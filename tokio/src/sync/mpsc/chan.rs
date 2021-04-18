@@ -263,6 +263,13 @@ impl<T, S: Semaphore> Rx<T, S> {
             }
         })
     }
+
+    /// Creates a [`Tx`] that will send to this [`Rx`].
+    pub(crate) fn tx(&self) -> Tx<T, S> {
+        let chan = self.inner.clone();
+        chan.tx_count.fetch_add(1, Relaxed);
+        Tx::new(chan)
+    }
 }
 
 impl<T, S: Semaphore> Drop for Rx<T, S> {

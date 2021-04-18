@@ -178,6 +178,28 @@ impl<T> UnboundedReceiver<T> {
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
+
+    /// Creates a [`UnboundedSender`] that can be used to send messages to this receiver.
+    ///
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (_tx, mut rx) = mpsc::unbounded_channel();
+    ///
+    ///     rx.sender().send("hello").unwrap();
+    ///     rx.sender().send("world").unwrap();
+    ///
+    ///     assert_eq!(Some("hello"), rx.recv().await);
+    ///     assert_eq!(Some("world"), rx.recv().await);
+    /// }
+    /// ```
+    pub fn sender(&self) -> UnboundedSender<T> {
+        UnboundedSender::new(self.chan.tx())
+    }
 }
 
 impl<T> UnboundedSender<T> {

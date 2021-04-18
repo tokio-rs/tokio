@@ -299,6 +299,28 @@ impl<T> Receiver<T> {
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
+
+    /// Creates a [`Sender`] that can be used to send messages to this receiver.
+    ///
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (_tx, mut rx) = mpsc::channel(100);
+    ///
+    ///     rx.sender().send("hello").await.unwrap();
+    ///     rx.sender().send("world").await.unwrap();
+    ///
+    ///     assert_eq!(Some("hello"), rx.recv().await);
+    ///     assert_eq!(Some("world"), rx.recv().await);
+    /// }
+    /// ```
+    pub fn sender(&self) -> Sender<T> {
+        Sender::new(self.chan.tx())
+    }
 }
 
 impl<T> fmt::Debug for Receiver<T> {
