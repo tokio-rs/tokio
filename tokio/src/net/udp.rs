@@ -381,6 +381,21 @@ impl UdpSocket {
         Ok(event.ready)
     }
 
+    /// Indicates to tokio that the requested state is no longer ready. The
+    /// internal readiness flag will be cleared, and tokio will wait for the
+    /// next edge-triggered readiness notification from the OS.
+    ///
+    /// It is critical that this function not be called unless your code
+    /// _actually observes_ that the requested state is _not_ ready. Do not call
+    /// it simply because, for example, a read succeeded; it should be called
+    /// when a read is observed to block.
+    ///
+    /// This function is only needed when working with async I/O operations outside
+    /// tokio since `try_send()` and `try_recv()` take care of it internally.
+    pub fn clear_ready(&self, interest: Interest) {
+        self.io.registration().clear_interest(interest);
+    }
+
     /// Wait for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is

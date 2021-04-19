@@ -205,6 +205,15 @@ impl Registration {
             res => res,
         }
     }
+
+    pub(crate) fn clear_interest(&self, interest: Interest) {
+        let ev = self.shared.ready_event(interest);
+
+        // No need to clear if it is already not ready
+        if !ev.ready.is_empty() {
+            self.shared.clear_readiness(ev);
+        }
+    }
 }
 
 impl Drop for Registration {
