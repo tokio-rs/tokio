@@ -50,7 +50,15 @@ an asynchronous application.
 
 ## Example
 
-A basic TCP echo server with Tokio:
+A basic TCP echo server with Tokio.
+
+Make sure you activated the full features of the tokio crate on Cargo.toml:
+
+```text
+[dependencies]
+tokio = { version = "1.5.0", features = ["full"] }
+```
+Then, on your main.rs:
 
 ```rust,no_run
 use tokio::net::TcpListener;

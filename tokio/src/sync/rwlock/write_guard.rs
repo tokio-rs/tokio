@@ -9,12 +9,13 @@ use std::ops;
 /// RAII structure used to release the exclusive write access of a lock when
 /// dropped.
 ///
-/// This structure is created by the [`write`] and method
+/// This structure is created by the [`write`] method
 /// on [`RwLock`].
 ///
 /// [`write`]: method@crate::sync::RwLock::write
 /// [`RwLock`]: struct@crate::sync::RwLock
 pub struct RwLockWriteGuard<'a, T: ?Sized> {
+    pub(super) permits_acquired: u32,
     pub(super) s: &'a Semaphore,
     pub(super) data: *mut T,
     pub(super) marker: marker::PhantomData<&'a mut T>,
@@ -64,9 +65,11 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     {
         let data = f(&mut *this) as *mut U;
         let s = this.s;
+        let permits_acquired = this.permits_acquired;
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
         RwLockMappedWriteGuard {
+            permits_acquired,
             s,
             data,
             marker: marker::PhantomData,
@@ -125,9 +128,11 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
             None => return Err(this),
         };
         let s = this.s;
+        let permits_acquired = this.permits_acquired;
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
         Ok(RwLockMappedWriteGuard {
+            permits_acquired,
             s,
             data,
             marker: marker::PhantomData,
@@ -185,7 +190,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         let RwLockWriteGuard { s, data, .. } = self;
 
         // Release all but one of the permits held by the write guard
-        s.release(super::MAX_READS - 1);
+        s.release((self.permits_acquired - 1) as usize);
         // NB: Forget to avoid drop impl from being called.
         mem::forget(self);
         RwLockReadGuard {
@@ -230,6 +235,6 @@ where
 
 impl<'a, T: ?Sized> Drop for RwLockWriteGuard<'a, T> {
     fn drop(&mut self) {
-        self.s.release(super::MAX_READS);
+        self.s.release(self.permits_acquired as usize);
     }
 }

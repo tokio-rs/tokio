@@ -48,7 +48,7 @@ cfg_rt! {
         /// since the function is executed outside of the runtime.
         /// Whereas `rt.block_on(async {delay_for(...).await})` doesn't panic.
         /// And this is because wrapping the function on an async makes it lazy,
-        /// and so gets executed inside the runtime successfuly without
+        /// and so gets executed inside the runtime successfully without
         /// panicking.
         pub(crate) fn current() -> Self {
             crate::runtime::context::time_handle()
@@ -73,7 +73,7 @@ cfg_not_rt! {
         /// since the function is executed outside of the runtime.
         /// Whereas `rt.block_on(async {delay_for(...).await})` doesn't
         /// panic. And this is because wrapping the function on an async makes it
-        /// lazy, and so outside executed inside the runtime successfuly without
+        /// lazy, and so outside executed inside the runtime successfully without
         /// panicking.
         pub(crate) fn current() -> Self {
             panic!(crate::util::error::CONTEXT_MISSING_ERROR)

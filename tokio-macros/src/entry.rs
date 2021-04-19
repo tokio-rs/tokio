@@ -1,7 +1,6 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::spanned::Spanned;
 
 #[derive(Clone, Copy, PartialEq)]
 enum RuntimeFlavor {
@@ -34,6 +33,7 @@ struct Configuration {
     flavor: Option<RuntimeFlavor>,
     worker_threads: Option<(usize, Span)>,
     start_paused: Option<(bool, Span)>,
+    is_test: bool,
 }
 
 impl Configuration {
@@ -47,6 +47,7 @@ impl Configuration {
             flavor: None,
             worker_threads: None,
             start_paused: None,
+            is_test,
         }
     }
 
@@ -92,16 +93,25 @@ impl Configuration {
         Ok(())
     }
 
+    fn macro_name(&self) -> &'static str {
+        if self.is_test {
+            "tokio::test"
+        } else {
+            "tokio::main"
+        }
+    }
+
     fn build(&self) -> Result<FinalConfig, syn::Error> {
         let flavor = self.flavor.unwrap_or(self.default_flavor);
         use RuntimeFlavor::*;
 
         let worker_threads = match (flavor, self.worker_threads) {
             (CurrentThread, Some((_, worker_threads_span))) => {
-                return Err(syn::Error::new(
-                    worker_threads_span,
-                    "The `worker_threads` option requires the `multi_thread` runtime flavor.",
-                ))
+                let msg = format!(
+                    "The `worker_threads` option requires the `multi_thread` runtime flavor. Use `#[{}(flavor = \"multi_thread\")]`",
+                    self.macro_name(),
+                );
+                return Err(syn::Error::new(worker_threads_span, msg));
             }
             (CurrentThread, None) => None,
             (Threaded, worker_threads) if self.rt_multi_thread_available => {
@@ -119,10 +129,11 @@ impl Configuration {
 
         let start_paused = match (flavor, self.start_paused) {
             (Threaded, Some((_, start_paused_span))) => {
-                return Err(syn::Error::new(
-                    start_paused_span,
-                    "The `start_paused` option requires the `current_thread` runtime flavor.",
-                ));
+                let msg = format!(
+                    "The `start_paused` option requires the `current_thread` runtime flavor. Use `#[{}(flavor = \"current_thread\")]`",
+                    self.macro_name(),
+                );
+                return Err(syn::Error::new(start_paused_span, msg));
             }
             (CurrentThread, Some((start_paused, _))) => Some(start_paused),
             (_, None) => None,
@@ -142,12 +153,12 @@ fn parse_int(int: syn::Lit, span: Span, field: &str) -> Result<usize, syn::Error
             Ok(value) => Ok(value),
             Err(e) => Err(syn::Error::new(
                 span,
-                format!("Failed to parse {} as integer: {}", field, e),
+                format!("Failed to parse value of `{}` as integer: {}", field, e),
             )),
         },
         _ => Err(syn::Error::new(
             span,
-            format!("Failed to parse {} as integer.", field),
+            format!("Failed to parse value of `{}` as integer.", field),
         )),
     }
 }
@@ -158,7 +169,7 @@ fn parse_string(int: syn::Lit, span: Span, field: &str) -> Result<String, syn::E
         syn::Lit::Verbatim(s) => Ok(s.to_string()),
         _ => Err(syn::Error::new(
             span,
-            format!("Failed to parse {} as string.", field),
+            format!("Failed to parse value of `{}` as string.", field),
         )),
     }
 }
@@ -168,7 +179,7 @@ fn parse_bool(bool: syn::Lit, span: Span, field: &str) -> Result<bool, syn::Erro
         syn::Lit::Bool(b) => Ok(b.value),
         _ => Err(syn::Error::new(
             span,
-            format!("Failed to parse {} as bool.", field),
+            format!("Failed to parse value of `{}` as bool.", field),
         )),
     }
 }
@@ -179,24 +190,13 @@ fn parse_knobs(
     is_test: bool,
     rt_multi_thread: bool,
 ) -> Result<TokenStream, syn::Error> {
-    let sig = &mut input.sig;
-    let body = &input.block;
-    let attrs = &input.attrs;
-    let vis = input.vis;
-
-    if sig.asyncness.is_none() {
-        let msg = "the async keyword is missing from the function declaration";
-        return Err(syn::Error::new_spanned(sig.fn_token, msg));
+    if input.sig.asyncness.take().is_none() {
+        let msg = "the `async` keyword is missing from the function declaration";
+        return Err(syn::Error::new_spanned(input.sig.fn_token, msg));
     }
 
-    sig.asyncness = None;
-
-    let macro_name = if is_test {
-        "tokio::test"
-    } else {
-        "tokio::main"
-    };
     let mut config = Configuration::new(is_test, rt_multi_thread);
+    let macro_name = config.macro_name();
 
     for arg in args {
         match arg {
@@ -208,20 +208,32 @@ fn parse_knobs(
                 }
                 match ident.unwrap().to_string().to_lowercase().as_str() {
                     "worker_threads" => {
-                        config.set_worker_threads(namevalue.lit.clone(), namevalue.span())?;
+                        config.set_worker_threads(
+                            namevalue.lit.clone(),
+                            syn::spanned::Spanned::span(&namevalue.lit),
+                        )?;
                     }
                     "flavor" => {
-                        config.set_flavor(namevalue.lit.clone(), namevalue.span())?;
+                        config.set_flavor(
+                            namevalue.lit.clone(),
+                            syn::spanned::Spanned::span(&namevalue.lit),
+                        )?;
                     }
                     "start_paused" => {
-                        config.set_start_paused(namevalue.lit.clone(), namevalue.span())?;
+                        config.set_start_paused(
+                            namevalue.lit.clone(),
+                            syn::spanned::Spanned::span(&namevalue.lit),
+                        )?;
                     }
                     "core_threads" => {
                         let msg = "Attribute `core_threads` is renamed to `worker_threads`";
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
                     name => {
-                        let msg = format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`", name);
+                        let msg = format!(
+                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`",
+                            name,
+                        );
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
                 }
@@ -281,26 +293,28 @@ fn parse_knobs(
         rt = quote! { #rt.start_paused(#v) };
     }
 
-    let header = {
-        if is_test {
-            quote! {
-                #[::core::prelude::v1::test]
-            }
-        } else {
-            quote! {}
+    let header = if is_test {
+        quote! {
+            #[::core::prelude::v1::test]
         }
+    } else {
+        quote! {}
     };
 
-    let result = quote! {
-        #header
-        #(#attrs)*
-        #vis #sig {
+    let body = &input.block;
+    input.block = syn::parse_quote! {
+        {
             #rt
                 .enable_all()
                 .build()
                 .unwrap()
                 .block_on(async #body)
         }
+    };
+
+    let result = quote! {
+        #header
+        #input
     };
 
     Ok(result.into())
@@ -332,13 +346,6 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
                 .to_compile_error()
                 .into();
         }
-    }
-
-    if !input.sig.inputs.is_empty() {
-        let msg = "the test function cannot accept arguments";
-        return syn::Error::new_spanned(&input.sig.inputs, msg)
-            .to_compile_error()
-            .into();
     }
 
     parse_knobs(input, args, true, rt_multi_thread).unwrap_or_else(|e| e.to_compile_error().into())

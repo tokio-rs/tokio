@@ -18,7 +18,7 @@ pub struct RwLockReadGuard<'a, T: ?Sized> {
     pub(super) marker: marker::PhantomData<&'a T>,
 }
 
-impl<'a, T> RwLockReadGuard<'a, T> {
+impl<'a, T: ?Sized> RwLockReadGuard<'a, T> {
     /// Make a new `RwLockReadGuard` for a component of the locked data.
     ///
     /// This operation cannot fail as the `RwLockReadGuard` passed in already

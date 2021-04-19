@@ -14,6 +14,13 @@ use std::sync::Arc;
 /// available, `acquire` (asynchronously) waits until an outstanding permit is
 /// dropped. At this point, the freed permit is assigned to the caller.
 ///
+/// This `Semaphore` is fair, which means that permits are given out in the order
+/// they were requested. This fairness is also applied when `acquire_many` gets
+/// involved, so if a call to `acquire_many` at the front of the queue requests
+/// more permits than currently available, this can prevent a call to `acquire`
+/// from completing, even if the semaphore has enough permits complete the call
+/// to `acquire`.
+///
 /// To use the `Semaphore` in a poll function, you can use the [`PollSemaphore`]
 /// utility.
 ///
@@ -279,6 +286,11 @@ impl Semaphore {
     /// ```
     pub fn close(&self) {
         self.ll_sem.close();
+    }
+
+    /// Returns true if the semaphore is closed
+    pub fn is_closed(&self) -> bool {
+        self.ll_sem.is_closed()
     }
 }
 

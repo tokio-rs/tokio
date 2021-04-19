@@ -1,3 +1,51 @@
+# 1.5.0 (April 12, 2021)
+
+### Added
+
+- io: add `AsyncSeekExt::stream_position` ([#3650])
+- io: add `AsyncWriteExt::write_vectored` ([#3678])
+- io: add a `copy_bidirectional` utility ([#3572])
+- net: implement `IntoRawFd` for `TcpSocket` ([#3684])
+- sync: add `OnceCell` ([#3591])
+- sync: add `OwnedRwLockReadGuard` and `OwnedRwLockWriteGuard` ([#3340])
+- sync: add `Semaphore::is_closed` ([#3673])
+- sync: add `mpsc::Sender::capacity` ([#3690])
+- sync: allow configuring `RwLock` max reads ([#3644])
+- task: add `sync_scope` for `LocalKey` ([#3612])
+
+### Fixed
+
+- chore: try to avoid `noalias` attributes on intrusive linked list ([#3654])
+- rt: fix panic in `JoinHandle::abort()` when called from other threads ([#3672])
+- sync: don't panic in `oneshot::try_recv` ([#3674])
+- sync: fix notifications getting dropped on receiver drop ([#3652])
+
+### Documented
+
+- io: clarify requirements of `AsyncFd` ([#3635])
+- runtime: fix unclear docs for `{Handle,Runtime}::block_on` ([#3628])
+- sync: document that `Semaphore` is fair ([#3693])
+- sync: improve doc on blocking mutex ([#3645])
+
+[#3340]: https://github.com/tokio-rs/tokio/pull/3340
+[#3572]: https://github.com/tokio-rs/tokio/pull/3572
+[#3591]: https://github.com/tokio-rs/tokio/pull/3591
+[#3612]: https://github.com/tokio-rs/tokio/pull/3612
+[#3628]: https://github.com/tokio-rs/tokio/pull/3628
+[#3635]: https://github.com/tokio-rs/tokio/pull/3635
+[#3644]: https://github.com/tokio-rs/tokio/pull/3644
+[#3645]: https://github.com/tokio-rs/tokio/pull/3645
+[#3650]: https://github.com/tokio-rs/tokio/pull/3650
+[#3652]: https://github.com/tokio-rs/tokio/pull/3652
+[#3654]: https://github.com/tokio-rs/tokio/pull/3654
+[#3672]: https://github.com/tokio-rs/tokio/pull/3672
+[#3673]: https://github.com/tokio-rs/tokio/pull/3673
+[#3674]: https://github.com/tokio-rs/tokio/pull/3674
+[#3678]: https://github.com/tokio-rs/tokio/pull/3678
+[#3684]: https://github.com/tokio-rs/tokio/pull/3684
+[#3690]: https://github.com/tokio-rs/tokio/pull/3690
+[#3693]: https://github.com/tokio-rs/tokio/pull/3693
+
 # 1.4.0 (March 20, 2021)
 
 ### Added

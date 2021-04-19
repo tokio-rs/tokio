@@ -681,35 +681,17 @@ impl Drop for Notified<'_> {
             let mut waiters = notify.waiters.lock();
             let mut notify_state = notify.state.load(SeqCst);
 
-            // `Notify.state` may be in any of the three states (Empty, Waiting,
-            // Notified). It doesn't actually matter what the atomic is set to
-            // at this point. We hold the lock and will ensure the atomic is in
-            // the correct state once the lock is dropped.
-            //
-            // Because the atomic state is not checked, at first glance, it may
-            // seem like this routine does not handle the case where the
-            // receiver is notified but has not yet observed the notification.
-            // If this happens, no matter how many notifications happen between
-            // this receiver being notified and the receive future dropping, all
-            // we need to do is ensure that one notification is returned back to
-            // the `Notify`. This is done by calling `notify_locked` if `self`
-            // has the `notified` flag set.
-
-            // remove the entry from the list
+            // remove the entry from the list (if not already removed)
             //
             // safety: the waiter is only added to `waiters` by virtue of it
             // being the only `LinkedList` available to the type.
             unsafe { waiters.remove(NonNull::new_unchecked(waiter.get())) };
 
             if waiters.is_empty() {
-                notify_state = set_state(notify_state, EMPTY);
-                // If the state *should* be `NOTIFIED`, the call to
-                // `notify_locked` below will end up doing the
-                // `store(NOTIFIED)`. If a concurrent receiver races and
-                // observes the incorrect `EMPTY` state, it will then obtain the
-                // lock and block until `notify.state` is in the correct final
-                // state.
-                notify.state.store(notify_state, SeqCst);
+                if let WAITING = get_state(notify_state) {
+                    notify_state = set_state(notify_state, EMPTY);
+                    notify.state.store(notify_state, SeqCst);
+                }
             }
 
             // See if the node was notified but not received. In this case, if

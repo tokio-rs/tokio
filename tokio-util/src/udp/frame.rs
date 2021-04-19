@@ -6,9 +6,12 @@ use tokio::{io::ReadBuf, net::UdpSocket};
 use bytes::{BufMut, BytesMut};
 use futures_core::ready;
 use futures_sink::Sink;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{
+    borrow::Borrow,
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+};
 use std::{io, mem::MaybeUninit};
 
 /// A unified [`Stream`] and [`Sink`] interface to an underlying `UdpSocket`, using
@@ -34,8 +37,8 @@ use std::{io, mem::MaybeUninit};
 #[must_use = "sinks do nothing unless polled"]
 #[cfg_attr(docsrs, doc(all(feature = "codec", feature = "udp")))]
 #[derive(Debug)]
-pub struct UdpFramed<C> {
-    socket: UdpSocket,
+pub struct UdpFramed<C, T = UdpSocket> {
+    socket: T,
     codec: C,
     rd: BytesMut,
     wr: BytesMut,
@@ -48,7 +51,13 @@ pub struct UdpFramed<C> {
 const INITIAL_RD_CAPACITY: usize = 64 * 1024;
 const INITIAL_WR_CAPACITY: usize = 8 * 1024;
 
-impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
+impl<C, T> Unpin for UdpFramed<C, T> {}
+
+impl<C, T> Stream for UdpFramed<C, T>
+where
+    T: Borrow<UdpSocket>,
+    C: Decoder,
+{
     type Item = Result<(C::Item, SocketAddr), C::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -79,7 +88,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
                 let buf = &mut *(pin.rd.chunk_mut() as *mut _ as *mut [MaybeUninit<u8>]);
                 let mut read = ReadBuf::uninit(buf);
                 let ptr = read.filled().as_ptr();
-                let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, &mut read));
+                let res = ready!(pin.socket.borrow().poll_recv_from(cx, &mut read));
 
                 assert_eq!(ptr, read.filled().as_ptr());
                 let addr = res?;
@@ -93,7 +102,11 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
     }
 }
 
-impl<I, C: Encoder<I> + Unpin> Sink<(I, SocketAddr)> for UdpFramed<C> {
+impl<I, C, T> Sink<(I, SocketAddr)> for UdpFramed<C, T>
+where
+    T: Borrow<UdpSocket>,
+    C: Encoder<I>,
+{
     type Error = C::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -125,13 +138,13 @@ impl<I, C: Encoder<I> + Unpin> Sink<(I, SocketAddr)> for UdpFramed<C> {
         }
 
         let Self {
-            ref mut socket,
+            ref socket,
             ref mut out_addr,
             ref mut wr,
             ..
         } = *self;
 
-        let n = ready!(socket.poll_send_to(cx, &wr, *out_addr))?;
+        let n = ready!(socket.borrow().poll_send_to(cx, &wr, *out_addr))?;
 
         let wrote_all = n == self.wr.len();
         self.wr.clear();
@@ -156,11 +169,14 @@ impl<I, C: Encoder<I> + Unpin> Sink<(I, SocketAddr)> for UdpFramed<C> {
     }
 }
 
-impl<C> UdpFramed<C> {
+impl<C, T> UdpFramed<C, T>
+where
+    T: Borrow<UdpSocket>,
+{
     /// Create a new `UdpFramed` backed by the given socket and codec.
     ///
     /// See struct level documentation for more details.
-    pub fn new(socket: UdpSocket, codec: C) -> UdpFramed<C> {
+    pub fn new(socket: T, codec: C) -> UdpFramed<C, T> {
         Self {
             socket,
             codec,
@@ -180,25 +196,19 @@ impl<C> UdpFramed<C> {
     /// Care should be taken to not tamper with the underlying stream of data
     /// coming in as it may corrupt the stream of frames otherwise being worked
     /// with.
-    pub fn get_ref(&self) -> &UdpSocket {
+    pub fn get_ref(&self) -> &T {
         &self.socket
     }
 
-    /// Returns a mutable reference to the underlying I/O stream wrapped by
-    /// `Framed`.
+    /// Returns a mutable reference to the underlying I/O stream wrapped by `Framed`.
     ///
     /// # Note
     ///
     /// Care should be taken to not tamper with the underlying stream of data
     /// coming in as it may corrupt the stream of frames otherwise being worked
     /// with.
-    pub fn get_mut(&mut self) -> &mut UdpSocket {
+    pub fn get_mut(&mut self) -> &mut T {
         &mut self.socket
-    }
-
-    /// Consumes the `Framed`, returning its underlying I/O stream.
-    pub fn into_inner(self) -> UdpSocket {
-        self.socket
     }
 
     /// Returns a reference to the underlying codec wrapped by
@@ -227,5 +237,10 @@ impl<C> UdpFramed<C> {
     /// Returns a mutable reference to the read buffer.
     pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
         &mut self.rd
+    }
+
+    /// Consumes the `Framed`, returning its underlying I/O stream.
+    pub fn into_inner(self) -> T {
+        self.socket
     }
 }
