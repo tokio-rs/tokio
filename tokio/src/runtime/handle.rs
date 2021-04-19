@@ -144,13 +144,15 @@ impl Handle {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        if self.is_shutdown() {
-            return JoinHandle::new_dropped_runtime();
-        }
-
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task");
-        self.spawner.spawn(future)
+        let join_handle = self.spawner.spawn(future);
+
+        if self.is_shutdown() {
+            JoinHandle::new_dropped_runtime()
+        } else {
+            join_handle
+        }
     }
 
     /// Run the provided function on an executor dedicated to blocking
