@@ -2,11 +2,12 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
-use crate::loom::thread;
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
 
+use crate::park::thread::CachedParkThread;
+use crate::park::Park;
 use std::fmt;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
@@ -57,6 +58,8 @@ struct Chan<T, S> {
 
     /// Receiver waker. Notified when a value is pushed into the channel.
     rx_waker: AtomicWaker,
+
+    not_ready_waker: AtomicWaker,
 
     /// Tracks the number of outstanding sender handles.
     ///
@@ -111,6 +114,7 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
         tx,
         semaphore,
         rx_waker: AtomicWaker::new(),
+        not_ready_waker: AtomicWaker::new(),
         tx_count: AtomicUsize::new(1),
         rx_fields: UnsafeCell::new(RxFields {
             list: rx,
@@ -271,20 +275,36 @@ impl<T, S: Semaphore> Rx<T, S> {
     /// Receives the next value without blocking
     pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
         use super::block::Read::*;
-
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
-            loop {
-                match rx_fields.list.pop(&self.inner.tx) {
-                    Some(Value(value)) => {
-                        self.inner.semaphore.add_permit();
-                        return Ok(value);
+
+            macro_rules! try_recv {
+                ($when_not_ready:expr) => {
+                    match rx_fields.list.pop(&self.inner.tx) {
+                        Some(Value(value)) => {
+                            self.inner.semaphore.add_permit();
+                            return Ok(value);
+                        }
+                        Some(Closed) => return Err(TryRecvError::Closed),
+                        Some(NotReady) => $when_not_ready,
+                        None => return Err(TryRecvError::Empty),
                     }
-                    Some(Closed) => return Err(TryRecvError::Closed),
-                    Some(NotReady) => thread::yield_now(),
-                    None => return Err(TryRecvError::Empty),
-                }
+                };
             }
+
+            // If we get NotReady, we:
+            // 1. Register a waker
+            // 2. Check again whether the value is ready
+            // 3. Park until we get woken up by the producer, setting a slot to ready
+            try_recv!({
+                let mut park = CachedParkThread::new();
+                let waker = park.unpark().into_waker();
+                loop {
+                    self.inner.not_ready_waker.register_by_ref(&waker);
+                    try_recv!({});
+                    park.park().expect("park failed");
+                }
+            })
         })
     }
 }
@@ -312,8 +332,9 @@ impl<T, S> Chan<T, S> {
         // Push the value
         self.tx.push(value);
 
-        // Notify the rx task
+        // Notify the rx tasks
         self.rx_waker.wake();
+        self.not_ready_waker.wake();
     }
 }
 
