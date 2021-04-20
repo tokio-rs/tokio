@@ -10,10 +10,10 @@ cfg_io_driver! {
     /// [`std::io::Write`] traits with the reactor that drives it.
     ///
     /// `PollEvented` uses [`Registration`] internally to take a type that
-    /// implements [`mio::Evented`] as well as [`std::io::Read`] and or
+    /// implements [`mio::event::Source`] as well as [`std::io::Read`] and or
     /// [`std::io::Write`] and associate it with a reactor that will drive it.
     ///
-    /// Once the [`mio::Evented`] type is wrapped by `PollEvented`, it can be
+    /// Once the [`mio::event::Source`] type is wrapped by `PollEvented`, it can be
     /// used from within the future's execution model. As such, the
     /// `PollEvented` type provides [`AsyncRead`] and [`AsyncWrite`]
     /// implementations using the underlying I/O resource as well as readiness
@@ -56,7 +56,6 @@ cfg_io_driver! {
     ///
     /// [`AsyncRead`]: trait@AsyncRead
     /// [`AsyncWrite`]: trait@AsyncWrite
-    /// [`mio::Evented`]: trait@mio::Evented
     /// [`Registration`]: struct@Registration
     /// [`TcpListener`]: struct@crate::net::TcpListener
     /// [`clear_read_ready`]: method@Self::clear_read_ready
