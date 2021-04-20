@@ -54,8 +54,8 @@ cfg_io_driver! {
     /// These events are included as part of the read readiness event stream. The
     /// write readiness event stream is only for `Ready::writable()` events.
     ///
-    /// [`AsyncRead`]: trait@AsyncRead
-    /// [`AsyncWrite`]: trait@AsyncWrite
+    /// [`AsyncRead`]: crate::io::AsyncRead
+    /// [`AsyncWrite`]: crate::io::AsyncWrite
     /// [`Registration`]: struct@Registration
     /// [`TcpListener`]: struct@crate::net::TcpListener
     /// [`clear_read_ready`]: method@Self::clear_read_ready
