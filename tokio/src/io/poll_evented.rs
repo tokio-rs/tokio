@@ -54,8 +54,6 @@ cfg_io_driver! {
     /// These events are included as part of the read readiness event stream. The
     /// write readiness event stream is only for `Ready::writable()` events.
     ///
-    /// [`std::io::Read`]: trait@std::io::Read
-    /// [`std::io::Write`]: trait@std::io::Write
     /// [`AsyncRead`]: trait@AsyncRead
     /// [`AsyncWrite`]: trait@AsyncWrite
     /// [`mio::Evented`]: trait@mio::Evented
