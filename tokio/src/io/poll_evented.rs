@@ -56,8 +56,7 @@ cfg_io_driver! {
     ///
     /// [`AsyncRead`]: crate::io::AsyncRead
     /// [`AsyncWrite`]: crate::io::AsyncWrite
-    /// [`Registration`]: struct@Registration
-    /// [`TcpListener`]: struct@crate::net::TcpListener
+    /// [`TcpListener`]: crate::net::TcpListener
     /// [`clear_read_ready`]: method@Self::clear_read_ready
     /// [`clear_write_ready`]: method@Self::clear_write_ready
     /// [`poll_read_ready`]: method@Self::poll_read_ready
