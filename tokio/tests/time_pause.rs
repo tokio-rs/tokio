@@ -79,9 +79,8 @@ async fn paused_time_stress_run() -> Vec<Duration> {
     times
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn advance_after_poll() {
-    time::pause();
 
     time::sleep(ms(1)).await;
 
@@ -242,10 +241,7 @@ async fn interval() {
 
 fn poll_next(interval: &mut task::Spawn<time::Interval>) -> Poll<Instant> {
     interval.enter(|cx, mut interval| {
-        tokio::pin! {
-            let fut = interval.tick();
-        }
-        fut.poll(cx)
+        interval.poll_tick(cx)
     })
 }
 
