@@ -98,7 +98,6 @@ async fn advance_after_poll() {
 
 #[tokio::test(start_paused = true)]
 async fn sleep_no_poll() {
-
     let start = Instant::now();
 
     // TODO: Skip this
@@ -160,7 +159,6 @@ impl Future for Tester {
 
 #[tokio::test(start_paused = true)]
 async fn sleep_same_task() {
-
     let start = Instant::now();
 
     // TODO: Skip this
@@ -179,7 +177,6 @@ async fn sleep_same_task() {
 
 #[tokio::test(start_paused = true)]
 async fn sleep_same_task_no_poll() {
-
     let start = Instant::now();
 
     // TODO: Skip this
@@ -198,7 +195,6 @@ async fn sleep_same_task_no_poll() {
 
 #[tokio::test(start_paused = true)]
 async fn interval() {
-
     let start = Instant::now();
 
     // TODO: Skip this
