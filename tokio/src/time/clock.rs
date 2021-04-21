@@ -120,22 +120,11 @@ cfg_test_util! {
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub async fn advance(duration: Duration) {
-        use crate::future::poll_fn;
-        use std::task::Poll;
-
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let until = clock.now() + duration;
         clock.advance(duration);
 
-        let mut yielded = false;
-        poll_fn(|cx| {
-            if yielded {
-                Poll::Ready(())
-            } else {
-                yielded = true;
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        }).await;
+        crate::time::sleep_until(until).await;
     }
 
     /// Return the current instant, factoring in frozen time.
