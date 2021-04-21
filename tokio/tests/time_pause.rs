@@ -96,9 +96,8 @@ async fn advance_after_poll() {
     assert_pending!(sleep.poll());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn sleep_no_poll() {
-    time::pause();
 
     let start = Instant::now();
 
@@ -159,9 +158,8 @@ impl Future for Tester {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn sleep_same_task() {
-    time::pause();
 
     let start = Instant::now();
 
@@ -179,9 +177,8 @@ async fn sleep_same_task() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn sleep_same_task_no_poll() {
-    time::pause();
 
     let start = Instant::now();
 
@@ -199,9 +196,8 @@ async fn sleep_same_task_no_poll() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn interval() {
-    time::pause();
 
     let start = Instant::now();
 
