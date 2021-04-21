@@ -180,7 +180,8 @@ unsafe impl<T> Send for Mutex<T> where T: ?Sized + Send {}
 unsafe impl<T> Sync for Mutex<T> where T: ?Sized + Send {}
 unsafe impl<T> Sync for MutexGuard<'_, T> where T: ?Sized + Send + Sync {}
 unsafe impl<T> Sync for OwnedMutexGuard<T> where T: ?Sized + Send + Sync {}
-unsafe impl<T> Sync for MappedMutexGuard<'_, T> where T: ?Sized + Send + Sync {}
+unsafe impl<'a, T> Sync for MappedMutexGuard<'a, T> where T: ?Sized + Sync + 'a {}
+unsafe impl<'a, T> Send for MappedMutexGuard<'a, T> where T: ?Sized + Send + 'a {}
 
 /// Error returned from the [`Mutex::try_lock`], [`RwLock::try_read`] and
 /// [`RwLock::try_write`] functions.
