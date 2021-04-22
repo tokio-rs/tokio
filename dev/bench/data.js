@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1619091360696,
+  "lastUpdate": 1619091399559,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26011,6 +26011,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20228907,
             "range": "± 3922397",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50183564+nylonicious@users.noreply.github.com",
+            "name": "Nylonicious",
+            "username": "nylonicious"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e2f893da2f33deef7fb7c6dc62b265f454c4456",
+          "message": "chore: fix some clippy lints (#3720)",
+          "timestamp": "2021-04-22T13:33:42+02:00",
+          "tree_id": "194649a927b773ed79c6f9a7cbd64c14312ce52c",
+          "url": "https://github.com/tokio-rs/tokio/commit/1e2f893da2f33deef7fb7c6dc62b265f454c4456"
+        },
+        "date": 1619091395982,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 200292,
+            "range": "± 25357",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 737085,
+            "range": "± 88514",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5364143,
+            "range": "± 1297363",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20690671,
+            "range": "± 3843276",
             "unit": "ns/iter"
           }
         ]
