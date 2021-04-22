@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1619091338809,
+  "lastUpdate": 1619091354469,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13715,6 +13715,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 493,
             "range": "± 12",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50183564+nylonicious@users.noreply.github.com",
+            "name": "Nylonicious",
+            "username": "nylonicious"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e2f893da2f33deef7fb7c6dc62b265f454c4456",
+          "message": "chore: fix some clippy lints (#3720)",
+          "timestamp": "2021-04-22T13:33:42+02:00",
+          "tree_id": "194649a927b773ed79c6f9a7cbd64c14312ce52c",
+          "url": "https://github.com/tokio-rs/tokio/commit/1e2f893da2f33deef7fb7c6dc62b265f454c4456"
+        },
+        "date": 1619091351502,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1036,
+            "range": "± 107",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 17542,
+            "range": "± 7965",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 998,
+            "range": "± 191",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16902,
+            "range": "± 6324",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 557,
+            "range": "± 104",
             "unit": "ns/iter"
           }
         ]
