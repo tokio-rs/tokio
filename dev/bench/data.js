@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1619091354469,
+  "lastUpdate": 1619091360696,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -61091,6 +61091,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 856012,
             "range": "± 18961",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50183564+nylonicious@users.noreply.github.com",
+            "name": "Nylonicious",
+            "username": "nylonicious"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e2f893da2f33deef7fb7c6dc62b265f454c4456",
+          "message": "chore: fix some clippy lints (#3720)",
+          "timestamp": "2021-04-22T13:33:42+02:00",
+          "tree_id": "194649a927b773ed79c6f9a7cbd64c14312ce52c",
+          "url": "https://github.com/tokio-rs/tokio/commit/1e2f893da2f33deef7fb7c6dc62b265f454c4456"
+        },
+        "date": 1619091357832,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6004243,
+            "range": "± 2400925",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5776001,
+            "range": "± 1736739",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5635734,
+            "range": "± 2440908",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 654,
+            "range": "± 29",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 650,
+            "range": "± 32",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 655,
+            "range": "± 18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 72276,
+            "range": "± 2309",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1279,
+            "range": "± 35",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 972692,
+            "range": "± 2289",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 693875,
+            "range": "± 3180",
             "unit": "ns/iter"
           }
         ]
