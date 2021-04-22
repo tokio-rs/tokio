@@ -188,9 +188,10 @@ impl AtomicWaker {
                     // any future calls to register will incorrectly be stuck
                     // believing it's being updated by someone else.
                     let guard = PanicGuard(&self.state);
-                    // Locked acquired, update the waker cell
-                    self.waker.with_mut(|t| *t = Some(waker.into_waker()));
+                    let new_waker = waker.into_waker();
                     std::mem::forget(guard);
+                    // Locked acquired, update the waker cell
+                    self.waker.with_mut(|t| *t = Some(new_waker));
 
                     // Release the lock. If the state transitioned to include
                     // the `WAKING` bit, this means that a wake has been
