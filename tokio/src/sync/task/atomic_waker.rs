@@ -184,10 +184,9 @@ impl AtomicWaker {
                 unsafe {
                     // If `into_waker` panics (because it's code outside of
                     // AtomicWaker) we need to prime a guard that is called on
-                    // unwind restore the waker to a WAITING state. Otherwise
-                    // any future calls to register will incorrectly be stuck in
-                    // a state where it believes it's being updated by someone
-                    // else.
+                    // unwind to restore the waker to a WAITING state. Otherwise
+                    // any future calls to register will incorrectly be stuck
+                    // believing it's being updated by someone else.
                     let guard = PanicGuard(&self.state);
                     // Locked acquired, update the waker cell
                     self.waker.with_mut(|t| *t = Some(waker.into_waker()));
