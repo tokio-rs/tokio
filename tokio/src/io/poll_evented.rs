@@ -40,13 +40,13 @@ cfg_io_driver! {
     /// [`poll_read_ready`] again will also indicate read readiness.
     ///
     /// When the operation is attempted and is unable to succeed due to the I/O
-    /// resource not being ready, the caller must call [`clear_read_ready`] or
-    /// [`clear_write_ready`]. This clears the readiness state until a new
+    /// resource not being ready, the caller must call `clear_read_ready` or
+    /// `clear_write_ready`. This clears the readiness state until a new
     /// readiness event is received.
     ///
     /// This allows the caller to implement additional functions. For example,
     /// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
-    /// [`clear_read_ready`].
+    /// `clear_read_ready`.
     ///
     /// ## Platform-specific events
     ///
@@ -57,10 +57,8 @@ cfg_io_driver! {
     /// [`AsyncRead`]: crate::io::AsyncRead
     /// [`AsyncWrite`]: crate::io::AsyncWrite
     /// [`TcpListener`]: crate::net::TcpListener
-    /// [`clear_read_ready`]: method@Self::clear_read_ready
-    /// [`clear_write_ready`]: method@Self::clear_write_ready
-    /// [`poll_read_ready`]: method@Self::poll_read_ready
-    /// [`poll_write_ready`]: method@Self::poll_write_ready
+    /// [`poll_read_ready`]: Registration::poll_read_ready
+    /// [`poll_write_ready`]: Registration::poll_write_ready
     pub(crate) struct PollEvented<E: Source> {
         io: Option<E>,
         registration: Registration,
