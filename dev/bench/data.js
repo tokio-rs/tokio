@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1619191674417,
+  "lastUpdate": 1619191690952,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26113,6 +26113,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20690671,
             "range": "± 3843276",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sunjay@users.noreply.github.com",
+            "name": "Sunjay Varma",
+            "username": "sunjay"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0ba1e3c3e1a597b55998e3e99ebe98db1bb629bd",
+          "message": "sync: add a MutexGuard::map method that returns a MappedMutexGuard (#2472)",
+          "timestamp": "2021-04-23T17:26:02+02:00",
+          "tree_id": "8a6b2361d8697dbf78a5ed1dd161aecb23690719",
+          "url": "https://github.com/tokio-rs/tokio/commit/0ba1e3c3e1a597b55998e3e99ebe98db1bb629bd"
+        },
+        "date": 1619191687769,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 201784,
+            "range": "± 3997",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 764054,
+            "range": "± 70636",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5859413,
+            "range": "± 1076858",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21640401,
+            "range": "± 3580865",
             "unit": "ns/iter"
           }
         ]
