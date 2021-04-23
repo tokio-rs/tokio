@@ -5,7 +5,7 @@ use crate::loom::sync::atomic::{self, AtomicUsize};
 
 use std::fmt;
 use std::panic::{RefUnwindSafe, UnwindSafe};
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, SeqCst};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Waker;
 
 /// A synchronization primitive for task waking.
