@@ -264,7 +264,7 @@ impl AtomicWaker {
                 // to replace the atomic waker, so it's a legitimate outcome
                 // that the net effect of the operation is a no-op (i.e. no
                 // wakeup was issued).
-                self.0.swap(WAITING, AcqRel);
+                self.0.store(WAITING, AcqRel);
             }
         }
     }
