@@ -5,7 +5,7 @@ use crate::loom::sync::atomic::{self, AtomicUsize};
 
 use std::fmt;
 use std::panic::{RefUnwindSafe, UnwindSafe};
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, SeqCst};
 use std::task::Waker;
 
 /// A synchronization primitive for task waking.
@@ -260,11 +260,10 @@ impl AtomicWaker {
 
         impl Drop for PanicGuard<'_> {
             fn drop(&mut self) {
-                // On panics, we restore straight back to WAITING. We just tried
-                // to replace the atomic waker, so it's a legitimate outcome
-                // that the net effect of the operation is a no-op (i.e. no
-                // wakeup was issued).
-                self.0.store(WAITING, Release);
+                // On panics, we want to unset the REGISTERING state which will
+                // preserve any potential WAKING state for future calls to
+                // register.
+                let _ = self.0.fetch_and(!REGISTERING, AcqRel);
             }
         }
     }
