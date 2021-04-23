@@ -52,12 +52,10 @@
 //! # }
 //! ```
 //!
-//! A simple example using [`interval`](self::interval::interval) to execute
-//! a task every two seconds.
+//! A simple example using [`interval`] to execute a task every two seconds.
 //!
-//! The difference between [`interval`](self::interval::interval) and
-//! [`sleep`] is that an [`interval`](self::interval::interval) measures
-//! the time since the last tick, which means that `.tick().await` may
+//! The difference between [`interval`] and [`sleep`] is that an [`interval`]
+//! measures the time since the last tick, which means that `.tick().await` may
 //! wait for a shorter time than the duration specified for the interval
 //! if some time has passed between calls to `.tick().await`.
 //!
@@ -82,6 +80,8 @@
 //!     }
 //! }
 //! ```
+//!
+//! [`interval`]: crate::time::interval()
 
 mod clock;
 pub(crate) use self::clock::Clock;

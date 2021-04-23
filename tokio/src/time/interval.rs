@@ -254,16 +254,16 @@ pub enum MissedTickBehavior {
     /// versions of Tokio.
     Burst,
 
-    /// Delay missed ticks to happen at multiples of [`period`] from when
+    /// Delay missed ticks to happen at multiples of `period` from when
     /// [`Interval`] regained control.
     ///
     /// When this strategy is used, after regaining control, [`Interval`] ticks
     /// immediately, then schedules all future ticks to happen at a regular
-    /// [`period`] from the point when [`Interval`] regained control.
+    /// `period` from the point when [`Interval`] regained control.
     /// [`tick`] yields immediately with an [`Instant`] that represents the time
     /// that the tick should have happened. All subsequent calls to
     /// [`tick`] yield an [`Instant`] that is a multiple of
-    /// [`period`] away from the point that [`Interval`] regained control.
+    /// `period` away from the point that [`Interval`] regained control.
     ///
     /// This would look something like this:
     /// ```text
@@ -280,20 +280,19 @@ pub enum MissedTickBehavior {
     /// ```
     ///
     /// Note that as a result, the ticks are no longer guaranteed to happen at
-    /// a multiple of [`period`] from `delay`.
+    /// a multiple of `period` from `delay`.
     ///
-    /// [`period`]: Interval::period
     /// [`tick`]: Interval::tick
     Delay,
 
-    /// Skip the missed ticks and tick on the next multiple of [`period`].
+    /// Skip the missed ticks and tick on the next multiple of `period`.
     ///
     /// When this strategy is used, after regaining control, [`Interval`] ticks
     /// immediately, then schedules the next tick on the closest multiple of
-    /// [`period`] from `delay`. Thus, the yielded value from
+    /// `period` from `delay`. Thus, the yielded value from
     /// [`tick`](Interval::tick) is an [`Instant`] that is some multiple of
-    /// [`period`] from `start`. However, that yielded [`Instant`] is not
-    /// guarenteed to be exactly one multiple of [`period`] from the tick that
+    /// `period` from `start`. However, that yielded [`Instant`] is not
+    /// guarenteed to be exactly one multiple of `period` from the tick that
     /// got blocked.
     ///
     /// This would look something like this:
@@ -308,8 +307,6 @@ pub enum MissedTickBehavior {
     //                                                                              Ready(s + 6p)
     // * Where `s` is the start time and `p` is the period
     /// ```
-    ///
-    /// [`period`]: Interval::period
     Skip,
 }
 
