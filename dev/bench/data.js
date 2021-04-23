@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1619091399559,
+  "lastUpdate": 1619191674417,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13769,6 +13769,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 557,
             "range": "± 104",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sunjay@users.noreply.github.com",
+            "name": "Sunjay Varma",
+            "username": "sunjay"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0ba1e3c3e1a597b55998e3e99ebe98db1bb629bd",
+          "message": "sync: add a MutexGuard::map method that returns a MappedMutexGuard (#2472)",
+          "timestamp": "2021-04-23T17:26:02+02:00",
+          "tree_id": "8a6b2361d8697dbf78a5ed1dd161aecb23690719",
+          "url": "https://github.com/tokio-rs/tokio/commit/0ba1e3c3e1a597b55998e3e99ebe98db1bb629bd"
+        },
+        "date": 1619191671326,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 769,
+            "range": "± 359",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14360,
+            "range": "± 4916",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 937,
+            "range": "± 507",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14356,
+            "range": "± 6642",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 470,
+            "range": "± 74",
             "unit": "ns/iter"
           }
         ]
