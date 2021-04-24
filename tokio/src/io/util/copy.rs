@@ -16,12 +16,16 @@ pub(super) struct CopyBuffer {
 
 impl CopyBuffer {
     pub(super) fn new() -> Self {
+        CopyBuffer::with_buffer_size(2048)
+    }
+
+    pub(super) fn with_buffer_size(size: usize) -> Self {
         Self {
             read_done: false,
             pos: 0,
             cap: 0,
             amt: 0,
-            buf: vec![0; 2048].into_boxed_slice(),
+            buf: vec![0; size].into_boxed_slice(),
         }
     }
 
