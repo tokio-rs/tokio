@@ -16,10 +16,10 @@ pub(super) struct CopyBuffer {
 
 impl CopyBuffer {
     pub(super) fn new() -> Self {
-        CopyBuffer::with_buffer_size(2048)
+        CopyBuffer::with_size(2048)
     }
 
-    pub(super) fn with_buffer_size(size: usize) -> Self {
+    pub(super) fn with_size(size: usize) -> Self {
         Self {
             read_done: false,
             pos: 0,
