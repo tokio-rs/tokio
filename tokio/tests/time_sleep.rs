@@ -7,8 +7,7 @@ use std::task::Context;
 use futures::task::noop_waker_ref;
 
 use tokio::time::{self, Duration, Instant};
-use tokio_test::{assert_pending, assert_ready, assert_elapsed, task};
-
+use tokio_test::{assert_elapsed, assert_pending, assert_ready, task};
 
 #[tokio::test]
 async fn immediate_sleep() {

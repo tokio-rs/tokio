@@ -4,7 +4,7 @@
 use rand::SeedableRng;
 use rand::{rngs::StdRng, Rng};
 use tokio::time::{self, Duration, Instant, Sleep};
-use tokio_test::{assert_err, assert_pending, assert_ready_eq, assert_elapsed, task};
+use tokio_test::{assert_elapsed, assert_err, assert_pending, assert_ready_eq, task};
 
 use std::{
     future::Future,
