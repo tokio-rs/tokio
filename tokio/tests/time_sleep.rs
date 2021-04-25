@@ -18,7 +18,7 @@ async fn immediate_sleep() {
 
     // Ready!
     time::sleep_until(now).await;
-    assert_elapsed!(now, 1);
+    assert_elapsed!(now, ms(1));
 }
 
 #[tokio::test]
