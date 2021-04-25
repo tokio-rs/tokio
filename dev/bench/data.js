@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1619334321758,
+  "lastUpdate": 1619334330466,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26215,6 +26215,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21640401,
             "range": "± 3580865",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "73466f4b6cee544f7ab8519e7e77010b2d4d0800",
+          "message": "task: update JoinHandle panic message (#3727)",
+          "timestamp": "2021-04-25T09:03:14+02:00",
+          "tree_id": "e8e3c699a4878e3a7375a010ca04a229f57682ad",
+          "url": "https://github.com/tokio-rs/tokio/commit/73466f4b6cee544f7ab8519e7e77010b2d4d0800"
+        },
+        "date": 1619334326209,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 210109,
+            "range": "± 48811",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 736049,
+            "range": "± 163936",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5299148,
+            "range": "± 1363439",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20335711,
+            "range": "± 3680344",
             "unit": "ns/iter"
           }
         ]
