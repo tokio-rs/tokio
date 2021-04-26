@@ -87,7 +87,7 @@ pub(super) struct StateCell {
     /// Holds either the scheduled expiration time for this timer, or (if the
     /// timer has been fired and is unregistered), [`u64::max_value()`].
     ///
-    /// [`u64::max_value()`]: prim@u64::max_value
+    /// [`u64::max_value`]: prim@u64::max_value
     state: AtomicU64,
     /// If the timer is fired (an Acquire order read on state shows
     /// `u64::max_value()`), holds the result that should be returned from
