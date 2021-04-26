@@ -271,6 +271,42 @@ impl<T> Receiver<T> {
         }
     }
 
+    /// Synchronizes the local version counter with the shared one.
+    ///
+    /// This can be useful in situations where the receiver has been cloned from
+    /// one whose local version counter is outdated. In this case, it may return
+    /// values already received by other receivers, which is not always the desired
+    /// behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = watch::channel(0);
+    ///     tokio::spawn(async move {
+    ///         tx.send(1).unwrap();
+    ///         sleep(Duration::from_millis(50)).await;
+    ///         tx.send(2).unwrap();
+    ///     });
+    ///
+    ///     let mut rx2 = rx.clone();
+    ///     rx2.changed().await.unwrap();
+    ///     assert_eq!(1, *rx2.borrow());
+    ///
+    ///     let mut rx2 = rx.clone();
+    ///     rx2.sync_version();
+    ///     rx2.changed().await.unwrap();
+    ///     assert_eq!(2, *rx2.borrow());
+    /// }
+    /// ```
+    pub fn sync_version(&mut self) {
+        self.version = self.shared.version.load(SeqCst);
+    }
+
     cfg_process_driver! {
         pub(crate) fn try_has_changed(&mut self) -> Option<Result<(), error::RecvError>> {
             maybe_changed(&self.shared, &mut self.version)
