@@ -281,7 +281,7 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::sync::watch;
+    /// use tokio::{sync::watch, time::sleep};
     /// use std::time::Duration;
     ///
     /// #[tokio::main]
