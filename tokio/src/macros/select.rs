@@ -154,7 +154,7 @@
 /// `select!` panics if all branches are disabled **and** there is no provided
 /// `else` branch. A branch is disabled when the provided `if` precondition
 /// returns `false` **or** when the pattern does not match the result of `<async
-/// expression>.
+/// expression>`.
 ///
 /// # Examples
 ///
