@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1619529916244,
+  "lastUpdate": 1619529919740,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13877,6 +13877,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 558,
             "range": "± 90",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "st4ck0v3rfl0w@gmail.com",
+            "name": "kamulos",
+            "username": "kamulos"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ce9697f2a24d6c407a518a3a0b68c9db11e72ad3",
+          "message": "doc: fix missing backtick in select doc (#3732)",
+          "timestamp": "2021-04-27T22:23:03+09:00",
+          "tree_id": "e2b8685175f4a6ce58850ecc51d105ecd28002c5",
+          "url": "https://github.com/tokio-rs/tokio/commit/ce9697f2a24d6c407a518a3a0b68c9db11e72ad3"
+        },
+        "date": 1619529907005,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 985,
+            "range": "± 144",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16658,
+            "range": "± 5223",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1028,
+            "range": "± 122",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16424,
+            "range": "± 6198",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 561,
+            "range": "± 83",
             "unit": "ns/iter"
           }
         ]
