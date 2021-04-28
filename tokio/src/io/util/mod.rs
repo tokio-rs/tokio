@@ -25,7 +25,7 @@ cfg_io_util! {
     mod chain;
 
     mod copy;
-    pub use copy::copy;
+    pub use copy::{copy, copy_with_buffer_size};
 
     mod copy_bidirectional;
     pub use copy_bidirectional::copy_bidirectional;

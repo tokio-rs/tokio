@@ -135,6 +135,53 @@ cfg_io_util! {
             buf: CopyBuffer::new()
         }.await
     }
+
+    /// Asynchronously copies the entire contents of a reader into a writer using the specified
+    /// buffer size.
+    ///
+    /// This function returns a future that will continuously read data from
+    /// `reader` and then write it into `writer` in a streaming fashion until
+    /// `reader` returns EOF.
+    ///
+    /// On success, the total number of bytes that were copied from `reader` to
+    /// `writer` is returned.
+    ///
+    /// This is an asynchronous version of [`std::io::copy`][std] with a custom
+    /// buffer size.
+    ///
+    /// [std]: std::io::copy
+    ///
+    /// # Errors
+    ///
+    /// The returned future will return an error immediately if any call to
+    /// `poll_read` or `poll_write` returns an error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut reader: &[u8] = b"hello";
+    /// let mut writer: Vec<u8> = vec![];
+    ///
+    /// io::copy_with_buffer_size(&mut reader, &mut writer, 2048).await?;
+    ///
+    /// assert_eq!(&b"hello"[..], &writer[..]);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn copy_with_buffer_size<'a, R, W>(reader: &'a mut R, writer: &'a mut W, buffer_size: usize) -> io::Result<u64>
+    where
+        R: AsyncRead + Unpin + ?Sized,
+        W: AsyncWrite + Unpin + ?Sized,
+    {
+        Copy {
+            reader,
+            writer,
+            buf: CopyBuffer::with_size(buffer_size)
+        }.await
+    }
 }
 
 impl<R, W> Future for Copy<'_, R, W>
