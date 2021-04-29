@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1619735304836,
+  "lastUpdate": 1619735317705,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26419,6 +26419,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19278172,
             "range": "± 2712955",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "arthurprs@gmail.com",
+            "name": "Arthur Silva",
+            "username": "arthurprs"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "078e317c0be7cc153728e5355dc42de4031eeaa1",
+          "message": "tokio: update CHANGELOG.md (#3735)",
+          "timestamp": "2021-04-30T00:26:28+02:00",
+          "tree_id": "63718ee05217f13747aa69b7032c62f439126cca",
+          "url": "https://github.com/tokio-rs/tokio/commit/078e317c0be7cc153728e5355dc42de4031eeaa1"
+        },
+        "date": 1619735314655,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 181417,
+            "range": "± 41007",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 689045,
+            "range": "± 140730",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4708637,
+            "range": "± 886122",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18320850,
+            "range": "± 1840687",
             "unit": "ns/iter"
           }
         ]
