@@ -19,6 +19,7 @@
 - rt: fix panic in `JoinHandle::abort()` when called from other threads ([#3672])
 - sync: don't panic in `oneshot::try_recv` ([#3674])
 - sync: fix notifications getting dropped on receiver drop ([#3652])
+- sync: fix `Semaphore` permit overflow calculation ([#3644])
 
 ### Documented
 
