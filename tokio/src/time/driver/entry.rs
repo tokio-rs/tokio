@@ -85,7 +85,7 @@ const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 /// requires only the driver lock.
 pub(super) struct StateCell {
     /// Holds either the scheduled expiration time for this timer, or (if the
-    /// timer has been fired and is unregistered), [`u64::max_value()`].
+    /// timer has been fired and is unregistered), `u64::max_value()`.
     state: AtomicU64,
     /// If the timer is fired (an Acquire order read on state shows
     /// `u64::max_value()`), holds the result that should be returned from
