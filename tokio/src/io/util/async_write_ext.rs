@@ -2,6 +2,7 @@ use crate::io::util::flush::{flush, Flush};
 use crate::io::util::shutdown::{shutdown, Shutdown};
 use crate::io::util::write::{write, Write};
 use crate::io::util::write_all::{write_all, WriteAll};
+use crate::io::util::write_all_buf::{write_all_buf, WriteAllBuf};
 use crate::io::util::write_buf::{write_buf, WriteBuf};
 use crate::io::util::write_int::{
     WriteI128, WriteI128Le, WriteI16, WriteI16Le, WriteI32, WriteI32Le, WriteI64, WriteI64Le,
@@ -231,6 +232,53 @@ cfg_io_util! {
             B: Buf,
         {
             write_buf(self, src)
+        }
+
+        /// Attempts to write an entire buffer into this writer
+        ///
+        /// Equivalent to:
+        ///
+        /// ```ignore
+        /// async fn write_all_buf(&mut self, buf: impl Buf) -> Result<(), io::Error> {
+        ///     while buf.has_remaining() {
+        ///         self.write_buf(&mut buf).await?;
+        ///     }
+        /// }
+        /// ```
+        ///
+        /// This method will continuously call [`write`] until
+        /// [`buf.has_remaining()`](bytes::Buf::has_remaining) returns false. This method will not
+        /// return until the entire buffer has been successfully written or an error occurs. The
+        /// first error generated will be returned.
+        ///
+        /// The buffer is advanced after each chunk is successfully written. After failure,
+        /// `src.chunk()` will return the chunk that failed to write.
+        ///
+        /// # Examples
+        ///
+        /// [`File`] implements `Read` and [`Cursor<&[u8]>`] implements [`Buf`]:
+        ///
+        /// [`File`]: crate::fs::File
+        /// [`Buf`]: bytes::Buf
+        ///
+        /// ```no_run
+        /// use tokio::io::{self, AsyncWriteExt};
+        /// use tokio::fs::File;
+        ///
+        /// use bytes::Buf;
+        /// use std::io::Cursor;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     let mut file = File::create("foo.txt").await?;
+        ///     let mut buffer = Cursor::new(b"data to write");
+        ///
+        ///     file.write_all_buf(&mut buffer);
+        ///     Ok(())
+        /// }
+        /// ```
+        fn write_all_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteAllBuf<'a, Self, B> where Self: Sized + Unpin, B: Buf {
+            write_all_buf(self, src)
         }
 
         /// Attempts to write an entire buffer into this writer.
