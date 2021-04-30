@@ -21,20 +21,20 @@ use bytes::Buf;
 cfg_io_util! {
     /// Defines numeric writer
     macro_rules! write_impl {
-        (
-            $(
-                $(#[$outer:meta])*
-                fn $name:ident(&mut self, n: $ty:ty) -> $($fut:ident)*;
-            )*
-        ) => {
-            $(
-                $(#[$outer])*
-                fn $name<'a>(&'a mut self, n: $ty) -> $($fut)*<&'a mut Self> where Self: Unpin {
-                    $($fut)*::new(self, n)
-                }
-            )*
+            (
+                $(
+                    $(#[$outer:meta])*
+                    fn $name:ident(&mut self, n: $ty:ty) -> $($fut:ident)*;
+                )*
+            ) => {
+                $(
+                    $(#[$outer])*
+                    fn $name<'a>(&'a mut self, n: $ty) -> $($fut)*<&'a mut Self> where Self: Unpin {
+                        $($fut)*::new(self, n)
+                    }
+                )*
+            }
         }
-    }
 
     /// Writes bytes to a sink.
     ///
@@ -160,7 +160,6 @@ cfg_io_util! {
             write_vectored(self, bufs)
         }
 
-
         /// Writes a buffer into this writer, advancing the buffer's internal
         /// cursor.
         ///
@@ -278,7 +277,11 @@ cfg_io_util! {
         /// ```
         ///
         /// [`write`]: AsyncWriteExt::write
-        fn write_all_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteAllBuf<'a, Self, B> where Self: Sized + Unpin, B: Buf {
+        fn write_all_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteAllBuf<'a, Self, B>
+        where
+            Self: Sized + Unpin,
+            B: Buf,
+        {
             write_all_buf(self, src)
         }
 
