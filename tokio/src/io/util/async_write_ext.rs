@@ -276,6 +276,8 @@ cfg_io_util! {
         ///     Ok(())
         /// }
         /// ```
+        ///
+        /// [`write`]: AsyncWriteExt::write
         fn write_all_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteAllBuf<'a, Self, B> where Self: Sized + Unpin, B: Buf {
             write_all_buf(self, src)
         }
