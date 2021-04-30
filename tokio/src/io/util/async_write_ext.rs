@@ -21,20 +21,20 @@ use bytes::Buf;
 cfg_io_util! {
     /// Defines numeric writer
     macro_rules! write_impl {
-            (
-                $(
-                    $(#[$outer:meta])*
-                    fn $name:ident(&mut self, n: $ty:ty) -> $($fut:ident)*;
-                )*
-            ) => {
-                $(
-                    $(#[$outer])*
-                    fn $name<'a>(&'a mut self, n: $ty) -> $($fut)*<&'a mut Self> where Self: Unpin {
-                        $($fut)*::new(self, n)
-                    }
-                )*
-            }
+        (
+            $(
+                $(#[$outer:meta])*
+                fn $name:ident(&mut self, n: $ty:ty) -> $($fut:ident)*;
+            )*
+        ) => {
+            $(
+                $(#[$outer])*
+                fn $name<'a>(&'a mut self, n: $ty) -> $($fut)*<&'a mut Self> where Self: Unpin {
+                    $($fut)*::new(self, n)
+                }
+            )*
         }
+    }
 
     /// Writes bytes to a sink.
     ///
