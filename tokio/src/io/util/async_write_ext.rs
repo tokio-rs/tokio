@@ -265,7 +265,6 @@ cfg_io_util! {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
-        /// use bytes::Buf;
         /// use std::io::Cursor;
         ///
         /// #[tokio::main]
@@ -273,7 +272,7 @@ cfg_io_util! {
         ///     let mut file = File::create("foo.txt").await?;
         ///     let mut buffer = Cursor::new(b"data to write");
         ///
-        ///     file.write_all_buf(&mut buffer);
+        ///     file.write_all_buf(&mut buffer).await?;
         ///     Ok(())
         /// }
         /// ```
