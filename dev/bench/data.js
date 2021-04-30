@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1619782064325,
+  "lastUpdate": 1619782073845,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26467,6 +26467,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18320850,
             "range": "± 1840687",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "11428655+MarcoIeni@users.noreply.github.com",
+            "name": "Marco Ieni",
+            "username": "MarcoIeni"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a08ce0d3e06d650361283dc87c8fe14b146df15d",
+          "message": "ci: check docs of private items (#3715)",
+          "timestamp": "2021-04-30T13:25:50+02:00",
+          "tree_id": "e564a6c170e581211f8d0ad8f0d8dbab4ad4928b",
+          "url": "https://github.com/tokio-rs/tokio/commit/a08ce0d3e06d650361283dc87c8fe14b146df15d"
+        },
+        "date": 1619782070338,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 158980,
+            "range": "± 70910",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 603228,
+            "range": "± 93177",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4358390,
+            "range": "± 1200419",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 16849618,
+            "range": "± 3224255",
             "unit": "ns/iter"
           }
         ]
