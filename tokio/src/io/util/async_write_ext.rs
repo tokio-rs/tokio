@@ -197,10 +197,11 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// [`File`] implements `Read` and [`Cursor<&[u8]>`] implements [`Buf`]:
+        /// [`File`] implements [`AsyncWrite`] and [`Cursor`]`<&[u8]>` implements [`Buf`]:
         ///
         /// [`File`]: crate::fs::File
         /// [`Buf`]: bytes::Buf
+        /// [`Cursor`]: std::io::Cursor
         ///
         /// ```no_run
         /// use tokio::io::{self, AsyncWriteExt};
@@ -255,10 +256,11 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// [`File`] implements `Read` and [`Cursor<&[u8]>`] implements [`Buf`]:
+        /// [`File`] implements [`AsyncWrite`] and [`Cursor`]`<&[u8]>` implements [`Buf`]:
         ///
         /// [`File`]: crate::fs::File
         /// [`Buf`]: bytes::Buf
+        /// [`Cursor`]: std::io::Cursor
         ///
         /// ```no_run
         /// use tokio::io::{self, AsyncWriteExt};
