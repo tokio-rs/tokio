@@ -271,6 +271,7 @@ impl Semaphore {
                     Self::MAX_PERMITS
                 );
                 let prev = self.permits.fetch_add(rem << Self::PERMIT_SHIFT, Release);
+                let prev = prev >> Self::PERMIT_SHIFT;
                 assert!(
                     prev + permits <= Self::MAX_PERMITS,
                     "number of added permits ({}) would overflow MAX_PERMITS ({})",

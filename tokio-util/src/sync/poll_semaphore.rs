@@ -82,6 +82,29 @@ impl PollSemaphore {
             }
         }
     }
+
+    /// Returns the current number of available permits.
+    ///
+    /// This is equivalent to the [`Semaphore::available_permits`] method on the
+    /// `tokio::sync::Semaphore` type.
+    ///
+    /// [`Semaphore::available_permits`]: tokio::sync::Semaphore::available_permits
+    pub fn available_permits(&self) -> usize {
+        self.semaphore.available_permits()
+    }
+
+    /// Adds `n` new permits to the semaphore.
+    ///
+    /// The maximum number of permits is `usize::MAX >> 3`, and this function
+    /// will panic if the limit is exceeded.
+    ///
+    /// This is equivalent to the [`Semaphore::add_permits`] method on the
+    /// `tokio::sync::Semaphore` type.
+    ///
+    /// [`Semaphore::add_permits`]: tokio::sync::Semaphore::add_permits
+    pub fn add_permits(&self, n: usize) {
+        self.semaphore.add_permits(n);
+    }
 }
 
 impl Stream for PollSemaphore {
@@ -103,5 +126,11 @@ impl fmt::Debug for PollSemaphore {
         f.debug_struct("PollSemaphore")
             .field("semaphore", &self.semaphore)
             .finish()
+    }
+}
+
+impl AsRef<Semaphore> for PollSemaphore {
+    fn as_ref(&self) -> &Semaphore {
+        &*self.semaphore
     }
 }

@@ -5,7 +5,7 @@ use std::io;
 use std::net::SocketAddr;
 
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
@@ -448,7 +448,7 @@ impl TcpSocket {
     /// `backlog` defines the maximum number of pending connections are queued
     /// by the operating system at any given time. Connection are removed from
     /// the queue with [`TcpListener::accept`]. When the queue is full, the
-    /// operationg-system will start rejecting connections.
+    /// operating-system will start rejecting connections.
     ///
     /// [`TcpListener::accept`]: TcpListener::accept
     ///
@@ -508,6 +508,13 @@ impl FromRawFd for TcpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
         let inner = mio::net::TcpSocket::from_raw_fd(fd);
         TcpSocket { inner }
+    }
+}
+
+#[cfg(unix)]
+impl IntoRawFd for TcpSocket {
+    fn into_raw_fd(self) -> RawFd {
+        self.inner.into_raw_fd()
     }
 }
 

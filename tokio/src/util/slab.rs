@@ -296,7 +296,7 @@ impl<T> Slab<T> {
 
             // Remove the slots vector from the page. This is done so that the
             // freeing process is done outside of the lock's critical section.
-            let vec = mem::replace(&mut slots.slots, vec![]);
+            let vec = mem::take(&mut slots.slots);
             slots.head = 0;
 
             // Drop the lock so we can drop the vector outside the lock below.

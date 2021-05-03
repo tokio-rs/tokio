@@ -151,7 +151,7 @@ impl BlockingPool {
         self.spawner.inner.condvar.notify_all();
 
         let last_exited_thread = std::mem::take(&mut shared.last_exiting_thread);
-        let workers = std::mem::replace(&mut shared.worker_threads, HashMap::new());
+        let workers = std::mem::take(&mut shared.worker_threads);
 
         drop(shared);
 

@@ -205,7 +205,7 @@ impl<T> Receiver<T> {
         // not memory access.
         shared.ref_count_rx.fetch_add(1, Relaxed);
 
-        Self { version, shared }
+        Self { shared, version }
     }
 
     /// Returns a reference to the most recently sent value

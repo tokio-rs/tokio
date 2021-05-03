@@ -436,7 +436,7 @@ cfg_sync! {
     pub mod mpsc;
 
     mod mutex;
-    pub use mutex::{Mutex, MutexGuard, TryLockError, OwnedMutexGuard};
+    pub use mutex::{Mutex, MutexGuard, TryLockError, OwnedMutexGuard, MappedMutexGuard};
 
     pub(crate) mod notify;
     pub use notify::Notify;
@@ -451,12 +451,18 @@ cfg_sync! {
 
     mod rwlock;
     pub use rwlock::RwLock;
+    pub use rwlock::owned_read_guard::OwnedRwLockReadGuard;
+    pub use rwlock::owned_write_guard::OwnedRwLockWriteGuard;
+    pub use rwlock::owned_write_guard_mapped::OwnedRwLockMappedWriteGuard;
     pub use rwlock::read_guard::RwLockReadGuard;
     pub use rwlock::write_guard::RwLockWriteGuard;
     pub use rwlock::write_guard_mapped::RwLockMappedWriteGuard;
 
     mod task;
     pub(crate) use task::AtomicWaker;
+
+    mod once_cell;
+    pub use self::once_cell::{OnceCell, SetError};
 
     pub mod watch;
 }

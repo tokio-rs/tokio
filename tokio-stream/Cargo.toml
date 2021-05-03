@@ -39,7 +39,7 @@ async-stream = "0.3"
 tokio-test = { path = "../tokio-test" }
 futures = { version = "0.3", default-features = false }
 
-proptest = "0.10.0"
+proptest = "1"
 
 [package.metadata.docs.rs]
 all-features = true

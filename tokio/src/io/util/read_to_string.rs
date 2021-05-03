@@ -37,7 +37,7 @@ pub(crate) fn read_to_string<'a, R>(
 where
     R: AsyncRead + ?Sized + Unpin,
 {
-    let buf = mem::replace(string, String::new()).into_bytes();
+    let buf = mem::take(string).into_bytes();
     ReadToString {
         reader,
         buf: VecWithInitialized::new(buf),

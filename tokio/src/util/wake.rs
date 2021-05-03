@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
-/// Simplfied waking interface based on Arcs
+/// Simplified waking interface based on Arcs
 pub(crate) trait Wake: Send + Sync {
     /// Wake by value
     fn wake(self: Arc<Self>);

@@ -10,10 +10,10 @@ cfg_io_driver! {
     /// [`std::io::Write`] traits with the reactor that drives it.
     ///
     /// `PollEvented` uses [`Registration`] internally to take a type that
-    /// implements [`mio::Evented`] as well as [`std::io::Read`] and or
+    /// implements [`mio::event::Source`] as well as [`std::io::Read`] and or
     /// [`std::io::Write`] and associate it with a reactor that will drive it.
     ///
-    /// Once the [`mio::Evented`] type is wrapped by `PollEvented`, it can be
+    /// Once the [`mio::event::Source`] type is wrapped by `PollEvented`, it can be
     /// used from within the future's execution model. As such, the
     /// `PollEvented` type provides [`AsyncRead`] and [`AsyncWrite`]
     /// implementations using the underlying I/O resource as well as readiness
@@ -40,13 +40,13 @@ cfg_io_driver! {
     /// [`poll_read_ready`] again will also indicate read readiness.
     ///
     /// When the operation is attempted and is unable to succeed due to the I/O
-    /// resource not being ready, the caller must call [`clear_read_ready`] or
-    /// [`clear_write_ready`]. This clears the readiness state until a new
+    /// resource not being ready, the caller must call `clear_read_ready` or
+    /// `clear_write_ready`. This clears the readiness state until a new
     /// readiness event is received.
     ///
     /// This allows the caller to implement additional functions. For example,
     /// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
-    /// [`clear_read_ready`].
+    /// `clear_read_ready`.
     ///
     /// ## Platform-specific events
     ///
@@ -54,17 +54,11 @@ cfg_io_driver! {
     /// These events are included as part of the read readiness event stream. The
     /// write readiness event stream is only for `Ready::writable()` events.
     ///
-    /// [`std::io::Read`]: trait@std::io::Read
-    /// [`std::io::Write`]: trait@std::io::Write
-    /// [`AsyncRead`]: trait@AsyncRead
-    /// [`AsyncWrite`]: trait@AsyncWrite
-    /// [`mio::Evented`]: trait@mio::Evented
-    /// [`Registration`]: struct@Registration
-    /// [`TcpListener`]: struct@crate::net::TcpListener
-    /// [`clear_read_ready`]: method@Self::clear_read_ready
-    /// [`clear_write_ready`]: method@Self::clear_write_ready
-    /// [`poll_read_ready`]: method@Self::poll_read_ready
-    /// [`poll_write_ready`]: method@Self::poll_write_ready
+    /// [`AsyncRead`]: crate::io::AsyncRead
+    /// [`AsyncWrite`]: crate::io::AsyncWrite
+    /// [`TcpListener`]: crate::net::TcpListener
+    /// [`poll_read_ready`]: Registration::poll_read_ready
+    /// [`poll_write_ready`]: Registration::poll_write_ready
     pub(crate) struct PollEvented<E: Source> {
         io: Option<E>,
         registration: Registration,
