@@ -23,7 +23,10 @@ impl Driver {
     pub(crate) fn new(park: SignalDriver) -> io::Result<Self> {
         let signal_handle = park.handle();
 
-        Ok(Self { park, signal_handle, })
+        Ok(Self {
+            park,
+            signal_handle,
+        })
     }
 }
 

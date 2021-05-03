@@ -132,7 +132,8 @@ where
 #[cfg(all(test, not(loom)))]
 pub(crate) mod test {
     use super::*;
-    use crate::signal::unix::driver::Handle as SignalHandle;
+    use crate::io::driver::Driver as IoDriver;
+    use crate::signal::unix::driver::{Driver as SignalDriver, Handle as SignalHandle};
     use crate::sync::watch;
     use std::cell::{Cell, RefCell};
     use std::io;
@@ -276,8 +277,6 @@ pub(crate) mod test {
 
     #[test]
     fn no_reap_if_signal_lock_held() {
-        let (tx, rx) = watch::channel(());
-
         let handle = SignalHandle::default();
 
         let orphanage = OrphanQueueImpl::new();
@@ -287,10 +286,47 @@ pub(crate) mod test {
         let waits = orphan.total_waits.clone();
         orphanage.push_orphan(orphan);
 
-        tx.send(()).unwrap();
         orphanage.reap_orphans(&handle);
         assert_eq!(waits.get(), 0);
 
         drop(signal_guard);
+    }
+
+    #[test]
+    fn does_not_register_signal_if_queue_empty() {
+        let signal_driver = IoDriver::new().and_then(SignalDriver::new).unwrap();
+        let handle = signal_driver.handle();
+
+        let orphanage = OrphanQueueImpl::new();
+        assert!(orphanage.sigchild.lock().unwrap().is_none()); // Sanity
+
+        // No register when queue empty
+        orphanage.reap_orphans(&handle);
+        assert!(orphanage.sigchild.lock().unwrap().is_none());
+
+        let orphan = MockWait::new(2);
+        let waits = orphan.total_waits.clone();
+        orphanage.push_orphan(orphan);
+
+        orphanage.reap_orphans(&handle);
+        assert!(orphanage.sigchild.lock().unwrap().is_some());
+        assert_eq!(waits.get(), 1); // Eager reap when registering listener
+    }
+
+    #[test]
+    fn does_nothing_if_signal_could_not_be_registered() {
+        let handle = SignalHandle::default();
+
+        let orphanage = OrphanQueueImpl::new();
+        assert!(orphanage.sigchild.lock().unwrap().is_none());
+
+        let orphan = MockWait::new(2);
+        let waits = orphan.total_waits.clone();
+        orphanage.push_orphan(orphan);
+
+        // Signal handler has "gone away", nothing to register or reap
+        orphanage.reap_orphans(&handle);
+        assert!(orphanage.sigchild.lock().unwrap().is_none());
+        assert_eq!(waits.get(), 0);
     }
 }
