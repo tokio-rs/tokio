@@ -6,7 +6,10 @@ use std::cell::UnsafeCell;
 use std::error::Error;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::{fmt, marker, mem};
+
+use super::Notify;
 
 /// An asynchronous `Mutex`-like type.
 ///
@@ -126,6 +129,13 @@ use std::{fmt, marker, mem};
 pub struct Mutex<T: ?Sized> {
     s: semaphore::Semaphore,
     c: UnsafeCell<T>,
+}
+
+/// Behaves like std::sync::Condvar but for tokio Mutexes
+#[ derive(Debug) ]
+pub struct Condvar {
+    notifier: Notify,
+    wait_count: AtomicU32,
 }
 
 /// A handle to a held `Mutex`. The guard can be held across any `.await` point
@@ -561,12 +571,6 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
             marker: marker::PhantomData,
         })
     }
-
-    /// Releases the lock and returns a reference to the corresponding Mutex
-    pub fn into_mutex_reference(self) -> &'a Mutex<T> {
-        self.lock.s.release(1);
-        self.lock
-    }
 }
 
 impl<T: ?Sized> Drop for MutexGuard<'_, T> {
@@ -715,5 +719,50 @@ impl<'a, T: ?Sized + fmt::Debug> fmt::Debug for MappedMutexGuard<'a, T> {
 impl<'a, T: ?Sized + fmt::Display> fmt::Display for MappedMutexGuard<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
+    }
+}
+
+impl Default for Condvar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Condvar {
+    /// Create new condition variable
+    pub fn new() -> Self {
+        Self{ wait_count: AtomicU32::new(0), notifier: Notify::new() }
+    }
+
+    /// For for another thread to call notify or notify_all
+    pub async fn wait<'a, T>(&self, lock: MutexGuard<'a, T>) -> MutexGuard<'a, T> {
+        self.wait_count.fetch_add(1, Ordering::SeqCst);
+
+        lock.lock.s.release(1);
+        let mutex = lock.lock;
+
+        self.notifier.notified().await;
+        mutex.lock().await
+    }
+
+    /// Notify at most one waiter
+    pub fn notify_one<T>(&self) {
+        let mut count = self.wait_count.load(Ordering::SeqCst);
+
+        while count > 0 {
+            match self.wait_count.compare_exchange(count, count-1, Ordering::SeqCst, Ordering::SeqCst) {
+                Ok(_) => self.notifier.notify_one(),
+                Err(val) => count = val
+            }
+        }
+    }
+
+    /// Notify all waiters
+    pub fn notify_all(&self) {
+        let count = self.wait_count.swap(0, Ordering::SeqCst);
+
+        for _ in 0..count {
+            self.notifier.notify_one();
+        }
     }
 }
