@@ -9,13 +9,6 @@
     doc = "You are viewing documentation built under windows. To view unix-specific wrappers, change to the `x86_64-unknown-linux-gnu` platform."
 )]
 
-/// Error types for the wrappers.
-pub mod errors {
-    cfg_sync! {
-        pub use crate::wrappers::broadcast::BroadcastStreamRecvError;
-    }
-}
-
 mod mpsc_bounded;
 pub use mpsc_bounded::ReceiverStream;
 
