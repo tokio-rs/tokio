@@ -144,6 +144,7 @@ where
 pub(crate) mod test {
     use super::*;
     use crate::signal::unix::driver::Handle as SignalHandle;
+    use crate::sync::watch;
     use std::cell::{Cell, RefCell};
     use std::io;
     use std::os::unix::process::ExitStatusExt;
@@ -266,5 +267,49 @@ pub(crate) mod test {
 
         // Safe to reap when empty
         drain_orphan_queue(orphanage.queue.lock().unwrap());
+    }
+
+    #[test]
+    fn no_reap_if_no_signal_received() {
+        let (tx, rx) = watch::channel(());
+
+        let handle = SignalHandle::default();
+
+        let orphanage = OrphanQueueImpl::new();
+        *orphanage.sigchild.lock().unwrap() = Some(rx);
+
+        let orphan = MockWait::new(2);
+        let waits = orphan.total_waits.clone();
+        orphanage.push_orphan(orphan);
+
+        orphanage.reap_orphans(&handle);
+        assert_eq!(waits.get(), 0);
+
+        orphanage.reap_orphans(&handle);
+        assert_eq!(waits.get(), 0);
+
+        tx.send(()).unwrap();
+        orphanage.reap_orphans(&handle);
+        assert_eq!(waits.get(), 1);
+    }
+
+    #[test]
+    fn no_reap_if_signal_lock_held() {
+        let (tx, rx) = watch::channel(());
+
+        let handle = SignalHandle::default();
+
+        let orphanage = OrphanQueueImpl::new();
+        let signal_guard = orphanage.sigchild.lock().unwrap();
+
+        let orphan = MockWait::new(2);
+        let waits = orphan.total_waits.clone();
+        orphanage.push_orphan(orphan);
+
+        tx.send(()).unwrap();
+        orphanage.reap_orphans(&handle);
+        assert_eq!(waits.get(), 0);
+
+        drop(signal_guard);
     }
 }
