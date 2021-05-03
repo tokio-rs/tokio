@@ -1,6 +1,9 @@
+use crate::signal::unix::driver::Handle as SignalHandle;
+use crate::signal::unix::{signal_with_handle, SignalKind};
+use crate::sync::watch;
 use std::io;
 use std::process::ExitStatus;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 /// An interface for waiting on a process to exit.
 pub(crate) trait Wait {
@@ -24,12 +27,12 @@ impl<T: Wait> Wait for &mut T {
 pub(crate) trait ReapOrphanQueue {
     /// Attempts to reap every process in the queue, ignoring any errors and
     /// enqueueing any orphans which have not yet exited.
-    fn reap_orphans(&self);
+    fn reap_orphans(&self, handle: &SignalHandle);
 }
 
 impl<T: ReapOrphanQueue> ReapOrphanQueue for &T {
-    fn reap_orphans(&self) {
-        (**self).reap_orphans()
+    fn reap_orphans(&self, handle: &SignalHandle) {
+        (**self).reap_orphans(handle)
     }
 }
 
@@ -48,12 +51,14 @@ impl<T, O: OrphanQueue<T>> OrphanQueue<T> for &O {
 /// An implementation of `OrphanQueue`.
 #[derive(Debug)]
 pub(crate) struct OrphanQueueImpl<T> {
+    sigchild: Mutex<Option<watch::Receiver<()>>>,
     queue: Mutex<Vec<T>>,
 }
 
 impl<T> OrphanQueueImpl<T> {
     pub(crate) fn new() -> Self {
         Self {
+            sigchild: Mutex::new(None),
             queue: Mutex::new(Vec::new()),
         }
     }
@@ -62,36 +67,83 @@ impl<T> OrphanQueueImpl<T> {
     fn len(&self) -> usize {
         self.queue.lock().unwrap().len()
     }
-}
 
-impl<T: Wait> OrphanQueue<T> for OrphanQueueImpl<T> {
-    fn push_orphan(&self, orphan: T) {
+    pub(crate) fn push_orphan(&self, orphan: T)
+    where
+        T: Wait,
+    {
         self.queue.lock().unwrap().push(orphan)
+    }
+
+    pub(crate) fn reap_orphans(&self, handle: &SignalHandle)
+    where
+        T: Wait,
+    {
+        let has_changed = match self.sigchild.try_lock() {
+            Ok(mut guard) => match &mut *guard {
+                Some(sigchild) => sigchild.try_has_changed().and_then(Result::ok).is_some(),
+                sigchild_guard @ None => {
+                    let queue = self.queue.lock().unwrap();
+                    if queue.is_empty() {
+                        // No orphans in the queue, continue to be lazy and initialize
+                        // the SIGCHLD listener later
+                        false
+                    } else {
+                        match signal_with_handle(SignalKind::child(), &handle) {
+                            Ok(sigchild) => {
+                                *sigchild_guard = Some(sigchild);
+                                // Since we're already holding the queue lock we can
+                                // do the drain here instead of re-acquiring it below
+                                drain_orphan_queue(queue);
+                                return;
+                            }
+
+                            // This shouldn't really happen, but if it does it
+                            // means that the signal driver isn't running, in
+                            // which case there isn't anything we can
+                            // register/initialize here, so we can try again later
+                            Err(_) => false,
+                        }
+                    }
+                }
+            },
+
+            // Someone else is holding the lock, they will be responsible for draining
+            // the queue as necessary, so we can safely bail
+            Err(_) => false,
+        };
+
+        if has_changed {
+            drain_orphan_queue(self.queue.lock().unwrap());
+        }
     }
 }
 
-impl<T: Wait> ReapOrphanQueue for OrphanQueueImpl<T> {
-    fn reap_orphans(&self) {
-        let mut queue = self.queue.lock().unwrap();
-        let queue = &mut *queue;
-
-        for i in (0..queue.len()).rev() {
-            match queue[i].try_wait() {
-                Ok(None) => {}
-                Ok(Some(_)) | Err(_) => {
-                    // The stdlib handles interruption errors (EINTR) when polling a child process.
-                    // All other errors represent invalid inputs or pids that have already been
-                    // reaped, so we can drop the orphan in case an error is raised.
-                    queue.swap_remove(i);
-                }
+fn drain_orphan_queue<T>(mut queue: MutexGuard<'_, Vec<T>>)
+where
+    T: Wait,
+{
+    // let mut queue = self.queue.lock().unwrap();
+    // let queue = &mut *queue;
+    for i in (0..queue.len()).rev() {
+        match queue[i].try_wait() {
+            Ok(None) => {}
+            Ok(Some(_)) | Err(_) => {
+                // The stdlib handles interruption errors (EINTR) when polling a child process.
+                // All other errors represent invalid inputs or pids that have already been
+                // reaped, so we can drop the orphan in case an error is raised.
+                queue.swap_remove(i);
             }
         }
     }
+
+    drop(queue);
 }
 
 #[cfg(all(test, not(loom)))]
 pub(crate) mod test {
     use super::*;
+    use crate::signal::unix::driver::Handle as SignalHandle;
     use std::cell::{Cell, RefCell};
     use std::io;
     use std::os::unix::process::ExitStatusExt;
@@ -119,7 +171,7 @@ pub(crate) mod test {
     }
 
     impl<W> ReapOrphanQueue for MockQueue<W> {
-        fn reap_orphans(&self) {
+        fn reap_orphans(&self, _handle: &SignalHandle) {
             self.total_reaps.set(self.total_reaps.get() + 1);
         }
     }
@@ -191,27 +243,28 @@ pub(crate) mod test {
 
         assert_eq!(orphanage.len(), 4);
 
-        orphanage.reap_orphans();
+        drain_orphan_queue(orphanage.queue.lock().unwrap());
         assert_eq!(orphanage.len(), 2);
         assert_eq!(first_waits.get(), 1);
         assert_eq!(second_waits.get(), 1);
         assert_eq!(third_waits.get(), 1);
         assert_eq!(fourth_waits.get(), 1);
 
-        orphanage.reap_orphans();
+        drain_orphan_queue(orphanage.queue.lock().unwrap());
         assert_eq!(orphanage.len(), 1);
         assert_eq!(first_waits.get(), 1);
         assert_eq!(second_waits.get(), 2);
         assert_eq!(third_waits.get(), 2);
         assert_eq!(fourth_waits.get(), 1);
 
-        orphanage.reap_orphans();
+        drain_orphan_queue(orphanage.queue.lock().unwrap());
         assert_eq!(orphanage.len(), 0);
         assert_eq!(first_waits.get(), 1);
         assert_eq!(second_waits.get(), 2);
         assert_eq!(third_waits.get(), 3);
         assert_eq!(fourth_waits.get(), 1);
 
-        orphanage.reap_orphans(); // Safe to reap when empty
+        // Safe to reap when empty
+        drain_orphan_queue(orphanage.queue.lock().unwrap());
     }
 }

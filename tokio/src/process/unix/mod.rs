@@ -32,6 +32,7 @@ use reap::Reaper;
 use crate::io::PollEvented;
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
+use crate::signal::unix::driver::Handle as SignalHandle;
 use crate::signal::unix::{signal, Signal, SignalKind};
 
 use mio::event::Source;
@@ -74,8 +75,8 @@ impl fmt::Debug for GlobalOrphanQueue {
 }
 
 impl ReapOrphanQueue for GlobalOrphanQueue {
-    fn reap_orphans(&self) {
-        ORPHAN_QUEUE.reap_orphans()
+    fn reap_orphans(&self, handle: &SignalHandle) {
+        ORPHAN_QUEUE.reap_orphans(handle)
     }
 }
 

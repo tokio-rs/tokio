@@ -5,7 +5,7 @@
 use crate::park::Park;
 use crate::process::unix::orphan::ReapOrphanQueue;
 use crate::process::unix::GlobalOrphanQueue;
-use crate::signal::unix::driver::Driver as SignalDriver;
+use crate::signal::unix::driver::{Driver as SignalDriver, Handle as SignalHandle};
 use crate::signal::unix::{signal_with_handle, SignalKind};
 use crate::sync::watch;
 
@@ -16,6 +16,7 @@ use std::time::Duration;
 #[derive(Debug)]
 pub(crate) struct Driver {
     park: SignalDriver,
+    signal_handle: SignalHandle,
     inner: CoreDriver<watch::Receiver<()>, GlobalOrphanQueue>,
 }
 
@@ -42,9 +43,9 @@ where
     S: HasChanged,
     Q: ReapOrphanQueue,
 {
-    fn process(&mut self) {
+    fn process(&mut self, handle: &SignalHandle) {
         if self.sigchild.has_changed() {
-            self.orphan_queue.reap_orphans();
+            self.orphan_queue.reap_orphans(handle);
         }
     }
 }
@@ -54,13 +55,18 @@ where
 impl Driver {
     /// Creates a new signal `Driver` instance that delegates wakeups to `park`.
     pub(crate) fn new(park: SignalDriver) -> io::Result<Self> {
-        let sigchild = signal_with_handle(SignalKind::child(), park.handle())?;
+        let signal_handle = park.handle();
+        let sigchild = signal_with_handle(SignalKind::child(), &signal_handle)?;
         let inner = CoreDriver {
             sigchild,
             orphan_queue: GlobalOrphanQueue,
         };
 
-        Ok(Self { park, inner })
+        Ok(Self {
+            park,
+            signal_handle,
+            inner,
+        })
     }
 }
 
@@ -76,13 +82,13 @@ impl Park for Driver {
 
     fn park(&mut self) -> Result<(), Self::Error> {
         self.park.park()?;
-        self.inner.process();
+        self.inner.process(&self.signal_handle);
         Ok(())
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
         self.park.park_timeout(duration)?;
-        self.inner.process();
+        self.inner.process(&self.signal_handle);
         Ok(())
     }
 
@@ -124,7 +130,7 @@ mod test {
             orphan_queue: MockQueue::<()>::new(),
         };
 
-        driver.process();
+        driver.process(&SignalHandle::default());
 
         assert_eq!(1, driver.sigchild.total_try_recv);
         assert_eq!(0, driver.orphan_queue.total_reaps.get());
