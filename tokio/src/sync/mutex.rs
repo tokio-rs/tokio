@@ -561,6 +561,12 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
             marker: marker::PhantomData,
         })
     }
+
+    /// Releases the lock and returns a reference to the corresponding Mutex
+    pub fn into_mutex_reference(self) -> &'a Mutex<T> {
+        self.lock.s.release(1);
+        self.lock
+    }
 }
 
 impl<T: ?Sized> Drop for MutexGuard<'_, T> {
