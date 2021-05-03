@@ -20,13 +20,13 @@ pub(crate) struct Driver {
 
 impl Driver {
     /// Creates a new signal `Driver` instance that delegates wakeups to `park`.
-    pub(crate) fn new(park: SignalDriver) -> io::Result<Self> {
+    pub(crate) fn new(park: SignalDriver) -> Self {
         let signal_handle = park.handle();
 
-        Ok(Self {
+        Self {
             park,
             signal_handle,
-        })
+        }
     }
 }
 
