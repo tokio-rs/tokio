@@ -24,7 +24,7 @@
 pub(crate) mod driver;
 
 pub(crate) mod orphan;
-use orphan::{OrphanQueue, OrphanQueueImpl, ReapOrphanQueue, Wait};
+use orphan::{OrphanQueue, OrphanQueueImpl, Wait};
 
 mod reap;
 use reap::Reaper;
@@ -74,8 +74,8 @@ impl fmt::Debug for GlobalOrphanQueue {
     }
 }
 
-impl ReapOrphanQueue for GlobalOrphanQueue {
-    fn reap_orphans(&self, handle: &SignalHandle) {
+impl GlobalOrphanQueue {
+    fn reap_orphans(handle: &SignalHandle) {
         ORPHAN_QUEUE.reap_orphans(handle)
     }
 }

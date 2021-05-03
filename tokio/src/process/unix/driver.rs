@@ -3,7 +3,6 @@
 //! Process driver
 
 use crate::park::Park;
-use crate::process::unix::orphan::ReapOrphanQueue;
 use crate::process::unix::GlobalOrphanQueue;
 use crate::signal::unix::driver::{Driver as SignalDriver, Handle as SignalHandle};
 
@@ -40,13 +39,13 @@ impl Park for Driver {
 
     fn park(&mut self) -> Result<(), Self::Error> {
         self.park.park()?;
-        GlobalOrphanQueue.reap_orphans(&self.signal_handle);
+        GlobalOrphanQueue::reap_orphans(&self.signal_handle);
         Ok(())
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
         self.park.park_timeout(duration)?;
-        GlobalOrphanQueue.reap_orphans(&self.signal_handle);
+        GlobalOrphanQueue::reap_orphans(&self.signal_handle);
         Ok(())
     }
 

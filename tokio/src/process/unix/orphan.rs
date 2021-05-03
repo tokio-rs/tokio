@@ -23,21 +23,8 @@ impl<T: Wait> Wait for &mut T {
     }
 }
 
-/// An interface for reaping a set of orphaned processes.
-pub(crate) trait ReapOrphanQueue {
-    /// Attempts to reap every process in the queue, ignoring any errors and
-    /// enqueueing any orphans which have not yet exited.
-    fn reap_orphans(&self, handle: &SignalHandle);
-}
-
-impl<T: ReapOrphanQueue> ReapOrphanQueue for &T {
-    fn reap_orphans(&self, handle: &SignalHandle) {
-        (**self).reap_orphans(handle)
-    }
-}
-
 /// An interface for queueing up an orphaned process so that it can be reaped.
-pub(crate) trait OrphanQueue<T>: ReapOrphanQueue {
+pub(crate) trait OrphanQueue<T> {
     /// Adds an orphan to the queue.
     fn push_orphan(&self, orphan: T);
 }
@@ -75,6 +62,8 @@ impl<T> OrphanQueueImpl<T> {
         self.queue.lock().unwrap().push(orphan)
     }
 
+    /// Attempts to reap every process in the queue, ignoring any errors and
+    /// enqueueing any orphans which have not yet exited.
     pub(crate) fn reap_orphans(&self, handle: &SignalHandle)
     where
         T: Wait,
@@ -153,14 +142,12 @@ pub(crate) mod test {
 
     pub(crate) struct MockQueue<W> {
         pub(crate) all_enqueued: RefCell<Vec<W>>,
-        pub(crate) total_reaps: Cell<usize>,
     }
 
     impl<W> MockQueue<W> {
         pub(crate) fn new() -> Self {
             Self {
                 all_enqueued: RefCell::new(Vec::new()),
-                total_reaps: Cell::new(0),
             }
         }
     }
@@ -168,12 +155,6 @@ pub(crate) mod test {
     impl<W> OrphanQueue<W> for MockQueue<W> {
         fn push_orphan(&self, orphan: W) {
             self.all_enqueued.borrow_mut().push(orphan);
-        }
-    }
-
-    impl<W> ReapOrphanQueue for MockQueue<W> {
-        fn reap_orphans(&self, _handle: &SignalHandle) {
-            self.total_reaps.set(self.total_reaps.get() + 1);
         }
     }
 
