@@ -169,11 +169,7 @@ impl<W: AsyncWrite + AsyncSeek> AsyncSeek for BufWriter<W> {
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
         let pos = match self.seek_state {
             SeekState::Init => {
-                // 1.x AsyncSeek recommends calling poll_complete before start_seek.
-                // We don't have to guarantee that the value returned by
-                // poll_complete called without start_seek is correct,
-                // so we'll return 0.
-                return Poll::Ready(Ok(0));
+                return self.project().inner.poll_complete(cx);
             }
             SeekState::Start(pos) => Some(pos),
             SeekState::Pending => None,
@@ -184,6 +180,8 @@ impl<W: AsyncWrite + AsyncSeek> AsyncSeek for BufWriter<W> {
 
         let mut me = self.project();
         if let Some(pos) = pos {
+            // Ensure previous seeks have finished before starting a new one
+            ready!(me.inner.as_mut().poll_complete(cx))?;
             if let Err(e) = me.inner.as_mut().start_seek(pos) {
                 *me.seek_state = SeekState::Init;
                 return Poll::Ready(Err(e));
