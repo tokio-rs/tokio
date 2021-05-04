@@ -994,7 +994,8 @@ impl Child {
     /// If the caller wishes to explicitly control when the child's stdin
     /// handle is closed, they may `.take()` it before calling `.wait()`:
     ///
-    /// ```no_run
+    /// ```
+    /// # #![cfg(unix)]
     /// use tokio::io::AsyncWriteExt;
     /// use tokio::process::Command;
     /// use std::process::Stdio;
