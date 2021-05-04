@@ -997,10 +997,14 @@ impl Child {
     /// ```no_run
     /// use tokio::io::AsyncWriteExt;
     /// use tokio::process::Command;
+    /// use std::process::Stdio;
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut child = Command::new("cat").spawn().unwrap();
+    ///     let mut child = Command::new("cat")
+    ///         .spawn()
+    ///         .stdin(Stdio::piped())
+    ///         .unwrap();
     ///
     ///     let mut stdin = child.stdin.take().unwrap();
     ///     tokio::spawn(async move {
