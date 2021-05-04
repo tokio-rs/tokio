@@ -1002,8 +1002,8 @@ impl Child {
     /// #[tokio::main]
     /// async fn main() {
     ///     let mut child = Command::new("cat")
-    ///         .spawn()
     ///         .stdin(Stdio::piped())
+    ///         .spawn()
     ///         .unwrap();
     ///
     ///     let mut stdin = child.stdin.take().unwrap();
