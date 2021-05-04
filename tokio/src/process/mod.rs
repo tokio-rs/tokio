@@ -996,11 +996,11 @@ impl Child {
     ///
     /// ```
     /// # #[cfg(not(unix))]fn main(){}
-    /// # #![cfg(unix)]
     /// use tokio::io::AsyncWriteExt;
     /// use tokio::process::Command;
     /// use std::process::Stdio;
     ///
+    /// # #[cfg(unix)]
     /// #[tokio::main]
     /// async fn main() {
     ///     let mut child = Command::new("cat")
