@@ -995,6 +995,7 @@ impl Child {
     /// handle is closed, they may `.take()` it before calling `.wait()`:
     ///
     /// ```
+    /// # #[cfg(not(unix))]fn main(){}
     /// # #![cfg(unix)]
     /// use tokio::io::AsyncWriteExt;
     /// use tokio::process::Command;
