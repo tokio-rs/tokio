@@ -51,19 +51,19 @@ impl<T> From<SendError<T>> for TrySendError<T> {
     }
 }
 
-// ===== RecvError =====
+// ===== ResizeError =====
 
-/// Error returned by `Receiver`.
+/// Error returned by `Receiver::resize`.
 #[derive(Debug)]
-pub struct RecvError(());
+pub struct ResizeError;
 
-impl fmt::Display for RecvError {
+impl fmt::Display for ResizeError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "channel closed")
     }
 }
 
-impl Error for RecvError {}
+impl std::error::Error for ResizeError {}
 
 cfg_time! {
     // ===== SendTimeoutError =====

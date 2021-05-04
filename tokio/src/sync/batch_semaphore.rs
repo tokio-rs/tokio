@@ -137,6 +137,22 @@ impl Semaphore {
         }
     }
 
+    /// Shrinks the number of available permits by the indicated reduction.
+    ///
+    /// This differs from `acquire` in that it does not block waiting for permits
+    /// to become available.
+    pub(crate) fn reduce_permits(&self, reduction: usize) {
+        let acquired = self.waiters.lock().queue.len();
+        let available = self.available_permits();
+        let total = acquired + available;
+
+        let next = total
+            .checked_sub(reduction)
+            .expect("cannot reduce to less than the total capacity");
+
+        self.permits.store(next << Self::PERMIT_SHIFT, Release);
+    }
+
     /// Creates a new semaphore with the initial number of permits
     ///
     /// Maximum number of permits on 32-bit platforms is `1<<29`.

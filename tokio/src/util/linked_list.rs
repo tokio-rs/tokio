@@ -25,6 +25,8 @@ pub(crate) struct LinkedList<L, T> {
 
     /// Node type marker.
     _marker: PhantomData<*const L>,
+
+    len: usize,
 }
 
 unsafe impl<L: Link> Send for LinkedList<L, L::Target> where L::Target: Send {}
@@ -109,6 +111,7 @@ impl<L, T> LinkedList<L, T> {
             head: None,
             tail: None,
             _marker: PhantomData,
+            len: 0,
         }
     }
 }
@@ -148,6 +151,8 @@ impl<L: Link> LinkedList<L, L::Target> {
             } else {
                 self.head = None
             }
+
+            self.len -= 1;
 
             L::pointers(last).as_mut().set_prev(None);
             L::pointers(last).as_mut().set_next(None);
@@ -203,7 +208,13 @@ impl<L: Link> LinkedList<L, L::Target> {
         L::pointers(node).as_mut().set_next(None);
         L::pointers(node).as_mut().set_prev(None);
 
+        self.len -= 1;
+
         Some(L::from_raw(node))
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.len
     }
 }
 

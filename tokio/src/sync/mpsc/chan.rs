@@ -41,6 +41,8 @@ pub(crate) trait Semaphore {
     fn close(&self);
 
     fn is_closed(&self) -> bool;
+
+    fn resize(&self, size: usize);
 }
 
 struct Chan<T, S> {
@@ -263,6 +265,14 @@ impl<T, S: Semaphore> Rx<T, S> {
             }
         })
     }
+
+    pub(crate) fn is_closed(&self) -> bool {
+        self.inner.semaphore.is_closed()
+    }
+
+    pub(crate) fn resize(&self, size: usize) {
+        self.inner.semaphore.resize(size);
+    }
 }
 
 impl<T, S: Semaphore> Drop for Rx<T, S> {
@@ -310,13 +320,13 @@ impl<T, S> Drop for Chan<T, S> {
 
 // ===== impl Semaphore for (::Semaphore, capacity) =====
 
-impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
+impl Semaphore for (crate::sync::batch_semaphore::Semaphore, AtomicUsize) {
     fn add_permit(&self) {
         self.0.release(1)
     }
 
     fn is_idle(&self) -> bool {
-        self.0.available_permits() == self.1
+        self.0.available_permits() == self.1.load(Acquire)
     }
 
     fn close(&self) {
@@ -325,6 +335,17 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
 
     fn is_closed(&self) -> bool {
         self.0.is_closed()
+    }
+
+    fn resize(&self, size: usize) {
+        let initial = self.1.load(Acquire);
+        if size < initial {
+            self.0.reduce_permits(initial - size);
+        } else {
+            self.0.release(size - initial);
+        }
+
+        self.1.store(size, Release);
     }
 }
 
@@ -353,5 +374,9 @@ impl Semaphore for AtomicUsize {
 
     fn is_closed(&self) -> bool {
         self.load(Acquire) & 1 == 1
+    }
+
+    fn resize(&self, size: usize) {
+        self.store(size, Release);
     }
 }

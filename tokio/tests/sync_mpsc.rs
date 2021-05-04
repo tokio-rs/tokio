@@ -494,3 +494,33 @@ async fn permit_available_not_acquired_close() {
     drop(permit2);
     assert!(rx.recv().await.is_none());
 }
+
+#[test]
+#[should_panic]
+fn resize_zero() {
+    let (_tx, rx) = mpsc::channel::<()>(1);
+
+    rx.resize(0).unwrap();
+}
+
+#[tokio::test]
+async fn resize_shrink() {
+    let (tx, rx) = mpsc::channel::<()>(2);
+
+    assert_ok!(rx.resize(1));
+
+    assert_ok!(tx.try_send(()));
+    assert_err!(tx.try_send(()), "send when the buffer is full");
+}
+
+#[tokio::test]
+async fn resize_grow() {
+    let (tx, rx) = mpsc::channel::<()>(1);
+
+    assert_ok!(tx.try_send(()));
+    assert_err!(tx.try_send(()), "send when the buffer is full");
+
+    assert_ok!(rx.resize(2));
+
+    assert_ok!(tx.try_send(()), "send after having resized the buffer");
+}
