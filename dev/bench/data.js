@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620206617739,
+  "lastUpdate": 1620206622229,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26827,6 +26827,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17499810,
             "range": "± 3835555",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "kaimast@cs.wisc.edu",
+            "name": "Kai Mast",
+            "username": "kaimast"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "55c5d1245138591d954e36429035ecc5f9fb625f",
+          "message": "util: require full feature in tokio-util tests (#3636)",
+          "timestamp": "2021-05-05T18:21:25+09:00",
+          "tree_id": "8b1602d8fe09eb828415cedfde8abfe0ee7aad7a",
+          "url": "https://github.com/tokio-rs/tokio/commit/55c5d1245138591d954e36429035ecc5f9fb625f"
+        },
+        "date": 1620206613059,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 180596,
+            "range": "± 91876",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 659452,
+            "range": "± 251901",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5238791,
+            "range": "± 1883103",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18823650,
+            "range": "± 3602960",
             "unit": "ns/iter"
           }
         ]
