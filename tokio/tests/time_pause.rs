@@ -4,28 +4,13 @@
 use rand::SeedableRng;
 use rand::{rngs::StdRng, Rng};
 use tokio::time::{self, Duration, Instant, Sleep};
-use tokio_test::{assert_err, assert_pending, assert_ready_eq, task};
+use tokio_test::{assert_elapsed, assert_err, assert_pending, assert_ready_eq, task};
 
 use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
-
-macro_rules! assert_elapsed {
-    ($now:expr, $ms:expr) => {{
-        let elapsed = $now.elapsed();
-        let lower = ms($ms);
-
-        // Handles ms rounding
-        assert!(
-            elapsed >= lower && elapsed <= lower + ms(1),
-            "actual = {:?}, expected = {:?}",
-            elapsed,
-            lower
-        );
-    }};
-}
 
 #[tokio::test]
 async fn pause_time_in_main() {
@@ -91,7 +76,7 @@ async fn advance_after_poll() {
 
     let before = Instant::now();
     time::advance(ms(100)).await;
-    assert_elapsed!(before, 100);
+    assert_elapsed!(before, ms(100));
 
     assert_pending!(sleep.poll());
 }
@@ -107,7 +92,7 @@ async fn sleep_no_poll() {
 
     let before = Instant::now();
     time::advance(ms(100)).await;
-    assert_elapsed!(before, 100);
+    assert_elapsed!(before, ms(100));
 
     assert_pending!(sleep.poll());
 }
@@ -147,7 +132,7 @@ impl Future for Tester {
                 }
             },
             State::AfterAdvance => {
-                assert_elapsed!(self.before.unwrap(), 100);
+                assert_elapsed!(self.before.unwrap(), ms(100));
 
                 assert_pending!(self.sleep.as_mut().poll(cx));
 
@@ -207,24 +192,24 @@ async fn interval() {
 
     let before = Instant::now();
     time::advance(ms(100)).await;
-    assert_elapsed!(before, 100);
+    assert_elapsed!(before, ms(100));
     assert_pending!(poll_next(&mut i));
 
     let before = Instant::now();
     time::advance(ms(200)).await;
-    assert_elapsed!(before, 200);
+    assert_elapsed!(before, ms(200));
     assert_ready_eq!(poll_next(&mut i), start + ms(300));
     assert_pending!(poll_next(&mut i));
 
     let before = Instant::now();
     time::advance(ms(400)).await;
-    assert_elapsed!(before, 400);
+    assert_elapsed!(before, ms(400));
     assert_ready_eq!(poll_next(&mut i), start + ms(600));
     assert_pending!(poll_next(&mut i));
 
     let before = Instant::now();
     time::advance(ms(500)).await;
-    assert_elapsed!(before, 500);
+    assert_elapsed!(before, ms(500));
     assert_ready_eq!(poll_next(&mut i), start + ms(900));
     assert_ready_eq!(poll_next(&mut i), start + ms(1200));
     assert_pending!(poll_next(&mut i));
