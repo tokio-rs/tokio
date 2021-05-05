@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620206260818,
+  "lastUpdate": 1620206263854,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26671,6 +26671,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17538593,
             "range": "± 3438942",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cvghy116@gmail.com",
+            "name": "Chế Vũ Gia Hy",
+            "username": "hyche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a945ce09960a55a6ac657a2a7aa3d72f8e00344e",
+          "message": "stream: implement Error and Display for BroadcastStreamRecvError (#3745)",
+          "timestamp": "2021-05-05T11:15:42+02:00",
+          "tree_id": "adfe9a0949afbc9f3fbfb843e00a136ce39746cf",
+          "url": "https://github.com/tokio-rs/tokio/commit/a945ce09960a55a6ac657a2a7aa3d72f8e00344e"
+        },
+        "date": 1620206260105,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 153024,
+            "range": "± 24974",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 565865,
+            "range": "± 60870",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4408835,
+            "range": "± 1108834",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17499810,
+            "range": "± 3835555",
             "unit": "ns/iter"
           }
         ]
