@@ -82,9 +82,6 @@ pub fn interval(period: Duration) -> Interval {
 /// An interval will tick indefinitely. At any time, the [`Interval`] value can
 /// be dropped. This cancels the interval.
 ///
-/// This function is equivalent to
-/// [`interval_with_missed_tick_behavior_at(start, period, Default::default())`](interval_with_missed_tick_behavior_at)
-///
 /// # Panics
 ///
 /// This function panics if `period` is zero.
@@ -109,105 +106,10 @@ pub fn interval(period: Duration) -> Interval {
 pub fn interval_at(start: Instant, period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
 
-    interval_with_missed_tick_behavior_at(start, period, Default::default())
-}
-
-/// Creates new [`Interval`] with a specific [`MissedTickBehavior`] that yields
-/// with interval of `period`. The first tick completes immediately.
-///
-/// An interval will tick indefinitely. At any time, the [`Interval`] value can
-/// be dropped. This cancels the interval.
-///
-/// This function is equivalent to
-/// [`interval_with_missed_tick_behavior_at(Instant::now(), period, missed_tick_behavior)`](interval_with_missed_tick_behavior_at)
-///
-/// # Panics
-///
-/// This function panics if `period` is zero.
-///
-/// # Examples
-///
-/// ```
-/// use tokio::time::{
-///     interval_with_missed_tick_behavior,
-///     sleep,
-///     Duration,
-///     MissedTickBehavior,
-/// };
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut interval = interval_with_missed_tick_behavior(
-///         Duration::from_millis(10),
-///         MissedTickBehavior::Skip,
-///     );
-///
-///     interval.tick().await;                  // ticks immediately
-///     sleep(Duration::from_millis(25)).await; // simulating executor getting blocked
-///     interval.tick().await;                  // ticks immediately, yielding an `Instant` 10ms after the starting tick
-///     interval.tick().await;                  // ticks after 5ms, yielding an `Instant` 30ms after the starting tick
-///
-///     // approximately 30ms have elapsed.
-/// }
-/// ```
-pub fn interval_with_missed_tick_behavior(
-    period: Duration,
-    missed_tick_behavior: MissedTickBehavior,
-) -> Interval {
-    assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
-
-    interval_with_missed_tick_behavior_at(Instant::now(), period, missed_tick_behavior)
-}
-
-/// Creates new [`Interval`] with a specific [`MissedTickBehavior`] that yields
-/// with interval of `period`. The first tick completes at `start`.
-///
-/// An interval will tick indefinitely. At any time, the [`Interval`] value can
-/// be dropped. This cancels the interval.
-///
-/// # Panics
-///
-/// This function panics if `period` is zero.
-///
-/// # Examples
-///
-/// ```
-/// use tokio::time::{
-///     interval_with_missed_tick_behavior_at,
-///     sleep,
-///     Duration,
-///     Instant,
-///     MissedTickBehavior
-/// };
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let start = Instant::now() + Duration::from_millis(50);
-///     let mut interval = interval_with_missed_tick_behavior_at(
-///         start,
-///         Duration::from_millis(10),
-///         MissedTickBehavior::Skip,
-///     );
-///
-///     interval.tick().await;                  // ticks after 50ms
-///     sleep(Duration::from_millis(25)).await; // simulating executor getting blocked
-///     interval.tick().await;                  // ticks immediately, yielding an `Instant` 10ms after the starting tick
-///     interval.tick().await;                  // ticks after 5ms, yielding an `Instant` 30ms after the starting tick
-///
-///     // approximately 30ms have elapsed.
-/// }
-/// ```
-pub fn interval_with_missed_tick_behavior_at(
-    start: Instant,
-    period: Duration,
-    missed_tick_behavior: MissedTickBehavior,
-) -> Interval {
-    assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
-
     Interval {
         delay: Box::pin(sleep_until(start)),
         period,
-        missed_tick_behavior,
+        missed_tick_behavior: Default::default(),
     }
 }
 
@@ -352,9 +254,7 @@ impl Default for MissedTickBehavior {
     }
 }
 
-/// Interval returned by [`interval`], [`interval_at`],
-/// [`interval_with_missed_tick_behavior`], and
-/// [`interval_with_missed_tick_behavior_at`].
+/// Interval returned by [`interval`], [`interval_at`]
 ///
 /// This type allows you to wait on a sequence of instants with a certain
 /// duration between each instant. Unlike calling [`sleep`] in a loop, this lets

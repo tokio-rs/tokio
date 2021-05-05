@@ -99,10 +99,7 @@ mod instant;
 pub use self::instant::Instant;
 
 mod interval;
-pub use interval::{
-    interval, interval_at, interval_with_missed_tick_behavior,
-    interval_with_missed_tick_behavior_at, Interval, MissedTickBehavior,
-};
+pub use interval::{interval, interval_at, Interval, MissedTickBehavior};
 
 mod timeout;
 #[doc(inline)]
