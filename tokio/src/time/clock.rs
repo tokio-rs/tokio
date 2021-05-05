@@ -17,7 +17,7 @@ cfg_not_test_util! {
     }
 
     impl Clock {
-        pub(crate) fn new() -> Clock {
+        pub(crate) fn new(_enable_pausing: bool, _start_paused: bool) -> Clock {
             Clock {}
         }
 
@@ -59,6 +59,9 @@ cfg_test_util! {
 
     #[derive(Debug)]
     struct Inner {
+        /// True if the ability to pause time is enabled.
+        enable_pausing: bool,
+
         /// Instant to use as the clock's base instant.
         base: std::time::Instant,
 
@@ -69,14 +72,19 @@ cfg_test_util! {
     /// Pause time
     ///
     /// The current value of `Instant::now()` is saved and all subsequent calls
-    /// to `Instant::now()` until the timer wheel is checked again will return the saved value.
-    /// Once the timer wheel is checked, time will immediately advance to the next registered
-    /// `Sleep`. This is useful for running tests that depend on time.
+    /// to `Instant::now()` until the timer wheel is checked again will return
+    /// the saved value. Once the timer wheel is checked, time will immediately
+    /// advance to the next registered `Sleep`. This is useful for running tests
+    /// that depend on time.
+    ///
+    /// Pausing time requires the `current_thread` Tokio runtime. This is the
+    /// default runtime used by `#[tokio::test]`. The runtime can be initialized
+    /// with time in a paused state using the `Builder::start_paused` method.
     ///
     /// # Panics
     ///
-    /// Panics if time is already frozen or if called from outside of the Tokio
-    /// runtime.
+    /// Panics if time is already frozen or if called from outside of a
+    /// `current_thread` Tokio runtime.
     pub fn pause() {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.pause();
@@ -112,22 +120,11 @@ cfg_test_util! {
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub async fn advance(duration: Duration) {
-        use crate::future::poll_fn;
-        use std::task::Poll;
-
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let until = clock.now() + duration;
         clock.advance(duration);
 
-        let mut yielded = false;
-        poll_fn(|cx| {
-            if yielded {
-                Poll::Ready(())
-            } else {
-                yielded = true;
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        }).await;
+        crate::time::sleep_until(until).await;
     }
 
     /// Return the current instant, factoring in frozen time.
@@ -142,19 +139,32 @@ cfg_test_util! {
     impl Clock {
         /// Return a new `Clock` instance that uses the current execution context's
         /// source of time.
-        pub(crate) fn new() -> Clock {
+        pub(crate) fn new(enable_pausing: bool, start_paused: bool) -> Clock {
             let now = std::time::Instant::now();
 
-            Clock {
+            let clock = Clock {
                 inner: Arc::new(Mutex::new(Inner {
+                    enable_pausing,
                     base: now,
                     unfrozen: Some(now),
                 })),
+            };
+
+            if start_paused {
+                clock.pause();
             }
+
+            clock
         }
 
         pub(crate) fn pause(&self) {
             let mut inner = self.inner.lock().unwrap();
+
+            if !inner.enable_pausing {
+                drop(inner); // avoid poisoning the lock
+                panic!("`time::pause()` requires the `current_thread` Tokio runtime. \
+                        This is the default Runtime used by `#[tokio::test].");
+            }
 
             let elapsed = inner.unfrozen.as_ref().expect("time is already frozen").elapsed();
             inner.base += elapsed;

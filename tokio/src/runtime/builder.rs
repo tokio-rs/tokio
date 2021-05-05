@@ -47,13 +47,16 @@ pub struct Builder {
     /// Whether or not to enable the time driver
     enable_time: bool,
 
+    /// Whether or not the clock should start paused.
+    start_paused: bool,
+
     /// The number of worker threads, used by Runtime.
     ///
     /// Only used when not using the current-thread executor.
     worker_threads: Option<usize>,
 
     /// Cap on thread usage.
-    max_threads: usize,
+    max_blocking_threads: usize,
 
     /// Name fn used for threads spawned by the runtime.
     pub(super) thread_name: ThreadNameFn,
@@ -83,6 +86,11 @@ impl Builder {
     /// Returns a new builder with the current thread scheduler selected.
     ///
     /// Configuration methods can be chained on the return value.
+    ///
+    /// To spawn non-`Send` tasks on the resulting runtime, combine it with a
+    /// [`LocalSet`].
+    ///
+    /// [`LocalSet`]: crate::task::LocalSet
     pub fn new_current_thread() -> Builder {
         Builder::new(Kind::CurrentThread)
     }
@@ -110,10 +118,13 @@ impl Builder {
             // Time defaults to "off"
             enable_time: false,
 
+            // The clock starts not-paused
+            start_paused: false,
+
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
 
-            max_threads: 512,
+            max_blocking_threads: 512,
 
             // Default thread name
             thread_name: std::sync::Arc::new(|| "tokio-runtime-worker".into()),
@@ -156,8 +167,8 @@ impl Builder {
 
     /// Sets the number of worker threads the `Runtime` will use.
     ///
-    /// This should be a number between 0 and 32,768 though it is advised to
-    /// keep this value on the smaller side.
+    /// This can be any number above 0 though it is advised to keep this value
+    /// on the smaller side.
     ///
     /// # Default
     ///
@@ -209,22 +220,31 @@ impl Builder {
         self
     }
 
-    /// Specifies limit for threads, spawned by the Runtime.
+    /// Specifies the limit for additional threads spawned by the Runtime.
     ///
-    /// This is number of threads to be used by Runtime, including `core_threads`
-    /// Having `max_threads` less than `worker_threads` results in invalid configuration
-    /// when building multi-threaded `Runtime`, which would cause a panic.
-    ///
-    /// Similarly to the `worker_threads`, this number should be between 0 and 32,768.
+    /// These threads are used for blocking operations like tasks spawned
+    /// through [`spawn_blocking`]. Unlike the [`worker_threads`], they are not
+    /// always active and will exit if left idle for too long. You can change
+    /// this timeout duration with [`thread_keep_alive`].
     ///
     /// The default value is 512.
     ///
-    /// When multi-threaded runtime is not used, will act as limit on additional threads.
+    /// # Panic
     ///
-    /// Otherwise as `core_threads` are always active, it limits additional threads (e.g. for
-    /// blocking annotations) as `max_threads - core_threads`.
-    pub fn max_threads(&mut self, val: usize) -> &mut Self {
-        self.max_threads = val;
+    /// This will panic if `val` is not larger than `0`.
+    ///
+    /// # Upgrading from 0.x
+    ///
+    /// In old versions `max_threads` limited both blocking and worker threads, but the
+    /// current `max_blocking_threads` does not include async worker threads in the count.
+    ///
+    /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
+    /// [`worker_threads`]: Self::worker_threads
+    /// [`thread_keep_alive`]: Self::thread_keep_alive
+    #[cfg_attr(docsrs, doc(alias = "max_threads"))]
+    pub fn max_blocking_threads(&mut self, val: usize) -> &mut Self {
+        assert!(val > 0, "Max blocking threads cannot be set to 0");
+        self.max_blocking_threads = val;
         self
     }
 
@@ -379,8 +399,14 @@ impl Builder {
 
     fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
+            enable_pause_time: match self.kind {
+                Kind::CurrentThread => true,
+                #[cfg(feature = "rt-multi-thread")]
+                Kind::MultiThread => false,
+            },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
+            start_paused: self.start_paused,
         }
     }
 
@@ -419,7 +445,7 @@ impl Builder {
         let spawner = Spawner::Basic(scheduler.spawner().clone());
 
         // Blocking pool
-        let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+        let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
@@ -484,16 +510,39 @@ cfg_time! {
     }
 }
 
+cfg_test_util! {
+    impl Builder {
+        /// Controls if the runtime's clock starts paused or advancing.
+        ///
+        /// Pausing time requires the current-thread runtime; construction of
+        /// the runtime will panic otherwise.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .enable_time()
+        ///     .start_paused(true)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn start_paused(&mut self, start_paused: bool) -> &mut Self {
+            self.start_paused = start_paused;
+            self
+        }
+    }
+}
+
 cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
             use crate::runtime::{Kind, ThreadPool};
             use crate::runtime::park::Parker;
-            use std::cmp;
 
-            let core_threads = self.worker_threads.unwrap_or_else(|| cmp::min(self.max_threads, num_cpus()));
-            assert!(core_threads <= self.max_threads, "Core threads number cannot be above max limit");
+            let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
@@ -501,7 +550,7 @@ cfg_rt_multi_thread! {
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Create the runtime handle
@@ -531,7 +580,7 @@ impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Builder")
             .field("worker_threads", &self.worker_threads)
-            .field("max_threads", &self.max_threads)
+            .field("max_blocking_threads", &self.max_blocking_threads)
             .field(
                 "thread_name",
                 &"<dyn Fn() -> String + Send + Sync + 'static>",

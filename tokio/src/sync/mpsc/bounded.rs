@@ -1,6 +1,6 @@
 use crate::sync::batch_semaphore::{self as semaphore, TryAcquireError};
 use crate::sync::mpsc::chan;
-use crate::sync::mpsc::error::{SendError, TryRecvError, TrySendError};
+use crate::sync::mpsc::error::{SendError, TrySendError};
 
 cfg_time! {
     use crate::sync::mpsc::error::SendTimeoutError;
@@ -8,29 +8,54 @@ cfg_time! {
 }
 
 use std::fmt;
-#[cfg(any(feature = "signal", feature = "process", feature = "stream"))]
 use std::task::{Context, Poll};
 
 /// Send values to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`](channel) function.
+///
+/// To use the `Sender` in a poll function, you can use the [`PollSender`]
+/// utility.
+///
+/// [`PollSender`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSender.html
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
 
 /// Permit to send one value into the channel.
 ///
-/// `Permit` values are returned by [`Sender::reserve()`] and are used to
-/// guarantee channel capacity before generating a message to send.
+/// `Permit` values are returned by [`Sender::reserve()`] and [`Sender::try_reserve()`]
+/// and are used to guarantee channel capacity before generating a message to send.
 ///
 /// [`Sender::reserve()`]: Sender::reserve
+/// [`Sender::try_reserve()`]: Sender::try_reserve
 pub struct Permit<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
+}
+
+/// Owned permit to send one value into the channel.
+///
+/// This is identical to the [`Permit`] type, except that it moves the sender
+/// rather than borrowing it.
+///
+/// `OwnedPermit` values are returned by [`Sender::reserve_owned()`] and
+/// [`Sender::try_reserve_owned()`] and are used to guarantee channel capacity
+/// before generating a message to send.
+///
+/// [`Permit`]: Permit
+/// [`Sender::reserve_owned()`]: Sender::reserve_owned
+/// [`Sender::try_reserve_owned()`]: Sender::try_reserve_owned
+pub struct OwnedPermit<T> {
+    chan: Option<chan::Tx<T, Semaphore>>,
 }
 
 /// Receive values from the associated `Sender`.
 ///
 /// Instances are created by the [`channel`](channel) function.
+///
+/// This receiver can be turned into a `Stream` using [`ReceiverStream`].
+///
+/// [`ReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReceiverStream.html
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
@@ -102,8 +127,21 @@ impl<T> Receiver<T> {
 
     /// Receives the next value for this receiver.
     ///
-    /// `None` is returned when all `Sender` halves have dropped, indicating
-    /// that no further values can be sent on the channel.
+    /// This method returns `None` if the channel has been closed and there are
+    /// no remaining messages in the channel's buffer. This indicates that no
+    /// further values can ever be received from this `Receiver`. The channel is
+    /// closed when all senders have been dropped, or when [`close`] is called.
+    ///
+    /// If there are no messages in the channel's buffer, but the channel has
+    /// not yet been closed, this method will sleep until a message is sent or
+    /// the channel is closed.
+    ///
+    /// Note that if [`close`] is called, but there are still outstanding
+    /// [`Permits`] from before it was closed, the channel is not considered
+    /// closed by `recv` until the permits are released.
+    ///
+    /// [`close`]: Self::close
+    /// [`Permits`]: struct@crate::sync::mpsc::Permit
     ///
     /// # Examples
     ///
@@ -144,12 +182,28 @@ impl<T> Receiver<T> {
         poll_fn(|cx| self.chan.recv(cx)).await
     }
 
-    #[cfg(any(feature = "signal", feature = "process"))]
-    pub(crate) fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.chan.recv(cx)
-    }
-
     /// Blocking receive to call outside of asynchronous contexts.
+    ///
+    /// This method returns `None` if the channel has been closed and there are
+    /// no remaining messages in the channel's buffer. This indicates that no
+    /// further values can ever be received from this `Receiver`. The channel is
+    /// closed when all senders have been dropped, or when [`close`] is called.
+    ///
+    /// If there are no messages in the channel's buffer, but the channel has
+    /// not yet been closed, this method will block until a message is sent or
+    /// the channel is closed.
+    ///
+    /// This method is intended for use cases where you are sending from
+    /// asynchronous code to synchronous code, and will work even if the sender
+    /// is not using [`blocking_send`] to send the message.
+    ///
+    /// Note that if [`close`] is called, but there are still outstanding
+    /// [`Permits`] from before it was closed, the channel is not considered
+    /// closed by `blocking_recv` until the permits are released.
+    ///
+    /// [`close`]: Self::close
+    /// [`Permits`]: struct@crate::sync::mpsc::Permit
+    /// [`blocking_send`]: fn@crate::sync::mpsc::Sender::blocking_send
     ///
     /// # Panics
     ///
@@ -183,31 +237,19 @@ impl<T> Receiver<T> {
         crate::future::block_on(self.recv())
     }
 
-    /// Attempts to return a pending value on this receiver without blocking.
-    ///
-    /// This method will never block the caller in order to wait for data to
-    /// become available. Instead, this will always return immediately with
-    /// a possible option of pending data on the channel.
-    ///
-    /// This is useful for a flavor of "optimistic check" before deciding to
-    /// block on a receiver.
-    ///
-    /// Compared with recv, this function has two failure cases instead of
-    /// one (one for disconnection, one for an empty buffer).
-    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
-        self.chan.try_recv()
-    }
-
-    /// Closes the receiving half of a channel, without dropping it.
+    /// Closes the receiving half of a channel without dropping it.
     ///
     /// This prevents any further messages from being sent on the channel while
     /// still enabling the receiver to drain messages that are buffered. Any
     /// outstanding [`Permit`] values will still be able to send messages.
     ///
-    /// In order to guarantee no messages are dropped, after calling `close()`,
-    /// `recv()` must be called until `None` is returned.
+    /// To guarantee that no messages are dropped, after calling `close()`,
+    /// `recv()` must be called until `None` is returned. If there are
+    /// outstanding [`Permit`] or [`OwnedPermit`] values, the `recv` method will
+    /// not return `None` until those are released.
     ///
     /// [`Permit`]: Permit
+    /// [`OwnedPermit`]: OwnedPermit
     ///
     /// # Examples
     ///
@@ -238,6 +280,25 @@ impl<T> Receiver<T> {
     pub fn close(&mut self) {
         self.chan.close();
     }
+
+    /// Polls to receive the next message on this channel.
+    ///
+    /// This method returns:
+    ///
+    ///  * `Poll::Pending` if no messages are available but the channel is not
+    ///    closed.
+    ///  * `Poll::Ready(Some(message))` if a message is available.
+    ///  * `Poll::Ready(None)` if the channel has been closed and all messages
+    ///    sent before it was closed have been received.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when a message is sent on any
+    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// `poll_recv`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup.
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        self.chan.recv(cx)
+    }
 }
 
 impl<T> fmt::Debug for Receiver<T> {
@@ -249,16 +310,6 @@ impl<T> fmt::Debug for Receiver<T> {
 }
 
 impl<T> Unpin for Receiver<T> {}
-
-cfg_stream! {
-    impl<T> crate::stream::Stream for Receiver<T> {
-        type Item = T;
-
-        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-            self.chan.recv(cx)
-        }
-    }
-}
 
 impl<T> Sender<T> {
     pub(crate) fn new(chan: chan::Tx<T, Semaphore>) -> Sender<T> {
@@ -348,7 +399,7 @@ impl<T> Sender<T> {
     ///         tx4.closed(),
     ///         tx5.closed()
     ///     );
-    ////     println!("Receiver dropped");
+    ///     println!("Receiver dropped");
     /// }
     /// ```
     pub async fn closed(&self) {
@@ -493,6 +544,12 @@ impl<T> Sender<T> {
 
     /// Blocking send to call outside of asynchronous contexts.
     ///
+    /// This method is intended for use cases where you are sending from
+    /// synchronous code to asynchronous code, and will work even if the
+    /// receiver is not using [`blocking_recv`] to receive the message.
+    ///
+    /// [`blocking_recv`]: fn@crate::sync::mpsc::Receiver::blocking_recv
+    ///
     /// # Panics
     ///
     /// This function panics if called within an asynchronous execution
@@ -584,12 +641,263 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub async fn reserve(&self) -> Result<Permit<'_, T>, SendError<()>> {
+        self.reserve_inner().await?;
+        Ok(Permit { chan: &self.chan })
+    }
+
+    /// Wait for channel capacity, moving the `Sender` and returning an owned
+    /// permit. Once capacity to send one message is available, it is reserved
+    /// for the caller.
+    ///
+    /// This moves the sender _by value_, and returns an owned permit that can
+    /// be used to send a message into the channel. Unlike [`Sender::reserve`],
+    /// this method may be used in cases where the permit must be valid for the
+    /// `'static` lifetime. `Sender`s may be cloned cheaply (`Sender::clone` is
+    /// essentially a reference count increment, comparable to [`Arc::clone`]),
+    /// so when multiple [`OwnedPermit`]s are needed or the `Sender` cannot be
+    /// moved, it can be cloned prior to calling `reserve_owned`.
+    ///
+    /// If the channel is full, the function waits for the number of unreceived
+    /// messages to become less than the channel capacity. Capacity to send one
+    /// message is reserved for the caller. An [`OwnedPermit`] is returned to
+    /// track the reserved capacity. The [`send`] function on [`OwnedPermit`]
+    /// consumes the reserved capacity.
+    ///
+    /// Dropping the [`OwnedPermit`] without sending a message releases the
+    /// capacity back to the channel.
+    ///
+    /// # Examples
+    /// Sending a message using an [`OwnedPermit`]:
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     // Reserve capacity, moving the sender.
+    ///     let permit = tx.reserve_owned().await.unwrap();
+    ///
+    ///     // Send a message, consuming the permit and returning
+    ///     // the moved sender.
+    ///     let tx = permit.send(123);
+    ///
+    ///     // The value sent on the permit is received.
+    ///     assert_eq!(rx.recv().await.unwrap(), 123);
+    ///
+    ///     // The sender can now be used again.
+    ///     tx.send(456).await.unwrap();
+    /// }
+    /// ```
+    ///
+    /// When multiple [`OwnedPermit`]s are needed, or the sender cannot be moved
+    /// by value, it can be inexpensively cloned before calling `reserve_owned`:
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     // Clone the sender and reserve capacity.
+    ///     let permit = tx.clone().reserve_owned().await.unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Sending on the permit succeeds.
+    ///     permit.send(456);
+    ///
+    ///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    /// }
+    /// ```
+    ///
+    /// [`Sender::reserve`]: Sender::reserve
+    /// [`OwnedPermit`]: OwnedPermit
+    /// [`send`]: OwnedPermit::send
+    /// [`Arc::clone`]: std::sync::Arc::clone
+    pub async fn reserve_owned(self) -> Result<OwnedPermit<T>, SendError<()>> {
+        self.reserve_inner().await?;
+        Ok(OwnedPermit {
+            chan: Some(self.chan),
+        })
+    }
+
+    async fn reserve_inner(&self) -> Result<(), SendError<()>> {
         match self.chan.semaphore().0.acquire(1).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(SendError(())),
+        }
+    }
+
+    /// Try to acquire a slot in the channel without waiting for the slot to become
+    /// available.
+    ///
+    /// If the channel is full this function will return [`TrySendError`], otherwise
+    /// if there is a slot available it will return a [`Permit`] that will then allow you
+    /// to [`send`] on the channel with a guaranteed slot. This function is similar to
+    /// [`reserve`] except it does not await for the slot to become available.
+    ///
+    /// Dropping [`Permit`] without sending a message releases the capacity back
+    /// to the channel.
+    ///
+    /// [`Permit`]: Permit
+    /// [`send`]: Permit::send
+    /// [`reserve`]: Sender::reserve
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     // Reserve capacity
+    ///     let permit = tx.try_reserve().unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Trying to reserve an additional slot on the `tx` will
+    ///     // fail because there is no capacity.
+    ///     assert!(tx.try_reserve().is_err());
+    ///
+    ///     // Sending on the permit succeeds
+    ///     permit.send(456);
+    ///
+    ///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    ///
+    /// }
+    /// ```
+    pub fn try_reserve(&self) -> Result<Permit<'_, T>, TrySendError<()>> {
+        match self.chan.semaphore().0.try_acquire(1) {
             Ok(_) => {}
-            Err(_) => return Err(SendError(())),
+            Err(_) => return Err(TrySendError::Full(())),
         }
 
         Ok(Permit { chan: &self.chan })
+    }
+
+    /// Try to acquire a slot in the channel without waiting for the slot to become
+    /// available, returning an owned permit.
+    ///
+    /// This moves the sender _by value_, and returns an owned permit that can
+    /// be used to send a message into the channel. Unlike [`Sender::try_reserve`],
+    /// this method may be used in cases where the permit must be valid for the
+    /// `'static` lifetime.  `Sender`s may be cloned cheaply (`Sender::clone` is
+    /// essentially a reference count increment, comparable to [`Arc::clone`]),
+    /// so when multiple [`OwnedPermit`]s are needed or the `Sender` cannot be
+    /// moved, it can be cloned prior to calling `try_reserve_owned`.
+    ///
+    /// If the channel is full this function will return a [`TrySendError`].
+    /// Since the sender is taken by value, the `TrySendError` returned in this
+    /// case contains the sender, so that it may be used again. Otherwise, if
+    /// there is a slot available, this method will return an [`OwnedPermit`]
+    /// that can then be used to [`send`] on the channel with a guaranteed slot.
+    /// This function is similar to  [`reserve_owned`] except it does not await
+    /// for the slot to become available.
+    ///
+    /// Dropping the [`OwnedPermit`] without sending a message releases the capacity back
+    /// to the channel.
+    ///
+    /// [`OwnedPermit`]: OwnedPermit
+    /// [`send`]: OwnedPermit::send
+    /// [`reserve_owned`]: Sender::reserve_owned
+    /// [`Arc::clone`]: std::sync::Arc::clone
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     // Reserve capacity
+    ///     let permit = tx.clone().try_reserve_owned().unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Trying to reserve an additional slot on the `tx` will
+    ///     // fail because there is no capacity.
+    ///     assert!(tx.try_reserve().is_err());
+    ///
+    ///     // Sending on the permit succeeds
+    ///     permit.send(456);
+    ///
+    ///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    ///
+    /// }
+    /// ```
+    pub fn try_reserve_owned(self) -> Result<OwnedPermit<T>, TrySendError<Self>> {
+        match self.chan.semaphore().0.try_acquire(1) {
+            Ok(_) => {}
+            Err(_) => return Err(TrySendError::Full(self)),
+        }
+
+        Ok(OwnedPermit {
+            chan: Some(self.chan),
+        })
+    }
+
+    /// Returns `true` if senders belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
+    /// let  tx2 = tx.clone();
+    /// assert!(tx.same_channel(&tx2));
+    ///
+    /// let (tx3, rx3) = tokio::sync::mpsc::channel::<()>(1);
+    /// assert!(!tx3.same_channel(&tx2));
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        self.chan.same_channel(&other.chan)
+    }
+
+    /// Returns the current capacity of the channel.
+    ///
+    /// The capacity goes down when sending a value by calling [`send`] or by reserving capacity
+    /// with [`reserve`]. The capacity goes up when values are received by the [`Receiver`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel::<()>(5);
+    ///
+    ///     assert_eq!(tx.capacity(), 5);
+    ///
+    ///     // Making a reservation drops the capacity by one.
+    ///     let permit = tx.reserve().await.unwrap();
+    ///     assert_eq!(tx.capacity(), 4);
+    ///
+    ///     // Sending and receiving a value increases the caapcity by one.
+    ///     permit.send(());
+    ///     rx.recv().await.unwrap();
+    ///     assert_eq!(tx.capacity(), 5);
+    /// }
+    /// ```
+    ///
+    /// [`send`]: Sender::send
+    /// [`reserve`]: Sender::reserve
+    pub fn capacity(&self) -> usize {
+        self.chan.semaphore().0.available_permits()
     }
 }
 
@@ -663,6 +971,8 @@ impl<T> Drop for Permit<'_, T> {
         // Add the permit back to the semaphore
         semaphore.add_permit();
 
+        // If this is the last sender for this channel, wake the receiver so
+        // that it can be notified that the channel is closed.
         if semaphore.is_closed() && semaphore.is_idle() {
             self.chan.wake_rx();
         }
@@ -672,6 +982,126 @@ impl<T> Drop for Permit<'_, T> {
 impl<T> fmt::Debug for Permit<'_, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Permit")
+            .field("chan", &self.chan)
+            .finish()
+    }
+}
+
+// ===== impl Permit =====
+
+impl<T> OwnedPermit<T> {
+    /// Sends a value using the reserved capacity.
+    ///
+    /// Capacity for the message has already been reserved. The message is sent
+    /// to the receiver and the permit is consumed. The operation will succeed
+    /// even if the receiver half has been closed. See [`Receiver::close`] for
+    /// more details on performing a clean shutdown.
+    ///
+    /// Unlike [`Permit::send`], this method returns the [`Sender`] from which
+    /// the `OwnedPermit` was reserved.
+    ///
+    /// [`Receiver::close`]: Receiver::close
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     // Reserve capacity
+    ///     let permit = tx.reserve_owned().await.unwrap();
+    ///
+    ///     // Send a message on the permit, returning the sender.
+    ///     let tx = permit.send(456);
+    ///
+    ///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    ///
+    ///     // We may now reuse `tx` to send another message.
+    ///     tx.send(789).await.unwrap();
+    /// }
+    /// ```
+    pub fn send(mut self, value: T) -> Sender<T> {
+        let chan = self.chan.take().unwrap_or_else(|| {
+            unreachable!("OwnedPermit channel is only taken when the permit is moved")
+        });
+        chan.send(value);
+
+        Sender { chan }
+    }
+
+    /// Release the reserved capacity *without* sending a message, returning the
+    /// [`Sender`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel(1);
+    ///
+    ///     // Clone the sender and reserve capacity
+    ///     let permit = tx.clone().reserve_owned().await.unwrap();
+    ///
+    ///     // Trying to send on the original `tx` will fail, since the `permit`
+    ///     // has reserved all the available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Release the permit without sending a message, returning the clone
+    ///     // of the sender.
+    ///     let tx2 = permit.release();
+    ///
+    ///     // We may now reuse `tx` to send another message.
+    ///     tx.send(789).await.unwrap();
+    ///     # drop(rx); drop(tx2);
+    /// }
+    /// ```
+    ///
+    /// [`Sender`]: Sender
+    pub fn release(mut self) -> Sender<T> {
+        use chan::Semaphore;
+
+        let chan = self.chan.take().unwrap_or_else(|| {
+            unreachable!("OwnedPermit channel is only taken when the permit is moved")
+        });
+
+        // Add the permit back to the semaphore
+        chan.semaphore().add_permit();
+        Sender { chan }
+    }
+}
+
+impl<T> Drop for OwnedPermit<T> {
+    fn drop(&mut self) {
+        use chan::Semaphore;
+
+        // Are we still holding onto the sender?
+        if let Some(chan) = self.chan.take() {
+            let semaphore = chan.semaphore();
+
+            // Add the permit back to the semaphore
+            semaphore.add_permit();
+
+            // If this `OwnedPermit` is holding the last sender for this
+            // channel, wake the receiver so that it can be notified that the
+            // channel is closed.
+            if semaphore.is_closed() && semaphore.is_idle() {
+                chan.wake_rx();
+            }
+        }
+
+        // Otherwise, do nothing.
+    }
+}
+
+impl<T> fmt::Debug for OwnedPermit<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("OwnedPermit")
             .field("chan", &self.chan)
             .finish()
     }

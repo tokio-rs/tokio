@@ -54,7 +54,7 @@ fn read_exclusive_pending() {
 // should be made available when one of the shared acesses is dropped
 #[test]
 fn exhaust_reading() {
-    let rwlock = RwLock::new(100);
+    let rwlock = RwLock::with_max_readers(100, 1024);
     let mut reads = Vec::new();
     loop {
         let mut t = spawn(rwlock.read());
@@ -234,4 +234,37 @@ async fn multithreaded() {
     barrier.wait().await;
     let g = rwlock.read().await;
     assert_eq!(*g, 17_000);
+}
+
+#[tokio::test]
+async fn try_write() {
+    let lock = RwLock::new(0);
+    let read_guard = lock.read().await;
+    assert!(lock.try_write().is_err());
+    drop(read_guard);
+    assert!(lock.try_write().is_ok());
+}
+
+#[test]
+fn try_read_try_write() {
+    let lock: RwLock<usize> = RwLock::new(15);
+
+    {
+        let rg1 = lock.try_read().unwrap();
+        assert_eq!(*rg1, 15);
+
+        assert!(lock.try_write().is_err());
+
+        let rg2 = lock.try_read().unwrap();
+        assert_eq!(*rg2, 15)
+    }
+
+    {
+        let mut wg = lock.try_write().unwrap();
+        *wg = 1515;
+
+        assert!(lock.try_read().is_err())
+    }
+
+    assert_eq!(*lock.try_read().unwrap(), 1515);
 }

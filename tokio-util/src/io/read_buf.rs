@@ -5,15 +5,15 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
-/// Read data from an `AsyncRead` into an implementer of the [`Buf`] trait.
+/// Read data from an `AsyncRead` into an implementer of the [`BufMut`] trait.
 ///
-/// [`Buf`]: bytes::Buf
+/// [`BufMut`]: bytes::BufMut
 ///
 /// # Example
 ///
 /// ```
 /// use bytes::{Bytes, BytesMut};
-/// use tokio::stream;
+/// use tokio_stream as stream;
 /// use tokio::io::Result;
 /// use tokio_util::io::{StreamReader, read_buf};
 /// # #[tokio::main]
@@ -59,7 +59,7 @@ where
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             let this = &mut *self;
-            super::poll_read_buf(Pin::new(this.0), cx, this.1)
+            crate::util::poll_read_buf(Pin::new(this.0), cx, this.1)
         }
     }
 }

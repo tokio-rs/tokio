@@ -21,12 +21,11 @@ use std::{fmt, io};
 /// Owned read half of a [`UnixStream`], created by [`into_split`].
 ///
 /// Reading from an `OwnedReadHalf` is usually done using the convenience methods found
-/// on the [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
+/// on the [`AsyncReadExt`] trait.
 ///
 /// [`UnixStream`]: crate::net::UnixStream
 /// [`into_split`]: crate::net::UnixStream::into_split()
 /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
-/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct OwnedReadHalf {
     inner: Arc<UnixStream>,
@@ -39,15 +38,13 @@ pub struct OwnedReadHalf {
 /// Dropping the write half will also shut down the write half of the stream.
 ///
 /// Writing to an `OwnedWriteHalf` is usually done using the convenience methods
-/// found on the [`AsyncWriteExt`] trait. Examples import this trait through
-/// [the prelude].
+/// found on the [`AsyncWriteExt`] trait.
 ///
 /// [`UnixStream`]: crate::net::UnixStream
 /// [`into_split`]: crate::net::UnixStream::into_split()
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [`poll_shutdown`]: fn@crate::io::AsyncWrite::poll_shutdown
 /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct OwnedWriteHalf {
     inner: Arc<UnixStream>,
@@ -139,7 +136,7 @@ impl OwnedWriteHalf {
 impl Drop for OwnedWriteHalf {
     fn drop(&mut self) {
         if self.shutdown_on_drop {
-            let _ = self.inner.shutdown(Shutdown::Write);
+            let _ = self.inner.shutdown_std(Shutdown::Write);
         }
     }
 }
@@ -153,6 +150,18 @@ impl AsyncWrite for OwnedWriteHalf {
         self.inner.poll_write_priv(cx, buf)
     }
 
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.inner.poll_write_vectored_priv(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.inner.is_write_vectored()
+    }
+
     #[inline]
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         // flush is a no-op
@@ -161,7 +170,7 @@ impl AsyncWrite for OwnedWriteHalf {
 
     // `poll_shutdown` on a write half shutdowns the stream in the "write" direction.
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        let res = self.inner.shutdown(Shutdown::Write);
+        let res = self.inner.shutdown_std(Shutdown::Write);
         if res.is_ok() {
             Pin::into_inner(self).shutdown_on_drop = false;
         }

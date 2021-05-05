@@ -1,38 +1,44 @@
 use crate::future::poll_fn;
-use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
+use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
 use std::fmt;
-use std::io::{self, Read, Write};
+use std::io;
 use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
+
+cfg_io_util! {
+    use bytes::BufMut;
+}
 
 cfg_net! {
     /// A TCP stream between a local and a remote socket.
     ///
     /// A TCP stream can either be created by connecting to an endpoint, via the
-    /// [`connect`] method, or by [accepting] a connection from a [listener].
+    /// [`connect`] method, or by [accepting] a connection from a [listener]. A
+    /// TCP stream can also be created via the [`TcpSocket`] type.
     ///
     /// Reading and writing to a `TcpStream` is usually done using the
     /// convenience methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`]
-    /// traits. Examples import these traits through [the prelude].
+    /// traits.
     ///
     /// [`connect`]: method@TcpStream::connect
     /// [accepting]: method@crate::net::TcpListener::accept
     /// [listener]: struct@crate::net::TcpListener
+    /// [`TcpSocket`]: struct@crate::net::TcpSocket
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-    /// [the prelude]: crate::prelude
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncWriteExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
@@ -51,6 +57,13 @@ cfg_net! {
     ///
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    ///
+    /// To shut down the stream in the write direction, you can call the
+    /// [`shutdown()`] method. This will cause the other peer to receive a read of
+    /// length 0, indicating that no more data will be sent. This only closes
+    /// the stream in one direction.
+    ///
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub struct TcpStream {
         io: PollEvented<mio::net::TcpStream>,
     }
@@ -60,22 +73,23 @@ impl TcpStream {
     /// Opens a TCP connection to a remote host.
     ///
     /// `addr` is an address of the remote host. Anything which implements the
-    /// [`ToSocketAddrs`] trait can be supplied as the address. Note that
-    /// strings only implement this trait when the **`net`** feature is enabled,
-    /// as strings may contain domain names that need to be resolved.
+    /// [`ToSocketAddrs`] trait can be supplied as the address.  If `addr`
+    /// yields multiple addresses, connect will be attempted with each of the
+    /// addresses until a connection is successful. If none of the addresses
+    /// result in a successful connection, the error returned from the last
+    /// connection attempt (the last address) is returned.
     ///
-    /// If `addr` yields multiple addresses, connect will be attempted with each
-    /// of the addresses until a connection is successful. If none of the
-    /// addresses result in a successful connection, the error returned from the
-    /// last connection attempt (the last address) is returned.
+    /// To configure the socket before connecting, you can use the [`TcpSocket`]
+    /// type.
     ///
     /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+    /// [`TcpSocket`]: struct@crate::net::TcpSocket
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncWriteExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
@@ -129,9 +143,9 @@ impl TcpStream {
         // actually hit an error or not.
         //
         // If all that succeeded then we ship everything on up.
-        poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
+        poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;
 
-        if let Some(e) = stream.io.get_ref().take_error()? {
+        if let Some(e) = stream.io.take_error()? {
             return Err(e);
         }
 
@@ -145,8 +159,10 @@ impl TcpStream {
 
     /// Creates new `TcpStream` from a `std::net::TcpStream`.
     ///
-    /// This function will convert a TCP stream created by the standard library
-    /// to a TCP stream ready to be used with the provided event loop handle.
+    /// This function is intended to be used to wrap a TCP stream from the
+    /// standard library in the Tokio equivalent. The conversion assumes nothing
+    /// about the underlying stream; it is left up to the user to set it in
+    /// non-blocking mode.
     ///
     /// # Examples
     ///
@@ -157,6 +173,7 @@ impl TcpStream {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let std_stream = std::net::TcpStream::connect("127.0.0.1:34254")?;
+    ///     std_stream.set_nonblocking(true)?;
     ///     let stream = TcpStream::from_std(std_stream)?;
     ///     Ok(())
     /// }
@@ -175,6 +192,60 @@ impl TcpStream {
         Ok(TcpStream { io })
     }
 
+    /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
+    ///
+    /// The returned [`std::net::TcpStream`] will have nonblocking mode set as `true`.
+    /// Use [`set_nonblocking`] to change the blocking mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::error::Error;
+    /// use std::io::Read;
+    /// use tokio::net::TcpListener;
+    /// # use tokio::net::TcpStream;
+    /// # use tokio::io::AsyncWriteExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let mut data = [0u8; 12];
+    ///     let listener = TcpListener::bind("127.0.0.1:34254").await?;
+    /// #   let handle = tokio::spawn(async {
+    /// #       let mut stream: TcpStream = TcpStream::connect("127.0.0.1:34254").await.unwrap();
+    /// #       stream.write(b"Hello world!").await.unwrap();
+    /// #   });
+    ///     let (tokio_tcp_stream, _) = listener.accept().await?;
+    ///     let mut std_tcp_stream = tokio_tcp_stream.into_std()?;
+    /// #   handle.await.expect("The task being joined has panicked");
+    ///     std_tcp_stream.set_nonblocking(false)?;
+    ///     std_tcp_stream.read_exact(&mut data)?;
+    /// #   assert_eq!(b"Hello world!", &data);
+    ///     Ok(())
+    /// }
+    /// ```
+    /// [`tokio::net::TcpStream`]: TcpStream
+    /// [`std::net::TcpStream`]: std::net::TcpStream
+    /// [`set_nonblocking`]: fn@std::net::TcpStream::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::net::TcpStream> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_fd())
+                .map(|raw_fd| unsafe { std::net::TcpStream::from_raw_fd(raw_fd) })
+        }
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_socket())
+                .map(|raw_socket| unsafe { std::net::TcpStream::from_raw_socket(raw_socket) })
+        }
+    }
+
     /// Returns the local address that this stream is bound to.
     ///
     /// # Examples
@@ -190,7 +261,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().local_addr()
+        self.io.local_addr()
     }
 
     /// Returns the remote address that this stream is connected to.
@@ -208,12 +279,17 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().peer_addr()
+        self.io.peer_addr()
     }
 
     /// Attempts to receive data on the socket, without removing that data from
     /// the queue, registering the current task for wakeup if data is not yet
     /// available.
+    ///
+    /// Note that on multiple calls to `poll_peek`, `poll_read` or
+    /// `poll_read_ready`, only the `Waker` from the `Context` passed to the
+    /// most recent call is scheduled to receive a wakeup. (However,
+    /// `poll_write` retains a second, independent waker.)
     ///
     /// # Return value
     ///
@@ -230,7 +306,7 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io;
+    /// use tokio::io::{self, ReadBuf};
     /// use tokio::net::TcpStream;
     ///
     /// use futures::future::poll_fn;
@@ -239,6 +315,7 @@ impl TcpStream {
     /// async fn main() -> io::Result<()> {
     ///     let stream = TcpStream::connect("127.0.0.1:8000").await?;
     ///     let mut buf = [0; 10];
+    ///     let mut buf = ReadBuf::new(&mut buf);
     ///
     ///     poll_fn(|cx| {
     ///         stream.poll_peek(cx, &mut buf)
@@ -247,18 +324,455 @@ impl TcpStream {
     ///     Ok(())
     /// }
     /// ```
-    pub fn poll_peek(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    pub fn poll_peek(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<usize>> {
         loop {
-            let ev = ready!(self.io.poll_read_ready(cx))?;
+            let ev = ready!(self.io.registration().poll_read_ready(cx))?;
 
-            match self.io.get_ref().peek(buf) {
-                Ok(ret) => return Poll::Ready(Ok(ret)),
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+
+            match self.io.peek(b) {
+                Ok(ret) => {
+                    unsafe { buf.assume_init(ret) };
+                    buf.advance(ret);
+                    return Poll::Ready(Ok(ret));
+                }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.clear_readiness(ev);
+                    self.io.registration().clear_readiness(ev);
                 }
                 Err(e) => return Poll::Ready(Err(e)),
             }
         }
+    }
+
+    /// Wait for any of the requested ready states.
+    ///
+    /// This function is usually paired with `try_read()` or `try_write()`. It
+    /// can be used to concurrently read / write to the same socket on a single
+    /// task without splitting the socket.
+    ///
+    /// # Examples
+    ///
+    /// Concurrently read and write to the stream on the same task without
+    /// splitting.
+    ///
+    /// ```no_run
+    /// use tokio::io::Interest;
+    /// use tokio::net::TcpStream;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     loop {
+    ///         let ready = stream.ready(Interest::READABLE | Interest::WRITABLE).await?;
+    ///
+    ///         if ready.is_readable() {
+    ///             let mut data = vec![0; 1024];
+    ///             // Try to read data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.try_read(&mut data) {
+    ///                 Ok(n) => {
+    ///                     println!("read {} bytes", n);        
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///
+    ///         }
+    ///
+    ///         if ready.is_writable() {
+    ///             // Try to write data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.try_write(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("write {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     continue
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
+        let event = self.io.registration().readiness(interest).await?;
+        Ok(event.ready)
+    }
+
+    /// Wait for the socket to become readable.
+    ///
+    /// This function is equivalent to `ready(Interest::READABLE)` and is usually
+    /// paired with `try_read()`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     let mut msg = vec![0; 1024];
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be readable
+    ///         stream.readable().await?;
+    ///
+    ///         // Try to read data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match stream.try_read(&mut msg) {
+    ///             Ok(n) => {
+    ///                 msg.truncate(n);
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     println!("GOT = {:?}", msg);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn readable(&self) -> io::Result<()> {
+        self.ready(Interest::READABLE).await?;
+        Ok(())
+    }
+
+    /// Polls for read readiness.
+    ///
+    /// If the tcp stream is not currently ready for reading, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the tcp
+    /// stream becomes ready for reading, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_read_ready`, `poll_read` or
+    /// `poll_peek`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup. (However,
+    /// `poll_write_ready` retains a second, independent waker.)
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`readable`] is not feasible. Where possible, using [`readable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the tcp stream is not ready for reading.
+    /// * `Poll::Ready(Ok(()))` if the tcp stream is ready for reading.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`readable`]: method@Self::readable
+    pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.io.registration().poll_read_ready(cx).map_ok(|_| ())
+    }
+
+    /// Try to read data from the stream into the provided buffer, returning how
+    /// many bytes were read.
+    ///
+    /// Receives any pending data from the socket but does not wait for new data
+    /// to arrive. On success, returns the number of bytes read. Because
+    /// `try_read()` is non-blocking, the buffer does not have to be stored by
+    /// the async task and can exist entirely on the stack.
+    ///
+    /// Usually, [`readable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`readable()`]: TcpStream::readable()
+    /// [`ready()`]: TcpStream::ready()
+    ///
+    /// # Return
+    ///
+    /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+    /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
+    /// and will no longer yield data. If the stream is not ready to read data
+    /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be readable
+    ///         stream.readable().await?;
+    ///
+    ///         // Creating the buffer **after** the `await` prevents it from
+    ///         // being stored in the async task.
+    ///         let mut buf = [0; 4096];
+    ///
+    ///         // Try to read data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match stream.try_read(&mut buf) {
+    ///             Ok(0) => break,
+    ///             Ok(n) => {
+    ///                 println!("read {} bytes", n);
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn try_read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        use std::io::Read;
+
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || (&*self.io).read(buf))
+    }
+
+    cfg_io_util! {
+        /// Try to read data from the stream into the provided buffer, advancing the
+        /// buffer's internal cursor, returning how many bytes were read.
+        ///
+        /// Receives any pending data from the socket but does not wait for new data
+        /// to arrive. On success, returns the number of bytes read. Because
+        /// `try_read_buf()` is non-blocking, the buffer does not have to be stored by
+        /// the async task and can exist entirely on the stack.
+        ///
+        /// Usually, [`readable()`] or [`ready()`] is used with this function.
+        ///
+        /// [`readable()`]: TcpStream::readable()
+        /// [`ready()`]: TcpStream::ready()
+        ///
+        /// # Return
+        ///
+        /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+        /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
+        /// and will no longer yield data. If the stream is not ready to read data
+        /// `Err(io::ErrorKind::WouldBlock)` is returned.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpStream;
+        /// use std::error::Error;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> Result<(), Box<dyn Error>> {
+        ///     // Connect to a peer
+        ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+        ///
+        ///     loop {
+        ///         // Wait for the socket to be readable
+        ///         stream.readable().await?;
+        ///
+        ///         let mut buf = Vec::with_capacity(4096);
+        ///
+        ///         // Try to read data, this may still fail with `WouldBlock`
+        ///         // if the readiness event is a false positive.
+        ///         match stream.try_read_buf(&mut buf) {
+        ///             Ok(0) => break,
+        ///             Ok(n) => {
+        ///                 println!("read {} bytes", n);
+        ///             }
+        ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+        ///                 continue;
+        ///             }
+        ///             Err(e) => {
+        ///                 return Err(e.into());
+        ///             }
+        ///         }
+        ///     }
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().try_io(Interest::READABLE, || {
+                use std::io::Read;
+
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `TcpStream::read` to have filled up `n` bytes in the
+                // buffer.
+                let n = (&*self.io).read(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok(n)
+            })
+        }
+    }
+
+    /// Wait for the socket to become writable.
+    ///
+    /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
+    /// paired with `try_write()`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be writable
+    ///         stream.writable().await?;
+    ///
+    ///         // Try to write data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match stream.try_write(b"hello world") {
+    ///             Ok(n) => {
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn writable(&self) -> io::Result<()> {
+        self.ready(Interest::WRITABLE).await?;
+        Ok(())
+    }
+
+    /// Polls for write readiness.
+    ///
+    /// If the tcp stream is not currently ready for writing, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the tcp
+    /// stream becomes ready for writing, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_write_ready` or `poll_write`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_read_ready` retains a
+    /// second, independent waker.)
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`writable`] is not feasible. Where possible, using [`writable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the tcp stream is not ready for writing.
+    /// * `Poll::Ready(Ok(()))` if the tcp stream is ready for writing.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`writable`]: method@Self::writable
+    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.io.registration().poll_write_ready(cx).map_ok(|_| ())
+    }
+
+    /// Try to write a buffer to the stream, returning how many bytes were
+    /// written.
+    ///
+    /// The function will attempt to write the entire contents of `buf`, but
+    /// only part of the buffer may be written.
+    ///
+    /// This function is usually paired with `writable()`.
+    ///
+    /// # Return
+    ///
+    /// If data is successfully written, `Ok(n)` is returned, where `n` is the
+    /// number of bytes written. If the stream is not ready to write data,
+    /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be writable
+    ///         stream.writable().await?;
+    ///
+    ///         // Try to write data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match stream.try_write(b"hello world") {
+    ///             Ok(n) => {
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn try_write(&self, buf: &[u8]) -> io::Result<usize> {
+        use std::io::Write;
+
+        self.io
+            .registration()
+            .try_io(Interest::WRITABLE, || (&*self.io).write(buf))
     }
 
     /// Receives data on the socket from the remote address to which it is
@@ -272,7 +786,7 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncReadExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
@@ -300,7 +814,8 @@ impl TcpStream {
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
-            .async_io(mio::Interest::READABLE, |io| io.peek(buf))
+            .registration()
+            .async_io(Interest::READABLE, || self.io.peek(buf))
             .await
     }
 
@@ -309,27 +824,8 @@ impl TcpStream {
     /// This function will cause all pending and future I/O on the specified
     /// portions to return immediately with an appropriate value (see the
     /// documentation of `Shutdown`).
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    /// use std::error::Error;
-    /// use std::net::Shutdown;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    ///     // Shutdown the stream
-    ///     stream.shutdown(Shutdown::Write)?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        self.io.get_ref().shutdown(how)
+    pub(super) fn shutdown_std(&self, how: Shutdown) -> io::Result<()> {
+        self.io.shutdown(how)
     }
 
     /// Gets the value of the `TCP_NODELAY` option on this socket.
@@ -351,7 +847,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn nodelay(&self) -> io::Result<bool> {
-        self.io.get_ref().nodelay()
+        self.io.nodelay()
     }
 
     /// Sets the value of the `TCP_NODELAY` option on this socket.
@@ -375,7 +871,73 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        self.io.get_ref().set_nodelay(nodelay)
+        self.io.set_nodelay(nodelay)
+    }
+
+    /// Reads the linger duration for this socket by getting the `SO_LINGER`
+    /// option.
+    ///
+    /// For more information about this option, see [`set_linger`].
+    ///
+    /// [`set_linger`]: TcpStream::set_linger
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    /// println!("{:?}", stream.linger()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn linger(&self) -> io::Result<Option<Duration>> {
+        let mio_socket = std::mem::ManuallyDrop::new(self.to_mio());
+
+        mio_socket.get_linger()
+    }
+
+    /// Sets the linger duration of this socket by setting the SO_LINGER option.
+    ///
+    /// This option controls the action taken when a stream has unsent messages and the stream is
+    /// closed. If SO_LINGER is set, the system shall block the process until it can transmit the
+    /// data or until the time expires.
+    ///
+    /// If SO_LINGER is not specified, and the stream is closed, the system handles the call in a
+    /// way that allows the process to continue as quickly as possible.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    /// stream.set_linger(None)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
+        let mio_socket = std::mem::ManuallyDrop::new(self.to_mio());
+
+        mio_socket.set_linger(dur)
+    }
+
+    fn to_mio(&self) -> mio::net::TcpSocket {
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{AsRawSocket, FromRawSocket};
+            unsafe { mio::net::TcpSocket::from_raw_socket(self.as_raw_socket()) }
+        }
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::{AsRawFd, FromRawFd};
+            unsafe { mio::net::TcpSocket::from_raw_fd(self.as_raw_fd()) }
+        }
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -397,7 +959,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn ttl(&self) -> io::Result<u32> {
-        self.io.get_ref().ttl()
+        self.io.ttl()
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -418,7 +980,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.io.get_ref().set_ttl(ttl)
+        self.io.set_ttl(ttl)
     }
 
     // These lifetime markers also appear in the generated documentation, and make
@@ -442,53 +1004,21 @@ impl TcpStream {
     /// this comes at the cost of a heap allocation.
     ///
     /// **Note:** Dropping the write half will shut down the write half of the TCP
-    /// stream. This is equivalent to calling [`shutdown(Write)`] on the `TcpStream`.
+    /// stream. This is equivalent to calling [`shutdown()`] on the `TcpStream`.
     ///
     /// [`split`]: TcpStream::split()
-    /// [`shutdown(Write)`]: fn@crate::net::TcpStream::shutdown
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
-
-    // == Poll IO functions that takes `&self` ==
-    //
-    // They are not public because (taken from the doc of `PollEvented`):
-    //
-    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
-    // caller must ensure that there are at most two tasks that use a
-    // `PollEvented` instance concurrently. One for reading and one for writing.
-    // While violating this requirement is "safe" from a Rust memory model point
-    // of view, it will result in unexpected behavior in the form of lost
-    // notifications and tasks hanging.
 
     pub(crate) fn poll_read_priv(
         &self,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        loop {
-            let ev = ready!(self.io.poll_read_ready(cx))?;
-
-            // Safety: `TcpStream::read` will not peek at the maybe uinitialized bytes.
-            let b = unsafe {
-                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
-            };
-            match self.io.get_ref().read(b) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.clear_readiness(ev);
-                }
-                Ok(n) => {
-                    // Safety: We trust `TcpStream::read` to have filled up `n` bytes
-                    // in the buffer.
-                    unsafe {
-                        buf.assume_init(n);
-                    }
-                    buf.advance(n);
-                    return Poll::Ready(Ok(()));
-                }
-                Err(e) => return Poll::Ready(Err(e)),
-            }
-        }
+        // Safety: `TcpStream::read` correctly handles reads into uninitialized memory
+        unsafe { self.io.poll_read(cx, buf) }
     }
 
     pub(super) fn poll_write_priv(
@@ -496,16 +1026,15 @@ impl TcpStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        loop {
-            let ev = ready!(self.io.poll_write_ready(cx))?;
+        self.io.poll_write(cx, buf)
+    }
 
-            match self.io.get_ref().write(buf) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.clear_readiness(ev);
-                }
-                x => return Poll::Ready(x),
-            }
-        }
+    pub(super) fn poll_write_vectored_priv(
+        &self,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.io.poll_write_vectored(cx, bufs)
     }
 }
 
@@ -542,6 +1071,18 @@ impl AsyncWrite for TcpStream {
         self.poll_write_priv(cx, buf)
     }
 
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.poll_write_vectored_priv(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
     #[inline]
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         // tcp flush is a no-op
@@ -549,14 +1090,14 @@ impl AsyncWrite for TcpStream {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.shutdown(std::net::Shutdown::Write)?;
+        self.shutdown_std(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
     }
 }
 
 impl fmt::Debug for TcpStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.get_ref().fmt(f)
+        self.io.fmt(f)
     }
 }
 
@@ -567,7 +1108,7 @@ mod sys {
 
     impl AsRawFd for TcpStream {
         fn as_raw_fd(&self) -> RawFd {
-            self.io.get_ref().as_raw_fd()
+            self.io.as_raw_fd()
         }
     }
 }
@@ -579,7 +1120,7 @@ mod sys {
 
     impl AsRawSocket for TcpStream {
         fn as_raw_socket(&self) -> RawSocket {
-            self.io.get_ref().as_raw_socket()
+            self.io.as_raw_socket()
         }
     }
 }

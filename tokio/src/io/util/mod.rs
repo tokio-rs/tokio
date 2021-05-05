@@ -27,6 +27,9 @@ cfg_io_util! {
     mod copy;
     pub use copy::copy;
 
+    mod copy_bidirectional;
+    pub use copy_bidirectional::copy_bidirectional;
+
     mod copy_buf;
     pub use copy_buf::copy_buf;
 
@@ -48,6 +51,7 @@ cfg_io_util! {
     mod read_line;
 
     mod read_to_end;
+    mod vec_with_initialized;
     cfg_process! {
         pub(crate) use read_to_end::read_to_end;
     }
@@ -70,18 +74,21 @@ cfg_io_util! {
     pub use take::Take;
 
     mod write;
+    mod write_vectored;
     mod write_all;
     mod write_buf;
+    mod write_all_buf;
     mod write_int;
 
 
     // used by `BufReader` and `BufWriter`
-    // https://github.com/rust-lang/rust/blob/master/src/libstd/sys_common/io.rs#L1
+    // https://github.com/rust-lang/rust/blob/master/library/std/src/sys_common/io.rs#L1
     const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 }
 
 cfg_not_io_util! {
     cfg_process! {
+        mod vec_with_initialized;
         mod read_to_end;
         // Used by process
         pub(crate) use read_to_end::read_to_end;

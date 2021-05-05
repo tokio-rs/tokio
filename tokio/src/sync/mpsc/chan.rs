@@ -2,7 +2,6 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
-use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
 
@@ -140,6 +139,11 @@ impl<T, S> Tx<T, S> {
     pub(crate) fn wake_rx(&self) {
         self.inner.rx_waker.wake();
     }
+
+    /// Returns `true` if senders belong to the same channel.
+    pub(crate) fn same_channel(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
 }
 
 impl<T, S: Semaphore> Tx<T, S> {
@@ -148,25 +152,10 @@ impl<T, S: Semaphore> Tx<T, S> {
     }
 
     pub(crate) async fn closed(&self) {
-        use std::future::Future;
-        use std::pin::Pin;
-        use std::task::Poll;
-
         // In order to avoid a race condition, we first request a notification,
-        // **then** check the current value's version. If a new version exists,
-        // the notification request is dropped. Requesting the notification
-        // requires polling the future once.
+        // **then** check whether the semaphore is closed. If the semaphore is
+        // closed the notification request is dropped.
         let notified = self.inner.notify_rx_closed.notified();
-        pin!(notified);
-
-        // Polling the future once is guaranteed to return `Pending` as `watch`
-        // only notifies using `notify_waiters`.
-        crate::future::poll_fn(|cx| {
-            let res = Pin::new(&mut notified).poll(cx);
-            assert!(!res.is_ready());
-            Poll::Ready(())
-        })
-        .await;
 
         if self.inner.semaphore.is_closed() {
             return;
@@ -271,22 +260,6 @@ impl<T, S: Semaphore> Rx<T, S> {
                 Ready(None)
             } else {
                 Pending
-            }
-        })
-    }
-
-    /// Receives the next value without blocking
-    pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
-        use super::block::Read::*;
-        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
-            let rx_fields = unsafe { &mut *rx_fields_ptr };
-            match rx_fields.list.pop(&self.inner.tx) {
-                Some(Value(value)) => {
-                    self.inner.semaphore.add_permit();
-                    Ok(value)
-                }
-                Some(Closed) => Err(TryRecvError::Closed),
-                None => Err(TryRecvError::Empty),
             }
         })
     }

@@ -19,7 +19,8 @@ impl<T> Unpin for BlockingTask<T> {}
 
 impl<T, R> Future for BlockingTask<T>
 where
-    T: FnOnce() -> R,
+    T: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
 {
     type Output = R;
 

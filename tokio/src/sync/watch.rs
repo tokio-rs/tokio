@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
+
 //! A single-producer, multi-consumer channel that only retains the *last* sent
 //! value.
 //!
@@ -51,16 +53,21 @@
 //! [`Sender::is_closed`]: crate::sync::watch::Sender::is_closed
 //! [`Sender::closed`]: crate::sync::watch::Sender::closed
 
-use crate::sync::Notify;
+use crate::sync::notify::Notify;
 
+use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::atomic::Ordering::{Relaxed, SeqCst};
+use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::ops;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Relaxed, SeqCst};
-use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 /// Receives values from the associated [`Sender`](struct@Sender).
 ///
 /// Instances are created by the [`channel`](fn@channel) function.
+///
+/// To turn this receiver into a `Stream`, you can use the [`WatchStream`]
+/// wrapper.
+///
+/// [`WatchStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.WatchStream.html
 #[derive(Debug)]
 pub struct Receiver<T> {
     /// Pointer to the shared state
@@ -193,6 +200,14 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
 }
 
 impl<T> Receiver<T> {
+    fn from_shared(version: usize, shared: Arc<Shared<T>>) -> Self {
+        // No synchronization necessary as this is only used as a counter and
+        // not memory access.
+        shared.ref_count_rx.fetch_add(1, Relaxed);
+
+        Self { shared, version }
+    }
+
     /// Returns a reference to the most recently sent value
     ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
@@ -241,34 +256,25 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
-        use std::future::Future;
-        use std::pin::Pin;
-        use std::task::Poll;
+        loop {
+            // In order to avoid a race condition, we first request a notification,
+            // **then** check the current value's version. If a new version exists,
+            // the notification request is dropped.
+            let notified = self.shared.notify_rx.notified();
 
-        // In order to avoid a race condition, we first request a notification,
-        // **then** check the current value's version. If a new version exists,
-        // the notification request is dropped. Requesting the notification
-        // requires polling the future once.
-        let notified = self.shared.notify_rx.notified();
-        pin!(notified);
+            if let Some(ret) = maybe_changed(&self.shared, &mut self.version) {
+                return ret;
+            }
 
-        // Polling the future once is guaranteed to return `Pending` as `watch`
-        // only notifies using `notify_waiters`.
-        crate::future::poll_fn(|cx| {
-            let res = Pin::new(&mut notified).poll(cx);
-            assert!(!res.is_ready());
-            Poll::Ready(())
-        })
-        .await;
-
-        if let Some(ret) = maybe_changed(&self.shared, &mut self.version) {
-            return ret;
+            notified.await;
+            // loop around again in case the wake-up was spurious
         }
+    }
 
-        notified.await;
-
-        maybe_changed(&self.shared, &mut self.version)
-            .expect("[bug] failed to observe change after notificaton.")
+    cfg_process_driver! {
+        pub(crate) fn try_has_changed(&mut self) -> Option<Result<(), error::RecvError>> {
+            maybe_changed(&self.shared, &mut self.version)
+        }
     }
 }
 
@@ -299,11 +305,7 @@ impl<T> Clone for Receiver<T> {
         let version = self.version;
         let shared = self.shared.clone();
 
-        // No synchronization necessary as this is only used as a counter and
-        // not memory access.
-        shared.ref_count_rx.fetch_add(1, Relaxed);
-
-        Receiver { version, shared }
+        Self::from_shared(version, shared)
     }
 }
 
@@ -335,6 +337,25 @@ impl<T> Sender<T> {
         self.shared.notify_rx.notify_waiters();
 
         Ok(())
+    }
+
+    /// Returns a reference to the most recently sent value
+    ///
+    /// Outstanding borrows hold a read lock. This means that long lived borrows
+    /// could cause the send half to block. It is recommended to keep the borrow
+    /// as short lived as possible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// let (tx, _) = watch::channel("hello");
+    /// assert_eq!(*tx.borrow(), "hello");
+    /// ```
+    pub fn borrow(&self) -> Ref<'_, T> {
+        let inner = self.shared.value.read().unwrap();
+        Ref { inner }
     }
 
     /// Checks if the channel has been closed. This happens when all receivers
@@ -387,6 +408,15 @@ impl<T> Sender<T> {
         notified.await;
         debug_assert_eq!(0, self.shared.ref_count_rx.load(Relaxed));
     }
+
+    cfg_signal_internal! {
+        pub(crate) fn subscribe(&self) -> Receiver<T> {
+            let shared = self.shared.clone();
+            let version = shared.version.load(SeqCst);
+
+            Receiver::from_shared(version, shared)
+        }
+    }
 }
 
 impl<T> Drop for Sender<T> {
@@ -403,5 +433,86 @@ impl<T> ops::Deref for Ref<'_, T> {
 
     fn deref(&self) -> &T {
         self.inner.deref()
+    }
+}
+
+#[cfg(all(test, loom))]
+mod tests {
+    use futures::future::FutureExt;
+    use loom::thread;
+
+    // test for https://github.com/tokio-rs/tokio/issues/3168
+    #[test]
+    fn watch_spurious_wakeup() {
+        loom::model(|| {
+            let (send, mut recv) = crate::sync::watch::channel(0i32);
+
+            send.send(1).unwrap();
+
+            let send_thread = thread::spawn(move || {
+                send.send(2).unwrap();
+                send
+            });
+
+            recv.changed().now_or_never();
+
+            let send = send_thread.join().unwrap();
+            let recv_thread = thread::spawn(move || {
+                recv.changed().now_or_never();
+                recv.changed().now_or_never();
+                recv
+            });
+
+            send.send(3).unwrap();
+
+            let mut recv = recv_thread.join().unwrap();
+            let send_thread = thread::spawn(move || {
+                send.send(2).unwrap();
+            });
+
+            recv.changed().now_or_never();
+
+            send_thread.join().unwrap();
+        });
+    }
+
+    #[test]
+    fn watch_borrow() {
+        loom::model(|| {
+            let (send, mut recv) = crate::sync::watch::channel(0i32);
+
+            assert!(send.borrow().eq(&0));
+            assert!(recv.borrow().eq(&0));
+
+            send.send(1).unwrap();
+            assert!(send.borrow().eq(&1));
+
+            let send_thread = thread::spawn(move || {
+                send.send(2).unwrap();
+                send
+            });
+
+            recv.changed().now_or_never();
+
+            let send = send_thread.join().unwrap();
+            let recv_thread = thread::spawn(move || {
+                recv.changed().now_or_never();
+                recv.changed().now_or_never();
+                recv
+            });
+
+            send.send(3).unwrap();
+
+            let recv = recv_thread.join().unwrap();
+            assert!(recv.borrow().eq(&3));
+            assert!(send.borrow().eq(&3));
+
+            send.send(2).unwrap();
+
+            thread::spawn(move || {
+                assert!(recv.borrow().eq(&2));
+            });
+            assert!(send.borrow().eq(&2));
+        });
     }
 }

@@ -14,22 +14,21 @@ the Rust programming language. It is:
 
 [![Crates.io][crates-badge]][crates-url]
 [![MIT licensed][mit-badge]][mit-url]
-[![Build Status][azure-badge]][azure-url]
+[![Build Status][actions-badge]][actions-url]
 [![Discord chat][discord-badge]][discord-url]
 
 [crates-badge]: https://img.shields.io/crates/v/tokio.svg
 [crates-url]: https://crates.io/crates/tokio
 [mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
 [mit-url]: https://github.com/tokio-rs/tokio/blob/master/LICENSE
-[azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.tokio?branchName=master
-[azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=1&branchName=master
+[actions-badge]: https://github.com/tokio-rs/tokio/workflows/CI/badge.svg
+[actions-url]: https://github.com/tokio-rs/tokio/actions?query=workflow%3ACI+branch%3Amaster
 [discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
 [discord-url]: https://discord.gg/tokio
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/tokio/tutorial) |
 [API Docs](https://docs.rs/tokio/latest/tokio) |
-[Roadmap](https://github.com/tokio-rs/tokio/blob/master/ROADMAP.md) |
 [Chat](https://discord.gg/tokio)
 
 ## Overview
@@ -55,7 +54,7 @@ A basic TCP echo server with Tokio:
 
 ```rust,no_run
 use tokio::net::TcpListener;
-use tokio::prelude::*;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -133,8 +132,7 @@ several other libraries, including:
 
 * [`tower`]: A library of modular and reusable components for building robust networking clients and servers.
 
-* [`tracing`] (formerly `tokio-trace`): A framework for application-level
-  tracing and async-aware diagnostics.
+* [`tracing`]: A framework for application-level tracing and async-aware diagnostics.
 
 * [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
 
@@ -157,7 +155,7 @@ several other libraries, including:
 
 ## Supported Rust Versions
 
-Tokio is built against the latest stable release. The minimum supported version is 1.39.
+Tokio is built against the latest stable release. The minimum supported version is 1.45.
 The current Tokio version is not guaranteed to build on Rust versions earlier than the
 minimum supported version.
 

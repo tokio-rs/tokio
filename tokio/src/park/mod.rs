@@ -41,6 +41,7 @@ cfg_rt! {
 #[cfg(any(feature = "rt", feature = "sync"))]
 pub(crate) mod thread;
 
+use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -50,7 +51,7 @@ pub(crate) trait Park {
     type Unpark: Unpark;
 
     /// Error returned by `park`
-    type Error;
+    type Error: Debug;
 
     /// Gets a new `Unpark` handle associated with this `Park` instance.
     fn unpark(&self) -> Self::Unpark;

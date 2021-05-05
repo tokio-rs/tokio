@@ -1,8 +1,3 @@
-fn main() {}
-
-// Disabled while future of UdpFramed is decided on.
-// See https://github.com/tokio-rs/tokio/issues/2830
-/*
 //! This example leverages `BytesCodec` to create a UDP client and server which
 //! speak a custom protocol.
 //!
@@ -14,8 +9,8 @@ fn main() {}
 #![warn(rust_2018_idioms)]
 
 use tokio::net::UdpSocket;
-use tokio::stream::StreamExt;
 use tokio::{io, time};
+use tokio_stream::StreamExt;
 use tokio_util::codec::BytesCodec;
 use tokio_util::udp::UdpFramed;
 
@@ -50,7 +45,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let b = pong(&mut b);
 
     // Run both futures simultaneously of `a` and `b` sending messages back and forth.
-    match futures::future::try_join(a, b).await {
+    match tokio::try_join!(a, b) {
         Err(e) => println!("an error occurred; error = {:?}", e),
         _ => println!("done!"),
     }
@@ -83,4 +78,3 @@ async fn pong(socket: &mut UdpFramed<BytesCodec>) -> Result<(), io::Error> {
 
     Ok(())
 }
-*/

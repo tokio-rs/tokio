@@ -1,47 +1,27 @@
 cfg_trace! {
     cfg_rt! {
-        use std::future::Future;
-        use std::pin::Pin;
-        use std::task::{Context, Poll};
-        use pin_project_lite::pin_project;
-
-        use tracing::Span;
-
-        pin_project! {
-            /// A future that has been instrumented with a `tracing` span.
-            #[derive(Debug, Clone)]
-            pub(crate) struct Instrumented<T> {
-                #[pin]
-                inner: T,
-                span: Span,
-            }
-        }
-
-        impl<T: Future> Future for Instrumented<T> {
-            type Output = T::Output;
-
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let this = self.project();
-                let _enter = this.span.enter();
-                this.inner.poll(cx)
-            }
-        }
-
-        impl<T> Instrumented<T> {
-            pub(crate) fn new(inner: T, span: Span) -> Self {
-                Self { inner, span }
-            }
-        }
+        pub(crate) use tracing::instrument::Instrumented;
 
         #[inline]
+        #[cfg_attr(tokio_track_caller, track_caller)]
         pub(crate) fn task<F>(task: F, kind: &'static str) -> Instrumented<F> {
+            use tracing::instrument::Instrument;
+            #[cfg(tokio_track_caller)]
+            let location = std::panic::Location::caller();
+            #[cfg(tokio_track_caller)]
             let span = tracing::trace_span!(
                 target: "tokio::task",
                 "task",
                 %kind,
-                future = %std::any::type_name::<F>(),
+                spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
             );
-            Instrumented::new(task, span)
+            #[cfg(not(tokio_track_caller))]
+            let span = tracing::trace_span!(
+                target: "tokio::task",
+                "task",
+                %kind,
+            );
+            task.instrument(span)
         }
     }
 }

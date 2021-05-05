@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::time::{self, sleep, Duration, Instant};
+use tokio::time::{self, sleep, sleep_until, Duration, Instant};
 use tokio_test::{assert_ok, assert_pending, assert_ready, task};
 use tokio_util::time::DelayQueue;
 
@@ -107,9 +107,10 @@ async fn multi_delay_at_start() {
     assert_pending!(poll!(queue));
     assert!(!queue.is_woken());
 
+    let start = Instant::now();
     for elapsed in 0..1200 {
-        sleep(ms(1)).await;
         let elapsed = elapsed + 1;
+        tokio::time::sleep_until(start + ms(elapsed)).await;
 
         if delays.contains(&elapsed) {
             assert!(queue.is_woken());
@@ -117,7 +118,12 @@ async fn multi_delay_at_start() {
             assert_pending!(poll!(queue));
         } else if queue.is_woken() {
             let cascade = &[192, 960];
-            assert!(cascade.contains(&elapsed), "elapsed={}", elapsed);
+            assert!(
+                cascade.contains(&elapsed),
+                "elapsed={} dt={:?}",
+                elapsed,
+                Instant::now() - start
+            );
 
             assert_pending!(poll!(queue));
         }
@@ -205,7 +211,7 @@ async fn reset_much_later() {
 
     sleep(ms(3)).await;
 
-    queue.reset_at(&key, now + ms(5));
+    queue.reset_at(&key, now + ms(10));
 
     sleep(ms(20)).await;
 
@@ -239,6 +245,35 @@ async fn reset_twice() {
     assert!(queue.is_woken());
 }
 
+/// Regression test: Given an entry inserted with a deadline in the past, so
+/// that it is placed directly on the expired queue, reset the entry to a
+/// deadline in the future. Validate that this leaves the entry and queue in an
+/// internally consistent state by running an additional reset on the entry
+/// before polling it to completion.
+#[tokio::test]
+async fn repeatedly_reset_entry_inserted_as_expired() {
+    time::pause();
+    let mut queue = task::spawn(DelayQueue::new());
+    let now = Instant::now();
+
+    let key = queue.insert_at("foo", now - ms(100));
+
+    queue.reset_at(&key, now + ms(100));
+    queue.reset_at(&key, now + ms(50));
+
+    assert_pending!(poll!(queue));
+
+    time::sleep_until(now + ms(60)).await;
+
+    assert!(queue.is_woken());
+
+    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    assert_eq!(entry, "foo");
+
+    let entry = assert_ready!(poll!(queue));
+    assert!(entry.is_none());
+}
+
 #[tokio::test]
 async fn remove_expired_item() {
     time::pause();
@@ -253,6 +288,38 @@ async fn remove_expired_item() {
 
     let entry = queue.remove(&key);
     assert_eq!(entry.into_inner(), "foo");
+}
+
+/// Regression test: it should be possible to remove entries which fall in the
+/// 0th slot of the internal timer wheel — that is, entries whose expiration
+/// (a) falls at the beginning of one of the wheel's hierarchical levels and (b)
+/// is equal to the wheel's current elapsed time.
+#[tokio::test]
+async fn remove_at_timer_wheel_threshold() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    let key1 = queue.insert_at("foo", now + ms(64));
+    let key2 = queue.insert_at("bar", now + ms(64));
+
+    sleep(ms(80)).await;
+
+    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+
+    match entry {
+        "foo" => {
+            let entry = queue.remove(&key2).into_inner();
+            assert_eq!(entry, "bar");
+        }
+        "bar" => {
+            let entry = queue.remove(&key1).into_inner();
+            assert_eq!(entry, "foo");
+        }
+        other => panic!("other: {:?}", other),
+    }
 }
 
 #[tokio::test]
@@ -402,7 +469,7 @@ async fn insert_before_first_after_poll() {
 
     sleep(ms(99)).await;
 
-    assert!(!queue.is_woken());
+    assert_pending!(poll!(queue));
 
     sleep(ms(1)).await;
 
@@ -457,7 +524,7 @@ async fn reset_later_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    sleep(ms(80)).await;
+    sleep_until(now + Duration::from_millis(80)).await;
 
     assert!(!queue.is_woken());
 
@@ -472,7 +539,7 @@ async fn reset_later_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    sleep(ms(39)).await;
+    sleep_until(now + Duration::from_millis(119)).await;
     assert!(!queue.is_woken());
 
     sleep(ms(1)).await;
@@ -515,7 +582,7 @@ async fn reset_earlier_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    sleep(ms(80)).await;
+    sleep_until(now + Duration::from_millis(80)).await;
 
     assert!(!queue.is_woken());
 
@@ -530,7 +597,7 @@ async fn reset_earlier_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    sleep(ms(39)).await;
+    sleep_until(now + Duration::from_millis(119)).await;
     assert!(!queue.is_woken());
 
     sleep(ms(1)).await;

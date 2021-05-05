@@ -18,17 +18,15 @@ macro_rules! cfg_compat {
     }
 }
 
-/*
-macro_rules! cfg_udp {
+macro_rules! cfg_net {
     ($($item:item)*) => {
         $(
-            #[cfg(all(feature = "udp", feature = "codec"))]
-            #[cfg_attr(docsrs, doc(cfg(all(feature = "udp", feature = "codec"))))]
+            #[cfg(all(feature = "net", feature = "codec"))]
+            #[cfg_attr(docsrs, doc(cfg(all(feature = "net", feature = "codec"))))]
             $item
         )*
     }
 }
-*/
 
 macro_rules! cfg_io {
     ($($item:item)*) => {
@@ -45,6 +43,16 @@ macro_rules! cfg_rt {
         $(
             #[cfg(feature = "rt")]
             #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_time {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "time")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
             $item
         )*
     }

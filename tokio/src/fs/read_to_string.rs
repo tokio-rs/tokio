@@ -5,7 +5,9 @@ use std::{io, path::Path};
 /// Creates a future which will open a file for reading and read the entire
 /// contents into a string and return said string.
 ///
-/// This is the async equivalent of `std::fs::read_to_string`.
+/// This is the async equivalent of [`std::fs::read_to_string`][std].
+///
+/// [std]: fn@std::fs::read_to_string
 ///
 /// # Examples
 ///

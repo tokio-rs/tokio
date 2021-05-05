@@ -56,7 +56,7 @@ fn send_sync_bound() {
 
 rt_test! {
     use tokio::net::{TcpListener, TcpStream, UdpSocket};
-    use tokio::prelude::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::runtime::Runtime;
     use tokio::sync::oneshot;
     use tokio::{task, time};
@@ -858,6 +858,21 @@ rt_test! {
     }
 
     #[test]
+    fn shutdown_timeout_0() {
+        let runtime = rt();
+
+        runtime.block_on(async move {
+            task::spawn_blocking(move || {
+                thread::sleep(Duration::from_secs(10_000));
+            });
+        });
+
+        let now = Instant::now();
+        Arc::try_unwrap(runtime).unwrap().shutdown_timeout(Duration::from_nanos(0));
+        assert!(now.elapsed().as_secs() < 1);
+    }
+
+    #[test]
     fn shutdown_wakeup_time() {
         let runtime = rt();
 
@@ -1002,43 +1017,75 @@ rt_test! {
         });
     }
 
+    #[test]
+    fn coop_unconstrained() {
+        use std::task::Poll::Ready;
+
+        let rt = rt();
+
+        rt.block_on(async {
+            // Create a bunch of tasks
+            let mut tasks = (0..1_000).map(|_| {
+                tokio::spawn(async { })
+            }).collect::<Vec<_>>();
+
+            // Hope that all the tasks complete...
+            time::sleep(Duration::from_millis(100)).await;
+
+            tokio::task::unconstrained(poll_fn(|cx| {
+                // All the tasks should be ready
+                for task in &mut tasks {
+                    assert!(Pin::new(task).poll(cx).is_ready());
+                }
+
+                Ready(())
+            })).await;
+        });
+    }
+
     // Tests that the "next task" scheduler optimization is not able to starve
     // other tasks.
     #[test]
     fn ping_pong_saturation() {
+        use std::sync::atomic::{Ordering, AtomicBool};
         use tokio::sync::mpsc;
 
         const NUM: usize = 100;
 
         let rt = rt();
 
+        let running = Arc::new(AtomicBool::new(true));
+
         rt.block_on(async {
             let (spawned_tx, mut spawned_rx) = mpsc::unbounded_channel();
 
+            let mut tasks = vec![];
             // Spawn a bunch of tasks that ping ping between each other to
             // saturate the runtime.
             for _ in 0..NUM {
                 let (tx1, mut rx1) = mpsc::unbounded_channel();
                 let (tx2, mut rx2) = mpsc::unbounded_channel();
                 let spawned_tx = spawned_tx.clone();
-
-                task::spawn(async move {
+                let running = running.clone();
+                tasks.push(task::spawn(async move {
                     spawned_tx.send(()).unwrap();
 
-                    tx1.send(()).unwrap();
 
-                    loop {
-                        rx2.recv().await.unwrap();
+                    while running.load(Ordering::Relaxed) {
                         tx1.send(()).unwrap();
+                        rx2.recv().await.unwrap();
                     }
-                });
 
-                task::spawn(async move {
-                    loop {
-                        rx1.recv().await.unwrap();
+                    // Close the channel and wait for the other task to exit.
+                    drop(tx1);
+                    assert!(rx2.recv().await.is_none());
+                }));
+
+                tasks.push(task::spawn(async move {
+                    while rx1.recv().await.is_some() {
                         tx2.send(()).unwrap();
                     }
-                });
+                }));
             }
 
             for _ in 0..NUM {
@@ -1053,6 +1100,10 @@ rt_test! {
                 }
             });
             handle.await.unwrap();
+            running.store(false, Ordering::Relaxed);
+            for t in tasks {
+                t.await.unwrap();
+            }
         });
     }
 }

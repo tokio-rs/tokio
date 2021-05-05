@@ -15,7 +15,7 @@ use std::task::Poll;
 #[derive(Debug)]
 pub(crate) struct Reaper<W, Q, S>
 where
-    W: Wait + Unpin,
+    W: Wait,
     Q: OrphanQueue<W>,
 {
     inner: Option<W>,
@@ -25,7 +25,7 @@ where
 
 impl<W, Q, S> Deref for Reaper<W, Q, S>
 where
-    W: Wait + Unpin,
+    W: Wait,
     Q: OrphanQueue<W>,
 {
     type Target = W;
@@ -37,7 +37,7 @@ where
 
 impl<W, Q, S> Reaper<W, Q, S>
 where
-    W: Wait + Unpin,
+    W: Wait,
     Q: OrphanQueue<W>,
 {
     pub(crate) fn new(inner: W, orphan_queue: Q, signal: S) -> Self {
@@ -61,7 +61,7 @@ impl<W, Q, S> Future for Reaper<W, Q, S>
 where
     W: Wait + Unpin,
     Q: OrphanQueue<W> + Unpin,
-    S: InternalStream,
+    S: InternalStream + Unpin,
 {
     type Output = io::Result<ExitStatus>;
 
@@ -106,7 +106,7 @@ where
 
 impl<W, Q, S> Kill for Reaper<W, Q, S>
 where
-    W: Kill + Wait + Unpin,
+    W: Kill + Wait,
     Q: OrphanQueue<W>,
 {
     fn kill(&mut self) -> io::Result<()> {
@@ -116,7 +116,7 @@ where
 
 impl<W, Q, S> Drop for Reaper<W, Q, S>
 where
-    W: Wait + Unpin,
+    W: Wait,
     Q: OrphanQueue<W>,
 {
     fn drop(&mut self) {
@@ -134,7 +134,6 @@ mod test {
     use super::*;
 
     use crate::process::unix::orphan::test::MockQueue;
-    use crate::sync::mpsc::error::TryRecvError;
     use futures::future::FutureExt;
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
@@ -205,10 +204,6 @@ mod test {
                 Some(()) => Poll::Ready(Some(())),
                 None => Poll::Pending,
             }
-        }
-
-        fn try_recv(&mut self) -> Result<(), TryRecvError> {
-            unimplemented!();
         }
     }
 

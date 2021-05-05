@@ -186,7 +186,7 @@ impl<T> Block<T> {
     ///
     /// * The block will no longer be accessed by any sender.
     pub(crate) unsafe fn tx_release(&self, tail_position: usize) {
-        // Track the observed tail_position. Any sender targetting a greater
+        // Track the observed tail_position. Any sender targeting a greater
         // tail_position is guaranteed to not access this block.
         self.observed_tail_position
             .with_mut(|ptr| *ptr = tail_position);
@@ -258,13 +258,15 @@ impl<T> Block<T> {
     pub(crate) unsafe fn try_push(
         &self,
         block: &mut NonNull<Block<T>>,
-        ordering: Ordering,
+        success: Ordering,
+        failure: Ordering,
     ) -> Result<(), NonNull<Block<T>>> {
         block.as_mut().start_index = self.start_index.wrapping_add(BLOCK_CAP);
 
         let next_ptr = self
             .next
-            .compare_and_swap(ptr::null_mut(), block.as_ptr(), ordering);
+            .compare_exchange(ptr::null_mut(), block.as_ptr(), success, failure)
+            .unwrap_or_else(|x| x);
 
         match NonNull::new(next_ptr) {
             Some(next_ptr) => Err(next_ptr),
@@ -306,11 +308,11 @@ impl<T> Block<T> {
         //
         // `Release` ensures that the newly allocated block is available to
         // other threads acquiring the next pointer.
-        let next = NonNull::new(self.next.compare_and_swap(
-            ptr::null_mut(),
-            new_block.as_ptr(),
-            AcqRel,
-        ));
+        let next = NonNull::new(
+            self.next
+                .compare_exchange(ptr::null_mut(), new_block.as_ptr(), AcqRel, Acquire)
+                .unwrap_or_else(|x| x),
+        );
 
         let next = match next {
             Some(next) => next,
@@ -333,7 +335,7 @@ impl<T> Block<T> {
 
         // TODO: Should this iteration be capped?
         loop {
-            let actual = unsafe { curr.as_ref().try_push(&mut new_block, AcqRel) };
+            let actual = unsafe { curr.as_ref().try_push(&mut new_block, AcqRel, Acquire) };
 
             curr = match actual {
                 Ok(_) => {
@@ -348,7 +350,7 @@ impl<T> Block<T> {
     }
 }
 
-/// Returns `true` if the specificed slot has a value ready to be consumed.
+/// Returns `true` if the specified slot has a value ready to be consumed.
 fn is_ready(bits: usize, slot: usize) -> bool {
     let mask = 1 << slot;
     mask == mask & bits

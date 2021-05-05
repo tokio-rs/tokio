@@ -8,7 +8,7 @@ use crate::runtime::task;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ptr::{self, NonNull};
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 
 /// Producer handle. May only be used from a single thread.
 pub(super) struct Local<T: 'static> {
@@ -194,13 +194,17 @@ impl<T> Local<T> {
         // work. This is because all tasks are pushed into the queue from the
         // current thread (or memory has been acquired if the local queue handle
         // moved).
-        let actual = self.inner.head.compare_and_swap(
-            prev,
-            pack(head.wrapping_add(n), head.wrapping_add(n)),
-            Release,
-        );
-
-        if actual != prev {
+        if self
+            .inner
+            .head
+            .compare_exchange(
+                prev,
+                pack(head.wrapping_add(n), head.wrapping_add(n)),
+                Release,
+                Relaxed,
+            )
+            .is_err()
+        {
             // We failed to claim the tasks, losing the race. Return out of
             // this function and try the full `push` routine again. The queue
             // may not be full anymore.
@@ -231,7 +235,7 @@ impl<T> Local<T> {
             // tasks and we are the only producer.
             self.inner.buffer[i_idx].with_mut(|ptr| unsafe {
                 let ptr = (*ptr).as_ptr();
-                (*ptr).header().queue_next.with_mut(|ptr| *ptr = Some(next));
+                (*ptr).header().set_next(Some(next))
             });
         }
 
@@ -568,7 +572,7 @@ impl<T: 'static> Inject<T> {
 
         let mut p = self.pointers.lock();
 
-        // It is possible to hit null here if another thread poped the last
+        // It is possible to hit null here if another thread popped the last
         // task between us checking `len` and acquiring the lock.
         let task = p.head?;
 
@@ -606,7 +610,7 @@ fn get_next(header: NonNull<task::Header>) -> Option<NonNull<task::Header>> {
 
 fn set_next(header: NonNull<task::Header>, val: Option<NonNull<task::Header>>) {
     unsafe {
-        header.as_ref().queue_next.with_mut(|ptr| *ptr = val);
+        header.as_ref().set_next(val);
     }
 }
 

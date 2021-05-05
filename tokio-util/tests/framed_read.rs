@@ -254,6 +254,29 @@ fn multi_frames_on_eof() {
     });
 }
 
+#[test]
+fn read_eof_then_resume() {
+    let mut task = task::spawn(());
+    let mock = mock! {
+        Ok(b"\x00\x00\x00\x01".to_vec()),
+        Ok(b"".to_vec()),
+        Ok(b"\x00\x00\x00\x02".to_vec()),
+        Ok(b"".to_vec()),
+        Ok(b"\x00\x00\x00\x03".to_vec()),
+    };
+    let mut framed = FramedRead::new(mock, U32Decoder);
+
+    task.enter(|cx, _| {
+        assert_read!(pin!(framed).poll_next(cx), 1);
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+        assert_read!(pin!(framed).poll_next(cx), 2);
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+        assert_read!(pin!(framed).poll_next(cx), 3);
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+    });
+}
+
 // ===== Mock ======
 
 struct Mock {

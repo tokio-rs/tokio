@@ -171,7 +171,11 @@ impl AtomicWaker {
     where
         W: WakerRef,
     {
-        match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {
+        match self
+            .state
+            .compare_exchange(WAITING, REGISTERING, Acquire, Acquire)
+            .unwrap_or_else(|x| x)
+        {
             WAITING => {
                 unsafe {
                     // Locked acquired, update the waker cell
@@ -219,6 +223,8 @@ impl AtomicWaker {
                 waker.wake();
 
                 // This is equivalent to a spin lock, so use a spin hint.
+                // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
+                #[allow(deprecated)]
                 atomic::spin_loop_hint();
             }
             state => {

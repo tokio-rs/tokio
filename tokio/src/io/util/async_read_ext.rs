@@ -35,15 +35,13 @@ cfg_io_util! {
 
     /// Reads bytes from a source.
     ///
-    /// Implemented as an extention trait, adding utility methods to all
+    /// Implemented as an extension trait, adding utility methods to all
     /// [`AsyncRead`] types. Callers will tend to import this trait instead of
     /// [`AsyncRead`].
     ///
-    /// As a convenience, this trait may be imported using the [`prelude`]:
-    ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::prelude::*;
+    /// use tokio::io::{self, AsyncReadExt};
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
@@ -60,7 +58,6 @@ cfg_io_util! {
     /// See [module][crate::io] documentation for more details.
     ///
     /// [`AsyncRead`]: AsyncRead
-    /// [`prelude`]: crate::prelude
     pub trait AsyncReadExt: AsyncRead {
         /// Creates a new `AsyncRead` instance that chains this stream with
         /// `next`.
@@ -185,7 +182,7 @@ cfg_io_util! {
         ///
         /// On a successful read, the number of read bytes is returned. If the
         /// supplied buffer is not empty and the function returns `Ok(0)` then
-        /// the source as reached an "end-of-file" event.
+        /// the source has reached an "end-of-file" event.
         ///
         /// # Errors
         ///

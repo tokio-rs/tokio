@@ -26,7 +26,6 @@ use tokio::io;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 
-use futures::future::try_join;
 use futures::FutureExt;
 use std::env;
 use std::error::Error;
@@ -74,7 +73,7 @@ async fn transfer(mut inbound: TcpStream, proxy_addr: String) -> Result<(), Box<
         wi.shutdown().await
     };
 
-    try_join(client_to_server, server_to_client).await?;
+    tokio::try_join!(client_to_server, server_to_client)?;
 
     Ok(())
 }

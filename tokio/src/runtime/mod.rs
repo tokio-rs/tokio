@@ -10,7 +10,7 @@
 //!
 //! Tokio's [`Runtime`] bundles all of these services as a single type, allowing
 //! them to be started, shut down, and configured together. However, often it is
-//! not required to configure a [`Runtime`] manually, and user may just use the
+//! not required to configure a [`Runtime`] manually, and a user may just use the
 //! [`tokio::main`] attribute macro, which creates a [`Runtime`] under the hood.
 //!
 //! # Usage
@@ -20,7 +20,7 @@
 //!
 //! ```no_run
 //! use tokio::net::TcpListener;
-//! use tokio::prelude::*;
+//! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -63,7 +63,7 @@
 //!
 //! ```no_run
 //! use tokio::net::TcpListener;
-//! use tokio::prelude::*;
+//! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //! use tokio::runtime::Runtime;
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -114,7 +114,7 @@
 //!
 //! The multi-thread scheduler executes futures on a _thread pool_, using a
 //! work-stealing strategy. By default, it will start a worker thread for each
-//! CPU core available on the system. This tends to be the ideal configurations
+//! CPU core available on the system. This tends to be the ideal configuration
 //! for most applications. The multi-thread scheduler requires the `rt-multi-thread`
 //! feature flag, and is selected by default:
 //! ```
@@ -198,7 +198,7 @@ cfg_rt! {
     use self::enter::enter;
 
     mod handle;
-    use handle::Handle;
+    pub use handle::{EnterGuard, Handle};
 
     mod spawner;
     use self::spawner::Spawner;
@@ -250,7 +250,7 @@ cfg_rt! {
     ///
     /// The Tokio runtime implements `Sync` and `Send` to allow you to wrap it
     /// in a `Arc`. Most fn take `&self` to allow you to call them concurrently
-    /// accross multiple threads.
+    /// across multiple threads.
     ///
     /// Calls to `shutdown` and `shutdown_timeout` require exclusive ownership of
     /// the runtime type and this can be achieved via `Arc::try_unwrap` when only
@@ -270,16 +270,6 @@ cfg_rt! {
 
         /// Blocking pool handle, used to signal shutdown
         blocking_pool: BlockingPool,
-    }
-
-    /// Runtime context guard.
-    ///
-    /// Returned by [`Runtime::enter`], the context guard exits the runtime
-    /// context on drop.
-    #[derive(Debug)]
-    pub struct EnterGuard<'a> {
-        rt: &'a Runtime,
-        guard: context::EnterGuard,
     }
 
     /// The runtime executor is either a thread-pool or a current-thread executor.
@@ -332,6 +322,27 @@ cfg_rt! {
             Builder::new_multi_thread().enable_all().build()
         }
 
+        /// Return a handle to the runtime's spawner.
+        ///
+        /// The returned handle can be used to spawn tasks that run on this runtime, and can
+        /// be cloned to allow moving the `Handle` to other threads.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Runtime;
+        ///
+        /// let rt = Runtime::new()
+        ///     .unwrap();
+        ///
+        /// let handle = rt.handle();
+        ///
+        /// // Use the handle...
+        /// ```
+        pub fn handle(&self) -> &Handle {
+            &self.handle
+        }
+
         /// Spawn a future onto the Tokio runtime.
         ///
         /// This spawns the given future onto the runtime's executor, usually a
@@ -357,16 +368,13 @@ cfg_rt! {
         /// });
         /// # }
         /// ```
+        #[cfg_attr(tokio_track_caller, track_caller)]
         pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
-            match &self.kind {
-                #[cfg(feature = "rt-multi-thread")]
-                Kind::ThreadPool(exec) => exec.spawn(future),
-                Kind::CurrentThread(exec) => exec.spawn(future),
-            }
+            self.handle.spawn(future)
         }
 
         /// Run the provided function on an executor dedicated to blocking operations.
@@ -385,9 +393,11 @@ cfg_rt! {
         ///     println!("now running on a worker thread");
         /// });
         /// # }
+        #[cfg_attr(tokio_track_caller, track_caller)]
         pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
         where
             F: FnOnce() -> R + Send + 'static,
+            R: Send + 'static,
         {
             self.handle.spawn_blocking(func)
         }
@@ -395,7 +405,7 @@ cfg_rt! {
         /// Run a future to completion on the Tokio runtime. This is the
         /// runtime's entry point.
         ///
-        /// This runs the given future on the runtime, blocking until it is
+        /// This runs the given future on the current thread, blocking until it is
         /// complete, and yielding its resolved result. Any tasks or timers
         /// which the future spawns internally will be executed on the runtime.
         ///
@@ -415,7 +425,7 @@ cfg_rt! {
         ///
         /// # Panics
         ///
-        /// This function panics if the provided future panics, or if not called within an
+        /// This function panics if the provided future panics, or if called within an
         /// asynchronous execution context.
         ///
         /// # Examples
@@ -476,10 +486,7 @@ cfg_rt! {
         /// }
         /// ```
         pub fn enter(&self) -> EnterGuard<'_> {
-            EnterGuard {
-                rt: self,
-                guard: context::enter(self.handle.clone()),
-            }
+            self.handle.enter()
         }
 
         /// Shutdown the runtime, waiting for at most `duration` for all spawned
@@ -519,7 +526,7 @@ cfg_rt! {
         /// ```
         pub fn shutdown_timeout(mut self, duration: Duration) {
             // Wakeup and shutdown all the worker threads
-            self.handle.spawner.shutdown();
+            self.handle.shutdown();
             self.blocking_pool.shutdown(Some(duration));
         }
 

@@ -1,5 +1,18 @@
 #![allow(unused_macros)]
 
+macro_rules! feature {
+    (
+        #![$meta:meta]
+        $($item:item)*
+    ) => {
+        $(
+            #[cfg($meta)]
+            #[cfg_attr(docsrs, doc(cfg($meta)))]
+            $item
+        )*
+    }
+}
+
 /// Enables enter::block_on
 macro_rules! cfg_block_on {
     ($($item:item)*) => {
@@ -61,6 +74,19 @@ macro_rules! cfg_io_driver {
                 feature = "process",
                 all(unix, feature = "signal"),
             ))))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_io_driver_impl {
+    ( $( $item:item )* ) => {
+        $(
+            #[cfg(any(
+                feature = "net",
+                feature = "process",
+                all(unix, feature = "signal"),
+            ))]
             $item
         )*
     }
@@ -215,16 +241,6 @@ macro_rules! cfg_not_signal_internal {
     }
 }
 
-macro_rules! cfg_stream {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "stream")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_sync {
     ($($item:item)*) => {
         $(
@@ -308,7 +324,7 @@ macro_rules! cfg_not_time {
 macro_rules! cfg_trace {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "tracing")]
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
             $item
         )*
@@ -318,7 +334,7 @@ macro_rules! cfg_trace {
 macro_rules! cfg_not_trace {
     ($($item:item)*) => {
         $(
-            #[cfg(not(feature = "tracing"))]
+            #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
             $item
         )*
     }
@@ -335,9 +351,26 @@ macro_rules! cfg_coop {
                     feature = "rt",
                     feature = "signal",
                     feature = "sync",
-                    feature = "stream",
                     feature = "time",
                     ))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_coop {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(any(
+                    feature = "fs",
+                    feature = "io-std",
+                    feature = "net",
+                    feature = "process",
+                    feature = "rt",
+                    feature = "signal",
+                    feature = "sync",
+                    feature = "time",
+                    )))]
             $item
         )*
     }

@@ -1,5 +1,6 @@
 use crate::runtime;
 use crate::task::JoinHandle;
+use crate::util::error::CONTEXT_MISSING_ERROR;
 
 use std::future::Future;
 
@@ -122,13 +123,14 @@ cfg_rt! {
     /// ```text
     /// error[E0391]: cycle detected when processing `main`
     /// ```
+    #[cfg_attr(tokio_track_caller, track_caller)]
     pub fn spawn<T>(task: T) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
         let spawn_handle = runtime::context::spawn_handle()
-        .expect("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
+        .expect(CONTEXT_MISSING_ERROR);
         let task = crate::util::trace::task(task, "task");
         spawn_handle.spawn(task)
     }

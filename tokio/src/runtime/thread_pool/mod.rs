@@ -59,15 +59,6 @@ impl ThreadPool {
         &self.spawner
     }
 
-    /// Spawns a task
-    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        self.spawner.spawn(future)
-    }
-
     /// Blocks the current thread waiting for the future to complete.
     ///
     /// The future will execute on the current thread, but all spawned tasks

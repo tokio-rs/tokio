@@ -43,6 +43,11 @@ impl<T> Mutex<T> {
         self.0.try_lock()
     }
 
+    #[inline]
+    pub(crate) fn get_mut(&mut self) -> &mut T {
+        self.0.get_mut()
+    }
+
     // Note: Additional methods `is_poisoned` and `into_inner`, can be
     // provided here as needed.
 }

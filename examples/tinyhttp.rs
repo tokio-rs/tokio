@@ -20,7 +20,7 @@ use http::{header::HeaderValue, Request, Response, StatusCode};
 extern crate serde_derive;
 use std::{env, error::Error, fmt, io};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
 #[tokio::main]

@@ -331,7 +331,7 @@ fn coop_and_block_in_place() {
         // runtime worker yielded as part of `block_in_place` and guarantees the
         // same thread will reclaim the worker at the end of the
         // `block_in_place` call.
-        .max_threads(1)
+        .max_blocking_threads(1)
         .build()
         .unwrap();
 
@@ -375,11 +375,34 @@ fn coop_and_block_in_place() {
 
 // Testing this does not panic
 #[test]
-fn max_threads() {
+fn max_blocking_threads() {
     let _rt = tokio::runtime::Builder::new_multi_thread()
-        .max_threads(1)
+        .max_blocking_threads(1)
         .build()
         .unwrap();
+}
+
+#[test]
+#[should_panic]
+fn max_blocking_threads_set_to_zero() {
+    let _rt = tokio::runtime::Builder::new_multi_thread()
+        .max_blocking_threads(0)
+        .build()
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn hang_on_shutdown() {
+    let (sync_tx, sync_rx) = std::sync::mpsc::channel::<()>();
+    tokio::spawn(async move {
+        tokio::task::block_in_place(|| sync_rx.recv().ok());
+    });
+
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        drop(sync_tx);
+    });
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 }
 
 fn rt() -> Runtime {

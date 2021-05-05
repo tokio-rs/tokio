@@ -24,10 +24,8 @@
 //! Wait 100ms and print "100 ms have elapsed"
 //!
 //! ```
-//! use tokio::time::sleep;
-//!
 //! use std::time::Duration;
-//!
+//! use tokio::time::sleep;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -36,9 +34,7 @@
 //! }
 //! ```
 //!
-//! Require that an operation takes no more than 300ms. Note that this uses the
-//! `timeout` function on the `FutureExt` trait. This trait is included in the
-//! prelude.
+//! Require that an operation takes no more than 1s.
 //!
 //! ```
 //! use tokio::time::{timeout, Duration};
@@ -58,10 +54,10 @@
 //!
 //! A simple example using [`interval`] to execute a task every two seconds.
 //!
-//! The difference between [`interval`] and [`sleep`] is that an
-//! [`interval`] measures the time since the last tick, which means that
-//! `.tick().await` may wait for a shorter time than the duration specified
-//! for the interval if some time has passed between calls to `.tick().await`.
+//! The difference between [`interval`] and [`sleep`] is that an [`interval`]
+//! measures the time since the last tick, which means that `.tick().await`
+//! may wait for a shorter time than the duration specified for the interval
+//! if some time has passed between calls to `.tick().await`.
 //!
 //! If the tick in the example below was replaced with [`sleep`], the task
 //! would only be executed once every three seconds, and not every two
@@ -93,10 +89,10 @@ pub(crate) use self::clock::Clock;
 #[cfg(feature = "test-util")]
 pub use clock::{advance, pause, resume};
 
-mod sleep;
-pub use sleep::{sleep, sleep_until, Sleep};
-
 pub(crate) mod driver;
+
+#[doc(inline)]
+pub use driver::sleep::{sleep, sleep_until, Sleep};
 
 pub mod error;
 
@@ -110,8 +106,6 @@ mod timeout;
 #[doc(inline)]
 pub use timeout::{timeout, timeout_at, Timeout};
 
-mod wheel;
-
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests;
@@ -119,32 +113,3 @@ mod tests;
 // Re-export for convenience
 #[doc(no_inline)]
 pub use std::time::Duration;
-
-// ===== Internal utils =====
-
-enum Round {
-    Up,
-    Down,
-}
-
-/// Convert a `Duration` to milliseconds, rounding up and saturating at
-/// `u64::MAX`.
-///
-/// The saturating is fine because `u64::MAX` milliseconds are still many
-/// million years.
-#[inline]
-fn ms(duration: Duration, round: Round) -> u64 {
-    const NANOS_PER_MILLI: u32 = 1_000_000;
-    const MILLIS_PER_SEC: u64 = 1_000;
-
-    // Round up.
-    let millis = match round {
-        Round::Up => (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI,
-        Round::Down => duration.subsec_millis(),
-    };
-
-    duration
-        .as_secs()
-        .saturating_mul(MILLIS_PER_SEC)
-        .saturating_add(u64::from(millis))
-}

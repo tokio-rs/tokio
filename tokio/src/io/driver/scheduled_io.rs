@@ -1,4 +1,4 @@
-use super::{Direction, Ready, ReadyEvent, Tick};
+use super::{Interest, Ready, ReadyEvent, Tick};
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::bit;
@@ -6,6 +6,8 @@ use crate::util::slab::Entry;
 
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::{Context, Poll, Waker};
+
+use super::Direction;
 
 cfg_io_readiness! {
     use crate::util::linked_list::{self, LinkedList};
@@ -41,6 +43,9 @@ struct Waiters {
 
     /// Waker used for AsyncWrite
     writer: Option<Waker>,
+
+    /// True if this ScheduledIo has been killed due to IO driver shutdown
+    is_shutdown: bool,
 }
 
 cfg_io_readiness! {
@@ -52,7 +57,7 @@ cfg_io_readiness! {
         waker: Option<Waker>,
 
         /// The interest this waiter is waiting on
-        interest: mio::Interest,
+        interest: Interest,
 
         is_ready: bool,
 
@@ -119,6 +124,12 @@ impl Default for ScheduledIo {
 impl ScheduledIo {
     pub(crate) fn generation(&self) -> usize {
         GENERATION.unpack(self.readiness.load(Acquire))
+    }
+
+    /// Invoked when the IO driver is shut down; forces this ScheduledIo into a
+    /// permanently ready state.
+    pub(super) fn shutdown(&self) {
+        self.wake0(Ready::ALL, true)
     }
 
     /// Sets the readiness on this `ScheduledIo` by invoking the given closure on
@@ -197,12 +208,18 @@ impl ScheduledIo {
     /// than 32 wakers to notify, if the stack array fills up, the lock is
     /// released, the array is cleared, and the iteration continues.
     pub(super) fn wake(&self, ready: Ready) {
+        self.wake0(ready, false);
+    }
+
+    fn wake0(&self, ready: Ready, shutdown: bool) {
         const NUM_WAKERS: usize = 32;
 
         let mut wakers: [Option<Waker>; NUM_WAKERS] = Default::default();
         let mut curr = 0;
 
         let mut waiters = self.waiters.lock();
+
+        waiters.is_shutdown |= shutdown;
 
         // check for AsyncRead slot
         if ready.is_readable() {
@@ -261,12 +278,21 @@ impl ScheduledIo {
         }
     }
 
+    pub(super) fn ready_event(&self, interest: Interest) -> ReadyEvent {
+        let curr = self.readiness.load(Acquire);
+
+        ReadyEvent {
+            tick: TICK.unpack(curr) as u8,
+            ready: interest.mask() & Ready::from_usize(READINESS.unpack(curr)),
+        }
+    }
+
     /// Poll version of checking readiness for a certain direction.
     ///
     /// These are to support `AsyncRead` and `AsyncWrite` polling methods,
     /// which cannot use the `async fn` version. This uses reserved reader
     /// and writer slots.
-    pub(in crate::io) fn poll_readiness(
+    pub(super) fn poll_readiness(
         &self,
         cx: &mut Context<'_>,
         direction: Direction,
@@ -282,13 +308,30 @@ impl ScheduledIo {
                 Direction::Read => &mut waiters.reader,
                 Direction::Write => &mut waiters.writer,
             };
-            *slot = Some(cx.waker().clone());
+
+            // Avoid cloning the waker if one is already stored that matches the
+            // current task.
+            match slot {
+                Some(existing) => {
+                    if !existing.will_wake(cx.waker()) {
+                        *existing = cx.waker().clone();
+                    }
+                }
+                None => {
+                    *slot = Some(cx.waker().clone());
+                }
+            }
 
             // Try again, in case the readiness was changed while we were
             // taking the waiters lock
             let curr = self.readiness.load(Acquire);
             let ready = direction.mask() & Ready::from_usize(READINESS.unpack(curr));
-            if ready.is_empty() {
+            if waiters.is_shutdown {
+                Poll::Ready(ReadyEvent {
+                    tick: TICK.unpack(curr) as u8,
+                    ready: direction.mask(),
+                })
+            } else if ready.is_empty() {
                 Poll::Pending
             } else {
                 Poll::Ready(ReadyEvent {
@@ -312,6 +355,12 @@ impl ScheduledIo {
         // result isn't important
         let _ = self.set_readiness(None, Tick::Clear(event.tick), |curr| curr - mask_no_closed);
     }
+
+    pub(crate) fn clear_wakers(&self) {
+        let mut waiters = self.waiters.lock();
+        waiters.reader.take();
+        waiters.writer.take();
+    }
 }
 
 impl Drop for ScheduledIo {
@@ -326,7 +375,7 @@ unsafe impl Sync for ScheduledIo {}
 cfg_io_readiness! {
     impl ScheduledIo {
         /// An async version of `poll_readiness` which uses a linked list of wakers
-        pub(crate) async fn readiness(&self, interest: mio::Interest) -> ReadyEvent {
+        pub(crate) async fn readiness(&self, interest: Interest) -> ReadyEvent {
             self.readiness_fut(interest).await
         }
 
@@ -334,7 +383,7 @@ cfg_io_readiness! {
         // we are borrowing the `UnsafeCell` possibly over await boundaries.
         //
         // Go figure.
-        fn readiness_fut(&self, interest: mio::Interest) -> Readiness<'_> {
+        fn readiness_fut(&self, interest: Interest) -> Readiness<'_> {
             Readiness {
                 scheduled_io: self,
                 state: State::Init,
@@ -394,21 +443,26 @@ cfg_io_readiness! {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { ready, tick });
+                            return Poll::Ready(ReadyEvent { tick, ready });
                         }
 
                         // Wasn't ready, take the lock (and check again while locked).
                         let mut waiters = scheduled_io.waiters.lock();
 
                         let curr = scheduled_io.readiness.load(SeqCst);
-                        let ready = Ready::from_usize(READINESS.unpack(curr));
+                        let mut ready = Ready::from_usize(READINESS.unpack(curr));
+
+                        if waiters.is_shutdown {
+                            ready = Ready::ALL;
+                        }
+
                         let ready = ready.intersection(interest);
 
                         if !ready.is_empty() {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { ready, tick });
+                            return Poll::Ready(ReadyEvent { tick, ready });
                         }
 
                         // Not ready even after locked, insert into list...
