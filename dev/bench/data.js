@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1619895435534,
+  "lastUpdate": 1620206260818,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -40821,6 +40821,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1154,
             "range": "± 175",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cvghy116@gmail.com",
+            "name": "Chế Vũ Gia Hy",
+            "username": "hyche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a945ce09960a55a6ac657a2a7aa3d72f8e00344e",
+          "message": "stream: implement Error and Display for BroadcastStreamRecvError (#3745)",
+          "timestamp": "2021-05-05T11:15:42+02:00",
+          "tree_id": "adfe9a0949afbc9f3fbfb843e00a136ce39746cf",
+          "url": "https://github.com/tokio-rs/tokio/commit/a945ce09960a55a6ac657a2a7aa3d72f8e00344e"
+        },
+        "date": 1620206257638,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14798,
+            "range": "± 5327",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1105,
+            "range": "± 59",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 633,
+            "range": "± 95",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15263,
+            "range": "± 5484",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1085,
+            "range": "± 100",
             "unit": "ns/iter"
           }
         ]
