@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620209495794,
+  "lastUpdate": 1620209513791,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -41391,6 +41391,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1059,
             "range": "± 220",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "russell.r.cohen@gmail.com",
+            "name": "Russell Cohen",
+            "username": "rcoh"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8ef39dfb22974e6f5f6203e279912d3eac68017d",
+          "message": "tokio-test: add assert_elapsed macro (#3728)",
+          "timestamp": "2021-05-05T12:09:28+02:00",
+          "tree_id": "ff96a5a7e3e1114749779e206237626e6b299faf",
+          "url": "https://github.com/tokio-rs/tokio/commit/8ef39dfb22974e6f5f6203e279912d3eac68017d"
+        },
+        "date": 1620209510255,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16237,
+            "range": "± 6721",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1037,
+            "range": "± 174",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 622,
+            "range": "± 95",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15812,
+            "range": "± 5421",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1050,
+            "range": "± 169",
             "unit": "ns/iter"
           }
         ]
