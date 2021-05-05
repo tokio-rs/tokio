@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620229288334,
+  "lastUpdate": 1620229294854,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -41649,6 +41649,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 945,
             "range": "± 9",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c4b6b130f33532e891e1021381b203f1bbced086",
+          "message": "chore: bump nightly to nightly-2021-04-25 (#3754)",
+          "timestamp": "2021-05-05T17:39:17+02:00",
+          "tree_id": "20e156dec85e236ed0778f68b514746c189f2898",
+          "url": "https://github.com/tokio-rs/tokio/commit/c4b6b130f33532e891e1021381b203f1bbced086"
+        },
+        "date": 1620229291184,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16015,
+            "range": "± 6618",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1002,
+            "range": "± 142",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 583,
+            "range": "± 145",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 17012,
+            "range": "± 7372",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1004,
+            "range": "± 175",
             "unit": "ns/iter"
           }
         ]
