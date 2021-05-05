@@ -128,7 +128,7 @@ where
             }
         }
 
-        Poll::Ready(Ok(Some(mem::replace(me.buf, String::new()))))
+        Poll::Ready(Ok(Some(mem::take(me.buf))))
     }
 }
 

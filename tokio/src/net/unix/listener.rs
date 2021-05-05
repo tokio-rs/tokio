@@ -4,7 +4,7 @@ use crate::net::unix::{SocketAddr, UnixStream};
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
@@ -86,6 +86,35 @@ impl UnixListener {
         let listener = mio::net::UnixListener::from_std(listener);
         let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })
+    }
+
+    /// Turn a [`tokio::net::UnixListener`] into a [`std::os::unix::net::UnixListener`].
+    ///
+    /// The returned [`std::os::unix::net::UnixListener`] will have nonblocking mode
+    /// set as `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use std::error::Error;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let tokio_listener = tokio::net::UnixListener::bind("127.0.0.1:0")?;
+    ///     let std_listener = tokio_listener.into_std()?;
+    ///     std_listener.set_nonblocking(false)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`tokio::net::UnixListener`]: UnixListener
+    /// [`std::os::unix::net::UnixListener`]: std::os::unix::net::UnixListener
+    /// [`set_nonblocking`]: fn@std::os::unix::net::UnixListener::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::os::unix::net::UnixListener> {
+        self.io
+            .into_inner()
+            .map(|io| io.into_raw_fd())
+            .map(|raw_fd| unsafe { net::UnixListener::from_raw_fd(raw_fd) })
     }
 
     /// Returns the local socket address of this listener.

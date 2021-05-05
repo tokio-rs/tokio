@@ -827,6 +827,6 @@ impl Shared {
     }
 
     fn ptr_eq(&self, other: &Shared) -> bool {
-        self as *const _ == other as *const _
+        std::ptr::eq(self, other)
     }
 }

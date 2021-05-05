@@ -54,7 +54,7 @@ fn read_exclusive_pending() {
 // should be made available when one of the shared acesses is dropped
 #[test]
 fn exhaust_reading() {
-    let rwlock = RwLock::new(100);
+    let rwlock = RwLock::with_max_readers(100, 1024);
     let mut reads = Vec::new();
     loop {
         let mut t = spawn(rwlock.read());

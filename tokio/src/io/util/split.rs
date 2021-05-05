@@ -106,7 +106,7 @@ where
             me.buf.pop();
         }
 
-        Poll::Ready(Ok(Some(mem::replace(me.buf, Vec::new()))))
+        Poll::Ready(Ok(Some(mem::take(me.buf))))
     }
 }
 

@@ -127,6 +127,35 @@ impl<T: 'static> LocalKey<T> {
         .await
     }
 
+    /// Sets a value `T` as the task-local value for the closure `F`.
+    ///
+    /// On completion of `scope`, the task-local will be dropped.
+    ///
+    /// ### Examples
+    ///
+    /// ```
+    /// # async fn dox() {
+    /// tokio::task_local! {
+    ///     static NUMBER: u32;
+    /// }
+    ///
+    /// NUMBER.sync_scope(1, || {
+    ///     println!("task local value: {}", NUMBER.get());
+    /// });
+    /// # }
+    /// ```
+    pub fn sync_scope<F, R>(&'static self, value: T, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        let mut scope = TaskLocalFuture {
+            local: &self,
+            slot: Some(value),
+            future: (),
+        };
+        Pin::new(&mut scope).with_task(|_| f())
+    }
+
     /// Accesses the current task-local and runs the provided closure.
     ///
     /// # Panics
@@ -145,7 +174,7 @@ impl<T: 'static> LocalKey<T> {
 
     /// Accesses the current task-local and runs the provided closure.
     ///
-    /// If the task-local with the accociated key is not present, this
+    /// If the task-local with the associated key is not present, this
     /// method will return an `AccessError`. For a panicking variant,
     /// see `with`.
     pub fn try_with<F, R>(&'static self, f: F) -> Result<R, AccessError>
@@ -185,10 +214,8 @@ pin_project! {
     }
 }
 
-impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
-    type Output = F::Output;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+impl<T: 'static, F> TaskLocalFuture<T, F> {
+    fn with_task<F2: FnOnce(Pin<&mut F>) -> R, R>(self: Pin<&mut Self>, f: F2) -> R {
         struct Guard<'a, T: 'static> {
             local: &'static LocalKey<T>,
             slot: &'a mut Option<T>,
@@ -213,7 +240,15 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
             local: *project.local,
         };
 
-        project.future.poll(cx)
+        f(project.future)
+    }
+}
+
+impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.with_task(|f| f.poll(cx))
     }
 }
 

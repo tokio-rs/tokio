@@ -75,6 +75,33 @@ async fn future_and_timeout_in_future() {
 }
 
 #[tokio::test]
+async fn very_large_timeout() {
+    time::pause();
+
+    // Not yet complete
+    let (tx, rx) = oneshot::channel();
+
+    // copy-paste unstable `Duration::MAX`
+    let duration_max = Duration::from_secs(u64::MAX) + Duration::from_nanos(999_999_999);
+
+    // Wrap it with a deadline
+    let mut fut = task::spawn(timeout(duration_max, rx));
+
+    // Ready!
+    assert_pending!(fut.poll());
+
+    // Turn the timer, it runs for the elapsed time
+    time::advance(Duration::from_secs(86400 * 365 * 10)).await;
+
+    assert_pending!(fut.poll());
+
+    // Complete the future
+    tx.send(()).unwrap();
+
+    assert_ready_ok!(fut.poll()).unwrap();
+}
+
+#[tokio::test]
 async fn deadline_now_elapses() {
     use futures::future::pending;
 

@@ -124,17 +124,27 @@ arguments to many common cargo commands. This section lists some commonly needed
 commands.
 
 Some commands just need the `--all-features` argument:
+
 ```
 cargo build --all-features
 cargo check --all-features
 cargo test --all-features
 ```
+
 When building documentation normally, the markers that list the features
 required for various parts of Tokio are missing. To build the documentation
 correctly, use this command:
+
 ```
 RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 ```
+
+There is currently a [bug in cargo] that means documentation cannot be built
+from the root of the workspace. If you `cd` into the `tokio` subdirectory the
+command shown above will work.
+
+[bug in cargo]: https://github.com/rust-lang/cargo/issues/9274
+
 The `cargo fmt` command does not work on the Tokio codebase. You can use the
 command below instead:
 
@@ -571,9 +581,8 @@ When releasing a new version of a crate, follow these steps:
 2. **Update Cargo metadata.** After releasing any path dependencies, update the
    `version` field in `Cargo.toml` to the new version, and the `documentation`
    field to the docs.rs URL of the new version.
-3. **Update other documentation links.** Update the `#![doc(html_root_url)]`
-   attribute in the crate's `lib.rs` and the "Documentation" link in the crate's
-   `README.md` to point to the docs.rs URL of the new version.
+3. **Update other documentation links.** Update the "Documentation" link in the
+   crate's `README.md` to point to the docs.rs URL of the new version.
 4. **Update the changelog for the crate.** Each crate in the Tokio repository
    has its own `CHANGELOG.md` in that crate's subdirectory. Any changes to that
    crate since the last release should be added to the changelog. Change

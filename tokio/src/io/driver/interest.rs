@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "net"), allow(unreachable_pub))]
+#![cfg_attr(not(feature = "net"), allow(dead_code, unreachable_pub))]
 
 use crate::io::driver::Ready;
 

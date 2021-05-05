@@ -481,3 +481,62 @@ async fn mut_on_left_hand_side() {
     .await;
     assert_eq!(v, 2);
 }
+
+#[tokio::test]
+async fn biased_one_not_ready() {
+    let (_tx1, rx1) = oneshot::channel::<i32>();
+    let (tx2, rx2) = oneshot::channel::<i32>();
+    let (tx3, rx3) = oneshot::channel::<i32>();
+
+    tx2.send(2).unwrap();
+    tx3.send(3).unwrap();
+
+    let v = tokio::select! {
+        biased;
+
+        _ = rx1 => unreachable!(),
+        res = rx2 => {
+            assert_ok!(res)
+        },
+        _ = rx3 => {
+            panic!("This branch should never be activated because `rx2` should be polled before `rx3` due to `biased;`.")
+        }
+    };
+
+    assert_eq!(2, v);
+}
+
+#[tokio::test]
+async fn biased_eventually_ready() {
+    use tokio::task::yield_now;
+
+    let one = async {};
+    let two = async { yield_now().await };
+    let three = async { yield_now().await };
+
+    let mut count = 0u8;
+
+    tokio::pin!(one, two, three);
+
+    loop {
+        tokio::select! {
+            biased;
+
+            _ = &mut two, if count < 2 => {
+                count += 1;
+                assert_eq!(count, 2);
+            }
+            _ = &mut three, if count < 3 => {
+                count += 1;
+                assert_eq!(count, 3);
+            }
+            _ = &mut one, if count < 1 => {
+                count += 1;
+                assert_eq!(count, 1);
+            }
+            else => break,
+        }
+    }
+
+    assert_eq!(count, 3);
+}

@@ -16,6 +16,20 @@ use std::io;
 /// implementing stateful streaming parsers. In many cases, though, this type
 /// will simply be a unit struct (e.g. `struct HttpDecoder`).
 ///
+/// For some underlying data-sources, namely files and FIFOs,
+/// it's possible to temporarily read 0 bytes by reaching EOF.
+///
+/// In these cases `decode_eof` will be called until it signals
+/// fullfillment of all closing frames by returning `Ok(None)`.
+/// After that, repeated attempts to read from the [`Framed`] or [`FramedRead`]
+/// will not invoke `decode` or `decode_eof` again, until data can be read
+/// during a retry.
+///
+/// It is up to the Decoder to keep track of a restart after an EOF,
+/// and to decide how to handle such an event by, for example,
+/// allowing frames to cross EOF boundaries, re-emitting opening frames, or
+/// reseting the entire internal state.
+///
 /// [`Framed`]: crate::codec::Framed
 /// [`FramedRead`]: crate::codec::FramedRead
 pub trait Decoder {
@@ -115,13 +129,18 @@ pub trait Decoder {
     /// This method defaults to calling `decode` and returns an error if
     /// `Ok(None)` is returned while there is unconsumed data in `buf`.
     /// Typically this doesn't need to be implemented unless the framing
-    /// protocol differs near the end of the stream.
+    /// protocol differs near the end of the stream, or if you need to construct
+    /// frames _across_ eof boundaries on sources that can be resumed.
     ///
     /// Note that the `buf` argument may be empty. If a previous call to
     /// `decode_eof` consumed all the bytes in the buffer, `decode_eof` will be
     /// called again until it returns `None`, indicating that there are no more
     /// frames to yield. This behavior enables returning finalization frames
     /// that may not be based on inbound data.
+    ///
+    /// Once `None` has been returned, `decode_eof` won't be called again until
+    /// an attempt to resume the stream has been made, where the underlying stream
+    /// actually returned more data.
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         match self.decode(buf)? {
             Some(frame) => Ok(Some(frame)),

@@ -85,7 +85,7 @@ const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 /// requires only the driver lock.
 pub(super) struct StateCell {
     /// Holds either the scheduled expiration time for this timer, or (if the
-    /// timer has been fired and is unregistered), [`u64::max_value()`].
+    /// timer has been fired and is unregistered), `u64::max_value()`.
     state: AtomicU64,
     /// If the timer is fired (an Acquire order read on state shows
     /// `u64::max_value()`), holds the result that should be returned from
@@ -543,6 +543,10 @@ impl TimerEntry {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), super::Error>> {
+        if self.driver.is_shutdown() {
+            panic!("{}", crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR);
+        }
+
         if let Some(deadline) = self.initial_deadline {
             self.as_mut().reset(deadline);
         }

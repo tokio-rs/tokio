@@ -103,8 +103,8 @@ cfg_time! {
     pub(crate) type Clock = crate::time::Clock;
     pub(crate) type TimeHandle = Option<crate::time::driver::Handle>;
 
-    fn create_clock(enable_pausing: bool) -> Clock {
-        crate::time::Clock::new(enable_pausing)
+    fn create_clock(enable_pausing: bool, start_paused: bool) -> Clock {
+        crate::time::Clock::new(enable_pausing, start_paused)
     }
 
     fn create_time_driver(
@@ -131,7 +131,7 @@ cfg_not_time! {
     pub(crate) type Clock = ();
     pub(crate) type TimeHandle = ();
 
-    fn create_clock(_enable_pausing: bool) -> Clock {
+    fn create_clock(_enable_pausing: bool, _start_paused: bool) -> Clock {
         ()
     }
 
@@ -162,13 +162,15 @@ pub(crate) struct Cfg {
     pub(crate) enable_io: bool,
     pub(crate) enable_time: bool,
     pub(crate) enable_pause_time: bool,
+    pub(crate) start_paused: bool,
 }
 
 impl Driver {
     pub(crate) fn new(cfg: Cfg) -> io::Result<(Self, Resources)> {
         let (io_stack, io_handle, signal_handle) = create_io_stack(cfg.enable_io)?;
 
-        let clock = create_clock(cfg.enable_pause_time);
+        let clock = create_clock(cfg.enable_pause_time, cfg.start_paused);
+
         let (time_driver, time_handle) =
             create_time_driver(cfg.enable_time, io_stack, clock.clone());
 

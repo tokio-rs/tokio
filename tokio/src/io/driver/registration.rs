@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "net"), allow(dead_code))]
+
 use crate::io::driver::{Direction, Handle, Interest, ReadyEvent, ScheduledIo};
 use crate::util::slab;
 
@@ -12,8 +14,9 @@ cfg_io_driver! {
     /// that it will receive task notifications on readiness. This is the lowest
     /// level API for integrating with a reactor.
     ///
-    /// The association between an I/O resource is made by calling [`new`]. Once
-    /// the association is established, it remains established until the
+    /// The association between an I/O resource is made by calling
+    /// [`new_with_interest_and_handle`].
+    /// Once the association is established, it remains established until the
     /// registration instance is dropped.
     ///
     /// A registration instance represents two separate readiness streams. One
@@ -34,7 +37,7 @@ cfg_io_driver! {
     /// stream. The write readiness event stream is only for `Ready::writable()`
     /// events.
     ///
-    /// [`new`]: method@Self::new
+    /// [`new_with_interest_and_handle`]: method@Self::new_with_interest_and_handle
     /// [`poll_read_ready`]: method@Self::poll_read_ready`
     /// [`poll_write_ready`]: method@Self::poll_write_ready`
     #[derive(Debug)]
@@ -233,7 +236,10 @@ cfg_io_readiness! {
 
             crate::future::poll_fn(|cx| {
                 if self.handle.inner().is_none() {
-                    return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, "reactor gone")));
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
+                    )));
                 }
 
                 Pin::new(&mut fut).poll(cx).map(Ok)

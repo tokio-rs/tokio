@@ -291,4 +291,20 @@ impl<T> UnboundedSender<T> {
     pub fn is_closed(&self) -> bool {
         self.chan.is_closed()
     }
+
+    /// Returns `true` if senders belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+    /// let  tx2 = tx.clone();
+    /// assert!(tx.same_channel(&tx2));
+    ///
+    /// let (tx3, rx3) = tokio::sync::mpsc::unbounded_channel::<()>();
+    /// assert!(!tx3.same_channel(&tx2));
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        self.chan.same_channel(&other.chan)
+    }
 }
