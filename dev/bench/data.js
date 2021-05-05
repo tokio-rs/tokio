@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620243950057,
+  "lastUpdate": 1620243954900,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -41859,6 +41859,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1004,
             "range": "± 175",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7ac341b5265cea9842e224989d1ac47094a5c93f",
+          "message": "task: update documentation on block_in_place (#3753)",
+          "timestamp": "2021-05-05T21:44:02+02:00",
+          "tree_id": "a6b392b25a1b7ebb2958d9ea1c53e9e2194c8b6c",
+          "url": "https://github.com/tokio-rs/tokio/commit/7ac341b5265cea9842e224989d1ac47094a5c93f"
+        },
+        "date": 1620243950871,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15612,
+            "range": "± 5115",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1119,
+            "range": "± 129",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 619,
+            "range": "± 88",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15481,
+            "range": "± 4624",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1072,
+            "range": "± 174",
             "unit": "ns/iter"
           }
         ]
