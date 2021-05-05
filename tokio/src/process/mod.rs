@@ -996,8 +996,11 @@ impl Child {
     ///
     /// ```
     /// # #[cfg(not(unix))]fn main(){}
+    /// # #[cfg(unix)]
     /// use tokio::io::AsyncWriteExt;
+    /// # #[cfg(unix)]
     /// use tokio::process::Command;
+    /// # #[cfg(unix)]
     /// use std::process::Stdio;
     ///
     /// # #[cfg(unix)]
