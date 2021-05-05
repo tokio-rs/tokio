@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620229311429,
+  "lastUpdate": 1620243939232,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -27283,6 +27283,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19312601,
             "range": "± 2897283",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7ac341b5265cea9842e224989d1ac47094a5c93f",
+          "message": "task: update documentation on block_in_place (#3753)",
+          "timestamp": "2021-05-05T21:44:02+02:00",
+          "tree_id": "a6b392b25a1b7ebb2958d9ea1c53e9e2194c8b6c",
+          "url": "https://github.com/tokio-rs/tokio/commit/7ac341b5265cea9842e224989d1ac47094a5c93f"
+        },
+        "date": 1620243935665,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 160947,
+            "range": "± 32534",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 652631,
+            "range": "± 184086",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4857168,
+            "range": "± 2269068",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18420216,
+            "range": "± 5196547",
             "unit": "ns/iter"
           }
         ]
