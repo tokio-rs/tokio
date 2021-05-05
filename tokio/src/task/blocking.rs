@@ -5,12 +5,12 @@ cfg_rt_multi_thread! {
     /// blocking the executor.
     ///
     /// In general, issuing a blocking call or performing a lot of compute in a
-    /// future without yielding is not okay, as it may prevent the executor from
-    /// driving other tasks forward. By using this function, the executor
-    /// knows that the task it is currently executing is about to block the
-    /// thread, and the executor is able to hand off any other tasks it has to a
-    /// new worker thread. See the [CPU-bound tasks and blocking code][blocking]
-    /// section for more information.
+    /// future without yielding is problematic, as it may prevent the executor
+    /// from driving other tasks forward. Calling this function informs the
+    /// executor that the currently executing task is about to block the thread,
+    /// so the executor is able to hand off any other tasks it has to a new
+    /// worker thread before that happens. See the [CPU-bound tasks and blocking
+    /// code][blocking] section for more information.
     ///
     /// Be aware that although this function avoids starving other independently
     /// spawned tasks, any other code running concurrently in the same task will
