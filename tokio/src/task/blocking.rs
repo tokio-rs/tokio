@@ -5,19 +5,24 @@ cfg_rt_multi_thread! {
     /// blocking the executor.
     ///
     /// In general, issuing a blocking call or performing a lot of compute in a
-    /// future without yielding is not okay, as it may prevent the executor from
-    /// driving other futures forward.  This function runs the closure on the
-    /// current thread by having the thread temporarily cease from being a core
-    /// thread, and turns it into a blocking thread. See the [CPU-bound tasks
-    /// and blocking code][blocking] section for more information.
+    /// future without yielding is problematic, as it may prevent the executor
+    /// from driving other tasks forward. Calling this function informs the
+    /// executor that the currently executing task is about to block the thread,
+    /// so the executor is able to hand off any other tasks it has to a new
+    /// worker thread before that happens. See the [CPU-bound tasks and blocking
+    /// code][blocking] section for more information.
     ///
-    /// Although this function avoids starving other independently spawned
-    /// tasks, any other code running concurrently in the same task will be
-    /// suspended during the call to `block_in_place`. This can happen e.g. when
-    /// using the [`join!`] macro. To avoid this issue, use [`spawn_blocking`]
-    /// instead.
+    /// Be aware that although this function avoids starving other independently
+    /// spawned tasks, any other code running concurrently in the same task will
+    /// be suspended during the call to `block_in_place`. This can happen e.g.
+    /// when using the [`join!`] macro. To avoid this issue, use
+    /// [`spawn_blocking`] instead of `block_in_place`.
     ///
-    /// Note that this function can only be used when using the `multi_thread` runtime.
+    /// Note that this function cannot be used within a [`current_thread`] runtime
+    /// because in this case there are no other worker threads to hand off tasks
+    /// to. On the other hand, calling the function outside a runtime is
+    /// allowed. In this case, `block_in_place` just calls the provided closure
+    /// normally.
     ///
     /// Code running behind `block_in_place` cannot be cancelled. When you shut
     /// down the executor, it will wait indefinitely for all blocking operations
@@ -43,6 +48,28 @@ cfg_rt_multi_thread! {
     /// });
     /// # }
     /// ```
+    ///
+    /// Code running inside `block_in_place` may use `block_on` to reenter the
+    /// async context.
+    ///
+    /// ```
+    /// use tokio::task;
+    /// use tokio::runtime::Handle;
+    ///
+    /// # async fn docs() {
+    /// task::block_in_place(move || {
+    ///     Handle::current().block_on(async move {
+    ///         // do something async
+    ///     });
+    /// });
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called from a [`current_thread`] runtime.
+    ///
+    /// [`current_thread`]: fn@crate::runtime::Builder::new_current_thread
     pub fn block_in_place<F, R>(f: F) -> R
     where
         F: FnOnce() -> R,
