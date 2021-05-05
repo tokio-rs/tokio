@@ -9,7 +9,7 @@ name: CI
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
-  nightly: nightly-2020-09-21
+  nightly: nightly-2021-04-25
   minrust: 1.45.2
 
 jobs:
@@ -279,7 +279,7 @@ jobs:
       - name: "doc --lib --all-features"
         run: cargo doc --lib --no-deps --all-features --document-private-items
         env:
-          RUSTDOCFLAGS: --cfg docsrs
+          RUSTDOCFLAGS: --cfg docsrs -Dwarnings
 
   loom:
     name: loom
