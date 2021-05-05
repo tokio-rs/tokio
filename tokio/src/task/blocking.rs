@@ -53,7 +53,8 @@ cfg_rt_multi_thread! {
     /// async context.
     ///
     /// ```
-    /// use tokio::task::{self, Handle};
+    /// use tokio::task;
+    /// use tokio::runtime::Handle;
     ///
     /// # async fn docs() {
     /// task::block_in_place(move || {
