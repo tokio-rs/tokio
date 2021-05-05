@@ -6,9 +6,9 @@ use std::task::{Context, Poll};
 use std::{convert::TryInto, future::Future};
 
 /// Creates new [`Interval`] that yields with interval of `period`. The first
-/// tick completes immediately. The [`MissedTickBehavior`] is the
-/// [default one](MissedTickBehavior::default), which is
-/// [`Burst`](MissedTickBehavior::Burst).
+/// tick completes immediately. The default [`MissedTickBehavior`] is
+/// [`Burst`](MissedTickBehavior::Burst), but this can be configured
+/// by calling [`set_missed_tick_behavior`](Interval::set_missed_tick_behavior).
 ///
 /// An interval will tick indefinitely. At any time, the [`Interval`] value can
 /// be dropped. This cancels the interval.
@@ -39,7 +39,7 @@ use std::{convert::TryInto, future::Future};
 ///
 /// A simple example using `interval` to execute a task every two seconds.
 ///
-/// The difference between `interval` and [`sleep`] is that an `interval`
+/// The difference between `interval` and [`sleep`] is that an [`Interval`]
 /// measures the time since the last tick, which means that [`.tick().await`]
 /// may wait for a shorter time than the duration specified for the interval
 /// if some time has passed between calls to [`.tick().await`].
@@ -75,9 +75,9 @@ pub fn interval(period: Duration) -> Interval {
 }
 
 /// Creates new [`Interval`] that yields with interval of `period` with the
-/// first tick completing at `start`. The [`MissedTickBehavior`] is the
-/// [default one](MissedTickBehavior::default), which is
-/// [`Burst`](MissedTickBehavior::Burst).
+/// first tick completing at `start`. The default [`MissedTickBehavior`] is
+/// [`Burst`](MissedTickBehavior::Burst), but this can be configured
+/// by calling [`set_missed_tick_behavior`](Interval::set_missed_tick_behavior).
 ///
 /// An interval will tick indefinitely. At any time, the [`Interval`] value can
 /// be dropped. This cancels the interval.
@@ -115,27 +115,42 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 
 /// Defines the behavior of an [`Interval`] when it misses a tick.
 ///
-/// Occasionally, the executor may be blocked, and as a result, [`Interval`]
-/// misses a tick. By default, when this happens, [`Interval`] fires ticks
-/// as quickly as it can until it is back to where it should be. However,
-/// this is not always the desired behavior when ticks are missed.
-/// `MissedTickBehavior` allows users to specify which behavior they want
-/// [`Interval`] to exhibit. Each variant represents a different strategy.
+/// Sometimes, an [`Interval`]'s tick is missed. For example, consider the
+/// following:
 ///
-/// Because the executor cannot guarantee exect precision with
-/// timers, these strategies will only apply when the
-/// error in time is greater than 5 milliseconds.
+/// ```ignore
+/// use tokio::time;
+///
+/// let mut interval = time::interval(time::Duration::from_secs(2));
+/// for _ in 0..5 {
+///     interval.tick().await;
+///     // if this takes more than 2 seconds, a tick will be delayed
+///     task_that_takes_one_to_three_seconds().await;
+/// }
+/// ```
+///
+/// Generally, a tick is missed if someone spends too much time without calling
+/// [`tick()`](Interval::tick).
+///
+/// By default, when at tick is missed, [`Interval`] fires ticks as quickly as
+/// it can until it is back to where it should be. However, this is not always
+/// the desired behavior. `MissedTickBehavior` allows users to specify which
+/// behavior they want [`Interval`] to exhibit. Each variant represents a
+/// different strategy.
+///
+/// Note that because the executor cannot guarantee exect precision with timers,
+/// these strategies will only apply when the error in time is greater than 5
+/// milliseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MissedTickBehavior {
     /// Tick as fast as possible until caught up.
     ///
-    /// When this strategy is used, after regaining control, [`Interval`] ticks
-    /// as fast as it can until it is caught up to where it should be had the
-    /// executor not been blocked. The [`Instant`]s yielded by
-    /// [`tick`](Interval::tick()) are the same as they would have been if the executor had not
-    /// been blocked.
+    /// When this strategy is used, [`Interval`] schedules ticks "normally" (the
+    /// same as it would have if the ticks hadn't been delayed), which results
+    /// in ticks being fired as fast as it can until it is caught up in time to
+    /// where it should be.
     ///
-    /// This would look something like this:
+    /// This looks something like this:
     /// ```text
     /// Expected ticks: |     1     |     2     |     3     |     4     |     5     |     6     |
     /// Actual ticks:   | work -----|          delay          | work | work | work -| work -----|
@@ -156,18 +171,13 @@ pub enum MissedTickBehavior {
     /// versions of Tokio.
     Burst,
 
-    /// Delay missed ticks to happen at multiples of `period` from when
-    /// [`Interval`] regained control.
+    /// Delay missed ticks to happen at multiples of `period` from when [`tick`]
+    /// was called.
     ///
-    /// When this strategy is used, after regaining control, [`Interval`] ticks
-    /// immediately, then schedules all future ticks to happen at a regular
-    /// `period` from the point when [`Interval`] regained control.
-    /// [`tick`] yields immediately with an [`Instant`] that represents the time
-    /// that the tick should have happened. All subsequent calls to
-    /// [`tick`] yield an [`Instant`] that is a multiple of
-    /// `period` away from the point that [`Interval`] regained control.
+    /// When this strategy is used, [`Interval`] schedules all future ticks to
+    /// happen at a regular `period` from the point when [`tick`] was called.
     ///
-    /// This would look something like this:
+    /// This looks something like this:
     /// ```text
     /// Expected ticks: |     1     |     2     |     3     |     4     |     5     |     6     |
     /// Actual ticks:   | work -----|          delay          | work -----| work -----| work -----|
@@ -189,15 +199,10 @@ pub enum MissedTickBehavior {
 
     /// Skip the missed ticks and tick on the next multiple of `period`.
     ///
-    /// When this strategy is used, after regaining control, [`Interval`] ticks
-    /// immediately, then schedules the next tick on the closest multiple of
-    /// `period` from `delay`. Thus, the yielded value from
-    /// [`tick`](Interval::tick) is an [`Instant`] that is some multiple of
-    /// `period` from `start`. However, that yielded [`Instant`] is not
-    /// guarenteed to be exactly one multiple of `period` from the tick that
-    /// got blocked.
+    /// When this strategy is used, [`Interval`] schedules the next tick for the
+    /// closest multiple of `period` from when the [`Interval`] first ticked.
     ///
-    /// This would look something like this:
+    /// This looks something like this:
     /// ```text
     /// Expected ticks: |     1     |     2     |     3     |     4     |     5     |     6     |
     /// Actual ticks:   | work -----|          delay          | work ---| work -----| work -----|
@@ -209,6 +214,9 @@ pub enum MissedTickBehavior {
     //                                                                              Ready(s + 6p)
     // * Where `s` is the start time and `p` is the period
     /// ```
+    ///
+    /// Note that the ticks aren't guarenteed to be one `period` away from the
+    /// last tick, but they will be a multiple of `period` away.
     Skip,
 }
 
@@ -245,8 +253,8 @@ impl Default for MissedTickBehavior {
     /// For most usecases, the [`Burst`] strategy is what is desired.
     /// Additionally, to preserve backwards compatibility, the [`Burst`]
     /// strategy must be the default. For these reasons,
-    /// [`MissedTickBehavior::Burst`] is the default for
-    /// [`MissedTickBehavior`]. See [`Burst`] for more details.
+    /// [`MissedTickBehavior::Burst`] is the default for [`MissedTickBehavior`].
+    /// See [`Burst`] for more details.
     ///
     /// [`Burst`]: MissedTickBehavior::Burst
     fn default() -> Self {
@@ -254,7 +262,7 @@ impl Default for MissedTickBehavior {
     }
 }
 
-/// Interval returned by [`interval`], [`interval_at`]
+/// Interval returned by [`interval`] and [`interval_at`]
 ///
 /// This type allows you to wait on a sequence of instants with a certain
 /// duration between each instant. Unlike calling [`sleep`] in a loop, this lets
@@ -272,8 +280,7 @@ pub struct Interval {
     /// The duration between values yielded by `Interval`.
     period: Duration,
 
-    /// The strategy `Interval` should use when the executor gets blocked and a
-    /// tick is missed.
+    /// The strategy `Interval` should use when a tick is missed.
     missed_tick_behavior: MissedTickBehavior,
 }
 
@@ -323,10 +330,9 @@ impl Interval {
 
         let now = Instant::now();
 
-        // If the executor was not blocked, and thus we are being called
-        // before the next tick is due, just schedule the next tick normally,
-        // one `period` after `scheduled_timeout`, when the last tick went
-        // off
+        // If a tick was not missed, and thus we are being called before the
+        // next tick is due, just schedule the next tick normally, one `period`
+        // after `timeout`
         //
         // However, if a tick took excessively long and we are now behind,
         // schedule the next tick according to how the user specified with
@@ -344,8 +350,7 @@ impl Interval {
         Poll::Ready(timeout)
     }
 
-    /// Returns the [`MissedTickBehavior`] strategy that is currently being
-    /// used.
+    /// Returns the [`MissedTickBehavior`] strategy currently being used.
     pub fn missed_tick_behavior(&self) -> MissedTickBehavior {
         self.missed_tick_behavior
     }
@@ -355,8 +360,7 @@ impl Interval {
         self.missed_tick_behavior = behavior;
     }
 
-    /// Resets the [`MissedTickBehavior`] strategy that should be used to the
-    /// [default one](MissedTickBehavior::default), which is
+    /// Resets the [`MissedTickBehavior`] strategy to the default, which is
     /// [`Burst`](MissedTickBehavior::Burst).
     pub fn reset_missed_tick_behavior(&mut self) {
         self.missed_tick_behavior = Default::default();
