@@ -89,7 +89,6 @@ impl<T> OrphanQueueImpl<T> {
                         // register/initialize here, so we can try again later
                         if let Ok(sigchild) = signal_with_handle(SignalKind::child(), &handle) {
                             *sigchild_guard = Some(sigchild);
-                            drop(sigchild_guard);
                             drain_orphan_queue(queue);
                         }
                     }
@@ -103,8 +102,6 @@ fn drain_orphan_queue<T>(mut queue: MutexGuard<'_, Vec<T>>)
 where
     T: Wait,
 {
-    // let mut queue = self.queue.lock().unwrap();
-    // let queue = &mut *queue;
     for i in (0..queue.len()).rev() {
         match queue[i].try_wait() {
             Ok(None) => {}
