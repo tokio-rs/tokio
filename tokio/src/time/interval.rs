@@ -360,12 +360,6 @@ impl Interval {
         self.missed_tick_behavior = behavior;
     }
 
-    /// Resets the [`MissedTickBehavior`] strategy to the default, which is
-    /// [`Burst`](MissedTickBehavior::Burst).
-    pub fn reset_missed_tick_behavior(&mut self) {
-        self.missed_tick_behavior = Default::default();
-    }
-
     /// Returns the period of the interval.
     pub fn period(&self) -> Duration {
         self.period
