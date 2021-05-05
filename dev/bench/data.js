@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620209486425,
+  "lastUpdate": 1620209495794,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -27031,6 +27031,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19986894,
             "range": "± 3085223",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "russell.r.cohen@gmail.com",
+            "name": "Russell Cohen",
+            "username": "rcoh"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8ef39dfb22974e6f5f6203e279912d3eac68017d",
+          "message": "tokio-test: add assert_elapsed macro (#3728)",
+          "timestamp": "2021-05-05T12:09:28+02:00",
+          "tree_id": "ff96a5a7e3e1114749779e206237626e6b299faf",
+          "url": "https://github.com/tokio-rs/tokio/commit/8ef39dfb22974e6f5f6203e279912d3eac68017d"
+        },
+        "date": 1620209492217,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 192855,
+            "range": "± 24598",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 714101,
+            "range": "± 101672",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5028741,
+            "range": "± 1052968",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19034726,
+            "range": "± 4354303",
             "unit": "ns/iter"
           }
         ]
