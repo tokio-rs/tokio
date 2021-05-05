@@ -84,13 +84,13 @@ unsafe impl Send for Entry {}
 
 /// Scheduler state shared between threads.
 struct Shared {
-    /// Remote run queue
-    queue: Mutex<VecDeque<Entry>>,
+    /// Remote run queue. None if the `Runtime` has been dropped.
+    queue: Mutex<Option<VecDeque<Entry>>>,
 
-    /// Unpark the blocked thread
+    /// Unpark the blocked thread.
     unpark: Box<dyn Unpark>,
 
-    // indicates whether the blocked on thread was woken
+    /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
 }
 
@@ -124,7 +124,7 @@ impl<P: Park> BasicScheduler<P> {
 
         let spawner = Spawner {
             shared: Arc::new(Shared {
-                queue: Mutex::new(VecDeque::with_capacity(INITIAL_CAPACITY)),
+                queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
                 unpark: unpark as Box<dyn Unpark>,
                 woken: AtomicBool::new(false),
             }),
@@ -352,17 +352,21 @@ impl<P: Park> Drop for BasicScheduler<P> {
             }
 
             // Drain remote queue
-            for entry in scheduler.spawner.shared.queue.lock().drain(..) {
-                match entry {
-                    Entry::Schedule(task) => {
-                        task.shutdown();
-                    }
-                    Entry::Release(..) => {
-                        // Do nothing, each entry in the linked list was *just*
-                        // dropped by the scheduler above.
+            let mut remote_queue = scheduler.spawner.shared.queue.lock();
+            if let Some(remote_queue) = remote_queue.take() {
+                for entry in remote_queue {
+                    match entry {
+                        Entry::Schedule(task) => {
+                            task.shutdown();
+                        }
+                        Entry::Release(..) => {
+                            // Do nothing, each entry in the linked list was *just*
+                            // dropped by the scheduler above.
+                        }
                     }
                 }
             }
+            drop(remote_queue);
 
             assert!(context.tasks.borrow().owned.is_empty());
         });
@@ -390,7 +394,10 @@ impl Spawner {
     }
 
     fn pop(&self) -> Option<Entry> {
-        self.shared.queue.lock().pop_front()
+        match self.shared.queue.lock().as_mut() {
+            Some(queue) => queue.pop_front(),
+            None => None,
+        }
     }
 
     fn waker_ref(&self) -> WakerRef<'_> {
@@ -429,7 +436,9 @@ impl Schedule for Arc<Shared> {
                 // safety: the task is inserted in the list in `bind`.
                 unsafe { cx.tasks.borrow_mut().owned.remove(ptr) }
             } else {
-                self.queue.lock().push_back(Entry::Release(ptr));
+                if let Some(queue) = self.queue.lock().as_mut() {
+                    queue.push_back(Entry::Release(ptr));
+                }
                 self.unpark.unpark();
                 // Returning `None` here prevents the task plumbing from being
                 // freed. It is then up to the scheduler through the queue we
@@ -445,8 +454,17 @@ impl Schedule for Arc<Shared> {
                 cx.tasks.borrow_mut().queue.push_back(task);
             }
             _ => {
-                self.queue.lock().push_back(Entry::Schedule(task));
-                self.unpark.unpark();
+                let mut guard = self.queue.lock();
+                if let Some(queue) = guard.as_mut() {
+                    queue.push_back(Entry::Schedule(task));
+                    drop(guard);
+                    self.unpark.unpark();
+                } else {
+                    // The runtime has shut down. We drop the new task
+                    // immediately.
+                    drop(guard);
+                    task.shutdown();
+                }
             }
         });
     }
