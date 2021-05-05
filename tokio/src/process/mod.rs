@@ -994,13 +994,22 @@ impl Child {
     /// If the caller wishes to explicitly control when the child's stdin
     /// handle is closed, they may `.take()` it before calling `.wait()`:
     ///
-    /// ```no_run
+    /// ```
+    /// # #[cfg(not(unix))]fn main(){}
+    /// # #[cfg(unix)]
     /// use tokio::io::AsyncWriteExt;
+    /// # #[cfg(unix)]
     /// use tokio::process::Command;
+    /// # #[cfg(unix)]
+    /// use std::process::Stdio;
     ///
+    /// # #[cfg(unix)]
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut child = Command::new("cat").spawn().unwrap();
+    ///     let mut child = Command::new("cat")
+    ///         .stdin(Stdio::piped())
+    ///         .spawn()
+    ///         .unwrap();
     ///
     ///     let mut stdin = child.stdin.take().unwrap();
     ///     tokio::spawn(async move {
