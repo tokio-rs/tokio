@@ -27,6 +27,16 @@ pub enum BroadcastStreamRecvError {
     Lagged(u64),
 }
 
+impl fmt::Display for BroadcastStreamRecvError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BroadcastStreamRecvError::Lagged(amt) => write!(f, "channel lagged by {}", amt),
+        }
+    }
+}
+
+impl std::error::Error for BroadcastStreamRecvError {}
+
 async fn make_future<T: Clone>(mut rx: Receiver<T>) -> (Result<T, RecvError>, Receiver<T>) {
     let result = rx.recv().await;
     (result, rx)
