@@ -302,6 +302,11 @@ impl<T> Receiver<T> {
 
     /// Resizes the channel buffer to the provided size
     ///
+    /// If the buffer is reduced to a smaller number of elements than it already
+    /// contains, it is no longer possible to send elements. It will be possible
+    /// to send new elements when the excess messages are consumed and there is
+    /// capacity available with respect to the new size.
+    ///
     /// A return value of `Ok` means that the operation was successful and the
     /// channel was resized. An error means that the channel is closed and can
     /// no longer be resized.
