@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::time::{self, Duration, Instant};
+use tokio::time::{self, Duration, Instant, MissedTickBehavior};
 use tokio_test::{assert_pending, assert_ready_eq, task};
 
 use std::task::Poll;
@@ -90,11 +90,8 @@ async fn delay() {
     // expect, so that the runtime will see that it is time to resolve the timer
     time::advance(ms(1)).await;
 
-    let mut i = task::spawn(time::interval_with_missed_tick_behavior_at(
-        start,
-        ms(300),
-        time::MissedTickBehavior::Delay,
-    ));
+    let mut i = task::spawn(time::interval_at(start, ms(300)));
+    i.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
     check_interval_poll!(i, start, 0);
 
@@ -145,11 +142,8 @@ async fn skip() {
     // expect, so that the runtime will see that it is time to resolve the timer
     time::advance(ms(1)).await;
 
-    let mut i = task::spawn(time::interval_with_missed_tick_behavior_at(
-        start,
-        ms(300),
-        time::MissedTickBehavior::Skip,
-    ));
+    let mut i = task::spawn(time::interval_at(start, ms(300)));
+    i.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
     check_interval_poll!(i, start, 0);
 
