@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620332916670,
+  "lastUpdate": 1620332919755,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -27643,6 +27643,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22999601,
             "range": "± 3585971",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "53383020+sb64@users.noreply.github.com",
+            "name": "sb64",
+            "username": "sb64"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6b9bdd5ca25bd3f30589506de911db73f7dbf8b4",
+          "message": "chore: fix CI for Rust 1.52 (#3758)",
+          "timestamp": "2021-05-06T22:26:27+02:00",
+          "tree_id": "48134e5e4a51ec9094cfb5f5767cfcb6e8351115",
+          "url": "https://github.com/tokio-rs/tokio/commit/6b9bdd5ca25bd3f30589506de911db73f7dbf8b4"
+        },
+        "date": 1620332913822,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 193028,
+            "range": "± 54782",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 718709,
+            "range": "± 168752",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5140060,
+            "range": "± 1139845",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21078635,
+            "range": "± 3824287",
             "unit": "ns/iter"
           }
         ]
