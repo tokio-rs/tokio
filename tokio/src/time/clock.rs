@@ -85,6 +85,18 @@ cfg_test_util! {
     ///
     /// Panics if time is already frozen or if called from outside of a
     /// `current_thread` Tokio runtime.
+    ///
+    /// # Auto-advance
+    ///
+    /// If time is paused, when the runtime has no work to do, the clock is
+    /// auto-advanced to the closest pending timer. This can cause some
+    /// confusion, because if a [`Sleep`] (or other timer-backed primitive) is
+    /// `.await`ed, the timer is set forward unexpectedly. However, this
+    /// behavior is necessary because there could be situations in which the
+    /// runtime hangs because the clock never gets advanced, so a timer never
+    /// resolves.
+    ///
+    /// [`Sleep`]: crate::time::Sleep
     pub fn pause() {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.pause();
@@ -119,11 +131,20 @@ cfg_test_util! {
     ///
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
+    ///
+    /// # Auto-advance
+    ///
+    /// If the time is paused and there is no work to do, the runtime advances
+    /// time to the next-closest timer, which may cause confusion. See
+    /// [`pause`](pause#auto-advance) for more details.
     pub async fn advance(duration: Duration) {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         let until = clock.now() + duration;
         clock.advance(duration);
 
+        // Prevent the runtime from advancing the clock to the next pending
+        // timer when parking, which likely will advance it too far (see
+        // https://github.com/tokio-rs/tokio/pull/3712)
         crate::time::sleep_until(until).await;
     }
 
