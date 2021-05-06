@@ -63,6 +63,25 @@ async fn disconnect() {
 }
 
 #[tokio::test]
+async fn disconnect_reader() {
+    let (a, mut b) = duplex(2);
+
+    let t1 = tokio::spawn(async move {
+        // this will block, as not all data fits into duplex
+        b.write_all(b"ping").await.unwrap_err();
+    });
+
+    let t2 = tokio::spawn(async move {
+        // here we drop the reader side, and we expect the writer in the other
+        // task to exit with an error
+        drop(a);
+    });
+
+    t2.await.unwrap();
+    t1.await.unwrap();
+}
+
+#[tokio::test]
 async fn max_write_size() {
     let (mut a, mut b) = duplex(32);
 
@@ -73,11 +92,11 @@ async fn max_write_size() {
         assert_eq!(n, 4);
     });
 
-    let t2 = tokio::spawn(async move {
-        let mut buf = [0u8; 4];
-        b.read_exact(&mut buf).await.unwrap();
-    });
+    let mut buf = [0u8; 4];
+    b.read_exact(&mut buf).await.unwrap();
 
     t1.await.unwrap();
-    t2.await.unwrap();
+
+    // drop b only after task t1 finishes writing
+    drop(b);
 }
