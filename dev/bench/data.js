@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620244263718,
+  "lastUpdate": 1620318761638,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -14525,6 +14525,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 592,
             "range": "± 57",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "stefan@pimaker.at",
+            "name": "Stefan",
+            "username": "PiMaker"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4075a445770bd5f4982006ec6f7b60d3fb6373e",
+          "message": "io: wake pending writers on DuplexStream close (#3756)",
+          "timestamp": "2021-05-06T18:30:39+02:00",
+          "tree_id": "6eb1abfd250a54a186d903d777198be45b6dd088",
+          "url": "https://github.com/tokio-rs/tokio/commit/d4075a445770bd5f4982006ec6f7b60d3fb6373e"
+        },
+        "date": 1620318758330,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 881,
+            "range": "± 77",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15241,
+            "range": "± 4578",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 901,
+            "range": "± 50",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15447,
+            "range": "± 5945",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 573,
+            "range": "± 50",
             "unit": "ns/iter"
           }
         ]
