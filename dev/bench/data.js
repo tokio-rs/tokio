@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620318761638,
+  "lastUpdate": 1620318768830,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -27541,6 +27541,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20261504,
             "range": "± 3243623",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "stefan@pimaker.at",
+            "name": "Stefan",
+            "username": "PiMaker"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4075a445770bd5f4982006ec6f7b60d3fb6373e",
+          "message": "io: wake pending writers on DuplexStream close (#3756)",
+          "timestamp": "2021-05-06T18:30:39+02:00",
+          "tree_id": "6eb1abfd250a54a186d903d777198be45b6dd088",
+          "url": "https://github.com/tokio-rs/tokio/commit/d4075a445770bd5f4982006ec6f7b60d3fb6373e"
+        },
+        "date": 1620318764434,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 196771,
+            "range": "± 25024",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 742134,
+            "range": "± 48114",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5484625,
+            "range": "± 850326",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22999601,
+            "range": "± 3585971",
             "unit": "ns/iter"
           }
         ]
