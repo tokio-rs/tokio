@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620318803519,
+  "lastUpdate": 1620332904254,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -14579,6 +14579,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 573,
             "range": "± 50",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "53383020+sb64@users.noreply.github.com",
+            "name": "sb64",
+            "username": "sb64"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6b9bdd5ca25bd3f30589506de911db73f7dbf8b4",
+          "message": "chore: fix CI for Rust 1.52 (#3758)",
+          "timestamp": "2021-05-06T22:26:27+02:00",
+          "tree_id": "48134e5e4a51ec9094cfb5f5767cfcb6e8351115",
+          "url": "https://github.com/tokio-rs/tokio/commit/6b9bdd5ca25bd3f30589506de911db73f7dbf8b4"
+        },
+        "date": 1620332900806,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 902,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16347,
+            "range": "± 5765",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 916,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15268,
+            "range": "± 2962",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 591,
+            "range": "± 290",
             "unit": "ns/iter"
           }
         ]
