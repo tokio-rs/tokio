@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620318768830,
+  "lastUpdate": 1620318777819,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -42171,6 +42171,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1205,
             "range": "± 126",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "stefan@pimaker.at",
+            "name": "Stefan",
+            "username": "PiMaker"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4075a445770bd5f4982006ec6f7b60d3fb6373e",
+          "message": "io: wake pending writers on DuplexStream close (#3756)",
+          "timestamp": "2021-05-06T18:30:39+02:00",
+          "tree_id": "6eb1abfd250a54a186d903d777198be45b6dd088",
+          "url": "https://github.com/tokio-rs/tokio/commit/d4075a445770bd5f4982006ec6f7b60d3fb6373e"
+        },
+        "date": 1620318773760,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 18390,
+            "range": "± 9371",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1014,
+            "range": "± 114",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 666,
+            "range": "± 62",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15914,
+            "range": "± 4565",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1013,
+            "range": "± 131",
             "unit": "ns/iter"
           }
         ]
