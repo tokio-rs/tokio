@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620332919755,
+  "lastUpdate": 1620332952781,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -64979,6 +64979,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 802544,
             "range": "± 49824",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "53383020+sb64@users.noreply.github.com",
+            "name": "sb64",
+            "username": "sb64"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6b9bdd5ca25bd3f30589506de911db73f7dbf8b4",
+          "message": "chore: fix CI for Rust 1.52 (#3758)",
+          "timestamp": "2021-05-06T22:26:27+02:00",
+          "tree_id": "48134e5e4a51ec9094cfb5f5767cfcb6e8351115",
+          "url": "https://github.com/tokio-rs/tokio/commit/6b9bdd5ca25bd3f30589506de911db73f7dbf8b4"
+        },
+        "date": 1620332945381,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7173732,
+            "range": "± 3056411",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6602096,
+            "range": "± 1989810",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6395797,
+            "range": "± 3704763",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 349,
+            "range": "± 64",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 344,
+            "range": "± 44",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 347,
+            "range": "± 53",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 65534,
+            "range": "± 12009",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 997,
+            "range": "± 242",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1130064,
+            "range": "± 118497",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 814819,
+            "range": "± 178645",
             "unit": "ns/iter"
           }
         ]
