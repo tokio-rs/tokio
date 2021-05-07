@@ -3,7 +3,7 @@ use crate::signal::unix::{signal_with_handle, SignalKind};
 use crate::sync::watch;
 use std::io;
 use std::process::ExitStatus;
-use std::sync::{Mutex, MutexGuard};
+use crate::loom::sync::{Mutex, MutexGuard};
 
 /// An interface for waiting on a process to exit.
 pub(crate) trait Wait {
