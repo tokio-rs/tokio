@@ -1,3 +1,6 @@
+#![cfg(feature = "full")]
+#![cfg(all(windows))]
+
 use std::io;
 use std::mem;
 use std::os::windows::io::AsRawHandle;
