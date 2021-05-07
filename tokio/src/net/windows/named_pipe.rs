@@ -313,7 +313,7 @@ impl NamedPipeBuilder {
     ///
     /// This function will panic if more than 254 instances are specified. If
     /// you do not wish to set an instance limit, leave it unspecified.
-    /// 
+    ///
     /// ```should_panic
     /// use tokio::net::windows::NamedPipeBuilder;
     ///
@@ -473,7 +473,7 @@ impl NamedPipeClientBuilder {
     ///
     /// Panics if the specified duration is larger than `0xffffffff`
     /// milliseconds, which is roughly equal to 1193 hours.
-    /// 
+    ///
     /// ```should_panic
     /// use std::time::Duration;
     /// use tokio::net::windows::NamedPipeClientBuilder;
