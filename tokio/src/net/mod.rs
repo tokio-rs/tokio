@@ -46,3 +46,9 @@ cfg_net_unix! {
     pub use unix::listener::UnixListener;
     pub use unix::stream::UnixStream;
 }
+
+cfg_net_windows! {
+    pub mod windows;
+    // TODO: should we re-export these?
+    // pub use windows::{NamedPipe, NamedPipeBuilder, NamedPipeClientBuilder};
+}

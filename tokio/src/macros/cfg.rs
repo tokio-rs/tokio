@@ -183,6 +183,16 @@ macro_rules! cfg_net_unix {
     }
 }
 
+macro_rules! cfg_net_windows {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(windows, feature = "net"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_process {
     ($($item:item)*) => {
         $(

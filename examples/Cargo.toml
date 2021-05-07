@@ -7,7 +7,7 @@ edition = "2018"
 # If you copy one of the examples into a new project, you should be using
 # [dependencies] instead.
 [dev-dependencies]
-tokio = { version = "1.0.0", features = ["full", "tracing"] }
+tokio = { path = "../tokio", version = "1.0.0", features = ["full", "tracing"] }
 tokio-util = { version = "0.6.3", features = ["full"] }
 tokio-stream = { version = "0.1" }
 
@@ -23,6 +23,8 @@ httparse = "1.0"
 time = "0.1"
 once_cell = "1.5.2"
 
+[target.'cfg(windows)'.dev-dependencies.winapi]
+version = "0.3.8"
 
 [[example]]
 name = "chat"
@@ -76,3 +78,11 @@ path = "custom-executor.rs"
 [[example]]
 name = "custom-executor-tokio-context"
 path = "custom-executor-tokio-context.rs"
+
+[[example]]
+name = "named-pipe"
+path = "named-pipe.rs"
+
+[[example]]
+name = "named-pipe-multi-client"
+path = "named-pipe-multi-client.rs"
