@@ -10,7 +10,11 @@ env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
   nightly: nightly-2020-09-21
-  minrust: 1.47.0
+  minrust: 1.45.2
+  # Tokio's tests require a higher minimum Rust version than Tokio itself.
+  #
+  # See https://github.com/tokio-rs/tokio/pull/3583 for more info.
+  minrust-tests: 1.47.0
 
 jobs:
   # Depends on all action sthat are required for a "successful" CI run.
@@ -249,7 +253,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
-        run: rustup update ${{ env.minrust }} && rustup default ${{ env.minrust }}
+        run: rustup update ${{ env.minrust-tests }} && rustup default ${{ env.minrust-tests }}
       - name: Install clippy
         run: rustup component add clippy
 
