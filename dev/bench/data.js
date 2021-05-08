@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620471454154,
+  "lastUpdate": 1620471464989,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -42639,6 +42639,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 984,
             "range": "± 102",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "35407569+csm123199@users.noreply.github.com",
+            "name": "Chris Moore",
+            "username": "csm123199"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "05c3cf3a0a93e79b8243577859c67f5b24708120",
+          "message": "util: impl AsRawFd/AsRawHandle for Compat<T> (#3765)",
+          "timestamp": "2021-05-08T12:55:04+02:00",
+          "tree_id": "1605642600fc0b135b7a537f2754a85a25a01eec",
+          "url": "https://github.com/tokio-rs/tokio/commit/05c3cf3a0a93e79b8243577859c67f5b24708120"
+        },
+        "date": 1620471461170,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14323,
+            "range": "± 4307",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 927,
+            "range": "± 213",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 627,
+            "range": "± 55",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14532,
+            "range": "± 3251",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 885,
+            "range": "± 124",
             "unit": "ns/iter"
           }
         ]
