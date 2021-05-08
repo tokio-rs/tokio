@@ -49,6 +49,26 @@ cfg_net_unix! {
 
 cfg_net_windows! {
     pub mod windows;
-    // TODO: should we re-export these?
-    // pub use windows::{NamedPipe, NamedPipeBuilder, NamedPipeClientBuilder};
+
+    use std::io;
+
+    pub(crate) async fn asyncify<F, T>(f: F) -> io::Result<T>
+    where
+        F: FnOnce() -> io::Result<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        match sys::run(f).await {
+            Ok(res) => res,
+            Err(_) => Err(io::Error::new(
+                io::ErrorKind::Other,
+                "background task failed",
+            )),
+        }
+    }
+
+    /// Types in this module can be mocked out in tests.
+    mod sys {
+        // TODO: don't rename
+        pub(crate) use crate::blocking::spawn_blocking as run;
+    }
 }

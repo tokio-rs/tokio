@@ -17,8 +17,8 @@ use winapi::um::namedpipeapi;
 use winapi::um::winbase;
 use winapi::um::winnt;
 
-use crate::fs::asyncify;
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf};
+use crate::net::asyncify;
 
 // Interned constant to wait forever. Not available in winapi.
 const NMPWAIT_WAIT_FOREVER: DWORD = 0xffffffff;
