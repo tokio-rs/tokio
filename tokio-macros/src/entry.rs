@@ -1,6 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use quote::quote;
+use quote::{quote, quote_spanned};
+use syn::spanned::Spanned;
 
 #[derive(Clone, Copy, PartialEq)]
 enum RuntimeFlavor {
@@ -278,11 +279,18 @@ fn parse_knobs(
 
     let config = config.build()?;
 
+    // If type mismatch occurs, the current rustc points to the last statement:
+    let last_stmt_span = input
+        .block
+        .stmts
+        .last()
+        .map_or_else(Span::call_site, |s| s.span());
+
     let mut rt = match config.flavor {
-        RuntimeFlavor::CurrentThread => quote! {
+        RuntimeFlavor::CurrentThread => quote_spanned! {last_stmt_span=>
             tokio::runtime::Builder::new_current_thread()
         },
-        RuntimeFlavor::Threaded => quote! {
+        RuntimeFlavor::Threaded => quote_spanned! {last_stmt_span=>
             tokio::runtime::Builder::new_multi_thread()
         },
     };
@@ -302,7 +310,8 @@ fn parse_knobs(
     };
 
     let body = &input.block;
-    input.block = syn::parse_quote! {
+    let brace_token = input.block.brace_token;
+    input.block = syn::parse2(quote_spanned! {last_stmt_span=>
         {
             #rt
                 .enable_all()
@@ -310,7 +319,9 @@ fn parse_knobs(
                 .unwrap()
                 .block_on(async #body)
         }
-    };
+    })
+    .unwrap();
+    input.block.brace_token = brace_token;
 
     let result = quote! {
         #header

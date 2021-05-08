@@ -8,6 +8,9 @@ fn compile_fail_full() {
     #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_invalid_input.rs");
 
+    #[cfg(feature = "full")]
+    t.compile_fail("tests/fail/macro_type_mismatch.rs");
+
     #[cfg(all(feature = "rt", not(feature = "full")))]
     t.compile_fail("tests/fail/macros_core_no_default.rs");
 
