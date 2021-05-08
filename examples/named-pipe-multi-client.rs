@@ -1,12 +1,12 @@
 use std::io;
-use std::time::Duration;
-use tokio::time;
 
 #[cfg(windows)]
 async fn windows_main() -> io::Result<()> {
+    use std::time::Duration;
     use tokio::io::AsyncWriteExt as _;
     use tokio::io::{AsyncBufReadExt as _, BufReader};
     use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder};
+    use tokio::time;
     use winapi::shared::winerror;
 
     const PIPE_NAME: &str = r"\\.\pipe\named-pipe-multi-client";
