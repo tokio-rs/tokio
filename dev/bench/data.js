@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620471394327,
+  "lastUpdate": 1620471414133,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -27793,6 +27793,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18726175,
             "range": "± 4906756",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "35407569+csm123199@users.noreply.github.com",
+            "name": "Chris Moore",
+            "username": "csm123199"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "05c3cf3a0a93e79b8243577859c67f5b24708120",
+          "message": "util: impl AsRawFd/AsRawHandle for Compat<T> (#3765)",
+          "timestamp": "2021-05-08T12:55:04+02:00",
+          "tree_id": "1605642600fc0b135b7a537f2754a85a25a01eec",
+          "url": "https://github.com/tokio-rs/tokio/commit/05c3cf3a0a93e79b8243577859c67f5b24708120"
+        },
+        "date": 1620471411092,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 174654,
+            "range": "± 27678",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 657553,
+            "range": "± 104915",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4967708,
+            "range": "± 1172270",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20569207,
+            "range": "± 3957584",
             "unit": "ns/iter"
           }
         ]
