@@ -4,9 +4,121 @@
 use std::io;
 use std::mem;
 use std::os::windows::io::AsRawHandle;
-use tokio::io::AsyncWriteExt as _;
-use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder, PipeMode};
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder, PipeEnd, PipeMode};
 use winapi::shared::winerror;
+
+#[tokio::test]
+async fn test_named_pipe_permissions() -> io::Result<()> {
+    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-permissions";
+
+    let server_builder = NamedPipeBuilder::new(PIPE_NAME);
+    let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
+
+    // Server side prevents connecting by denying inbound access, client errors
+    // when attempting to create the connection.
+    {
+        let server_builder = server_builder.clone().access_inbound(false);
+        let _server = server_builder.create()?;
+
+        let e = client_builder.create().unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
+
+        // Disabling reading allows a client to connect, but leads to runtime
+        // error if a read is attempted.
+        let mut client = client_builder.clone().write(false).create()?;
+
+        let e = client.write(b"ping").await.unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
+    }
+
+    // Server side prevents connecting by denying outbound access, client errors
+    // when attempting to create the connection.
+    {
+        let server_builder = server_builder.clone().access_outbound(false);
+        let _server = server_builder.create()?;
+
+        let e = client_builder.create().unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
+
+        // Disabling reading allows a client to connect, but leads to runtime
+        // error if a read is attempted.
+        let mut client = client_builder.clone().read(false).create()?;
+
+        let mut buf = [0u8; 4];
+        let e = client.read(&mut buf).await.unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
+    }
+
+    // A functional, unidirectional server-to-client only communication.
+    {
+        let mut server = server_builder.clone().access_inbound(false).create()?;
+        let mut client = client_builder.clone().write(false).create()?;
+
+        let write = server.write_all(b"ping");
+
+        let mut buf = [0u8; 4];
+        let read = client.read_exact(&mut buf);
+
+        let ((), read) = tokio::try_join!(write, read)?;
+
+        assert_eq!(read, 4);
+        assert_eq!(&buf[..], b"ping");
+    }
+
+    // A functional, unidirectional client-to-server only communication.
+    {
+        let mut server = server_builder.clone().access_outbound(false).create()?;
+        let mut client = client_builder.clone().read(false).create()?;
+
+        // TODO: Explain why this test doesn't work without calling connect
+        // first.
+        //
+        // Because I have no idea -- udoprog
+        server.connect().await?;
+
+        let write = client.write_all(b"ping");
+
+        let mut buf = [0u8; 4];
+        let read = server.read_exact(&mut buf);
+
+        let ((), read) = tokio::try_join!(write, read)?;
+
+        println!("done reading and writing");
+
+        assert_eq!(read, 4);
+        assert_eq!(&buf[..], b"ping");
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_named_pipe_info() -> io::Result<()> {
+    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-info";
+
+    let server_builder = NamedPipeBuilder::new(PIPE_NAME)
+        .pipe_mode(PipeMode::Message)
+        .max_instances(5);
+
+    let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
+
+    let server = server_builder.create()?;
+    let client = client_builder.create()?;
+
+    let server_info = server.info()?;
+    let client_info = client.info()?;
+
+    assert_eq!(server_info.end, PipeEnd::Server);
+    assert_eq!(server_info.mode, PipeMode::Message);
+    assert_eq!(server_info.max_instances, 5);
+
+    assert_eq!(client_info.end, PipeEnd::Client);
+    assert_eq!(client_info.mode, PipeMode::Message);
+    assert_eq!(server_info.max_instances, 5);
+
+    Ok(())
+}
 
 #[tokio::test]
 async fn test_named_pipe_client_drop() -> io::Result<()> {

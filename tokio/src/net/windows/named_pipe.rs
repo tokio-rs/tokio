@@ -1,6 +1,7 @@
 use std::ffi::OsStr;
 use std::fmt;
 use std::io;
+use std::mem;
 use std::os::windows::ffi::OsStrExt as _;
 use std::os::windows::io::RawHandle;
 use std::os::windows::io::{AsRawHandle, FromRawHandle};
@@ -9,10 +10,9 @@ use std::ptr;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use winapi::shared::minwindef::DWORD;
+use winapi::shared::minwindef::{DWORD, FALSE};
 use winapi::um::fileapi;
 use winapi::um::handleapi;
-use winapi::um::minwinbase;
 use winapi::um::namedpipeapi;
 use winapi::um::winbase;
 use winapi::um::winnt;
@@ -66,15 +66,15 @@ impl NamedPipe {
     /// connect to an instance of a named pipe. A client process connects by
     /// creating a named pipe with the same name.
     ///
-    /// This corresponds to the [`ConnectNamedPipe`] system call.
+    /// This corresponds to the [ConnectNamedPipe] system call.
     ///
-    /// [`ConnectNamedPipe`]: https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
+    /// [ConnectNamedPipe]: https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
     ///
     /// ```no_run
     /// use tokio::net::windows::NamedPipeBuilder;
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeBuilder::new("\\\\.\\pipe\\mynamedpipe");
+    /// let builder = NamedPipeBuilder::new(r"\\.\pipe\mynamedpipe");
     /// let pipe = builder.create()?;
     ///
     /// // Wait for a client to connect.
@@ -104,7 +104,7 @@ impl NamedPipe {
     /// use tokio::net::windows::NamedPipeBuilder;
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeBuilder::new("\\\\.\\pipe\\mynamedpipe");
+    /// let builder = NamedPipeBuilder::new(r"\\.\pipe\mynamedpipe");
     /// let pipe = builder.create()?;
     ///
     /// // Wait for a client to connect.
@@ -118,6 +118,80 @@ impl NamedPipe {
     /// ```
     pub fn disconnect(&self) -> io::Result<()> {
         self.io.disconnect()
+    }
+
+    /// Retrieves information about the current named pipe.
+    ///
+    /// ```no_run
+    /// use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder, PipeMode, PipeEnd};
+    ///
+    /// # fn main() -> std::io::Result<()> {
+    /// const PIPE_NAME: &str = r"\\.\pipe\mynamedpipe";
+    ///
+    /// let server_builder = NamedPipeBuilder::new(PIPE_NAME)
+    ///     .pipe_mode(PipeMode::Message)
+    ///     .max_instances(5);
+    ///
+    /// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
+    ///
+    /// let server = server_builder.create()?;
+    /// let client = client_builder.create()?;
+    ///
+    /// let server_info = server.info()?;
+    /// let client_info = client.info()?;
+    ///
+    /// assert_eq!(server_info.end, PipeEnd::Server);
+    /// assert_eq!(server_info.mode, PipeMode::Message);
+    /// assert_eq!(server_info.max_instances, 5);
+    ///
+    /// assert_eq!(client_info.end, PipeEnd::Client);
+    /// assert_eq!(client_info.mode, PipeMode::Message);
+    /// assert_eq!(client_info.max_instances, 5);
+    /// # Ok(()) }
+    /// ```
+    pub fn info(&self) -> io::Result<PipeInfo> {
+        unsafe {
+            let mut flags = mem::MaybeUninit::uninit();
+            let mut out_buffer_size = mem::MaybeUninit::uninit();
+            let mut in_buffer_size = mem::MaybeUninit::uninit();
+            let mut max_instances = mem::MaybeUninit::uninit();
+
+            let result = namedpipeapi::GetNamedPipeInfo(
+                self.io.as_raw_handle(),
+                flags.as_mut_ptr(),
+                out_buffer_size.as_mut_ptr(),
+                in_buffer_size.as_mut_ptr(),
+                max_instances.as_mut_ptr(),
+            );
+
+            if result == FALSE {
+                return Err(io::Error::last_os_error());
+            }
+
+            let flags = flags.assume_init();
+            let out_buffer_size = out_buffer_size.assume_init();
+            let in_buffer_size = in_buffer_size.assume_init();
+            let max_instances = max_instances.assume_init();
+
+            let mut end = PipeEnd::Client;
+            let mut mode = PipeMode::Byte;
+
+            if flags & winbase::PIPE_SERVER_END != 0 {
+                end = PipeEnd::Server;
+            }
+
+            if flags & winbase::PIPE_TYPE_MESSAGE != 0 {
+                mode = PipeMode::Message;
+            }
+
+            Ok(PipeInfo {
+                end,
+                mode,
+                out_buffer_size,
+                in_buffer_size,
+                max_instances,
+            })
+        }
     }
 }
 
@@ -214,7 +288,7 @@ impl NamedPipeBuilder {
     /// use tokio::net::windows::NamedPipeBuilder;
     ///
     /// # fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeBuilder::new("\\\\.\\pipe\\mynamedpipe");
+    /// let builder = NamedPipeBuilder::new(r"\\.\pipe\mynamedpipe");
     /// let pipe = builder.create()?;
     /// # Ok(()) }
     /// ```
@@ -318,7 +392,7 @@ impl NamedPipeBuilder {
     /// use tokio::net::windows::NamedPipeBuilder;
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeBuilder::new("\\\\.\\pipe\\mynamedpipe").max_instances(255);
+    /// let builder = NamedPipeBuilder::new(r"\\.\pipe\mynamedpipe").max_instances(255);
     /// # Ok(()) }
     /// ```
     pub fn max_instances(mut self, instances: usize) -> Self {
@@ -360,7 +434,7 @@ impl NamedPipeBuilder {
     /// use tokio::net::windows::NamedPipeBuilder;
     ///
     /// # fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeBuilder::new("\\\\.\\pipe\\mynamedpipe");
+    /// let builder = NamedPipeBuilder::new(r"\\.\pipe\mynamedpipe");
     /// let pipe = builder.create()?;
     /// # Ok(()) }
     /// ```
@@ -393,7 +467,7 @@ impl NamedPipeBuilder {
             self.out_buffer_size,
             self.in_buffer_size,
             self.default_timeout,
-            attrs as *mut minwinbase::SECURITY_ATTRIBUTES,
+            attrs as *mut _,
         );
 
         if h == handleapi::INVALID_HANDLE_VALUE {
@@ -423,6 +497,7 @@ impl fmt::Debug for NamedPipeBuilder {
 #[derive(Clone)]
 pub struct NamedPipeClientBuilder {
     name: Arc<[u16]>,
+    desired_access: DWORD,
 }
 
 impl NamedPipeClientBuilder {
@@ -432,7 +507,7 @@ impl NamedPipeClientBuilder {
     /// use tokio::net::windows::NamedPipeClientBuilder;
     ///
     /// # fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeClientBuilder::new("\\\\.\\pipe\\mynamedpipe");
+    /// let builder = NamedPipeClientBuilder::new(r"\\.\pipe\mynamedpipe");
     /// let pipe = builder.create()?;
     /// # Ok(()) }
     /// ```
@@ -443,6 +518,7 @@ impl NamedPipeClientBuilder {
                 .encode_wide()
                 .chain(Some(0))
                 .collect::<Arc<[u16]>>(),
+            desired_access: winnt::GENERIC_READ | winnt::GENERIC_WRITE,
         }
     }
 
@@ -460,7 +536,7 @@ impl NamedPipeClientBuilder {
     /// use tokio::net::windows::NamedPipeClientBuilder;
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeClientBuilder::new("\\\\.\\pipe\\mynamedpipe");
+    /// let builder = NamedPipeClientBuilder::new(r"\\.\pipe\mynamedpipe");
     ///
     /// // Wait forever until a socket is available to be connected to.
     /// builder.wait(None).await?;
@@ -479,7 +555,7 @@ impl NamedPipeClientBuilder {
     /// use tokio::net::windows::NamedPipeClientBuilder;
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeClientBuilder::new("\\\\.\\pipe\\mynamedpipe");
+    /// let builder = NamedPipeClientBuilder::new(r"\\.\pipe\mynamedpipe");
     ///
     /// builder.wait(Some(Duration::from_millis(0xffffffff))).await?;
     /// # Ok(()) }
@@ -512,7 +588,7 @@ impl NamedPipeClientBuilder {
             // Safety: There's nothing unsafe about this.
             let result = unsafe { namedpipeapi::WaitNamedPipeW(name.as_ptr(), timeout) };
 
-            if result == 0 {
+            if result == FALSE {
                 return Err(io::Error::last_os_error());
             }
 
@@ -520,6 +596,28 @@ impl NamedPipeClientBuilder {
         });
 
         task.await
+    }
+
+    /// If the client supports reading data. This is enabled by default.
+    ///
+    /// This corresponds to setting [GENERIC_READ] in the call to [CreateFile].
+    ///
+    /// [GENERIC_READ]: https://docs.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
+    /// [CreateFile]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
+    pub fn read(mut self, allowed: bool) -> Self {
+        bool_flag!(self.desired_access, allowed, winnt::GENERIC_READ);
+        self
+    }
+
+    /// If the created pipe supports writing data. This is enabled by default.
+    ///
+    /// This corresponds to setting [GENERIC_WRITE] in the call to [CreateFile].
+    ///
+    /// [GENERIC_WRITE]: https://docs.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
+    /// [CreateFile]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
+    pub fn write(mut self, allowed: bool) -> Self {
+        bool_flag!(self.desired_access, allowed, winnt::GENERIC_WRITE);
+        self
     }
 
     /// Open the named pipe identified by the name provided in [new].
@@ -553,7 +651,7 @@ impl NamedPipeClientBuilder {
     /// use winapi::shared::winerror;
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeClientBuilder::new("\\\\.\\pipe\\mynamedpipe");
+    /// let builder = NamedPipeClientBuilder::new(r"\\.\pipe\mynamedpipe");
     ///
     /// let client = loop {
     ///     match builder.create() {
@@ -597,9 +695,9 @@ impl NamedPipeClientBuilder {
         // well-structured wide `name` to pass into CreateFileW.
         let h = fileapi::CreateFileW(
             self.name.as_ptr(),
-            winnt::GENERIC_READ | winnt::GENERIC_WRITE,
+            self.desired_access,
             0,
-            attrs as *mut minwinbase::SECURITY_ATTRIBUTES,
+            attrs as *mut _,
             fileapi::OPEN_EXISTING,
             winbase::FILE_FLAG_OVERLAPPED | winbase::SECURITY_IDENTIFICATION,
             ptr::null_mut(),
@@ -628,17 +726,52 @@ impl fmt::Debug for NamedPipeClientBuilder {
 /// The pipe mode of a [NamedPipe].
 ///
 /// Set through [NamedPipeBuilder::pipe_mode].
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum PipeMode {
     /// Data is written to the pipe as a stream of bytes. The pipe does not
     /// distinguish bytes written during different write operations.
+    ///
+    /// Corresponds to [PIPE_TYPE_BYTE][winbase::PIPE_TYPE_BYTE].
     Byte,
     /// Data is written to the pipe as a stream of messages. The pipe treats the
     /// bytes written during each write operation as a message unit. Any reading
     /// function on [NamedPipe] returns [ERROR_MORE_DATA] when a message is not
     /// read completely.
     ///
+    /// Corresponds to [PIPE_TYPE_MESSAGE][winbase::PIPE_TYPE_MESSAGE].
+    ///
     /// [ERROR_MORE_DATA]: winapi::shared::winerror::ERROR_MORE_DATA
     Message,
+}
+
+/// Indicates the end of a [NamedPipe].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PipeEnd {
+    /// The [NamedPipe] refers to the client end of a named pipe instance.
+    ///
+    /// Corresponds to [PIPE_CLIENT_END][winbase::PIPE_CLIENT_END].
+    Client,
+    /// The [NamedPipe] refers to the server end of a named pipe instance.
+    ///
+    /// Corresponds to [PIPE_SERVER_END][winbase::PIPE_SERVER_END].
+    Server,
+}
+
+/// Information about a named pipe.
+///
+/// Constructed through [NamedPipe::info].
+#[derive(Debug)]
+pub struct PipeInfo {
+    /// Indicates the mode of a named pipe.
+    pub mode: PipeMode,
+    /// Indicates the end of a named pipe.
+    pub end: PipeEnd,
+    /// The maximum number of instances that can be created for this pipe.
+    pub max_instances: u32,
+    /// The number of bytes to reserve for the output buffer.
+    pub out_buffer_size: u32,
+    /// The number of bytes to reserve for the input buffer.
+    pub in_buffer_size: u32,
 }
