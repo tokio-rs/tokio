@@ -1,14 +1,15 @@
 use std::io;
-use tokio::io::AsyncWriteExt as _;
-use tokio::io::{AsyncBufReadExt as _, BufReader};
-use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder};
-use winapi::shared::winerror;
 
-const PIPE_NAME: &str = r"\\.\pipe\named-pipe-single-client";
-const N: usize = 10;
+#[cfg(windows)]
+async fn windows_main() -> io::Result<()> {
+    use tokio::io::AsyncWriteExt as _;
+    use tokio::io::{AsyncBufReadExt as _, BufReader};
+    use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder};
+    use winapi::shared::winerror;
 
-#[tokio::main]
-async fn main() -> io::Result<()> {
+    const PIPE_NAME: &str = r"\\.\pipe\named-pipe-single-client";
+    const N: usize = 10;
+
     let server_builder = NamedPipeBuilder::new(PIPE_NAME);
     let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
 
@@ -69,5 +70,20 @@ async fn main() -> io::Result<()> {
     }
 
     server.await??;
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    #[cfg(windows)]
+    {
+        windows_main().await?;
+    }
+
+    #[cfg(not(windows))]
+    {
+        println!("Named pipes are only supported on Windows!");
+    }
+
     Ok(())
 }
