@@ -1,9 +1,9 @@
+use crate::loom::sync::{Mutex, MutexGuard};
 use crate::signal::unix::driver::Handle as SignalHandle;
 use crate::signal::unix::{signal_with_handle, SignalKind};
 use crate::sync::watch;
 use std::io;
 use std::process::ExitStatus;
-use crate::loom::sync::{Mutex, MutexGuard};
 
 /// An interface for waiting on a process to exit.
 pub(crate) trait Wait {
@@ -52,14 +52,14 @@ impl<T> OrphanQueueImpl<T> {
 
     #[cfg(test)]
     fn len(&self) -> usize {
-        self.queue.lock().unwrap().len()
+        self.queue.lock().len()
     }
 
     pub(crate) fn push_orphan(&self, orphan: T)
     where
         T: Wait,
     {
-        self.queue.lock().unwrap().push(orphan)
+        self.queue.lock().push(orphan)
     }
 
     /// Attempts to reap every process in the queue, ignoring any errors and
@@ -70,15 +70,15 @@ impl<T> OrphanQueueImpl<T> {
     {
         // If someone else is holding the lock, they will be responsible for draining
         // the queue as necessary, so we can safely bail if that happens
-        if let Ok(mut sigchild_guard) = self.sigchild.try_lock() {
+        if let Some(mut sigchild_guard) = self.sigchild.try_lock() {
             match &mut *sigchild_guard {
                 Some(sigchild) => {
                     if sigchild.try_has_changed().and_then(Result::ok).is_some() {
-                        drain_orphan_queue(self.queue.lock().unwrap());
+                        drain_orphan_queue(self.queue.lock());
                     }
                 }
                 None => {
-                    let queue = self.queue.lock().unwrap();
+                    let queue = self.queue.lock();
 
                     // Be lazy and only initialize the SIGCHLD listener if there
                     // are any orphaned processes in the queue.
@@ -214,21 +214,21 @@ pub(crate) mod test {
 
         assert_eq!(orphanage.len(), 4);
 
-        drain_orphan_queue(orphanage.queue.lock().unwrap());
+        drain_orphan_queue(orphanage.queue.lock());
         assert_eq!(orphanage.len(), 2);
         assert_eq!(first_waits.get(), 1);
         assert_eq!(second_waits.get(), 1);
         assert_eq!(third_waits.get(), 1);
         assert_eq!(fourth_waits.get(), 1);
 
-        drain_orphan_queue(orphanage.queue.lock().unwrap());
+        drain_orphan_queue(orphanage.queue.lock());
         assert_eq!(orphanage.len(), 1);
         assert_eq!(first_waits.get(), 1);
         assert_eq!(second_waits.get(), 2);
         assert_eq!(third_waits.get(), 2);
         assert_eq!(fourth_waits.get(), 1);
 
-        drain_orphan_queue(orphanage.queue.lock().unwrap());
+        drain_orphan_queue(orphanage.queue.lock());
         assert_eq!(orphanage.len(), 0);
         assert_eq!(first_waits.get(), 1);
         assert_eq!(second_waits.get(), 2);
@@ -236,7 +236,7 @@ pub(crate) mod test {
         assert_eq!(fourth_waits.get(), 1);
 
         // Safe to reap when empty
-        drain_orphan_queue(orphanage.queue.lock().unwrap());
+        drain_orphan_queue(orphanage.queue.lock());
     }
 
     #[test]
@@ -246,7 +246,7 @@ pub(crate) mod test {
         let handle = SignalHandle::default();
 
         let orphanage = OrphanQueueImpl::new();
-        *orphanage.sigchild.lock().unwrap() = Some(rx);
+        *orphanage.sigchild.lock() = Some(rx);
 
         let orphan = MockWait::new(2);
         let waits = orphan.total_waits.clone();
@@ -268,7 +268,7 @@ pub(crate) mod test {
         let handle = SignalHandle::default();
 
         let orphanage = OrphanQueueImpl::new();
-        let signal_guard = orphanage.sigchild.lock().unwrap();
+        let signal_guard = orphanage.sigchild.lock();
 
         let orphan = MockWait::new(2);
         let waits = orphan.total_waits.clone();
@@ -286,18 +286,18 @@ pub(crate) mod test {
         let handle = signal_driver.handle();
 
         let orphanage = OrphanQueueImpl::new();
-        assert!(orphanage.sigchild.lock().unwrap().is_none()); // Sanity
+        assert!(orphanage.sigchild.lock().is_none()); // Sanity
 
         // No register when queue empty
         orphanage.reap_orphans(&handle);
-        assert!(orphanage.sigchild.lock().unwrap().is_none());
+        assert!(orphanage.sigchild.lock().is_none());
 
         let orphan = MockWait::new(2);
         let waits = orphan.total_waits.clone();
         orphanage.push_orphan(orphan);
 
         orphanage.reap_orphans(&handle);
-        assert!(orphanage.sigchild.lock().unwrap().is_some());
+        assert!(orphanage.sigchild.lock().is_some());
         assert_eq!(waits.get(), 1); // Eager reap when registering listener
     }
 
@@ -306,7 +306,7 @@ pub(crate) mod test {
         let handle = SignalHandle::default();
 
         let orphanage = OrphanQueueImpl::new();
-        assert!(orphanage.sigchild.lock().unwrap().is_none());
+        assert!(orphanage.sigchild.lock().is_none());
 
         let orphan = MockWait::new(2);
         let waits = orphan.total_waits.clone();
@@ -314,7 +314,7 @@ pub(crate) mod test {
 
         // Signal handler has "gone away", nothing to register or reap
         orphanage.reap_orphans(&handle);
-        assert!(orphanage.sigchild.lock().unwrap().is_none());
+        assert!(orphanage.sigchild.lock().is_none());
         assert_eq!(waits.get(), 0);
     }
 }
