@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620471383879,
+  "lastUpdate": 1620471386518,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -27691,6 +27691,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21078635,
             "range": "± 3824287",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2c5dc83019b0af47b2ee35df09002dfa16fcb3cb",
+          "message": "cargo: path dependencies for all tokio things (#3764)",
+          "timestamp": "2021-05-08T12:54:30+02:00",
+          "tree_id": "37b24f79c8f0cacafa29c7b6429c3868ceaade33",
+          "url": "https://github.com/tokio-rs/tokio/commit/2c5dc83019b0af47b2ee35df09002dfa16fcb3cb"
+        },
+        "date": 1620471381082,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 177082,
+            "range": "± 31064",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 622971,
+            "range": "± 124631",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4773636,
+            "range": "± 980578",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18726175,
+            "range": "± 4906756",
             "unit": "ns/iter"
           }
         ]
