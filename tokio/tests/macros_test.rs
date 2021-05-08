@@ -21,7 +21,7 @@ async fn test_macro_is_resilient_to_shadowing() {
 // https://github.com/tokio-rs/tokio/issues/3403
 #[rustfmt::skip] // this `rustfmt::skip` is necessary because unused_braces does not warn if the block contains newline.
 #[tokio::main]
-async fn unused_braces_main() { println!("hello") }
+pub async fn unused_braces_main() { println!("hello") }
 #[rustfmt::skip] // this `rustfmt::skip` is necessary because unused_braces does not warn if the block contains newline.
 #[tokio::test]
 async fn unused_braces_test() { assert_eq!(1 + 1, 2) }
