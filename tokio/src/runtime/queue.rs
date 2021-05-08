@@ -572,7 +572,7 @@ impl<T: 'static> Inject<T> {
 
         let mut p = self.pointers.lock();
 
-        // It is possible to hit null here if another thread poped the last
+        // It is possible to hit null here if another thread popped the last
         // task between us checking `len` and acquiring the lock.
         let task = p.head?;
 

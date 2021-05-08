@@ -3,7 +3,7 @@ use std::fmt;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio::sync::{AcquireError, OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{AcquireError, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
 use super::ReusableBoxFuture;
 
@@ -12,17 +12,15 @@ use super::ReusableBoxFuture;
 /// [`Semaphore`]: tokio::sync::Semaphore
 pub struct PollSemaphore {
     semaphore: Arc<Semaphore>,
-    permit_fut: ReusableBoxFuture<Result<OwnedSemaphorePermit, AcquireError>>,
+    permit_fut: Option<ReusableBoxFuture<Result<OwnedSemaphorePermit, AcquireError>>>,
 }
 
 impl PollSemaphore {
     /// Create a new `PollSemaphore`.
     pub fn new(semaphore: Arc<Semaphore>) -> Self {
-        let fut = Arc::clone(&semaphore).acquire_owned();
-
         Self {
             semaphore,
-            permit_fut: ReusableBoxFuture::new(fut),
+            permit_fut: None,
         }
     }
 
@@ -55,14 +53,57 @@ impl PollSemaphore {
     /// the `Waker` from the `Context` passed to the most recent call is
     /// scheduled to receive a wakeup.
     pub fn poll_acquire(&mut self, cx: &mut Context<'_>) -> Poll<Option<OwnedSemaphorePermit>> {
-        match ready!(self.permit_fut.poll(cx)) {
-            Ok(permit) => {
+        let permit_future = match self.permit_fut.as_mut() {
+            Some(fut) => fut,
+            None => {
+                // avoid allocations completely if we can grab a permit immediately
+                match Arc::clone(&self.semaphore).try_acquire_owned() {
+                    Ok(permit) => return Poll::Ready(Some(permit)),
+                    Err(TryAcquireError::Closed) => return Poll::Ready(None),
+                    Err(TryAcquireError::NoPermits) => {}
+                }
+
                 let next_fut = Arc::clone(&self.semaphore).acquire_owned();
-                self.permit_fut.set(next_fut);
-                Poll::Ready(Some(permit))
+                self.permit_fut
+                    .get_or_insert(ReusableBoxFuture::new(next_fut))
             }
-            Err(_closed) => Poll::Ready(None),
+        };
+
+        let result = ready!(permit_future.poll(cx));
+
+        let next_fut = Arc::clone(&self.semaphore).acquire_owned();
+        permit_future.set(next_fut);
+
+        match result {
+            Ok(permit) => Poll::Ready(Some(permit)),
+            Err(_closed) => {
+                self.permit_fut = None;
+                Poll::Ready(None)
+            }
         }
+    }
+
+    /// Returns the current number of available permits.
+    ///
+    /// This is equivalent to the [`Semaphore::available_permits`] method on the
+    /// `tokio::sync::Semaphore` type.
+    ///
+    /// [`Semaphore::available_permits`]: tokio::sync::Semaphore::available_permits
+    pub fn available_permits(&self) -> usize {
+        self.semaphore.available_permits()
+    }
+
+    /// Adds `n` new permits to the semaphore.
+    ///
+    /// The maximum number of permits is `usize::MAX >> 3`, and this function
+    /// will panic if the limit is exceeded.
+    ///
+    /// This is equivalent to the [`Semaphore::add_permits`] method on the
+    /// `tokio::sync::Semaphore` type.
+    ///
+    /// [`Semaphore::add_permits`]: tokio::sync::Semaphore::add_permits
+    pub fn add_permits(&self, n: usize) {
+        self.semaphore.add_permits(n);
     }
 }
 
@@ -85,5 +126,11 @@ impl fmt::Debug for PollSemaphore {
         f.debug_struct("PollSemaphore")
             .field("semaphore", &self.semaphore)
             .finish()
+    }
+}
+
+impl AsRef<Semaphore> for PollSemaphore {
+    fn as_ref(&self) -> &Semaphore {
+        &*self.semaphore
     }
 }

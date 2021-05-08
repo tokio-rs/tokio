@@ -8,7 +8,8 @@ use std::{task::Context, task::Poll};
 /// Associates an IO object backed by a Unix file descriptor with the tokio
 /// reactor, allowing for readiness to be polled. The file descriptor must be of
 /// a type that can be used with the OS polling facilities (ie, `poll`, `epoll`,
-/// `kqueue`, etc), such as a network socket or pipe.
+/// `kqueue`, etc), such as a network socket or pipe, and the file descriptor
+/// must have the nonblocking mode set to true.
 ///
 /// Creating an AsyncFd registers the file descriptor with the current tokio
 /// Reactor, allowing you to directly await the file descriptor being readable
@@ -36,18 +37,19 @@ use std::{task::Context, task::Poll};
 ///
 /// On some platforms, the readiness detecting mechanism relies on
 /// edge-triggered notifications. This means that the OS will only notify Tokio
-/// when the file descriptor transitions from not-ready to ready. Tokio
-/// internally tracks when it has received a ready notification, and when
+/// when the file descriptor transitions from not-ready to ready. For this to
+/// work you should first try to read or write and only poll for readiness
+/// if that fails with an error of [`std::io::ErrorKind::WouldBlock`].
+///
+/// Tokio internally tracks when it has received a ready notification, and when
 /// readiness checking functions like [`readable`] and [`writable`] are called,
 /// if the readiness flag is set, these async functions will complete
-/// immediately.
-///
-/// This however does mean that it is critical to ensure that this ready flag is
-/// cleared when (and only when) the file descriptor ceases to be ready. The
-/// [`AsyncFdReadyGuard`] returned from readiness checking functions serves this
-/// function; after calling a readiness-checking async function, you must use
-/// this [`AsyncFdReadyGuard`] to signal to tokio whether the file descriptor is no
-/// longer in a ready state.
+/// immediately. This however does mean that it is critical to ensure that this
+/// ready flag is cleared when (and only when) the file descriptor ceases to be
+/// ready. The [`AsyncFdReadyGuard`] returned from readiness checking functions
+/// serves this function; after calling a readiness-checking async function,
+/// you must use this [`AsyncFdReadyGuard`] to signal to tokio whether the file
+/// descriptor is no longer in a ready state.
 ///
 /// ## Use with to a poll-based API
 ///

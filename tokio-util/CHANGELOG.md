@@ -1,3 +1,43 @@
+# 0.6.6 (April 12, 2021)
+
+### Added
+
+- util: makes `Framed` and `FramedStream` resumable after eof ([#3272])
+- util: add `PollSemaphore::{add_permits, available_permits}` ([#3683])
+
+### Fixed
+
+- chore: avoid allocation if `PollSemaphore` is unused ([#3634])
+
+[#3272]: https://github.com/tokio-rs/tokio/pull/3272
+[#3634]: https://github.com/tokio-rs/tokio/pull/3634
+[#3683]: https://github.com/tokio-rs/tokio/pull/3683
+
+# 0.6.5 (March 20, 2021)
+
+### Fixed
+
+- util: annotate time module as requiring `time` feature ([#3606])
+
+[#3606]: https://github.com/tokio-rs/tokio/pull/3606
+
+# 0.6.4 (March 9, 2021)
+
+### Added
+
+- codec: `AnyDelimiter` codec ([#3406])
+- sync: add pollable `mpsc::Sender` ([#3490])
+
+### Fixed
+
+- codec: `LinesCodec` should only return `MaxLineLengthExceeded` once per line ([#3556])
+- sync: fuse PollSemaphore ([#3578])
+
+[#3406]: https://github.com/tokio-rs/tokio/pull/3406
+[#3490]: https://github.com/tokio-rs/tokio/pull/3490
+[#3556]: https://github.com/tokio-rs/tokio/pull/3556
+[#3578]: https://github.com/tokio-rs/tokio/pull/3578
+
 # 0.6.3 (January 31, 2021)
 
 ### Added

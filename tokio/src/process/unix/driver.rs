@@ -6,8 +6,8 @@ use crate::park::Park;
 use crate::process::unix::orphan::ReapOrphanQueue;
 use crate::process::unix::GlobalOrphanQueue;
 use crate::signal::unix::driver::Driver as SignalDriver;
-use crate::signal::unix::{signal_with_handle, InternalStream, Signal, SignalKind};
-use crate::sync::mpsc::error::TryRecvError;
+use crate::signal::unix::{signal_with_handle, SignalKind};
+use crate::sync::watch;
 
 use std::io;
 use std::time::Duration;
@@ -16,7 +16,7 @@ use std::time::Duration;
 #[derive(Debug)]
 pub(crate) struct Driver {
     park: SignalDriver,
-    inner: CoreDriver<Signal, GlobalOrphanQueue>,
+    inner: CoreDriver<watch::Receiver<()>, GlobalOrphanQueue>,
 }
 
 #[derive(Debug)]
@@ -25,27 +25,25 @@ struct CoreDriver<S, Q> {
     orphan_queue: Q,
 }
 
+trait HasChanged {
+    fn has_changed(&mut self) -> bool;
+}
+
+impl<T> HasChanged for watch::Receiver<T> {
+    fn has_changed(&mut self) -> bool {
+        self.try_has_changed().and_then(Result::ok).is_some()
+    }
+}
+
 // ===== impl CoreDriver =====
 
 impl<S, Q> CoreDriver<S, Q>
 where
-    S: InternalStream,
+    S: HasChanged,
     Q: ReapOrphanQueue,
 {
-    fn got_signal(&mut self) -> bool {
-        match self.sigchild.try_recv() {
-            Ok(()) => true,
-            Err(TryRecvError::Empty) => false,
-            Err(TryRecvError::Closed) => panic!("signal was deregistered"),
-        }
-    }
-
     fn process(&mut self) {
-        if self.got_signal() {
-            // Drain all notifications which may have been buffered
-            // so we can try to reap all orphans in one batch
-            while self.got_signal() {}
-
+        if self.sigchild.has_changed() {
             self.orphan_queue.reap_orphans();
         }
     }
@@ -97,8 +95,6 @@ impl Park for Driver {
 mod test {
     use super::*;
     use crate::process::unix::orphan::test::MockQueue;
-    use crate::sync::mpsc::error::TryRecvError;
-    use std::task::{Context, Poll};
 
     struct MockStream {
         total_try_recv: usize,
@@ -114,17 +110,10 @@ mod test {
         }
     }
 
-    impl InternalStream for MockStream {
-        fn poll_recv(&mut self, _cx: &mut Context<'_>) -> Poll<Option<()>> {
-            unimplemented!();
-        }
-
-        fn try_recv(&mut self) -> Result<(), TryRecvError> {
+    impl HasChanged for MockStream {
+        fn has_changed(&mut self) -> bool {
             self.total_try_recv += 1;
-            match self.values.remove(0) {
-                Some(()) => Ok(()),
-                None => Err(TryRecvError::Empty),
-            }
+            self.values.remove(0).is_some()
         }
     }
 
@@ -139,18 +128,5 @@ mod test {
 
         assert_eq!(1, driver.sigchild.total_try_recv);
         assert_eq!(0, driver.orphan_queue.total_reaps.get());
-    }
-
-    #[test]
-    fn coalesce_signals_before_reaping() {
-        let mut driver = CoreDriver {
-            sigchild: MockStream::new(vec![Some(()), Some(()), None]),
-            orphan_queue: MockQueue::<()>::new(),
-        };
-
-        driver.process();
-
-        assert_eq!(3, driver.sigchild.total_try_recv);
-        assert_eq!(1, driver.orphan_queue.total_reaps.get());
     }
 }

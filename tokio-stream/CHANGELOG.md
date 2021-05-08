@@ -1,3 +1,26 @@
+# 0.1.5 (March 20, 2021)
+
+### Fixed
+
+- stream: documentation note for throttle `Unpin` ([#3600])
+
+[#3600]: https://github.com/tokio-rs/tokio/pull/3600
+
+# 0.1.4 (March 9, 2021)
+
+Added
+
+- signal: add `Signal` wrapper ([#3510])
+
+Fixed
+
+- stream: remove duplicate `doc_cfg` declaration ([#3561])
+- sync: yield initial value in `WatchStream` ([#3576])
+
+[#3510]: https://github.com/tokio-rs/tokio/pull/3510
+[#3561]: https://github.com/tokio-rs/tokio/pull/3561
+[#3576]: https://github.com/tokio-rs/tokio/pull/3576
+
 # 0.1.3 (February 5, 2021)
 
 Added

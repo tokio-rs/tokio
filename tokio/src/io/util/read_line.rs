@@ -36,7 +36,7 @@ where
 {
     ReadLine {
         reader,
-        buf: mem::replace(string, String::new()).into_bytes(),
+        buf: mem::take(string).into_bytes(),
         output: string,
         read: 0,
         _pin: PhantomPinned,
@@ -99,7 +99,7 @@ pub(super) fn read_line_internal<R: AsyncBufRead + ?Sized>(
     read: &mut usize,
 ) -> Poll<io::Result<usize>> {
     let io_res = ready!(read_until_internal(reader, cx, b'\n', buf, read));
-    let utf8_res = String::from_utf8(mem::replace(buf, Vec::new()));
+    let utf8_res = String::from_utf8(mem::take(buf));
 
     // At this point both buf and output are empty. The allocation is in utf8_res.
 

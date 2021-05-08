@@ -24,10 +24,8 @@
 //! Wait 100ms and print "100 ms have elapsed"
 //!
 //! ```
-//! use tokio::time::sleep;
-//!
 //! use std::time::Duration;
-//!
+//! use tokio::time::sleep;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -36,7 +34,7 @@
 //! }
 //! ```
 //!
-//! Require that an operation takes no more than 300ms.
+//! Require that an operation takes no more than 1s.
 //!
 //! ```
 //! use tokio::time::{timeout, Duration};

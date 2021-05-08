@@ -1,6 +1,56 @@
 #![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
 
-//! A channel for sending a single message between asynchronous tasks.
+//! A one-shot channel is used for sending a single message between
+//! asynchronous tasks. The [`channel`] function is used to create a
+//! [`Sender`] and [`Receiver`] handle pair that form the channel.
+//!
+//! The `Sender` handle is used by the producer to send the value.
+//! The `Receiver` handle is used by the consumer to receive the value.
+//!
+//! Each handle can be used on separate tasks.
+//!
+//! # Examples
+//!
+//! ```
+//! use tokio::sync::oneshot;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let (tx, rx) = oneshot::channel();
+//!
+//!     tokio::spawn(async move {
+//!         if let Err(_) = tx.send(3) {
+//!             println!("the receiver dropped");
+//!         }
+//!     });
+//!
+//!     match rx.await {
+//!         Ok(v) => println!("got = {:?}", v),
+//!         Err(_) => println!("the sender dropped"),
+//!     }
+//! }
+//! ```
+//!
+//! If the sender is dropped without sending, the receiver will fail with
+//! [`error::RecvError`]:
+//!
+//! ```
+//! use tokio::sync::oneshot;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let (tx, rx) = oneshot::channel::<u32>();
+//!
+//!     tokio::spawn(async move {
+//!         drop(tx);
+//!     });
+//!
+//!     match rx.await {
+//!         Ok(_) => panic!("This doesn't happen"),
+//!         Err(_) => println!("the sender dropped"),
+//!     }
+//! }
+//! ```
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
@@ -14,17 +64,62 @@ use std::sync::atomic::Ordering::{self, AcqRel, Acquire};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll, Waker};
 
-/// Sends a value to the associated `Receiver`.
+/// Sends a value to the associated [`Receiver`].
 ///
-/// Instances are created by the [`channel`](fn@channel) function.
+/// A pair of both a [`Sender`] and a [`Receiver`]  are created by the
+/// [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Sender<T> {
     inner: Option<Arc<Inner<T>>>,
 }
 
-/// Receive a value from the associated `Sender`.
+/// Receive a value from the associated [`Sender`].
 ///
-/// Instances are created by the [`channel`](fn@channel) function.
+/// A pair of both a [`Sender`] and a [`Receiver`]  are created by the
+/// [`channel`](fn@channel) function.
+///
+/// # Examples
+///
+/// ```
+/// use tokio::sync::oneshot;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (tx, rx) = oneshot::channel();
+///
+///     tokio::spawn(async move {
+///         if let Err(_) = tx.send(3) {
+///             println!("the receiver dropped");
+///         }
+///     });
+///
+///     match rx.await {
+///         Ok(v) => println!("got = {:?}", v),
+///         Err(_) => println!("the sender dropped"),
+///     }
+/// }
+/// ```
+///
+/// If the sender is dropped without sending, the receiver will fail with
+/// [`error::RecvError`]:
+///
+/// ```
+/// use tokio::sync::oneshot;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (tx, rx) = oneshot::channel::<u32>();
+///
+///     tokio::spawn(async move {
+///         drop(tx);
+///     });
+///
+///     match rx.await {
+///         Ok(_) => panic!("This doesn't happen"),
+///         Err(_) => println!("the sender dropped"),
+///     }
+/// }
+/// ```
 #[derive(Debug)]
 pub struct Receiver<T> {
     inner: Option<Arc<Inner<T>>>,
@@ -577,7 +672,7 @@ impl<T> Receiver<T> {
                 return Err(TryRecvError::Empty);
             }
         } else {
-            panic!("called after complete");
+            Err(TryRecvError::Closed)
         };
 
         self.inner = None;

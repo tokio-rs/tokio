@@ -40,20 +40,14 @@ cfg_time! {
 
     cfg_test_util! {
         pub(crate) fn clock() -> Option<crate::runtime::driver::Clock> {
-            CONTEXT.with(|ctx| match *ctx.borrow() {
-                Some(ref ctx) => Some(ctx.clock.clone()),
-                None => None,
-            })
+            CONTEXT.with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.clock.clone()))
         }
     }
 }
 
 cfg_rt! {
     pub(crate) fn spawn_handle() -> Option<crate::runtime::Spawner> {
-        CONTEXT.with(|ctx| match *ctx.borrow() {
-            Some(ref ctx) => Some(ctx.spawner.clone()),
-            None => None,
-        })
+        CONTEXT.with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.spawner.clone()))
     }
 }
 

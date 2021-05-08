@@ -134,3 +134,20 @@ fn notify_in_drop_after_wake() {
     // Now, notifying **should not** deadlock
     notify.notify_waiters();
 }
+
+#[test]
+fn notify_one_after_dropped_all() {
+    let notify = Notify::new();
+    let mut notified1 = spawn(async { notify.notified().await });
+
+    assert_pending!(notified1.poll());
+
+    notify.notify_waiters();
+    notify.notify_one();
+
+    drop(notified1);
+
+    let mut notified2 = spawn(async { notify.notified().await });
+
+    assert_ready!(notified2.poll());
+}

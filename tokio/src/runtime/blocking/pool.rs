@@ -61,7 +61,7 @@ struct Shared {
     /// Prior to shutdown, we clean up JoinHandles by having each timed-out
     /// thread join on the previous timed-out thread. This is not strictly
     /// necessary but helps avoid Valgrind false positives, see
-    /// https://github.com/tokio-rs/tokio/commit/646fbae76535e397ef79dbcaacb945d4c829f666
+    /// <https://github.com/tokio-rs/tokio/commit/646fbae76535e397ef79dbcaacb945d4c829f666>
     /// for more information.
     last_exiting_thread: Option<thread::JoinHandle<()>>,
     /// This holds the JoinHandles for all running threads; on shutdown, the thread
@@ -151,7 +151,7 @@ impl BlockingPool {
         self.spawner.inner.condvar.notify_all();
 
         let last_exited_thread = std::mem::take(&mut shared.last_exiting_thread);
-        let workers = std::mem::replace(&mut shared.worker_threads, HashMap::new());
+        let workers = std::mem::take(&mut shared.worker_threads);
 
         drop(shared);
 

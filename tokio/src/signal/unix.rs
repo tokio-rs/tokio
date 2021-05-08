@@ -6,8 +6,8 @@
 #![cfg(unix)]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
-use crate::sync::mpsc::error::TryRecvError;
-use crate::sync::mpsc::{channel, Receiver};
+use crate::signal::RxFuture;
+use crate::sync::watch;
 
 use libc::c_int;
 use mio::net::UnixStream;
@@ -222,7 +222,8 @@ fn action(globals: Pin<&'static Globals>, signal: c_int) {
 ///
 /// This will register the signal handler if it hasn't already been registered,
 /// returning any error along the way if that fails.
-fn signal_enable(signal: c_int, handle: Handle) -> io::Result<()> {
+fn signal_enable(signal: SignalKind, handle: Handle) -> io::Result<()> {
+    let signal = signal.0;
     if signal < 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
         return Err(Error::new(
             ErrorKind::Other,
@@ -325,7 +326,7 @@ fn signal_enable(signal: c_int, handle: Handle) -> io::Result<()> {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct Signal {
-    rx: Receiver<()>,
+    inner: RxFuture,
 }
 
 /// Creates a new stream which will receive notifications when the current
@@ -351,21 +352,21 @@ pub struct Signal {
 /// * If the signal is one of
 ///   [`signal_hook::FORBIDDEN`](fn@signal_hook_registry::register#panics)
 pub fn signal(kind: SignalKind) -> io::Result<Signal> {
-    signal_with_handle(kind, Handle::current())
+    let rx = signal_with_handle(kind, Handle::current())?;
+
+    Ok(Signal {
+        inner: RxFuture::new(rx),
+    })
 }
 
-pub(crate) fn signal_with_handle(kind: SignalKind, handle: Handle) -> io::Result<Signal> {
-    let signal = kind.0;
-
+pub(crate) fn signal_with_handle(
+    kind: SignalKind,
+    handle: Handle,
+) -> io::Result<watch::Receiver<()>> {
     // Turn the signal delivery on once we are ready for it
-    signal_enable(signal, handle)?;
+    signal_enable(kind, handle)?;
 
-    // One wakeup in a queue is enough, no need for us to buffer up any
-    // more.
-    let (tx, rx) = channel(1);
-    globals().register_listener(signal as EventId, tx);
-
-    Ok(Signal { rx })
+    Ok(globals().register_listener(kind.0 as EventId))
 }
 
 impl Signal {
@@ -393,8 +394,7 @@ impl Signal {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        use crate::future::poll_fn;
-        poll_fn(|cx| self.poll_recv(cx)).await
+        self.inner.recv().await
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -432,28 +432,18 @@ impl Signal {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.rx.poll_recv(cx)
-    }
-
-    /// Try to receive a signal notification without blocking or registering a waker.
-    pub(crate) fn try_recv(&mut self) -> Result<(), TryRecvError> {
-        self.rx.try_recv()
+        self.inner.poll_recv(cx)
     }
 }
 
 // Work around for abstracting streams internally
-pub(crate) trait InternalStream: Unpin {
+pub(crate) trait InternalStream {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>>;
-    fn try_recv(&mut self) -> Result<(), TryRecvError>;
 }
 
 impl InternalStream for Signal {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         self.poll_recv(cx)
-    }
-
-    fn try_recv(&mut self) -> Result<(), TryRecvError> {
-        self.try_recv()
     }
 }
 
@@ -467,11 +457,15 @@ mod tests {
 
     #[test]
     fn signal_enable_error_on_invalid_input() {
-        signal_enable(-1, Handle::default()).unwrap_err();
+        signal_enable(SignalKind::from_raw(-1), Handle::default()).unwrap_err();
     }
 
     #[test]
     fn signal_enable_error_on_forbidden_input() {
-        signal_enable(signal_hook_registry::FORBIDDEN[0], Handle::default()).unwrap_err();
+        signal_enable(
+            SignalKind::from_raw(signal_hook_registry::FORBIDDEN[0]),
+            Handle::default(),
+        )
+        .unwrap_err();
     }
 }

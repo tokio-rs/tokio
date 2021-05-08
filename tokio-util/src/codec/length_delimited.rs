@@ -535,14 +535,14 @@ impl LengthDelimitedCodec {
         Ok(Some(n))
     }
 
-    fn decode_data(&self, n: usize, src: &mut BytesMut) -> io::Result<Option<BytesMut>> {
+    fn decode_data(&self, n: usize, src: &mut BytesMut) -> Option<BytesMut> {
         // At this point, the buffer has already had the required capacity
         // reserved. All there is to do is read.
         if src.len() < n {
-            return Ok(None);
+            return None;
         }
 
-        Ok(Some(src.split_to(n)))
+        Some(src.split_to(n))
     }
 }
 
@@ -562,7 +562,7 @@ impl Decoder for LengthDelimitedCodec {
             DecodeState::Data(n) => n,
         };
 
-        match self.decode_data(n, src)? {
+        match self.decode_data(n, src) {
             Some(data) => {
                 // Update the decode state
                 self.state = DecodeState::Head;

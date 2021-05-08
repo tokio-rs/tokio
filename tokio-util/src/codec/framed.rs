@@ -52,6 +52,11 @@ where
     /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
     ///
+    /// Note that, for some byte sources, the stream can be resumed after an EOF
+    /// by reading from it, even after it has returned `None`. Repeated attempts
+    /// to do so, without new data available, continue to return `None` without
+    /// creating more (closing) frames.
+    ///
     /// [`Stream`]: futures_core::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`Decode`]: crate::codec::Decoder

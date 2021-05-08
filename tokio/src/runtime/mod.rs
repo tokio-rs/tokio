@@ -250,7 +250,7 @@ cfg_rt! {
     ///
     /// The Tokio runtime implements `Sync` and `Send` to allow you to wrap it
     /// in a `Arc`. Most fn take `&self` to allow you to call them concurrently
-    /// accross multiple threads.
+    /// across multiple threads.
     ///
     /// Calls to `shutdown` and `shutdown_timeout` require exclusive ownership of
     /// the runtime type and this can be achieved via `Arc::try_unwrap` when only
@@ -405,7 +405,7 @@ cfg_rt! {
         /// Run a future to completion on the Tokio runtime. This is the
         /// runtime's entry point.
         ///
-        /// This runs the given future on the runtime, blocking until it is
+        /// This runs the given future on the current thread, blocking until it is
         /// complete, and yielding its resolved result. Any tasks or timers
         /// which the future spawns internally will be executed on the runtime.
         ///
@@ -526,7 +526,7 @@ cfg_rt! {
         /// ```
         pub fn shutdown_timeout(mut self, duration: Duration) {
             // Wakeup and shutdown all the worker threads
-            self.handle.spawner.shutdown();
+            self.handle.shutdown();
             self.blocking_pool.shutdown(Some(duration));
         }
 

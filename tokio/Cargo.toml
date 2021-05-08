@@ -7,12 +7,12 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.0.x" git tag.
-version = "1.2.0"
+version = "1.5.0"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/1.2.0/tokio/"
+documentation = "https://docs.rs/tokio/1.5.0/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -42,7 +42,7 @@ full = [
   "time",
 ]
 
-fs = []
+fs = ["libc"]
 io-util = ["memchr", "bytes"]
 # stdin, stdout, stderr
 io-std = []
@@ -103,11 +103,11 @@ parking_lot = { version = "0.11.0", optional = true }
 tracing = { version = "0.1.21", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.42", optional = true }
+libc = { version = "0.2.87", optional = true }
 signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
-libc = { version = "0.2.42" }
+libc = { version = "0.2.87" }
 nix = { version = "0.19.0" }
 
 [target.'cfg(windows)'.dependencies.winapi]
@@ -119,13 +119,13 @@ optional = true
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
-proptest = "0.10.0"
+proptest = "1"
 rand = "0.8.0"
 tempfile = "3.1.0"
 async-stream = "0.3"
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.4", features = ["futures", "checkpoint"] }
+loom = { version = "0.5", features = ["futures", "checkpoint"] }
 
 [build-dependencies]
 autocfg = "1" # Needed for conditionally enabling `track-caller`
