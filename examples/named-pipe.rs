@@ -2,6 +2,7 @@ use std::io;
 
 #[cfg(windows)]
 async fn windows_main() -> io::Result<()> {
+    use std::time::Duration;
     use tokio::io::AsyncWriteExt as _;
     use tokio::io::{AsyncBufReadExt as _, BufReader};
     use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder};
@@ -26,7 +27,7 @@ async fn windows_main() -> io::Result<()> {
     });
 
     let client = tokio::spawn(async move {
-        client_builder.wait(None).await?;
+        client_builder.wait(Some(Duration::from_secs(5))).await?;
         let client = client_builder.create()?;
 
         let mut client = BufReader::new(client);
