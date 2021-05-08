@@ -1,7 +1,6 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use quote::{quote, quote_spanned};
-use syn::spanned::Spanned;
+use quote::{quote, quote_spanned, ToTokens};
 
 #[derive(Clone, Copy, PartialEq)]
 enum RuntimeFlavor {
@@ -279,18 +278,29 @@ fn parse_knobs(
 
     let config = config.build()?;
 
-    // If type mismatch occurs, the current rustc points to the last statement:
-    let last_stmt_span = input
-        .block
-        .stmts
-        .last()
-        .map_or_else(Span::call_site, |s| s.span());
+    // If type mismatch occurs, the current rustc points to the last statement.
+    let (last_stmt_start_span, last_stmt_end_span) = {
+        let mut last_stmt = input
+            .block
+            .stmts
+            .last()
+            .map(ToTokens::into_token_stream)
+            .unwrap_or_default()
+            .into_iter();
+        // `Span` on stable Rust has a limitation that only points to the first
+        // token, not the whole tokens. We can work around this limitation by
+        // using the first/last span of the tokens like
+        // `syn::Error::new_spanned` does.
+        let start = last_stmt.next().map_or_else(Span::call_site, |t| t.span());
+        let end = last_stmt.last().map_or(start, |t| t.span());
+        (start, end)
+    };
 
     let mut rt = match config.flavor {
-        RuntimeFlavor::CurrentThread => quote_spanned! {last_stmt_span=>
+        RuntimeFlavor::CurrentThread => quote_spanned! {last_stmt_start_span=>
             tokio::runtime::Builder::new_current_thread()
         },
-        RuntimeFlavor::Threaded => quote_spanned! {last_stmt_span=>
+        RuntimeFlavor::Threaded => quote_spanned! {last_stmt_start_span=>
             tokio::runtime::Builder::new_multi_thread()
         },
     };
@@ -311,7 +321,7 @@ fn parse_knobs(
 
     let body = &input.block;
     let brace_token = input.block.brace_token;
-    input.block = syn::parse2(quote_spanned! {last_stmt_span=>
+    input.block = syn::parse2(quote_spanned! {last_stmt_end_span=>
         {
             #rt
                 .enable_all()
