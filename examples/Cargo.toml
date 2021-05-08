@@ -79,11 +79,10 @@ path = "custom-executor.rs"
 name = "custom-executor-tokio-context"
 path = "custom-executor-tokio-context.rs"
 
-# TODO: uncomment once / if released
-# [[example]]
-# name = "named-pipe"
-# path = "named-pipe.rs"
+[[example]]
+name = "named-pipe"
+path = "named-pipe.rs"
 
-# [[example]]
-# name = "named-pipe-multi-client"
-# path = "named-pipe-multi-client.rs"
+[[example]]
+name = "named-pipe-multi-client"
+path = "named-pipe-multi-client.rs"
