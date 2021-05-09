@@ -1,6 +1,6 @@
 #![cfg(unix)]
 
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
