@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620587114035,
+  "lastUpdate": 1620587135854,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -43527,6 +43527,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 949,
             "range": "± 164",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "83243170052afe3b9a40a12ba7d66f09645d3971",
+          "message": "doc: fix doc-cfg on io::duplex, io::copy_bidirectional, and task::unconstrained (#3773)",
+          "timestamp": "2021-05-10T04:03:42+09:00",
+          "tree_id": "cb2153d4f2e8541ae3d686bf1659b6e65905661f",
+          "url": "https://github.com/tokio-rs/tokio/commit/83243170052afe3b9a40a12ba7d66f09645d3971"
+        },
+        "date": 1620587132690,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14843,
+            "range": "± 4848",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 874,
+            "range": "± 135",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 568,
+            "range": "± 107",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15580,
+            "range": "± 4503",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 896,
+            "range": "± 173",
             "unit": "ns/iter"
           }
         ]
