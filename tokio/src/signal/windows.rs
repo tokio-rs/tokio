@@ -20,6 +20,7 @@ pub(crate) use self::os_impl::{OsExtraData, OsStorage};
 
 #[cfg(not(windows))]
 mod os_impl {
+    use std::io;
     pub(crate) struct Event {
         pub(super) inner: crate::signal::RxFuture,
     }
