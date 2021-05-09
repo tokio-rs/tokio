@@ -3,7 +3,7 @@
 //! This module is only defined on Unix platforms and contains the primary
 //! `Signal` type for receiving notifications of signals.
 
-#![cfg(any(docsrs, unix))]
+#![cfg(unix)]
 #![cfg_attr(docsrs, doc(cfg(all(unix, feature = "signal"))))]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
