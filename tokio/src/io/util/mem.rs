@@ -45,6 +45,7 @@ use std::{
 /// # }
 /// ```
 #[derive(Debug)]
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub struct DuplexStream {
     read: Arc<Mutex<Pipe>>,
     write: Arc<Mutex<Pipe>>,
@@ -80,6 +81,7 @@ struct Pipe {
 ///
 /// The `max_buf_size` argument is the maximum amount of bytes that can be
 /// written to a side before the write returns `Poll::Pending`.
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub fn duplex(max_buf_size: usize) -> (DuplexStream, DuplexStream) {
     let one = Arc::new(Mutex::new(Pipe::new(max_buf_size)));
     let two = Arc::new(Mutex::new(Pipe::new(max_buf_size)));
