@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620570214376,
+  "lastUpdate": 1620570218627,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -43263,6 +43263,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 840,
             "range": "± 154",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "distinct": true,
+          "id": "312321cbd37e544bf10d1e97e5a61b9fac01a49f",
+          "message": "chore: enable syntax highlighting for toml in readme",
+          "timestamp": "2021-05-09T16:21:36+02:00",
+          "tree_id": "03a66413fa91e57166dae504bd5891a12f87321a",
+          "url": "https://github.com/tokio-rs/tokio/commit/312321cbd37e544bf10d1e97e5a61b9fac01a49f"
+        },
+        "date": 1620570212034,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14244,
+            "range": "± 5356",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 822,
+            "range": "± 118",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 522,
+            "range": "± 82",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14938,
+            "range": "± 4805",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 858,
+            "range": "± 134",
             "unit": "ns/iter"
           }
         ]
