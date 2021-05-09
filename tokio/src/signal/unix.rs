@@ -9,7 +9,6 @@ use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storag
 use crate::signal::RxFuture;
 use crate::sync::watch;
 
-use libc::c_int;
 use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
@@ -61,7 +60,7 @@ impl Init for OsExtraData {
 
 /// Represents the specific kind of signal to listen for.
 #[derive(Debug, Clone, Copy)]
-pub struct SignalKind(c_int);
+pub struct SignalKind(libc::c_int);
 
 impl SignalKind {
     /// Allows for listening to any valid OS signal.
@@ -74,8 +73,14 @@ impl SignalKind {
     /// // let signum = libc::OS_SPECIFIC_SIGNAL;
     /// let kind = SignalKind::from_raw(signum);
     /// ```
-    pub fn from_raw(signum: c_int) -> Self {
-        Self(signum)
+    // Use `std::os::raw::c_int` on public API to prevent leaking a non-stable
+    // type alias from libc.
+    // `libc::c_int` and `std::os::raw::c_int` are currently the same type, and are
+    // unlikely to change to other types, but technically libc can change this
+    // in the future minor version.
+    // See https://github.com/tokio-rs/tokio/issues/3767 for more.
+    pub fn from_raw(signum: std::os::raw::c_int) -> Self {
+        Self(signum as libc::c_int)
     }
 
     /// Represents the SIGALRM signal.
@@ -208,7 +213,7 @@ impl Default for SignalInfo {
 /// 2. Wake up the driver by writing a byte to a pipe
 ///
 /// Those two operations should both be async-signal safe.
-fn action(globals: Pin<&'static Globals>, signal: c_int) {
+fn action(globals: Pin<&'static Globals>, signal: libc::c_int) {
     globals.record_event(signal as EventId);
 
     // Send a wakeup, ignore any errors (anything reasonably possible is
