@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620554399414,
+  "lastUpdate": 1620554409056,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -27949,6 +27949,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20569207,
             "range": "± 3957584",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f9ce18a52451fdc55c247f0901cebc3f9171e75a",
+          "message": "macros: improve diagnostics on type mismatch (#3766)",
+          "timestamp": "2021-05-09T18:58:05+09:00",
+          "tree_id": "9e3dfe43ae87bc5e1f2949c4b2a5eee8bd512b64",
+          "url": "https://github.com/tokio-rs/tokio/commit/f9ce18a52451fdc55c247f0901cebc3f9171e75a"
+        },
+        "date": 1620554405209,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 191598,
+            "range": "± 23250",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 717045,
+            "range": "± 111859",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5670782,
+            "range": "± 1661439",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21243901,
+            "range": "± 3937224",
             "unit": "ns/iter"
           }
         ]
