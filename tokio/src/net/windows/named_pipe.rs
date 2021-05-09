@@ -2,68 +2,26 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::io;
 use std::mem;
+use std::os::windows::ffi::OsStrExt as _;
+use std::os::windows::io::RawHandle;
+use std::os::windows::io::{AsRawHandle, FromRawHandle};
 use std::pin::Pin;
 use std::ptr;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use winapi::shared::minwindef::{DWORD, FALSE};
+use winapi::um::fileapi;
+use winapi::um::handleapi;
+use winapi::um::namedpipeapi;
+use winapi::um::winbase;
+use winapi::um::winnt;
 
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf};
 use crate::net::asyncify;
 
-// This module permits rustdoc to work by hiding non-existant items for other
-// platforms.
-#[cfg(not(doc))]
-mod sys {
-    pub(super) use mio::windows as mio_windows;
-    pub(super) use std::os::windows::ffi::OsStrExt;
-    pub(super) use std::os::windows::io::RawHandle;
-    pub(super) use std::os::windows::io::{AsRawHandle, FromRawHandle};
-    pub(super) use winapi::shared::minwindef::{DWORD, FALSE};
-    pub(super) use winapi::um::fileapi;
-    pub(super) use winapi::um::handleapi;
-    pub(super) use winapi::um::namedpipeapi;
-    pub(super) use winapi::um::winbase;
-    pub(super) use winapi::um::winnt;
-
-    // Interned constant to wait forever. Not available in winapi.
-    pub(super) const NMPWAIT_WAIT_FOREVER: DWORD = 0xffffffff;
-
-    /// Raw handle conversion for [NamedPipe].
-    ///
-    /// # Panics
-    ///
-    /// This panics if called outside of a [Tokio Runtime] which doesn't have [I/O
-    /// enabled].
-    ///
-    /// [Tokio Runtime]: crate::runtime::Runtime
-    /// [I/O enabled]: crate::runtime::Builder::enable_io
-    impl FromRawHandle for super::NamedPipe {
-        unsafe fn from_raw_handle(handle: RawHandle) -> Self {
-            Self::try_from_raw_handle(handle).unwrap()
-        }
-    }
-
-    impl AsRawHandle for super::NamedPipe {
-        fn as_raw_handle(&self) -> RawHandle {
-            self.io.as_raw_handle()
-        }
-    }
-}
-
-// Stubs needed when generating documentation. None of these show up in public
-// docs, but because they are present in function signatures rustdoc needs them.
-#[cfg(doc)]
-mod sys {
-    pub(super) type DWORD = u32;
-    pub(super) type RawHandle = ();
-
-    pub(super) mod mio_windows {
-        pub type NamedPipe = ();
-    }
-}
-
-use self::sys::*;
+// Interned constant to wait forever. Not available in winapi.
+const NMPWAIT_WAIT_FOREVER: DWORD = 0xffffffff;
 
 /// A [Windows named pipe].
 ///
@@ -163,12 +121,12 @@ use self::sys::*;
 /// ```
 ///
 /// [create]: NamedPipeClientBuilder::create
-/// [ERROR_PIPE_BUSY]: ::winapi::shared::winerror::ERROR_PIPE_BUSY
+/// [ERROR_PIPE_BUSY]: winapi::shared::winerror::ERROR_PIPE_BUSY
 /// [wait]: NamedPipeClientBuilder::wait
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
 pub struct NamedPipe {
-    io: PollEvented<mio_windows::NamedPipe>,
+    io: PollEvented<mio::windows::NamedPipe>,
 }
 
 impl NamedPipe {
@@ -191,7 +149,7 @@ impl NamedPipe {
     /// [Tokio Runtime]: crate::runtime::Runtime
     /// [I/O enabled]: crate::runtime::RuntimeBuilder::enable_io
     unsafe fn try_from_raw_handle(handle: RawHandle) -> io::Result<Self> {
-        let named_pipe = mio_windows::NamedPipe::from_raw_handle(handle);
+        let named_pipe = mio::windows::NamedPipe::from_raw_handle(handle);
 
         Ok(NamedPipe {
             io: PollEvented::new(named_pipe)?,
@@ -374,6 +332,27 @@ impl AsyncWrite for NamedPipe {
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.poll_flush(cx)
+    }
+}
+
+/// Raw handle conversion for [NamedPipe].
+///
+/// # Panics
+///
+/// This panics if called outside of a [Tokio Runtime] which doesn't have [I/O
+/// enabled].
+///
+/// [Tokio Runtime]: crate::runtime::Runtime
+/// [I/O enabled]: crate::runtime::Builder::enable_io
+impl FromRawHandle for NamedPipe {
+    unsafe fn from_raw_handle(handle: RawHandle) -> Self {
+        Self::try_from_raw_handle(handle).unwrap()
+    }
+}
+
+impl AsRawHandle for NamedPipe {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.io.as_raw_handle()
     }
 }
 
@@ -583,7 +562,7 @@ impl NamedPipeBuilder {
     ///
     /// This corresponds to setting [FILE_FLAG_FIRST_PIPE_INSTANCE].
     ///
-    /// [ERROR_ACCESS_DENIED]: ::winapi::shared::winerror::ERROR_ACCESS_DENIED
+    /// [ERROR_ACCESS_DENIED]: winapi::shared::winerror::ERROR_ACCESS_DENIED
     /// [FILE_FLAG_FIRST_PIPE_INSTANCE]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_first_pipe_instance
     ///
     /// # Examples
@@ -729,7 +708,7 @@ impl NamedPipeBuilder {
             return Err(io::Error::last_os_error());
         }
 
-        let io = mio_windows::NamedPipe::from_raw_handle(h);
+        let io = mio::windows::NamedPipe::from_raw_handle(h);
         let io = PollEvented::new(io)?;
 
         Ok(NamedPipe { io })
@@ -997,8 +976,7 @@ impl NamedPipeClientBuilder {
     ///   [winapi]. This error is raised when the named pipe has been created,
     ///   but the server is not currently waiting for a connection.
     ///
-    /// [winapi]: ::winapi
-    /// [ERROR_PIPE_BUSY]: ::winapi::shared::winerror::ERROR_PIPE_BUSY
+    /// [ERROR_PIPE_BUSY]: winapi::shared::winerror::ERROR_PIPE_BUSY
     ///
     /// The generic connect loop looks like this.
     ///
@@ -1064,7 +1042,7 @@ impl NamedPipeClientBuilder {
             return Err(io::Error::last_os_error());
         }
 
-        let io = mio_windows::NamedPipe::from_raw_handle(h);
+        let io = mio::windows::NamedPipe::from_raw_handle(h);
         let io = PollEvented::new(io)?;
 
         Ok(NamedPipe { io })
@@ -1089,19 +1067,16 @@ pub enum PipeMode {
     /// Data is written to the pipe as a stream of bytes. The pipe does not
     /// distinguish bytes written during different write operations.
     ///
-    /// Corresponds to [PIPE_TYPE_BYTE].
-    ///
-    /// [PIPE_TYPE_BYTE]: ::winapi::um::winbase::PIPE_TYPE_BYTE
+    /// Corresponds to [PIPE_TYPE_BYTE][winbase::PIPE_TYPE_BYTE].
     Byte,
     /// Data is written to the pipe as a stream of messages. The pipe treats the
     /// bytes written during each write operation as a message unit. Any reading
     /// function on [NamedPipe] returns [ERROR_MORE_DATA] when a message is not
     /// read completely.
     ///
-    /// Corresponds to [PIPE_TYPE_MESSAGE].
+    /// Corresponds to [PIPE_TYPE_MESSAGE][winbase::PIPE_TYPE_MESSAGE].
     ///
-    /// [ERROR_MORE_DATA]: ::winapi::shared::winerror::ERROR_MORE_DATA
-    /// [PIPE_TYPE_MESSAGE]: ::winapi::um::winbase::PIPE_TYPE_MESSAGE
+    /// [ERROR_MORE_DATA]: winapi::shared::winerror::ERROR_MORE_DATA
     Message,
 }
 
@@ -1111,15 +1086,11 @@ pub enum PipeMode {
 pub enum PipeEnd {
     /// The [NamedPipe] refers to the client end of a named pipe instance.
     ///
-    /// Corresponds to [PIPE_CLIENT_END].
-    ///
-    /// [PIPE_CLIENT_END]: ::winapi::um::winbase::PIPE_CLIENT_END
+    /// Corresponds to [PIPE_CLIENT_END][winbase::PIPE_CLIENT_END].
     Client,
     /// The [NamedPipe] refers to the server end of a named pipe instance.
     ///
-    /// Corresponds to [PIPE_SERVER_END].
-    ///
-    /// [PIPE_SERVER_END]: ::winapi::um::winbase::PIPE_SERVER_END
+    /// Corresponds to [PIPE_SERVER_END][winbase::PIPE_SERVER_END].
     Server,
 }
 

@@ -186,8 +186,8 @@ macro_rules! cfg_net_unix {
 macro_rules! cfg_net_windows {
     ($($item:item)*) => {
         $(
-            #[cfg(all(any(doc, windows), feature = "net"))]
-            #[cfg_attr(docsrs, doc(all(windows, cfg(feature = "net"))))]
+            #[cfg(all(windows, feature = "net"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
             $item
         )*
     }
