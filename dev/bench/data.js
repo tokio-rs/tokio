@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620589030400,
+  "lastUpdate": 1620589041104,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -15065,6 +15065,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 498,
             "range": "± 34",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9ff7d8c3525bfbe1493aebe89b5e8d455f02f1eb",
+          "message": "net: hide net::unix::datagram module from docs (#3775)",
+          "timestamp": "2021-05-10T04:35:09+09:00",
+          "tree_id": "667e2529d24d3461f07a09a31850163f00105dc4",
+          "url": "https://github.com/tokio-rs/tokio/commit/9ff7d8c3525bfbe1493aebe89b5e8d455f02f1eb"
+        },
+        "date": 1620589035336,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 928,
+            "range": "± 316",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15644,
+            "range": "± 6448",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 929,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 19083,
+            "range": "± 14417",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 613,
+            "range": "± 341",
             "unit": "ns/iter"
           }
         ]
