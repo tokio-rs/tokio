@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620554381289,
+  "lastUpdate": 1620554399414,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -42747,6 +42747,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 885,
             "range": "± 124",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f9ce18a52451fdc55c247f0901cebc3f9171e75a",
+          "message": "macros: improve diagnostics on type mismatch (#3766)",
+          "timestamp": "2021-05-09T18:58:05+09:00",
+          "tree_id": "9e3dfe43ae87bc5e1f2949c4b2a5eee8bd512b64",
+          "url": "https://github.com/tokio-rs/tokio/commit/f9ce18a52451fdc55c247f0901cebc3f9171e75a"
+        },
+        "date": 1620554395898,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15624,
+            "range": "± 4835",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 980,
+            "range": "± 31",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 650,
+            "range": "± 13",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15143,
+            "range": "± 3207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 980,
+            "range": "± 7",
             "unit": "ns/iter"
           }
         ]
