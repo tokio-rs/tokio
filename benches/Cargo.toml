@@ -10,6 +10,7 @@ bencher = "0.1.5"
 
 [dev-dependencies]
 tokio-util = { version = "0.6.6", path = "../tokio-util", features = ["full"] }
+tokio-stream = { path = "../tokio-stream" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.42"
