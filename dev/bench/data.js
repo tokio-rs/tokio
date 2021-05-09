@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620570210980,
+  "lastUpdate": 1620570214376,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -28255,6 +28255,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20870536,
             "range": "± 3794319",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "distinct": true,
+          "id": "312321cbd37e544bf10d1e97e5a61b9fac01a49f",
+          "message": "chore: enable syntax highlighting for toml in readme",
+          "timestamp": "2021-05-09T16:21:36+02:00",
+          "tree_id": "03a66413fa91e57166dae504bd5891a12f87321a",
+          "url": "https://github.com/tokio-rs/tokio/commit/312321cbd37e544bf10d1e97e5a61b9fac01a49f"
+        },
+        "date": 1620570207592,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 182448,
+            "range": "± 52147",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 675390,
+            "range": "± 168483",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4747626,
+            "range": "± 1434281",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19121290,
+            "range": "± 4254782",
             "unit": "ns/iter"
           }
         ]
