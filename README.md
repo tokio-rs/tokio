@@ -54,7 +54,7 @@ A basic TCP echo server with Tokio.
 
 Make sure you activated the full features of the tokio crate on Cargo.toml:
 
-```text
+```toml
 [dependencies]
 tokio = { version = "1.5.0", features = ["full"] }
 ```
