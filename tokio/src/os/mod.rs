@@ -203,6 +203,7 @@ pub mod unix {
 }
 
 #[cfg(unix)]
+#[allow(unused)]
 pub(crate) mod unix {
     pub(crate) use std::os::unix::{io, net};
 }
