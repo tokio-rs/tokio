@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620582947175,
+  "lastUpdate": 1620582955966,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -28357,6 +28357,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19121290,
             "range": "± 4254782",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7207e3ca43d27b5e86d5b10a2425c6aae87b8ee1",
+          "message": "signal: use std::os::raw::c_int instead of libc::c_int on public API (#3774)",
+          "timestamp": "2021-05-10T02:53:57+09:00",
+          "tree_id": "20494a9d3c5567ef3fad7b25e845ea3c95683831",
+          "url": "https://github.com/tokio-rs/tokio/commit/7207e3ca43d27b5e86d5b10a2425c6aae87b8ee1"
+        },
+        "date": 1620582952539,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 195662,
+            "range": "± 41127",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 677163,
+            "range": "± 96550",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5317495,
+            "range": "± 1105234",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20997968,
+            "range": "± 3127878",
             "unit": "ns/iter"
           }
         ]
