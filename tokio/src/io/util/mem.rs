@@ -10,46 +10,45 @@ use std::{
     task::{self, Poll, Waker},
 };
 
-cfg_io_util! {
-    /// A bidirectional pipe to read and write bytes in memory.
-    ///
-    /// A pair of `DuplexStream`s are created together, and they act as a "channel"
-    /// that can be used as in-memory IO types. Writing to one of the pairs will
-    /// allow that data to be read from the other, and vice versa.
-    ///
-    /// # Closing a `DuplexStream`
-    ///
-    /// If one end of the `DuplexStream` channel is dropped, any pending reads on
-    /// the other side will continue to read data until the buffer is drained, then
-    /// they will signal EOF by returning 0 bytes. Any writes to the other side,
-    /// including pending ones (that are waiting for free space in the buffer) will
-    /// return `Err(BrokenPipe)` immediately.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # async fn ex() -> std::io::Result<()> {
-    /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    /// let (mut client, mut server) = tokio::io::duplex(64);
-    ///
-    /// client.write_all(b"ping").await?;
-    ///
-    /// let mut buf = [0u8; 4];
-    /// server.read_exact(&mut buf).await?;
-    /// assert_eq!(&buf, b"ping");
-    ///
-    /// server.write_all(b"pong").await?;
-    ///
-    /// client.read_exact(&mut buf).await?;
-    /// assert_eq!(&buf, b"pong");
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[derive(Debug)]
-    pub struct DuplexStream {
-        read: Arc<Mutex<Pipe>>,
-        write: Arc<Mutex<Pipe>>,
-    }
+/// A bidirectional pipe to read and write bytes in memory.
+///
+/// A pair of `DuplexStream`s are created together, and they act as a "channel"
+/// that can be used as in-memory IO types. Writing to one of the pairs will
+/// allow that data to be read from the other, and vice versa.
+///
+/// # Closing a `DuplexStream`
+///
+/// If one end of the `DuplexStream` channel is dropped, any pending reads on
+/// the other side will continue to read data until the buffer is drained, then
+/// they will signal EOF by returning 0 bytes. Any writes to the other side,
+/// including pending ones (that are waiting for free space in the buffer) will
+/// return `Err(BrokenPipe)` immediately.
+///
+/// # Example
+///
+/// ```
+/// # async fn ex() -> std::io::Result<()> {
+/// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
+/// let (mut client, mut server) = tokio::io::duplex(64);
+///
+/// client.write_all(b"ping").await?;
+///
+/// let mut buf = [0u8; 4];
+/// server.read_exact(&mut buf).await?;
+/// assert_eq!(&buf, b"ping");
+///
+/// server.write_all(b"pong").await?;
+///
+/// client.read_exact(&mut buf).await?;
+/// assert_eq!(&buf, b"pong");
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug)]
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+pub struct DuplexStream {
+    read: Arc<Mutex<Pipe>>,
+    write: Arc<Mutex<Pipe>>,
 }
 
 /// A unidirectional IO over a piece of memory.
@@ -78,26 +77,25 @@ struct Pipe {
 
 // ===== impl DuplexStream =====
 
-cfg_io_util! {
-    /// Create a new pair of `DuplexStream`s that act like a pair of connected sockets.
-    ///
-    /// The `max_buf_size` argument is the maximum amount of bytes that can be
-    /// written to a side before the write returns `Poll::Pending`.
-    pub fn duplex(max_buf_size: usize) -> (DuplexStream, DuplexStream) {
-        let one = Arc::new(Mutex::new(Pipe::new(max_buf_size)));
-        let two = Arc::new(Mutex::new(Pipe::new(max_buf_size)));
+/// Create a new pair of `DuplexStream`s that act like a pair of connected sockets.
+///
+/// The `max_buf_size` argument is the maximum amount of bytes that can be
+/// written to a side before the write returns `Poll::Pending`.
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+pub fn duplex(max_buf_size: usize) -> (DuplexStream, DuplexStream) {
+    let one = Arc::new(Mutex::new(Pipe::new(max_buf_size)));
+    let two = Arc::new(Mutex::new(Pipe::new(max_buf_size)));
 
-        (
-            DuplexStream {
-                read: one.clone(),
-                write: two.clone(),
-            },
-            DuplexStream {
-                read: two,
-                write: one,
-            },
-        )
-    }
+    (
+        DuplexStream {
+            read: one.clone(),
+            write: two.clone(),
+        },
+        DuplexStream {
+            read: two,
+            write: one,
+        },
+    )
 }
 
 impl AsyncRead for DuplexStream {
