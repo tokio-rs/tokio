@@ -72,6 +72,8 @@ jobs:
       - name: build benches
         run: cargo build --benches
         working-directory: benches
+        # bench.yml workflow runs benchmarks only on linux.
+        if: startsWith(matrix.os, 'ubuntu')
 
   valgrind:
     name: valgrind
