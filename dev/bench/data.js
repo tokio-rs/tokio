@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620589041104,
+  "lastUpdate": 1620589045893,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -28561,6 +28561,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20942281,
             "range": "± 3338206",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9ff7d8c3525bfbe1493aebe89b5e8d455f02f1eb",
+          "message": "net: hide net::unix::datagram module from docs (#3775)",
+          "timestamp": "2021-05-10T04:35:09+09:00",
+          "tree_id": "667e2529d24d3461f07a09a31850163f00105dc4",
+          "url": "https://github.com/tokio-rs/tokio/commit/9ff7d8c3525bfbe1493aebe89b5e8d455f02f1eb"
+        },
+        "date": 1620589039567,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 227580,
+            "range": "± 72440",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 810306,
+            "range": "± 133169",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5270418,
+            "range": "± 1071803",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22736179,
+            "range": "± 4065371",
             "unit": "ns/iter"
           }
         ]
