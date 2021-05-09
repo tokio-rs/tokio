@@ -68,6 +68,13 @@ jobs:
         run: cargo hack test --each-feature
         working-directory: tests-build
 
+      # Build benchmarks. Run of benchmarks is done by bench.yml workflow.
+      - name: build benches
+        run: cargo build --benches
+        working-directory: benches
+        # bench.yml workflow runs benchmarks only on linux.
+        if: startsWith(matrix.os, 'ubuntu')
+
   valgrind:
     name: valgrind
     runs-on: ubuntu-latest
