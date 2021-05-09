@@ -1,9 +1,17 @@
 use crate::io::driver::{Handle, Interest, ReadyEvent, Registration};
+use crate::os::unix::io::{AsRawFd, RawFd};
 
-use mio::unix::SourceFd;
 use std::io;
-use std::os::unix::io::{AsRawFd, RawFd};
 use std::{task::Context, task::Poll};
+
+// helps rustdoc on non-supported platforms.
+doc_prelude! {
+    mod mock {}
+
+    #[cfg(unix)] {
+        pub(super) use mio::unix::SourceFd;
+    }
+}
 
 /// Associates an IO object backed by a Unix file descriptor with the tokio
 /// reactor, allowing for readiness to be polled. The file descriptor must be of

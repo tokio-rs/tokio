@@ -7,12 +7,26 @@ use crate::io::PollEvented;
 use crate::park::Park;
 use crate::signal::registry::globals;
 
-use mio::net::UnixStream;
 use std::io::{self, Read};
 use std::ptr;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use std::time::Duration;
+
+// helps rustdoc on non-supported platforms.
+//
+// NB: this module is strictly speaking not publicly documented, all though it
+// is much easier to mock it during rustdoc generation than hide it completely.
+doc_prelude! {
+    mod mock {
+        pub(super) struct UnixStream(());
+    }
+
+    #[cfg(unix)] {
+        pub(super) use mio::net::UnixStream;
+        pub(super) use std::os::unix::io::{AsRawFd, FromRawFd};
+    }
+}
 
 /// Responsible for registering wakeups when an OS signal is received, and
 /// subsequently dispatching notifications to any signal listeners as appropriate.
@@ -45,7 +59,6 @@ impl Driver {
     /// Creates a new signal `Driver` instance that delegates wakeups to `park`.
     pub(crate) fn new(park: IoDriver) -> io::Result<Self> {
         use std::mem::ManuallyDrop;
-        use std::os::unix::io::{AsRawFd, FromRawFd};
 
         // NB: We give each driver a "fresh" reciever file descriptor to avoid
         // the issues described in alexcrichton/tokio-process#42.

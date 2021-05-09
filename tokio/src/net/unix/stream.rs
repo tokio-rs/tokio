@@ -4,16 +4,30 @@ use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::unix::ucred::{self, UCred};
 use crate::net::unix::SocketAddr;
+use crate::os::unix::io::{AsRawFd, RawFd};
+use crate::os::unix::net;
 
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+// helps rustdoc on non-supported platforms.
+doc_prelude! {
+    mod mock {
+        pub(super) mod mio_net {
+            pub struct UnixStream(());
+        }
+    }
+
+    #[cfg(unix)] {
+        pub(super) use std::os::unix::io::{FromRawFd, IntoRawFd};
+        pub(super) use mio::net as mio_net;
+    }
+}
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -33,7 +47,7 @@ cfg_net_unix! {
     ///
     /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub struct UnixStream {
-        io: PollEvented<mio::net::UnixStream>,
+        io: PollEvented<mio_net::UnixStream>,
     }
 }
 
@@ -47,7 +61,7 @@ impl UnixStream {
     where
         P: AsRef<Path>,
     {
-        let stream = mio::net::UnixStream::connect(path)?;
+        let stream = mio_net::UnixStream::connect(path)?;
         let stream = UnixStream::new(stream)?;
 
         poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;
@@ -502,7 +516,7 @@ impl UnixStream {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
-        let stream = mio::net::UnixStream::from_std(stream);
+        let stream = mio_net::UnixStream::from_std(stream);
         let io = PollEvented::new(stream)?;
 
         Ok(UnixStream { io })
@@ -544,13 +558,13 @@ impl UnixStream {
     /// }
     /// ```
     /// [`tokio::net::UnixStream`]: UnixStream
-    /// [`std::os::unix::net::UnixStream`]: std::os::unix::net::UnixStream
-    /// [`set_nonblocking`]: fn@std::os::unix::net::UnixStream::set_nonblocking
-    pub fn into_std(self) -> io::Result<std::os::unix::net::UnixStream> {
+    /// [`std::os::unix::net::UnixStream`]: crate::os::unix::net::UnixStream
+    /// [`set_nonblocking`]: fn@crate::os::unix::net::UnixStream::set_nonblocking
+    pub fn into_std(self) -> io::Result<net::UnixStream> {
         self.io
             .into_inner()
             .map(|io| io.into_raw_fd())
-            .map(|raw_fd| unsafe { std::os::unix::net::UnixStream::from_raw_fd(raw_fd) })
+            .map(|raw_fd| unsafe { net::UnixStream::from_raw_fd(raw_fd) })
     }
 
     /// Creates an unnamed pair of connected sockets.
@@ -559,14 +573,14 @@ impl UnixStream {
     /// communicating back and forth between one another. Each socket will
     /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
-        let (a, b) = mio::net::UnixStream::pair()?;
+        let (a, b) = mio_net::UnixStream::pair()?;
         let a = UnixStream::new(a)?;
         let b = UnixStream::new(b)?;
 
         Ok((a, b))
     }
 
-    pub(crate) fn new(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
+    pub(crate) fn new(stream: mio_net::UnixStream) -> io::Result<UnixStream> {
         let io = PollEvented::new(stream)?;
         Ok(UnixStream { io })
     }
@@ -630,7 +644,7 @@ impl UnixStream {
     }
 }
 
-impl TryFrom<net::UnixStream> for UnixStream {
+impl TryFrom<net::UnixStream> for super::UnixStream {
     type Error = io::Error;
 
     /// Consumes stream, returning the tokio I/O object.

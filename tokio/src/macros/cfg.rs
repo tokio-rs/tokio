@@ -1,5 +1,49 @@
 #![allow(unused_macros)]
 
+/// Helper for rustdoc to generate cross platform documentation.
+///
+/// This implements the approach taken by libstd and documented in [advanced
+/// features of
+/// rustdoc](https://doc.rust-lang.org/rustdoc/advanced-features.html).
+///
+/// We leverage that the content of functions are largely ignored by rustdoc,
+/// and provide the ability to mock anything that is required for rustdoc to
+/// compile documentation on other platforms
+///
+/// This does have a few downsides:
+/// * Anything outlined in the `mock` section won't *correctly* link to the
+///   correct upstream crate for types used *unless* it's built for that
+///   platform.
+/// * Trait implementations that mentions types in the `mock` section won't be
+///   visible in generated documentation *unless* it's built for that platform.
+macro_rules! doc_prelude {
+    (
+        $vis:vis mod mock {
+            $($mock_items:tt)*
+        }
+
+        $(#[cfg($($meta:meta)*)] {
+            $($items:tt)*
+        })*
+    ) => {
+        #[cfg(all(doc, not(any($($($meta)*),*))))]
+        #[doc(hidden)]
+        $vis mod doc {
+            $($mock_items)*
+        }
+
+        $(
+            #[cfg(any(not(doc), $($meta)*))]
+            #[doc(hidden)]
+            $vis mod doc {
+                $($items)*
+            }
+        )*
+
+        $vis use self::doc::*;
+    }
+}
+
 macro_rules! feature {
     (
         #![$meta:meta]
@@ -176,8 +220,8 @@ macro_rules! cfg_net {
 macro_rules! cfg_net_unix {
     ($($item:item)*) => {
         $(
-            #[cfg(all(unix, feature = "net"))]
-            #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
+            #[cfg(all(any(doc, unix), feature = "net"))]
+            #[cfg_attr(docsrs, doc(cfg(all(unix, feature = "net"))))]
             $item
         )*
     }

@@ -1,4 +1,16 @@
-use libc::{gid_t, pid_t, uid_t};
+// helps rustdoc on non-supported platforms.
+doc_prelude! {
+    mod mock {
+        #![allow(non_camel_case_types)]
+        pub(super) struct gid_t(());
+        pub(super) struct pid_t(());
+        pub(super) struct uid_t(());
+    }
+
+    #[cfg(unix)] {
+        pub(super) use libc::{gid_t, pid_t, uid_t};
+    }
+}
 
 /// Credentials of a process
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]

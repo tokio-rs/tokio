@@ -5,7 +5,8 @@
 //! `SetConsoleCtrlHandler` function which receives events of the type
 //! `CTRL_C_EVENT` and `CTRL_BREAK_EVENT`.
 
-#![cfg(windows)]
+#![cfg(any(doc, windows))]
+#![cfg_attr(docsrs, doc(cfg(all(windows, feature = "signal"))))]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Init, Storage};
 use crate::signal::RxFuture;
@@ -14,9 +15,20 @@ use std::convert::TryFrom;
 use std::io;
 use std::sync::Once;
 use std::task::{Context, Poll};
-use winapi::shared::minwindef::{BOOL, DWORD, FALSE, TRUE};
-use winapi::um::consoleapi::SetConsoleCtrlHandler;
-use winapi::um::wincon::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
+
+// helps rustdoc on non-supported platforms.
+doc_prelude! {
+    mod mock {
+        pub(super) struct DWORD(());
+        pub(super) struct BOOL(());
+    }
+
+    #[cfg(windows)] {
+        pub(super) use winapi::shared::minwindef::{BOOL, DWORD, FALSE, TRUE};
+        pub(super) use winapi::um::consoleapi::SetConsoleCtrlHandler;
+        pub(super) use winapi::um::wincon::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct OsStorage {
