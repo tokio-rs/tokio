@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620566921626,
+  "lastUpdate": 1620570210980,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -14903,6 +14903,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 594,
             "range": "± 15",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "distinct": true,
+          "id": "312321cbd37e544bf10d1e97e5a61b9fac01a49f",
+          "message": "chore: enable syntax highlighting for toml in readme",
+          "timestamp": "2021-05-09T16:21:36+02:00",
+          "tree_id": "03a66413fa91e57166dae504bd5891a12f87321a",
+          "url": "https://github.com/tokio-rs/tokio/commit/312321cbd37e544bf10d1e97e5a61b9fac01a49f"
+        },
+        "date": 1620570207381,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 724,
+            "range": "± 83",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15684,
+            "range": "± 6227",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 819,
+            "range": "± 144",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14949,
+            "range": "± 5063",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 489,
+            "range": "± 95",
             "unit": "ns/iter"
           }
         ]
