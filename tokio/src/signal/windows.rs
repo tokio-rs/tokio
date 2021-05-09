@@ -18,7 +18,7 @@ use std::task::{Context, Poll};
 
 // helps rustdoc on non-unix platforms.
 doc_prelude! {
-    mod mock {
+    mod stub {
         pub(super) struct DWORD(());
         pub(super) struct BOOL(());
     }

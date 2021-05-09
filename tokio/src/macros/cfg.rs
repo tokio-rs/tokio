@@ -18,18 +18,13 @@
 ///   visible in generated documentation *unless* it's built for that platform.
 macro_rules! doc_prelude {
     (
-        $vis:vis mod mock {
-            $($mock_items:tt)*
-        }
-
-        $(#[cfg($($meta:meta)*)] {
-            $($items:tt)*
-        })*
+        $vis:vis mod stub {$($stubs:tt)* }
+        $(#[cfg($($meta:meta)*)] { $($items:tt)* })*
     ) => {
-        #[cfg(any(docsrs, not(any($($($meta)*),*))))]
+        #[cfg(docsrs)]
         #[doc(hidden)]
         $vis mod doc {
-            $($mock_items)*
+            $($stubs)*
         }
 
         $(
