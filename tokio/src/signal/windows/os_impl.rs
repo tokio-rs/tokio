@@ -125,3 +125,54 @@ unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
         FALSE
     }
 }
+
+#[cfg(all(test, not(loom)))]
+mod tests {
+    use super::*;
+    use crate::runtime::Runtime;
+
+    use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
+
+    #[test]
+    fn ctrl_c() {
+        let rt = rt();
+        let _enter = rt.enter();
+
+        let mut ctrl_c = task::spawn(crate::signal::ctrl_c());
+
+        assert_pending!(ctrl_c.poll());
+
+        // Windows doesn't have a good programmatic way of sending events
+        // like sending signals on Unix, so we'll stub out the actual OS
+        // integration and test that our handling works.
+        unsafe {
+            super::handler(CTRL_C_EVENT);
+        }
+
+        assert_ready_ok!(ctrl_c.poll());
+    }
+
+    #[test]
+    fn ctrl_break() {
+        let rt = rt();
+
+        rt.block_on(async {
+            let mut ctrl_break = assert_ok!(crate::signal::windows::ctrl_break());
+
+            // Windows doesn't have a good programmatic way of sending events
+            // like sending signals on Unix, so we'll stub out the actual OS
+            // integration and test that our handling works.
+            unsafe {
+                super::handler(CTRL_BREAK_EVENT);
+            }
+
+            ctrl_break.recv().await.unwrap();
+        });
+    }
+
+    fn rt() -> Runtime {
+        crate::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+    }
+}
