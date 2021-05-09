@@ -7,26 +7,14 @@ use crate::io::PollEvented;
 use crate::park::Park;
 use crate::signal::registry::globals;
 
+use mio::net::UnixStream;
 use std::io::{self, Read};
+use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::net;
 use std::ptr;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use std::time::Duration;
-
-// helps rustdoc on non-supported platforms.
-//
-// NB: this module is strictly speaking not publicly documented, all though it
-// is much easier to mock it during rustdoc generation than hide it completely.
-doc_prelude! {
-    mod mock {
-        pub(super) struct UnixStream(());
-    }
-
-    #[cfg(unix)] {
-        pub(super) use mio::net::UnixStream;
-        pub(super) use std::os::unix::io::{AsRawFd, FromRawFd};
-    }
-}
 
 /// Responsible for registering wakeups when an OS signal is received, and
 /// subsequently dispatching notifications to any signal listeners as appropriate.
@@ -84,8 +72,7 @@ impl Driver {
         let receiver_fd = globals().receiver.as_raw_fd();
 
         // safety: there is nothing unsafe about this, but the `from_raw_fd` fn is marked as unsafe.
-        let original =
-            ManuallyDrop::new(unsafe { std::os::unix::net::UnixStream::from_raw_fd(receiver_fd) });
+        let original = ManuallyDrop::new(unsafe { net::UnixStream::from_raw_fd(receiver_fd) });
         let receiver = UnixStream::from_std(original.try_clone()?);
         let receiver = PollEvented::new_with_interest_and_handle(
             receiver,

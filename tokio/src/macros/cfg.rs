@@ -26,14 +26,14 @@ macro_rules! doc_prelude {
             $($items:tt)*
         })*
     ) => {
-        #[cfg(all(doc, not(any($($($meta)*),*))))]
+        #[cfg(any(docsrs, not(any($($($meta)*),*))))]
         #[doc(hidden)]
         $vis mod doc {
             $($mock_items)*
         }
 
         $(
-            #[cfg(any(not(doc), $($meta)*))]
+            #[cfg(all(not(docsrs), $($meta)*))]
             #[doc(hidden)]
             $vis mod doc {
                 $($items)*
@@ -220,7 +220,7 @@ macro_rules! cfg_net {
 macro_rules! cfg_net_unix {
     ($($item:item)*) => {
         $(
-            #[cfg(all(any(doc, unix), feature = "net"))]
+            #[cfg(all(any(docsrs, unix), feature = "net"))]
             #[cfg_attr(docsrs, doc(cfg(all(unix, feature = "net"))))]
             $item
         )*

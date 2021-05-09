@@ -5,7 +5,7 @@
 //! `SetConsoleCtrlHandler` function which receives events of the type
 //! `CTRL_C_EVENT` and `CTRL_BREAK_EVENT`.
 
-#![cfg(any(doc, windows))]
+#![cfg(any(docsrs, windows))]
 #![cfg_attr(docsrs, doc(cfg(all(windows, feature = "signal"))))]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Init, Storage};
@@ -16,7 +16,7 @@ use std::io;
 use std::sync::Once;
 use std::task::{Context, Poll};
 
-// helps rustdoc on non-supported platforms.
+// helps rustdoc on non-unix platforms.
 doc_prelude! {
     mod mock {
         pub(super) struct DWORD(());

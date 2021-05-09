@@ -1,27 +1,13 @@
 use crate::io::{Interest, PollEvented};
 use crate::net::unix::{SocketAddr, UnixStream};
-use crate::os::unix::io::{AsRawFd, RawFd};
-use crate::os::unix::net;
 
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
-
-// helps rustdoc on non-supported platforms.
-doc_prelude! {
-    mod mock {
-        pub(super) mod mio_net {
-            pub type UnixListener = ();
-        }
-    }
-
-    #[cfg(unix)] {
-        pub(super) use mio::net as mio_net;
-        pub(super) use std::os::unix::io::{FromRawFd, IntoRawFd};
-    }
-}
 
 cfg_net_unix! {
     /// A Unix socket which can accept connections from other Unix sockets.
@@ -59,7 +45,7 @@ cfg_net_unix! {
     /// }
     /// ```
     pub struct UnixListener {
-        io: PollEvented<mio_net::UnixListener>,
+        io: PollEvented<mio::net::UnixListener>,
     }
 }
 
@@ -77,7 +63,7 @@ impl UnixListener {
     where
         P: AsRef<Path>,
     {
-        let listener = mio_net::UnixListener::bind(path)?;
+        let listener = mio::net::UnixListener::bind(path)?;
         let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })
     }
@@ -97,7 +83,7 @@ impl UnixListener {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_std(listener: net::UnixListener) -> io::Result<UnixListener> {
-        let listener = mio_net::UnixListener::from_std(listener);
+        let listener = mio::net::UnixListener::from_std(listener);
         let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })
     }
@@ -122,8 +108,8 @@ impl UnixListener {
     /// ```
     ///
     /// [`tokio::net::UnixListener`]: UnixListener
-    /// [`std::os::unix::net::UnixListener`]: crate::os::unix::net::UnixListener
-    /// [`set_nonblocking`]: fn@crate::os::unix::net::UnixListener::set_nonblocking
+    /// [`std::os::unix::net::UnixListener`]: std::os::unix::net::UnixListener
+    /// [`set_nonblocking`]: fn@std::os::unix::net::UnixListener::set_nonblocking
     pub fn into_std(self) -> io::Result<net::UnixListener> {
         self.io
             .into_inner()

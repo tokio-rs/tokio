@@ -1,28 +1,14 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::unix::SocketAddr;
-use crate::os::unix::io::{AsRawFd, RawFd};
-use crate::os::unix::net;
 
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
-
-// helps rustdoc on non-supported platforms.
-doc_prelude! {
-    mod mock {
-        pub(super) mod mio_net {
-            pub struct UnixDatagram(());
-        }
-    }
-
-    #[cfg(unix)] {
-        pub(super) use mio::net as mio_net;
-        pub(super) use std::os::unix::io::{FromRawFd, IntoRawFd};
-    }
-}
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -105,7 +91,7 @@ cfg_net_unix! {
     /// # }
     /// ```
     pub struct UnixDatagram {
-        io: PollEvented<mio_net::UnixDatagram>,
+        io: PollEvented<mio::net::UnixDatagram>,
     }
 }
 
@@ -307,7 +293,7 @@ impl UnixDatagram {
     where
         P: AsRef<Path>,
     {
-        let socket = mio_net::UnixDatagram::bind(path)?;
+        let socket = mio::net::UnixDatagram::bind(path)?;
         UnixDatagram::new(socket)
     }
 
@@ -341,7 +327,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn pair() -> io::Result<(UnixDatagram, UnixDatagram)> {
-        let (a, b) = mio_net::UnixDatagram::pair()?;
+        let (a, b) = mio::net::UnixDatagram::pair()?;
         let a = UnixDatagram::new(a)?;
         let b = UnixDatagram::new(b)?;
 
@@ -385,7 +371,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn from_std(datagram: net::UnixDatagram) -> io::Result<UnixDatagram> {
-        let socket = mio_net::UnixDatagram::from_std(datagram);
+        let socket = mio::net::UnixDatagram::from_std(datagram);
         let io = PollEvented::new(socket)?;
         Ok(UnixDatagram { io })
     }
@@ -411,8 +397,8 @@ impl UnixDatagram {
     /// ```
     ///
     /// [`tokio::net::UnixDatagram`]: UnixDatagram
-    /// [`std::os::unix::net::UnixDatagram`]: crate::os::unix::net::UnixDatagram
-    /// [`set_nonblocking`]: fn@crate::os::unix::net::UnixDatagram::set_nonblocking
+    /// [`std::os::unix::net::UnixDatagram`]: std::os::unix::net::UnixDatagram
+    /// [`set_nonblocking`]: fn@std::os::unix::net::UnixDatagram::set_nonblocking
     pub fn into_std(self) -> io::Result<net::UnixDatagram> {
         self.io
             .into_inner()
@@ -420,7 +406,7 @@ impl UnixDatagram {
             .map(|raw_fd| unsafe { net::UnixDatagram::from_raw_fd(raw_fd) })
     }
 
-    fn new(socket: mio_net::UnixDatagram) -> io::Result<UnixDatagram> {
+    fn new(socket: mio::net::UnixDatagram) -> io::Result<UnixDatagram> {
         let io = PollEvented::new(socket)?;
         Ok(UnixDatagram { io })
     }
@@ -457,7 +443,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn unbound() -> io::Result<UnixDatagram> {
-        let socket = mio_net::UnixDatagram::unbound()?;
+        let socket = mio::net::UnixDatagram::unbound()?;
         UnixDatagram::new(socket)
     }
 

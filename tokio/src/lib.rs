@@ -442,8 +442,6 @@ mod util;
 /// ```
 pub mod stream {}
 
-pub mod os;
-
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**
     /// intended to be used as part of the public API and is permitted to

@@ -3,12 +3,14 @@
 //! This module is only defined on Unix platforms and contains the primary
 //! `Signal` type for receiving notifications of signals.
 
-#![cfg(any(doc, unix))]
+#![cfg(any(docsrs, unix))]
+#![cfg_attr(docsrs, doc(cfg(all(unix, feature = "signal"))))]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::signal::RxFuture;
 use crate::sync::watch;
 
+use libc::c_int;
 use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,23 +21,6 @@ pub(crate) mod driver;
 use self::driver::Handle;
 
 pub(crate) type OsStorage = Vec<SignalInfo>;
-
-// helps rustdoc generate documentation
-doc_prelude! {
-    mod mock {
-        #[allow(non_camel_case_types)]
-        pub(super) struct c_int(());
-
-        pub(super) mod mio_net {
-            pub struct UnixStream(());
-        }
-    }
-
-    #[cfg(unix)] {
-        pub(super) use libc::c_int;
-        pub(super) use mio::net as mio_net;
-    }
-}
 
 // Number of different unix signals
 // (FreeBSD has 33)
@@ -62,13 +47,13 @@ impl Storage for OsStorage {
 
 #[derive(Debug)]
 pub(crate) struct OsExtraData {
-    sender: mio_net::UnixStream,
-    receiver: mio_net::UnixStream,
+    sender: mio::net::UnixStream,
+    receiver: mio::net::UnixStream,
 }
 
 impl Init for OsExtraData {
     fn init() -> Self {
-        let (receiver, sender) = mio_net::UnixStream::pair().expect("failed to create UnixStream");
+        let (receiver, sender) = mio::net::UnixStream::pair().expect("failed to create UnixStream");
 
         Self { sender, receiver }
     }
