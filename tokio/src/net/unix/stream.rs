@@ -10,7 +10,6 @@ use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::pin::Pin;
