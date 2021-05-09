@@ -77,43 +77,45 @@ where
     }
 }
 
-/// Copies data in both directions between `a` and `b`.
-///
-/// This function returns a future that will read from both streams,
-/// writing any data read to the opposing stream.
-/// This happens in both directions concurrently.
-///
-/// If an EOF is observed on one stream, [`shutdown()`] will be invoked on
-/// the other, and reading from that stream will stop. Copying of data in
-/// the other direction will continue.
-///
-/// The future will complete successfully once both directions of communication has been shut down.
-/// A direction is shut down when the reader reports EOF,
-/// at which point [`shutdown()`] is called on the corresponding writer. When finished,
-/// it will return a tuple of the number of bytes copied from a to b
-/// and the number of bytes copied from b to a, in that order.
-///
-/// [`shutdown()`]: crate::io::AsyncWriteExt::shutdown
-///
-/// # Errors
-///
-/// The future will immediately return an error if any IO operation on `a`
-/// or `b` returns an error. Some data read from either stream may be lost (not
-/// written to the other stream) in this case.
-///
-/// # Return value
-///
-/// Returns a tuple of bytes copied `a` to `b` and bytes copied `b` to `a`.
-pub async fn copy_bidirectional<A, B>(a: &mut A, b: &mut B) -> Result<(u64, u64), std::io::Error>
-where
-    A: AsyncRead + AsyncWrite + Unpin + ?Sized,
-    B: AsyncRead + AsyncWrite + Unpin + ?Sized,
-{
-    CopyBidirectional {
-        a,
-        b,
-        a_to_b: TransferState::Running(CopyBuffer::new()),
-        b_to_a: TransferState::Running(CopyBuffer::new()),
+cfg_io_util! {
+    /// Copies data in both directions between `a` and `b`.
+    ///
+    /// This function returns a future that will read from both streams,
+    /// writing any data read to the opposing stream.
+    /// This happens in both directions concurrently.
+    ///
+    /// If an EOF is observed on one stream, [`shutdown()`] will be invoked on
+    /// the other, and reading from that stream will stop. Copying of data in
+    /// the other direction will continue.
+    ///
+    /// The future will complete successfully once both directions of communication has been shut down.
+    /// A direction is shut down when the reader reports EOF,
+    /// at which point [`shutdown()`] is called on the corresponding writer. When finished,
+    /// it will return a tuple of the number of bytes copied from a to b
+    /// and the number of bytes copied from b to a, in that order.
+    ///
+    /// [`shutdown()`]: crate::io::AsyncWriteExt::shutdown
+    ///
+    /// # Errors
+    ///
+    /// The future will immediately return an error if any IO operation on `a`
+    /// or `b` returns an error. Some data read from either stream may be lost (not
+    /// written to the other stream) in this case.
+    ///
+    /// # Return value
+    ///
+    /// Returns a tuple of bytes copied `a` to `b` and bytes copied `b` to `a`.
+    pub async fn copy_bidirectional<A, B>(a: &mut A, b: &mut B) -> Result<(u64, u64), std::io::Error>
+    where
+        A: AsyncRead + AsyncWrite + Unpin + ?Sized,
+        B: AsyncRead + AsyncWrite + Unpin + ?Sized,
+    {
+        CopyBidirectional {
+            a,
+            b,
+            a_to_b: TransferState::Running(CopyBuffer::new()),
+            b_to_a: TransferState::Running(CopyBuffer::new()),
+        }
+        .await
     }
-    .await
 }
