@@ -136,7 +136,7 @@ use self::doc::*;
 ///
 /// [create]: NamedPipeClientOptions::create
 /// [ERROR_PIPE_BUSY]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
-/// [wait]: NamedPipeClientOptions::wait
+/// [wait]: wait_named_pipe
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
 pub struct NamedPipe {
@@ -319,17 +319,16 @@ impl NamedPipe {
     ///
     /// Data reported through peek is sporadic. Once peek returns any data for a
     /// given named pipe, further calls to it are not gauranteed to return the
-    /// same or higher number of bytes available
-    /// ([PipePeekInfo::total_bytes_available]). It might even report a count of
-    /// `0` even if no data has been read from the named pipe that was
-    /// previously peeked.
+    /// same or higher number of bytes available ([total_bytes_available]). It
+    /// might even report a count of `0` even if no data has been read from the
+    /// named pipe that was previously peeked.
     ///
     /// Peeking does not update the state of the named pipe, so in order to
     /// advance it you have to actively issue reads. A peek reporting a number
-    /// of bytes available ([PipePeekInfo::total_bytes_available]) of `0` does
-    /// not guarantee that there is no data available to read from the named
-    /// pipe. Even if a peer is writing data, reads still have to be issued for
-    /// the state of the named pipe to update.
+    /// of bytes available ([total_bytes_available]) of `0` does not guarantee
+    /// that there is no data available to read from the named pipe. Even if a
+    /// peer is writing data, reads still have to be issued for the state of the
+    /// named pipe to update.
     ///
     /// Finally, peeking might report no data available indefinitely if there's
     /// too little data in the buffer of the named pipe.
@@ -337,6 +336,7 @@ impl NamedPipe {
     /// You can play around with the [`named-pipe-peek` example] to get a feel
     /// for how this function behaves.
     ///
+    /// [total_bytes_available]: PipePeekInfo::total_bytes_available
     /// [`named-pipe-peek` example]: https://github.com/tokio-rs/tokio/blob/master/examples/named-pipe-peek.rs
     ///
     /// # Examples
