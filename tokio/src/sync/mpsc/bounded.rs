@@ -1,6 +1,9 @@
-use crate::sync::batch_semaphore::{self as semaphore, TryAcquireError};
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{SendError, TrySendError};
+use crate::{
+    loom::sync::atomic::AtomicUsize,
+    sync::batch_semaphore::{self as semaphore, TryAcquireError},
+};
 
 cfg_time! {
     use crate::sync::mpsc::error::SendTimeoutError;
@@ -107,7 +110,7 @@ pub struct Receiver<T> {
 /// ```
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
     assert!(buffer > 0, "mpsc bounded channel requires buffer > 0");
-    let semaphore = (semaphore::Semaphore::new(buffer), buffer);
+    let semaphore = (semaphore::Semaphore::new(buffer), AtomicUsize::new(buffer));
     let (tx, rx) = chan::channel(semaphore);
 
     let tx = Sender::new(tx);
@@ -118,7 +121,7 @@ pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
 
 /// Channel semaphore is a tuple of the semaphore implementation and a `usize`
 /// representing the channel bound.
-type Semaphore = (semaphore::Semaphore, usize);
+type Semaphore = (semaphore::Semaphore, AtomicUsize);
 
 impl<T> Receiver<T> {
     pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> Receiver<T> {
@@ -298,6 +301,36 @@ impl<T> Receiver<T> {
     /// recent call is scheduled to receive a wakeup.
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
+    }
+
+    /// Resizes the channel buffer to the provided size
+    ///
+    /// If the buffer is reduced to a smaller number of elements than it already
+    /// contains, it is no longer possible to send elements. It will be possible
+    /// to send new elements when the excess messages are consumed and there is
+    /// capacity available with respect to the new size.
+    ///
+    /// # Examples
+    ///
+    /// In the following example, a buffer of size 1 is resized to accommodate
+    /// a second value.
+    ///
+    /// ```rust
+    /// use tokio::sync::mpsc;
+    ///
+    /// fn main() {
+    ///     let (tx, rx) = mpsc::channel(1);
+    ///
+    ///     tx.try_send(()).unwrap();
+    ///     assert!(tx.try_send(()).is_err());
+    ///
+    ///     rx.resize(2);
+    ///     assert!(tx.try_send(()).is_ok());
+    /// }
+    /// ```
+    pub fn resize(&self, new_capacity: usize) {
+        assert!(new_capacity > 0, "mpsc bounded channel requires buffer > 0");
+        self.chan.resize(new_capacity)
     }
 }
 
@@ -969,7 +1002,7 @@ impl<T> Drop for Permit<'_, T> {
         let semaphore = self.chan.semaphore();
 
         // Add the permit back to the semaphore
-        semaphore.add_permit();
+        semaphore.add_permits(1);
 
         // If this is the last sender for this channel, wake the receiver so
         // that it can be notified that the channel is closed.
@@ -1071,7 +1104,7 @@ impl<T> OwnedPermit<T> {
         });
 
         // Add the permit back to the semaphore
-        chan.semaphore().add_permit();
+        chan.semaphore().add_permits(1);
         Sender { chan }
     }
 }
@@ -1085,7 +1118,7 @@ impl<T> Drop for OwnedPermit<T> {
             let semaphore = chan.semaphore();
 
             // Add the permit back to the semaphore
-            semaphore.add_permit();
+            semaphore.add_permits(1);
 
             // If this `OwnedPermit` is holding the last sender for this
             // channel, wake the receiver so that it can be notified that the

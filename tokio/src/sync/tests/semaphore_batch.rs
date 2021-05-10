@@ -248,3 +248,47 @@ fn cancel_acquire_releases_permits() {
     assert_eq!(6, s.available_permits());
     assert_ok!(s.try_acquire(6));
 }
+
+#[test]
+fn try_acquire_with_underflow() {
+    let s = Semaphore::new(1);
+
+    s.reduce_permits(1);
+
+    assert_err!(s.try_acquire(1));
+}
+
+#[test]
+fn release_with_underflow() {
+    let s = Semaphore::new(1);
+
+    s.reduce_permits(1);
+    assert_eq!(s.available_permits(), 0);
+
+    assert_err!(s.try_acquire(1));
+
+    s.release(1);
+    assert_ok!(s.try_acquire(1));
+}
+
+#[test]
+fn poll_acquire_permit_with_underflow() {
+    let s = Semaphore::new(0);
+
+    // Introduce an underflow of 1
+    s.reduce_permits(2);
+
+    // Try to acquire a permit
+    let mut acquire = task::spawn(s.acquire(1));
+    assert_pending!(acquire.poll());
+
+    assert_eq!(s.available_permits(), 0);
+
+    // Cancel the underflow
+    s.release(2);
+
+    assert!(acquire.is_woken());
+    assert_ready_ok!(acquire.poll());
+
+    assert_eq!(s.available_permits(), 0);
+}

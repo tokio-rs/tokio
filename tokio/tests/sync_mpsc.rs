@@ -494,3 +494,31 @@ async fn permit_available_not_acquired_close() {
     drop(permit2);
     assert!(rx.recv().await.is_none());
 }
+
+#[tokio::test]
+async fn bounded_resize_shrink() {
+    let (tx, rx) = mpsc::channel::<()>(2);
+
+    assert_ok!(tx.try_send(()));
+
+    rx.resize(1);
+    assert_err!(tx.try_send(()));
+}
+
+#[tokio::test]
+async fn bounded_resize_grow() {
+    let (tx, rx) = mpsc::channel::<()>(1);
+
+    assert_ok!(tx.try_send(()));
+    assert_err!(tx.try_send(()));
+
+    rx.resize(2);
+    assert_ok!(tx.try_send(()));
+}
+
+#[tokio::test]
+#[should_panic]
+async fn bounded_resize_zero() {
+    let (_, rx) = mpsc::channel::<()>(1);
+    rx.resize(0);
+}
