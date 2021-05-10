@@ -165,7 +165,7 @@ impl NamedPipe {
     /// [I/O enabled].
     ///
     /// [Tokio Runtime]: crate::runtime::Runtime
-    /// [I/O enabled]: crate::runtime::RuntimeBuilder::enable_io
+    /// [I/O enabled]: crate::runtime::Builder::enable_io
     unsafe fn try_from_raw_handle(handle: RawHandle) -> io::Result<Self> {
         let named_pipe = mio_windows::NamedPipe::from_raw_handle(handle);
 
