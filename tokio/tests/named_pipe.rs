@@ -4,9 +4,163 @@
 use std::io;
 use std::mem;
 use std::os::windows::io::AsRawHandle;
-use tokio::io::AsyncWriteExt as _;
-use tokio::net::windows::{wait_named_pipe, NamedPipeClientOptions, NamedPipeOptions, PipeMode};
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tokio::net::windows::{
+    wait_named_pipe, NamedPipe, NamedPipeClientOptions, NamedPipeOptions, PipeMode,
+};
 use winapi::shared::winerror;
+
+#[tokio::test]
+async fn test_named_pipe_peek_consumed() -> io::Result<()> {
+    const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-peek-consumed";
+    const N: usize = 1000;
+
+    let mut server = NamedPipeOptions::new().create(PIPE_NAME)?;
+    let mut client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
+    server.connect().await?;
+
+    let client = tokio::spawn(async move {
+        for _ in 0..N {
+            client.write_all(b"ping").await?;
+        }
+
+        let mut buf = [0u8; 4];
+        client.read_exact(&mut buf).await?;
+
+        Ok::<_, io::Error>(buf)
+    });
+
+    let mut buf = [0u8; 4];
+    let mut available = 0;
+
+    for _ in 0..N {
+        if available < buf.len() {
+            server.read_exact(&mut buf).await?;
+            assert_eq!(&buf[..], b"ping");
+
+            let (_, info) = server.peek(Some(&mut buf[..]))?;
+            available = info.total_bytes_available;
+            continue;
+        }
+
+        server.read_exact(&mut buf).await?;
+        available -= buf.len();
+        assert_eq!(&buf[..], b"ping");
+    }
+
+    server.write_all(b"pong").await?;
+
+    let buf = client.await??;
+    assert_eq!(&buf[..], b"pong");
+    Ok(())
+}
+
+async fn peek_ping_pong(n: usize, mut client: NamedPipe, mut server: NamedPipe) -> io::Result<()> {
+    use rand::Rng as _;
+    use std::sync::Arc;
+
+    /// A weirdly sized read to induce as many partial reads as possible.
+    const UNALIGNED: usize = 27;
+
+    let mut data = vec![0; 1024];
+
+    let mut r = rand::thread_rng();
+    r.fill(&mut data[..]);
+
+    let data = Arc::new(data);
+    let data2 = data.clone();
+
+    let client = tokio::spawn(async move {
+        for _ in 0..n {
+            client.write_all(&data2[..]).await?;
+        }
+
+        let mut buf = [0u8; 4];
+        client.read_exact(&mut buf).await?;
+        Ok::<_, io::Error>(buf)
+    });
+
+    let server = tokio::spawn(async move {
+        let mut full_buf = vec![0u8; data.len()];
+        let mut peeks = 0u32;
+
+        for _ in 0..n {
+            let mut buf = &mut full_buf[..];
+
+            while !buf.is_empty() {
+                let e = usize::min(buf.len(), UNALIGNED);
+                let r = server.read(&mut buf[..e]).await?;
+                buf = &mut buf[r..];
+
+                let (_, info) = server.peek(None)?;
+
+                if info.total_bytes_available != 0 {
+                    peeks += 1;
+                }
+            }
+
+            assert_eq!(&full_buf[..], &data[..]);
+        }
+
+        server.write_all(b"pong").await?;
+
+        // NB: this is not at all helpful, but keeping it here because when run
+        // in release mode we can usually see a couple of hundred peeks go
+        // through.
+        assert!(peeks == 0 || peeks > 0);
+        Ok::<_, io::Error>(())
+    });
+
+    let (client, server) = tokio::try_join!(client, server)?;
+    assert_eq!(&client?[..], b"pong");
+    let _ = server?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_named_pipe_peek() -> io::Result<()> {
+    {
+        const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-server-peek-small";
+
+        let server = NamedPipeOptions::new().create(PIPE_NAME)?;
+        let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
+        server.connect().await?;
+
+        peek_ping_pong(1, client, server).await?;
+    }
+
+    {
+        const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-client-peek-big";
+
+        let server = NamedPipeOptions::new().create(PIPE_NAME)?;
+        let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
+        server.connect().await?;
+
+        peek_ping_pong(1, server, client).await?;
+    }
+
+    {
+        const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-server-peek-big";
+
+        let server = NamedPipeOptions::new().create(PIPE_NAME)?;
+        let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
+        server.connect().await?;
+
+        peek_ping_pong(100, client, server).await?;
+    }
+
+    {
+        const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-client-peek-big";
+
+        let server = NamedPipeOptions::new().create(PIPE_NAME)?;
+        let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
+        server.connect().await?;
+
+        peek_ping_pong(100, server, client).await?;
+    }
+
+    Ok(())
+}
 
 #[tokio::test]
 async fn test_named_pipe_client_drop() -> io::Result<()> {

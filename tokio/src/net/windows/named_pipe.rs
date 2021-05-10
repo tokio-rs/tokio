@@ -310,6 +310,131 @@ impl NamedPipe {
             })
         }
     }
+
+    /// Copies data from a named or anonymous pipe into a buffer without
+    /// removing it from the pipe. It also returns information about data in the
+    /// pipe.
+    ///
+    /// # Considerations
+    ///
+    /// Data reported through peek is sporadic. Once peek returns any data for a
+    /// given named pipe, further calls to it are not gauranteed to return the
+    /// same or higher number of bytes available
+    /// ([PipePeekInfo::total_bytes_available]). It might even report a count of
+    /// `0` even if no data has been read from the named pipe that was
+    /// previously peeked.
+    ///
+    /// Peeking does not update the state of the named pipe, so in order to
+    /// advance it you have to actively issue reads. A peek reporting a number
+    /// of bytes available ([PipePeekInfo::total_bytes_available]) of `0` does
+    /// not guarantee that there is no data available to read from the named
+    /// pipe. Even if a peer is writing data, reads still have to be issued for
+    /// the state of the named pipe to update.
+    ///
+    /// Finally, peeking might report no data available indefinitely if there's
+    /// too little data in the buffer of the named pipe.
+    ///
+    /// You can play around with the [`named-pipe-peek` example] to get a feel
+    /// for how this function behaves.
+    ///
+    /// [`named-pipe-peek` example]: https://github.com/tokio-rs/tokio/blob/master/examples/named-pipe-peek.rs
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io;
+    /// use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    /// use tokio::net::windows::{NamedPipeOptions, NamedPipeClientOptions};
+    ///
+    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-peek-consumed";
+    /// const N: usize = 100;
+    ///
+    /// # #[tokio::main] async fn main() -> std::io::Result<()> {
+    /// let mut server = NamedPipeOptions::new().create(PIPE_NAME)?;
+    /// let mut client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
+    /// server.connect().await?;
+    ///
+    /// let client = tokio::spawn(async move {
+    ///     for _ in 0..N {
+    ///         client.write_all(b"ping").await?;
+    ///     }
+    ///
+    ///     let mut buf = [0u8; 4];
+    ///     client.read_exact(&mut buf).await?;
+    ///
+    ///     Ok::<_, io::Error>(buf)
+    /// });
+    ///
+    /// let mut buf = [0u8; 4];
+    /// let mut available = 0;
+    ///
+    /// for n in 0..N {
+    ///     if available < 4 {
+    ///         server.read_exact(&mut buf).await?;
+    ///         assert_eq!(&buf[..], b"ping");
+    ///
+    ///         let (_, info) = server.peek(None)?;
+    ///         available = info.total_bytes_available;
+    ///         continue;
+    ///     }
+    ///
+    ///     // here we know that at least `available` bytes are immediately
+    ///     // ready to read.
+    ///     server.read_exact(&mut buf).await?;
+    ///     available -= buf.len();
+    ///     assert_eq!(&buf[..], b"ping");
+    /// }
+    ///
+    /// server.write_all(b"pong").await?;
+    ///
+    /// let buf = client.await??;
+    /// assert_eq!(&buf[..], b"pong");
+    /// # Ok(()) }
+    /// ```
+    pub fn peek(&mut self, buf: Option<&mut [u8]>) -> io::Result<(usize, PipePeekInfo)> {
+        use std::convert::TryFrom as _;
+
+        unsafe {
+            let mut n = mem::MaybeUninit::zeroed();
+            let mut total_bytes_available = mem::MaybeUninit::zeroed();
+            let mut bytes_left_this_message = mem::MaybeUninit::zeroed();
+
+            let (buf, len) = match buf {
+                Some(buf) => {
+                    let len = DWORD::try_from(buf.len()).expect("buffer too large for win32 api");
+                    (buf.as_mut_ptr() as *mut _, len)
+                }
+                None => (ptr::null_mut(), 0),
+            };
+
+            let result = namedpipeapi::PeekNamedPipe(
+                self.io.as_raw_handle(),
+                buf,
+                len,
+                n.as_mut_ptr(),
+                total_bytes_available.as_mut_ptr(),
+                bytes_left_this_message.as_mut_ptr(),
+            );
+
+            if result == FALSE {
+                return Err(io::Error::last_os_error());
+            }
+
+            let n = usize::try_from(n.assume_init()).expect("output size too large");
+
+            let total_bytes_available = usize::try_from(total_bytes_available.assume_init())
+                .expect("available bytes too large");
+            let bytes_left_this_message = usize::try_from(bytes_left_this_message.assume_init())
+                .expect("bytes left in message too large");
+
+            let info = PipePeekInfo {
+                total_bytes_available,
+                bytes_left_this_message,
+            };
+
+            Ok((n, info))
+        }
+    }
 }
 
 impl AsyncRead for NamedPipe {
@@ -939,9 +1064,26 @@ pub struct PipeInfo {
     pub in_buffer_size: u32,
 }
 
-/// Waits until either a time-out interval elapses or an instance of the
-/// specified named pipe is available for connection (that is, the pipe's
-/// server process has a pending [connect] operation on the pipe).
+/// Information about a pipe gained by peeking it.
+///
+/// See [NamedPipe::peek].
+#[derive(Debug, Clone)]
+pub struct PipePeekInfo {
+    /// Indicates the total number of bytes available on the pipe.
+    pub total_bytes_available: usize,
+    /// Indicates the number of bytes left in the current message.
+    ///
+    /// This is undefined unless the pipe mode is [PipeMode::Message].
+    pub bytes_left_this_message: usize,
+}
+
+/// Waits until either a configurable time-out interval elapses or an instance
+/// of the specified named pipe is available for connection. That is, the pipe's
+/// server process has a pending [connect] operation waiting on the other end of
+/// the pipe.
+///
+/// If a zero duration is provided, the default timeout of the named pipe will
+/// be used.
 ///
 /// This corresponds to the [`WaitNamedPipeW`] system call.
 ///
@@ -951,8 +1093,8 @@ pub struct PipeInfo {
 ///
 /// # Errors
 ///
-/// If a server hasn't already created the named pipe, this will return an
-/// error with the kind [std::io::ErrorKind::NotFound].
+/// If a server hasn't already created the named pipe, this will return an error
+/// with the kind [std::io::ErrorKind::NotFound].
 ///
 /// ```
 /// use std::io;
@@ -997,6 +1139,28 @@ pub struct PipeInfo {
 /// let e = wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(1))).await.unwrap_err();
 ///
 /// assert_eq!(e.kind(), io::ErrorKind::NotFound);
+/// # Ok(()) }
+/// ```
+///
+/// If a wait times out, this function will error with
+/// [io::ErrorKind::TimedOut].
+///
+/// ```
+/// use std::io;
+/// use std::time::Duration;
+/// use tokio::net::windows::{NamedPipeClientOptions, NamedPipeOptions, wait_named_pipe};
+///
+/// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-wait-error-timedout";
+///
+/// # #[tokio::main] async fn main() -> std::io::Result<()> {
+/// let server = NamedPipeOptions::new().create(PIPE_NAME)?;
+/// // connect one client, causing the server to be occupied.
+/// wait_named_pipe(PIPE_NAME, Some(Duration::from_millis(10))).await?;
+/// let client1 = NamedPipeClientOptions::new().create(PIPE_NAME)?;
+///
+/// // this times out because the server is busy.
+/// let e = wait_named_pipe(PIPE_NAME, Some(Duration::from_millis(10))).await.unwrap_err();
+/// assert_eq!(e.kind(), io::ErrorKind::TimedOut);
 /// # Ok(()) }
 /// ```
 ///
