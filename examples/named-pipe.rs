@@ -5,14 +5,11 @@ async fn windows_main() -> io::Result<()> {
     use std::time::Duration;
     use tokio::io::AsyncWriteExt as _;
     use tokio::io::{AsyncBufReadExt as _, BufReader};
-    use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder};
+    use tokio::net::windows::{wait_named_pipe, NamedPipeClientOptions, NamedPipeOptions};
 
     const PIPE_NAME: &str = r"\\.\pipe\named-pipe-single-client";
 
-    let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-
-    let server = server_builder.create()?;
+    let server = NamedPipeOptions::new().create(PIPE_NAME)?;
 
     let server = tokio::spawn(async move {
         // Note: we wait for a client to connect.
@@ -27,8 +24,8 @@ async fn windows_main() -> io::Result<()> {
     });
 
     let client = tokio::spawn(async move {
-        client_builder.wait(Some(Duration::from_secs(5))).await?;
-        let client = client_builder.create()?;
+        wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(5))).await?;
+        let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
 
         let mut client = BufReader::new(client);
 

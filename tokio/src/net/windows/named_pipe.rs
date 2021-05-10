@@ -1,10 +1,8 @@
 use std::ffi::OsStr;
-use std::fmt;
 use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::ptr;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -43,8 +41,8 @@ use self::doc::*;
 
 /// A [Windows named pipe].
 ///
-/// Constructed using [NamedPipeClientBuilder::create] for clients, or
-/// [NamedPipeBuilder::create] for servers. See their corresponding
+/// Constructed using [NamedPipeClientOptions::create] for clients, or
+/// [NamedPipeOptions::create] for servers. See their corresponding
 /// documentation for examples.
 ///
 /// Connecting a client involves a few steps. First we must try to [create], the
@@ -58,22 +56,20 @@ use self::doc::*;
 ///
 /// ```no_run
 /// use std::time::Duration;
-/// use tokio::net::windows::NamedPipeClientBuilder;
+/// use tokio::net::windows::{NamedPipeClientOptions, wait_named_pipe};
 /// use winapi::shared::winerror;
 ///
 /// const PIPE_NAME: &str = r"\\.\pipe\named-pipe-idiomatic-client";
 ///
 /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-/// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-///
 /// let client = loop {
-///     match client_builder.create() {
+///     match NamedPipeClientOptions::new().create(PIPE_NAME) {
 ///         Ok(client) => break client,
 ///         Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
 ///         Err(e) => return Err(e),
 ///     }
 ///
-///     client_builder.wait(Some(Duration::from_secs(5))).await?;
+///     wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(5))).await?;
 /// };
 ///
 /// /* use the connected client */
@@ -89,22 +85,21 @@ use self::doc::*;
 /// ```no_run
 /// use std::io;
 /// use std::sync::Arc;
-/// use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder};
+/// use tokio::net::windows::NamedPipeOptions;
 /// use tokio::sync::Notify;
 ///
 /// const PIPE_NAME: &str = r"\\.\pipe\named-pipe-idiomatic-server";
 ///
 /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-/// let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-/// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-///
 /// // The first server needs to be constructed early so that clients can
 /// // be correctly connected. Otherwise calling .wait will cause the client to
 /// // error.
 /// //
 /// // Here we also make use of `first_pipe_instance`, which will ensure that
 /// // there are no other servers up and running already.
-/// let mut server = server_builder.clone().first_pipe_instance(true).create()?;
+/// let mut server = NamedPipeOptions::new()
+///     .first_pipe_instance(true)
+///     .create(PIPE_NAME)?;
 ///
 /// let shutdown = Arc::new(Notify::new());
 /// let shutdown2 = shutdown.clone();
@@ -123,7 +118,8 @@ use self::doc::*;
 ///         // isn't closed (after it's done in the task) before a new one is
 ///         // available. Otherwise the client might error with
 ///         // `io::ErrorKind::NotFound`.
-///         server = server_builder.create()?;
+///         server = NamedPipeOptions::new()
+///             .create(PIPE_NAME)?;
 ///
 ///         let client = tokio::spawn(async move {
 ///             /* use the connected client */
@@ -138,9 +134,9 @@ use self::doc::*;
 /// # Ok(()) }
 /// ```
 ///
-/// [create]: NamedPipeClientBuilder::create
+/// [create]: NamedPipeClientOptions::create
 /// [ERROR_PIPE_BUSY]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
-/// [wait]: NamedPipeClientBuilder::wait
+/// [wait]: NamedPipeClientOptions::wait
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
 pub struct NamedPipe {
@@ -183,11 +179,12 @@ impl NamedPipe {
     /// [ConnectNamedPipe]: https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
     ///
     /// ```no_run
-    /// use tokio::net::windows::NamedPipeBuilder;
+    /// use tokio::net::windows::NamedPipeOptions;
+    ///
+    /// const PIPE_NAME: &str = r"\\.\pipe\mynamedpipe";
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeBuilder::new(r"\\.\pipe\mynamedpipe");
-    /// let pipe = builder.create()?;
+    /// let pipe = NamedPipeOptions::new().create(PIPE_NAME)?;
     ///
     /// // Wait for a client to connect.
     /// pipe.connect().await?;
@@ -214,17 +211,16 @@ impl NamedPipe {
     ///
     /// ```
     /// use tokio::io::AsyncWriteExt as _;
-    /// use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder};
+    /// use tokio::net::windows::{NamedPipeOptions, NamedPipeClientOptions};
     /// use winapi::shared::winerror;
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-disconnect";
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    /// let server = server_builder.create()?;
+    /// let server = NamedPipeOptions::new().create(PIPE_NAME)?;
     ///
-    /// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-    /// let mut client = client_builder.create()?;
+    /// let mut client = NamedPipeClientOptions::new()
+    ///     .create(PIPE_NAME)?;
     ///
     /// // Wait for a client to become connected.
     /// server.connect().await?;
@@ -245,19 +241,18 @@ impl NamedPipe {
     /// Retrieves information about the current named pipe.
     ///
     /// ```
-    /// use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder, PipeMode, PipeEnd};
+    /// use tokio::net::windows::{NamedPipeOptions, NamedPipeClientOptions, PipeMode, PipeEnd};
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-info";
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let server_builder = NamedPipeBuilder::new(PIPE_NAME)
+    /// let server = NamedPipeOptions::new()
     ///     .pipe_mode(PipeMode::Message)
-    ///     .max_instances(5);
+    ///     .max_instances(5)
+    ///     .create(PIPE_NAME)?;
     ///
-    /// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-    ///
-    /// let server = server_builder.create()?;
-    /// let client = client_builder.create()?;
+    /// let client = NamedPipeClientOptions::new()
+    ///     .create(PIPE_NAME)?;
     ///
     /// let server_info = server.info()?;
     /// let client_info = client.info()?;
@@ -391,10 +386,9 @@ macro_rules! bool_flag {
 /// options. This is required to use for named pipe servers who wants to modify
 /// pipe-related options.
 ///
-/// See [NamedPipeBuilder::create].
-#[derive(Clone)]
-pub struct NamedPipeBuilder {
-    name: Arc<[u16]>,
+/// See [NamedPipeOptions::create].
+#[derive(Debug, Clone)]
+pub struct NamedPipeOptions {
     open_mode: DWORD,
     pipe_mode: DWORD,
     max_instances: DWORD,
@@ -403,26 +397,21 @@ pub struct NamedPipeBuilder {
     default_timeout: DWORD,
 }
 
-impl NamedPipeBuilder {
+impl NamedPipeOptions {
     /// Creates a new named pipe builder with the default settings.
     ///
     /// ```
-    /// use tokio::net::windows::NamedPipeBuilder;
+    /// use tokio::net::windows::NamedPipeOptions;
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-new";
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    /// let server = server_builder.create()?;
+    /// let server = NamedPipeOptions::new()
+    ///     .create(PIPE_NAME)?;
     /// # Ok(()) }
     /// ```
-    pub fn new(addr: impl AsRef<OsStr>) -> NamedPipeBuilder {
-        NamedPipeBuilder {
-            name: addr
-                .as_ref()
-                .encode_wide()
-                .chain(Some(0))
-                .collect::<Arc<[u16]>>(),
+    pub fn new() -> NamedPipeOptions {
+        NamedPipeOptions {
             open_mode: winbase::PIPE_ACCESS_DUPLEX | winbase::FILE_FLAG_OVERLAPPED,
             pipe_mode: winbase::PIPE_TYPE_BYTE | winbase::PIPE_REJECT_REMOTE_CLIENTS,
             max_instances: winbase::PIPE_UNLIMITED_INSTANCES,
@@ -440,7 +429,7 @@ impl NamedPipeBuilder {
     /// This corresponding to specifying [dwPipeMode].
     ///
     /// [dwPipeMode]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
-    pub fn pipe_mode(mut self, pipe_mode: PipeMode) -> Self {
+    pub fn pipe_mode(&mut self, pipe_mode: PipeMode) -> &mut Self {
         self.pipe_mode = match pipe_mode {
             PipeMode::Byte => winbase::PIPE_TYPE_BYTE,
             PipeMode::Message => winbase::PIPE_TYPE_MESSAGE,
@@ -460,26 +449,29 @@ impl NamedPipeBuilder {
     /// ```
     /// use std::io;
     /// use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
-    /// use tokio::net::windows::{NamedPipeClientBuilder, NamedPipeBuilder};
+    /// use tokio::net::windows::{NamedPipeClientOptions, NamedPipeOptions};
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-inbound";
     ///
     /// # #[tokio::main] async fn main() -> io::Result<()> {
-    /// let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    /// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-    ///
     /// // Server side prevents connecting by denying inbound access, client errors
     /// // when attempting to create the connection.
     /// {
-    ///     let server_builder = server_builder.clone().access_inbound(false);
-    ///     let _server = server_builder.create()?;
+    ///     let _server = NamedPipeOptions::new()
+    ///         .access_inbound(false)
+    ///         .create(PIPE_NAME)?;
     ///
-    ///     let e = client_builder.create().unwrap_err();
+    ///     let e = NamedPipeClientOptions::new()
+    ///         .create(PIPE_NAME)
+    ///         .unwrap_err();
+    ///
     ///     assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
     ///
     ///     // Disabling writing allows a client to connect, but leads to runtime
     ///     // error if a write is attempted.
-    ///     let mut client = client_builder.clone().write(false).create()?;
+    ///     let mut client = NamedPipeClientOptions::new()
+    ///         .write(false)
+    ///         .create(PIPE_NAME)?;
     ///
     ///     let e = client.write(b"ping").await.unwrap_err();
     ///     assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
@@ -487,8 +479,13 @@ impl NamedPipeBuilder {
     ///
     /// // A functional, unidirectional server-to-client only communication.
     /// {
-    ///     let mut server = server_builder.clone().access_inbound(false).create()?;
-    ///     let mut client = client_builder.clone().write(false).create()?;
+    ///     let mut server = NamedPipeOptions::new()
+    ///         .access_inbound(false)
+    ///         .create(PIPE_NAME)?;
+    ///
+    ///     let mut client = NamedPipeClientOptions::new()
+    ///         .write(false)
+    ///         .create(PIPE_NAME)?;
     ///
     ///     let write = server.write_all(b"ping");
     ///
@@ -502,7 +499,7 @@ impl NamedPipeBuilder {
     /// }
     /// # Ok(()) }
     /// ```
-    pub fn access_inbound(mut self, allowed: bool) -> Self {
+    pub fn access_inbound(&mut self, allowed: bool) -> &mut Self {
         bool_flag!(self.open_mode, allowed, winbase::PIPE_ACCESS_INBOUND);
         self
     }
@@ -518,26 +515,27 @@ impl NamedPipeBuilder {
     /// ```
     /// use std::io;
     /// use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
-    /// use tokio::net::windows::{NamedPipeClientBuilder, NamedPipeBuilder};
+    /// use tokio::net::windows::{NamedPipeClientOptions, NamedPipeOptions};
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-outbound";
     ///
     /// # #[tokio::main] async fn main() -> io::Result<()> {
-    /// let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    /// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-    ///
     /// // Server side prevents connecting by denying outbound access, client errors
     /// // when attempting to create the connection.
     /// {
-    ///     let server_builder = server_builder.clone().access_outbound(false);
-    ///     let _server = server_builder.create()?;
+    ///     let _server = NamedPipeOptions::new()
+    ///         .access_outbound(false)
+    ///         .create(PIPE_NAME)?;
     ///
-    ///     let e = client_builder.create().unwrap_err();
+    ///     let e = NamedPipeClientOptions::new()
+    ///         .create(PIPE_NAME)
+    ///         .unwrap_err();
+    ///
     ///     assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
     ///
     ///     // Disabling reading allows a client to connect, but leads to runtime
     ///     // error if a read is attempted.
-    ///     let mut client = client_builder.clone().read(false).create()?;
+    ///     let mut client = NamedPipeClientOptions::new().read(false).create(PIPE_NAME)?;
     ///
     ///     let mut buf = [0u8; 4];
     ///     let e = client.read(&mut buf).await.unwrap_err();
@@ -546,8 +544,8 @@ impl NamedPipeBuilder {
     ///
     /// // A functional, unidirectional client-to-server only communication.
     /// {
-    ///     let mut server = server_builder.clone().access_outbound(false).create()?;
-    ///     let mut client = client_builder.clone().read(false).create()?;
+    ///     let mut server = NamedPipeOptions::new().access_outbound(false).create(PIPE_NAME)?;
+    ///     let mut client = NamedPipeClientOptions::new().read(false).create(PIPE_NAME)?;
     ///
     ///     // TODO: Explain why this test doesn't work without calling connect
     ///     // first.
@@ -569,7 +567,7 @@ impl NamedPipeBuilder {
     /// }
     /// # Ok(()) }
     /// ```
-    pub fn access_outbound(mut self, allowed: bool) -> Self {
+    pub fn access_outbound(&mut self, allowed: bool) -> &mut Self {
         bool_flag!(self.open_mode, allowed, winbase::PIPE_ACCESS_OUTBOUND);
         self
     }
@@ -587,23 +585,24 @@ impl NamedPipeBuilder {
     ///
     /// ```
     /// use std::io;
-    /// use tokio::net::windows::NamedPipeBuilder;
+    /// use tokio::net::windows::NamedPipeOptions;
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-first-instance";
     ///
     /// # #[tokio::main] async fn main() -> io::Result<()> {
-    /// let builder = NamedPipeBuilder::new(PIPE_NAME).first_pipe_instance(true);
+    /// let mut builder = NamedPipeOptions::new();
+    /// builder.first_pipe_instance(true);
     ///
-    /// let server = builder.create()?;
-    /// let e = builder.create().unwrap_err();
+    /// let server = builder.create(PIPE_NAME)?;
+    /// let e = builder.create(PIPE_NAME).unwrap_err();
     /// assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
     /// drop(server);
     ///
     /// // OK: since, we've closed the other instance.
-    /// let _server2 = builder.create()?;
+    /// let _server2 = builder.create(PIPE_NAME)?;
     /// # Ok(()) }
     /// ```
-    pub fn first_pipe_instance(mut self, first: bool) -> Self {
+    pub fn first_pipe_instance(&mut self, first: bool) -> &mut Self {
         bool_flag!(
             self.open_mode,
             first,
@@ -618,7 +617,7 @@ impl NamedPipeBuilder {
     /// This corresponds to setting [PIPE_REJECT_REMOTE_CLIENTS].
     ///
     /// [PIPE_REJECT_REMOTE_CLIENTS]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_reject_remote_clients
-    pub fn reject_remote_clients(mut self, reject: bool) -> Self {
+    pub fn reject_remote_clients(&mut self, reject: bool) -> &mut Self {
         bool_flag!(self.pipe_mode, reject, winbase::PIPE_REJECT_REMOTE_CLIENTS);
         self
     }
@@ -639,13 +638,13 @@ impl NamedPipeBuilder {
     /// you do not wish to set an instance limit, leave it unspecified.
     ///
     /// ```should_panic
-    /// use tokio::net::windows::NamedPipeBuilder;
+    /// use tokio::net::windows::NamedPipeOptions;
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeBuilder::new(r"\\.\pipe\mynamedpipe").max_instances(255);
+    /// let builder = NamedPipeOptions::new().max_instances(255);
     /// # Ok(()) }
     /// ```
-    pub fn max_instances(mut self, instances: usize) -> Self {
+    pub fn max_instances(&mut self, instances: usize) -> &mut Self {
         assert!(instances < 255, "cannot specify more than 254 instances");
         self.max_instances = instances as DWORD;
         self
@@ -656,7 +655,7 @@ impl NamedPipeBuilder {
     /// This corresponds to specifying [nOutBufferSize].
     ///
     /// [nOutBufferSize]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
-    pub fn out_buffer_size(mut self, buffer: u32) -> Self {
+    pub fn out_buffer_size(&mut self, buffer: u32) -> &mut Self {
         self.out_buffer_size = buffer as DWORD;
         self
     }
@@ -666,7 +665,7 @@ impl NamedPipeBuilder {
     /// This corresponds to specifying [nInBufferSize].
     ///
     /// [nInBufferSize]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
-    pub fn in_buffer_size(mut self, buffer: u32) -> Self {
+    pub fn in_buffer_size(&mut self, buffer: u32) -> &mut Self {
         self.in_buffer_size = buffer as DWORD;
         self
     }
@@ -677,32 +676,31 @@ impl NamedPipeBuilder {
     /// This function will call the [CreateNamedPipe] function and return the
     /// result.
     ///
-    /// [new]: NamedPipeBuilder::new
+    /// [new]: NamedPipeOptions::new
     /// [CreateNamedPipe]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     ///
     /// ```
-    /// use tokio::net::windows::NamedPipeBuilder;
+    /// use tokio::net::windows::NamedPipeOptions;
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-create";
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    /// let server = server_builder.create()?;
+    /// let server = NamedPipeOptions::new().create(PIPE_NAME)?;
     /// # Ok(()) }
     /// ```
-    pub fn create(&self) -> io::Result<NamedPipe> {
+    pub fn create(&self, addr: impl AsRef<OsStr>) -> io::Result<NamedPipe> {
         // Safety: We're calling create_with_security_attributes w/ a null
         // pointer which disables it.
-        unsafe { self.create_with_security_attributes(ptr::null_mut()) }
+        unsafe { self.create_with_security_attributes(addr, ptr::null_mut()) }
     }
 
     /// Create the named pipe identified by the name provided in [new] for use
     /// by a server.
     ///
-    /// This is the same as [create][NamedPipeBuilder::create] except that it
+    /// This is the same as [create][NamedPipeOptions::create] except that it
     /// supports providing security attributes.
     ///
-    /// [new]: NamedPipeBuilder::new
+    /// [new]: NamedPipeOptions::new
     ///
     /// # Safety
     ///
@@ -710,9 +708,15 @@ impl NamedPipeBuilder {
     /// a [SECURITY_ATTRIBUTES] structure.
     ///
     /// [SECURITY_ATTRIBUTES]: [crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES]
-    pub unsafe fn create_with_security_attributes(&self, attrs: *mut ()) -> io::Result<NamedPipe> {
+    pub unsafe fn create_with_security_attributes(
+        &self,
+        addr: impl AsRef<OsStr>,
+        attrs: *mut (),
+    ) -> io::Result<NamedPipe> {
+        let addr = encode_addr(addr);
+
         let h = namedpipeapi::CreateNamedPipeW(
-            self.name.as_ptr(),
+            addr.as_ptr(),
             self.open_mode,
             self.pipe_mode,
             self.max_instances,
@@ -733,225 +737,33 @@ impl NamedPipeBuilder {
     }
 }
 
-impl fmt::Debug for NamedPipeBuilder {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = String::from_utf16_lossy(&self.name[..self.name.len() - 1]);
-        f.debug_struct("NamedPipeBuilder")
-            .field("name", &name)
-            .finish()
-    }
-}
-
 /// A builder suitable for building and interacting with named pipes from the
 /// client side.
 ///
-/// See [NamedPipeClientBuilder::create].
-#[derive(Clone)]
-pub struct NamedPipeClientBuilder {
-    name: Arc<[u16]>,
+/// See [NamedPipeClientOptions::create].
+#[derive(Debug, Clone)]
+pub struct NamedPipeClientOptions {
     desired_access: DWORD,
 }
 
-impl NamedPipeClientBuilder {
+impl NamedPipeClientOptions {
     /// Creates a new named pipe builder with the default settings.
     ///
     /// ```
-    /// use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder};
+    /// use tokio::net::windows::{NamedPipeOptions, NamedPipeClientOptions};
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-new";
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
     /// // Server must be created in order for the client creation to succeed.
-    /// let server = NamedPipeBuilder::new(PIPE_NAME).create()?;
-    ///
-    /// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-    /// let client = client_builder.create()?;
+    /// let server = NamedPipeOptions::new().create(PIPE_NAME)?;
+    /// let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
     /// # Ok(()) }
     /// ```
-    pub fn new(addr: impl AsRef<OsStr>) -> Self {
+    pub fn new() -> Self {
         Self {
-            name: addr
-                .as_ref()
-                .encode_wide()
-                .chain(Some(0))
-                .collect::<Arc<[u16]>>(),
             desired_access: winnt::GENERIC_READ | winnt::GENERIC_WRITE,
         }
-    }
-
-    /// Waits until either a time-out interval elapses or an instance of the
-    /// specified named pipe is available for connection (that is, the pipe's
-    /// server process has a pending [connect] operation on the pipe).
-    ///
-    /// This corresponds to the [`WaitNamedPipeW`] system call.
-    ///
-    /// [`WaitNamedPipeW`]:
-    /// https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-waitnamedpipea
-    /// [connect]: NamedPipe::connect
-    ///
-    /// # Errors
-    ///
-    /// If a server hasn't already created the named pipe, this will return an
-    /// error with the kind [std::io::ErrorKind::NotFound].
-    ///
-    /// ```
-    /// use std::io;
-    /// use std::time::Duration;
-    /// use tokio::net::windows::NamedPipeClientBuilder;
-    ///
-    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-wait-error1";
-    ///
-    /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-    ///
-    /// let e = client_builder.wait(Some(Duration::from_secs(1))).await.unwrap_err();
-    ///
-    /// // Errors because no server exists.
-    /// assert_eq!(e.kind(), io::ErrorKind::NotFound);
-    /// # Ok(()) }
-    /// ```
-    ///
-    /// Waiting while a server is being closed will first cause it to block, but
-    /// then error with [std::io::ErrorKind::NotFound].
-    ///
-    /// ```
-    /// use std::io;
-    /// use std::time::Duration;
-    /// use tokio::net::windows::{NamedPipeClientBuilder, NamedPipeBuilder};
-    ///
-    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-wait-error2";
-    ///
-    /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    /// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-    ///
-    /// let server = server_builder.create()?;
-    ///
-    /// // Construct a client that occupies the server so that the next one is
-    /// // forced to wait.
-    /// let _client = client_builder.create()?;
-    ///
-    /// tokio::spawn(async move {
-    ///     // Drop the server after 100ms, causing the waiting client to err.
-    ///     tokio::time::sleep(Duration::from_millis(100)).await;
-    ///     drop(server);
-    /// });
-    ///
-    /// let e = client_builder.wait(Some(Duration::from_secs(1))).await.unwrap_err();
-    ///
-    /// assert_eq!(e.kind(), io::ErrorKind::NotFound);
-    /// # Ok(()) }
-    /// ```
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::io;
-    /// use std::time::Duration;
-    /// use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
-    /// use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder};
-    /// use winapi::shared::winerror;
-    ///
-    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-wait";
-    ///
-    /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    /// let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-    ///
-    /// // The first server needs to be constructed early so that clients can
-    /// // be correctly connected. Otherwise calling .wait will cause the client
-    /// // to error because the file descriptor doesn't exist.
-    /// //
-    /// // Here we also make use of `first_pipe_instance`, which will ensure
-    /// // that there are no other servers up and running already.
-    /// let mut server = server_builder.clone().first_pipe_instance(true).create()?;
-    ///
-    /// let client = tokio::spawn(async move {
-    ///     // Wait forever until a socket is available to be connected to.
-    ///     let mut client = loop {
-    ///         match client_builder.create() {
-    ///             Ok(client) => break client,
-    ///             Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
-    ///             Err(e) => return Err(e),
-    ///         }
-    ///
-    ///         client_builder.wait(Some(Duration::from_secs(5))).await?;
-    ///     };
-    ///
-    ///     let mut buf = [0u8; 4];
-    ///     client.read_exact(&mut buf[..]).await?;
-    ///     Ok::<_, io::Error>(buf)
-    /// });
-    ///
-    /// let server = tokio::spawn(async move {
-    ///     tokio::time::sleep(Duration::from_millis(200)).await;
-    ///
-    ///     // Calling `connect` is necessary for the waiting client to wake up,
-    ///     // even if the server is created after the client.
-    ///     server.connect().await?;
-    ///
-    ///     server.write_all(b"ping").await?;
-    ///     Ok::<_, io::Error>(())
-    /// });
-    ///
-    /// let (client, server) = tokio::try_join!(client, server)?;
-    /// let payload = client?;
-    /// assert_eq!(&payload[..], b"ping");
-    /// let _ = server?;
-    /// # Ok(()) }
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if the specified duration is larger than `0xffffffff`
-    /// milliseconds, which is roughly equal to 1193 hours.
-    ///
-    /// ```should_panic
-    /// use std::time::Duration;
-    /// use tokio::net::windows::NamedPipeClientBuilder;
-    ///
-    /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeClientBuilder::new(r"\\.\pipe\mynamedpipe");
-    ///
-    /// builder.wait(Some(Duration::from_millis(0xffffffff))).await?;
-    /// # Ok(()) }
-    /// ```
-    pub async fn wait(&self, timeout: Option<Duration>) -> io::Result<()> {
-        let timeout = match timeout {
-            Some(timeout) => {
-                let timeout = timeout.as_millis();
-                assert! {
-                    timeout < NMPWAIT_WAIT_FOREVER as u128,
-                    "timeout out of bounds, can wait at most {}ms, but got {}ms", NMPWAIT_WAIT_FOREVER - 1,
-                    timeout
-                };
-                timeout as DWORD
-            }
-            None => NMPWAIT_WAIT_FOREVER,
-        };
-
-        let name = self.name.clone();
-
-        // TODO: Is this the right thread pool to use? `WaitNamedPipeW` could
-        // potentially block for a fairly long time all though it's only
-        // expected to be used when connecting something which should be fairly
-        // constrained.
-        //
-        // But doing something silly like spawning hundreds of clients trying to
-        // connect to a named pipe server without a timeout could easily end up
-        // starving the thread pool.
-        let task = asyncify(move || {
-            // Safety: There's nothing unsafe about this.
-            let result = unsafe { namedpipeapi::WaitNamedPipeW(name.as_ptr(), timeout) };
-
-            if result == FALSE {
-                return Err(io::Error::last_os_error());
-            }
-
-            Ok(())
-        });
-
-        task.await
     }
 
     /// If the client supports reading data. This is enabled by default.
@@ -960,7 +772,7 @@ impl NamedPipeClientBuilder {
     ///
     /// [GENERIC_READ]: https://docs.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
     /// [CreateFile]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
-    pub fn read(mut self, allowed: bool) -> Self {
+    pub fn read(&mut self, allowed: bool) -> &mut Self {
         bool_flag!(self.desired_access, allowed, winnt::GENERIC_READ);
         self
     }
@@ -971,7 +783,7 @@ impl NamedPipeClientBuilder {
     ///
     /// [GENERIC_WRITE]: https://docs.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
     /// [CreateFile]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
-    pub fn write(mut self, allowed: bool) -> Self {
+    pub fn write(&mut self, allowed: bool) -> &mut Self {
         bool_flag!(self.desired_access, allowed, winnt::GENERIC_WRITE);
         self
     }
@@ -980,7 +792,7 @@ impl NamedPipeClientBuilder {
     ///
     /// This constructs the handle using [CreateFile].
     ///
-    /// [new]: NamedPipeClientBuilder::new
+    /// [new]: NamedPipeClientOptions::new
     /// [CreateFile]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
     ///
     /// # Errors
@@ -1002,20 +814,20 @@ impl NamedPipeClientBuilder {
     /// ```no_run
     /// use std::io;
     /// use std::time::Duration;
-    /// use tokio::net::windows::NamedPipeClientBuilder;
+    /// use tokio::net::windows::{NamedPipeClientOptions, wait_named_pipe};
     /// use winapi::shared::winerror;
     ///
-    /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let builder = NamedPipeClientBuilder::new(r"\\.\pipe\mynamedpipe");
+    /// const PIPE_NAME: &str = r"\\.\pipe\mynamedpipe";
     ///
+    /// # #[tokio::main] async fn main() -> std::io::Result<()> {
     /// let client = loop {
-    ///     match builder.create() {
+    ///     match NamedPipeClientOptions::new().create(PIPE_NAME) {
     ///         Ok(client) => break client,
     ///         Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
     ///         Err(e) => return Err(e),
     ///     }
     ///
-    ///     if builder.wait(Some(Duration::from_secs(5))).await.is_err() {
+    ///     if wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(5))).await.is_err() {
     ///         return Err(io::Error::new(io::ErrorKind::Other, "server timed out"));
     ///     }
     /// };
@@ -1023,18 +835,18 @@ impl NamedPipeClientBuilder {
     /// // use the connected client.
     /// # Ok(()) }
     /// ```
-    pub fn create(&self) -> io::Result<NamedPipe> {
+    pub fn create(&self, addr: impl AsRef<OsStr>) -> io::Result<NamedPipe> {
         // Safety: We're calling create_with_security_attributes w/ a null
         // pointer which disables it.
-        unsafe { self.create_with_security_attributes(ptr::null_mut()) }
+        unsafe { self.create_with_security_attributes(addr, ptr::null_mut()) }
     }
 
     /// Open the named pipe identified by the name provided in [new].
     ///
-    /// This is the same as [create][NamedPipeClientBuilder::create] except that
+    /// This is the same as [create][NamedPipeClientOptions::create] except that
     /// it supports providing security attributes.
     ///
-    /// [new]: NamedPipeClientBuilder::new
+    /// [new]: NamedPipeClientOptions::new
     ///
     /// # Safety
     ///
@@ -1042,13 +854,19 @@ impl NamedPipeClientBuilder {
     /// of a [SECURITY_ATTRIBUTES] structure.
     ///
     /// [SECURITY_ATTRIBUTES]: [crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES]
-    pub unsafe fn create_with_security_attributes(&self, attrs: *mut ()) -> io::Result<NamedPipe> {
+    pub unsafe fn create_with_security_attributes(
+        &self,
+        addr: impl AsRef<OsStr>,
+        attrs: *mut (),
+    ) -> io::Result<NamedPipe> {
+        let addr = encode_addr(addr);
+
         // NB: We could use a platform specialized `OpenOptions` here, but since
         // we have access to winapi it ultimately doesn't hurt to use
         // `CreateFile` explicitly since it allows the use of our already
-        // well-structured wide `name` to pass into CreateFileW.
+        // well-structured wide `addr` to pass into CreateFileW.
         let h = fileapi::CreateFileW(
-            self.name.as_ptr(),
+            addr.as_ptr(),
             self.desired_access,
             0,
             attrs as *mut _,
@@ -1068,18 +886,9 @@ impl NamedPipeClientBuilder {
     }
 }
 
-impl fmt::Debug for NamedPipeClientBuilder {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = String::from_utf16_lossy(&self.name[..self.name.len() - 1]);
-        f.debug_struct("NamedPipeClientBuilder")
-            .field("name", &name)
-            .finish()
-    }
-}
-
 /// The pipe mode of a [NamedPipe].
 ///
-/// Set through [NamedPipeBuilder::pipe_mode].
+/// Set through [NamedPipeOptions::pipe_mode].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum PipeMode {
@@ -1128,4 +937,180 @@ pub struct PipeInfo {
     pub out_buffer_size: u32,
     /// The number of bytes to reserve for the input buffer.
     pub in_buffer_size: u32,
+}
+
+/// Waits until either a time-out interval elapses or an instance of the
+/// specified named pipe is available for connection (that is, the pipe's
+/// server process has a pending [connect] operation on the pipe).
+///
+/// This corresponds to the [`WaitNamedPipeW`] system call.
+///
+/// [`WaitNamedPipeW`]:
+/// https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-waitnamedpipea
+/// [connect]: NamedPipe::connect
+///
+/// # Errors
+///
+/// If a server hasn't already created the named pipe, this will return an
+/// error with the kind [std::io::ErrorKind::NotFound].
+///
+/// ```
+/// use std::io;
+/// use std::time::Duration;
+/// use tokio::net::windows::wait_named_pipe;
+///
+/// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-wait-error1";
+///
+/// # #[tokio::main] async fn main() -> std::io::Result<()> {
+/// let e = wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(1))).await.unwrap_err();
+///
+/// // Errors because no server exists.
+/// assert_eq!(e.kind(), io::ErrorKind::NotFound);
+/// # Ok(()) }
+/// ```
+///
+/// Waiting while a server is being closed will first cause it to block, but
+/// then error with [std::io::ErrorKind::NotFound].
+///
+/// ```
+/// use std::io;
+/// use std::time::Duration;
+/// use tokio::net::windows::{NamedPipeClientOptions, NamedPipeOptions, wait_named_pipe};
+///
+/// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-wait-error2";
+///
+/// # #[tokio::main] async fn main() -> std::io::Result<()> {
+/// let server = NamedPipeOptions::new()
+///     .create(PIPE_NAME)?;
+///
+/// // Construct a client that occupies the server so that the next one is
+/// // forced to wait.
+/// let _client = NamedPipeClientOptions::new()
+///     .create(PIPE_NAME)?;
+///
+/// tokio::spawn(async move {
+///     // Drop the server after 100ms, causing the waiting client to err.
+///     tokio::time::sleep(Duration::from_millis(100)).await;
+///     drop(server);
+/// });
+///
+/// let e = wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(1))).await.unwrap_err();
+///
+/// assert_eq!(e.kind(), io::ErrorKind::NotFound);
+/// # Ok(()) }
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// use std::io;
+/// use std::time::Duration;
+/// use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+/// use tokio::net::windows::{NamedPipeOptions, NamedPipeClientOptions, wait_named_pipe};
+/// use winapi::shared::winerror;
+///
+/// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-wait";
+///
+/// # #[tokio::main] async fn main() -> std::io::Result<()> {
+/// // The first server needs to be constructed early so that clients can
+/// // be correctly connected. Otherwise calling .wait will cause the client
+/// // to error because the file descriptor doesn't exist.
+/// //
+/// // Here we also make use of `first_pipe_instance`, which will ensure
+/// // that there are no other servers up and running already.
+/// let mut server = NamedPipeOptions::new()
+///     .first_pipe_instance(true)
+///     .create(PIPE_NAME)?;
+///
+/// let client = tokio::spawn(async move {
+///     // Wait forever until a socket is available to be connected to.
+///     let mut client = loop {
+///         match NamedPipeClientOptions::new().create(PIPE_NAME) {
+///             Ok(client) => break client,
+///             Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
+///             Err(e) => return Err(e),
+///         }
+///
+///         wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(5))).await?;
+///     };
+///
+///     let mut buf = [0u8; 4];
+///     client.read_exact(&mut buf[..]).await?;
+///     Ok::<_, io::Error>(buf)
+/// });
+///
+/// let server = tokio::spawn(async move {
+///     tokio::time::sleep(Duration::from_millis(200)).await;
+///
+///     // Calling `connect` is necessary for the waiting client to wake up,
+///     // even if the server is created after the client.
+///     server.connect().await?;
+///
+///     server.write_all(b"ping").await?;
+///     Ok::<_, io::Error>(())
+/// });
+///
+/// let (client, server) = tokio::try_join!(client, server)?;
+/// let payload = client?;
+/// assert_eq!(&payload[..], b"ping");
+/// let _ = server?;
+/// # Ok(()) }
+/// ```
+///
+/// # Panics
+///
+/// Panics if the specified duration is larger than `0xffffffff`
+/// milliseconds, which is roughly equal to 1193 hours.
+///
+/// ```should_panic
+/// use std::time::Duration;
+/// use tokio::net::windows::wait_named_pipe;
+///
+/// const PIPE_NAME: &str = r"\\.\pipe\mynamedpipe";
+///
+/// # #[tokio::main] async fn main() -> std::io::Result<()> {
+/// wait_named_pipe(PIPE_NAME, Some(Duration::from_millis(0xffffffff))).await?;
+/// # Ok(()) }
+/// ```
+pub async fn wait_named_pipe(addr: impl AsRef<OsStr>, timeout: Option<Duration>) -> io::Result<()> {
+    let addr = encode_addr(addr);
+
+    let timeout = match timeout {
+        Some(timeout) => {
+            let timeout = timeout.as_millis();
+            assert! {
+                timeout < NMPWAIT_WAIT_FOREVER as u128,
+                "timeout out of bounds, can wait at most {}ms, but got {}ms", NMPWAIT_WAIT_FOREVER - 1,
+                timeout
+            };
+            timeout as DWORD
+        }
+        None => NMPWAIT_WAIT_FOREVER,
+    };
+
+    // TODO: Is this the right thread pool to use? `WaitNamedPipeW` could
+    // potentially block for a fairly long time all though it's only
+    // expected to be used when connecting something which should be fairly
+    // constrained.
+    //
+    // But doing something silly like spawning hundreds of clients trying to
+    // connect to a named pipe server without a timeout could easily end up
+    // starving the thread pool.
+    let task = asyncify(move || {
+        // Safety: There's nothing unsafe about this.
+        let result = unsafe { namedpipeapi::WaitNamedPipeW(addr.as_ptr(), timeout) };
+
+        if result == FALSE {
+            return Err(io::Error::last_os_error());
+        }
+
+        Ok(())
+    });
+
+    task.await
+}
+
+/// Encode an address so that it is a null-terminated wide string.
+fn encode_addr(addr: impl AsRef<OsStr>) -> Box<[u16]> {
+    addr.as_ref().encode_wide().chain(Some(0)).collect()
 }

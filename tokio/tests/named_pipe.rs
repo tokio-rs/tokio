@@ -5,20 +5,18 @@ use std::io;
 use std::mem;
 use std::os::windows::io::AsRawHandle;
 use tokio::io::AsyncWriteExt as _;
-use tokio::net::windows::{NamedPipeBuilder, NamedPipeClientBuilder, PipeMode};
+use tokio::net::windows::{wait_named_pipe, NamedPipeClientOptions, NamedPipeOptions, PipeMode};
 use winapi::shared::winerror;
 
 #[tokio::test]
 async fn test_named_pipe_client_drop() -> io::Result<()> {
     const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-client-drop";
 
-    let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
+    let mut server = NamedPipeOptions::new().create(PIPE_NAME)?;
 
-    let mut server = server_builder.create()?;
     assert_eq!(num_instances("test-named-pipe-client-drop")?, 1);
 
-    let client = client_builder.create()?;
+    let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
 
     server.connect().await?;
     drop(client);
@@ -37,11 +35,8 @@ async fn test_named_pipe_client_drop() -> io::Result<()> {
 async fn test_named_pipe_client_connect() -> io::Result<()> {
     const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-client-connect";
 
-    let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-
-    let server = server_builder.create()?;
-    let client = client_builder.create()?;
+    let server = NamedPipeOptions::new().create(PIPE_NAME)?;
+    let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
     server.connect().await?;
 
     let e = client.connect().await.unwrap_err();
@@ -58,10 +53,7 @@ async fn test_named_pipe_single_client() -> io::Result<()> {
 
     const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-single-client";
 
-    let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-
-    let server = server_builder.create()?;
+    let server = NamedPipeOptions::new().create(PIPE_NAME)?;
 
     let server = tokio::spawn(async move {
         // Note: we wait for a client to connect.
@@ -76,9 +68,9 @@ async fn test_named_pipe_single_client() -> io::Result<()> {
     });
 
     let client = tokio::spawn(async move {
-        client_builder.wait(None).await?;
+        wait_named_pipe(PIPE_NAME, None).await?;
 
-        let client = client_builder.create()?;
+        let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
 
         let mut client = BufReader::new(client);
 
@@ -103,13 +95,10 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
     const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-multi-client";
     const N: usize = 10;
 
-    let server_builder = NamedPipeBuilder::new(PIPE_NAME);
-    let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
-
     // The first server needs to be constructed early so that clients can
     // be correctly connected. Otherwise calling .wait will cause the client to
     // error.
-    let mut server = server_builder.create()?;
+    let mut server = NamedPipeOptions::new().create(PIPE_NAME)?;
 
     let server = tokio::spawn(async move {
         for _ in 0..N {
@@ -122,7 +111,7 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
             // isn't closed (after it's done in the task) before a new one is
             // available. Otherwise the client might error with
             // `io::ErrorKind::NotFound`.
-            server = server_builder.create()?;
+            server = NamedPipeOptions::new().create(PIPE_NAME)?;
 
             let _ = tokio::spawn(async move {
                 let mut buf = String::new();
@@ -139,8 +128,6 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
     let mut clients = Vec::new();
 
     for _ in 0..N {
-        let client_builder = client_builder.clone();
-
         clients.push(tokio::spawn(async move {
             // This showcases a generic connect loop.
             //
@@ -148,7 +135,7 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
             // pipe is busy we use the specialized wait function on the client
             // builder.
             let client = loop {
-                match client_builder.create() {
+                match NamedPipeClientOptions::new().create(PIPE_NAME) {
                     Ok(client) => break client,
                     Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
                     Err(e) if e.kind() == io::ErrorKind::NotFound => (),
@@ -156,7 +143,7 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
                 }
 
                 // Wait for a named pipe to become available.
-                client_builder.wait(None).await?;
+                wait_named_pipe(PIPE_NAME, None).await?;
             };
 
             let mut client = BufReader::new(client);
@@ -183,11 +170,11 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
 async fn test_named_pipe_mode_message() -> io::Result<()> {
     const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-mode-message";
 
-    let server_builder = NamedPipeBuilder::new(PIPE_NAME).pipe_mode(PipeMode::Message);
-    let client_builder = NamedPipeClientBuilder::new(PIPE_NAME);
+    let server = NamedPipeOptions::new()
+        .pipe_mode(PipeMode::Message)
+        .create(PIPE_NAME)?;
 
-    let server = server_builder.create()?;
-    let _ = client_builder.create()?;
+    let _ = NamedPipeClientOptions::new().create(PIPE_NAME)?;
     server.connect().await?;
     Ok(())
 }
