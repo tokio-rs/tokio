@@ -1,12 +1,12 @@
 use std::io;
 
-const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-peek-consumed";
-const N: usize = 1000;
-
 #[cfg(windows)]
 async fn windows_main() -> io::Result<()> {
     use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
     use tokio::net::windows::{NamedPipeClientOptions, NamedPipeOptions};
+
+    const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-peek-consumed";
+    const N: usize = 1000;
 
     let mut server = NamedPipeOptions::new().create(PIPE_NAME)?;
     let mut client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
