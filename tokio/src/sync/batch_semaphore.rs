@@ -422,7 +422,7 @@ impl Semaphore {
             Some(v.saturating_sub(reduction << Self::PERMIT_SHIFT))
         }) {
             Ok(prev) => reduction.saturating_sub(prev >> Self::PERMIT_SHIFT),
-            Err(_) => unreachable!()
+            Err(_) => unreachable!(),
         };
 
         self.underflow.store(underflow, Release);
