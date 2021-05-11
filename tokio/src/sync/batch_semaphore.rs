@@ -420,7 +420,8 @@ impl Semaphore {
         let underflow = match self.permits.fetch_update(Relaxed, Relaxed, |v| {
             Some(v.saturating_sub(reduction << Self::PERMIT_SHIFT))
         }) {
-            Ok(prev) | Err(prev) => reduction.saturating_sub(prev >> Self::PERMIT_SHIFT),
+            Ok(prev) => reduction.saturating_sub(prev >> Self::PERMIT_SHIFT),
+            Err(prev) => unreachable!()
         };
 
         self.underflow.store(underflow, Release);
