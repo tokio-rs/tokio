@@ -181,7 +181,8 @@ impl Semaphore {
             .underflow
             .fetch_update(Relaxed, Relaxed, |v| Some(v.saturating_sub(added)))
         {
-            Ok(prev) | Err(prev) => added.saturating_sub(prev),
+            Ok(prev) => added.saturating_sub(prev),
+            Err(_) => unreachable!(),
         };
 
         // Assign permits to the wait queue
@@ -421,7 +422,7 @@ impl Semaphore {
             Some(v.saturating_sub(reduction << Self::PERMIT_SHIFT))
         }) {
             Ok(prev) => reduction.saturating_sub(prev >> Self::PERMIT_SHIFT),
-            Err(prev) => unreachable!()
+            Err(_) => unreachable!()
         };
 
         self.underflow.store(underflow, Release);
