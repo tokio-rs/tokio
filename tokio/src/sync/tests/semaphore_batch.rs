@@ -276,7 +276,7 @@ fn poll_acquire_permit_with_underflow() {
     let s = Semaphore::new(0);
 
     // Introduce an underflow of 1
-    s.reduce_permits(2);
+    s.reduce_permits(1);
 
     // Try to acquire a permit
     let mut acquire = task::spawn(s.acquire(1));
