@@ -379,7 +379,7 @@ impl Semaphore for AtomicUsize {
 
     fn reduce_permits(&self, reduction: usize) {
         self.fetch_update(Acquire, Release, |v| Some(v.saturating_sub(reduction)))
-            .expect("TODO");
+            .expect("update failed");
     }
 
     fn is_idle(&self) -> bool {
