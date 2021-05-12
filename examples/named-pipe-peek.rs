@@ -32,7 +32,7 @@ async fn windows_main() -> io::Result<()> {
             server.read_exact(&mut buf).await?;
             assert_eq!(&buf[..], b"ping");
 
-            let (_, info) = server.peek(None)?;
+            let info = server.peek(None)?;
             available = info.total_bytes_available;
             continue;
         }

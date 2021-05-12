@@ -373,7 +373,7 @@ impl NamedPipe {
     ///         server.read_exact(&mut buf).await?;
     ///         assert_eq!(&buf[..], b"ping");
     ///
-    ///         let (_, info) = server.peek(None)?;
+    ///         let info = server.peek(None)?;
     ///         available = info.total_bytes_available;
     ///         continue;
     ///     }
@@ -391,7 +391,7 @@ impl NamedPipe {
     /// assert_eq!(&buf[..], b"pong");
     /// # Ok(()) }
     /// ```
-    pub fn peek(&mut self, buf: Option<&mut [u8]>) -> io::Result<(usize, PipePeekInfo)> {
+    pub fn peek(&mut self, mut buf: Option<&mut ReadBuf<'_>>) -> io::Result<PipePeekInfo> {
         use std::convert::TryFrom as _;
 
         unsafe {
@@ -399,28 +399,40 @@ impl NamedPipe {
             let mut total_bytes_available = mem::MaybeUninit::zeroed();
             let mut bytes_left_this_message = mem::MaybeUninit::zeroed();
 
-            let (buf, len) = match buf {
-                Some(buf) => {
-                    let len = DWORD::try_from(buf.len()).expect("buffer too large for win32 api");
-                    (buf.as_mut_ptr() as *mut _, len)
-                }
-                None => (ptr::null_mut(), 0),
-            };
+            let result = {
+                let (buf, len) = match &mut buf {
+                    Some(buf) => {
+                        let len = DWORD::try_from(buf.capacity())
+                            .expect("buffer too large for win32 api");
+                        // Safety: the OS has no expectation on whether the
+                        // buffer is initialized or not.
+                        let buf = buf.inner_mut() as *mut _ as *mut _;
+                        (buf, len)
+                    }
+                    None => (ptr::null_mut(), 0),
+                };
 
-            let result = namedpipeapi::PeekNamedPipe(
-                self.io.as_raw_handle(),
-                buf,
-                len,
-                n.as_mut_ptr(),
-                total_bytes_available.as_mut_ptr(),
-                bytes_left_this_message.as_mut_ptr(),
-            );
+                namedpipeapi::PeekNamedPipe(
+                    self.io.as_raw_handle(),
+                    buf,
+                    len,
+                    n.as_mut_ptr(),
+                    total_bytes_available.as_mut_ptr(),
+                    bytes_left_this_message.as_mut_ptr(),
+                )
+            };
 
             if result == FALSE {
                 return Err(io::Error::last_os_error());
             }
 
             let n = usize::try_from(n.assume_init()).expect("output size too large");
+
+            if let Some(buf) = buf {
+                // Safety: we trust that the OS has initialized up until `n`
+                // through the call to PeekNamedPipe.
+                buf.assume_init(n);
+            }
 
             let total_bytes_available = usize::try_from(total_bytes_available.assume_init())
                 .expect("available bytes too large");
@@ -432,7 +444,7 @@ impl NamedPipe {
                 bytes_left_this_message,
             };
 
-            Ok((n, info))
+            Ok(info)
         }
     }
 }

@@ -4,7 +4,7 @@
 use std::io;
 use std::mem;
 use std::os::windows::io::AsRawHandle;
-use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _, ReadBuf};
 use tokio::net::windows::{
     wait_named_pipe, NamedPipe, NamedPipeClientOptions, NamedPipeOptions, PipeMode,
 };
@@ -38,7 +38,7 @@ async fn test_named_pipe_peek_consumed() -> io::Result<()> {
             server.read_exact(&mut buf).await?;
             assert_eq!(&buf[..], b"ping");
 
-            let (_, info) = server.peek(Some(&mut buf[..]))?;
+            let info = server.peek(Some(&mut ReadBuf::new(&mut buf[..])))?;
             available = info.total_bytes_available;
             continue;
         }
@@ -92,7 +92,7 @@ async fn peek_ping_pong(n: usize, mut client: NamedPipe, mut server: NamedPipe) 
                 let r = server.read(&mut buf[..e]).await?;
                 buf = &mut buf[r..];
 
-                let (_, info) = server.peek(None)?;
+                let info = server.peek(None)?;
 
                 if info.total_bytes_available != 0 {
                     peeks += 1;
