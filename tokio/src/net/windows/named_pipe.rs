@@ -1051,6 +1051,7 @@ pub enum PipeEnd {
 ///
 /// Constructed through [NamedPipe::info].
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct PipeInfo {
     /// Indicates the mode of a named pipe.
     pub mode: PipeMode,
@@ -1068,6 +1069,7 @@ pub struct PipeInfo {
 ///
 /// See [NamedPipe::peek].
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct PipePeekInfo {
     /// Indicates the total number of bytes available on the pipe.
     pub total_bytes_available: usize,
