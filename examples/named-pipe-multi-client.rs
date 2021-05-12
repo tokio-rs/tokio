@@ -4,7 +4,7 @@ use std::io;
 async fn windows_main() -> io::Result<()> {
     use std::time::Duration;
     use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
-    use tokio::net::windows::{wait_named_pipe, NamedPipeClientOptions, NamedPipeOptions};
+    use tokio::net::windows::{NamedPipeClientOptions, NamedPipeOptions};
     use tokio::time;
     use winapi::shared::winerror;
 
@@ -51,6 +51,11 @@ async fn windows_main() -> io::Result<()> {
 
     for _ in 0..N {
         clients.push(tokio::spawn(async move {
+            // This showcases a generic connect loop.
+            //
+            // We immediately try to create a client, if it's not found or
+            // the pipe is busy we use the specialized wait function on the
+            // client builder.
             let mut client = loop {
                 match NamedPipeClientOptions::new().create(PIPE_NAME) {
                     Ok(client) => break client,
@@ -58,12 +63,7 @@ async fn windows_main() -> io::Result<()> {
                     Err(e) => return Err(e),
                 }
 
-                // This showcases a generic connect loop.
-                //
-                // We immediately try to create a client, if it's not found or
-                // the pipe is busy we use the specialized wait function on the
-                // client builder.
-                wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(5))).await?;
+                time::sleep(Duration::from_millis(5)).await;
             };
 
             let mut buf = [0u8; 4];

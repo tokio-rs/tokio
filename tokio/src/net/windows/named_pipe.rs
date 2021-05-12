@@ -7,7 +7,6 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf};
-use crate::net::asyncify;
 use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 
 // Hide imports which are not used when generating documentation.
@@ -49,14 +48,15 @@ use self::doc::*;
 /// error typically indicates one of two things:
 ///
 /// * [std::io::ErrorKind::NotFound] - There is no server available.
-/// * [ERROR_PIPE_BUSY] - There is a server available, but it is busy. Use
-/// [wait] until it becomes available.
+/// * [ERROR_PIPE_BUSY] - There is a server available, but it is busy. Sleep for
+///   a while and try again, or use [wait_named_pipe] until it becomes available.
 ///
 /// So a typical client connect loop will look like the this:
 ///
 /// ```no_run
 /// use std::time::Duration;
-/// use tokio::net::windows::{NamedPipeClientOptions, wait_named_pipe};
+/// use tokio::net::windows::NamedPipeClientOptions;
+/// use tokio::time;
 /// use winapi::shared::winerror;
 ///
 /// const PIPE_NAME: &str = r"\\.\pipe\named-pipe-idiomatic-client";
@@ -69,7 +69,7 @@ use self::doc::*;
 ///         Err(e) => return Err(e),
 ///     }
 ///
-///     wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(5))).await?;
+///     time::sleep(Duration::from_millis(50)).await;
 /// };
 ///
 /// /* use the connected client */
@@ -136,7 +136,6 @@ use self::doc::*;
 ///
 /// [create]: NamedPipeClientOptions::create
 /// [ERROR_PIPE_BUSY]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
-/// [wait]: wait_named_pipe
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
 pub struct NamedPipe {
@@ -807,14 +806,22 @@ impl NamedPipeOptions {
         self
     }
 
-    /// Create the named pipe identified by the name provided in [new] for use
-    /// by a server.
+    /// Create the named pipe identified by `addr` for use as a server.
     ///
     /// This function will call the [CreateNamedPipe] function and return the
     /// result.
     ///
-    /// [new]: NamedPipeOptions::new
     /// [CreateNamedPipe]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+    ///
+    /// # Errors
+    ///
+    /// This errors if called outside of a [Tokio Runtime] which doesn't have
+    /// [I/O enabled] or if any OS-specific I/O errors occur.
+    ///
+    /// [Tokio Runtime]: crate::runtime::Runtime
+    /// [I/O enabled]: crate::runtime::Builder::enable_io
+    ///
+    /// # Examples
     ///
     /// ```
     /// use tokio::net::windows::NamedPipeOptions;
@@ -831,13 +838,18 @@ impl NamedPipeOptions {
         unsafe { self.create_with_security_attributes(addr, ptr::null_mut()) }
     }
 
-    /// Create the named pipe identified by the name provided in [new] for use
-    /// by a server.
+    /// Create the named pipe identified by `addr` for use as a server.
     ///
     /// This is the same as [create][NamedPipeOptions::create] except that it
     /// supports providing security attributes.
     ///
-    /// [new]: NamedPipeOptions::new
+    /// # Errors
+    ///
+    /// This errors if called outside of a [Tokio Runtime] which doesn't have
+    /// [I/O enabled] or if any OS-specific I/O errors occur.
+    ///
+    /// [Tokio Runtime]: crate::runtime::Runtime
+    /// [I/O enabled]: crate::runtime::Builder::enable_io
     ///
     /// # Safety
     ///
@@ -925,17 +937,19 @@ impl NamedPipeClientOptions {
         self
     }
 
-    /// Open the named pipe identified by the name provided in [new].
+    /// Open the named pipe identified by `addr`.
     ///
     /// This constructs the handle using [CreateFile].
     ///
-    /// [new]: NamedPipeClientOptions::new
     /// [CreateFile]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
     ///
     /// # Errors
     ///
+    /// This errors if called outside of a [Tokio Runtime] which doesn't have
+    /// [I/O enabled] or if any OS-specific I/O errors occur.
+    ///
     /// There are a few errors you should be aware of that you need to take into
-    /// account when creating a named pipe on the client side.
+    /// account when creating a named pipe on the client side:
     ///
     /// * [std::io::ErrorKind::NotFound] - This indicates that the named pipe
     ///   does not exist. Presumably the server is not up.
@@ -944,14 +958,17 @@ impl NamedPipeClientOptions {
     ///   but the server is not currently waiting for a connection.
     ///
     /// [ERROR_PIPE_BUSY]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
+    /// [I/O enabled]: crate::runtime::Builder::enable_io
+    /// [Tokio Runtime]: crate::runtime::Runtime
     /// [winapi]: crate::winapi
     ///
-    /// The generic connect loop looks like this.
+    /// A connect loop that waits until a socket becomes available looks like
+    /// this:
     ///
     /// ```no_run
-    /// use std::io;
     /// use std::time::Duration;
-    /// use tokio::net::windows::{NamedPipeClientOptions, wait_named_pipe};
+    /// use tokio::net::windows::NamedPipeClientOptions;
+    /// use tokio::time;
     /// use winapi::shared::winerror;
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\mynamedpipe";
@@ -964,9 +981,7 @@ impl NamedPipeClientOptions {
     ///         Err(e) => return Err(e),
     ///     }
     ///
-    ///     if wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(5))).await.is_err() {
-    ///         return Err(io::Error::new(io::ErrorKind::Other, "server timed out"));
-    ///     }
+    ///     time::sleep(Duration::from_millis(50)).await;
     /// };
     ///
     /// // use the connected client.
@@ -978,12 +993,10 @@ impl NamedPipeClientOptions {
         unsafe { self.create_with_security_attributes(addr, ptr::null_mut()) }
     }
 
-    /// Open the named pipe identified by the name provided in [new].
+    /// Open the named pipe identified by `addr`.
     ///
     /// This is the same as [create][NamedPipeClientOptions::create] except that
     /// it supports providing security attributes.
-    ///
-    /// [new]: NamedPipeClientOptions::new
     ///
     /// # Safety
     ///
@@ -1096,6 +1109,12 @@ pub struct PipePeekInfo {
 /// server process has a pending [connect] operation waiting on the other end of
 /// the pipe.
 ///
+/// This function **blocks** until the given named pipe is available. If you
+/// want to use it in an async context, make use of
+/// [tokio::task::spawn_blocking], but be aware that if used carelessly it might
+/// end up starving the thread pool. One should in particular avoid to use it
+/// with an overly large timeout, because the operation cannot be cancelled.
+///
 /// If a zero duration is provided, the default timeout of the named pipe will
 /// be used.
 ///
@@ -1117,8 +1136,8 @@ pub struct PipePeekInfo {
 ///
 /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-wait-error1";
 ///
-/// # #[tokio::main] async fn main() -> std::io::Result<()> {
-/// let e = wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(1))).await.unwrap_err();
+/// # fn main() -> std::io::Result<()> {
+/// let e = wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(1))).unwrap_err();
 ///
 /// // Errors because no server exists.
 /// assert_eq!(e.kind(), io::ErrorKind::NotFound);
@@ -1132,6 +1151,7 @@ pub struct PipePeekInfo {
 /// use std::io;
 /// use std::time::Duration;
 /// use tokio::net::windows::{NamedPipeClientOptions, NamedPipeOptions, wait_named_pipe};
+/// use tokio::time;
 ///
 /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-wait-error2";
 ///
@@ -1146,11 +1166,11 @@ pub struct PipePeekInfo {
 ///
 /// tokio::spawn(async move {
 ///     // Drop the server after 100ms, causing the waiting client to err.
-///     tokio::time::sleep(Duration::from_millis(100)).await;
+///     time::sleep(Duration::from_millis(100)).await;
 ///     drop(server);
 /// });
 ///
-/// let e = wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(1))).await.unwrap_err();
+/// let e = wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(1))).unwrap_err();
 ///
 /// assert_eq!(e.kind(), io::ErrorKind::NotFound);
 /// # Ok(()) }
@@ -1169,11 +1189,11 @@ pub struct PipePeekInfo {
 /// # #[tokio::main] async fn main() -> std::io::Result<()> {
 /// let server = NamedPipeOptions::new().create(PIPE_NAME)?;
 /// // connect one client, causing the server to be occupied.
-/// wait_named_pipe(PIPE_NAME, Some(Duration::from_millis(10))).await?;
+/// wait_named_pipe(PIPE_NAME, Some(Duration::from_millis(10)))?;
 /// let client1 = NamedPipeClientOptions::new().create(PIPE_NAME)?;
 ///
 /// // this times out because the server is busy.
-/// let e = wait_named_pipe(PIPE_NAME, Some(Duration::from_millis(10))).await.unwrap_err();
+/// let e = wait_named_pipe(PIPE_NAME, Some(Duration::from_millis(10))).unwrap_err();
 /// assert_eq!(e.kind(), io::ErrorKind::TimedOut);
 /// # Ok(()) }
 /// ```
@@ -1209,7 +1229,9 @@ pub struct PipePeekInfo {
 ///             Err(e) => return Err(e),
 ///         }
 ///
-///         wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(5))).await?;
+///         tokio::task::spawn_blocking(move || {
+///             wait_named_pipe(PIPE_NAME, Some(Duration::from_millis(500)))
+///         }).await??;
 ///     };
 ///
 ///     let mut buf = [0u8; 4];
@@ -1246,11 +1268,11 @@ pub struct PipePeekInfo {
 ///
 /// const PIPE_NAME: &str = r"\\.\pipe\mynamedpipe";
 ///
-/// # #[tokio::main] async fn main() -> std::io::Result<()> {
-/// wait_named_pipe(PIPE_NAME, Some(Duration::from_millis(0xffffffff))).await?;
+/// # fn main() -> std::io::Result<()> {
+/// wait_named_pipe(PIPE_NAME, Some(Duration::from_millis(0xffffffff)))?;
 /// # Ok(()) }
 /// ```
-pub async fn wait_named_pipe(addr: impl AsRef<OsStr>, timeout: Option<Duration>) -> io::Result<()> {
+pub fn wait_named_pipe(addr: impl AsRef<OsStr>, timeout: Option<Duration>) -> io::Result<()> {
     let addr = encode_addr(addr);
 
     let timeout = match timeout {
@@ -1266,26 +1288,14 @@ pub async fn wait_named_pipe(addr: impl AsRef<OsStr>, timeout: Option<Duration>)
         None => NMPWAIT_WAIT_FOREVER,
     };
 
-    // TODO: Is this the right thread pool to use? `WaitNamedPipeW` could
-    // potentially block for a fairly long time all though it's only
-    // expected to be used when connecting something which should be fairly
-    // constrained.
-    //
-    // But doing something silly like spawning hundreds of clients trying to
-    // connect to a named pipe server without a timeout could easily end up
-    // starving the thread pool.
-    let task = asyncify(move || {
-        // Safety: There's nothing unsafe about this.
-        let result = unsafe { namedpipeapi::WaitNamedPipeW(addr.as_ptr(), timeout) };
+    // Safety: There's nothing unsafe about this.
+    let result = unsafe { namedpipeapi::WaitNamedPipeW(addr.as_ptr(), timeout) };
 
-        if result == FALSE {
-            return Err(io::Error::last_os_error());
-        }
+    if result == FALSE {
+        return Err(io::Error::last_os_error());
+    }
 
-        Ok(())
-    });
-
-    task.await
+    Ok(())
 }
 
 /// Encode an address so that it is a null-terminated wide string.

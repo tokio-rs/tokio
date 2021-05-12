@@ -4,10 +4,10 @@
 use std::io;
 use std::mem;
 use std::os::windows::io::AsRawHandle;
+use std::time::Duration;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _, ReadBuf};
-use tokio::net::windows::{
-    wait_named_pipe, NamedPipe, NamedPipeClientOptions, NamedPipeOptions, PipeMode,
-};
+use tokio::net::windows::{NamedPipe, NamedPipeClientOptions, NamedPipeOptions, PipeMode};
+use tokio::time;
 use winapi::shared::winerror;
 
 #[tokio::test]
@@ -222,8 +222,6 @@ async fn test_named_pipe_single_client() -> io::Result<()> {
     });
 
     let client = tokio::spawn(async move {
-        wait_named_pipe(PIPE_NAME, None).await?;
-
         let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
 
         let mut client = BufReader::new(client);
@@ -297,7 +295,7 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
                 }
 
                 // Wait for a named pipe to become available.
-                wait_named_pipe(PIPE_NAME, None).await?;
+                time::sleep(Duration::from_millis(50)).await;
             };
 
             let mut client = BufReader::new(client);

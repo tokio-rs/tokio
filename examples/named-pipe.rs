@@ -2,10 +2,9 @@ use std::io;
 
 #[cfg(windows)]
 async fn windows_main() -> io::Result<()> {
-    use std::time::Duration;
     use tokio::io::AsyncWriteExt as _;
     use tokio::io::{AsyncBufReadExt as _, BufReader};
-    use tokio::net::windows::{wait_named_pipe, NamedPipeClientOptions, NamedPipeOptions};
+    use tokio::net::windows::{NamedPipeClientOptions, NamedPipeOptions};
 
     const PIPE_NAME: &str = r"\\.\pipe\named-pipe-single-client";
 
@@ -24,7 +23,9 @@ async fn windows_main() -> io::Result<()> {
     });
 
     let client = tokio::spawn(async move {
-        wait_named_pipe(PIPE_NAME, Some(Duration::from_secs(5))).await?;
+        // There's no need to use a connect loop here, since we know that the
+        // server is already up - `create` was called before spawning any of the
+        // tasks.
         let client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
 
         let mut client = BufReader::new(client);
