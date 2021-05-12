@@ -77,10 +77,10 @@ use self::doc::*;
 /// ```
 ///
 /// A client will error with [std::io::ErrorKind::NotFound] for most creation
-/// oriented operations like [create] or [wait] unless at least once server
-/// instance is up and running at all time. This means that the typical listen
-/// loop for a server is a bit involved, because we have to ensure that we never
-/// drop a server accidentally while a client might want to connect.
+/// oriented operations like [create] or [wait_named_pipe] unless at least once
+/// server instance is up and running at all time. This means that the typical
+/// listen loop for a server is a bit involved, because we have to ensure that
+/// we never drop a server accidentally while a client might want to connect.
 ///
 /// ```no_run
 /// use std::io;
@@ -1110,17 +1110,18 @@ pub struct PipePeekInfo {
 /// the pipe.
 ///
 /// This function **blocks** until the given named pipe is available. If you
-/// want to use it in an async context, make use of
-/// [tokio::task::spawn_blocking], but be aware that if used carelessly it might
-/// end up starving the thread pool. One should in particular avoid to use it
-/// with an overly large timeout, because the operation cannot be cancelled.
+/// want to use it in an async context, make use of [spawn_blocking], but be
+/// aware that if used carelessly it might end up starving the thread pool. One
+/// should in particular avoid to use it with an overly large timeout, because
+/// the operation cannot be cancelled.
 ///
 /// If a zero duration is provided, the default timeout of the named pipe will
 /// be used.
 ///
-/// This corresponds to the [`WaitNamedPipeW`] system call.
+/// This corresponds to the [WaitNamedPipeW] system call.
 ///
-/// [`WaitNamedPipeW`]:
+/// [spawn_blocking]: crate::task::spawn_blocking
+/// [WaitNamedPipeW]:
 /// https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-waitnamedpipea
 /// [connect]: NamedPipe::connect
 ///
