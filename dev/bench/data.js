@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620893809126,
+  "lastUpdate": 1620893821396,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -28663,6 +28663,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22736179,
             "range": "± 4065371",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d846bf24b1e1c825efb2a139ffe4882cb8aeb6de",
+          "message": "sync: Barrier doc should use task, not thread (#3780)",
+          "timestamp": "2021-05-13T10:14:10+02:00",
+          "tree_id": "7e2b1a89fdfb9c9618ec0f5c3deab6a262dd8754",
+          "url": "https://github.com/tokio-rs/tokio/commit/d846bf24b1e1c825efb2a139ffe4882cb8aeb6de"
+        },
+        "date": 1620893817068,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 192028,
+            "range": "± 9132",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 706478,
+            "range": "± 64994",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5540594,
+            "range": "± 1261268",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20176720,
+            "range": "± 4643338",
             "unit": "ns/iter"
           }
         ]
