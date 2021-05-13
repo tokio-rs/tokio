@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620589045893,
+  "lastUpdate": 1620893795038,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -43785,6 +43785,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 978,
             "range": "± 97",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d846bf24b1e1c825efb2a139ffe4882cb8aeb6de",
+          "message": "sync: Barrier doc should use task, not thread (#3780)",
+          "timestamp": "2021-05-13T10:14:10+02:00",
+          "tree_id": "7e2b1a89fdfb9c9618ec0f5c3deab6a262dd8754",
+          "url": "https://github.com/tokio-rs/tokio/commit/d846bf24b1e1c825efb2a139ffe4882cb8aeb6de"
+        },
+        "date": 1620893790898,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14945,
+            "range": "± 5563",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 968,
+            "range": "± 186",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 632,
+            "range": "± 67",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15107,
+            "range": "± 3559",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 968,
+            "range": "± 183",
             "unit": "ns/iter"
           }
         ]
