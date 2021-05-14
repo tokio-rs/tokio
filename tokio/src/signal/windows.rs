@@ -8,32 +8,19 @@
 #![cfg(any(windows, docsrs))]
 #![cfg_attr(docsrs, doc(cfg(all(windows, feature = "signal"))))]
 
+use crate::signal::RxFuture;
 use std::io;
 use std::task::{Context, Poll};
 
-use self::os_impl::Event;
+#[cfg(not(docsrs))]
+#[path = "windows/sys.rs"]
+mod imp;
+#[cfg(not(docsrs))]
+pub(crate) use self::imp::{OsExtraData, OsStorage};
 
-#[cfg(windows)]
-mod os_impl;
-#[cfg(windows)]
-pub(crate) use self::os_impl::{OsExtraData, OsStorage};
-
-#[cfg(not(windows))]
-mod os_impl {
-    use std::io;
-    pub(crate) struct Event {
-        pub(super) inner: crate::signal::RxFuture,
-    }
-    impl Event {
-        pub(super) fn new_ctrl_c() -> io::Result<Self> {
-            panic!()
-        }
-
-        pub(super) fn new_ctrl_break() -> io::Result<Self> {
-            panic!()
-        }
-    }
-}
+#[cfg(docsrs)]
+#[path = "windows/stub.rs"]
+mod imp;
 
 /// Creates a new stream which receives "ctrl-c" notifications sent to the
 /// process.
@@ -58,7 +45,9 @@ mod os_impl {
 /// }
 /// ```
 pub fn ctrl_c() -> io::Result<CtrlC> {
-    Event::new_ctrl_c().map(|inner| CtrlC { inner })
+    Ok(CtrlC {
+        inner: self::imp::ctrl_c()?,
+    })
 }
 
 /// Represents a stream which receives "ctrl-c" notifications sent to the process
@@ -71,7 +60,7 @@ pub fn ctrl_c() -> io::Result<CtrlC> {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct CtrlC {
-    inner: Event,
+    inner: RxFuture,
 }
 
 impl CtrlC {
@@ -99,7 +88,7 @@ impl CtrlC {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.inner.recv().await
+        self.inner.recv().await
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -131,7 +120,7 @@ impl CtrlC {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.inner.poll_recv(cx)
+        self.inner.poll_recv(cx)
     }
 }
 
@@ -145,7 +134,7 @@ impl CtrlC {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct CtrlBreak {
-    inner: Event,
+    inner: RxFuture,
 }
 
 impl CtrlBreak {
@@ -171,7 +160,7 @@ impl CtrlBreak {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.inner.recv().await
+        self.inner.recv().await
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -203,7 +192,7 @@ impl CtrlBreak {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.inner.poll_recv(cx)
+        self.inner.poll_recv(cx)
     }
 }
 
@@ -228,5 +217,7 @@ impl CtrlBreak {
 /// }
 /// ```
 pub fn ctrl_break() -> io::Result<CtrlBreak> {
-    Event::new_ctrl_break().map(|inner| CtrlBreak { inner })
+    Ok(CtrlBreak {
+        inner: self::imp::ctrl_break()?,
+    })
 }

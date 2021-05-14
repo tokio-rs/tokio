@@ -9,6 +9,20 @@ use winapi::shared::minwindef::{BOOL, DWORD, FALSE, TRUE};
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
 
+pub(super) fn ctrl_c() -> io::Result<RxFuture> {
+    new(CTRL_C_EVENT)
+}
+
+pub(super) fn ctrl_break() -> io::Result<RxFuture> {
+    new(CTRL_BREAK_EVENT)
+}
+
+fn new(signum: DWORD) -> io::Result<RxFuture> {
+    global_init()?;
+    let rx = globals().register_listener(signum as EventId);
+    Ok(RxFuture::new(rx))
+}
+
 #[derive(Debug)]
 pub(crate) struct OsStorage {
     ctrl_c: EventInfo,
@@ -48,45 +62,6 @@ pub(crate) struct OsExtraData {}
 impl Init for OsExtraData {
     fn init() -> Self {
         Self {}
-    }
-}
-
-/// Stream of events discovered via `SetConsoleCtrlHandler`.
-///
-/// This structure can be used to listen for events of the type `CTRL_C_EVENT`
-/// and `CTRL_BREAK_EVENT`. The `Stream` trait is implemented for this struct
-/// and will resolve for each notification received by the process. Note that
-/// there are few limitations with this as well:
-///
-/// * A notification to this process notifies *all* `Event` streams for that
-///   event type.
-/// * Notifications to an `Event` stream **are coalesced** if they aren't
-///   processed quickly enough. This means that if two notifications are
-///   received back-to-back, then the stream may only receive one item about the
-///   two notifications.
-#[must_use = "streams do nothing unless polled"]
-#[derive(Debug)]
-pub(crate) struct Event {
-    pub(super) inner: RxFuture,
-}
-
-impl Event {
-    pub(super) fn new_ctrl_c() -> io::Result<Self> {
-        Event::new(CTRL_C_EVENT)
-    }
-
-    pub(super) fn new_ctrl_break() -> io::Result<Self> {
-        Event::new(CTRL_BREAK_EVENT)
-    }
-
-    fn new(signum: DWORD) -> io::Result<Self> {
-        global_init()?;
-
-        let rx = globals().register_listener(signum as EventId);
-
-        Ok(Self {
-            inner: RxFuture::new(rx),
-        })
     }
 }
 
