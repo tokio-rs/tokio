@@ -123,11 +123,14 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 ///
 /// # async fn task_that_takes_one_to_three_seconds() {}
 ///
-/// let mut interval = time::interval(time::Duration::from_secs(2));
-/// for _ in 0..5 {
-///     interval.tick().await;
-///     // if this takes more than 2 seconds, a tick will be delayed
-///     task_that_takes_one_to_three_seconds().await;
+/// #[tokio::main]
+/// async fn main() {
+///     let mut interval = time::interval(time::Duration::from_secs(2));
+///     for _ in 0..5 {
+///         interval.tick().await;
+///         // if this takes more than 2 seconds, a tick will be delayed
+///         task_that_takes_one_to_three_seconds().await;
+///     }
 /// }
 /// ```
 ///
