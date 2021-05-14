@@ -1,3 +1,16 @@
+# 0.1.6 (May 14, 2021)
+
+### Added
+
+- stream: implement `Error` and `Display` for `BroadcastStreamRecvError` ([#3745])
+
+### Fixed
+
+- stream: avoid yielding in `AllFuture` and `AnyFuture` ([#3625])
+
+[#3745]: https://github.com/tokio-rs/tokio/pull/3745
+[#3625]: https://github.com/tokio-rs/tokio/pull/3625
+
 # 0.1.5 (March 20, 2021)
 
 ### Fixed
