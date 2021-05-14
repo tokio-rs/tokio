@@ -3,29 +3,31 @@
 ### Added
 
 - fs: try doing a non-blocking read before punting to the threadpool ([#3518])
-- time: add getter for Interval's period ([#3705])
+- io: add `write_all_buf` to `AsyncWriteExt` ([#3737])
+- io: implement `AsyncSeek` for `BufReader`, `BufWriter`, and `BufStream` ([#3491])
+- net: support non-blocking vectored I/O ([#3761])
 - sync: add `mpsc::Sender::{reserve_owned, try_reserve_owned}` ([#3704])
 - sync: add a `MutexGuard::map` method that returns a `MappedMutexGuard` ([#2472])
-- io: add `write_all_buf` to `AsyncWriteExt` ([#3737])
-- net: support non-blocking vectored I/O ([#3761])
+- time: add getter for Interval's period ([#3705])
 
 ### Fixed
 
-- time: prevent `time::advance` from going too far ([#3712])
-- task: update `JoinHandle` panic message ([#3727])
-- sync: preserve permit state in `notify_waiters` ([#3660])
 - io: wake pending writers on `DuplexStream` close ([#3756])
-- signal: use `std::os::raw::c_int` instead of `libc::c_int` on public API ([#3774])
 - process: avoid redundant effort to reap orphan processes ([#3743])
+- signal: use `std::os::raw::c_int` instead of `libc::c_int` on public API ([#3774])
+- sync: preserve permit state in `notify_waiters` ([#3660])
+- task: update `JoinHandle` panic message ([#3727])
+- time: prevent `time::advance` from going too far ([#3712])
 
 ### Documented
 
-- process: updated example ([#3748])
-- task: update documentation on `block_in_place` ([#3753])
 - net: hide `net::unix::datagram` module from docs ([#3775])
+- process: updated example ([#3748])
 - sync: `Barrier` doc should use task, not thread ([#3780])
+- task: update documentation on `block_in_place` ([#3753])
 
 [#2472]: https://github.com/tokio-rs/tokio/pull/2472
+[#3491]: https://github.com/tokio-rs/tokio/pull/3491
 [#3518]: https://github.com/tokio-rs/tokio/pull/3518
 [#3660]: https://github.com/tokio-rs/tokio/pull/3660
 [#3704]: https://github.com/tokio-rs/tokio/pull/3704
