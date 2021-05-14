@@ -138,7 +138,7 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 /// behavior they want [`Interval`] to exhibit. Each variant represents a
 /// different strategy.
 ///
-/// Note that because the executor cannot guarantee exect precision with timers,
+/// Note that because the executor cannot guarantee exact precision with timers,
 /// these strategies will only apply when the error in time is greater than 5
 /// milliseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
