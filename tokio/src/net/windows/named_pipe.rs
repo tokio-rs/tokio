@@ -394,19 +394,19 @@ impl NamedPipe {
         use std::convert::TryFrom as _;
 
         unsafe {
-            let mut n = mem::MaybeUninit::zeroed();
-            let mut total_bytes_available = mem::MaybeUninit::zeroed();
-            let mut bytes_left_this_message = mem::MaybeUninit::zeroed();
+            let mut n = 0;
+            let mut total_bytes_available = 0;
+            let mut bytes_left_this_message = 0;
 
             let result = {
                 let (buf, len) = match &mut buf {
                     Some(buf) => {
-                        let len = DWORD::try_from(buf.capacity())
+                        let unfilled = buf.unfilled_mut();
+                        let len = DWORD::try_from(unfilled.len())
                             .expect("buffer too large for win32 api");
                         // Safety: the OS has no expectation on whether the
                         // buffer is initialized or not.
-                        let buf = buf.inner_mut() as *mut _ as *mut _;
-                        (buf, len)
+                        (unfilled.as_mut_ptr() as *mut _, len)
                     }
                     None => (ptr::null_mut(), 0),
                 };
@@ -415,9 +415,9 @@ impl NamedPipe {
                     self.io.as_raw_handle(),
                     buf,
                     len,
-                    n.as_mut_ptr(),
-                    total_bytes_available.as_mut_ptr(),
-                    bytes_left_this_message.as_mut_ptr(),
+                    &mut n,
+                    &mut total_bytes_available,
+                    &mut bytes_left_this_message,
                 )
             };
 
@@ -425,18 +425,19 @@ impl NamedPipe {
                 return Err(io::Error::last_os_error());
             }
 
-            let n = usize::try_from(n.assume_init()).expect("output size too large");
+            let n = usize::try_from(n).expect("output size too large");
 
             if let Some(buf) = buf {
                 // Safety: we trust that the OS has initialized up until `n`
                 // through the call to PeekNamedPipe.
                 buf.assume_init(n);
+                buf.advance(n);
             }
 
-            let total_bytes_available = usize::try_from(total_bytes_available.assume_init())
-                .expect("available bytes too large");
-            let bytes_left_this_message = usize::try_from(bytes_left_this_message.assume_init())
-                .expect("bytes left in message too large");
+            let total_bytes_available =
+                usize::try_from(total_bytes_available).expect("available bytes too large");
+            let bytes_left_this_message =
+                usize::try_from(bytes_left_this_message).expect("bytes left in message too large");
 
             let info = PipePeekInfo {
                 total_bytes_available,
@@ -953,9 +954,9 @@ impl NamedPipeClientOptions {
     ///
     /// * [std::io::ErrorKind::NotFound] - This indicates that the named pipe
     ///   does not exist. Presumably the server is not up.
-    /// * [ERROR_PIPE_BUSY] - which needs to be tested for through a constant in
-    ///   [winapi]. This error is raised when the named pipe has been created,
-    ///   but the server is not currently waiting for a connection.
+    /// * [ERROR_PIPE_BUSY] - This error is raised when the named pipe exists,
+    ///   but the server is not currently waiting for a connection. Please see the
+    ///   examples for how to check for this error.
     ///
     /// [ERROR_PIPE_BUSY]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
     /// [I/O enabled]: crate::runtime::Builder::enable_io
@@ -1100,7 +1101,7 @@ pub struct PipePeekInfo {
     pub total_bytes_available: usize,
     /// Indicates the number of bytes left in the current message.
     ///
-    /// This is undefined unless the pipe mode is [PipeMode::Message].
+    /// If the pipe mode is not [PipeMode::Message], then this is zero.
     pub bytes_left_this_message: usize,
 }
 
