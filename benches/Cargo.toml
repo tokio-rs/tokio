@@ -5,8 +5,12 @@ publish = false
 edition = "2018"
 
 [dependencies]
-tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
+tokio = { version = "1.5.0", path = "../tokio", features = ["full"] }
 bencher = "0.1.5"
+
+[dev-dependencies]
+tokio-util = { version = "0.6.6", path = "../tokio-util", features = ["full"] }
+tokio-stream = { path = "../tokio-stream" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.42"
@@ -40,4 +44,9 @@ harness = false
 [[bench]]
 name = "signal"
 path = "signal.rs"
+harness = false
+
+[[bench]]
+name = "fs"
+path = "fs.rs"
 harness = false

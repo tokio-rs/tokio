@@ -35,7 +35,7 @@ use std::{io, mem::MaybeUninit};
 /// [`Sink`]: futures_sink::Sink
 /// [`split`]: https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html#method.split
 #[must_use = "sinks do nothing unless polled"]
-#[cfg_attr(docsrs, doc(all(feature = "codec", feature = "udp")))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "codec", feature = "udp"))))]
 #[derive(Debug)]
 pub struct UdpFramed<C, T = UdpSocket> {
     socket: T,

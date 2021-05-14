@@ -76,7 +76,7 @@ cfg_not_rt! {
         /// lazy, and so outside executed inside the runtime successfully without
         /// panicking.
         pub(crate) fn current() -> Self {
-            panic!(crate::util::error::CONTEXT_MISSING_ERROR)
+            panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
         }
     }
 }
