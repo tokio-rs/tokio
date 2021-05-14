@@ -1,3 +1,49 @@
+# 1.6.0 (May 14, 2021)
+
+### Added
+
+- fs: try doing a non-blocking read before punting to the threadpool ([#3518])
+- io: add `write_all_buf` to `AsyncWriteExt` ([#3737])
+- io: implement `AsyncSeek` for `BufReader`, `BufWriter`, and `BufStream` ([#3491])
+- net: support non-blocking vectored I/O ([#3761])
+- sync: add `mpsc::Sender::{reserve_owned, try_reserve_owned}` ([#3704])
+- sync: add a `MutexGuard::map` method that returns a `MappedMutexGuard` ([#2472])
+- time: add getter for Interval's period ([#3705])
+
+### Fixed
+
+- io: wake pending writers on `DuplexStream` close ([#3756])
+- process: avoid redundant effort to reap orphan processes ([#3743])
+- signal: use `std::os::raw::c_int` instead of `libc::c_int` on public API ([#3774])
+- sync: preserve permit state in `notify_waiters` ([#3660])
+- task: update `JoinHandle` panic message ([#3727])
+- time: prevent `time::advance` from going too far ([#3712])
+
+### Documented
+
+- net: hide `net::unix::datagram` module from docs ([#3775])
+- process: updated example ([#3748])
+- sync: `Barrier` doc should use task, not thread ([#3780])
+- task: update documentation on `block_in_place` ([#3753])
+
+[#2472]: https://github.com/tokio-rs/tokio/pull/2472
+[#3491]: https://github.com/tokio-rs/tokio/pull/3491
+[#3518]: https://github.com/tokio-rs/tokio/pull/3518
+[#3660]: https://github.com/tokio-rs/tokio/pull/3660
+[#3704]: https://github.com/tokio-rs/tokio/pull/3704
+[#3705]: https://github.com/tokio-rs/tokio/pull/3705
+[#3712]: https://github.com/tokio-rs/tokio/pull/3712
+[#3727]: https://github.com/tokio-rs/tokio/pull/3727
+[#3737]: https://github.com/tokio-rs/tokio/pull/3737
+[#3743]: https://github.com/tokio-rs/tokio/pull/3743
+[#3748]: https://github.com/tokio-rs/tokio/pull/3748
+[#3753]: https://github.com/tokio-rs/tokio/pull/3753
+[#3756]: https://github.com/tokio-rs/tokio/pull/3756
+[#3761]: https://github.com/tokio-rs/tokio/pull/3761
+[#3774]: https://github.com/tokio-rs/tokio/pull/3774
+[#3775]: https://github.com/tokio-rs/tokio/pull/3775
+[#3780]: https://github.com/tokio-rs/tokio/pull/3780
+
 # 1.5.0 (April 12, 2021)
 
 ### Added
