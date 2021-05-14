@@ -118,8 +118,10 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 /// Sometimes, an [`Interval`]'s tick is missed. For example, consider the
 /// following:
 ///
-/// ```ignore
+/// ```
 /// use tokio::time;
+///
+/// # async fn task_that_takes_one_to_three_seconds() {}
 ///
 /// let mut interval = time::interval(time::Duration::from_secs(2));
 /// for _ in 0..5 {
