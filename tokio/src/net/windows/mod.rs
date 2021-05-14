@@ -2,6 +2,5 @@
 
 mod named_pipe;
 pub use self::named_pipe::{
-    wait_named_pipe, NamedPipe, NamedPipeClientOptions, NamedPipeOptions, PipeEnd, PipeMode,
-    PipePeekInfo,
+    NamedPipe, NamedPipeClientOptions, NamedPipeOptions, PipeEnd, PipeMode, PipePeekInfo,
 };
