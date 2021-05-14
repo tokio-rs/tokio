@@ -192,7 +192,6 @@ pub enum MissedTickBehavior {
     /// ```text
     /// Expected ticks: |     1     |     2     |     3     |     4     |     5     |     6     |
     /// Actual ticks:   | work -----|          delay          | work ---| work -----| work -----|
-    // * Where `s` is the start time and `p` is the period
     /// ```
     ///
     /// Note that the ticks aren't guarenteed to be one `period` away from the
