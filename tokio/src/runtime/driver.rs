@@ -23,7 +23,7 @@ cfg_io_driver! {
             let io_handle = io_driver.handle();
 
             let (signal_driver, signal_handle) = create_signal_driver(io_driver)?;
-            let process_driver = create_process_driver(signal_driver)?;
+            let process_driver = create_process_driver(signal_driver);
 
             (Either::A(process_driver), Some(io_handle), signal_handle)
         } else {
@@ -80,7 +80,7 @@ cfg_not_signal_internal! {
 cfg_process_driver! {
     type ProcessDriver = crate::process::unix::driver::Driver;
 
-    fn create_process_driver(signal_driver: SignalDriver) -> io::Result<ProcessDriver> {
+    fn create_process_driver(signal_driver: SignalDriver) -> ProcessDriver {
         crate::process::unix::driver::Driver::new(signal_driver)
     }
 }
@@ -89,8 +89,8 @@ cfg_not_process_driver! {
     cfg_io_driver! {
         type ProcessDriver = SignalDriver;
 
-        fn create_process_driver(signal_driver: SignalDriver) -> io::Result<ProcessDriver> {
-            Ok(signal_driver)
+        fn create_process_driver(signal_driver: SignalDriver) -> ProcessDriver {
+            signal_driver
         }
     }
 }
