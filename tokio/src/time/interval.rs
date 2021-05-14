@@ -166,9 +166,6 @@ pub enum MissedTickBehavior {
     ///
     /// This is the default behavior when [`Interval`] is created with
     /// [`interval`] and [`interval_at`].
-    ///
-    /// Note: this is the behavior that [`Interval`] exhibited in previous
-    /// versions of Tokio.
     Burst,
 
     /// Delay missed ticks to happen at multiples of `period` from when [`tick`]
