@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1621009329321,
+  "lastUpdate": 1621009333482,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -29275,6 +29275,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18516440,
             "range": "± 3115179",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3a659c47c33f0d8ccdebbdce320610dc8814fae0",
+          "message": "chore: prepare tokio-mcaros v1.2.0 (#3783)",
+          "timestamp": "2021-05-14T18:20:17+02:00",
+          "tree_id": "ac41ddd449f20c71995366d8e3ddc836e02abd53",
+          "url": "https://github.com/tokio-rs/tokio/commit/3a659c47c33f0d8ccdebbdce320610dc8814fae0"
+        },
+        "date": 1621009326206,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 176305,
+            "range": "± 33828",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 620674,
+            "range": "± 92385",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4662943,
+            "range": "± 1168854",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19027497,
+            "range": "± 5088580",
             "unit": "ns/iter"
           }
         ]
