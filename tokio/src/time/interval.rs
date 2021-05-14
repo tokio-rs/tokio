@@ -159,14 +159,6 @@ pub enum MissedTickBehavior {
     /// ```text
     /// Expected ticks: |     1     |     2     |     3     |     4     |     5     |     6     |
     /// Actual ticks:   | work -----|          delay          | work | work | work -| work -----|
-    //  Poll behavior:  |   |       |                         |      |      |       |           |
-    //                  |   |       |                         |      |      |       |           |
-    //           Ready(s)   |       |             Ready(s + 2p)      |      |       |           |
-    //                Pending       |                    Ready(s + 3p)      |       |           |
-    //                   Ready(s + p)                           Ready(s + 4p)       |           |
-    //                                                                  Ready(s + 5p)           |
-    //                                                                              Ready(s + 6p)
-    // * Where `s` is the start time and `p` is the period
     /// ```
     ///
     /// This is the default behavior when [`Interval`] is created with
@@ -183,14 +175,6 @@ pub enum MissedTickBehavior {
     /// ```text
     /// Expected ticks: |     1     |     2     |     3     |     4     |     5     |     6     |
     /// Actual ticks:   | work -----|          delay          | work -----| work -----| work -----|
-    //  Poll behavior:  |   |       |                         |   |       |           |           |
-    //                  |   |       |                         |   |       |           |           |
-    //           Ready(s)   |       |             Ready(s + 2p)   |       |           |           |
-    //                Pending       |                       Pending       |           |           |
-    //                   Ready(s + p)                     Ready(s + 2p + d)           |           |
-    //                                                                Ready(s + 3p + d)           |
-    //                                                                            Ready(s + 4p + d)
-    // * Where `s` is the start time, `p` is the period, and `d` is the delay
     /// ```
     ///
     /// Note that as a result, the ticks are no longer guaranteed to happen at
@@ -208,12 +192,6 @@ pub enum MissedTickBehavior {
     /// ```text
     /// Expected ticks: |     1     |     2     |     3     |     4     |     5     |     6     |
     /// Actual ticks:   | work -----|          delay          | work ---| work -----| work -----|
-    //  Poll behavior:  |   |       |                         |         |           |           |
-    //                  |   |       |                         |         |           |           |
-    //           Ready(s)   |       |             Ready(s + 2p)         |           |           |
-    //                Pending       |                       Ready(s + 4p)           |           |
-    //                   Ready(s + p)                                   Ready(s + 5p)           |
-    //                                                                              Ready(s + 6p)
     // * Where `s` is the start time and `p` is the period
     /// ```
     ///
