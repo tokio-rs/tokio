@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620977963908,
+  "lastUpdate": 1620977969360,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -28711,6 +28711,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20176720,
             "range": "± 4643338",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "kestrer.dev@gmail.com",
+            "name": "Kestrer",
+            "username": "Kestrer"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0b93bd511da6e96eaa9237760dc9683710ebdabc",
+          "message": "net: support non-blocking vectored I/O (#3761)",
+          "timestamp": "2021-05-14T09:38:01+02:00",
+          "tree_id": "0f357cfb2597264b99968077290b591e5028e1f4",
+          "url": "https://github.com/tokio-rs/tokio/commit/0b93bd511da6e96eaa9237760dc9683710ebdabc"
+        },
+        "date": 1620977966294,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 160562,
+            "range": "± 2749",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 612049,
+            "range": "± 46547",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4866624,
+            "range": "± 1192724",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18517239,
+            "range": "± 2846876",
             "unit": "ns/iter"
           }
         ]
