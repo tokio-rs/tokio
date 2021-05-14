@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1620980567587,
+  "lastUpdate": 1620980575407,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -28867,6 +28867,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18517239,
             "range": "± 2846876",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ivanppetkov@gmail.com",
+            "name": "Ivan Petkov",
+            "username": "ipetkov"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e188e99ca3bae5fe9a3e8622b59094388259cd84",
+          "message": "process: avoid redundant effort to reap orphan processes (#3743)",
+          "timestamp": "2021-05-14T10:21:21+02:00",
+          "tree_id": "33813c3bb886986512d543b1839bb88479efffa5",
+          "url": "https://github.com/tokio-rs/tokio/commit/e188e99ca3bae5fe9a3e8622b59094388259cd84"
+        },
+        "date": 1620980572307,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 158732,
+            "range": "± 3589",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 608687,
+            "range": "± 45626",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4890924,
+            "range": "± 1059023",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17842087,
+            "range": "± 3987278",
             "unit": "ns/iter"
           }
         ]
