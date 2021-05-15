@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1621009712706,
+  "lastUpdate": 1621072672228,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -29731,6 +29731,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19158234,
             "range": "± 3699287",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "soeren@s-me.ch",
+            "name": "Sören Meier",
+            "username": "soerenmeier"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "652f0ae7287794d7cd476d4965e143b2f3901bb4",
+          "message": "sync: add receiver_count to watch::Sender (#3729)",
+          "timestamp": "2021-05-15T11:56:24+02:00",
+          "tree_id": "d39ccb6542cad04ae182787635898d83007796a4",
+          "url": "https://github.com/tokio-rs/tokio/commit/652f0ae7287794d7cd476d4965e143b2f3901bb4"
+        },
+        "date": 1621072669086,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 158669,
+            "range": "± 5763",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 629278,
+            "range": "± 56792",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4709609,
+            "range": "± 1333631",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17786106,
+            "range": "± 2890092",
             "unit": "ns/iter"
           }
         ]
