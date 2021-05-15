@@ -12,7 +12,6 @@ use std::time::Duration;
 
 mod wheel;
 
-#[doc(inline)]
 pub mod delay_queue;
 
 pub use delay_queue::DelayQueue;

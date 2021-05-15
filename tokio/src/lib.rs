@@ -453,15 +453,20 @@ cfg_macros! {
         #[cfg(feature = "rt-multi-thread")]
         #[cfg(not(test))] // Work around for rust-lang/rust#62127
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[doc(inline)]
         pub use tokio_macros::main;
 
         #[cfg(feature = "rt-multi-thread")]
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[doc(inline)]
         pub use tokio_macros::test;
 
         cfg_not_rt_multi_thread! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
+            #[doc(inline)]
             pub use tokio_macros::main_rt as main;
+
+            #[doc(inline)]
             pub use tokio_macros::test_rt as test;
         }
     }
@@ -469,7 +474,10 @@ cfg_macros! {
     // Always fail if rt is not enabled.
     cfg_not_rt! {
         #[cfg(not(test))]
+        #[doc(inline)]
         pub use tokio_macros::main_fail as main;
+
+        #[doc(inline)]
         pub use tokio_macros::test_fail as test;
     }
 }
