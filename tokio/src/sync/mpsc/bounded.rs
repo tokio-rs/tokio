@@ -10,8 +10,8 @@ cfg_time! {
     use crate::time::Duration;
 }
 
-use std::fmt;
 use std::task::{Context, Poll};
+use std::{cmp::Ordering, fmt};
 
 /// Send values to the associated `Receiver`.
 ///
@@ -62,6 +62,9 @@ pub struct OwnedPermit<T> {
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
+
+    /// The number of permits that exceed the capacity of the channel
+    underflow: usize,
 }
 
 /// Creates a bounded mpsc channel for communicating between asynchronous tasks
@@ -125,7 +128,7 @@ type Semaphore = (semaphore::Semaphore, AtomicUsize);
 
 impl<T> Receiver<T> {
     pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> Receiver<T> {
-        Receiver { chan }
+        Receiver { chan, underflow: 0 }
     }
 
     /// Receives the next value for this receiver.
@@ -181,8 +184,20 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<T> {
-        use crate::future::poll_fn;
-        poll_fn(|cx| self.chan.recv(cx)).await
+        use crate::{future::poll_fn, sync::mpsc::chan::Semaphore};
+        let res = poll_fn(|cx| self.chan.recv(cx)).await;
+
+        // If there is already an underflow, the permit released by recv is
+        // cancelled and the underflow is reduced accordingly.
+        if self.underflow > 0 {
+            self.chan
+                .semaphore()
+                .reduce_permits(1);
+
+            self.underflow -= 1;
+        }
+
+        res
     }
 
     /// Blocking receive to call outside of asynchronous contexts.
@@ -328,9 +343,34 @@ impl<T> Receiver<T> {
     ///     assert!(tx.try_send(()).is_ok());
     /// }
     /// ```
-    pub fn resize(&self, new_capacity: usize) {
-        assert!(new_capacity > 0, "mpsc bounded channel requires buffer > 0");
-        self.chan.resize(new_capacity)
+    pub fn resize(&mut self, new_size: usize) {
+        use crate::sync::mpsc::chan::Semaphore;
+        assert!(new_size > 0, "mpsc bounded channel requires buffer > 0");
+
+        let semaphore = self.chan.semaphore();
+        let cap = semaphore.cap();
+
+        match new_size.cmp(&cap) {
+            Ordering::Less => {
+                let sub = cap - new_size;
+
+                // Reduce the number of available permits and increase the 
+                // underflow if there's an excess of acquired permits.
+                semaphore.reduce_permits(sub);
+                self.underflow += sub.saturating_sub(semaphore.available_permits());
+            }
+            Ordering::Equal => {}
+            Ordering::Greater => {
+                let add = new_size - cap;
+
+                // Empty the underflow if any and add the remaining permits to
+                // the semaphore. 
+                semaphore.add_permits(add.saturating_sub(self.underflow));
+                self.underflow = self.underflow.saturating_sub(add);
+            }
+        };
+
+        semaphore.set_cap(new_size);
     }
 }
 

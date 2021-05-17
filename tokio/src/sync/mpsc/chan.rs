@@ -36,17 +36,19 @@ impl<T, S: Semaphore + fmt::Debug> fmt::Debug for Rx<T, S> {
 pub(crate) trait Semaphore {
     fn is_idle(&self) -> bool;
 
-    fn add_permits(&self, addition: usize);
+    fn add_permits(&self, n: usize);
 
-    fn reduce_permits(&self, reduction: usize);
+    fn reduce_permits(&self, n: usize);
 
     fn close(&self);
 
     fn is_closed(&self) -> bool;
 
+    fn set_cap(&self, cap: usize);
+
     fn cap(&self) -> usize;
 
-    fn set_cap(&self, new_capacity: usize);
+    fn available_permits(&self) -> usize;
 }
 
 struct Chan<T, S> {
@@ -270,20 +272,8 @@ impl<T, S: Semaphore> Rx<T, S> {
         })
     }
 
-    pub(crate) fn resize(&self, new_capacity: usize) {
-        let curr = self.inner.semaphore.cap();
-
-        if new_capacity == curr {
-            return;
-        }
-
-        if new_capacity > curr {
-            self.inner.semaphore.add_permits(new_capacity - curr)
-        } else {
-            self.inner.semaphore.reduce_permits(curr - new_capacity)
-        }
-
-        self.inner.semaphore.set_cap(new_capacity);
+    pub(crate) fn semaphore(&self) -> &S {
+        &self.inner.semaphore
     }
 }
 
@@ -333,8 +323,8 @@ impl<T, S> Drop for Chan<T, S> {
 // ===== impl Semaphore for (::Semaphore, capacity) =====
 
 impl Semaphore for (crate::sync::batch_semaphore::Semaphore, AtomicUsize) {
-    fn add_permits(&self, addition: usize) {
-        self.0.release(addition)
+    fn add_permits(&self, n: usize) {
+        self.0.release(n)
     }
 
     fn reduce_permits(&self, reduction: usize) {
@@ -353,12 +343,16 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, AtomicUsize) {
         self.0.is_closed()
     }
 
+    fn set_cap(&self, cap: usize) {
+        self.1.store(cap, Release)
+    }
+
     fn cap(&self) -> usize {
         self.1.load(Acquire)
     }
 
-    fn set_cap(&self, new_capacity: usize) {
-        self.1.store(new_capacity, Release);
+    fn available_permits(&self) -> usize {
+        self.0.available_permits()
     }
 }
 
@@ -368,8 +362,8 @@ use std::sync::atomic::Ordering::{Acquire, Release};
 use std::usize;
 
 impl Semaphore for AtomicUsize {
-    fn add_permits(&self, addition: usize) {
-        let prev = self.fetch_sub(addition << 1, Release);
+    fn add_permits(&self, n: usize) {
+        let prev = self.fetch_sub(n << 1, Release);
 
         if prev >> 1 == 0 {
             // Something went wrong
@@ -378,7 +372,7 @@ impl Semaphore for AtomicUsize {
     }
 
     fn reduce_permits(&self, reduction: usize) {
-        self.fetch_update(Acquire, Release, |v| Some(v.saturating_sub(reduction)))
+        self.fetch_update(Acquire, Release, |v| Some(v.saturating_sub(reduction << 1)))
             .expect("update failed");
     }
 
@@ -394,11 +388,15 @@ impl Semaphore for AtomicUsize {
         self.load(Acquire) & 1 == 1
     }
 
-    fn cap(&self) -> usize {
-        self.load(Acquire)
+    fn set_cap(&self, cap: usize) {
+        self.store(cap << 1, Release)
     }
 
-    fn set_cap(&self, _: usize) {
-        unreachable!()
+    fn cap(&self) -> usize {
+        self.load(Acquire) >> 1
+    }
+
+    fn available_permits(&self) -> usize {
+        self.load(Acquire) >> 1
     }
 }

@@ -34,8 +34,6 @@ pub(crate) struct Semaphore {
     waiters: Mutex<Waitlist>,
     /// The current number of available permits in the semaphore.
     permits: AtomicUsize,
-    /// The current underflow preventing the acquisition of new permits.
-    underflow: AtomicUsize,
 }
 
 struct Waitlist {
@@ -136,7 +134,6 @@ impl Semaphore {
                 queue: LinkedList::new(),
                 closed: false,
             }),
-            underflow: AtomicUsize::new(0),
         }
     }
 
@@ -158,7 +155,6 @@ impl Semaphore {
                 queue: LinkedList::new(),
                 closed: false,
             }),
-            underflow: AtomicUsize::new(0),
         }
     }
 
@@ -175,18 +171,8 @@ impl Semaphore {
             return;
         }
 
-        // Try to empty the underflow with the number of permits requested and
-        // return the number of permits remaining after the operation.
-        let remaining = match self
-            .underflow
-            .fetch_update(Relaxed, Relaxed, |v| Some(v.saturating_sub(added)))
-        {
-            Ok(prev) => added.saturating_sub(prev),
-            Err(_) => unreachable!(),
-        };
-
         // Assign permits to the wait queue
-        self.add_permits_locked(remaining, self.waiters.lock());
+        self.add_permits_locked(added, self.waiters.lock());
     }
 
     /// Closes the semaphore. This prevents the semaphore from issuing new
@@ -221,10 +207,6 @@ impl Semaphore {
             "a semaphore may not have more than MAX_PERMITS permits ({})",
             Self::MAX_PERMITS
         );
-
-        if self.underflow.load(Acquire) > 0 {
-            return Err(TryAcquireError::NoPermits);
-        }
 
         let num_permits = (num_permits as usize) << Self::PERMIT_SHIFT;
         let mut curr = self.permits.load(Acquire);
@@ -418,14 +400,11 @@ impl Semaphore {
     /// This differs from `acquire` in that it does not block waiting for permits
     /// to become available.
     pub(crate) fn reduce_permits(&self, reduction: usize) {
-        let underflow = match self.permits.fetch_update(Relaxed, Relaxed, |v| {
-            Some(v.saturating_sub(reduction << Self::PERMIT_SHIFT))
-        }) {
-            Ok(prev) => reduction.saturating_sub(prev >> Self::PERMIT_SHIFT),
-            Err(_) => unreachable!(),
-        };
-
-        self.underflow.store(underflow, Release);
+        self.permits
+            .fetch_update(Relaxed, Relaxed, |v| {
+                v.saturating_sub(reduction << Self::PERMIT_SHIFT).into()
+            })
+            .unwrap();
     }
 }
 
