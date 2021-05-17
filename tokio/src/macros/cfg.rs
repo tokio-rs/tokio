@@ -157,7 +157,6 @@ macro_rules! cfg_macros {
         $(
             #[cfg(feature = "macros")]
             #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-            #[doc(inline)]
             $item
         )*
     }
