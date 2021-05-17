@@ -621,8 +621,8 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut writer = Vec::new();
             ///
-            ///     writer.write_i64(i64::min_value()).await?;
-            ///     writer.write_i64(i64::max_value()).await?;
+            ///     writer.write_i64(i64::MIN).await?;
+            ///     writer.write_i64(i64::MAX).await?;
             ///
             ///     assert_eq!(writer, b"\x80\x00\x00\x00\x00\x00\x00\x00\x7f\xff\xff\xff\xff\xff\xff\xff");
             ///     Ok(())
@@ -699,7 +699,7 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut writer = Vec::new();
             ///
-            ///     writer.write_i128(i128::min_value()).await?;
+            ///     writer.write_i128(i128::MIN).await?;
             ///
             ///     assert_eq!(writer, vec![
             ///         0x80, 0, 0, 0, 0, 0, 0, 0,
@@ -930,8 +930,8 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut writer = Vec::new();
             ///
-            ///     writer.write_i64_le(i64::min_value()).await?;
-            ///     writer.write_i64_le(i64::max_value()).await?;
+            ///     writer.write_i64_le(i64::MIN).await?;
+            ///     writer.write_i64_le(i64::MAX).await?;
             ///
             ///     assert_eq!(writer, b"\x00\x00\x00\x00\x00\x00\x00\x80\xff\xff\xff\xff\xff\xff\xff\x7f");
             ///     Ok(())
@@ -1008,7 +1008,7 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut writer = Vec::new();
             ///
-            ///     writer.write_i128_le(i128::min_value()).await?;
+            ///     writer.write_i128_le(i128::MIN).await?;
             ///
             ///     assert_eq!(writer, vec![
             ///          0, 0, 0, 0, 0, 0, 0,
