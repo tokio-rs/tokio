@@ -198,7 +198,7 @@ impl<R: AsyncRead + AsyncSeek> AsyncSeek for BufReader<R> {
                 // it should be safe to assume that remainder fits within an i64 as the alternative
                 // means we managed to allocate 8 exbibytes and that's absurd.
                 // But it's not out of the realm of possibility for some weird underlying reader to
-                // support seeking by i64::min_value() so we need to handle underflow when subtracting
+                // support seeking by i64::MIN so we need to handle underflow when subtracting
                 // remainder.
                 if let Some(offset) = n.checked_sub(remainder) {
                     self.as_mut()

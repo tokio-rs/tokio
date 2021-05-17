@@ -306,7 +306,7 @@ impl State {
         let prev = self.val.fetch_add(REF_ONE, Relaxed);
 
         // If the reference count overflowed, abort.
-        if prev > isize::max_value() as usize {
+        if prev > isize::MAX as usize {
             process::abort();
         }
     }
@@ -410,7 +410,7 @@ impl Snapshot {
     }
 
     fn ref_inc(&mut self) {
-        assert!(self.0 <= isize::max_value() as usize);
+        assert!(self.0 <= isize::MAX as usize);
         self.0 += REF_ONE;
     }
 

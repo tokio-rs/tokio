@@ -68,7 +68,7 @@ use std::{marker::PhantomPinned, pin::Pin, ptr::NonNull};
 
 type TimerResult = Result<(), crate::time::error::Error>;
 
-const STATE_DEREGISTERED: u64 = u64::max_value();
+const STATE_DEREGISTERED: u64 = u64::MAX;
 const STATE_PENDING_FIRE: u64 = STATE_DEREGISTERED - 1;
 const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 
@@ -85,10 +85,10 @@ const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 /// requires only the driver lock.
 pub(super) struct StateCell {
     /// Holds either the scheduled expiration time for this timer, or (if the
-    /// timer has been fired and is unregistered), `u64::max_value()`.
+    /// timer has been fired and is unregistered), `u64::MAX`.
     state: AtomicU64,
     /// If the timer is fired (an Acquire order read on state shows
-    /// `u64::max_value()`), holds the result that should be returned from
+    /// `u64::MAX`), holds the result that should be returned from
     /// polling the timer. Otherwise, the contents are unspecified and reading
     /// without holding the driver lock is undefined behavior.
     result: UnsafeCell<TimerResult>,
@@ -125,7 +125,7 @@ impl StateCell {
     fn when(&self) -> Option<u64> {
         let cur_state = self.state.load(Ordering::Relaxed);
 
-        if cur_state == u64::max_value() {
+        if cur_state == u64::MAX {
             None
         } else {
             Some(cur_state)
@@ -271,7 +271,7 @@ impl StateCell {
     /// ordering, but is conservative - if it returns false, the timer is
     /// definitely _not_ registered.
     pub(super) fn might_be_registered(&self) -> bool {
-        self.state.load(Ordering::Relaxed) != u64::max_value()
+        self.state.load(Ordering::Relaxed) != u64::MAX
     }
 }
 
@@ -591,7 +591,7 @@ impl TimerHandle {
         match self.inner.as_ref().state.mark_pending(not_after) {
             Ok(()) => {
                 // mark this as being on the pending queue in cached_when
-                self.inner.as_ref().set_cached_when(u64::max_value());
+                self.inner.as_ref().set_cached_when(u64::MAX);
                 Ok(())
             }
             Err(tick) => {

@@ -579,7 +579,7 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut reader = Cursor::new(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
             ///
-            ///     assert_eq!(i64::min_value(), reader.read_i64().await?);
+            ///     assert_eq!(i64::MIN, reader.read_i64().await?);
             ///     Ok(())
             /// }
             /// ```
@@ -659,7 +659,7 @@ cfg_io_util! {
             ///         0, 0, 0, 0, 0, 0, 0, 0
             ///     ]);
             ///
-            ///     assert_eq!(i128::min_value(), reader.read_i128().await?);
+            ///     assert_eq!(i128::MIN, reader.read_i128().await?);
             ///     Ok(())
             /// }
             /// ```

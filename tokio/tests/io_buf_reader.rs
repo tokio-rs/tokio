@@ -120,10 +120,7 @@ async fn test_buffered_reader_seek() {
 
     assert_eq!(reader.seek(SeekFrom::Start(3)).await.unwrap(), 3);
     assert_eq!(run_fill_buf!(reader).unwrap(), &[0, 1][..]);
-    assert!(reader
-        .seek(SeekFrom::Current(i64::min_value()))
-        .await
-        .is_err());
+    assert!(reader.seek(SeekFrom::Current(i64::MIN)).await.is_err());
     assert_eq!(run_fill_buf!(reader).unwrap(), &[0, 1][..]);
     assert_eq!(reader.seek(SeekFrom::Current(1)).await.unwrap(), 4);
     assert_eq!(run_fill_buf!(reader).unwrap(), &[1, 2][..]);
@@ -163,7 +160,7 @@ async fn test_buffered_reader_seek_underflow() {
                     self.pos = self.pos.wrapping_add(n as u64);
                 }
                 SeekFrom::End(n) => {
-                    self.pos = u64::max_value().wrapping_add(n as u64);
+                    self.pos = u64::MAX.wrapping_add(n as u64);
                 }
             }
             Ok(())
@@ -175,18 +172,12 @@ async fn test_buffered_reader_seek_underflow() {
 
     let mut reader = BufReader::with_capacity(5, PositionReader { pos: 0 });
     assert_eq!(run_fill_buf!(reader).unwrap(), &[0, 1, 2, 3, 4][..]);
-    assert_eq!(
-        reader.seek(SeekFrom::End(-5)).await.unwrap(),
-        u64::max_value() - 5
-    );
+    assert_eq!(reader.seek(SeekFrom::End(-5)).await.unwrap(), u64::MAX - 5);
     assert_eq!(run_fill_buf!(reader).unwrap().len(), 5);
     // the following seek will require two underlying seeks
     let expected = 9_223_372_036_854_775_802;
     assert_eq!(
-        reader
-            .seek(SeekFrom::Current(i64::min_value()))
-            .await
-            .unwrap(),
+        reader.seek(SeekFrom::Current(i64::MIN)).await.unwrap(),
         expected
     );
     assert_eq!(run_fill_buf!(reader).unwrap().len(), 5);
@@ -350,10 +341,7 @@ async fn maybe_pending_seek() {
 
     assert_eq!(reader.seek(SeekFrom::Current(3)).await.unwrap(), 3);
     assert_eq!(run_fill_buf!(reader).unwrap(), &[0, 1][..]);
-    assert!(reader
-        .seek(SeekFrom::Current(i64::min_value()))
-        .await
-        .is_err());
+    assert!(reader.seek(SeekFrom::Current(i64::MIN)).await.is_err());
     assert_eq!(run_fill_buf!(reader).unwrap(), &[0, 1][..]);
     assert_eq!(reader.seek(SeekFrom::Current(1)).await.unwrap(), 4);
     assert_eq!(run_fill_buf!(reader).unwrap(), &[1, 2][..]);

@@ -73,7 +73,7 @@ pub(crate) mod impl_linux {
 
             // These paranoid checks should be optimized-out
             assert!(mem::size_of::<u32>() <= mem::size_of::<usize>());
-            assert!(ucred_size <= u32::max_value() as usize);
+            assert!(ucred_size <= u32::MAX as usize);
 
             let mut ucred_size = ucred_size as socklen_t;
 
