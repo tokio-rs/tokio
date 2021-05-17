@@ -45,7 +45,7 @@ use self::doc::*;
 ///
 /// * [std::io::ErrorKind::NotFound] - There is no server available.
 /// * [ERROR_PIPE_BUSY] - There is a server available, but it is busy. Sleep for
-///   a while and try again, or use [wait_named_pipe] until it becomes available.
+///   a while and try again.
 ///
 /// So a typical client connect loop will look like the this:
 ///
@@ -73,10 +73,10 @@ use self::doc::*;
 /// ```
 ///
 /// A client will error with [std::io::ErrorKind::NotFound] for most creation
-/// oriented operations like [create] or [wait_named_pipe] unless at least once
-/// server instance is up and running at all time. This means that the typical
-/// listen loop for a server is a bit involved, because we have to ensure that
-/// we never drop a server accidentally while a client might want to connect.
+/// oriented operations like [create] unless at least once server instance is up
+/// and running at all time. This means that the typical listen loop for a
+/// server is a bit involved, because we have to ensure that we never drop a
+/// server accidentally while a client might want to connect.
 ///
 /// ```no_run
 /// use std::io;
