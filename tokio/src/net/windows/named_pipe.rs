@@ -481,21 +481,6 @@ impl AsyncWrite for NamedPipe {
     }
 }
 
-/// Raw handle conversion for [NamedPipe].
-///
-/// # Panics
-///
-/// This panics if called outside of a [Tokio Runtime] which doesn't have [I/O
-/// enabled].
-///
-/// [Tokio Runtime]: crate::runtime::Runtime
-/// [I/O enabled]: crate::runtime::Builder::enable_io
-impl FromRawHandle for NamedPipe {
-    unsafe fn from_raw_handle(handle: RawHandle) -> Self {
-        Self::try_from_raw_handle(handle).unwrap()
-    }
-}
-
 impl AsRawHandle for NamedPipe {
     fn as_raw_handle(&self) -> RawHandle {
         self.io.as_raw_handle()
