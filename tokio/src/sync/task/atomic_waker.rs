@@ -29,7 +29,7 @@ pub(crate) struct AtomicWaker {
 
 // `AtomicWaker` is a multi-consumer, single-producer transfer cell. The cell
 // stores a `Waker` value produced by calls to `register` and many threads can
-// race to take the waker by calling `wake.
+// race to take the waker by calling `wake`.
 //
 // If a new `Waker` instance is produced by calling `register` before an existing
 // one is consumed, then the existing one is overwritten.
