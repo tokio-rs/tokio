@@ -409,13 +409,35 @@ impl<T> Sender<T> {
         debug_assert_eq!(0, self.shared.ref_count_rx.load(Relaxed));
     }
 
-    cfg_signal_internal! {
-        pub(crate) fn subscribe(&self) -> Receiver<T> {
-            let shared = self.shared.clone();
-            let version = shared.version.load(SeqCst);
+    /// Creates a new [`Receiver`] handle that will receive values sent **after**
+    /// this call to `subscribe`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, _rx) = watch::channel(0u64);
+    ///
+    ///     tx.send(5).unwrap();
+    ///
+    ///     let mut rx = tx.subscribe();
+    ///     // A new Receiver will immediately see the latest value.
+    ///     assert_eq!(5, *rx.borrow());
+    ///
+    ///     tx.send(100).unwrap();
+    ///
+    ///     rx.changed().await.unwrap();
+    ///     assert_eq!(100, *rx.borrow());
+    /// }
+    /// ```
+    pub fn subscribe(&self) -> Receiver<T> {
+        let shared = self.shared.clone();
+        let version = shared.version.load(SeqCst);
 
-            Receiver::from_shared(version, shared)
-        }
+        Receiver::from_shared(version, shared)
     }
 
     /// Returns the number of receivers that currently exist
