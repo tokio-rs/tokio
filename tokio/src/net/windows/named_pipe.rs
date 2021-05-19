@@ -36,15 +36,15 @@ use self::doc::*;
 
 /// A [Windows named pipe].
 ///
-/// Constructed using [NamedPipeClientOptions::create] for clients, or
-/// [NamedPipeOptions::create] for servers. See their corresponding
+/// Constructed using [`NamedPipeClientOptions::create`] for clients, or
+/// [`NamedPipeOptions::create`] for servers. See their corresponding
 /// documentation for examples.
 ///
-/// Connecting a client involves a few steps. First we must try to [create], the
+/// Connecting a client involves a few steps. First we must try to [`create`], the
 /// error typically indicates one of two things:
 ///
-/// * [std::io::ErrorKind::NotFound] - There is no server available.
-/// * [ERROR_PIPE_BUSY] - There is a server available, but it is busy. Sleep for
+/// * [`std::io::ErrorKind::NotFound`] - There is no server available.
+/// * [`ERROR_PIPE_BUSY`] - There is a server available, but it is busy. Sleep for
 ///   a while and try again.
 ///
 /// So a typical client connect loop will look like the this:
@@ -72,8 +72,8 @@ use self::doc::*;
 /// # Ok(()) }
 /// ```
 ///
-/// A client will error with [std::io::ErrorKind::NotFound] for most creation
-/// oriented operations like [create] unless at least once server instance is up
+/// A client will error with [`std::io::ErrorKind::NotFound`] for most creation
+/// oriented operations like [`create`] unless at least once server instance is up
 /// and running at all time. This means that the typical listen loop for a
 /// server is a bit involved, because we have to ensure that we never drop a
 /// server accidentally while a client might want to connect.
@@ -130,8 +130,8 @@ use self::doc::*;
 /// # Ok(()) }
 /// ```
 ///
-/// [create]: NamedPipeClientOptions::create
-/// [ERROR_PIPE_BUSY]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
+/// [`create`]: NamedPipeClientOptions::create
+/// [`ERROR_PIPE_BUSY`]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
 pub struct NamedPipe {
@@ -169,9 +169,9 @@ impl NamedPipe {
     /// connect to an instance of a named pipe. A client process connects by
     /// creating a named pipe with the same name.
     ///
-    /// This corresponds to the [ConnectNamedPipe] system call.
+    /// This corresponds to the [`ConnectNamedPipe`] system call.
     ///
-    /// [ConnectNamedPipe]: https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
+    /// [`ConnectNamedPipe`]: https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
     ///
     /// ```no_run
     /// use tokio::net::windows::NamedPipeOptions;
@@ -314,13 +314,13 @@ impl NamedPipe {
     ///
     /// Data reported through peek is sporadic. Once peek returns any data for a
     /// given named pipe, further calls to it are not gauranteed to return the
-    /// same or higher number of bytes available ([total_bytes_available]). It
+    /// same or higher number of bytes available ([`total_bytes_available`]). It
     /// might even report a count of `0` even if no data has been read from the
     /// named pipe that was previously peeked.
     ///
     /// Peeking does not update the state of the named pipe, so in order to
     /// advance it you have to actively issue reads. A peek reporting a number
-    /// of bytes available ([total_bytes_available]) of `0` does not guarantee
+    /// of bytes available ([`total_bytes_available`]) of `0` does not guarantee
     /// that there is no data available to read from the named pipe. Even if a
     /// peer is writing data, reads still have to be issued for the state of the
     /// named pipe to update.
@@ -331,7 +331,7 @@ impl NamedPipe {
     /// You can play around with the [`named-pipe-peek` example] to get a feel
     /// for how this function behaves.
     ///
-    /// [total_bytes_available]: PipePeekInfo::total_bytes_available
+    /// [`total_bytes_available`]: PipePeekInfo::total_bytes_available
     /// [`named-pipe-peek` example]: https://github.com/tokio-rs/tokio/blob/master/examples/named-pipe-peek.rs
     ///
     /// # Examples
@@ -504,7 +504,7 @@ macro_rules! bool_flag {
 /// options. This is required to use for named pipe servers who wants to modify
 /// pipe-related options.
 ///
-/// See [NamedPipeOptions::create].
+/// See [`NamedPipeOptions::create`].
 #[derive(Debug, Clone)]
 pub struct NamedPipeOptions {
     open_mode: DWORD,
@@ -541,12 +541,12 @@ impl NamedPipeOptions {
 
     /// The pipe mode.
     ///
-    /// The default pipe mode is [PipeMode::Byte]. See [PipeMode] for
+    /// The default pipe mode is [`PipeMode::Byte`]. See [`PipeMode`] for
     /// documentation of what each mode means.
     ///
-    /// This corresponding to specifying [dwPipeMode].
+    /// This corresponding to specifying [`dwPipeMode`].
     ///
-    /// [dwPipeMode]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+    /// [`dwPipeMode`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn pipe_mode(&mut self, pipe_mode: PipeMode) -> &mut Self {
         self.pipe_mode = match pipe_mode {
             PipeMode::Byte => winbase::PIPE_TYPE_BYTE,
@@ -558,9 +558,9 @@ impl NamedPipeOptions {
 
     /// The flow of data in the pipe goes from client to server only.
     ///
-    /// This corresponds to setting [PIPE_ACCESS_INBOUND].
+    /// This corresponds to setting [`PIPE_ACCESS_INBOUND`].
     ///
-    /// [PIPE_ACCESS_INBOUND]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_access_inbound
+    /// [`PIPE_ACCESS_INBOUND`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_access_inbound
     ///
     /// # Examples
     ///
@@ -624,9 +624,9 @@ impl NamedPipeOptions {
 
     /// The flow of data in the pipe goes from server to client only.
     ///
-    /// This corresponds to setting [PIPE_ACCESS_OUTBOUND].
+    /// This corresponds to setting [`PIPE_ACCESS_OUTBOUND`].
     ///
-    /// [PIPE_ACCESS_OUTBOUND]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_access_outbound
+    /// [`PIPE_ACCESS_OUTBOUND`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_access_outbound
     ///
     /// # Examples
     ///
@@ -692,12 +692,12 @@ impl NamedPipeOptions {
 
     /// If you attempt to create multiple instances of a pipe with this flag,
     /// creation of the first instance succeeds, but creation of the next
-    /// instance fails with [ERROR_ACCESS_DENIED].
+    /// instance fails with [`ERROR_ACCESS_DENIED`].
     ///
-    /// This corresponds to setting [FILE_FLAG_FIRST_PIPE_INSTANCE].
+    /// This corresponds to setting [`FILE_FLAG_FIRST_PIPE_INSTANCE`].
     ///
-    /// [ERROR_ACCESS_DENIED]: crate::winapi::shared::winerror::ERROR_ACCESS_DENIED
-    /// [FILE_FLAG_FIRST_PIPE_INSTANCE]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_first_pipe_instance
+    /// [`ERROR_ACCESS_DENIED`]: crate::winapi::shared::winerror::ERROR_ACCESS_DENIED
+    /// [`FILE_FLAG_FIRST_PIPE_INSTANCE`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_first_pipe_instance
     ///
     /// # Examples
     ///
@@ -732,9 +732,9 @@ impl NamedPipeOptions {
     /// Indicates whether this server can accept remote clients or not. This is
     /// enabled by default.
     ///
-    /// This corresponds to setting [PIPE_REJECT_REMOTE_CLIENTS].
+    /// This corresponds to setting [`PIPE_REJECT_REMOTE_CLIENTS`].
     ///
-    /// [PIPE_REJECT_REMOTE_CLIENTS]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_reject_remote_clients
+    /// [`PIPE_REJECT_REMOTE_CLIENTS`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_reject_remote_clients
     pub fn reject_remote_clients(&mut self, reject: bool) -> &mut Self {
         bool_flag!(self.pipe_mode, reject, winbase::PIPE_REJECT_REMOTE_CLIENTS);
         self
@@ -745,10 +745,9 @@ impl NamedPipeOptions {
     /// be specified for other instances of the pipe. Acceptable values are in
     /// the range 1 through 254. The default value is unlimited.
     ///
-    /// This corresponds to specifying [nMaxInstances].
+    /// This corresponds to specifying [`nMaxInstances`].
     ///
-    /// [nMaxInstances]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
-    /// [PIPE_UNLIMITED_INSTANCES]: crate::winapi::um::winbase::PIPE_UNLIMITED_INSTANCES
+    /// [`nMaxInstances`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     ///
     /// # Panics
     ///
@@ -770,9 +769,9 @@ impl NamedPipeOptions {
 
     /// The number of bytes to reserve for the output buffer.
     ///
-    /// This corresponds to specifying [nOutBufferSize].
+    /// This corresponds to specifying [`nOutBufferSize`].
     ///
-    /// [nOutBufferSize]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+    /// [`nOutBufferSize`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn out_buffer_size(&mut self, buffer: u32) -> &mut Self {
         self.out_buffer_size = buffer as DWORD;
         self
@@ -780,9 +779,9 @@ impl NamedPipeOptions {
 
     /// The number of bytes to reserve for the input buffer.
     ///
-    /// This corresponds to specifying [nInBufferSize].
+    /// This corresponds to specifying [`nInBufferSize`].
     ///
-    /// [nInBufferSize]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+    /// [`nInBufferSize`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn in_buffer_size(&mut self, buffer: u32) -> &mut Self {
         self.in_buffer_size = buffer as DWORD;
         self
@@ -790,10 +789,10 @@ impl NamedPipeOptions {
 
     /// Create the named pipe identified by `addr` for use as a server.
     ///
-    /// This function will call the [CreateNamedPipe] function and return the
+    /// This function will call the [`CreateNamedPipe`] function and return the
     /// result.
     ///
-    /// [CreateNamedPipe]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+    /// [`CreateNamedPipe`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     ///
     /// # Errors
     ///
@@ -822,7 +821,7 @@ impl NamedPipeOptions {
 
     /// Create the named pipe identified by `addr` for use as a server.
     ///
-    /// This is the same as [create][NamedPipeOptions::create] except that it
+    /// This is the same as [`create`][NamedPipeOptions::create] except that it
     /// supports providing security attributes.
     ///
     /// # Errors
@@ -836,9 +835,9 @@ impl NamedPipeOptions {
     /// # Safety
     ///
     /// The caller must ensure that `attrs` points to an initialized instance of
-    /// a [SECURITY_ATTRIBUTES] structure.
+    /// a [`SECURITY_ATTRIBUTES`] structure.
     ///
-    /// [SECURITY_ATTRIBUTES]: [crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES]
+    /// [`SECURITY_ATTRIBUTES`]: [crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES]
     pub unsafe fn create_with_security_attributes(
         &self,
         addr: impl AsRef<OsStr>,
@@ -871,7 +870,7 @@ impl NamedPipeOptions {
 /// A builder suitable for building and interacting with named pipes from the
 /// client side.
 ///
-/// See [NamedPipeClientOptions::create].
+/// See [`NamedPipeClientOptions::create`].
 #[derive(Debug, Clone)]
 pub struct NamedPipeClientOptions {
     desired_access: DWORD,
@@ -899,10 +898,10 @@ impl NamedPipeClientOptions {
 
     /// If the client supports reading data. This is enabled by default.
     ///
-    /// This corresponds to setting [GENERIC_READ] in the call to [CreateFile].
+    /// This corresponds to setting [`GENERIC_READ`] in the call to [`CreateFile`].
     ///
-    /// [GENERIC_READ]: https://docs.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
-    /// [CreateFile]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
+    /// [`GENERIC_READ`]: https://docs.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
+    /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
     pub fn read(&mut self, allowed: bool) -> &mut Self {
         bool_flag!(self.desired_access, allowed, winnt::GENERIC_READ);
         self
@@ -910,10 +909,10 @@ impl NamedPipeClientOptions {
 
     /// If the created pipe supports writing data. This is enabled by default.
     ///
-    /// This corresponds to setting [GENERIC_WRITE] in the call to [CreateFile].
+    /// This corresponds to setting [`GENERIC_WRITE`] in the call to [`CreateFile`].
     ///
-    /// [GENERIC_WRITE]: https://docs.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
-    /// [CreateFile]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
+    /// [`GENERIC_WRITE`]: https://docs.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
+    /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
     pub fn write(&mut self, allowed: bool) -> &mut Self {
         bool_flag!(self.desired_access, allowed, winnt::GENERIC_WRITE);
         self
@@ -921,28 +920,28 @@ impl NamedPipeClientOptions {
 
     /// Open the named pipe identified by `addr`.
     ///
-    /// This constructs the handle using [CreateFile].
+    /// This constructs the handle using [`CreateFile`].
     ///
-    /// [CreateFile]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
+    /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
     ///
     /// # Errors
     ///
     /// This errors if called outside of a [Tokio Runtime] which doesn't have
     /// [I/O enabled] or if any OS-specific I/O errors occur.
     ///
-    /// There are a few errors you should be aware of that you need to take into
-    /// account when creating a named pipe on the client side:
+    /// There are a few errors you need to take into account when creating a
+    /// named pipe on the client side:
     ///
-    /// * [std::io::ErrorKind::NotFound] - This indicates that the named pipe
+    /// * [`std::io::ErrorKind::NotFound`] - This indicates that the named pipe
     ///   does not exist. Presumably the server is not up.
-    /// * [ERROR_PIPE_BUSY] - This error is raised when the named pipe exists,
+    /// * [`ERROR_PIPE_BUSY`] - This error is raised when the named pipe exists,
     ///   but the server is not currently waiting for a connection. Please see the
     ///   examples for how to check for this error.
     ///
-    /// [ERROR_PIPE_BUSY]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
+    /// [`ERROR_PIPE_BUSY`]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
     /// [I/O enabled]: crate::runtime::Builder::enable_io
     /// [Tokio Runtime]: crate::runtime::Runtime
-    /// [winapi]: crate::winapi
+    /// [`winapi`]: crate::winapi
     ///
     /// A connect loop that waits until a socket becomes available looks like
     /// this:
@@ -977,15 +976,15 @@ impl NamedPipeClientOptions {
 
     /// Open the named pipe identified by `addr`.
     ///
-    /// This is the same as [create][NamedPipeClientOptions::create] except that
+    /// This is the same as [`create`][NamedPipeClientOptions::create] except that
     /// it supports providing security attributes.
     ///
     /// # Safety
     ///
     /// The caller must ensure that `attrs` points to an initialized instance
-    /// of a [SECURITY_ATTRIBUTES] structure.
+    /// of a [`SECURITY_ATTRIBUTES`] structure.
     ///
-    /// [SECURITY_ATTRIBUTES]: [crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES]
+    /// [`SECURITY_ATTRIBUTES`]: [crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES]
     pub unsafe fn create_with_security_attributes(
         &self,
         addr: impl AsRef<OsStr>,
@@ -1018,45 +1017,45 @@ impl NamedPipeClientOptions {
     }
 }
 
-/// The pipe mode of a [NamedPipe].
+/// The pipe mode of a [`NamedPipe`].
 ///
-/// Set through [NamedPipeOptions::pipe_mode].
+/// Set through [`NamedPipeOptions::pipe_mode`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum PipeMode {
     /// Data is written to the pipe as a stream of bytes. The pipe does not
     /// distinguish bytes written during different write operations.
     ///
-    /// Corresponds to [PIPE_TYPE_BYTE][crate::winapi::um::winbase::PIPE_TYPE_BYTE].
+    /// Corresponds to [`PIPE_TYPE_BYTE`][crate::winapi::um::winbase::PIPE_TYPE_BYTE].
     Byte,
     /// Data is written to the pipe as a stream of messages. The pipe treats the
     /// bytes written during each write operation as a message unit. Any reading
-    /// function on [NamedPipe] returns [ERROR_MORE_DATA] when a message is not
+    /// function on [`NamedPipe`] returns [`ERROR_MORE_DATA`] when a message is not
     /// read completely.
     ///
-    /// Corresponds to [PIPE_TYPE_MESSAGE][crate::winapi::um::winbase::PIPE_TYPE_MESSAGE].
+    /// Corresponds to [`PIPE_TYPE_MESSAGE`][crate::winapi::um::winbase::PIPE_TYPE_MESSAGE].
     ///
-    /// [ERROR_MORE_DATA]: crate::winapi::shared::winerror::ERROR_MORE_DATA
+    /// [`ERROR_MORE_DATA`]: crate::winapi::shared::winerror::ERROR_MORE_DATA
     Message,
 }
 
-/// Indicates the end of a [NamedPipe].
+/// Indicates the end of a [`NamedPipe`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum PipeEnd {
-    /// The [NamedPipe] refers to the client end of a named pipe instance.
+    /// The [`NamedPipe`] refers to the client end of a named pipe instance.
     ///
-    /// Corresponds to [PIPE_CLIENT_END][crate::winapi::um::winbase::PIPE_CLIENT_END].
+    /// Corresponds to [`PIPE_CLIENT_END`][`crate::winapi::um::winbase::PIPE_CLIENT_END`].
     Client,
-    /// The [NamedPipe] refers to the server end of a named pipe instance.
+    /// The [`NamedPipe`] refers to the server end of a named pipe instance.
     ///
-    /// Corresponds to [PIPE_SERVER_END][crate::winapi::um::winbase::PIPE_SERVER_END].
+    /// Corresponds to [`PIPE_SERVER_END`][`crate::winapi::um::winbase::PIPE_SERVER_END`].
     Server,
 }
 
 /// Information about a named pipe.
 ///
-/// Constructed through [NamedPipe::info].
+/// Constructed through [`NamedPipe::info`].
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct PipeInfo {
@@ -1074,7 +1073,7 @@ pub struct PipeInfo {
 
 /// Information about a pipe gained by peeking it.
 ///
-/// See [NamedPipe::peek].
+/// See [`NamedPipe::peek`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct PipePeekInfo {
@@ -1082,7 +1081,8 @@ pub struct PipePeekInfo {
     pub total_bytes_available: usize,
     /// Indicates the number of bytes left in the current message.
     ///
-    /// If the pipe mode is not [PipeMode::Message], then this is zero.
+    /// If the pipe mode is not [`PipeMode::Message`], then this is
+    /// zero.
     pub bytes_left_this_message: usize,
 }
 
