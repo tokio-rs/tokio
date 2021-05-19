@@ -48,5 +48,10 @@ pub mod um {
         ///
         /// [winapi]: https://docs.rs/winapi/*/winapi/um/winbase/constant.PIPE_SERVER_END.html
         pub type PIPE_SERVER_END = crate::doc::NotDefinedHere;
+
+        /// See [winapi::um::winbase::SECURITY_IDENTIFICATION][winapi]
+        ///
+        /// [winapi]: https://docs.rs/winapi/*/winapi/um/winbase/constant.SECURITY_IDENTIFICATION.html
+        pub type SECURITY_IDENTIFICATION = crate::doc::NotDefinedHere;
     }
 }
