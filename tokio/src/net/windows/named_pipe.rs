@@ -1041,10 +1041,9 @@ impl NamedPipeClientOptions {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `attrs` points to an initialized instance of
-    /// a [`SECURITY_ATTRIBUTES`] structure. This argument *can* be set to null
-    /// and be ignored. But the caller should then instead prefer to use
-    /// [`create`].
+    /// The `attrs` argument must either be null or point at a valid instance
+    /// of the [`SECURITY_ATTRIBUTES`] structure. If the argument is null,
+    /// the behavior is identical to calling the [`create`] method.
     ///
     /// [`SECURITY_ATTRIBUTES`]: [crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES]
     /// [`create`]: [NamedPipeClientOptions::create]
