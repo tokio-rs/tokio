@@ -54,4 +54,13 @@ pub mod um {
         /// [winapi]: https://docs.rs/winapi/*/winapi/um/winbase/constant.SECURITY_IDENTIFICATION.html
         pub type SECURITY_IDENTIFICATION = crate::doc::NotDefinedHere;
     }
+
+    /// See [winapi::um::minwinbase](https://docs.rs/winapi/*/winapi/um/minwinbase/index.html).
+    #[allow(non_camel_case_types)]
+    pub mod minwinbase {
+        /// See [winapi::um::minwinbase::SECURITY_ATTRIBUTES][winapi]
+        ///
+        /// [winapi]: https://docs.rs/winapi/*/winapi/um/minwinbase/constant.SECURITY_ATTRIBUTES.html
+        pub type SECURITY_ATTRIBUTES = crate::doc::NotDefinedHere;
+    }
 }
