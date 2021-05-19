@@ -868,7 +868,7 @@ impl NamedPipeOptions {
     /// The caller must ensure that `attrs` points to an initialized instance of
     /// a [`SECURITY_ATTRIBUTES`] structure.
     ///
-    /// [`SECURITY_ATTRIBUTES`]: [crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES]
+    /// [`SECURITY_ATTRIBUTES`]: crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES
     pub unsafe fn create_with_security_attributes(
         &self,
         addr: impl AsRef<OsStr>,
@@ -970,7 +970,7 @@ impl NamedPipeClientOptions {
     /// automatically when using this method.
     ///
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
-    /// [`SECURITY_IDENTIFICATION`]: winbase::SECURITY_IDENTIFICATION
+    /// [`SECURITY_IDENTIFICATION`]: crate::winapi::um::winbase::SECURITY_IDENTIFICATION
     /// [Impersonation Levels]: https://docs.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-security_impersonation_level
     pub fn security_qos_flags(&mut self, flags: u32) -> &mut Self {
         // See: https://github.com/rust-lang/rust/pull/58216
@@ -1111,11 +1111,11 @@ pub enum PipeMode {
 pub enum PipeEnd {
     /// The [`NamedPipe`] refers to the client end of a named pipe instance.
     ///
-    /// Corresponds to [`PIPE_CLIENT_END`][`crate::winapi::um::winbase::PIPE_CLIENT_END`].
+    /// Corresponds to [`PIPE_CLIENT_END`][crate::winapi::um::winbase::PIPE_CLIENT_END].
     Client,
     /// The [`NamedPipe`] refers to the server end of a named pipe instance.
     ///
-    /// Corresponds to [`PIPE_SERVER_END`][`crate::winapi::um::winbase::PIPE_SERVER_END`].
+    /// Corresponds to [`PIPE_SERVER_END`][crate::winapi::um::winbase::PIPE_SERVER_END].
     Server,
 }
 
