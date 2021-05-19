@@ -738,9 +738,47 @@ impl NamedPipeOptions {
     /// be specified for other instances of the pipe. Acceptable values are in
     /// the range 1 through 254. The default value is unlimited.
     ///
+    /// This value is only respected by the first instance that creates the pipe
+    /// and is ignored otherwise.
+    ///
     /// This corresponds to specifying [`nMaxInstances`].
     ///
     /// [`nMaxInstances`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+    ///
+    /// # Errors
+    ///
+    /// The same numbers of `max_instances` have to be used by all servers. Any
+    /// additional servers trying to be built which uses a mismatching value
+    /// will error.
+    ///
+    /// ```
+    /// use std::io;
+    /// use tokio::net::windows::{NamedPipeOptions, NamedPipeClientOptions};
+    ///
+    /// // Use this from winapi instead in real code.
+    /// const ERROR_PIPE_BUSY: u32 = 231;
+    ///
+    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-max-instances";
+    ///
+    /// # #[tokio::main] async fn main() -> io::Result<()> {
+    /// let mut server = NamedPipeOptions::new();
+    /// server.max_instances(2);
+    ///
+    /// let s1 = server.create(PIPE_NAME)?;
+    /// let c1 = NamedPipeClientOptions::new().create(PIPE_NAME);
+    ///
+    /// let s2 = server.create(PIPE_NAME)?;
+    /// let c2 = NamedPipeClientOptions::new().create(PIPE_NAME);
+    ///
+    /// // Too many servers!
+    /// let e = server.create(PIPE_NAME).unwrap_err();
+    /// assert_eq!(e.raw_os_error(), Some(ERROR_PIPE_BUSY as i32));
+    ///
+    /// // Still too many servers even if we specify a higher value!
+    /// let e = server.max_instances(100).create(PIPE_NAME).unwrap_err();
+    /// assert_eq!(e.raw_os_error(), Some(ERROR_PIPE_BUSY as i32));
+    /// # Ok(()) }
+    /// ```
     ///
     /// # Panics
     ///
