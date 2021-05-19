@@ -351,8 +351,10 @@ impl<P: Park> Drop for BasicScheduler<P> {
                 task.shutdown();
             }
 
-            // Drain remote queue
+            // Drain remote queue and set it to None
             let mut remote_queue = scheduler.spawner.shared.queue.lock();
+
+            // Using `Option::take` to replace the shared queue with `None`.
             if let Some(remote_queue) = remote_queue.take() {
                 for entry in remote_queue {
                     match entry {
@@ -366,6 +368,11 @@ impl<P: Park> Drop for BasicScheduler<P> {
                     }
                 }
             }
+            // By dropping the mutex lock after the full duration of the above loop,
+            // any thread that sees the queue in the `None` state is guaranteed that
+            // the runtime has fully shut down.
+            //
+            // The assert below is unrelated to this mutex.
             drop(remote_queue);
 
             assert!(context.tasks.borrow().owned.is_empty());
@@ -436,9 +443,19 @@ impl Schedule for Arc<Shared> {
                 // safety: the task is inserted in the list in `bind`.
                 unsafe { cx.tasks.borrow_mut().owned.remove(ptr) }
             } else {
+                // By sending an `Entry::Release` to the runtime, we ask the
+                // runtime to remove this task from the linked list in
+                // `Tasks::owned`.
+                //
+                // If the queue is `None`, then the task was already removed
+                // from that list in the destructor of `BasicScheduler`. We do
+                // not do anything in this case for the same reason that
+                // `Entry::Release` messages are ignored in the remote queue
+                // drain loop of `BasicScheduler`'s destructor.
                 if let Some(queue) = self.queue.lock().as_mut() {
                     queue.push_back(Entry::Release(ptr));
                 }
+
                 self.unpark.unpark();
                 // Returning `None` here prevents the task plumbing from being
                 // freed. It is then up to the scheduler through the queue we
