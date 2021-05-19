@@ -867,6 +867,7 @@ impl NamedPipeOptions {
 #[derive(Debug, Clone)]
 pub struct NamedPipeClientOptions {
     desired_access: DWORD,
+    security_qos_flags: DWORD,
 }
 
 impl NamedPipeClientOptions {
@@ -886,6 +887,7 @@ impl NamedPipeClientOptions {
     pub fn new() -> Self {
         Self {
             desired_access: winnt::GENERIC_READ | winnt::GENERIC_WRITE,
+            security_qos_flags: winbase::SECURITY_IDENTIFICATION | winbase::SECURITY_SQOS_PRESENT,
         }
     }
 
@@ -908,6 +910,33 @@ impl NamedPipeClientOptions {
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
     pub fn write(&mut self, allowed: bool) -> &mut Self {
         bool_flag!(self.desired_access, allowed, winnt::GENERIC_WRITE);
+        self
+    }
+
+    /// Sets qos flags which are combined with other flags and attributes in the
+    /// call to [`CreateFile`].
+    ///
+    /// By default `security_qos_flags` is set to [`SECURITY_IDENTIFICATION`],
+    /// calling this function would override that value completely with the
+    /// argument specified.
+    ///
+    /// When `security_qos_flags` is not set, a malicious program can gain the
+    /// elevated privileges of a privileged Rust process when it allows opening
+    /// user-specified paths, by tricking it into opening a named pipe. So
+    /// arguably `security_qos_flags` should also be set when opening arbitrary
+    /// paths. However the bits can then conflict with other flags, specifically
+    /// `FILE_FLAG_OPEN_NO_RECALL`.
+    ///
+    /// For information about possible values, see [Impersonation Levels] on the
+    /// Windows Dev Center site. The `SECURITY_SQOS_PRESENT` flag is set
+    /// automatically when using this method.
+    ///
+    /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
+    /// [`SECURITY_IDENTIFICATION`]: winbase::SECURITY_IDENTIFICATION
+    /// [Impersonation Levels]: https://docs.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-security_impersonation_level
+    pub fn security_qos_flags(&mut self, flags: u32) -> &mut Self {
+        // See: https://github.com/rust-lang/rust/pull/58216
+        self.security_qos_flags = flags | winbase::SECURITY_SQOS_PRESENT;
         self
     }
 
@@ -995,7 +1024,7 @@ impl NamedPipeClientOptions {
             0,
             attrs as *mut _,
             fileapi::OPEN_EXISTING,
-            winbase::FILE_FLAG_OVERLAPPED | winbase::SECURITY_IDENTIFICATION,
+            self.get_flags(),
             ptr::null_mut(),
         );
 
@@ -1007,6 +1036,10 @@ impl NamedPipeClientOptions {
         let io = PollEvented::new(io)?;
 
         Ok(NamedPipe { io })
+    }
+
+    fn get_flags(&self) -> u32 {
+        self.security_qos_flags | winbase::FILE_FLAG_OVERLAPPED
     }
 }
 
