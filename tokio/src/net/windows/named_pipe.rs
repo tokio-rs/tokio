@@ -80,9 +80,7 @@ use self::doc::*;
 ///
 /// ```no_run
 /// use std::io;
-/// use std::sync::Arc;
 /// use tokio::net::windows::NamedPipeOptions;
-/// use tokio::sync::Notify;
 ///
 /// const PIPE_NAME: &str = r"\\.\pipe\named-pipe-idiomatic-server";
 ///
@@ -97,36 +95,30 @@ use self::doc::*;
 ///     .first_pipe_instance(true)
 ///     .create(PIPE_NAME)?;
 ///
-/// let shutdown = Arc::new(Notify::new());
-/// let shutdown2 = shutdown.clone();
-///
 /// // Spawn the server loop.
 /// let server = tokio::spawn(async move {
 ///     loop {
 ///         // Wait for a client to connect.
-///         let connected = tokio::select! {
-///             connected = server.connect() => connected,
-///             _ = shutdown2.notified() => break,
-///         };
+///         let connected = server.connect().await?;
 ///
 ///         // Construct the next server to be connected before sending the one
 ///         // we already have of onto a task. This ensures that the server
 ///         // isn't closed (after it's done in the task) before a new one is
 ///         // available. Otherwise the client might error with
 ///         // `io::ErrorKind::NotFound`.
-///         server = NamedPipeOptions::new()
-///             .create(PIPE_NAME)?;
+///         server = NamedPipeOptions::new().create(PIPE_NAME)?;
 ///
 ///         let client = tokio::spawn(async move {
 ///             /* use the connected client */
 /// #           Ok::<_, std::io::Error>(())
 ///         });
+/// #       if true { break } // needed for type inference to work
 ///     }
 ///
 ///     Ok::<_, io::Error>(())
 /// });
-/// # shutdown.notify_one();
-/// # let _ = server.await??;
+///
+/// /* do something else not server related here */
 /// # Ok(()) }
 /// ```
 ///
