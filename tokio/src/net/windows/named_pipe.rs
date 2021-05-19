@@ -998,15 +998,18 @@ impl NamedPipeClientOptions {
 
     /// Open the named pipe identified by `addr`.
     ///
-    /// This is the same as [`create`][NamedPipeClientOptions::create] except that
-    /// it supports providing security attributes.
+    /// This is the same as [`create`] except that it supports providing
+    /// security attributes.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `attrs` points to an initialized instance
-    /// of a [`SECURITY_ATTRIBUTES`] structure.
+    /// The caller must ensure that `attrs` points to an initialized instance of
+    /// a [`SECURITY_ATTRIBUTES`] structure. This argument *can* be set to null
+    /// and be ignored. But the caller should then instead prefer to use
+    /// [`create`].
     ///
     /// [`SECURITY_ATTRIBUTES`]: [crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES]
+    /// [`create`]: [NamedPipeClientOptions::create]
     pub unsafe fn create_with_security_attributes(
         &self,
         addr: impl AsRef<OsStr>,
