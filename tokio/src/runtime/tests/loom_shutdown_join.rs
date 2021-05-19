@@ -12,9 +12,7 @@ fn join_handle_cancel_on_shutdown() {
             .build()
             .unwrap();
 
-        let handle = rt.block_on(async move {
-            Handle::current()
-        });
+        let handle = rt.block_on(async move { Handle::current() });
 
         let jh1 = handle.spawn(futures::future::pending::<()>());
 
