@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1621412160838,
+  "lastUpdate": 1621412165078,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -30037,6 +30037,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19375669,
             "range": "± 3487804",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "luciofranco14@gmail.com",
+            "name": "Lucio Franco",
+            "username": "LucioFranco"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "44a070d1b4531a60ed0af2b49dd99e66f912be1e",
+          "message": "doc: add missing backtick (#3799)",
+          "timestamp": "2021-05-19T10:14:08+02:00",
+          "tree_id": "bf57db78bb644480bd3603118cf0bbfc1d33703d",
+          "url": "https://github.com/tokio-rs/tokio/commit/44a070d1b4531a60ed0af2b49dd99e66f912be1e"
+        },
+        "date": 1621412160599,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 166662,
+            "range": "± 26339",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 606172,
+            "range": "± 85670",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4669019,
+            "range": "± 1500658",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18570526,
+            "range": "± 4151746",
             "unit": "ns/iter"
           }
         ]
