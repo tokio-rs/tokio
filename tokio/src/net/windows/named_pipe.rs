@@ -1043,8 +1043,8 @@ impl NamedPipeClientOptions {
     /// of the [`SECURITY_ATTRIBUTES`] structure. If the argument is null,
     /// the behavior is identical to calling the [`create`] method.
     ///
-    /// [`SECURITY_ATTRIBUTES`]: [crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES]
-    /// [`create`]: [NamedPipeClientOptions::create]
+    /// [`SECURITY_ATTRIBUTES`]: crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES
+    /// [`create`]: NamedPipeClientOptions::create
     pub unsafe fn create_with_security_attributes(
         &self,
         addr: impl AsRef<OsStr>,
