@@ -398,10 +398,9 @@ impl NamedPipe {
                 let (buf, len) = match &mut buf {
                     Some(buf) => {
                         let unfilled = buf.unfilled_mut();
-                        let len = DWORD::try_from(unfilled.len())
-                            .expect("buffer too large for win32 api");
-                        // Safety: the OS has no expectation on whether the
-                        // buffer is initialized or not.
+                        let len = <DWORD>::try_from(unfilled.len()).unwrap_or(DWORD::MAX);
+                        // NB: The OS has no expectation on whether the buffer
+                        // is initialized or not.
                         (unfilled.as_mut_ptr() as *mut _, len)
                     }
                     None => (ptr::null_mut(), 0),
@@ -421,7 +420,9 @@ impl NamedPipe {
                 return Err(io::Error::last_os_error());
             }
 
-            let n = usize::try_from(n).expect("output size too large");
+            // NB: This is either guaranteed to fit within `usize` because of
+            // the clamping above, or the OS is reporting bogus values.
+            let n = usize::try_from(n).unwrap();
 
             if let Some(buf) = buf {
                 // Safety: we trust that the OS has initialized up until `n`
