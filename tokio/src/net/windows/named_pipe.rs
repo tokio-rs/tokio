@@ -754,9 +754,7 @@ impl NamedPipeOptions {
     /// ```
     /// use std::io;
     /// use tokio::net::windows::{NamedPipeOptions, NamedPipeClientOptions};
-    ///
-    /// // Use this from winapi instead in real code.
-    /// const ERROR_PIPE_BUSY: u32 = 231;
+    /// use winapi::shared::winerror;
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-max-instances";
     ///
@@ -772,11 +770,11 @@ impl NamedPipeOptions {
     ///
     /// // Too many servers!
     /// let e = server.create(PIPE_NAME).unwrap_err();
-    /// assert_eq!(e.raw_os_error(), Some(ERROR_PIPE_BUSY as i32));
+    /// assert_eq!(e.raw_os_error(), Some(winerror::ERROR_PIPE_BUSY as i32));
     ///
     /// // Still too many servers even if we specify a higher value!
     /// let e = server.max_instances(100).create(PIPE_NAME).unwrap_err();
-    /// assert_eq!(e.raw_os_error(), Some(ERROR_PIPE_BUSY as i32));
+    /// assert_eq!(e.raw_os_error(), Some(winerror::ERROR_PIPE_BUSY as i32));
     /// # Ok(()) }
     /// ```
     ///
