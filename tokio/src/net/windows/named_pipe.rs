@@ -1088,5 +1088,9 @@ pub struct PipePeekInfo {
 
 /// Encode an address so that it is a null-terminated wide string.
 fn encode_addr(addr: impl AsRef<OsStr>) -> Box<[u16]> {
-    addr.as_ref().encode_wide().chain(Some(0)).collect()
+    let len = addr.as_ref().encode_wide().count();
+    let mut vec = Vec::with_capacity(len + 1);
+    vec.extend(addr.as_ref().encode_wide());
+    vec.push(0);
+    vec.into_boxed_slice()
 }
