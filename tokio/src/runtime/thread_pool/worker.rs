@@ -823,7 +823,9 @@ impl Shared {
         }
 
         // Drain the injection queue
-        while self.inject.pop().is_some() {}
+        while let Some(task) = self.inject.pop() {
+            task.shutdown();
+        }
     }
 
     fn ptr_eq(&self, other: &Shared) -> bool {
