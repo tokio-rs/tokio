@@ -1,10 +1,10 @@
+use std::ffi::c_void;
 use std::ffi::OsStr;
 use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::ptr;
 use std::task::{Context, Poll};
-use std::ffi::c_void;
 
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf};
 use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
