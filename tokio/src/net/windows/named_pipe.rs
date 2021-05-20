@@ -4,6 +4,7 @@ use std::mem;
 use std::pin::Pin;
 use std::ptr;
 use std::task::{Context, Poll};
+use std::ffi::c_void;
 
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf};
 use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
@@ -870,7 +871,7 @@ impl NamedPipeOptions {
     pub unsafe fn create_with_security_attributes(
         &self,
         addr: impl AsRef<OsStr>,
-        attrs: *mut (),
+        attrs: *mut c_void,
     ) -> io::Result<NamedPipe> {
         let addr = encode_addr(addr);
 
@@ -1048,7 +1049,7 @@ impl NamedPipeClientOptions {
     pub unsafe fn create_with_security_attributes(
         &self,
         addr: impl AsRef<OsStr>,
-        attrs: *mut (),
+        attrs: *mut c_void,
     ) -> io::Result<NamedPipe> {
         let addr = encode_addr(addr);
 
