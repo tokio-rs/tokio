@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1621591378625,
+  "lastUpdate": 1621591415124,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -30295,6 +30295,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20173259,
             "range": "± 3186864",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "34047788+gitsrc@users.noreply.github.com",
+            "name": "GITSRC",
+            "username": "gitsrc"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5ed84e1cd83472ea3f32b7dfb02bd978c09f37c5",
+          "message": "doc: update README.md (#3806)",
+          "timestamp": "2021-05-21T09:55:53+02:00",
+          "tree_id": "a594900bd982f5c92ee40afad03927709c6ee59e",
+          "url": "https://github.com/tokio-rs/tokio/commit/5ed84e1cd83472ea3f32b7dfb02bd978c09f37c5"
+        },
+        "date": 1621591410893,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 193345,
+            "range": "± 68840",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 666225,
+            "range": "± 166172",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5201216,
+            "range": "± 1019701",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20715199,
+            "range": "± 3340556",
             "unit": "ns/iter"
           }
         ]
