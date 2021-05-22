@@ -480,6 +480,11 @@ impl<T: AsRawFd> Drop for AsyncFd<T> {
 }
 
 impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
+    /// Returns a shared reference to the inner [`AsyncFd`].
+    pub fn get_ref(&self) -> &AsyncFd<Inner> {
+        &self.async_fd
+    }
+
     /// Indicates to tokio that the file descriptor is no longer ready. The
     /// internal readiness flag will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
@@ -543,6 +548,16 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
 }
 
 impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
+    /// Returns a shared reference to the inner [`AsyncFd`].
+    pub fn get_ref(&self) -> &AsyncFd<Inner> {
+        &self.async_fd
+    }
+
+    /// Returns a mutable reference to the inner [`AsyncFd`].
+    pub fn get_mut(&mut self) -> &mut AsyncFd<Inner> {
+        &mut self.async_fd
+    }
+
     /// Indicates to tokio that the file descriptor is no longer ready. The
     /// internal readiness flag will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
