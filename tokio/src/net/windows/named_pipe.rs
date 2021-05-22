@@ -844,15 +844,16 @@ impl NamedPipeOptions {
     /// # Ok(()) }
     /// ```
     pub fn create(&self, addr: impl AsRef<OsStr>) -> io::Result<NamedPipe> {
-        // Safety: We're calling create_with_security_attributes w/ a null
+        // Safety: We're calling create_with_security_attributes_raw w/ a null
         // pointer which disables it.
-        unsafe { self.create_with_security_attributes(addr, ptr::null_mut()) }
+        unsafe { self.create_with_security_attributes_raw(addr, ptr::null_mut()) }
     }
 
     /// Create the named pipe identified by `addr` for use as a server.
     ///
-    /// This is the same as [`create`][NamedPipeOptions::create] except that it
-    /// supports providing security attributes.
+    /// This is the same as [`create`] except that it supports providing the raw
+    /// pointer to a structure of [`SECURITY_ATTRIBUTES`] which will be passed
+    /// as the `lpSecurityAttributes` argument to [`CreateFile`].
     ///
     /// # Errors
     ///
@@ -864,11 +865,14 @@ impl NamedPipeOptions {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `attrs` points to an initialized instance of
-    /// a [`SECURITY_ATTRIBUTES`] structure.
+    /// The `attrs` argument must either be null or point at a valid instance of
+    /// the [`SECURITY_ATTRIBUTES`] structure. If the argument is null, the
+    /// behavior is identical to calling the [`create`] method.
     ///
+    /// [`create`]: NamedPipeOptions::create
+    /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
     /// [`SECURITY_ATTRIBUTES`]: crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES
-    pub unsafe fn create_with_security_attributes(
+    pub unsafe fn create_with_security_attributes_raw(
         &self,
         addr: impl AsRef<OsStr>,
         attrs: *mut c_void,
@@ -1028,25 +1032,27 @@ impl NamedPipeClientOptions {
     /// # Ok(()) }
     /// ```
     pub fn create(&self, addr: impl AsRef<OsStr>) -> io::Result<NamedPipe> {
-        // Safety: We're calling create_with_security_attributes w/ a null
+        // Safety: We're calling create_with_security_attributes_raw w/ a null
         // pointer which disables it.
-        unsafe { self.create_with_security_attributes(addr, ptr::null_mut()) }
+        unsafe { self.create_with_security_attributes_raw(addr, ptr::null_mut()) }
     }
 
     /// Open the named pipe identified by `addr`.
     ///
-    /// This is the same as [`create`] except that it supports providing
-    /// security attributes.
+    /// This is the same as [`create`] except that it supports providing the raw
+    /// pointer to a structure of [`SECURITY_ATTRIBUTES`] which will be passed
+    /// as the `lpSecurityAttributes` argument to [`CreateFile`].
     ///
     /// # Safety
     ///
-    /// The `attrs` argument must either be null or point at a valid instance
-    /// of the [`SECURITY_ATTRIBUTES`] structure. If the argument is null,
-    /// the behavior is identical to calling the [`create`] method.
+    /// The `attrs` argument must either be null or point at a valid instance of
+    /// the [`SECURITY_ATTRIBUTES`] structure. If the argument is null, the
+    /// behavior is identical to calling the [`create`] method.
     ///
-    /// [`SECURITY_ATTRIBUTES`]: crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES
     /// [`create`]: NamedPipeClientOptions::create
-    pub unsafe fn create_with_security_attributes(
+    /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
+    /// [`SECURITY_ATTRIBUTES`]: crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES
+    pub unsafe fn create_with_security_attributes_raw(
         &self,
         addr: impl AsRef<OsStr>,
         attrs: *mut c_void,
