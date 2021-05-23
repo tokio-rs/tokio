@@ -190,9 +190,7 @@ impl<T> Receiver<T> {
         // If there is already an underflow, the permit released by recv is
         // cancelled and the underflow is reduced accordingly.
         if self.underflow > 0 {
-            self.chan
-                .semaphore()
-                .reduce_permits(1);
+            self.chan.semaphore().reduce_permits(1);
 
             self.underflow -= 1;
         }
@@ -334,7 +332,7 @@ impl<T> Receiver<T> {
     /// use tokio::sync::mpsc;
     ///
     /// fn main() {
-    ///     let (tx, rx) = mpsc::channel(1);
+    ///     let (tx, mut rx) = mpsc::channel(1);
     ///
     ///     tx.try_send(()).unwrap();
     ///     assert!(tx.try_send(()).is_err());
@@ -354,7 +352,7 @@ impl<T> Receiver<T> {
             Ordering::Less => {
                 let sub = cap - new_size;
 
-                // Reduce the number of available permits and increase the 
+                // Reduce the number of available permits and increase the
                 // underflow if there's an excess of acquired permits.
                 semaphore.reduce_permits(sub);
                 self.underflow += sub.saturating_sub(semaphore.available_permits());
@@ -364,7 +362,7 @@ impl<T> Receiver<T> {
                 let add = new_size - cap;
 
                 // Empty the underflow if any and add the remaining permits to
-                // the semaphore. 
+                // the semaphore.
                 semaphore.add_permits(add.saturating_sub(self.underflow));
                 self.underflow = self.underflow.saturating_sub(add);
             }
