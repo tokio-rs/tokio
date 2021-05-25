@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1621980836622,
+  "lastUpdate": 1621980856832,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -71459,6 +71459,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 738259,
             "range": "± 63968",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "petrosagg@gmail.com",
+            "name": "Petros Angelatos",
+            "username": "petrosagg"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4abeca7bc5729abd1212e00c0b38139932eb6780",
+          "message": "io: impl AsyncSeek for BufStream (#3810)\n\nSigned-off-by: Petros Angelatos <petrosagg@gmail.com>",
+          "timestamp": "2021-05-26T07:11:47+09:00",
+          "tree_id": "259187a739f10986085a1c410b0b73df6a9e97ef",
+          "url": "https://github.com/tokio-rs/tokio/commit/4abeca7bc5729abd1212e00c0b38139932eb6780"
+        },
+        "date": 1621980852111,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7553132,
+            "range": "± 3701895",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 7169569,
+            "range": "± 2116868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6396082,
+            "range": "± 3933547",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 309,
+            "range": "± 78",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 309,
+            "range": "± 66",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 307,
+            "range": "± 51",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 66084,
+            "range": "± 14451",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1068,
+            "range": "± 119",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1096058,
+            "range": "± 161966",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 793570,
+            "range": "± 155419",
             "unit": "ns/iter"
           }
         ]
