@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1621980807934,
+  "lastUpdate": 1621980836622,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -30397,6 +30397,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20715199,
             "range": "± 3340556",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "petrosagg@gmail.com",
+            "name": "Petros Angelatos",
+            "username": "petrosagg"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4abeca7bc5729abd1212e00c0b38139932eb6780",
+          "message": "io: impl AsyncSeek for BufStream (#3810)\n\nSigned-off-by: Petros Angelatos <petrosagg@gmail.com>",
+          "timestamp": "2021-05-26T07:11:47+09:00",
+          "tree_id": "259187a739f10986085a1c410b0b73df6a9e97ef",
+          "url": "https://github.com/tokio-rs/tokio/commit/4abeca7bc5729abd1212e00c0b38139932eb6780"
+        },
+        "date": 1621980832798,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 190152,
+            "range": "± 15266",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 709755,
+            "range": "± 77566",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5376962,
+            "range": "± 809473",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21583230,
+            "range": "± 3622638",
             "unit": "ns/iter"
           }
         ]
