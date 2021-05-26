@@ -231,7 +231,7 @@ impl Semaphore {
     /// # Examples
     ///
     ///```
-    /// use tokio::sync::Semaphore;
+    /// use tokio::sync::{Semaphore, TryAcquireError};
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -243,8 +243,8 @@ impl Semaphore {
     ///     let permit_2 = semaphore.try_acquire().unwrap();
     ///     assert_eq!(semaphore.available_permits(), 0);
     ///
-    ///     drop(permit_1);
-    ///     assert_eq!(semaphore.available_permits(), 1);
+    ///     let permit_3 = semaphore.try_acquire();
+    ///     assert_eq!(permit_3.err(), Some(TryAcquireError::NoPermits));
     /// }
     /// ```
     ///
@@ -356,11 +356,11 @@ impl Semaphore {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let semaphore = Arc::new(Semaphore::new(15));
+    ///     let semaphore = Arc::new(Semaphore::new(10));
     ///     let mut join_handles = Vec::new();
     ///
     ///     for i in 1..=5 {
-    ///         let permit = semaphore.clone().acquire_many_owned(i).await.unwrap();
+    ///         let permit = semaphore.clone().acquire_many_owned(2).await.unwrap();
     ///         join_handles.push(tokio::spawn(async move {
     ///             // perform task...
     ///             // explicitly own `permit` in the task
@@ -453,11 +453,11 @@ impl Semaphore {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let semaphore = Arc::new(Semaphore::new(15));
+    ///     let semaphore = Arc::new(Semaphore::new(10));
     ///     let mut join_handles = Vec::new();
     ///
     ///     for i in 1..=5 {
-    ///         let permit = semaphore.clone().try_acquire_many_owned(i).unwrap();
+    ///         let permit = semaphore.clone().try_acquire_many_owned(2).unwrap();
     ///         join_handles.push(tokio::spawn(async move {
     ///             // perform task...
     ///             // explicitly own `permit` in the task
