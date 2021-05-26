@@ -86,7 +86,7 @@
 //! ```
 //!
 //! Again, like `std::thread`'s [`JoinHandle` type][thread_join], if the spawned
-//! task panics, awaiting its `JoinHandle` will return a [`JoinError`]`. For
+//! task panics, awaiting its `JoinHandle` will return a [`JoinError`]. For
 //! example:
 //!
 //! ```
