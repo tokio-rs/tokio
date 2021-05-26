@@ -158,14 +158,15 @@ impl Semaphore {
     /// #[tokio::main]
     /// async fn main() {
     ///     let semaphore = Semaphore::new(2);
-    ///     let p1 = semaphore.acquire().await;
-    ///     let p2 = semaphore.acquire().await;
-    ///     assert_eq!(p1.is_ok(), true);
-    ///     assert_eq!(p2.is_ok(), true);
+    ///
+    ///     let permit_1 = semaphore.acquire().await.unwrap();
+    ///     assert_eq!(semaphore.available_permits(), 1);
+    ///
+    ///     let permit_2 = semaphore.acquire().await.unwrap();
     ///     assert_eq!(semaphore.available_permits(), 0);
-    ///     semaphore.close();
-    ///     let p3 = semaphore.acquire().await;
-    ///     assert_eq!(p3.is_err(), true);
+    ///
+    ///     drop(permit_1);
+    ///     assert_eq!(semaphore.available_permits(), 1);
     /// }
     /// ```
     ///
