@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1621980856832,
+  "lastUpdate": 1622013929658,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -46593,6 +46593,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 977,
             "range": "± 44",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "petrosagg@gmail.com",
+            "name": "Petros Angelatos",
+            "username": "petrosagg"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4abeca7bc5729abd1212e00c0b38139932eb6780",
+          "message": "io: impl AsyncSeek for BufStream (#3810)\n\nSigned-off-by: Petros Angelatos <petrosagg@gmail.com>",
+          "timestamp": "2021-05-26T07:11:47+09:00",
+          "tree_id": "259187a739f10986085a1c410b0b73df6a9e97ef",
+          "url": "https://github.com/tokio-rs/tokio/commit/4abeca7bc5729abd1212e00c0b38139932eb6780"
+        },
+        "date": 1622013925677,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 17010,
+            "range": "± 7462",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 974,
+            "range": "± 40",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 650,
+            "range": "± 32",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15104,
+            "range": "± 4348",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 954,
+            "range": "± 79",
             "unit": "ns/iter"
           }
         ]
