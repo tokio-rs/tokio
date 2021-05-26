@@ -88,13 +88,10 @@ cfg_test_util! {
     ///
     /// # Auto-advance
     ///
-    /// If time is paused, when the runtime has no work to do, the clock is
-    /// auto-advanced to the closest pending timer. This can cause some
-    /// confusion, because if a [`Sleep`] (or other timer-backed primitive) is
-    /// `.await`ed, the timer is set forward unexpectedly. However, this
-    /// behavior is necessary because there could be situations in which the
-    /// runtime hangs because the clock never gets advanced, so a timer never
-    /// resolves.
+    /// If time is paused and the runtime has no work to do, the clock is
+    /// auto-advanced to the next pending timer. This means that [`Sleep`] or
+    /// other timer-backed primitives can cause the runtime to advance the
+    /// current time when awaited.
     ///
     /// [`Sleep`]: crate::time::Sleep
     pub fn pause() {
@@ -135,8 +132,8 @@ cfg_test_util! {
     /// # Auto-advance
     ///
     /// If the time is paused and there is no work to do, the runtime advances
-    /// time to the next-closest timer, which may cause confusion. See
-    /// [`pause`](pause#auto-advance) for more details.
+    /// time to the next timer. See [`pause`](pause#auto-advance) for more
+    /// details.
     pub async fn advance(duration: Duration) {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         let until = clock.now() + duration;
