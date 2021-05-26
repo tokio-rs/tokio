@@ -54,7 +54,7 @@ A basic TCP echo server with Tokio.
 
 Make sure you activated the full features of the tokio crate on Cargo.toml:
 
-```text
+```toml
 [dependencies]
 tokio = { version = "1.5.0", features = ["full"] }
 ```
@@ -66,7 +66,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
 
     loop {
         let (mut socket, _) = listener.accept().await?;

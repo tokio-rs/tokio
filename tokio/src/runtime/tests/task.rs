@@ -79,7 +79,7 @@ static CURRENT: TryLock<Option<Runtime>> = TryLock::new(None);
 
 impl Runtime {
     fn tick(&self) -> usize {
-        self.tick_max(usize::max_value())
+        self.tick_max(usize::MAX)
     }
 
     fn tick_max(&self, max: usize) -> usize {

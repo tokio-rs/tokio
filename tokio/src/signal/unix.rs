@@ -9,7 +9,6 @@ use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storag
 use crate::signal::RxFuture;
 use crate::sync::watch;
 
-use libc::c_int;
 use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
@@ -61,7 +60,7 @@ impl Init for OsExtraData {
 
 /// Represents the specific kind of signal to listen for.
 #[derive(Debug, Clone, Copy)]
-pub struct SignalKind(c_int);
+pub struct SignalKind(libc::c_int);
 
 impl SignalKind {
     /// Allows for listening to any valid OS signal.
@@ -74,8 +73,14 @@ impl SignalKind {
     /// // let signum = libc::OS_SPECIFIC_SIGNAL;
     /// let kind = SignalKind::from_raw(signum);
     /// ```
-    pub fn from_raw(signum: c_int) -> Self {
-        Self(signum)
+    // Use `std::os::raw::c_int` on public API to prevent leaking a non-stable
+    // type alias from libc.
+    // `libc::c_int` and `std::os::raw::c_int` are currently the same type, and are
+    // unlikely to change to other types, but technically libc can change this
+    // in the future minor version.
+    // See https://github.com/tokio-rs/tokio/issues/3767 for more.
+    pub fn from_raw(signum: std::os::raw::c_int) -> Self {
+        Self(signum as libc::c_int)
     }
 
     /// Represents the SIGALRM signal.
@@ -208,7 +213,7 @@ impl Default for SignalInfo {
 /// 2. Wake up the driver by writing a byte to a pipe
 ///
 /// Those two operations should both be async-signal safe.
-fn action(globals: Pin<&'static Globals>, signal: c_int) {
+fn action(globals: Pin<&'static Globals>, signal: libc::c_int) {
     globals.record_event(signal as EventId);
 
     // Send a wakeup, ignore any errors (anything reasonably possible is
@@ -222,7 +227,7 @@ fn action(globals: Pin<&'static Globals>, signal: c_int) {
 ///
 /// This will register the signal handler if it hasn't already been registered,
 /// returning any error along the way if that fails.
-fn signal_enable(signal: SignalKind, handle: Handle) -> io::Result<()> {
+fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     let signal = signal.0;
     if signal < 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
         return Err(Error::new(
@@ -352,7 +357,7 @@ pub struct Signal {
 /// * If the signal is one of
 ///   [`signal_hook::FORBIDDEN`](fn@signal_hook_registry::register#panics)
 pub fn signal(kind: SignalKind) -> io::Result<Signal> {
-    let rx = signal_with_handle(kind, Handle::current())?;
+    let rx = signal_with_handle(kind, &Handle::current())?;
 
     Ok(Signal {
         inner: RxFuture::new(rx),
@@ -361,7 +366,7 @@ pub fn signal(kind: SignalKind) -> io::Result<Signal> {
 
 pub(crate) fn signal_with_handle(
     kind: SignalKind,
-    handle: Handle,
+    handle: &Handle,
 ) -> io::Result<watch::Receiver<()>> {
     // Turn the signal delivery on once we are ready for it
     signal_enable(kind, handle)?;
@@ -457,14 +462,14 @@ mod tests {
 
     #[test]
     fn signal_enable_error_on_invalid_input() {
-        signal_enable(SignalKind::from_raw(-1), Handle::default()).unwrap_err();
+        signal_enable(SignalKind::from_raw(-1), &Handle::default()).unwrap_err();
     }
 
     #[test]
     fn signal_enable_error_on_forbidden_input() {
         signal_enable(
             SignalKind::from_raw(signal_hook_registry::FORBIDDEN[0]),
-            Handle::default(),
+            &Handle::default(),
         )
         .unwrap_err();
     }

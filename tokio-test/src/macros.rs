@@ -259,3 +259,37 @@ macro_rules! assert_err {
         }
     }};
 }
+
+/// Asserts that an exact duration has elapsed since since the start instant ±1ms.
+///
+/// ```rust
+/// use tokio::time::{self, Instant};
+/// use std::time::Duration;
+/// use tokio_test::assert_elapsed;
+/// # async fn test_time_passed() {
+///
+/// let start = Instant::now();
+/// let dur = Duration::from_millis(50);
+/// time::sleep(dur).await;
+/// assert_elapsed!(start, dur);
+/// # }
+/// ```
+///
+/// This 1ms buffer is required because Tokio's hashed-wheel timer has finite time resolution and
+/// will not always sleep for the exact interval.
+#[macro_export]
+macro_rules! assert_elapsed {
+    ($start:expr, $dur:expr) => {{
+        let elapsed = $start.elapsed();
+        // type ascription improves compiler error when wrong type is passed
+        let lower: std::time::Duration = $dur;
+
+        // Handles ms rounding
+        assert!(
+            elapsed >= lower && elapsed <= lower + std::time::Duration::from_millis(1),
+            "actual = {:?}, expected = {:?}",
+            elapsed,
+            lower
+        );
+    }};
+}

@@ -86,7 +86,7 @@
 //! ```
 //!
 //! Again, like `std::thread`'s [`JoinHandle` type][thread_join], if the spawned
-//! task panics, awaiting its `JoinHandle` will return a [`JoinError`]`. For
+//! task panics, awaiting its `JoinHandle` will return a [`JoinError`]. For
 //! example:
 //!
 //! ```
@@ -121,6 +121,11 @@
 //!
 //! Instead, Tokio provides two APIs for running blocking operations in an
 //! asynchronous context: [`task::spawn_blocking`] and [`task::block_in_place`].
+//!
+//! Be aware that if you call a non-async method from async code, that non-async
+//! method is still inside the asynchronous context, so you should also avoid
+//! blocking operations there. This includes destructors of objects destroyed in
+//! async code.
 //!
 //! #### spawn_blocking
 //!

@@ -89,12 +89,12 @@ fn size_overflow() {
         }
 
         fn size_hint(&self) -> (usize, Option<usize>) {
-            (usize::max_value(), Some(usize::max_value()))
+            (usize::MAX, Some(usize::MAX))
         }
     }
 
     let m1 = Monster;
     let m2 = Monster;
     let m = m1.chain(m2);
-    assert_eq!(m.size_hint(), (usize::max_value(), None));
+    assert_eq!(m.size_hint(), (usize::MAX, None));
 }

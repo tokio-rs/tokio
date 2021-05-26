@@ -4,9 +4,9 @@ use crate::sync::batch_semaphore as semaphore;
 
 use std::cell::UnsafeCell;
 use std::error::Error;
-use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::{fmt, marker, mem};
 
 /// An asynchronous `Mutex`-like type.
 ///
@@ -160,6 +160,19 @@ pub struct OwnedMutexGuard<T: ?Sized> {
     lock: Arc<Mutex<T>>,
 }
 
+/// A handle to a held `Mutex` that has had a function applied to it via [`MutexGuard::map`].
+///
+/// This can be used to hold a subfield of the protected data.
+///
+/// [`MutexGuard::map`]: method@MutexGuard::map
+#[must_use = "if unused the Mutex will immediately unlock"]
+pub struct MappedMutexGuard<'a, T: ?Sized> {
+    s: &'a semaphore::Semaphore,
+    data: *mut T,
+    // Needed to tell the borrow checker that we are holding a `&mut T`
+    marker: marker::PhantomData<&'a mut T>,
+}
+
 // As long as T: Send, it's fine to send and share Mutex<T> between threads.
 // If T was not Send, sending and sharing a Mutex<T> would be bad, since you can
 // access T through Mutex<T>.
@@ -167,6 +180,8 @@ unsafe impl<T> Send for Mutex<T> where T: ?Sized + Send {}
 unsafe impl<T> Sync for Mutex<T> where T: ?Sized + Send {}
 unsafe impl<T> Sync for MutexGuard<'_, T> where T: ?Sized + Send + Sync {}
 unsafe impl<T> Sync for OwnedMutexGuard<T> where T: ?Sized + Send + Sync {}
+unsafe impl<'a, T> Sync for MappedMutexGuard<'a, T> where T: ?Sized + Sync + 'a {}
+unsafe impl<'a, T> Send for MappedMutexGuard<'a, T> where T: ?Sized + Send + 'a {}
 
 /// Error returned from the [`Mutex::try_lock`], [`RwLock::try_read`] and
 /// [`RwLock::try_write`] functions.
@@ -451,6 +466,103 @@ where
 
 // === impl MutexGuard ===
 
+impl<'a, T: ?Sized> MutexGuard<'a, T> {
+    /// Makes a new [`MappedMutexGuard`] for a component of the locked data.
+    ///
+    /// This operation cannot fail as the [`MutexGuard`] passed in already locked the mutex.
+    ///
+    /// This is an associated function that needs to be used as `MutexGuard::map(...)`. A method
+    /// would interfere with methods of the same name on the contents of the locked data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::{Mutex, MutexGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let foo = Mutex::new(Foo(1));
+    ///
+    /// {
+    ///     let mut mapped = MutexGuard::map(foo.lock().await, |f| &mut f.0);
+    ///     *mapped = 2;
+    /// }
+    ///
+    /// assert_eq!(Foo(2), *foo.lock().await);
+    /// # }
+    /// ```
+    ///
+    /// [`MutexGuard`]: struct@MutexGuard
+    /// [`MappedMutexGuard`]: struct@MappedMutexGuard
+    #[inline]
+    pub fn map<U, F>(mut this: Self, f: F) -> MappedMutexGuard<'a, U>
+    where
+        F: FnOnce(&mut T) -> &mut U,
+    {
+        let data = f(&mut *this) as *mut U;
+        let s = &this.lock.s;
+        mem::forget(this);
+        MappedMutexGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        }
+    }
+
+    /// Attempts to make a new [`MappedMutexGuard`] for a component of the locked data. The
+    /// original guard is returned if the closure returns `None`.
+    ///
+    /// This operation cannot fail as the [`MutexGuard`] passed in already locked the mutex.
+    ///
+    /// This is an associated function that needs to be used as `MutexGuard::try_map(...)`. A
+    /// method would interfere with methods of the same name on the contents of the locked data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::{Mutex, MutexGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let foo = Mutex::new(Foo(1));
+    ///
+    /// {
+    ///     let mut mapped = MutexGuard::try_map(foo.lock().await, |f| Some(&mut f.0))
+    ///         .expect("should not fail");
+    ///     *mapped = 2;
+    /// }
+    ///
+    /// assert_eq!(Foo(2), *foo.lock().await);
+    /// # }
+    /// ```
+    ///
+    /// [`MutexGuard`]: struct@MutexGuard
+    /// [`MappedMutexGuard`]: struct@MappedMutexGuard
+    #[inline]
+    pub fn try_map<U, F>(mut this: Self, f: F) -> Result<MappedMutexGuard<'a, U>, Self>
+    where
+        F: FnOnce(&mut T) -> Option<&mut U>,
+    {
+        let data = match f(&mut *this) {
+            Some(data) => data as *mut U,
+            None => return Err(this),
+        };
+        let s = &this.lock.s;
+        mem::forget(this);
+        Ok(MappedMutexGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        })
+    }
+}
+
 impl<T: ?Sized> Drop for MutexGuard<'_, T> {
     fn drop(&mut self) {
         self.lock.s.release(1)
@@ -510,6 +622,91 @@ impl<T: ?Sized + fmt::Debug> fmt::Debug for OwnedMutexGuard<T> {
 }
 
 impl<T: ?Sized + fmt::Display> fmt::Display for OwnedMutexGuard<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&**self, f)
+    }
+}
+
+// === impl MappedMutexGuard ===
+
+impl<'a, T: ?Sized> MappedMutexGuard<'a, T> {
+    /// Makes a new [`MappedMutexGuard`] for a component of the locked data.
+    ///
+    /// This operation cannot fail as the [`MappedMutexGuard`] passed in already locked the mutex.
+    ///
+    /// This is an associated function that needs to be used as `MappedMutexGuard::map(...)`. A
+    /// method would interfere with methods of the same name on the contents of the locked data.
+    ///
+    /// [`MappedMutexGuard`]: struct@MappedMutexGuard
+    #[inline]
+    pub fn map<U, F>(mut this: Self, f: F) -> MappedMutexGuard<'a, U>
+    where
+        F: FnOnce(&mut T) -> &mut U,
+    {
+        let data = f(&mut *this) as *mut U;
+        let s = this.s;
+        mem::forget(this);
+        MappedMutexGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        }
+    }
+
+    /// Attempts to make a new [`MappedMutexGuard`] for a component of the locked data. The
+    /// original guard is returned if the closure returns `None`.
+    ///
+    /// This operation cannot fail as the [`MappedMutexGuard`] passed in already locked the mutex.
+    ///
+    /// This is an associated function that needs to be used as `MappedMutexGuard::try_map(...)`. A
+    /// method would interfere with methods of the same name on the contents of the locked data.
+    ///
+    /// [`MappedMutexGuard`]: struct@MappedMutexGuard
+    #[inline]
+    pub fn try_map<U, F>(mut this: Self, f: F) -> Result<MappedMutexGuard<'a, U>, Self>
+    where
+        F: FnOnce(&mut T) -> Option<&mut U>,
+    {
+        let data = match f(&mut *this) {
+            Some(data) => data as *mut U,
+            None => return Err(this),
+        };
+        let s = this.s;
+        mem::forget(this);
+        Ok(MappedMutexGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        })
+    }
+}
+
+impl<'a, T: ?Sized> Drop for MappedMutexGuard<'a, T> {
+    fn drop(&mut self) {
+        self.s.release(1)
+    }
+}
+
+impl<'a, T: ?Sized> Deref for MappedMutexGuard<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.data }
+    }
+}
+
+impl<'a, T: ?Sized> DerefMut for MappedMutexGuard<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *self.data }
+    }
+}
+
+impl<'a, T: ?Sized + fmt::Debug> fmt::Debug for MappedMutexGuard<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
+    }
+}
+
+impl<'a, T: ?Sized + fmt::Display> fmt::Display for MappedMutexGuard<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }

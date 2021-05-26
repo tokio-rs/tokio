@@ -119,7 +119,7 @@ impl Wheel {
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
             let when = item.as_ref().cached_when();
-            if when == u64::max_value() {
+            if when == u64::MAX {
                 self.pending.remove(item);
             } else {
                 debug_assert!(

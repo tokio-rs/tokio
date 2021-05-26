@@ -1,11 +1,11 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
-use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
+use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
-use std::io;
+use std::io::{self, SeekFrom};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{cmp, fmt};
+use std::{cmp, fmt, mem};
 
 pin_project! {
     /// The `BufReader` struct adds buffering to any reader.
@@ -30,6 +30,7 @@ pin_project! {
         pub(super) buf: Box<[u8]>,
         pub(super) pos: usize,
         pub(super) cap: usize,
+        pub(super) seek_state: SeekState,
     }
 }
 
@@ -48,6 +49,7 @@ impl<R: AsyncRead> BufReader<R> {
             buf: buffer.into_boxed_slice(),
             pos: 0,
             cap: 0,
+            seek_state: SeekState::Init,
         }
     }
 
@@ -138,6 +140,122 @@ impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
     fn consume(self: Pin<&mut Self>, amt: usize) {
         let me = self.project();
         *me.pos = cmp::min(*me.pos + amt, *me.cap);
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) enum SeekState {
+    /// start_seek has not been called.
+    Init,
+    /// start_seek has been called, but poll_complete has not yet been called.
+    Start(SeekFrom),
+    /// Waiting for completion of the first poll_complete in the `n.checked_sub(remainder).is_none()` branch.
+    PendingOverflowed(i64),
+    /// Waiting for completion of poll_complete.
+    Pending,
+}
+
+/// Seek to an offset, in bytes, in the underlying reader.
+///
+/// The position used for seeking with `SeekFrom::Current(_)` is the
+/// position the underlying reader would be at if the `BufReader` had no
+/// internal buffer.
+///
+/// Seeking always discards the internal buffer, even if the seek position
+/// would otherwise fall within it. This guarantees that calling
+/// `.into_inner()` immediately after a seek yields the underlying reader
+/// at the same position.
+///
+/// See [`AsyncSeek`] for more details.
+///
+/// Note: In the edge case where you're seeking with `SeekFrom::Current(n)`
+/// where `n` minus the internal buffer length overflows an `i64`, two
+/// seeks will be performed instead of one. If the second seek returns
+/// `Err`, the underlying reader will be left at the same position it would
+/// have if you called `seek` with `SeekFrom::Current(0)`.
+impl<R: AsyncRead + AsyncSeek> AsyncSeek for BufReader<R> {
+    fn start_seek(self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
+        // We needs to call seek operation multiple times.
+        // And we should always call both start_seek and poll_complete,
+        // as start_seek alone cannot guarantee that the operation will be completed.
+        // poll_complete receives a Context and returns a Poll, so it cannot be called
+        // inside start_seek.
+        *self.project().seek_state = SeekState::Start(pos);
+        Ok(())
+    }
+
+    fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        let res = match mem::replace(self.as_mut().project().seek_state, SeekState::Init) {
+            SeekState::Init => {
+                // 1.x AsyncSeek recommends calling poll_complete before start_seek.
+                // We don't have to guarantee that the value returned by
+                // poll_complete called without start_seek is correct,
+                // so we'll return 0.
+                return Poll::Ready(Ok(0));
+            }
+            SeekState::Start(SeekFrom::Current(n)) => {
+                let remainder = (self.cap - self.pos) as i64;
+                // it should be safe to assume that remainder fits within an i64 as the alternative
+                // means we managed to allocate 8 exbibytes and that's absurd.
+                // But it's not out of the realm of possibility for some weird underlying reader to
+                // support seeking by i64::MIN so we need to handle underflow when subtracting
+                // remainder.
+                if let Some(offset) = n.checked_sub(remainder) {
+                    self.as_mut()
+                        .get_pin_mut()
+                        .start_seek(SeekFrom::Current(offset))?;
+                    self.as_mut().get_pin_mut().poll_complete(cx)?
+                } else {
+                    // seek backwards by our remainder, and then by the offset
+                    self.as_mut()
+                        .get_pin_mut()
+                        .start_seek(SeekFrom::Current(-remainder))?;
+                    if self.as_mut().get_pin_mut().poll_complete(cx)?.is_pending() {
+                        *self.as_mut().project().seek_state = SeekState::PendingOverflowed(n);
+                        return Poll::Pending;
+                    }
+
+                    // https://github.com/rust-lang/rust/pull/61157#issuecomment-495932676
+                    self.as_mut().discard_buffer();
+
+                    self.as_mut()
+                        .get_pin_mut()
+                        .start_seek(SeekFrom::Current(n))?;
+                    self.as_mut().get_pin_mut().poll_complete(cx)?
+                }
+            }
+            SeekState::PendingOverflowed(n) => {
+                if self.as_mut().get_pin_mut().poll_complete(cx)?.is_pending() {
+                    *self.as_mut().project().seek_state = SeekState::PendingOverflowed(n);
+                    return Poll::Pending;
+                }
+
+                // https://github.com/rust-lang/rust/pull/61157#issuecomment-495932676
+                self.as_mut().discard_buffer();
+
+                self.as_mut()
+                    .get_pin_mut()
+                    .start_seek(SeekFrom::Current(n))?;
+                self.as_mut().get_pin_mut().poll_complete(cx)?
+            }
+            SeekState::Start(pos) => {
+                // Seeking with Start/End doesn't care about our buffer length.
+                self.as_mut().get_pin_mut().start_seek(pos)?;
+                self.as_mut().get_pin_mut().poll_complete(cx)?
+            }
+            SeekState::Pending => self.as_mut().get_pin_mut().poll_complete(cx)?,
+        };
+
+        match res {
+            Poll::Ready(res) => {
+                self.discard_buffer();
+                Poll::Ready(Ok(res))
+            }
+            Poll::Pending => {
+                *self.as_mut().project().seek_state = SeekState::Pending;
+                Poll::Pending
+            }
+        }
     }
 }
 

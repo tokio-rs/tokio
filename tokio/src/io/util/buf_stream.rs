@@ -1,8 +1,8 @@
 use crate::io::util::{BufReader, BufWriter};
-use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
+use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
-use std::io;
+use std::io::{self, SeekFrom};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -94,9 +94,11 @@ impl<RW> From<BufWriter<BufReader<RW>>> for BufStream<RW> {
                     buf: rbuf,
                     pos,
                     cap,
+                    seek_state: rseek_state,
                 },
             buf: wbuf,
             written,
+            seek_state: wseek_state,
         } = b;
 
         BufStream {
@@ -105,10 +107,12 @@ impl<RW> From<BufWriter<BufReader<RW>>> for BufStream<RW> {
                     inner,
                     buf: wbuf,
                     written,
+                    seek_state: wseek_state,
                 },
                 buf: rbuf,
                 pos,
                 cap,
+                seek_state: rseek_state,
             },
         }
     }
@@ -139,6 +143,34 @@ impl<RW: AsyncRead + AsyncWrite> AsyncRead for BufStream<RW> {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         self.project().inner.poll_read(cx, buf)
+    }
+}
+
+/// Seek to an offset, in bytes, in the underlying stream.
+///
+/// The position used for seeking with `SeekFrom::Current(_)` is the
+/// position the underlying stream would be at if the `BufStream` had no
+/// internal buffer.
+///
+/// Seeking always discards the internal buffer, even if the seek position
+/// would otherwise fall within it. This guarantees that calling
+/// `.into_inner()` immediately after a seek yields the underlying reader
+/// at the same position.
+///
+/// See [`AsyncSeek`] for more details.
+///
+/// Note: In the edge case where you're seeking with `SeekFrom::Current(n)`
+/// where `n` minus the internal buffer length overflows an `i64`, two
+/// seeks will be performed instead of one. If the second seek returns
+/// `Err`, the underlying reader will be left at the same position it would
+/// have if you called `seek` with `SeekFrom::Current(0)`.
+impl<RW: AsyncRead + AsyncWrite + AsyncSeek> AsyncSeek for BufStream<RW> {
+    fn start_seek(self: Pin<&mut Self>, position: SeekFrom) -> io::Result<()> {
+        self.project().inner.start_seek(position)
+    }
+
+    fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        self.project().inner.poll_complete(cx)
     }
 }
 

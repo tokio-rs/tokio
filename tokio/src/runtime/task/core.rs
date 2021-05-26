@@ -279,7 +279,7 @@ impl<T: Future> CoreStage<T> {
             // Safety:: the caller ensures mutal exclusion to the field.
             match mem::replace(unsafe { &mut *ptr }, Stage::Consumed) {
                 Stage::Finished(output) => output,
-                _ => panic!("unexpected task state"),
+                _ => panic!("JoinHandle polled after completion"),
             }
         })
     }

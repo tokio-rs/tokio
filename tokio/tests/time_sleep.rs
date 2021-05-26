@@ -7,22 +7,7 @@ use std::task::Context;
 use futures::task::noop_waker_ref;
 
 use tokio::time::{self, Duration, Instant};
-use tokio_test::{assert_pending, assert_ready, task};
-
-macro_rules! assert_elapsed {
-    ($now:expr, $ms:expr) => {{
-        let elapsed = $now.elapsed();
-        let lower = ms($ms);
-
-        // Handles ms rounding
-        assert!(
-            elapsed >= lower && elapsed <= lower + ms(1),
-            "actual = {:?}, expected = {:?}",
-            elapsed,
-            lower
-        );
-    }};
-}
+use tokio_test::{assert_elapsed, assert_pending, assert_ready, task};
 
 #[tokio::test]
 async fn immediate_sleep() {
@@ -32,7 +17,7 @@ async fn immediate_sleep() {
 
     // Ready!
     time::sleep_until(now).await;
-    assert_elapsed!(now, 0);
+    assert_elapsed!(now, ms(1));
 }
 
 #[tokio::test]
@@ -60,10 +45,11 @@ async fn delayed_sleep_level_0() {
 
     for &i in &[1, 10, 60] {
         let now = Instant::now();
+        let dur = ms(i);
 
-        time::sleep_until(now + ms(i)).await;
+        time::sleep_until(now + dur).await;
 
-        assert_elapsed!(now, i);
+        assert_elapsed!(now, dur);
     }
 }
 
@@ -77,7 +63,7 @@ async fn sub_ms_delayed_sleep() {
 
         time::sleep_until(deadline).await;
 
-        assert_elapsed!(now, 1);
+        assert_elapsed!(now, ms(1));
     }
 }
 
@@ -90,7 +76,7 @@ async fn delayed_sleep_wrapping_level_0() {
     let now = Instant::now();
     time::sleep_until(now + ms(60)).await;
 
-    assert_elapsed!(now, 60);
+    assert_elapsed!(now, ms(60));
 }
 
 #[tokio::test]
@@ -107,7 +93,7 @@ async fn reset_future_sleep_before_fire() {
     sleep.as_mut().reset(Instant::now() + ms(200));
     sleep.await;
 
-    assert_elapsed!(now, 200);
+    assert_elapsed!(now, ms(200));
 }
 
 #[tokio::test]
@@ -124,7 +110,7 @@ async fn reset_past_sleep_before_turn() {
     sleep.as_mut().reset(now + ms(80));
     sleep.await;
 
-    assert_elapsed!(now, 80);
+    assert_elapsed!(now, ms(80));
 }
 
 #[tokio::test]
@@ -143,7 +129,7 @@ async fn reset_past_sleep_before_fire() {
     sleep.as_mut().reset(now + ms(80));
     sleep.await;
 
-    assert_elapsed!(now, 80);
+    assert_elapsed!(now, ms(80));
 }
 
 #[tokio::test]
@@ -154,11 +140,11 @@ async fn reset_future_sleep_after_fire() {
     let mut sleep = Box::pin(time::sleep_until(now + ms(100)));
 
     sleep.as_mut().await;
-    assert_elapsed!(now, 100);
+    assert_elapsed!(now, ms(100));
 
     sleep.as_mut().reset(now + ms(110));
     sleep.await;
-    assert_elapsed!(now, 110);
+    assert_elapsed!(now, ms(110));
 }
 
 #[tokio::test]
