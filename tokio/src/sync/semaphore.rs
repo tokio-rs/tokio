@@ -26,6 +26,8 @@ use std::sync::Arc;
 ///
 /// # Examples
 ///
+/// Basic usage:
+///
 /// ```
 /// use tokio::sync::{Semaphore, TryAcquireError};
 ///
@@ -403,7 +405,6 @@ impl Semaphore {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     // use [`acquire_owned`] to move permits across tasks
     ///     let semaphore = Arc::new(Semaphore::new(5));
     ///     let mut join_handles = Vec::new();
     ///
@@ -452,7 +453,6 @@ impl Semaphore {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     // use [`acquire_owned`] to move permits across tasks
     ///     let semaphore = Arc::new(Semaphore::new(15));
     ///     let mut join_handles = Vec::new();
     ///
