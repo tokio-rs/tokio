@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622031931342,
+  "lastUpdate": 1622031935413,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -16253,6 +16253,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 562,
             "range": "± 37",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rafael.bachmann.93@gmail.com",
+            "name": "Rafael Bachmann",
+            "username": "barafael"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "81ee3d202a9e748e19e641acd052fe3566eb65aa",
+          "message": "doc: fix minor doc typo (stray backtick) (#3814)",
+          "timestamp": "2021-05-26T14:23:39+02:00",
+          "tree_id": "90b1cc6e8b614c8b1821518ae5be31d322beb0c7",
+          "url": "https://github.com/tokio-rs/tokio/commit/81ee3d202a9e748e19e641acd052fe3566eb65aa"
+        },
+        "date": 1622031930792,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 845,
+            "range": "± 129",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15530,
+            "range": "± 5540",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 879,
+            "range": "± 222",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15363,
+            "range": "± 5478",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 511,
+            "range": "± 116",
             "unit": "ns/iter"
           }
         ]
