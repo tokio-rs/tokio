@@ -109,7 +109,10 @@ impl<T> Local<T> {
     }
 
     /// Pushes a task to the back of the local queue, skipping the LIFO slot.
-    pub(super) fn push_back(&mut self, mut task: task::Notified<T>, inject: &Inject<T>) {
+    pub(super) fn push_back(&mut self, mut task: task::Notified<T>, inject: &Inject<T>)
+    where
+        T: crate::runtime::task::Schedule,
+    {
         let tail = loop {
             let head = self.inner.head.load(Acquire);
             let (steal, real) = unpack(head);
@@ -504,7 +507,10 @@ impl<T: 'static> Inject<T> {
     }
 
     /// Pushes a value into the queue.
-    pub(super) fn push(&self, task: task::Notified<T>) {
+    pub(super) fn push(&self, task: task::Notified<T>)
+    where
+        T: crate::runtime::task::Schedule,
+    {
         // Acquire queue lock
         let mut p = self.pointers.lock();
 
@@ -512,7 +518,7 @@ impl<T: 'static> Inject<T> {
             // Drop the mutex to avoid a potential deadlock when
             // re-entering.
             drop(p);
-            drop(task);
+            task.shutdown();
             return;
         }
 
