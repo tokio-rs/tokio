@@ -480,16 +480,6 @@ impl<T: AsRawFd> Drop for AsyncFd<T> {
 }
 
 impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
-    /// Returns a shared reference to the inner [`AsyncFd`].
-    pub fn get_ref(&self) -> &AsyncFd<Inner> {
-        self.async_fd
-    }
-
-    /// Returns a shared reference to the backing object of the inner [`AsyncFd`].
-    pub fn get_inner(&self) -> &Inner {
-        self.get_ref().get_ref()
-    }
-
     /// Indicates to tokio that the file descriptor is no longer ready. The
     /// internal readiness flag will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
@@ -550,16 +540,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
             result => Ok(result),
         }
     }
-}
 
-impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// Returns a shared reference to the inner [`AsyncFd`].
     pub fn get_ref(&self) -> &AsyncFd<Inner> {
-        self.async_fd
-    }
-
-    /// Returns a mutable reference to the inner [`AsyncFd`].
-    pub fn get_mut(&mut self) -> &mut AsyncFd<Inner> {
         self.async_fd
     }
 
@@ -567,12 +550,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     pub fn get_inner(&self) -> &Inner {
         self.get_ref().get_ref()
     }
+}
 
-    /// Returns a mutable reference to the backing object of the inner [`AsyncFd`].
-    pub fn get_inner_mut(&mut self) -> &mut Inner {
-        self.get_mut().get_mut()
-    }
-
+impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// Indicates to tokio that the file descriptor is no longer ready. The
     /// internal readiness flag will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
@@ -630,6 +610,26 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
             Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
             result => Ok(result),
         }
+    }
+
+    /// Returns a shared reference to the inner [`AsyncFd`].
+    pub fn get_ref(&self) -> &AsyncFd<Inner> {
+        self.async_fd
+    }
+
+    /// Returns a mutable reference to the inner [`AsyncFd`].
+    pub fn get_mut(&mut self) -> &mut AsyncFd<Inner> {
+        self.async_fd
+    }
+
+    /// Returns a shared reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner(&self) -> &Inner {
+        self.get_ref().get_ref()
+    }
+
+    /// Returns a mutable reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner_mut(&mut self) -> &mut Inner {
+        self.get_mut().get_mut()
     }
 }
 
