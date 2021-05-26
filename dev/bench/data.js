@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622033769925,
+  "lastUpdate": 1622033773751,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -30853,6 +30853,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18380726,
             "range": "± 2650283",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rafael.bachmann.93@gmail.com",
+            "name": "Rafael Bachmann",
+            "username": "barafael"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "81ee3d202a9e748e19e641acd052fe3566eb65aa",
+          "message": "doc: fix minor doc typo (stray backtick) (#3814)",
+          "timestamp": "2021-05-26T14:23:39+02:00",
+          "tree_id": "90b1cc6e8b614c8b1821518ae5be31d322beb0c7",
+          "url": "https://github.com/tokio-rs/tokio/commit/81ee3d202a9e748e19e641acd052fe3566eb65aa"
+        },
+        "date": 1622033766806,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 186796,
+            "range": "± 78350",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 683207,
+            "range": "± 132048",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4528127,
+            "range": "± 1365209",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19043434,
+            "range": "± 3796899",
             "unit": "ns/iter"
           }
         ]
