@@ -208,7 +208,7 @@ impl<T> Receiver<T> {
         Self { shared, version }
     }
 
-    /// Returns a reference to the most recently sent value
+    /// Returns a reference to the most recently sent value.
     ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
     /// could cause the send half to block. It is recommended to keep the borrow
@@ -224,6 +224,23 @@ impl<T> Receiver<T> {
     /// ```
     pub fn borrow(&self) -> Ref<'_, T> {
         let inner = self.shared.value.read().unwrap();
+        Ref { inner }
+    }
+
+    /// Returns a reference to the most recently sent value and mark that value
+    /// as seen.
+    ///
+    /// Any future calls to [`changed`] on this receiver will return immediately
+    /// if no new messages have been sent since `borrow_and_update` was called.
+    ///
+    /// Outstanding borrows hold a read lock. This means that long lived borrows
+    /// could cause the send half to block. It is recommended to keep the borrow
+    /// as short lived as possible.
+    ///
+    /// [`changed`]: Receiver::changed
+    pub fn borrow_and_update(&mut self) -> Ref<'_, T> {
+        let inner = self.shared.value.read().unwrap();
+        self.version = self.shared.version.load(SeqCst);
         Ref { inner }
     }
 
@@ -328,10 +345,21 @@ impl<T> Sender<T> {
             return Err(error::SendError { inner: value });
         }
 
-        *self.shared.value.write().unwrap() = value;
+        {
+            // Acquire the write lock and update the value.
+            let mut lock = self.shared.value.write().unwrap();
+            *lock = value;
 
-        // Update the version. 2 is used so that the CLOSED bit is not set.
-        self.shared.version.fetch_add(2, SeqCst);
+            // Update the version. 2 is used so that the CLOSED bit is not set.
+            self.shared.version.fetch_add(2, SeqCst);
+
+            // Release the write lock.
+            //
+            // Incrementing the version counter while holding the lock ensures
+            // that receivers are able to figure out the version number of the
+            // value they are currently looking at.
+            drop(lock);
+        }
 
         // Notify all watchers
         self.shared.notify_rx.notify_waiters();
