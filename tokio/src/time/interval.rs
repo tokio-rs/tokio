@@ -119,13 +119,13 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 /// following:
 ///
 /// ```
-/// use tokio::time;
-///
+/// use tokio::time::{self, Duration};
 /// # async fn task_that_takes_one_to_three_seconds() {}
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut interval = time::interval(time::Duration::from_secs(2));
+///     // ticks every 2 seconds
+///     let mut interval = time::interval(Duration::from_secs(2));
 ///     for _ in 0..5 {
 ///         interval.tick().await;
 ///         // if this takes more than 2 seconds, a tick will be delayed
@@ -134,17 +134,16 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 /// }
 /// ```
 ///
-/// Generally, a tick is missed if someone spends too much time without calling
-/// [`tick()`](Interval::tick).
+/// Generally, a tick is missed if too much time is spent without calling
+/// [`Interval::tick()`].
 ///
-/// By default, when at tick is missed, [`Interval`] fires ticks as quickly as
-/// it can until it is back to where it should be. However, this is not always
-/// the desired behavior. `MissedTickBehavior` allows users to specify which
-/// behavior they want [`Interval`] to exhibit. Each variant represents a
-/// different strategy.
+/// By default, when a tick is missed, [`Interval`] fires ticks as quickly as it
+/// can until it is "caught up" in time to where it should be.
+/// `MissedTickBehavior` can be used to specify a different behavior for
+/// [`Interval`] to exhibit. Each variant represents a different strategy.
 ///
 /// Note that because the executor cannot guarantee exact precision with timers,
-/// these strategies will only apply when the error in time is greater than 5
+/// these strategies will only apply when the delay is greater than 5
 /// milliseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MissedTickBehavior {
@@ -152,8 +151,12 @@ pub enum MissedTickBehavior {
     ///
     /// When this strategy is used, [`Interval`] schedules ticks "normally" (the
     /// same as it would have if the ticks hadn't been delayed), which results
-    /// in ticks being fired as fast as it can until it is caught up in time to
-    /// where it should be.
+    /// in it firing ticks as fast as possible until it is caught up in time to
+    /// where it should be. Unlike [`Delay`] and [`Skip`], the ticks yielded
+    /// when `Burst` is used (the [`Instant`]s that [`tick`](Interval::tick)
+    /// yields) aren't different than they would have been if a tick had not
+    /// been missed. Like [`Skip`], and unlike [`Delay`], the ticks may be
+    /// shortened.
     ///
     /// This looks something like this:
     /// ```text
@@ -161,15 +164,91 @@ pub enum MissedTickBehavior {
     /// Actual ticks:   | work -----|          delay          | work | work | work -| work -----|
     /// ```
     ///
+    /// In code:
+    ///
+    /// ```
+    /// use tokio::time::{self, Duration, Instant};
+    /// # async fn task_that_takes_five_seconds() {
+    /// #   time::sleep(Duration::from_secs(5)).await
+    /// # }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     // ticks every two seconds
+    ///     let mut interval = time::interval(Duration::from_secs(2));
+    ///
+    ///     let start = Instant::now();
+    ///
+    ///     // ticks immediately, as expected
+    ///     // `deadline` is when `interval` was scheduled to tick; when
+    ///     // `interval` is not delayed, `deadline` should be the same as, or
+    ///     // really close to, the time right now
+    ///     let deadline = interval.tick().await;
+    ///     // because tokio's timer can't guarentee precision beyond one
+    ///     // millisecond, we test whether deadline is within one millisecond
+    ///     // of where we expect it to be
+    ///     assert!(
+    ///         start - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // ticks normally, after two seconds
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(2) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(2) + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     task_that_takes_five_seconds().await;
+    ///     // `interval` is now behind; we are at seven seconds past `start`,
+    ///     // but `interval` is scheduled to tick at four seconds past `start`
+    ///
+    ///     // ticks immediately, as it was supposed to go off three seconds ago
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(4) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(4) + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // ticks immediately, as it was supposed to go off one second ago
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(6) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(6) + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // ticks after one second
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(8) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(8) + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // ticks normally, after two seconds
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(10) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(10) + Duration::from_millis(1)
+    ///     );
+    /// }
+    /// ```
+    ///
     /// This is the default behavior when [`Interval`] is created with
     /// [`interval`] and [`interval_at`].
+    ///
+    /// [`Delay`]: MissedTickBehavior::Delay
+    /// [`Skip`]: MissedTickBehavior::Skip
     Burst,
 
-    /// Delay missed ticks to happen at multiples of `period` from when [`tick`]
-    /// was called.
+    /// Tick at multiples of `period` from when [`tick`] was called, rather than
+    /// from `start`.
     ///
-    /// When this strategy is used, [`Interval`] schedules all future ticks to
+    /// When this strategy is used and [`Interval`] has missed a tick, instead
+    /// of scheduling ticks to fire at multiples of `period` from `start` (the
+    /// time when the first tick was fired), it schedules all future ticks to
     /// happen at a regular `period` from the point when [`tick`] was called.
+    /// Unlike [`Burst`] and [`Skip`], ticks are not shortened, and they aren't
+    /// guaranteed to happen at a multiple of `period` from `start` any longer.
     ///
     /// This looks something like this:
     /// ```text
@@ -177,16 +256,87 @@ pub enum MissedTickBehavior {
     /// Actual ticks:   | work -----|          delay          | work -----| work -----| work -----|
     /// ```
     ///
-    /// Note that as a result, the ticks are no longer guaranteed to happen at
-    /// a multiple of `period` from `delay`.
+    /// In code:
     ///
+    /// ```
+    /// use tokio::time::{self, Duration, Instant, MissedTickBehavior};
+    /// # async fn task_that_takes_five_seconds() {
+    /// #   time::sleep(Duration::from_secs(5)).await
+    /// # }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     // ticks every two seconds
+    ///     let mut interval = time::interval(Duration::from_secs(2));
+    ///     interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+    ///
+    ///     let start = Instant::now();
+    ///
+    ///     // ticks immediately, as expected
+    ///     // `deadline` is when `interval` was scheduled to tick; when
+    ///     // `interval` is not delayed, `deadline` should be the same as, or
+    ///     // really close to, the time right now
+    ///     let deadline = interval.tick().await;
+    ///     // because tokio's timer can't guarentee precision beyond one
+    ///     // millisecond, we test whether deadline is within one millisecond
+    ///     // of where we expect it to be
+    ///     assert!(
+    ///         start - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // ticks normally, after two seconds
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(2) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(2) + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // `interval` is now behind; we are at seven seconds past `start`,
+    ///     // but `interval` is scheduled to tick at four seconds past `start`
+    ///     task_that_takes_five_seconds().await;
+    ///
+    ///     // ticks immediately, as it was supposed to go off three seconds ago
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(4) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(4) + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // ticks normally after two seconds, one `period` after when we last
+    ///     // called `tick` (rather than one `period` after the last `deadline`)
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(9) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(9) + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // ticks normally, after two seconds
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(11) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(11) + Duration::from_millis(1)
+    ///     );
+    /// }
+    /// ```
+    ///
+    /// [`Burst`]: MissedTickBehavior::Burst
+    /// [`Skip`]: MissedTickBehavior::Skip
     /// [`tick`]: Interval::tick
     Delay,
 
-    /// Skip the missed ticks and tick on the next multiple of `period`.
+    /// Skip missed ticks and tick on the next multiple of `period` from
+    /// `start`.
     ///
-    /// When this strategy is used, [`Interval`] schedules the next tick for the
-    /// closest multiple of `period` from when the [`Interval`] first ticked.
+    /// When this strategy is used, [`Interval`] schedules the next tick to fire
+    /// at the next-closest tick that is a multiple of `period` away from
+    /// `start` (the point where [`Interval`] first ticked). Like [`Burst`], all
+    /// ticks remain multiples of `period` away from `start`, but unlike
+    /// [`Burst`], the ticks may not be *one* multiple of `period` away from the
+    /// last tick. Like [`Delay`], the ticks are no longer the same as they
+    /// would have been if ticks had not been missed, but unlike [`Delay`], and
+    /// like [`Burst`], the ticks may be shortened to be less than one `period`
+    /// away from each other.
     ///
     /// This looks something like this:
     /// ```text
@@ -194,8 +344,73 @@ pub enum MissedTickBehavior {
     /// Actual ticks:   | work -----|          delay          | work ---| work -----| work -----|
     /// ```
     ///
-    /// Note that the ticks aren't guarenteed to be one `period` away from the
-    /// last tick, but they will be a multiple of `period` away.
+    /// In code:
+    ///
+    /// ```
+    /// use tokio::time::{self, Duration, Instant, MissedTickBehavior};
+    /// # async fn task_that_takes_five_seconds() {
+    /// #   time::sleep(Duration::from_secs(5)).await
+    /// # }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     // ticks every two seconds
+    ///     let mut interval = time::interval(Duration::from_secs(2));
+    ///     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    ///
+    ///     let start = Instant::now();
+    ///
+    ///     // ticks immediately, as expected
+    ///     // `deadline` is when `interval` was scheduled to tick; when
+    ///     // `interval` is not delayed, `deadline` should be the same as, or
+    ///     // really close to, the time right now
+    ///     let deadline = interval.tick().await;
+    ///     // because tokio's timer can't guarentee precision beyond one
+    ///     // millisecond, we test whether deadline is within one millisecond
+    ///     // of where we expect it to be
+    ///     assert!(
+    ///         start - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // ticks normally, after two seconds
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(2) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(2) + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // `interval` is now behind; we are at seven seconds past `start`,
+    ///     // but `interval` is scheduled to tick at four seconds past `start`
+    ///     task_that_takes_five_seconds().await;
+    ///
+    ///     // ticks after one second, because the next-closest multiple of
+    ///     // `period` from `start` is at eight seconds after `start`
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(8) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(8) + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // ticks normally after two seconds, one `period` after when we last
+    ///     // called `tick` (which is also five periods after `start`)
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(10) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(10) + Duration::from_millis(1)
+    ///     );
+    ///
+    ///     // ticks normally, after two seconds
+    ///     let deadline = interval.tick().await;
+    ///     assert!(
+    ///         start + Duration::from_secs(12) - Duration::from_millis(1) <= deadline
+    ///             && deadline <= start + Duration::from_secs(12) + Duration::from_millis(1)
+    ///     );
+    /// }
+    /// ```
+    ///
+    /// [`Burst`]: MissedTickBehavior::Burst
+    /// [`Delay`]: MissedTickBehavior::Delay
     Skip,
 }
 
@@ -304,7 +519,7 @@ impl Interval {
         // Wait for the delay to be done
         ready!(Pin::new(&mut self.delay).poll(cx));
 
-        // Get the time at which the `delay` was supposed to complete
+        // Get the time when we were scheduled to tick
         let timeout = self.delay.deadline();
 
         let now = Instant::now();
@@ -325,7 +540,7 @@ impl Interval {
 
         self.delay.as_mut().reset(next);
 
-        // Return the current instant
+        // Return the time when we were scheduled to tick
         Poll::Ready(timeout)
     }
 
