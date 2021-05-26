@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622017599514,
+  "lastUpdate": 1622017626386,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -46797,6 +46797,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 954,
             "range": "± 79",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a39e6c2439927ed9c73043401959b0b02d054630",
+          "message": "runtime: immediately drop new task when runtime is shut down (#3752)",
+          "timestamp": "2021-05-26T10:24:56+02:00",
+          "tree_id": "a7ff27c7ed25aad010d48ad80e1338f0d50dd3b3",
+          "url": "https://github.com/tokio-rs/tokio/commit/a39e6c2439927ed9c73043401959b0b02d054630"
+        },
+        "date": 1622017621503,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15493,
+            "range": "± 3852",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1042,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 680,
+            "range": "± 23",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15272,
+            "range": "± 3051",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1021,
+            "range": "± 8",
             "unit": "ns/iter"
           }
         ]
