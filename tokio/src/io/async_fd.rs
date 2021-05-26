@@ -482,7 +482,12 @@ impl<T: AsRawFd> Drop for AsyncFd<T> {
 impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// Returns a shared reference to the inner [`AsyncFd`].
     pub fn get_ref(&self) -> &AsyncFd<Inner> {
-        &self.async_fd
+        self.async_fd
+    }
+
+    /// Returns a shared reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner(&self) -> &Inner {
+        self.get_ref().get_ref()
     }
 
     /// Indicates to tokio that the file descriptor is no longer ready. The
@@ -550,12 +555,22 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
 impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// Returns a shared reference to the inner [`AsyncFd`].
     pub fn get_ref(&self) -> &AsyncFd<Inner> {
-        &self.async_fd
+        self.async_fd
     }
 
     /// Returns a mutable reference to the inner [`AsyncFd`].
     pub fn get_mut(&mut self) -> &mut AsyncFd<Inner> {
-        &mut self.async_fd
+        self.async_fd
+    }
+
+    /// Returns a shared reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner(&self) -> &Inner {
+        self.get_ref().get_ref()
+    }
+
+    /// Returns a mutable reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner_mut(&mut self) -> &mut Inner {
+        self.get_mut().get_mut()
     }
 
     /// Indicates to tokio that the file descriptor is no longer ready. The
