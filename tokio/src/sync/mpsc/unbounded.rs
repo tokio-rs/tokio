@@ -176,7 +176,7 @@ impl<T> UnboundedReceiver<T> {
     /// `poll_recv`, only the `Waker` from the `Context` passed to the most
     /// recent call is scheduled to receive a wakeup.
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.chan.recv(cx)
+        self.chan.recv(cx, true)
     }
 }
 

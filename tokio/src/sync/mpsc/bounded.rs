@@ -184,16 +184,9 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<T> {
-        use crate::{future::poll_fn, sync::mpsc::chan::Semaphore};
-        let res = poll_fn(|cx| self.chan.recv(cx)).await;
-
-        // If there is already an underflow, the permit released by recv is
-        // cancelled and the underflow is reduced accordingly.
-        if self.underflow > 0 {
-            self.chan.semaphore().reduce_permits(1);
-
-            self.underflow -= 1;
-        }
+        use crate::future::poll_fn;
+        let res = poll_fn(|cx| self.chan.recv(cx, self.underflow == 0)).await;
+        self.underflow = self.underflow.saturating_sub(1);
 
         res
     }
@@ -313,7 +306,10 @@ impl<T> Receiver<T> {
     /// `poll_recv`, only the `Waker` from the `Context` passed to the most
     /// recent call is scheduled to receive a wakeup.
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.chan.recv(cx)
+        let res = self.chan.recv(cx, self.underflow == 0);
+        self.underflow = self.underflow.saturating_sub(1);
+
+        res
     }
 
     /// Resizes the channel buffer to the provided size

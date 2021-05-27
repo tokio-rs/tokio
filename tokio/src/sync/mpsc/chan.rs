@@ -221,7 +221,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     }
 
     /// Receive the next value
-    pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+    pub(crate) fn recv(&mut self, cx: &mut Context<'_>, release: bool) -> Poll<Option<T>> {
         use super::block::Read::*;
 
         // Keep track of task budget
@@ -234,7 +234,9 @@ impl<T, S: Semaphore> Rx<T, S> {
                 () => {
                     match rx_fields.list.pop(&self.inner.tx) {
                         Some(Value(value)) => {
-                            self.inner.semaphore.add_permits(1);
+                            if release {
+                                self.inner.semaphore.add_permits(1);
+                            }
                             coop.made_progress();
                             return Ready(Some(value));
                         }
