@@ -120,16 +120,16 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 ///
 /// ```
 /// use tokio::time::{self, Duration};
-/// # async fn task_that_takes_one_to_three_seconds() {}
+/// # async fn task_that_takes_one_to_three_millis() {}
 ///
 /// #[tokio::main]
 /// async fn main() {
 ///     // ticks every 2 seconds
-///     let mut interval = time::interval(Duration::from_secs(2));
+///     let mut interval = time::interval(Duration::from_millis(2));
 ///     for _ in 0..5 {
 ///         interval.tick().await;
-///         // if this takes more than 2 seconds, a tick will be delayed
-///         task_that_takes_one_to_three_seconds().await;
+///         // if this takes more than 2 milliseconds, a tick will be delayed
+///         task_that_takes_one_to_three_millis().await;
 ///     }
 /// }
 /// ```
@@ -168,24 +168,31 @@ pub enum MissedTickBehavior {
     ///
     /// ```
     /// use tokio::time::{interval, Duration};
-    /// # async fn task_that_takes_more_than_50_millis() {}
+    /// # async fn task_that_takes_200_millis() {}
     ///
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut interval = interval(Duration::from_millis(50));
     ///
-    /// task_that_takes_more_than_50_millis().await;
+    /// task_that_takes_200_millis().await;
     /// // The `Interval` has missed a tick
     ///
     /// // Since we have exceeded our timeout, this will resolve immediately
     /// interval.tick().await;
     ///
-    /// // If we missed our tick by more than 50ms (if we are over 100ms after
-    /// // `start`), this will also resolve immediately, otherwise, it will
-    /// // resolve 100ms after `start`. That is, in `tick`, even though we
-    /// // recognize that we missed a tick, we schedule the next tick to happen
-    /// // 50ms (or whatever the `period` is) from when were were *supposed* to
-    /// // tick
+    /// // Since we are more than 100ms after the start of `interval`, this will
+    /// // also resolve immediately.
+    /// interval.tick().await;
+    ///
+    /// // Also resolves immediately, because it was supposed to resolve at
+    /// // 150ms after the start of `interval`
+    /// interval.tick().await;
+    ///
+    /// // Resolves immediately
+    /// interval.tick().await;
+    ///
+    /// // Since we have gotten to 200ms after the start of `interval`, this
+    /// // will resolve after 50ms
     /// interval.tick().await;
     /// # }
     /// ```
@@ -268,25 +275,22 @@ pub enum MissedTickBehavior {
     ///
     /// ```
     /// use tokio::time::{interval, Duration, MissedTickBehavior};
-    /// # async fn task_that_takes_more_than_50_millis() {}
+    /// # async fn task_that_takes_75_millis() {}
     ///
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut interval = interval(Duration::from_millis(50));
     /// interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
     ///
-    /// task_that_takes_more_than_50_millis().await;
+    /// task_that_takes_75_millis().await;
     /// // The `Interval` has missed a tick
     ///
     /// // Since we have exceeded our timeout, this will resolve immediately
     /// interval.tick().await;
     ///
-    /// // This one will resolve at the closest multiple of `period` from
-    /// // `start` after the call to `tick` up above. That is, in `tick`, when
-    /// // we recognize that we missed a tick, we schedule the next tick to
-    /// // happen at the next `period` from `start` that is after right now,
-    /// // rather than scheduling it to happen one `period` from when were were
-    /// // *supposed* to tick, or one period after right now.
+    /// // This one will resolve after 25ms, 100ms after the start of
+    /// // `interval`, which is the closest multiple of `period` from the start
+    /// // of `interval` after the call to `tick` up above.
     /// interval.tick().await;
     /// # }
     /// ```
