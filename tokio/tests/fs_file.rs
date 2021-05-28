@@ -22,27 +22,6 @@ async fn basic_read() {
 
     assert_eq!(n, HELLO.len());
     assert_eq!(&buf[..n], HELLO);
-
-    // Drop the data from the cache to stimulate uncached codepath on Linux (see preadv2 in
-    // file.rs)
-    #[cfg(target_os = "linux")]
-    {
-        use std::os::unix::io::AsRawFd;
-        nix::unistd::fsync(tempfile.as_raw_fd()).unwrap();
-        nix::fcntl::posix_fadvise(
-            tempfile.as_raw_fd(),
-            0,
-            0,
-            nix::fcntl::PosixFadviseAdvice::POSIX_FADV_DONTNEED,
-        )
-        .unwrap();
-    }
-
-    let mut file = File::open(tempfile.path()).await.unwrap();
-    let n = file.read(&mut buf).await.unwrap();
-
-    assert_eq!(n, HELLO.len());
-    assert_eq!(&buf[..n], HELLO);
 }
 
 #[tokio::test]
