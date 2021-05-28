@@ -1,3 +1,11 @@
+# 1.6.1 (May 28, 2021)
+
+This release reverts [#3518] because it doesn't work on some kernels due to
+a kernel bug. ([#3803])
+
+[#3518]: https://github.com/tokio-rs/tokio/issues/3518
+[#3803]: https://github.com/tokio-rs/tokio/issues/3803
+
 # 1.6.0 (May 14, 2021)
 
 ### Added
