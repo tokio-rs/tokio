@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622185512947,
+  "lastUpdate": 1622185518867,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -31009,6 +31009,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19043434,
             "range": "± 3796899",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "37811630+j-vanderstoep@users.noreply.github.com",
+            "name": "j-vanderstoep",
+            "username": "j-vanderstoep"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "21264f1d33474338815865c9d3fa8b5a7bb4c6f1",
+          "message": "tcp: assign an unused port (#3817)",
+          "timestamp": "2021-05-28T09:03:27+02:00",
+          "tree_id": "39f6d10a3c21290d43e7e497b9202a936bbda9e3",
+          "url": "https://github.com/tokio-rs/tokio/commit/21264f1d33474338815865c9d3fa8b5a7bb4c6f1"
+        },
+        "date": 1622185514179,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 178356,
+            "range": "± 37584",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 630559,
+            "range": "± 150197",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4571958,
+            "range": "± 1033087",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18287403,
+            "range": "± 3163469",
             "unit": "ns/iter"
           }
         ]
