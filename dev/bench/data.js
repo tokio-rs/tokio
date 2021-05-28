@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622225075619,
+  "lastUpdate": 1622225103041,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -31111,6 +31111,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18287403,
             "range": "± 3163469",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "distinct": false,
+          "id": "eb7aee980ccaba9a87dfa0c6c6f236760eec464e",
+          "message": "Merge branch 'tokio-1.6.x' into merge-1.6.1",
+          "timestamp": "2021-05-28T10:04:08-07:00",
+          "tree_id": "fcf97f036cde0c6793c9cab05bd8cd7e5b5867a8",
+          "url": "https://github.com/tokio-rs/tokio/commit/eb7aee980ccaba9a87dfa0c6c6f236760eec464e"
+        },
+        "date": 1622225098162,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 201445,
+            "range": "± 58248",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 714201,
+            "range": "± 227947",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5073391,
+            "range": "± 1400840",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20321063,
+            "range": "± 2911958",
             "unit": "ns/iter"
           }
         ]
