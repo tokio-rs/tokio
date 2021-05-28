@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622235424387,
+  "lastUpdate": 1622235429133,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -31213,6 +31213,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20321063,
             "range": "± 2911958",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8f6d8b25bf27adec804326d306fc2e217816408a",
+          "message": "chore: add FUNDING.yml (#3824)\n\nReference Tokio sponsorship",
+          "timestamp": "2021-05-28T13:55:16-07:00",
+          "tree_id": "fd036ea10a5684b516da7eae72f4edddfa022aec",
+          "url": "https://github.com/tokio-rs/tokio/commit/8f6d8b25bf27adec804326d306fc2e217816408a"
+        },
+        "date": 1622235425185,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 204701,
+            "range": "± 59641",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 659259,
+            "range": "± 85762",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4894801,
+            "range": "± 930199",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20341842,
+            "range": "± 4401944",
             "unit": "ns/iter"
           }
         ]
