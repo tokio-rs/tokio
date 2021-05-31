@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622472046638,
+  "lastUpdate": 1622472050393,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -16631,6 +16631,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 525,
             "range": "± 78",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "932be124812bb064a531ff154a480024e220fa4a",
+          "message": "ci: ignore private crates in minimal-versions check (#3827)",
+          "timestamp": "2021-05-31T23:39:06+09:00",
+          "tree_id": "d3feef3bd84fee79666b71d705dfc07bda891291",
+          "url": "https://github.com/tokio-rs/tokio/commit/932be124812bb064a531ff154a480024e220fa4a"
+        },
+        "date": 1622472044802,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 764,
+            "range": "± 79",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 12961,
+            "range": "± 3234",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 795,
+            "range": "± 209",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 12652,
+            "range": "± 4888",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 486,
+            "range": "± 69",
             "unit": "ns/iter"
           }
         ]
