@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622472050393,
+  "lastUpdate": 1622472057110,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -31519,6 +31519,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18812174,
             "range": "± 3406792",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "932be124812bb064a531ff154a480024e220fa4a",
+          "message": "ci: ignore private crates in minimal-versions check (#3827)",
+          "timestamp": "2021-05-31T23:39:06+09:00",
+          "tree_id": "d3feef3bd84fee79666b71d705dfc07bda891291",
+          "url": "https://github.com/tokio-rs/tokio/commit/932be124812bb064a531ff154a480024e220fa4a"
+        },
+        "date": 1622472052611,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 185198,
+            "range": "± 18191",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 679113,
+            "range": "± 117969",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5196316,
+            "range": "± 1483450",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20711520,
+            "range": "± 3580617",
             "unit": "ns/iter"
           }
         ]
