@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622458671780,
+  "lastUpdate": 1622458683187,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -73619,6 +73619,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 678767,
             "range": "± 21202",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eddie22099@gmail.com",
+            "name": "Edward Shen",
+            "username": "edward-shen"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bdd6765016e0883578dfa111201fc90cfc4eafc1",
+          "message": "doc: clarify limits on return values of AsyncWrite::poll_write (#3820)",
+          "timestamp": "2021-05-31T19:55:55+09:00",
+          "tree_id": "9b3873a500af749adeeb4f7cc29c9098d591dec4",
+          "url": "https://github.com/tokio-rs/tokio/commit/bdd6765016e0883578dfa111201fc90cfc4eafc1"
+        },
+        "date": 1622458678497,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7011245,
+            "range": "± 3099541",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6310982,
+            "range": "± 2841291",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6674560,
+            "range": "± 3044349",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 290,
+            "range": "± 113",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 292,
+            "range": "± 78",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 293,
+            "range": "± 83",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 55422,
+            "range": "± 6653",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 904,
+            "range": "± 263",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1092598,
+            "range": "± 285029",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 754782,
+            "range": "± 89464",
             "unit": "ns/iter"
           }
         ]
