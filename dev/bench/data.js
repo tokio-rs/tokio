@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622466119815,
+  "lastUpdate": 1622466137464,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -31363,6 +31363,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20596066,
             "range": "± 5275129",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eddie22099@gmail.com",
+            "name": "Edward Shen",
+            "username": "edward-shen"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bdd6765016e0883578dfa111201fc90cfc4eafc1",
+          "message": "doc: clarify limits on return values of AsyncWrite::poll_write (#3820)",
+          "timestamp": "2021-05-31T19:55:55+09:00",
+          "tree_id": "9b3873a500af749adeeb4f7cc29c9098d591dec4",
+          "url": "https://github.com/tokio-rs/tokio/commit/bdd6765016e0883578dfa111201fc90cfc4eafc1"
+        },
+        "date": 1622466133965,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 161670,
+            "range": "± 7093",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 619847,
+            "range": "± 53253",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4964568,
+            "range": "± 756571",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18812174,
+            "range": "± 3406792",
             "unit": "ns/iter"
           }
         ]
