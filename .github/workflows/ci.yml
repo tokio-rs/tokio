@@ -238,7 +238,7 @@ jobs:
           cargo hack --remove-dev-deps --workspace
           # Update Cargo.lock to minimal version dependencies.
           cargo update -Z minimal-versions
-          cargo check --all-features
+          cargo hack check --all-features --ignore-private
 
   fmt:
     name: fmt
