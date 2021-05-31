@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622458683187,
+  "lastUpdate": 1622466119815,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -47997,6 +47997,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 953,
             "range": "± 48",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eddie22099@gmail.com",
+            "name": "Edward Shen",
+            "username": "edward-shen"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bdd6765016e0883578dfa111201fc90cfc4eafc1",
+          "message": "doc: clarify limits on return values of AsyncWrite::poll_write (#3820)",
+          "timestamp": "2021-05-31T19:55:55+09:00",
+          "tree_id": "9b3873a500af749adeeb4f7cc29c9098d591dec4",
+          "url": "https://github.com/tokio-rs/tokio/commit/bdd6765016e0883578dfa111201fc90cfc4eafc1"
+        },
+        "date": 1622466115903,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 12735,
+            "range": "± 2083",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 816,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 544,
+            "range": "± 15",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12760,
+            "range": "± 2139",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 714,
+            "range": "± 4",
             "unit": "ns/iter"
           }
         ]
