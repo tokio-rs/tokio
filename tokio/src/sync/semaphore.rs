@@ -65,8 +65,8 @@ use std::sync::Arc;
 ///         }));
 ///     }
 ///
-///     for j in join_handles {
-///         j.await.unwrap();
+///     for handle in join_handles {
+///         handle.await.unwrap();
 ///     }
 /// }
 /// ```
@@ -324,8 +324,8 @@ impl Semaphore {
     ///         }));
     ///     }
     ///
-    ///     for j in join_handles {
-    ///         j.await.unwrap();
+    ///     for handle in join_handles {
+    ///         handle.await.unwrap();
     ///     }
     /// }
     /// ```
@@ -359,7 +359,7 @@ impl Semaphore {
     ///     let semaphore = Arc::new(Semaphore::new(10));
     ///     let mut join_handles = Vec::new();
     ///
-    ///     for i in 1..=5 {
+    ///     for _ in 1..=5 {
     ///         let permit = semaphore.clone().acquire_many_owned(2).await.unwrap();
     ///         join_handles.push(tokio::spawn(async move {
     ///             // perform task...
@@ -368,8 +368,8 @@ impl Semaphore {
     ///         }));
     ///     }
     ///
-    ///     for j in join_handles {
-    ///         j.await.unwrap();
+    ///     for handle in join_handles {
+    ///         handle.await.unwrap();
     ///     }
     /// }
     /// ```
@@ -416,8 +416,8 @@ impl Semaphore {
     ///         }));
     ///     }
     ///
-    ///     for j in join_handles {
-    ///         j.await.unwrap();
+    ///     for handle in join_handles {
+    ///         handle.await.unwrap();
     ///     }
     /// }
     /// ```
@@ -455,7 +455,7 @@ impl Semaphore {
     ///     let semaphore = Arc::new(Semaphore::new(10));
     ///     let mut join_handles = Vec::new();
     ///
-    ///     for i in 1..=5 {
+    ///     for _ in 1..=5 {
     ///         let permit = semaphore.clone().try_acquire_many_owned(2).unwrap();
     ///         join_handles.push(tokio::spawn(async move {
     ///             // perform task...
@@ -464,8 +464,8 @@ impl Semaphore {
     ///         }));
     ///     }
     ///
-    ///     for j in join_handles {
-    ///         j.await.unwrap();
+    ///     for handle in join_handles {
+    ///         handle.await.unwrap();
     ///     }
     /// }
     /// ```
