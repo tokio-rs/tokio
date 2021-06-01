@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622472089407,
+  "lastUpdate": 1622534308810,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -16685,6 +16685,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 486,
             "range": "± 69",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "5460955+JamesHallowell@users.noreply.github.com",
+            "name": "James Hallowell",
+            "username": "JamesHallowell"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4c89758fc8e6869ba82ddaa17268624499a5a2d",
+          "message": "sync: fix spelling mistake in mpsc::Sender docs (#3828)",
+          "timestamp": "2021-06-01T09:56:34+02:00",
+          "tree_id": "33c6d7fd6aaf00f7b7d3fdb4d13f787a4ed2507d",
+          "url": "https://github.com/tokio-rs/tokio/commit/d4c89758fc8e6869ba82ddaa17268624499a5a2d"
+        },
+        "date": 1622534305208,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 861,
+            "range": "± 148",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13495,
+            "range": "± 2891",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 758,
+            "range": "± 133",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13732,
+            "range": "± 2963",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 507,
+            "range": "± 85",
             "unit": "ns/iter"
           }
         ]
