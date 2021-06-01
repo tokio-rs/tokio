@@ -887,7 +887,7 @@ impl<T> Sender<T> {
     ///     let permit = tx.reserve().await.unwrap();
     ///     assert_eq!(tx.capacity(), 4);
     ///
-    ///     // Sending and receiving a value increases the caapcity by one.
+    ///     // Sending and receiving a value increases the capacity by one.
     ///     permit.send(());
     ///     rx.recv().await.unwrap();
     ///     assert_eq!(tx.capacity(), 5);
