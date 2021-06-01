@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622534308810,
+  "lastUpdate": 1622534313060,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -31621,6 +31621,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20711520,
             "range": "± 3580617",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "5460955+JamesHallowell@users.noreply.github.com",
+            "name": "James Hallowell",
+            "username": "JamesHallowell"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4c89758fc8e6869ba82ddaa17268624499a5a2d",
+          "message": "sync: fix spelling mistake in mpsc::Sender docs (#3828)",
+          "timestamp": "2021-06-01T09:56:34+02:00",
+          "tree_id": "33c6d7fd6aaf00f7b7d3fdb4d13f787a4ed2507d",
+          "url": "https://github.com/tokio-rs/tokio/commit/d4c89758fc8e6869ba82ddaa17268624499a5a2d"
+        },
+        "date": 1622534306099,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 191020,
+            "range": "± 14799",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 709767,
+            "range": "± 49066",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5509755,
+            "range": "± 1023508",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20754962,
+            "range": "± 5037212",
             "unit": "ns/iter"
           }
         ]
