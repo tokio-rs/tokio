@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622534683215,
+  "lastUpdate": 1622534686284,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -74579,6 +74579,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 653251,
             "range": "± 132020",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "5460955+JamesHallowell@users.noreply.github.com",
+            "name": "James Hallowell",
+            "username": "JamesHallowell"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4c89758fc8e6869ba82ddaa17268624499a5a2d",
+          "message": "sync: fix spelling mistake in mpsc::Sender docs (#3828)",
+          "timestamp": "2021-06-01T09:56:34+02:00",
+          "tree_id": "33c6d7fd6aaf00f7b7d3fdb4d13f787a4ed2507d",
+          "url": "https://github.com/tokio-rs/tokio/commit/d4c89758fc8e6869ba82ddaa17268624499a5a2d"
+        },
+        "date": 1622534682428,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6095675,
+            "range": "± 2441512",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6014974,
+            "range": "± 1266629",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5299720,
+            "range": "± 1988727",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 254,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 255,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 254,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 23787,
+            "range": "± 130",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 773,
+            "range": "± 14",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 924838,
+            "range": "± 1533",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 677936,
+            "range": "± 2660",
             "unit": "ns/iter"
           }
         ]
