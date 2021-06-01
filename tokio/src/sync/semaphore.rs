@@ -164,7 +164,7 @@ impl Semaphore {
     ///
     /// # Examples
     ///
-    ///```
+    /// ```
     /// use tokio::sync::Semaphore;
     ///
     /// #[tokio::main]
@@ -200,7 +200,7 @@ impl Semaphore {
     ///
     /// # Examples
     ///
-    ///```
+    /// ```
     /// use tokio::sync::Semaphore;
     ///
     /// #[tokio::main]
@@ -230,7 +230,7 @@ impl Semaphore {
     ///
     /// # Examples
     ///
-    ///```
+    /// ```
     /// use tokio::sync::{Semaphore, TryAcquireError};
     ///
     /// #[tokio::main]
@@ -269,7 +269,7 @@ impl Semaphore {
     ///
     /// # Examples
     ///
-    ///```
+    /// ```
     /// use tokio::sync::{Semaphore, TryAcquireError};
     ///
     /// #[tokio::main]
@@ -373,7 +373,6 @@ impl Semaphore {
     ///     }
     /// }
     /// ```
-    ///
     ///
     /// [`Arc`]: std::sync::Arc
     /// [`AcquireError`]: crate::sync::AcquireError
