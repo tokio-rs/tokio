@@ -398,7 +398,7 @@ macro_rules! select {
         // set the appropriate bit in `disabled`.
         $(
             if !$c {
-                let mask = 1 << $crate::count!( $($skip)* );
+                let mask: util::Mask = 1 << $crate::count!( $($skip)* );
                 disabled |= mask;
             }
         )*
