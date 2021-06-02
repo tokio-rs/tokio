@@ -854,6 +854,8 @@ mod preadv2 {
         }
     }
 
+    // This checks for a bug in certain kernels:
+    // https://lore.kernel.org/linux-fsdevel/fea8b16d-5a69-40f9-b123-e84dcd6e8f2e@www.fastmail.com/T/#u
     #[cfg_attr(test, allow(unused))]
     pub(crate) fn has_buggy_preadv2() -> bool {
         let mut uts: MaybeUninit<libc::utsname> = MaybeUninit::zeroed();
