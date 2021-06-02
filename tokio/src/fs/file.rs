@@ -766,17 +766,32 @@ pub(crate) fn try_nonblocking_read(
     file: &crate::fs::sys::File,
     dst: &mut ReadBuf<'_>,
 ) -> Option<std::io::Result<()>> {
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicU8, Ordering};
 
-    static NONBLOCKING_READ_SUPPORTED: AtomicBool = AtomicBool::new(true);
-    if !NONBLOCKING_READ_SUPPORTED.load(Ordering::Relaxed) {
+    const UNKNOWN: u8 = 0;
+    const NOT_SUPPORTED: u8 = 1;
+    const NOT_BUGGY: u8 = 2;
+
+    static NONBLOCKING_READ_SUPPORTED: AtomicU8 = AtomicU8::new(UNKNOWN);
+
+    let supported = NONBLOCKING_READ_SUPPORTED.load(Ordering::Relaxed);
+    if supported == NOT_SUPPORTED {
         return None;
     }
+    if supported == UNKNOWN {
+        if preadv2::has_buggy_preadv2() {
+            NONBLOCKING_READ_SUPPORTED.store(NOT_SUPPORTED, Ordering::Relaxed);
+            return None;
+        } else {
+            NONBLOCKING_READ_SUPPORTED.store(NOT_BUGGY, Ordering::Relaxed);
+        }
+    }
+
     let out = preadv2::preadv2_safe(file, dst, -1, preadv2::RWF_NOWAIT);
     if let Err(err) = &out {
         match err.raw_os_error() {
             Some(libc::ENOSYS) => {
-                NONBLOCKING_READ_SUPPORTED.store(false, Ordering::Relaxed);
+                NONBLOCKING_READ_SUPPORTED.store(NOT_SUPPORTED, Ordering::Relaxed);
                 return None;
             }
             Some(libc::ENOTSUP) | Some(libc::EAGAIN) => return None,
@@ -797,6 +812,8 @@ pub(crate) fn try_nonblocking_read(
 #[cfg(target_os = "linux")]
 mod preadv2 {
     use libc::{c_int, c_long, c_void, iovec, off_t, ssize_t};
+    use std::ffi::CStr;
+    use std::mem::MaybeUninit;
     use std::os::unix::prelude::AsRawFd;
 
     use crate::io::ReadBuf;
@@ -835,6 +852,19 @@ mod preadv2 {
                 Ok(())
             }
         }
+    }
+
+    #[cfg_attr(test, allow(unused))]
+    pub(crate) fn has_buggy_preadv2() -> bool {
+        let mut uts: MaybeUninit<libc::utsname> = MaybeUninit::zeroed();
+        let res = unsafe { libc::uname(uts.as_mut_ptr()) };
+        if res < 0 {
+            // Getting kernel version failed, assume that it's buggy
+            return true;
+        }
+        let release = unsafe { CStr::from_ptr((*uts.as_ptr()).release.as_ptr()) };
+        let release = release.to_bytes();
+        release.starts_with(b"5.9.") || release.starts_with(b"5.10.")
     }
 
     #[cfg(test)]
