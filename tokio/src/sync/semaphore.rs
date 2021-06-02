@@ -264,8 +264,8 @@ impl Semaphore {
     /// Tries to acquire `n` permits from the semaphore.
     ///
     /// If the semaphore has been closed, this returns a [`TryAcquireError::Closed`]
-    /// and a [`TryAcquireError::NoPermits`] if there are no permits left. Otherwise,
-    /// this returns a [`SemaphorePermit`] representing the acquired permits.
+    /// and a [`TryAcquireError::NoPermits`] if there are not enough permits left.
+    /// Otherwise, this returns a [`SemaphorePermit`] representing the acquired permits.
     ///
     /// # Examples
     ///
