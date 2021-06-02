@@ -200,7 +200,7 @@ impl NamedPipe {
     /// process.
     ///
     /// ```
-    /// use tokio::io::AsyncWriteExt as _;
+    /// use tokio::io::AsyncWriteExt;
     /// use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
     /// use winapi::shared::winerror;
     ///
@@ -329,7 +329,7 @@ impl NamedPipe {
     ///
     /// ```
     /// use std::io;
-    /// use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    /// use tokio::io::{AsyncReadExt, AsyncWriteExt};
     /// use tokio::net::windows::named_pipe::{ServerOptions, ClientOptions};
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-peek-consumed";
@@ -378,7 +378,7 @@ impl NamedPipe {
     /// # Ok(()) }
     /// ```
     pub fn peek(&mut self, mut buf: Option<&mut ReadBuf<'_>>) -> io::Result<PipePeekInfo> {
-        use std::convert::TryFrom as _;
+        use std::convert::TryFrom;
 
         unsafe {
             let mut n = 0;
@@ -557,7 +557,7 @@ impl ServerOptions {
     ///
     /// ```
     /// use std::io;
-    /// use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    /// use tokio::io::{AsyncReadExt, AsyncWriteExt};
     /// use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-inbound";
@@ -623,7 +623,7 @@ impl ServerOptions {
     ///
     /// ```
     /// use std::io;
-    /// use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    /// use tokio::io::{AsyncReadExt, AsyncWriteExt};
     /// use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-outbound";
