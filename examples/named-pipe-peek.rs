@@ -9,7 +9,7 @@ async fn windows_main() -> io::Result<()> {
     const N: usize = 1000;
 
     let mut server = ServerOptions::new().create(PIPE_NAME)?;
-    let mut client = ClientOptions::new().create(PIPE_NAME)?;
+    let mut client = ClientOptions::new().open(PIPE_NAME)?;
     server.connect().await?;
 
     let client = tokio::spawn(async move {

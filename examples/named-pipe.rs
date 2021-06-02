@@ -24,9 +24,9 @@ async fn windows_main() -> io::Result<()> {
 
     let client = tokio::spawn(async move {
         // There's no need to use a connect loop here, since we know that the
-        // server is already up - `create` was called before spawning any of the
+        // server is already up - `open` was called before spawning any of the
         // tasks.
-        let client = ClientOptions::new().create(PIPE_NAME)?;
+        let client = ClientOptions::new().open(PIPE_NAME)?;
 
         let mut client = BufReader::new(client);
 

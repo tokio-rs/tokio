@@ -16,7 +16,7 @@ async fn test_named_pipe_peek_consumed() -> io::Result<()> {
     const N: usize = 1000;
 
     let mut server = ServerOptions::new().create(PIPE_NAME)?;
-    let mut client = ClientOptions::new().create(PIPE_NAME)?;
+    let mut client = ClientOptions::new().open(PIPE_NAME)?;
     server.connect().await?;
 
     let client = tokio::spawn(async move {
@@ -123,7 +123,7 @@ async fn test_named_pipe_peek() -> io::Result<()> {
         const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-server-peek-small";
 
         let server = ServerOptions::new().create(PIPE_NAME)?;
-        let client = ClientOptions::new().create(PIPE_NAME)?;
+        let client = ClientOptions::new().open(PIPE_NAME)?;
         server.connect().await?;
 
         peek_ping_pong(1, client, server).await?;
@@ -133,7 +133,7 @@ async fn test_named_pipe_peek() -> io::Result<()> {
         const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-client-peek-big";
 
         let server = ServerOptions::new().create(PIPE_NAME)?;
-        let client = ClientOptions::new().create(PIPE_NAME)?;
+        let client = ClientOptions::new().open(PIPE_NAME)?;
         server.connect().await?;
 
         peek_ping_pong(1, server, client).await?;
@@ -143,7 +143,7 @@ async fn test_named_pipe_peek() -> io::Result<()> {
         const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-server-peek-big";
 
         let server = ServerOptions::new().create(PIPE_NAME)?;
-        let client = ClientOptions::new().create(PIPE_NAME)?;
+        let client = ClientOptions::new().open(PIPE_NAME)?;
         server.connect().await?;
 
         peek_ping_pong(100, client, server).await?;
@@ -153,7 +153,7 @@ async fn test_named_pipe_peek() -> io::Result<()> {
         const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-client-peek-big";
 
         let server = ServerOptions::new().create(PIPE_NAME)?;
-        let client = ClientOptions::new().create(PIPE_NAME)?;
+        let client = ClientOptions::new().open(PIPE_NAME)?;
         server.connect().await?;
 
         peek_ping_pong(100, server, client).await?;
@@ -170,7 +170,7 @@ async fn test_named_pipe_client_drop() -> io::Result<()> {
 
     assert_eq!(num_instances("test-named-pipe-client-drop")?, 1);
 
-    let client = ClientOptions::new().create(PIPE_NAME)?;
+    let client = ClientOptions::new().open(PIPE_NAME)?;
 
     server.connect().await?;
     drop(client);
@@ -190,7 +190,7 @@ async fn test_named_pipe_client_connect() -> io::Result<()> {
     const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-client-connect";
 
     let server = ServerOptions::new().create(PIPE_NAME)?;
-    let client = ClientOptions::new().create(PIPE_NAME)?;
+    let client = ClientOptions::new().open(PIPE_NAME)?;
     server.connect().await?;
 
     let e = client.connect().await.unwrap_err();
@@ -222,7 +222,7 @@ async fn test_named_pipe_single_client() -> io::Result<()> {
     });
 
     let client = tokio::spawn(async move {
-        let client = ClientOptions::new().create(PIPE_NAME)?;
+        let client = ClientOptions::new().open(PIPE_NAME)?;
 
         let mut client = BufReader::new(client);
 
@@ -287,7 +287,7 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
             // pipe is busy we use the specialized wait function on the client
             // builder.
             let client = loop {
-                match ClientOptions::new().create(PIPE_NAME) {
+                match ClientOptions::new().open(PIPE_NAME) {
                     Ok(client) => break client,
                     Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
                     Err(e) if e.kind() == io::ErrorKind::NotFound => (),
@@ -326,7 +326,7 @@ async fn test_named_pipe_mode_message() -> io::Result<()> {
         .pipe_mode(PipeMode::Message)
         .create(PIPE_NAME)?;
 
-    let _ = ClientOptions::new().create(PIPE_NAME)?;
+    let _ = ClientOptions::new().open(PIPE_NAME)?;
     server.connect().await?;
     Ok(())
 }

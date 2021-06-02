@@ -57,7 +57,7 @@ async fn windows_main() -> io::Result<()> {
             // the pipe is busy we use the specialized wait function on the
             // client builder.
             let mut client = loop {
-                match ClientOptions::new().create(PIPE_NAME) {
+                match ClientOptions::new().open(PIPE_NAME) {
                     Ok(client) => break client,
                     Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
                     Err(e) => return Err(e),

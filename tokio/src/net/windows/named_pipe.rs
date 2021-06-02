@@ -63,7 +63,7 @@ use self::doc::*;
 ///
 /// # #[tokio::main] async fn main() -> std::io::Result<()> {
 /// let client = loop {
-///     match ClientOptions::new().create(PIPE_NAME) {
+///     match ClientOptions::new().open(PIPE_NAME) {
 ///         Ok(client) => break client,
 ///         Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
 ///         Err(e) => return Err(e),
@@ -208,10 +208,11 @@ impl NamedPipe {
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-disconnect";
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let server = ServerOptions::new().create(PIPE_NAME)?;
+    /// let server = ServerOptions::new()
+    ///     .create(PIPE_NAME)?;
     ///
     /// let mut client = ClientOptions::new()
-    ///     .create(PIPE_NAME)?;
+    ///     .open(PIPE_NAME)?;
     ///
     /// // Wait for a client to become connected.
     /// server.connect().await?;
@@ -243,7 +244,7 @@ impl NamedPipe {
     ///     .create(PIPE_NAME)?;
     ///
     /// let client = ClientOptions::new()
-    ///     .create(PIPE_NAME)?;
+    ///     .open(PIPE_NAME)?;
     ///
     /// let server_info = server.info()?;
     /// let client_info = client.info()?;
@@ -337,7 +338,7 @@ impl NamedPipe {
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
     /// let mut server = ServerOptions::new().create(PIPE_NAME)?;
-    /// let mut client = ClientOptions::new().create(PIPE_NAME)?;
+    /// let mut client = ClientOptions::new().open(PIPE_NAME)?;
     /// server.connect().await?;
     ///
     /// let client = tokio::spawn(async move {
@@ -516,8 +517,7 @@ impl ServerOptions {
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-new";
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let server = ServerOptions::new()
-    ///     .create(PIPE_NAME)?;
+    /// let server = ServerOptions::new().create(PIPE_NAME)?;
     /// # Ok(()) }
     /// ```
     pub fn new() -> ServerOptions {
@@ -572,7 +572,7 @@ impl ServerOptions {
     ///         .create(PIPE_NAME)?;
     ///
     ///     let e = ClientOptions::new()
-    ///         .create(PIPE_NAME)
+    ///         .open(PIPE_NAME)
     ///         .unwrap_err();
     ///
     ///     assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
@@ -581,7 +581,7 @@ impl ServerOptions {
     ///     // error if a write is attempted.
     ///     let mut client = ClientOptions::new()
     ///         .write(false)
-    ///         .create(PIPE_NAME)?;
+    ///         .open(PIPE_NAME)?;
     ///
     ///     let e = client.write(b"ping").await.unwrap_err();
     ///     assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
@@ -595,7 +595,7 @@ impl ServerOptions {
     ///
     ///     let mut client = ClientOptions::new()
     ///         .write(false)
-    ///         .create(PIPE_NAME)?;
+    ///         .open(PIPE_NAME)?;
     ///
     ///     let write = server.write_all(b"ping");
     ///
@@ -638,14 +638,16 @@ impl ServerOptions {
     ///         .create(PIPE_NAME)?;
     ///
     ///     let e = ClientOptions::new()
-    ///         .create(PIPE_NAME)
+    ///         .open(PIPE_NAME)
     ///         .unwrap_err();
     ///
     ///     assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
     ///
     ///     // Disabling reading allows a client to connect, but leads to runtime
     ///     // error if a read is attempted.
-    ///     let mut client = ClientOptions::new().read(false).create(PIPE_NAME)?;
+    ///     let mut client = ClientOptions::new()
+    ///         .read(false)
+    ///         .open(PIPE_NAME)?;
     ///
     ///     let mut buf = [0u8; 4];
     ///     let e = client.read(&mut buf).await.unwrap_err();
@@ -655,7 +657,7 @@ impl ServerOptions {
     /// // A functional, unidirectional client-to-server only communication.
     /// {
     ///     let mut server = ServerOptions::new().access_outbound(false).create(PIPE_NAME)?;
-    ///     let mut client = ClientOptions::new().read(false).create(PIPE_NAME)?;
+    ///     let mut client = ClientOptions::new().read(false).open(PIPE_NAME)?;
     ///
     ///     // TODO: Explain why this test doesn't work without calling connect
     ///     // first.
@@ -762,10 +764,10 @@ impl ServerOptions {
     /// server.max_instances(2);
     ///
     /// let s1 = server.create(PIPE_NAME)?;
-    /// let c1 = ClientOptions::new().create(PIPE_NAME);
+    /// let c1 = ClientOptions::new().open(PIPE_NAME);
     ///
     /// let s2 = server.create(PIPE_NAME)?;
-    /// let c2 = ClientOptions::new().create(PIPE_NAME);
+    /// let c2 = ClientOptions::new().open(PIPE_NAME);
     ///
     /// // Too many servers!
     /// let e = server.create(PIPE_NAME).unwrap_err();
@@ -920,7 +922,7 @@ impl ClientOptions {
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
     /// // Server must be created in order for the client creation to succeed.
     /// let server = ServerOptions::new().create(PIPE_NAME)?;
-    /// let client = ClientOptions::new().create(PIPE_NAME)?;
+    /// let client = ClientOptions::new().open(PIPE_NAME)?;
     /// # Ok(()) }
     /// ```
     pub fn new() -> Self {
@@ -1017,7 +1019,7 @@ impl ClientOptions {
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
     /// let client = loop {
-    ///     match ClientOptions::new().create(PIPE_NAME) {
+    ///     match ClientOptions::new().open(PIPE_NAME) {
     ///         Ok(client) => break client,
     ///         Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
     ///         Err(e) => return Err(e),
@@ -1029,15 +1031,15 @@ impl ClientOptions {
     /// // use the connected client.
     /// # Ok(()) }
     /// ```
-    pub fn create(&self, addr: impl AsRef<OsStr>) -> io::Result<NamedPipe> {
-        // Safety: We're calling create_with_security_attributes_raw w/ a null
+    pub fn open(&self, addr: impl AsRef<OsStr>) -> io::Result<NamedPipe> {
+        // Safety: We're calling open_with_security_attributes_raw w/ a null
         // pointer which disables it.
-        unsafe { self.create_with_security_attributes_raw(addr, ptr::null_mut()) }
+        unsafe { self.open_with_security_attributes_raw(addr, ptr::null_mut()) }
     }
 
     /// Open the named pipe identified by `addr`.
     ///
-    /// This is the same as [`create`] except that it supports providing the raw
+    /// This is the same as [`open`] except that it supports providing the raw
     /// pointer to a structure of [`SECURITY_ATTRIBUTES`] which will be passed
     /// as the `lpSecurityAttributes` argument to [`CreateFile`].
     ///
@@ -1045,12 +1047,12 @@ impl ClientOptions {
     ///
     /// The `attrs` argument must either be null or point at a valid instance of
     /// the [`SECURITY_ATTRIBUTES`] structure. If the argument is null, the
-    /// behavior is identical to calling the [`create`] method.
+    /// behavior is identical to calling the [`open`] method.
     ///
-    /// [`create`]: ClientOptions::create
+    /// [`open`]: ClientOptions::create
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
     /// [`SECURITY_ATTRIBUTES`]: crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES
-    pub unsafe fn create_with_security_attributes_raw(
+    pub unsafe fn open_with_security_attributes_raw(
         &self,
         addr: impl AsRef<OsStr>,
         attrs: *mut c_void,
