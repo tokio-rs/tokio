@@ -40,12 +40,12 @@ use self::doc::*;
 
 /// A [Windows named pipe].
 ///
-/// Constructed using [`ClientOptions::create`] for clients, or
-/// [`ServerOptions::create`] for servers. See their corresponding
-/// documentation for examples.
+/// Constructed using [`ClientOptions::open`] for clients, or
+/// [`ServerOptions::create`] for servers. See their corresponding documentation
+/// for examples.
 ///
-/// Connecting a client involves a few steps. First we must try to [`create`], the
-/// error typically indicates one of two things:
+/// Connecting a client involves a few steps. First we must try to
+/// [`ClientOptions::open`], the error typically indicates one of two things:
 ///
 /// * [`std::io::ErrorKind::NotFound`] - There is no server available.
 /// * [`ERROR_PIPE_BUSY`] - There is a server available, but it is busy. Sleep for
@@ -77,10 +77,10 @@ use self::doc::*;
 /// ```
 ///
 /// A client will error with [`std::io::ErrorKind::NotFound`] for most creation
-/// oriented operations like [`create`] unless at least once server instance is up
-/// and running at all time. This means that the typical listen loop for a
-/// server is a bit involved, because we have to ensure that we never drop a
-/// server accidentally while a client might want to connect.
+/// oriented operations like [`ClientOptions::open`] unless at least once server
+/// instance is up and running at all time. This means that the typical listen
+/// loop for a server is a bit involved, because we have to ensure that we never
+/// drop a server accidentally while a client might want to connect.
 ///
 /// ```no_run
 /// use std::io;
@@ -126,7 +126,6 @@ use self::doc::*;
 /// # Ok(()) }
 /// ```
 ///
-/// [`create`]: ClientOptions::create
 /// [`ERROR_PIPE_BUSY`]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
@@ -904,7 +903,7 @@ impl ServerOptions {
 /// A builder suitable for building and interacting with named pipes from the
 /// client side.
 ///
-/// See [`ClientOptions::create`].
+/// See [`ClientOptions::open`].
 #[derive(Debug, Clone)]
 pub struct ClientOptions {
     desired_access: DWORD,
@@ -1049,7 +1048,7 @@ impl ClientOptions {
     /// the [`SECURITY_ATTRIBUTES`] structure. If the argument is null, the
     /// behavior is identical to calling the [`open`] method.
     ///
-    /// [`open`]: ClientOptions::create
+    /// [`open`]: ClientOptions::open
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
     /// [`SECURITY_ATTRIBUTES`]: crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES
     pub unsafe fn open_with_security_attributes_raw(
