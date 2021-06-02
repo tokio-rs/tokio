@@ -632,7 +632,7 @@ impl ServerOptions {
     /// // Server side prevents connecting by denying outbound access, client errors
     /// // when attempting to create the connection.
     /// {
-    ///     let _server = ServerOptions::new()
+    ///     let server = ServerOptions::new()
     ///         .access_outbound(false)
     ///         .create(PIPE_NAME)?;
     ///
@@ -648,6 +648,8 @@ impl ServerOptions {
     ///         .read(false)
     ///         .open(PIPE_NAME)?;
     ///
+    ///     server.connect().await?;
+    ///
     ///     let mut buf = [0u8; 4];
     ///     let e = client.read(&mut buf).await.unwrap_err();
     ///     assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
@@ -657,11 +659,6 @@ impl ServerOptions {
     /// {
     ///     let mut server = ServerOptions::new().access_outbound(false).create(PIPE_NAME)?;
     ///     let mut client = ClientOptions::new().read(false).open(PIPE_NAME)?;
-    ///
-    ///     // TODO: Explain why this test doesn't work without calling connect
-    ///     // first.
-    ///     //
-    ///     // Because I have no idea -- udoprog
     ///     server.connect().await?;
     ///
     ///     let write = client.write_all(b"ping");
