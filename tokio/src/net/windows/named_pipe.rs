@@ -683,14 +683,44 @@ impl ServerOptions {
         self
     }
 
-    /// If you attempt to create multiple instances of a pipe with this flag,
-    /// creation of the first instance succeeds, but creation of the next
-    /// instance fails with [`ERROR_ACCESS_DENIED`].
+    /// If you attempt to create multiple instances of a pipe with this flag
+    /// set, creation of the first server instance succeeds, but creation of any
+    /// subsequent instances will fail with
+    /// [`std::io::ErrorKind::PermissionDenied`].
+    ///
+    /// This option is intended to be used with servers that want to ensure that
+    /// they are the only process listening for clients on a given named pipe.
+    /// This is accomplished by enabling it for the first server instance
+    /// created in a process.
     ///
     /// This corresponds to setting [`FILE_FLAG_FIRST_PIPE_INSTANCE`].
     ///
-    /// [`ERROR_ACCESS_DENIED`]: crate::winapi::shared::winerror::ERROR_ACCESS_DENIED
-    /// [`FILE_FLAG_FIRST_PIPE_INSTANCE`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_first_pipe_instance
+    /// # Errors
+    ///
+    /// If this option is set and more than one instance of the server for a
+    /// given named pipe exists, calling [`create`] will fail with
+    /// [`std::io::ErrorKind::PermissionDenied`].
+    ///
+    /// ```
+    /// use std::io;
+    /// use tokio::net::windows::named_pipe::ServerOptions;
+    ///
+    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-first-instance-error";
+    ///
+    /// # #[tokio::main] async fn main() -> io::Result<()> {
+    /// let server1 = ServerOptions::new()
+    ///     .first_pipe_instance(true)
+    ///     .create(PIPE_NAME)?;
+    ///
+    /// // Second server errs, since it's not the first instance.
+    /// let e = ServerOptions::new()
+    ///     .first_pipe_instance(true)
+    ///     .create(PIPE_NAME)
+    ///     .unwrap_err();
+    ///
+    /// assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
+    /// # Ok(()) }
+    /// ```
     ///
     /// # Examples
     ///
@@ -713,6 +743,9 @@ impl ServerOptions {
     /// let _server2 = builder.create(PIPE_NAME)?;
     /// # Ok(()) }
     /// ```
+    ///
+    /// [`create`]: ServerOptions::create
+    /// [`FILE_FLAG_FIRST_PIPE_INSTANCE`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_first_pipe_instance
     pub fn first_pipe_instance(&mut self, first: bool) -> &mut Self {
         bool_flag!(
             self.open_mode,
@@ -722,8 +755,8 @@ impl ServerOptions {
         self
     }
 
-    /// Indicates whether this server can accept remote clients or not. This is
-    /// enabled by default.
+    /// Indicates whether this server can accept remote clients or not. Remote
+    /// clients are disabled by default.
     ///
     /// This corresponds to setting [`PIPE_REJECT_REMOTE_CLIENTS`].
     ///
@@ -738,9 +771,6 @@ impl ServerOptions {
     /// be specified for other instances of the pipe. Acceptable values are in
     /// the range 1 through 254. The default value is unlimited.
     ///
-    /// This value is only respected by the first instance that creates the pipe
-    /// and is ignored otherwise.
-    ///
     /// This corresponds to specifying [`nMaxInstances`].
     ///
     /// [`nMaxInstances`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
@@ -749,7 +779,7 @@ impl ServerOptions {
     ///
     /// The same numbers of `max_instances` have to be used by all servers. Any
     /// additional servers trying to be built which uses a mismatching value
-    /// will error.
+    /// might error.
     ///
     /// ```
     /// use std::io;
