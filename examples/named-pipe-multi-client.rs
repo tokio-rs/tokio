@@ -4,7 +4,7 @@ use std::io;
 async fn windows_main() -> io::Result<()> {
     use std::time::Duration;
     use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
-    use tokio::net::windows::{NamedPipeClientOptions, NamedPipeOptions};
+    use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
     use tokio::time;
     use winapi::shared::winerror;
 
@@ -16,7 +16,7 @@ async fn windows_main() -> io::Result<()> {
     //
     // Here we also make use of `first_pipe_instance`, which will ensure
     // that there are no other servers up and running already.
-    let mut server = NamedPipeOptions::new()
+    let mut server = ServerOptions::new()
         .first_pipe_instance(true)
         .create(PIPE_NAME)?;
 
@@ -34,7 +34,7 @@ async fn windows_main() -> io::Result<()> {
             // isn't closed (after it's done in the task) before a new one is
             // available. Otherwise the client might error with
             // `io::ErrorKind::NotFound`.
-            server = NamedPipeOptions::new().create(PIPE_NAME)?;
+            server = ServerOptions::new().create(PIPE_NAME)?;
 
             let _ = tokio::spawn(async move {
                 let mut buf = [0u8; 4];
@@ -57,7 +57,7 @@ async fn windows_main() -> io::Result<()> {
             // the pipe is busy we use the specialized wait function on the
             // client builder.
             let mut client = loop {
-                match NamedPipeClientOptions::new().create(PIPE_NAME) {
+                match ClientOptions::new().create(PIPE_NAME) {
                     Ok(client) => break client,
                     Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
                     Err(e) => return Err(e),

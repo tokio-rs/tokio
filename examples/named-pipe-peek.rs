@@ -3,13 +3,13 @@ use std::io;
 #[cfg(windows)]
 async fn windows_main() -> io::Result<()> {
     use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
-    use tokio::net::windows::{NamedPipeClientOptions, NamedPipeOptions};
+    use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
 
     const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-peek-consumed";
     const N: usize = 1000;
 
-    let mut server = NamedPipeOptions::new().create(PIPE_NAME)?;
-    let mut client = NamedPipeClientOptions::new().create(PIPE_NAME)?;
+    let mut server = ServerOptions::new().create(PIPE_NAME)?;
+    let mut client = ClientOptions::new().create(PIPE_NAME)?;
     server.connect().await?;
 
     let client = tokio::spawn(async move {
