@@ -147,11 +147,11 @@ impl NamedPipe {
     ///
     /// # Errors
     ///
-    /// This errors if called outside of a [Tokio Runtime] which doesn't have
-    /// [I/O enabled].
+    /// This errors if called outside of a [Tokio Runtime], or in a runtime that
+    /// has not [enabled I/O], or if any OS-specific I/O errors occur.
     ///
     /// [Tokio Runtime]: crate::runtime::Runtime
-    /// [I/O enabled]: crate::runtime::Builder::enable_io
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
     pub unsafe fn try_from_raw_handle(handle: RawHandle) -> io::Result<Self> {
         let named_pipe = mio_windows::NamedPipe::from_raw_handle(handle);
 
@@ -825,11 +825,11 @@ impl ServerOptions {
     ///
     /// # Errors
     ///
-    /// This errors if called outside of a [Tokio Runtime] which doesn't have
-    /// [I/O enabled] or if any OS-specific I/O errors occur.
+    /// This errors if called outside of a [Tokio Runtime], or in a runtime that
+    /// has not [enabled I/O], or if any OS-specific I/O errors occur.
     ///
     /// [Tokio Runtime]: crate::runtime::Runtime
-    /// [I/O enabled]: crate::runtime::Builder::enable_io
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
     ///
     /// # Examples
     ///
@@ -856,11 +856,11 @@ impl ServerOptions {
     ///
     /// # Errors
     ///
-    /// This errors if called outside of a [Tokio Runtime] which doesn't have
-    /// [I/O enabled] or if any OS-specific I/O errors occur.
+    /// This errors if called outside of a [Tokio Runtime], or in a runtime that
+    /// has not [enabled I/O], or if any OS-specific I/O errors occur.
     ///
     /// [Tokio Runtime]: crate::runtime::Runtime
-    /// [I/O enabled]: crate::runtime::Builder::enable_io
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
     ///
     /// # Safety
     ///
@@ -988,8 +988,8 @@ impl ClientOptions {
     ///
     /// # Errors
     ///
-    /// This errors if called outside of a [Tokio Runtime] which doesn't have
-    /// [I/O enabled] or if any OS-specific I/O errors occur.
+    /// This errors if called outside of a [Tokio Runtime], or in a runtime that
+    /// has not [enabled I/O], or if any OS-specific I/O errors occur.
     ///
     /// There are a few errors you need to take into account when creating a
     /// named pipe on the client side:
@@ -1001,9 +1001,9 @@ impl ClientOptions {
     ///   examples for how to check for this error.
     ///
     /// [`ERROR_PIPE_BUSY`]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
-    /// [I/O enabled]: crate::runtime::Builder::enable_io
-    /// [Tokio Runtime]: crate::runtime::Runtime
     /// [`winapi`]: crate::winapi
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
+    /// [Tokio Runtime]: crate::runtime::Runtime
     ///
     /// A connect loop that waits until a socket becomes available looks like
     /// this:
