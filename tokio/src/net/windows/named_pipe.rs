@@ -553,7 +553,61 @@ impl ServerOptions {
     ///
     /// [`PIPE_ACCESS_INBOUND`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_access_inbound
     ///
+    /// # Errors
+    ///
+    /// Server side prevents connecting by denying inbound access, client errors
+    /// with [`std::io::ErrorKind::PermissionDenied`] when attempting to create
+    /// the connection.
+    ///
+    /// ```
+    /// use std::io;
+    /// use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
+    ///
+    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-inbound-err1";
+    ///
+    /// # #[tokio::main] async fn main() -> io::Result<()> {
+    /// let _server = ServerOptions::new()
+    ///     .access_inbound(false)
+    ///     .create(PIPE_NAME)?;
+    ///
+    /// let e = ClientOptions::new()
+    ///     .open(PIPE_NAME)
+    ///     .unwrap_err();
+    ///
+    /// assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
+    /// # Ok(()) }
+    /// ```
+    ///
+    /// Disabling writing allows a client to connect, but errors with
+    /// [`std::io::ErrorKind::PermissionDenied`] if a write is attempted.
+    ///
+    /// ```
+    /// use std::io;
+    /// use tokio::io::AsyncWriteExt;
+    /// use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
+    ///
+    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-inbound-err2";
+    ///
+    /// # #[tokio::main] async fn main() -> io::Result<()> {
+    /// let server = ServerOptions::new()
+    ///     .access_inbound(false)
+    ///     .create(PIPE_NAME)?;
+    ///
+    /// let mut client = ClientOptions::new()
+    ///     .write(false)
+    ///     .open(PIPE_NAME)?;
+    ///
+    /// server.connect().await?;
+    ///
+    /// let e = client.write(b"ping").await.unwrap_err();
+    /// assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
+    /// # Ok(()) }
+    /// ```
+    ///
     /// # Examples
+    ///
+    /// A unidirectional named pipe that only supports server-to-client
+    /// communication.
     ///
     /// ```
     /// use std::io;
@@ -563,49 +617,25 @@ impl ServerOptions {
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-inbound";
     ///
     /// # #[tokio::main] async fn main() -> io::Result<()> {
-    /// // Server side prevents connecting by denying inbound access, client errors
-    /// // when attempting to create the connection.
-    /// {
-    ///     let _server = ServerOptions::new()
-    ///         .access_inbound(false)
-    ///         .create(PIPE_NAME)?;
+    /// let mut server = ServerOptions::new()
+    ///     .access_inbound(false)
+    ///     .create(PIPE_NAME)?;
     ///
-    ///     let e = ClientOptions::new()
-    ///         .open(PIPE_NAME)
-    ///         .unwrap_err();
+    /// let mut client = ClientOptions::new()
+    ///     .write(false)
+    ///     .open(PIPE_NAME)?;
     ///
-    ///     assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
+    /// server.connect().await?;
     ///
-    ///     // Disabling writing allows a client to connect, but leads to runtime
-    ///     // error if a write is attempted.
-    ///     let mut client = ClientOptions::new()
-    ///         .write(false)
-    ///         .open(PIPE_NAME)?;
+    /// let write = server.write_all(b"ping");
     ///
-    ///     let e = client.write(b"ping").await.unwrap_err();
-    ///     assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
-    /// }
+    /// let mut buf = [0u8; 4];
+    /// let read = client.read_exact(&mut buf);
     ///
-    /// // A functional, unidirectional server-to-client only communication.
-    /// {
-    ///     let mut server = ServerOptions::new()
-    ///         .access_inbound(false)
-    ///         .create(PIPE_NAME)?;
+    /// let ((), read) = tokio::try_join!(write, read)?;
     ///
-    ///     let mut client = ClientOptions::new()
-    ///         .write(false)
-    ///         .open(PIPE_NAME)?;
-    ///
-    ///     let write = server.write_all(b"ping");
-    ///
-    ///     let mut buf = [0u8; 4];
-    ///     let read = client.read_exact(&mut buf);
-    ///
-    ///     let ((), read) = tokio::try_join!(write, read)?;
-    ///
-    ///     assert_eq!(read, 4);
-    ///     assert_eq!(&buf[..], b"ping");
-    /// }
+    /// assert_eq!(read, 4);
+    /// assert_eq!(&buf[..], b"ping");
     /// # Ok(()) }
     /// ```
     pub fn access_inbound(&mut self, allowed: bool) -> &mut Self {
@@ -629,7 +659,7 @@ impl ServerOptions {
     /// use std::io;
     /// use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
     ///
-    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-outbound1";
+    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-outbound-err1";
     ///
     /// # #[tokio::main] async fn main() -> io::Result<()> {
     /// let server = ServerOptions::new()
@@ -652,7 +682,7 @@ impl ServerOptions {
     /// use tokio::io::AsyncReadExt;
     /// use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
     ///
-    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-outbound2";
+    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-outbound-err2";
     ///
     /// # #[tokio::main] async fn main() -> io::Result<()> {
     /// let server = ServerOptions::new()
@@ -673,18 +703,24 @@ impl ServerOptions {
     ///
     /// # Examples
     ///
-    /// A unidirectional named pipe that only supported client-to-server
+    /// A unidirectional named pipe that only supports client-to-server
     /// communication.
     ///
     /// ```
     /// use tokio::io::{AsyncReadExt, AsyncWriteExt};
     /// use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
     ///
-    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-outbound3";
+    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-access-outbound";
     ///
     /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let mut server = ServerOptions::new().access_outbound(false).create(PIPE_NAME)?;
-    /// let mut client = ClientOptions::new().read(false).open(PIPE_NAME)?;
+    /// let mut server = ServerOptions::new()
+    ///     .access_outbound(false)
+    ///     .create(PIPE_NAME)?;
+    ///
+    /// let mut client = ClientOptions::new()
+    ///     .read(false)
+    ///     .open(PIPE_NAME)?;
+    ///
     /// server.connect().await?;
     ///
     /// let write = client.write_all(b"ping");
