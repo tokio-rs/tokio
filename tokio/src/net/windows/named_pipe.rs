@@ -76,9 +76,9 @@ use self::doc::*;
 /// # Ok(()) }
 /// ```
 ///
-/// A client will error with [`std::io::ErrorKind::NotFound`] for most creation
-/// oriented operations like [`ClientOptions::open`] unless at least once server
-/// instance is up and running at all time. This means that the typical listen
+/// To avoid having clients fail with [`std::io::ErrorKind::NotFound`] when
+/// connecting to a named pipe server, you must ensure that at least one server
+/// instance is up and running at all times. This means that the typical listen
 /// loop for a server is a bit involved, because we have to ensure that we never
 /// drop a server accidentally while a client might want to connect.
 ///
