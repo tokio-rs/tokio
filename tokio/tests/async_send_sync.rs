@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
-#![allow(clippy::type_complexity)]
+#![allow(clippy::type_complexity, clippy::diverging_sub_expression)]
 
 use std::cell::Cell;
 use std::future::Future;

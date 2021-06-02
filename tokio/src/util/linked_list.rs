@@ -50,6 +50,7 @@ pub(crate) unsafe trait Link {
     type Target;
 
     /// Convert the handle to a raw pointer without consuming the handle
+    #[allow(clippy::wrong_self_convention)]
     fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target>;
 
     /// Convert the raw pointer to a handle

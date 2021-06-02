@@ -537,3 +537,13 @@ async fn biased_eventually_ready() {
 
     assert_eq!(count, 3);
 }
+
+// https://github.com/tokio-rs/tokio/issues/3830
+// https://github.com/rust-lang/rust-clippy/issues/7304
+#[warn(clippy::default_numeric_fallback)]
+pub async fn default_numeric_fallback() {
+    tokio::select! {
+        _ = async {} => (),
+        else => (),
+    }
+}
