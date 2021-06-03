@@ -392,7 +392,7 @@ impl Spawner {
     /// Spawns a future onto the thread pool
     pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
-        F: Future + Send + 'static,
+        F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
         let (task, handle) = task::joinable(future);

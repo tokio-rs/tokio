@@ -4,7 +4,6 @@ use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::shutdown;
-use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
@@ -84,18 +83,6 @@ where
 {
     let rt = context::current().expect(CONTEXT_MISSING_ERROR);
     rt.spawn_blocking(func)
-}
-
-#[allow(dead_code)]
-pub(crate) fn try_spawn_blocking<F, R>(func: F) -> Result<(), ()>
-where
-    F: FnOnce() -> R + Send + 'static,
-    R: Send + 'static,
-{
-    let rt = context::current().expect(CONTEXT_MISSING_ERROR);
-
-    let (task, _handle) = task::joinable(BlockingTask::new(func));
-    rt.blocking_spawner.spawn(task, &rt)
 }
 
 // ===== impl BlockingPool =====

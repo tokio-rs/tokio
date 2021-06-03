@@ -174,8 +174,11 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        let fut = BlockingTask::new(func);
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let func = {
+        let fut = {
+            use tracing::Instrument;
             #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
             #[cfg(tokio_track_caller)]
@@ -193,12 +196,9 @@ impl Handle {
                 kind = %"blocking",
                 function = %std::any::type_name::<F>(),
             );
-            move || {
-                let _g = span.enter();
-                func()
-            }
+            fut.instrument(span)
         };
-        let (task, handle) = task::joinable(BlockingTask::new(func));
+        let (task, handle) = task::joinable(fut);
         let _ = self.blocking_spawner.spawn(task, &self);
         handle
     }
