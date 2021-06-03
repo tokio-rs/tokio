@@ -55,7 +55,7 @@ const REF_ONE: usize = 1 << REF_COUNT_SHIFT;
 /// State a task is initialized with
 ///
 /// A task is initialized with two references: one for the scheduler and one for
-/// the `JoinHandle`. As the task starts with a `JoinHandle`, `JOIN_INTERST` is
+/// the `JoinHandle`. As the task starts with a `JoinHandle`, `JOIN_INTEREST` is
 /// set. A new task is immediately pushed into the run queue for execution and
 /// starts with the `NOTIFIED` flag set.
 const INITIAL_STATE: usize = (REF_ONE * 2) | JOIN_INTEREST | NOTIFIED;
@@ -67,7 +67,7 @@ impl State {
     pub(super) fn new() -> State {
         // A task is initialized with three references: one for the scheduler,
         // one for the `JoinHandle`, one for the task handle made available in
-        // release. As the task starts with a `JoinHandle`, `JOIN_INTERST` is
+        // release. As the task starts with a `JoinHandle`, `JOIN_INTEREST` is
         // set. A new task is immediately pushed into the run queue for
         // execution and starts with the `NOTIFIED` flag set.
         State {
