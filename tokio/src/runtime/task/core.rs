@@ -71,6 +71,10 @@ pub(crate) struct Header {
 
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
+
+    /// The tracing ID for this instrumented task.
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(super) id: Option<tracing::Id>,
 }
 
 unsafe impl Send for Header {}
@@ -80,9 +84,6 @@ unsafe impl Sync for Header {}
 pub(super) struct Trailer {
     /// Consumer task waiting on completion of this task.
     pub(super) waker: UnsafeCell<Option<Waker>>,
-    /// The tracing ID for this instrumented task.
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(super) id: Option<tracing::Id>,
 }
 
 /// Either the future or the output.
@@ -105,6 +106,8 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 queue_next: UnsafeCell::new(None),
                 stack_next: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                id,
             },
             core: Core {
                 scheduler: Scheduler {
@@ -116,8 +119,6 @@ impl<T: Future, S: Schedule> Cell<T, S> {
             },
             trailer: Trailer {
                 waker: UnsafeCell::new(None),
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
-                id,
             },
         })
     }

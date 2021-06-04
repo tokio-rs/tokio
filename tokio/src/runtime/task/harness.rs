@@ -148,7 +148,7 @@ where
 
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) fn id(&self) -> Option<&tracing::Id> {
-        self.trailer().id.as_ref()
+        self.header().id.as_ref()
     }
 
     /// Forcibly shutdown the task
