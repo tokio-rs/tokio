@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622838750950,
+  "lastUpdate": 1622838780327,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -31927,6 +31927,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18728269,
             "range": "± 2677223",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "h.bing612@gmail.com",
+            "name": "Tony Han",
+            "username": "tony612"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d101feac504fea552a6c70537f22ccb7df8635e3",
+          "message": "runtime: fix typo in task state doc (#3835)",
+          "timestamp": "2021-06-04T22:31:04+02:00",
+          "tree_id": "c9c359ca66230e226a286bd1468fbb5d6fc64f9f",
+          "url": "https://github.com/tokio-rs/tokio/commit/d101feac504fea552a6c70537f22ccb7df8635e3"
+        },
+        "date": 1622838776008,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 201254,
+            "range": "± 71955",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 723356,
+            "range": "± 427372",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5272833,
+            "range": "± 1884603",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20052104,
+            "range": "± 3459832",
             "unit": "ns/iter"
           }
         ]
