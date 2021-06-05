@@ -428,6 +428,8 @@
 //!   bounding of any kind.
 
 cfg_sync! {
+    pub mod futures;
+
     mod barrier;
     pub use barrier::{Barrier, BarrierWaitResult};
 
