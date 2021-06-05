@@ -482,6 +482,48 @@ impl TcpSocket {
         let mio = self.inner.listen(backlog)?;
         TcpListener::new(mio)
     }
+
+    /// Converts a TcpStream into a TcpSocket
+    /// This converts the TcpStream into
+    /// the platform specific raw_fd(unix) / raw_socket(windows)
+    /// and then converts them into the TcpSocket
+    /// as TcpSocket implements the FromRawFd(unix) and
+    /// FromRawSocket(windows) traits.
+
+    /// # Examples
+    /// ```
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::net::TcpStream;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///
+    ///     let stream = TcpStream::connect("127.0.0.1:8080")?;
+    ///
+    ///     let socket = TcpSocket::from_std_stream(stream)?;
+    /// # drop(socket);
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn from_std_stream(std_stream: std::net::TcpStream) -> io::Result<TcpSocket> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
+
+            let raw_fd = std_stream.into_raw_fd();
+            unsafe { Ok(TcpSocket::from_raw_fd(raw_fd)) }
+        }
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+
+            let raw_socket = std_stream.into_raw_socket();
+            unsafe { Ok(TcpSocket::from_raw_socket(raw_socket)) }
+        }
+    }
 }
 
 impl fmt::Debug for TcpSocket {
