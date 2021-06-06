@@ -28,6 +28,7 @@ default = []
 
 # enable everything
 full = [
+  "aio",
   "fs",
   "io-util",
   "io-std",
@@ -40,6 +41,10 @@ full = [
   "signal",
   "sync",
   "time",
+]
+
+aio = [
+  "mio/os-poll"
 ]
 
 fs = []
@@ -123,6 +128,10 @@ proptest = "1"
 rand = "0.8.0"
 tempfile = "3.1.0"
 async-stream = "0.3"
+
+[target.'cfg(target_os = "freebsd")'.dev-dependencies]
+futures-test = "0.3.7"
+mio-aio = { git = "https://github.com/asomers/mio-aio", rev = "f0a68b53003436db30cd96480a9fcd9c410affb7"  }
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.5", features = ["futures", "checkpoint"] }

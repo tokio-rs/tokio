@@ -211,6 +211,11 @@ cfg_io_driver_impl! {
         pub use driver::{Interest, Ready};
     }
 
+    cfg_aio! {
+        mod poll_aio;
+        pub use poll_aio::{PollAio, PollAioEvent};
+    }
+
     mod poll_evented;
 
     #[cfg(not(loom))]
