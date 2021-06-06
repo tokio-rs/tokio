@@ -56,7 +56,7 @@ use std::sync::Arc;
 ///     let semaphore = Arc::new(Semaphore::new(3));
 ///     let mut join_handles = Vec::new();
 ///
-///     for _ in 1..=5 {
+///     for _ in 0..5 {
 ///         let permit = semaphore.clone().acquire_owned().await.unwrap();
 ///         join_handles.push(tokio::spawn(async move {
 ///             // perform task...
@@ -207,7 +207,7 @@ impl Semaphore {
     /// async fn main() {
     ///     let semaphore = Semaphore::new(5);
     ///
-    ///     let p1 = semaphore.acquire_many(3).await.unwrap();
+    ///     let permit = semaphore.acquire_many(3).await.unwrap();
     ///     assert_eq!(semaphore.available_permits(), 2);
     /// }
     /// ```
@@ -315,7 +315,7 @@ impl Semaphore {
     ///     let semaphore = Arc::new(Semaphore::new(3));
     ///     let mut join_handles = Vec::new();
     ///
-    ///     for _ in 1..=5 {
+    ///     for _ in 0..5 {
     ///         let permit = semaphore.clone().acquire_owned().await.unwrap();
     ///         join_handles.push(tokio::spawn(async move {
     ///             // perform task...
@@ -359,7 +359,7 @@ impl Semaphore {
     ///     let semaphore = Arc::new(Semaphore::new(10));
     ///     let mut join_handles = Vec::new();
     ///
-    ///     for _ in 1..=5 {
+    ///     for _ in 0..5 {
     ///         let permit = semaphore.clone().acquire_many_owned(2).await.unwrap();
     ///         join_handles.push(tokio::spawn(async move {
     ///             // perform task...
@@ -400,25 +400,20 @@ impl Semaphore {
     ///
     /// ```
     /// use std::sync::Arc;
-    /// use tokio::sync::Semaphore;
+    /// use tokio::sync::{Semaphore, TryAcquireError};
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let semaphore = Arc::new(Semaphore::new(5));
-    ///     let mut join_handles = Vec::new();
+    ///     let semaphore = Arc::new(Semaphore::new(2));
     ///
-    ///     for _ in 1..=5 {
-    ///         let permit = semaphore.clone().try_acquire_owned().unwrap();
-    ///         join_handles.push(tokio::spawn(async move {
-    ///             // perform task...
-    ///             // explicitly own `permit` in the task
-    ///             drop(permit);
-    ///         }));
-    ///     }
+    ///     let permit_1 = Arc::clone(&semaphore).try_acquire_owned().unwrap();
+    ///     assert_eq!(semaphore.available_permits(), 1);
     ///
-    ///     for handle in join_handles {
-    ///         handle.await.unwrap();
-    ///     }
+    ///     let permit_2 = Arc::clone(&semaphore).try_acquire_owned().unwrap();
+    ///     assert_eq!(semaphore.available_permits(), 0);
+    ///
+    ///     let permit_3 = semaphore.try_acquire_owned();
+    ///     assert_eq!(permit_3.err(), Some(TryAcquireError::NoPermits));
     /// }
     /// ```
     ///
@@ -448,25 +443,17 @@ impl Semaphore {
     ///
     /// ```
     /// use std::sync::Arc;
-    /// use tokio::sync::Semaphore;
+    /// use tokio::sync::{Semaphore, TryAcquireError};
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let semaphore = Arc::new(Semaphore::new(10));
-    ///     let mut join_handles = Vec::new();
+    ///     let semaphore = Arc::new(Semaphore::new(4));
     ///
-    ///     for _ in 1..=5 {
-    ///         let permit = semaphore.clone().try_acquire_many_owned(2).unwrap();
-    ///         join_handles.push(tokio::spawn(async move {
-    ///             // perform task...
-    ///             // explicitly own `permit` in the task
-    ///             drop(permit);
-    ///         }));
-    ///     }
+    ///     let permit_1 = Arc::clone(&semaphore).try_acquire_many_owned(3).unwrap();
+    ///     assert_eq!(semaphore.available_permits(), 1);
     ///
-    ///     for handle in join_handles {
-    ///         handle.await.unwrap();
-    ///     }
+    ///     let permit_2 = semaphore.try_acquire_many_owned(2);
+    ///     assert_eq!(permit_2.err(), Some(TryAcquireError::NoPermits));
     /// }
     /// ```
     ///
