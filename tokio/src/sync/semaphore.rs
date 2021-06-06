@@ -233,19 +233,18 @@ impl Semaphore {
     /// ```
     /// use tokio::sync::{Semaphore, TryAcquireError};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let semaphore = Semaphore::new(2);
+    /// # fn main() {
+    /// let semaphore = Semaphore::new(2);
     ///
-    ///     let permit_1 = semaphore.try_acquire().unwrap();
-    ///     assert_eq!(semaphore.available_permits(), 1);
+    /// let permit_1 = semaphore.try_acquire().unwrap();
+    /// assert_eq!(semaphore.available_permits(), 1);
     ///
-    ///     let permit_2 = semaphore.try_acquire().unwrap();
-    ///     assert_eq!(semaphore.available_permits(), 0);
+    /// let permit_2 = semaphore.try_acquire().unwrap();
+    /// assert_eq!(semaphore.available_permits(), 0);
     ///
-    ///     let permit_3 = semaphore.try_acquire();
-    ///     assert_eq!(permit_3.err(), Some(TryAcquireError::NoPermits));
-    /// }
+    /// let permit_3 = semaphore.try_acquire();
+    /// assert_eq!(permit_3.err(), Some(TryAcquireError::NoPermits));
+    /// # }
     /// ```
     ///
     /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
@@ -272,16 +271,15 @@ impl Semaphore {
     /// ```
     /// use tokio::sync::{Semaphore, TryAcquireError};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let semaphore = Semaphore::new(4);
+    /// # fn main() {
+    /// let semaphore = Semaphore::new(4);
     ///
-    ///     let permit_1 = semaphore.try_acquire_many(3).unwrap();
-    ///     assert_eq!(semaphore.available_permits(), 1);
+    /// let permit_1 = semaphore.try_acquire_many(3).unwrap();
+    /// assert_eq!(semaphore.available_permits(), 1);
     ///
-    ///     let permit_2 = semaphore.try_acquire_many(2);
-    ///     assert_eq!(permit_2.err(), Some(TryAcquireError::NoPermits));
-    /// }
+    /// let permit_2 = semaphore.try_acquire_many(2);
+    /// assert_eq!(permit_2.err(), Some(TryAcquireError::NoPermits));
+    /// # }
     /// ```
     ///
     /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
@@ -402,19 +400,18 @@ impl Semaphore {
     /// use std::sync::Arc;
     /// use tokio::sync::{Semaphore, TryAcquireError};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let semaphore = Arc::new(Semaphore::new(2));
+    /// # fn main() {
+    /// let semaphore = Arc::new(Semaphore::new(2));
     ///
-    ///     let permit_1 = Arc::clone(&semaphore).try_acquire_owned().unwrap();
-    ///     assert_eq!(semaphore.available_permits(), 1);
+    /// let permit_1 = Arc::clone(&semaphore).try_acquire_owned().unwrap();
+    /// assert_eq!(semaphore.available_permits(), 1);
     ///
-    ///     let permit_2 = Arc::clone(&semaphore).try_acquire_owned().unwrap();
-    ///     assert_eq!(semaphore.available_permits(), 0);
+    /// let permit_2 = Arc::clone(&semaphore).try_acquire_owned().unwrap();
+    /// assert_eq!(semaphore.available_permits(), 0);
     ///
-    ///     let permit_3 = semaphore.try_acquire_owned();
-    ///     assert_eq!(permit_3.err(), Some(TryAcquireError::NoPermits));
-    /// }
+    /// let permit_3 = semaphore.try_acquire_owned();
+    /// assert_eq!(permit_3.err(), Some(TryAcquireError::NoPermits));
+    /// # }
     /// ```
     ///
     /// [`Arc`]: std::sync::Arc
@@ -445,16 +442,15 @@ impl Semaphore {
     /// use std::sync::Arc;
     /// use tokio::sync::{Semaphore, TryAcquireError};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let semaphore = Arc::new(Semaphore::new(4));
+    /// # fn main() {
+    /// let semaphore = Arc::new(Semaphore::new(4));
     ///
-    ///     let permit_1 = Arc::clone(&semaphore).try_acquire_many_owned(3).unwrap();
-    ///     assert_eq!(semaphore.available_permits(), 1);
+    /// let permit_1 = Arc::clone(&semaphore).try_acquire_many_owned(3).unwrap();
+    /// assert_eq!(semaphore.available_permits(), 1);
     ///
-    ///     let permit_2 = semaphore.try_acquire_many_owned(2);
-    ///     assert_eq!(permit_2.err(), Some(TryAcquireError::NoPermits));
-    /// }
+    /// let permit_2 = semaphore.try_acquire_many_owned(2);
+    /// assert_eq!(permit_2.err(), Some(TryAcquireError::NoPermits));
+    /// # }
     /// ```
     ///
     /// [`Arc`]: std::sync::Arc
