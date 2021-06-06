@@ -316,6 +316,7 @@
 //! - `sync`: Enables all `tokio::sync` types.
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
+//! - `aio`: Enables `tokio::io::PollAio`, for working with POSIX AIO.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are

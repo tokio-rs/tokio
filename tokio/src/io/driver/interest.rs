@@ -14,6 +14,16 @@ use std::ops;
 pub struct Interest(mio::Interest);
 
 impl Interest {
+    cfg_aio! {
+        /// Interest for POSIX AIO
+        pub const AIO: Interest = Interest(mio::Interest::AIO);
+    }
+
+    cfg_aio! {
+        /// Interest for POSIX AIO lio_listio events
+        pub const LIO: Interest = Interest(mio::Interest::LIO);
+    }
+
     /// Interest in all readable events.
     ///
     /// Readable interest includes read-closed events.
