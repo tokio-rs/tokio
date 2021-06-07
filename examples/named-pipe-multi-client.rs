@@ -37,7 +37,7 @@ async fn windows_main() -> io::Result<()> {
             server = ServerOptions::new().create(PIPE_NAME)?;
 
             let _ = tokio::spawn(async move {
-                let mut buf = [0u8; 4];
+                let mut buf = vec![0u8; 4];
                 inner.read_exact(&mut buf).await?;
                 inner.write_all(b"pong").await?;
                 Ok::<_, io::Error>(())
