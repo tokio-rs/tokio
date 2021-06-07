@@ -87,7 +87,3 @@ path = "named-pipe.rs"
 [[example]]
 name = "named-pipe-multi-client"
 path = "named-pipe-multi-client.rs"
-
-[[example]]
-name = "named-pipe-peek"
-path = "named-pipe-peek.rs"

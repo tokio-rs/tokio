@@ -3,7 +3,7 @@ use std::io;
 #[cfg(windows)]
 async fn windows_main() -> io::Result<()> {
     use std::time::Duration;
-    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
     use tokio::time;
     use winapi::shared::winerror;
