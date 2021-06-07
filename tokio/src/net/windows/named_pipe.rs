@@ -152,7 +152,7 @@ impl NamedPipe {
     ///
     /// [Tokio Runtime]: crate::runtime::Runtime
     /// [enabled I/O]: crate::runtime::Builder::enable_io
-    pub unsafe fn try_from_raw_handle(handle: RawHandle) -> io::Result<Self> {
+    pub unsafe fn from_raw_handle(handle: RawHandle) -> io::Result<Self> {
         let named_pipe = mio_windows::NamedPipe::from_raw_handle(handle);
 
         Ok(NamedPipe {
