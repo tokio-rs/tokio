@@ -181,8 +181,9 @@ cfg_io_util! {
         /// # Return
         ///
         /// On a successful read, the number of read bytes is returned. If the
-        /// supplied buffer is not empty and the function returns `Ok(0)` then
-        /// the source has reached an "end-of-file" event.
+        /// remaining capacity of the supplied buffer is greater than 0 and
+        /// the function returns `Ok(0)` then the source has reached an
+        /// "end-of-file" event.
         ///
         /// # Errors
         ///
