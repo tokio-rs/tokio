@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1622838795150,
+  "lastUpdate": 1623189140560,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -75143,6 +75143,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 829786,
             "range": "± 3826",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sean@seanmonstar.com",
+            "name": "Sean McArthur",
+            "username": "seanmonstar"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e7d74b3119178b9b86f7b547774b6b121de2239a",
+          "message": "tracing: instrument task wakers (#3836)\n\n## Motivation\r\n\r\nIn support of tokio-rs/console#37, we want to understand when a specific task's waker has been interacted with, such as when it is awoken, or if it's forgotten (not cloned), etc.\r\n\r\n## Solution\r\n\r\nWhen the tracing feature is enabled, a super trait of Future (InstrumentedFuture) is implemented for Instrumented<F> that allows grabbing the task's ID (well, its span ID), and stores that in the raw task trailer. The waker vtable then emits events and includes that ID.",
+          "timestamp": "2021-06-08T14:50:40-07:00",
+          "tree_id": "0e6dc70986dc3e51e9b9d20e0847c053344e709b",
+          "url": "https://github.com/tokio-rs/tokio/commit/e7d74b3119178b9b86f7b547774b6b121de2239a"
+        },
+        "date": 1623189137020,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 5802948,
+            "range": "± 2230022",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5683917,
+            "range": "± 1558182",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5181697,
+            "range": "± 1999033",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 222,
+            "range": "± 67",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 226,
+            "range": "± 75",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 214,
+            "range": "± 53",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 25342,
+            "range": "± 7475",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 681,
+            "range": "± 111",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 861419,
+            "range": "± 163969",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 605680,
+            "range": "± 91630",
             "unit": "ns/iter"
           }
         ]
