@@ -9,13 +9,13 @@
 //! Make sure to consult the relevant safety section of each function before
 //! use.
 
+use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
 use crate::runtime::task::{Notified, Schedule, Task};
 use crate::util::linked_list;
 
-use std::future::Future;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
@@ -71,6 +71,10 @@ pub(crate) struct Header {
 
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
+
+    /// The tracing ID for this instrumented task.
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(super) id: Option<tracing::Id>,
 }
 
 unsafe impl Send for Header {}
@@ -93,6 +97,8 @@ impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
     pub(super) fn new(future: T, state: State) -> Box<Cell<T, S>> {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let id = future.id();
         Box::new(Cell {
             header: Header {
                 state,
@@ -100,6 +106,8 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 queue_next: UnsafeCell::new(None),
                 stack_next: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                id,
             },
             core: Core {
                 scheduler: Scheduler {

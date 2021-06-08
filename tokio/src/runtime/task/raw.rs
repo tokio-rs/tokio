@@ -1,6 +1,6 @@
+use crate::future::Future;
 use crate::runtime::task::{Cell, Harness, Header, Schedule, State};
 
-use std::future::Future;
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
 

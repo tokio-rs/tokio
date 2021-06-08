@@ -26,9 +26,9 @@ cfg_rt_multi_thread! {
     pub(crate) use self::stack::TransferStack;
 }
 
+use crate::future::Future;
 use crate::util::linked_list;
 
-use std::future::Future;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{fmt, mem};

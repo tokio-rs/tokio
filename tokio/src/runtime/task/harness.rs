@@ -1,9 +1,9 @@
+use crate::future::Future;
 use crate::runtime::task::core::{Cell, Core, CoreStage, Header, Scheduler, Trailer};
 use crate::runtime::task::state::Snapshot;
 use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{JoinError, Notified, Schedule, Task};
 
-use std::future::Future;
 use std::mem;
 use std::panic;
 use std::ptr::NonNull;
@@ -144,6 +144,11 @@ where
         if self.header().state.ref_dec() {
             self.dealloc();
         }
+    }
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(super) fn id(&self) -> Option<&tracing::Id> {
+        self.header().id.as_ref()
     }
 
     /// Forcibly shutdown the task
