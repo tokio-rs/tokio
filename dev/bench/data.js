@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623189140560,
+  "lastUpdate": 1623189145703,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -31975,6 +31975,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20052104,
             "range": "± 3459832",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sean@seanmonstar.com",
+            "name": "Sean McArthur",
+            "username": "seanmonstar"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e7d74b3119178b9b86f7b547774b6b121de2239a",
+          "message": "tracing: instrument task wakers (#3836)\n\n## Motivation\r\n\r\nIn support of tokio-rs/console#37, we want to understand when a specific task's waker has been interacted with, such as when it is awoken, or if it's forgotten (not cloned), etc.\r\n\r\n## Solution\r\n\r\nWhen the tracing feature is enabled, a super trait of Future (InstrumentedFuture) is implemented for Instrumented<F> that allows grabbing the task's ID (well, its span ID), and stores that in the raw task trailer. The waker vtable then emits events and includes that ID.",
+          "timestamp": "2021-06-08T14:50:40-07:00",
+          "tree_id": "0e6dc70986dc3e51e9b9d20e0847c053344e709b",
+          "url": "https://github.com/tokio-rs/tokio/commit/e7d74b3119178b9b86f7b547774b6b121de2239a"
+        },
+        "date": 1623189140534,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 186555,
+            "range": "± 16138",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 674949,
+            "range": "± 90247",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4646391,
+            "range": "± 807130",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20253049,
+            "range": "± 2348329",
             "unit": "ns/iter"
           }
         ]
