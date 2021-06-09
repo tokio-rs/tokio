@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623243774319,
+  "lastUpdate": 1623243900718,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -49245,6 +49245,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 874,
             "range": "± 101",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "evan.mesterhazy@gmail.com",
+            "name": "Evan Mesterhazy",
+            "username": "emesterhazy"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d16e50639a0dd5dac695338768adc4792c680ce7",
+          "message": "doc: clarify EOF condition for AsyncReadExt::read_buf (#3850)",
+          "timestamp": "2021-06-09T15:00:32+02:00",
+          "tree_id": "b515e284adaf2d1cb876a1b38c30b66c38c71292",
+          "url": "https://github.com/tokio-rs/tokio/commit/d16e50639a0dd5dac695338768adc4792c680ce7"
+        },
+        "date": 1623243897024,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13363,
+            "range": "± 2437",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 828,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 545,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12689,
+            "range": "± 2324",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 824,
+            "range": "± 9",
             "unit": "ns/iter"
           }
         ]
