@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623243907588,
+  "lastUpdate": 1623243915548,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -32233,6 +32233,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20039222,
             "range": "± 3071470",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "evan.mesterhazy@gmail.com",
+            "name": "Evan Mesterhazy",
+            "username": "emesterhazy"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d16e50639a0dd5dac695338768adc4792c680ce7",
+          "message": "doc: clarify EOF condition for AsyncReadExt::read_buf (#3850)",
+          "timestamp": "2021-06-09T15:00:32+02:00",
+          "tree_id": "b515e284adaf2d1cb876a1b38c30b66c38c71292",
+          "url": "https://github.com/tokio-rs/tokio/commit/d16e50639a0dd5dac695338768adc4792c680ce7"
+        },
+        "date": 1623243911115,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 207806,
+            "range": "± 28359",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 735125,
+            "range": "± 83914",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5228800,
+            "range": "± 1253739",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20304338,
+            "range": "± 3193523",
             "unit": "ns/iter"
           }
         ]
