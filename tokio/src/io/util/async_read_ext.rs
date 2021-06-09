@@ -182,11 +182,9 @@ cfg_io_util! {
         ///
         /// # Return
         ///
-        /// If the return value of this method is `Ok(n)`, then it must be
-        /// guaranteed that `0 <= n <= buf.len()`. A nonzero `n` value indicates
-        /// that the buffer `buf` has been filled in with `n` bytes of data from
-        /// this source. If `n` is `0`, then it can indicate one of two
-        /// scenarios:
+        /// A nonzero `n` value indicates that the buffer `buf` has been filled
+        /// in with `n` bytes of data from this source. If `n` is `0`, then it
+        /// can indicate one of two scenarios:
         ///
         /// 1. This reader has reached its "end of file" and will likely no longer
         ///    be able to produce bytes. Note that this does not mean that the
