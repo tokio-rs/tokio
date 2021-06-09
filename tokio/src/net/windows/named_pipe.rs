@@ -38,49 +38,20 @@ mod doc {
 
 use self::doc::*;
 
-/// A [Windows named pipe].
+/// A [Windows named pipe] server.
 ///
-/// Constructed using [`ClientOptions::open`] for clients, or
-/// [`ServerOptions::create`] for servers. See their corresponding documentation
-/// for examples.
+/// Accepting client connections involves creating a server with
+/// [`ServerOptions::create`] and waiting for clients to connect using
+/// [`NamedPipeServer::connect`].
 ///
-/// Connecting a client involves a few steps. First we must try to
-/// [`ClientOptions::open`], the error typically indicates one of two things:
+/// To avoid having clients sporadically fail with
+/// [`std::io::ErrorKind::NotFound`] when they connect to a server, we must
+/// ensure that at least one server instance is available at all times. This
+/// means that the typical listen loop for a server is a bit involved, because
+/// we have to ensure that we never drop a server accidentally while a client
+/// might connect.
 ///
-/// * [`std::io::ErrorKind::NotFound`] - There is no server available.
-/// * [`ERROR_PIPE_BUSY`] - There is a server available, but it is busy. Sleep for
-///   a while and try again.
-///
-/// So a typical client connect loop will look like the this:
-///
-/// ```no_run
-/// use std::time::Duration;
-/// use tokio::net::windows::named_pipe::ClientOptions;
-/// use tokio::time;
-/// use winapi::shared::winerror;
-///
-/// const PIPE_NAME: &str = r"\\.\pipe\named-pipe-idiomatic-client";
-///
-/// # #[tokio::main] async fn main() -> std::io::Result<()> {
-/// let client = loop {
-///     match ClientOptions::new().open(PIPE_NAME) {
-///         Ok(client) => break client,
-///         Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
-///         Err(e) => return Err(e),
-///     }
-///
-///     time::sleep(Duration::from_millis(50)).await;
-/// };
-///
-/// /* use the connected client */
-/// # Ok(()) }
-/// ```
-///
-/// To avoid having clients fail with [`std::io::ErrorKind::NotFound`] when
-/// connecting to a named pipe server, you must ensure that at least one server
-/// instance is up and running at all times. This means that the typical listen
-/// loop for a server is a bit involved, because we have to ensure that we never
-/// drop a server accidentally while a client might want to connect.
+/// So a correctly implemented server looks like this:
 ///
 /// ```no_run
 /// use std::io;
@@ -129,12 +100,12 @@ use self::doc::*;
 /// [`ERROR_PIPE_BUSY`]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
-pub struct NamedPipe {
+pub struct NamedPipeServer {
     io: PollEvented<mio_windows::NamedPipe>,
 }
 
-impl NamedPipe {
-    /// Fallibly construct a new named pipe from the specified raw handle.
+impl NamedPipeServer {
+    /// Construct a new named pipe server from the specified raw handle.
     ///
     /// This function will consume ownership of the handle given, passing
     /// responsibility for closing the handle to the returned object.
@@ -155,9 +126,35 @@ impl NamedPipe {
     pub unsafe fn from_raw_handle(handle: RawHandle) -> io::Result<Self> {
         let named_pipe = mio_windows::NamedPipe::from_raw_handle(handle);
 
-        Ok(NamedPipe {
+        Ok(Self {
             io: PollEvented::new(named_pipe)?,
         })
+    }
+
+    /// Retrieves information about the named pipe the server is associated
+    /// with.
+    ///
+    /// ```no_run
+    /// use tokio::net::windows::named_pipe::{PipeEnd, PipeMode, ServerOptions};
+    ///
+    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-server-info";
+    ///
+    /// # #[tokio::main] async fn main() -> std::io::Result<()> {
+    /// let server = ServerOptions::new()
+    ///     .pipe_mode(PipeMode::Message)
+    ///     .max_instances(5)
+    ///     .create(PIPE_NAME)?;
+    ///
+    /// let server_info = server.info()?;
+    ///
+    /// assert_eq!(server_info.end, PipeEnd::Server);
+    /// assert_eq!(server_info.mode, PipeMode::Message);
+    /// assert_eq!(server_info.max_instances, 5);
+    /// # Ok(()) }
+    /// ```
+    pub fn info(&self) -> io::Result<PipeInfo> {
+        // Safety: we're ensuring the lifetime of the named pipe.
+        unsafe { named_pipe_info(self.io.as_raw_handle()) }
     }
 
     /// Enables a named pipe server process to wait for a client process to
@@ -228,77 +225,9 @@ impl NamedPipe {
     pub fn disconnect(&self) -> io::Result<()> {
         self.io.disconnect()
     }
-
-    /// Retrieves information about the current named pipe.
-    ///
-    /// ```
-    /// use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions, PipeMode, PipeEnd};
-    ///
-    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-info";
-    ///
-    /// # #[tokio::main] async fn main() -> std::io::Result<()> {
-    /// let server = ServerOptions::new()
-    ///     .pipe_mode(PipeMode::Message)
-    ///     .max_instances(5)
-    ///     .create(PIPE_NAME)?;
-    ///
-    /// let client = ClientOptions::new()
-    ///     .open(PIPE_NAME)?;
-    ///
-    /// let server_info = server.info()?;
-    /// let client_info = client.info()?;
-    ///
-    /// assert_eq!(server_info.end, PipeEnd::Server);
-    /// assert_eq!(server_info.mode, PipeMode::Message);
-    /// assert_eq!(server_info.max_instances, 5);
-    ///
-    /// assert_eq!(client_info.end, PipeEnd::Client);
-    /// assert_eq!(client_info.mode, PipeMode::Message);
-    /// assert_eq!(server_info.max_instances, 5);
-    /// # Ok(()) }
-    /// ```
-    pub fn info(&self) -> io::Result<PipeInfo> {
-        unsafe {
-            let mut flags = 0;
-            let mut out_buffer_size = 0;
-            let mut in_buffer_size = 0;
-            let mut max_instances = 0;
-
-            let result = namedpipeapi::GetNamedPipeInfo(
-                self.io.as_raw_handle(),
-                &mut flags,
-                &mut out_buffer_size,
-                &mut in_buffer_size,
-                &mut max_instances,
-            );
-
-            if result == FALSE {
-                return Err(io::Error::last_os_error());
-            }
-
-            let mut end = PipeEnd::Client;
-            let mut mode = PipeMode::Byte;
-
-            if flags & winbase::PIPE_SERVER_END != 0 {
-                end = PipeEnd::Server;
-            }
-
-            if flags & winbase::PIPE_TYPE_MESSAGE != 0 {
-                mode = PipeMode::Message;
-            }
-
-            Ok(PipeInfo {
-                end,
-                mode,
-                out_buffer_size,
-                in_buffer_size,
-                max_instances,
-            })
-        }
-    }
 }
 
-impl AsyncRead for NamedPipe {
+impl AsyncRead for NamedPipeServer {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -308,7 +237,7 @@ impl AsyncRead for NamedPipe {
     }
 }
 
-impl AsyncWrite for NamedPipe {
+impl AsyncWrite for NamedPipeServer {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -334,7 +263,144 @@ impl AsyncWrite for NamedPipe {
     }
 }
 
-impl AsRawHandle for NamedPipe {
+impl AsRawHandle for NamedPipeServer {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.io.as_raw_handle()
+    }
+}
+
+/// A [Windows named pipe] client.
+///
+/// Constructed using [`ClientOptions::open`].
+///
+/// Connecting a client correctly involves a few steps. When connecting through
+/// [`ClientOptions::open`], it might error indicating one of two things:
+///
+/// * [`std::io::ErrorKind::NotFound`] - There is no server available.
+/// * [`ERROR_PIPE_BUSY`] - There is a server available, but it is busy. Sleep
+///   for a while and try again.
+///
+/// So a correctly implemented client looks like this:
+///
+/// ```no_run
+/// use std::time::Duration;
+/// use tokio::net::windows::named_pipe::ClientOptions;
+/// use tokio::time;
+/// use winapi::shared::winerror;
+///
+/// const PIPE_NAME: &str = r"\\.\pipe\named-pipe-idiomatic-client";
+///
+/// # #[tokio::main] async fn main() -> std::io::Result<()> {
+/// let client = loop {
+///     match ClientOptions::new().open(PIPE_NAME) {
+///         Ok(client) => break client,
+///         Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
+///         Err(e) => return Err(e),
+///     }
+///
+///     time::sleep(Duration::from_millis(50)).await;
+/// };
+///
+/// /* use the connected client */
+/// # Ok(()) }
+/// ```
+///
+/// [`ERROR_PIPE_BUSY`]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
+/// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
+#[derive(Debug)]
+pub struct NamedPipeClient {
+    io: PollEvented<mio_windows::NamedPipe>,
+}
+
+impl NamedPipeClient {
+    /// Construct a new named pipe client from the specified raw handle.
+    ///
+    /// This function will consume ownership of the handle given, passing
+    /// responsibility for closing the handle to the returned object.
+    ///
+    /// This function is also unsafe as the primitives currently returned have
+    /// the contract that they are the sole owner of the file descriptor they
+    /// are wrapping. Usage of this function could accidentally allow violating
+    /// this contract which can cause memory unsafety in code that relies on it
+    /// being true.
+    ///
+    /// # Errors
+    ///
+    /// This errors if called outside of a [Tokio Runtime], or in a runtime that
+    /// has not [enabled I/O], or if any OS-specific I/O errors occur.
+    ///
+    /// [Tokio Runtime]: crate::runtime::Runtime
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
+    pub unsafe fn from_raw_handle(handle: RawHandle) -> io::Result<Self> {
+        let named_pipe = mio_windows::NamedPipe::from_raw_handle(handle);
+
+        Ok(Self {
+            io: PollEvented::new(named_pipe)?,
+        })
+    }
+
+    /// Retrieves information about the named pipe the client is associated
+    /// with.
+    ///
+    /// ```no_run
+    /// use tokio::net::windows::named_pipe::{ClientOptions, PipeEnd, PipeMode};
+    ///
+    /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-info";
+    ///
+    /// # #[tokio::main] async fn main() -> std::io::Result<()> {
+    /// let client = ClientOptions::new()
+    ///     .open(PIPE_NAME)?;
+    ///
+    /// let client_info = client.info()?;
+    ///
+    /// assert_eq!(client_info.end, PipeEnd::Client);
+    /// assert_eq!(client_info.mode, PipeMode::Message);
+    /// assert_eq!(client_info.max_instances, 5);
+    /// # Ok(()) }
+    /// ```
+    pub fn info(&self) -> io::Result<PipeInfo> {
+        // Safety: we're ensuring the lifetime of the named pipe.
+        unsafe { named_pipe_info(self.io.as_raw_handle()) }
+    }
+}
+
+impl AsyncRead for NamedPipeClient {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        unsafe { self.io.poll_read(cx, buf) }
+    }
+}
+
+impl AsyncWrite for NamedPipeClient {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        self.io.poll_write(cx, buf)
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.io.poll_write_vectored(cx, bufs)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.poll_flush(cx)
+    }
+}
+
+impl AsRawHandle for NamedPipeClient {
     fn as_raw_handle(&self) -> RawHandle {
         self.io.as_raw_handle()
     }
@@ -767,8 +833,7 @@ impl ServerOptions {
 
     /// Create the named pipe identified by `addr` for use as a server.
     ///
-    /// This function will call the [`CreateNamedPipe`] function and return the
-    /// result.
+    /// This uses the [`CreateNamedPipe`] function.
     ///
     /// [`CreateNamedPipe`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     ///
@@ -791,7 +856,7 @@ impl ServerOptions {
     /// let server = ServerOptions::new().create(PIPE_NAME)?;
     /// # Ok(()) }
     /// ```
-    pub fn create(&self, addr: impl AsRef<OsStr>) -> io::Result<NamedPipe> {
+    pub fn create(&self, addr: impl AsRef<OsStr>) -> io::Result<NamedPipeServer> {
         // Safety: We're calling create_with_security_attributes_raw w/ a null
         // pointer which disables it.
         unsafe { self.create_with_security_attributes_raw(addr, ptr::null_mut()) }
@@ -824,7 +889,7 @@ impl ServerOptions {
         &self,
         addr: impl AsRef<OsStr>,
         attrs: *mut c_void,
-    ) -> io::Result<NamedPipe> {
+    ) -> io::Result<NamedPipeServer> {
         let addr = encode_addr(addr);
 
         let h = namedpipeapi::CreateNamedPipeW(
@@ -842,10 +907,7 @@ impl ServerOptions {
             return Err(io::Error::last_os_error());
         }
 
-        let io = mio_windows::NamedPipe::from_raw_handle(h);
-        let io = PollEvented::new(io)?;
-
-        Ok(NamedPipe { io })
+        NamedPipeServer::from_raw_handle(h)
     }
 }
 
@@ -931,7 +993,8 @@ impl ClientOptions {
 
     /// Open the named pipe identified by `addr`.
     ///
-    /// This constructs the handle using [`CreateFile`].
+    /// This opens the client using [`CreateFile`] with the
+    /// `dwCreationDisposition` option set to `OPEN_EXISTING`.
     ///
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
     ///
@@ -979,7 +1042,7 @@ impl ClientOptions {
     /// // use the connected client.
     /// # Ok(()) }
     /// ```
-    pub fn open(&self, addr: impl AsRef<OsStr>) -> io::Result<NamedPipe> {
+    pub fn open(&self, addr: impl AsRef<OsStr>) -> io::Result<NamedPipeClient> {
         // Safety: We're calling open_with_security_attributes_raw w/ a null
         // pointer which disables it.
         unsafe { self.open_with_security_attributes_raw(addr, ptr::null_mut()) }
@@ -1004,7 +1067,7 @@ impl ClientOptions {
         &self,
         addr: impl AsRef<OsStr>,
         attrs: *mut c_void,
-    ) -> io::Result<NamedPipe> {
+    ) -> io::Result<NamedPipeClient> {
         let addr = encode_addr(addr);
 
         // NB: We could use a platform specialized `OpenOptions` here, but since
@@ -1025,10 +1088,7 @@ impl ClientOptions {
             return Err(io::Error::last_os_error());
         }
 
-        let io = mio_windows::NamedPipe::from_raw_handle(h);
-        let io = PollEvented::new(io)?;
-
-        Ok(NamedPipe { io })
+        NamedPipeClient::from_raw_handle(h)
     }
 
     fn get_flags(&self) -> u32 {
@@ -1036,7 +1096,7 @@ impl ClientOptions {
     }
 }
 
-/// The pipe mode of a [`NamedPipe`].
+/// The pipe mode of a named pipe.
 ///
 /// Set through [`ServerOptions::pipe_mode`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1049,8 +1109,8 @@ pub enum PipeMode {
     Byte,
     /// Data is written to the pipe as a stream of messages. The pipe treats the
     /// bytes written during each write operation as a message unit. Any reading
-    /// function on [`NamedPipe`] returns [`ERROR_MORE_DATA`] when a message is not
-    /// read completely.
+    /// on a named pipe returns [`ERROR_MORE_DATA`] when a message is not read
+    /// completely.
     ///
     /// Corresponds to [`PIPE_TYPE_MESSAGE`][crate::winapi::um::winbase::PIPE_TYPE_MESSAGE].
     ///
@@ -1058,15 +1118,15 @@ pub enum PipeMode {
     Message,
 }
 
-/// Indicates the end of a [`NamedPipe`].
+/// Indicates the end of a named pipe.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum PipeEnd {
-    /// The [`NamedPipe`] refers to the client end of a named pipe instance.
+    /// The named pipe refers to the client end of a named pipe instance.
     ///
     /// Corresponds to [`PIPE_CLIENT_END`][crate::winapi::um::winbase::PIPE_CLIENT_END].
     Client,
-    /// The [`NamedPipe`] refers to the server end of a named pipe instance.
+    /// The named pipe refers to the server end of a named pipe instance.
     ///
     /// Corresponds to [`PIPE_SERVER_END`][crate::winapi::um::winbase::PIPE_SERVER_END].
     Server,
@@ -1074,7 +1134,7 @@ pub enum PipeEnd {
 
 /// Information about a named pipe.
 ///
-/// Constructed through [`NamedPipe::info`].
+/// Constructed through [`NamedPipeServer::info`] or [`NamedPipeClient::info`].
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct PipeInfo {
@@ -1097,4 +1157,43 @@ fn encode_addr(addr: impl AsRef<OsStr>) -> Box<[u16]> {
     vec.extend(addr.as_ref().encode_wide());
     vec.push(0);
     vec.into_boxed_slice()
+}
+
+/// Internal function to get the info out of a raw named pipe.
+unsafe fn named_pipe_info(handle: RawHandle) -> io::Result<PipeInfo> {
+    let mut flags = 0;
+    let mut out_buffer_size = 0;
+    let mut in_buffer_size = 0;
+    let mut max_instances = 0;
+
+    let result = namedpipeapi::GetNamedPipeInfo(
+        handle,
+        &mut flags,
+        &mut out_buffer_size,
+        &mut in_buffer_size,
+        &mut max_instances,
+    );
+
+    if result == FALSE {
+        return Err(io::Error::last_os_error());
+    }
+
+    let mut end = PipeEnd::Client;
+    let mut mode = PipeMode::Byte;
+
+    if flags & winbase::PIPE_SERVER_END != 0 {
+        end = PipeEnd::Server;
+    }
+
+    if flags & winbase::PIPE_TYPE_MESSAGE != 0 {
+        mode = PipeMode::Message;
+    }
+
+    Ok(PipeInfo {
+        end,
+        mode,
+        out_buffer_size,
+        in_buffer_size,
+        max_instances,
+    })
 }

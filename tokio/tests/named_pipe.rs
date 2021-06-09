@@ -32,23 +32,6 @@ async fn test_named_pipe_client_drop() -> io::Result<()> {
     Ok(())
 }
 
-// This tests what happens when a client tries to disconnect.
-#[tokio::test]
-async fn test_named_pipe_client_connect() -> io::Result<()> {
-    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-client-connect";
-
-    let server = ServerOptions::new().create(PIPE_NAME)?;
-    let client = ClientOptions::new().open(PIPE_NAME)?;
-    server.connect().await?;
-
-    let e = client.connect().await.unwrap_err();
-    assert_eq!(
-        e.raw_os_error(),
-        Some(winerror::ERROR_INVALID_FUNCTION as i32)
-    );
-    Ok(())
-}
-
 #[tokio::test]
 async fn test_named_pipe_single_client() -> io::Result<()> {
     use tokio::io::{AsyncBufReadExt as _, BufReader};
