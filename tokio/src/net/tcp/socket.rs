@@ -483,25 +483,27 @@ impl TcpSocket {
         TcpListener::new(mio)
     }
 
-    /// Converts a `socket2::Socket` into a `TcpSocket`. The socket2 socket
-    /// needs to be in a disconnected state when passed as an argument.
-    /// 
+    /// Converts a [`std::net::TcpStream`] into a `TcpSocket`. The provided
+    /// socket must not have been connected prior to calling this function. This
+    /// function is typically used together with crates such as [`socket2`] to
+    /// configure socket options that are not available on `TcpSocket`.
+    ///
+    /// [`std::net::TcpStream`]: struct@std::net::TcpStream
+    /// [`socket2`]: https://docs.rs/socket2/
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use tokio::net::TcpSocket;
     /// use socket2::{Domain, Socket, Type};
     /// use std::net::TcpStream;
     ///
     /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///
+    /// async fn main() -> std::io::Result<()> {
+    ///     
     ///     let socket2_socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
-    /// 
-    ///     let stream = TcpStream::from(socket2_socket);
-    /// 
-    ///     let socket = TcpSocket::from_std_stream(stream)?;
-    /// # drop(socket);
+    ///
+    ///     let socket = TcpSocket::from_std_stream(socket2_socket.into())?;
     ///
     ///     Ok(())
     /// }
