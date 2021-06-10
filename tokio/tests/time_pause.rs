@@ -215,6 +215,40 @@ async fn interval() {
     assert_pending!(poll_next(&mut i));
 }
 
+#[tokio::test]
+async fn test_time_advance_sub_ms() {
+    time::pause();
+    let now = Instant::now();
+
+    let dur = Duration::from_micros(51_592);
+    time::advance(dur).await;
+
+    assert_eq!(now.elapsed(), dur);
+
+    let now = Instant::now();
+    let dur = Duration::from_micros(1);
+    time::advance(dur).await;
+
+    assert_eq!(now.elapsed(), dur);
+}
+
+#[tokio::test]
+async fn test_time_advance_3ms_and_change() {
+    time::pause();
+    let now = Instant::now();
+
+    let dur = Duration::from_micros(3_141_592);
+    time::advance(dur).await;
+
+    assert_eq!(now.elapsed(), dur);
+
+    let now = Instant::now();
+    let dur = Duration::from_micros(3_123_456);
+    time::advance(dur).await;
+
+    assert_eq!(now.elapsed(), dur);
+}
+
 fn poll_next(interval: &mut task::Spawn<time::Interval>) -> Poll<Instant> {
     interval.enter(|cx, mut interval| interval.poll_tick(cx))
 }
