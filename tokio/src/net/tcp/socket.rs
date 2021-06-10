@@ -496,14 +496,13 @@ impl TcpSocket {
     /// ```
     /// use tokio::net::TcpSocket;
     /// use socket2::{Domain, Socket, Type};
-    /// use std::net::TcpStream;
     ///
     /// #[tokio::main]
     /// async fn main() -> std::io::Result<()> {
     ///     
     ///     let socket2_socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
     ///
-    ///     let socket = TcpSocket::from_std_stream(socket2_socket.into())?;
+    ///     let socket = TcpSocket::from_std_stream(socket2_socket.into());
     ///
     ///     Ok(())
     /// }

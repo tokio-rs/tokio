@@ -123,6 +123,7 @@ proptest = "1"
 rand = "0.8.0"
 tempfile = "3.1.0"
 async-stream = "0.3"
+socket2 = "0.4"
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.5", features = ["futures", "checkpoint"] }
