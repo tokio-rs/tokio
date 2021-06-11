@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623401297379,
+  "lastUpdate": 1623402040828,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -49557,6 +49557,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 959,
             "range": "± 62",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "37569873+AtulJatia@users.noreply.github.com",
+            "name": "AtulJatia",
+            "username": "AtulJatia"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2e44cd29dfe84e2176f647b05e91bfc11270facd",
+          "message": "net: TcpSocket from std::net::TcpStream (#3838)",
+          "timestamp": "2021-06-11T10:58:58+02:00",
+          "tree_id": "245ba1cb091b074f0f168d26f4c662d7094a6fa1",
+          "url": "https://github.com/tokio-rs/tokio/commit/2e44cd29dfe84e2176f647b05e91bfc11270facd"
+        },
+        "date": 1623402035939,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16521,
+            "range": "± 4879",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 989,
+            "range": "± 50",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 646,
+            "range": "± 48",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15813,
+            "range": "± 7852",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 984,
+            "range": "± 77",
             "unit": "ns/iter"
           }
         ]
