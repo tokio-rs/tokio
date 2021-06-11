@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623401272582,
+  "lastUpdate": 1623401276147,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -32335,6 +32335,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20304338,
             "range": "± 3193523",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "oguz@bilgener.me",
+            "name": "Oğuz Bilgener",
+            "username": "oguzbilgener"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2ab1fb00a9f3c484d0130feb73ecef8437a915dd",
+          "message": "sync: add examples to Semaphore (#3808)",
+          "timestamp": "2021-06-11T10:46:16+02:00",
+          "tree_id": "774e97d39a6ca434bee254cecca3ede050190f14",
+          "url": "https://github.com/tokio-rs/tokio/commit/2ab1fb00a9f3c484d0130feb73ecef8437a915dd"
+        },
+        "date": 1623401272262,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 162037,
+            "range": "± 4757",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 609269,
+            "range": "± 43740",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5148682,
+            "range": "± 693719",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19908513,
+            "range": "± 3771643",
             "unit": "ns/iter"
           }
         ]
