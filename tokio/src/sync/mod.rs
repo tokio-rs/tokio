@@ -428,7 +428,10 @@
 //!   bounding of any kind.
 
 cfg_sync! {
-    pub mod futures;
+    /// Named future types.
+    pub mod futures {
+        pub use super::notify::Notified;
+    }
 
     mod barrier;
     pub use barrier::{Barrier, BarrierWaitResult};
