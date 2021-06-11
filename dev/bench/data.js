@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623402040828,
+  "lastUpdate": 1623402044966,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -32383,6 +32383,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19908513,
             "range": "± 3771643",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "37569873+AtulJatia@users.noreply.github.com",
+            "name": "AtulJatia",
+            "username": "AtulJatia"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2e44cd29dfe84e2176f647b05e91bfc11270facd",
+          "message": "net: TcpSocket from std::net::TcpStream (#3838)",
+          "timestamp": "2021-06-11T10:58:58+02:00",
+          "tree_id": "245ba1cb091b074f0f168d26f4c662d7094a6fa1",
+          "url": "https://github.com/tokio-rs/tokio/commit/2e44cd29dfe84e2176f647b05e91bfc11270facd"
+        },
+        "date": 1623402037736,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 192930,
+            "range": "± 6346",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 700868,
+            "range": "± 57560",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5608791,
+            "range": "± 1246061",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21517399,
+            "range": "± 4065455",
             "unit": "ns/iter"
           }
         ]
