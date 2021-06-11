@@ -215,9 +215,8 @@ async fn interval() {
     assert_pending!(poll_next(&mut i));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_time_advance_sub_ms() {
-    time::pause();
     let now = Instant::now();
 
     let dur = Duration::from_micros(51_592);
@@ -232,9 +231,8 @@ async fn test_time_advance_sub_ms() {
     assert_eq!(now.elapsed(), dur);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_time_advance_3ms_and_change() {
-    time::pause();
     let now = Instant::now();
 
     let dur = Duration::from_micros(3_141_592);
@@ -244,6 +242,40 @@ async fn test_time_advance_3ms_and_change() {
 
     let now = Instant::now();
     let dur = Duration::from_micros(3_123_456);
+    time::advance(dur).await;
+
+    assert_eq!(now.elapsed(), dur);
+}
+
+#[tokio::test(start_paused = true)]
+async fn regression_3710_with_submillis_advance() {
+    let start = Instant::now();
+
+    time::advance(Duration::from_millis(1)).await;
+
+    let mut sleep = task::spawn(time::sleep_until(start + Duration::from_secs(60)));
+
+    assert_pending!(sleep.poll());
+
+    let before = Instant::now();
+    let dur = Duration::from_micros(51_592);
+    time::advance(dur).await;
+    assert_eq!(before.elapsed(), dur);
+
+    assert_pending!(sleep.poll());
+}
+
+#[tokio::test(start_paused = true)]
+async fn exact_1ms_advance() {
+    let now = Instant::now();
+
+    let dur = Duration::from_millis(1);
+    time::advance(dur).await;
+
+    assert_eq!(now.elapsed(), dur);
+
+    let now = Instant::now();
+    let dur = Duration::from_millis(1);
     time::advance(dur).await;
 
     assert_eq!(now.elapsed(), dur);
