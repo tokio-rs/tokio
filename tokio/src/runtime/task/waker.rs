@@ -50,7 +50,7 @@ cfg_trace! {
             if let Some(id) = $harness.id() {
                 tracing::trace!(
                     target: "tokio::task::waker",
-                    op = %$op,
+                    op = $op,
                     task.id = id.into_u64(),
                 );
             }
