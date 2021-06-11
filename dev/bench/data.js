@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623402166703,
+  "lastUpdate": 1623402179662,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -49767,6 +49767,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 984,
             "range": "± 77",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "blackinmen@gmail.com",
+            "name": "Bart Pelle",
+            "username": "Velocity-"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f7592402545cc185eba0e9980a74c2ac92754c90",
+          "message": "chore: update version in README.md (#3851)",
+          "timestamp": "2021-06-11T11:01:22+02:00",
+          "tree_id": "2c5f6e9db121c03e229951a79575a359a1b74745",
+          "url": "https://github.com/tokio-rs/tokio/commit/f7592402545cc185eba0e9980a74c2ac92754c90"
+        },
+        "date": 1623402176381,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13547,
+            "range": "± 3495",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 704,
+            "range": "± 27",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 493,
+            "range": "± 96",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12567,
+            "range": "± 5710",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 815,
+            "range": "± 3",
             "unit": "ns/iter"
           }
         ]
