@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623402179662,
+  "lastUpdate": 1623402202167,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -32539,6 +32539,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21517399,
             "range": "± 4065455",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "blackinmen@gmail.com",
+            "name": "Bart Pelle",
+            "username": "Velocity-"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f7592402545cc185eba0e9980a74c2ac92754c90",
+          "message": "chore: update version in README.md (#3851)",
+          "timestamp": "2021-06-11T11:01:22+02:00",
+          "tree_id": "2c5f6e9db121c03e229951a79575a359a1b74745",
+          "url": "https://github.com/tokio-rs/tokio/commit/f7592402545cc185eba0e9980a74c2ac92754c90"
+        },
+        "date": 1623402197869,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 206050,
+            "range": "± 193204",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 707003,
+            "range": "± 80691",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5231047,
+            "range": "± 1061223",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20648424,
+            "range": "± 3427760",
             "unit": "ns/iter"
           }
         ]
