@@ -476,10 +476,10 @@ impl<P: Park + 'static> TimerUnpark<P> {
 
 impl<P: Park + 'static> Unpark for TimerUnpark<P> {
     fn unpark(&self) {
-        self.inner.unpark();
-
         #[cfg(feature = "test-util")]
         self.did_wake.store(true, Ordering::SeqCst);
+
+        self.inner.unpark();
     }
 }
 
