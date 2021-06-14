@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623692345352,
+  "lastUpdate": 1623692349518,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -32791,6 +32791,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18941595,
             "range": "± 4544773",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sean@seanmonstar.com",
+            "name": "Sean McArthur",
+            "username": "seanmonstar"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f55b77aaddaed8e48a8c0d81c66da82f12433087",
+          "message": "tracing: emit waker op as str instead as Debug (#3853)",
+          "timestamp": "2021-06-14T10:37:24-07:00",
+          "tree_id": "0eb535543c3a86a7571ba1dd11d7a36563c62c6f",
+          "url": "https://github.com/tokio-rs/tokio/commit/f55b77aaddaed8e48a8c0d81c66da82f12433087"
+        },
+        "date": 1623692340666,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 192071,
+            "range": "± 16871",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 708990,
+            "range": "± 55413",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5495019,
+            "range": "± 981852",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19979350,
+            "range": "± 3226576",
             "unit": "ns/iter"
           }
         ]
