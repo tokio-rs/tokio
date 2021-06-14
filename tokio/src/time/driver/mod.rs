@@ -274,7 +274,7 @@ where
     }
 
     cfg_not_test_util! {
-        fn park_timeout(&mut self, limit: Duration) -> Result<(), P::Error> {
+        fn park_timeout(&mut self, duration: Duration) -> Result<(), P::Error> {
             self.park.park_timeout(duration)
         }
     }
