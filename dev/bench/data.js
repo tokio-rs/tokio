@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623701758525,
+  "lastUpdate": 1623701772903,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -32893,6 +32893,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19979350,
             "range": "± 3226576",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2c24a028f6e4f2aea2b3975deeba92142f3d149b",
+          "message": "chore: re-enable test_socket_pair on FreeBSD (#3844)\n\nIt was disabled due to an OS bug that has been fixed on all currently\r\nsupported releases of FreeBSD",
+          "timestamp": "2021-06-14T13:14:35-07:00",
+          "tree_id": "d30a4259d844641a4a71ae0f819ec70d501a26fb",
+          "url": "https://github.com/tokio-rs/tokio/commit/2c24a028f6e4f2aea2b3975deeba92142f3d149b"
+        },
+        "date": 1623701769195,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 160115,
+            "range": "± 16966",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 605109,
+            "range": "± 71110",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5037631,
+            "range": "± 1154809",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17363426,
+            "range": "± 5821059",
             "unit": "ns/iter"
           }
         ]
