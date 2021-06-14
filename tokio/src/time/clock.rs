@@ -7,7 +7,7 @@
 //! configurable.
 
 cfg_not_test_util! {
-    use crate::time::{Duration, Instant};
+    use crate::time::{Instant};
 
     #[derive(Debug, Clone)]
     pub(crate) struct Clock {}
@@ -23,14 +23,6 @@ cfg_not_test_util! {
 
         pub(crate) fn now(&self) -> Instant {
             now()
-        }
-
-        pub(crate) fn is_paused(&self) -> bool {
-            false
-        }
-
-        pub(crate) fn advance(&self, _dur: Duration) {
-            unreachable!();
         }
     }
 }
