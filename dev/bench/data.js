@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623701772903,
+  "lastUpdate": 1623701779566,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -77405,6 +77405,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 780313,
             "range": "± 55492",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2c24a028f6e4f2aea2b3975deeba92142f3d149b",
+          "message": "chore: re-enable test_socket_pair on FreeBSD (#3844)\n\nIt was disabled due to an OS bug that has been fixed on all currently\r\nsupported releases of FreeBSD",
+          "timestamp": "2021-06-14T13:14:35-07:00",
+          "tree_id": "d30a4259d844641a4a71ae0f819ec70d501a26fb",
+          "url": "https://github.com/tokio-rs/tokio/commit/2c24a028f6e4f2aea2b3975deeba92142f3d149b"
+        },
+        "date": 1623701775822,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 5969086,
+            "range": "± 2901057",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5536540,
+            "range": "± 1678324",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6373445,
+            "range": "± 2155367",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 254,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 254,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 254,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 23636,
+            "range": "± 244",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 771,
+            "range": "± 17",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 912654,
+            "range": "± 8080",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 666382,
+            "range": "± 3316",
             "unit": "ns/iter"
           }
         ]
