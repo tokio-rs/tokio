@@ -140,7 +140,7 @@ struct Waiter {
     _p: PhantomPinned,
 }
 
-/// Future returned from `notified()`
+/// Future returned from [`Notify::notified()`]
 #[derive(Debug)]
 pub struct Notified<'a> {
     /// The `Notify` being received on.
