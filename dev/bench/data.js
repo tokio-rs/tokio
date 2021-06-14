@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623692367524,
+  "lastUpdate": 1623701758525,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -50337,6 +50337,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 973,
             "range": "± 480",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2c24a028f6e4f2aea2b3975deeba92142f3d149b",
+          "message": "chore: re-enable test_socket_pair on FreeBSD (#3844)\n\nIt was disabled due to an OS bug that has been fixed on all currently\r\nsupported releases of FreeBSD",
+          "timestamp": "2021-06-14T13:14:35-07:00",
+          "tree_id": "d30a4259d844641a4a71ae0f819ec70d501a26fb",
+          "url": "https://github.com/tokio-rs/tokio/commit/2c24a028f6e4f2aea2b3975deeba92142f3d149b"
+        },
+        "date": 1623701754717,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13026,
+            "range": "± 4448",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 830,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 550,
+            "range": "± 143",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13051,
+            "range": "± 3604",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 829,
+            "range": "± 27",
             "unit": "ns/iter"
           }
         ]
