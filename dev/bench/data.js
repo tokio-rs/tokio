@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623701779566,
+  "lastUpdate": 1623701792562,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17387,6 +17387,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 651,
             "range": "± 128",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2c24a028f6e4f2aea2b3975deeba92142f3d149b",
+          "message": "chore: re-enable test_socket_pair on FreeBSD (#3844)\n\nIt was disabled due to an OS bug that has been fixed on all currently\r\nsupported releases of FreeBSD",
+          "timestamp": "2021-06-14T13:14:35-07:00",
+          "tree_id": "d30a4259d844641a4a71ae0f819ec70d501a26fb",
+          "url": "https://github.com/tokio-rs/tokio/commit/2c24a028f6e4f2aea2b3975deeba92142f3d149b"
+        },
+        "date": 1623701787515,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 895,
+            "range": "± 115",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 19104,
+            "range": "± 11292",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 938,
+            "range": "± 123",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16744,
+            "range": "± 7973",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 602,
+            "range": "± 44",
             "unit": "ns/iter"
           }
         ]
