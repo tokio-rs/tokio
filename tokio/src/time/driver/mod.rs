@@ -92,10 +92,12 @@ pub(crate) struct Driver<P: Park + 'static> {
     /// Parker to delegate to
     park: P,
 
-    // When test-util is enabled, this tracks if the driver was woken before
-    // entering park. While it may look racy, it only has any effect when the
-    // clock is paused and pausing the clock is restricted to a single-threaded
-    // runtime.
+    // When `true`, a call to `park_timeout` should immediately return and time
+    // should not advance. One reason for this to be `true` is if the task
+    // passed to `Runtime::block_on` called `task::yield_now()`.
+    //
+    // While it may look racy, it only has any effect when the clock is paused
+    // and pausing the clock is restricted to a single-threaded runtime.
     #[cfg(feature = "test-util")]
     did_wake: Arc<AtomicBool>,
 }
@@ -201,8 +203,6 @@ where
     }
 
     fn park_internal(&mut self, limit: Option<Duration>) -> Result<(), P::Error> {
-        let clock = &self.time_source.clock;
-
         let mut lock = self.handle.get().state.lock();
 
         assert!(!self.handle.is_shutdown());
@@ -226,35 +226,14 @@ where
                         duration = std::cmp::min(limit, duration);
                     }
 
-                    if clock.is_paused() {
-                        self.park.park_timeout(Duration::from_secs(0))?;
-
-                        // If the time driver was woken, then the park completed
-                        // before the "duration" elapsed (usually caused by a
-                        // yield in `Runtime::block_on`). In this case, we don't
-                        // advance the clock.
-                        if !self.did_wake() {
-                            // Simulate advancing time
-                            clock.advance(duration);
-                        }
-                    } else {
-                        self.park.park_timeout(duration)?;
-                    }
+                    self.park_timeout(duration)?;
                 } else {
                     self.park.park_timeout(Duration::from_secs(0))?;
                 }
             }
             None => {
                 if let Some(duration) = limit {
-                    if clock.is_paused() {
-                        self.park.park_timeout(Duration::from_secs(0))?;
-
-                        if !self.did_wake() {
-                            clock.advance(duration);
-                        }
-                    } else {
-                        self.park.park_timeout(duration)?;
-                    }
+                    self.park_timeout(duration)?;
                 } else {
                     self.park.park()?;
                 }
@@ -268,14 +247,35 @@ where
     }
 
     cfg_test_util! {
+        fn park_timeout(&mut self, duration: Duration) -> Result<(), P::Error> {
+            let clock = &self.time_source.clock;
+
+            if clock.is_paused() {
+                self.park.park_timeout(Duration::from_secs(0))?;
+
+                // If the time driver was woken, then the park completed
+                // before the "duration" elapsed (usually caused by a
+                // yield in `Runtime::block_on`). In this case, we don't
+                // advance the clock.
+                if !self.did_wake() {
+                    // Simulate advancing time
+                    clock.advance(duration);
+                }
+            } else {
+                self.park.park_timeout(duration)?;
+            }
+
+            Ok(())
+        }
+
         fn did_wake(&self) -> bool {
             self.did_wake.swap(false, Ordering::SeqCst)
         }
     }
 
     cfg_not_test_util! {
-        fn did_wake(&self) -> bool {
-            unreachable!()
+        fn park_timeout(&mut self, limit: Duration) -> Result<(), P::Error> {
+            self.park.park_timeout(duration)
         }
     }
 }
