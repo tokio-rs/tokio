@@ -121,20 +121,9 @@ cfg_test_util! {
     /// runtime.
     pub async fn advance(duration: Duration) {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
-        let until = clock.now() + duration;
         clock.advance(duration);
 
-        // Fixes tokio-rs/tokio#3837
-        //
-        // "sleep_until" is needed to ensure registered timers are fired after the
-        // advance call, however, it will also round up time to the nearest ms. To
-        // avoid this loss of precision, we sleep until the previous millisecond.
-        // If the advance is less than 1ms, then we just need to yield.
-        if duration >= Duration::from_millis(1) {
-            crate::time::sleep_until(until - Duration::from_millis(1)).await;
-        } else {
-            crate::task::yield_now().await;
-        }
+        crate::task::yield_now().await;
     }
 
     /// Return the current instant, factoring in frozen time.

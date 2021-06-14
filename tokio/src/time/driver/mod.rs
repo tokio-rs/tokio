@@ -91,6 +91,13 @@ pub(crate) struct Driver<P: Park + 'static> {
 
     /// Parker to delegate to
     park: P,
+
+    // When test-util is enabled, this tracks if the driver was woken before
+    // entering park. While it may look racy, it only has any effect when the
+    // clock is paused and pausing the clock is restricted to a single-threaded
+    // runtime.
+    #[cfg(feature = "test-util")]
+    did_wake: Arc<AtomicBool>,
 }
 
 /// A structure which handles conversion from Instants to u64 timestamps.
@@ -178,6 +185,8 @@ where
             time_source,
             handle: Handle::new(Arc::new(inner)),
             park,
+            #[cfg(feature = "test-util")]
+            did_wake: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -220,8 +229,14 @@ where
                     if clock.is_paused() {
                         self.park.park_timeout(Duration::from_secs(0))?;
 
-                        // Simulate advancing time
-                        clock.advance(duration);
+                        // If the time driver was woken, then the park completed
+                        // before the "duration" elapsed (usually caused by a
+                        // yield in `Runtime::block_on`). In this case, we don't
+                        // advance the clock.
+                        if !self.did_wake() {
+                            // Simulate advancing time
+                            clock.advance(duration);
+                        }
                     } else {
                         self.park.park_timeout(duration)?;
                     }
@@ -233,7 +248,10 @@ where
                 if let Some(duration) = limit {
                     if clock.is_paused() {
                         self.park.park_timeout(Duration::from_secs(0))?;
-                        clock.advance(duration);
+
+                        if !self.did_wake() {
+                            clock.advance(duration);
+                        }
                     } else {
                         self.park.park_timeout(duration)?;
                     }
@@ -247,6 +265,18 @@ where
         self.handle.process();
 
         Ok(())
+    }
+
+    cfg_test_util! {
+        fn did_wake(&self) -> bool {
+            self.did_wake.swap(false, Ordering::SeqCst)
+        }
+    }
+
+    cfg_not_test_util! {
+        fn did_wake(&self) -> bool {
+            unreachable!()
+        }
     }
 }
 
@@ -387,11 +417,11 @@ impl<P> Park for Driver<P>
 where
     P: Park + 'static,
 {
-    type Unpark = P::Unpark;
+    type Unpark = TimerUnpark<P>;
     type Error = P::Error;
 
     fn unpark(&self) -> Self::Unpark {
-        self.park.unpark()
+        TimerUnpark::new(self)
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
@@ -423,6 +453,33 @@ where
 {
     fn drop(&mut self) {
         self.shutdown();
+    }
+}
+
+pub(crate) struct TimerUnpark<P: Park + 'static> {
+    inner: P::Unpark,
+
+    #[cfg(feature = "test-util")]
+    did_wake: Arc<AtomicBool>,
+}
+
+impl<P: Park + 'static> TimerUnpark<P> {
+    fn new(driver: &Driver<P>) -> TimerUnpark<P> {
+        TimerUnpark {
+            inner: driver.park.unpark(),
+
+            #[cfg(feature = "test-util")]
+            did_wake: driver.did_wake.clone(),
+        }
+    }
+}
+
+impl<P: Park + 'static> Unpark for TimerUnpark<P> {
+    fn unpark(&self) {
+        self.inner.unpark();
+
+        #[cfg(feature = "test-util")]
+        self.did_wake.store(true, Ordering::SeqCst);
     }
 }
 
