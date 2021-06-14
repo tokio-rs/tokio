@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623658089649,
+  "lastUpdate": 1623692345352,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -50181,6 +50181,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 977,
             "range": "± 84",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sean@seanmonstar.com",
+            "name": "Sean McArthur",
+            "username": "seanmonstar"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f55b77aaddaed8e48a8c0d81c66da82f12433087",
+          "message": "tracing: emit waker op as str instead as Debug (#3853)",
+          "timestamp": "2021-06-14T10:37:24-07:00",
+          "tree_id": "0eb535543c3a86a7571ba1dd11d7a36563c62c6f",
+          "url": "https://github.com/tokio-rs/tokio/commit/f55b77aaddaed8e48a8c0d81c66da82f12433087"
+        },
+        "date": 1623692340057,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 25930,
+            "range": "± 24975",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 928,
+            "range": "± 41",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 617,
+            "range": "± 134",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15491,
+            "range": "± 6080",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 973,
+            "range": "± 480",
             "unit": "ns/iter"
           }
         ]
