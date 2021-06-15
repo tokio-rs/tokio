@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623729809929,
+  "lastUpdate": 1623737717229,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -50649,6 +50649,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 974,
             "range": "± 4",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "97e7830364d5a2d79b38dc89232f91c8c7e75f49",
+          "message": "net: provide NamedPipe{Client, Server} types and builders (#3760)\n\nThis builds on https://github.com/tokio-rs/mio/pull/1351 and introduces the\r\ntokio::net::windows::named_pipe module which provides low level types for\r\nbuilding and communicating asynchronously over windows named pipes.\r\n\r\nNamed pipes require the `net` feature flag to be enabled on Windows.\r\n\r\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2021-06-15T08:13:31+02:00",
+          "tree_id": "15f84fc0e733abe48dcc9efbacd738ed93300fd6",
+          "url": "https://github.com/tokio-rs/tokio/commit/97e7830364d5a2d79b38dc89232f91c8c7e75f49"
+        },
+        "date": 1623737712994,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15041,
+            "range": "± 5435",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 864,
+            "range": "± 83",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 576,
+            "range": "± 76",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15280,
+            "range": "± 6608",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 883,
+            "range": "± 105",
             "unit": "ns/iter"
           }
         ]
