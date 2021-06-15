@@ -1,3 +1,11 @@
+# 1.6.2 (June 14, 2021)
+
+### Fixes
+
+- test: sub-ms `time:advance` regression introduced in 1.6 ([#3852])
+
+[#3852]: https://github.com/tokio-rs/tokio/pull/3852
+
 # 1.6.1 (May 28, 2021)
 
 This release reverts [#3518] because it doesn't work on some kernels due to
