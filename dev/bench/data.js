@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623737722744,
+  "lastUpdate": 1623737726429,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -77885,6 +77885,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 815705,
             "range": "± 163568",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "97e7830364d5a2d79b38dc89232f91c8c7e75f49",
+          "message": "net: provide NamedPipe{Client, Server} types and builders (#3760)\n\nThis builds on https://github.com/tokio-rs/mio/pull/1351 and introduces the\r\ntokio::net::windows::named_pipe module which provides low level types for\r\nbuilding and communicating asynchronously over windows named pipes.\r\n\r\nNamed pipes require the `net` feature flag to be enabled on Windows.\r\n\r\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2021-06-15T08:13:31+02:00",
+          "tree_id": "15f84fc0e733abe48dcc9efbacd738ed93300fd6",
+          "url": "https://github.com/tokio-rs/tokio/commit/97e7830364d5a2d79b38dc89232f91c8c7e75f49"
+        },
+        "date": 1623737722149,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6102122,
+            "range": "± 2774270",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5818475,
+            "range": "± 1567561",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6420603,
+            "range": "± 2397453",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 250,
+            "range": "± 1",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 250,
+            "range": "± 1",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 250,
+            "range": "± 1",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 24013,
+            "range": "± 273",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 773,
+            "range": "± 13",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 913462,
+            "range": "± 1654",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 662728,
+            "range": "± 3437",
             "unit": "ns/iter"
           }
         ]
