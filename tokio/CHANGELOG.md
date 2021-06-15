@@ -1,3 +1,37 @@
+# 1.7.0 (June 15, 2021)
+
+### Added
+
+- net: add named pipes on windows ([#3760])
+- net: add `TcpSocket` from `std::net::TcpStream` conversion ([#3838])
+- sync: add `receiver_count` to `watch::Sender` ([#3729])
+- sync: export `sync::notify::Notified` future publicly ([#3840])
+- tracing: instrument task wakers ([#3836])
+
+### Fixed
+
+- macros: suppress `clippy::default_numeric_fallback` lint in generated code ([#3831])
+- runtime: immediately drop new tasks when runtime is shut down ([#3752])
+- sync: deprecate unused `mpsc::RecvError` type ([#3833])
+
+### Documented
+
+- io: clarify EOF condition for `AsyncReadExt::read_buf` ([#3850])
+- io: clarify limits on return values of `AsyncWrite::poll_write` ([#3820])
+- sync: add examples to Semaphore ([#3808])
+
+[#3729]: https://github.com/tokio-rs/tokio/pull/3729
+[#3752]: https://github.com/tokio-rs/tokio/pull/3752
+[#3760]: https://github.com/tokio-rs/tokio/pull/3760
+[#3808]: https://github.com/tokio-rs/tokio/pull/3808
+[#3820]: https://github.com/tokio-rs/tokio/pull/3820
+[#3831]: https://github.com/tokio-rs/tokio/pull/3831
+[#3833]: https://github.com/tokio-rs/tokio/pull/3833
+[#3836]: https://github.com/tokio-rs/tokio/pull/3836
+[#3838]: https://github.com/tokio-rs/tokio/pull/3838
+[#3840]: https://github.com/tokio-rs/tokio/pull/3840
+[#3850]: https://github.com/tokio-rs/tokio/pull/3850
+
 # 1.6.2 (June 14, 2021)
 
 ### Fixes
