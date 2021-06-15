@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623737717229,
+  "lastUpdate": 1623737722744,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -33097,6 +33097,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18292801,
             "range": "± 2573541",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "97e7830364d5a2d79b38dc89232f91c8c7e75f49",
+          "message": "net: provide NamedPipe{Client, Server} types and builders (#3760)\n\nThis builds on https://github.com/tokio-rs/mio/pull/1351 and introduces the\r\ntokio::net::windows::named_pipe module which provides low level types for\r\nbuilding and communicating asynchronously over windows named pipes.\r\n\r\nNamed pipes require the `net` feature flag to be enabled on Windows.\r\n\r\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2021-06-15T08:13:31+02:00",
+          "tree_id": "15f84fc0e733abe48dcc9efbacd738ed93300fd6",
+          "url": "https://github.com/tokio-rs/tokio/commit/97e7830364d5a2d79b38dc89232f91c8c7e75f49"
+        },
+        "date": 1623737717885,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 199090,
+            "range": "± 45842",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 721038,
+            "range": "± 63633",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5802796,
+            "range": "± 1631627",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20372935,
+            "range": "± 3838749",
             "unit": "ns/iter"
           }
         ]
