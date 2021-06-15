@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623729768974,
+  "lastUpdate": 1623729782372,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -50595,6 +50595,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 829,
             "range": "± 27",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "distinct": false,
+          "id": "606206ecade593c4e32fa6056c5d7bd3759516c6",
+          "message": "Merge branch 'tokio-1.6.x' into merge-1.6.x",
+          "timestamp": "2021-06-14T17:51:30-07:00",
+          "tree_id": "147a487641864055fd053f9fa184dcae75d8b5c8",
+          "url": "https://github.com/tokio-rs/tokio/commit/606206ecade593c4e32fa6056c5d7bd3759516c6"
+        },
+        "date": 1623729777561,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16926,
+            "range": "± 7289",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 976,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 647,
+            "range": "± 32",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16476,
+            "range": "± 7453",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 974,
+            "range": "± 4",
             "unit": "ns/iter"
           }
         ]
