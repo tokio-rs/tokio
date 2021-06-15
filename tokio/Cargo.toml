@@ -54,6 +54,7 @@ net = [
   "mio/tcp",
   "mio/udp",
   "mio/uds",
+  "winapi/namedpipeapi",
 ]
 process = [
   "bytes",
@@ -114,6 +115,9 @@ nix = { version = "0.19.0" }
 version = "0.3.8"
 default-features = false
 optional = true
+
+[target.'cfg(windows)'.dev-dependencies.ntapi]
+version = "0.3.6"
 
 [dev-dependencies]
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
