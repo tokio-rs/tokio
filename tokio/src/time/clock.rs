@@ -7,7 +7,7 @@
 //! configurable.
 
 cfg_not_test_util! {
-    use crate::time::{Duration, Instant};
+    use crate::time::{Instant};
 
     #[derive(Debug, Clone)]
     pub(crate) struct Clock {}
@@ -23,14 +23,6 @@ cfg_not_test_util! {
 
         pub(crate) fn now(&self) -> Instant {
             now()
-        }
-
-        pub(crate) fn is_paused(&self) -> bool {
-            false
-        }
-
-        pub(crate) fn advance(&self, _dur: Duration) {
-            unreachable!();
         }
     }
 }
@@ -121,10 +113,9 @@ cfg_test_util! {
     /// runtime.
     pub async fn advance(duration: Duration) {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
-        let until = clock.now() + duration;
         clock.advance(duration);
 
-        crate::time::sleep_until(until).await;
+        crate::task::yield_now().await;
     }
 
     /// Return the current instant, factoring in frozen time.
