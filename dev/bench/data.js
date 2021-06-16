@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623778900532,
+  "lastUpdate": 1623840404724,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -33301,6 +33301,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20674699,
             "range": "± 4165483",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "thomas@archlinux.org",
+            "name": "brain0",
+            "username": "brain0"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4a93af4d2506c96acf9786154372fa26139f7312",
+          "message": "io: add get_{ref,mut} methods to AsyncFdReadyGuard and AsyncFdReadyMutGuard. (#3807)",
+          "timestamp": "2021-06-16T12:45:05+02:00",
+          "tree_id": "872920e236f42cb6d4740f5b54225d4b7342a064",
+          "url": "https://github.com/tokio-rs/tokio/commit/4a93af4d2506c96acf9786154372fa26139f7312"
+        },
+        "date": 1623840400360,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 160082,
+            "range": "± 7504",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 607864,
+            "range": "± 42405",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4936840,
+            "range": "± 1051987",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18163146,
+            "range": "± 3246845",
             "unit": "ns/iter"
           }
         ]
