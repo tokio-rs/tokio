@@ -4,12 +4,12 @@
 
 use std::ffi::c_void;
 use std::ffi::OsStr;
-use std::io;
+use std::io::{self, Read, Write};
 use std::pin::Pin;
 use std::ptr;
 use std::task::{Context, Poll};
 
-use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf};
+use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
 use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 
 // Hide imports which are not used when generating documentation.
@@ -361,6 +361,23 @@ impl NamedPipeClient {
     pub fn info(&self) -> io::Result<PipeInfo> {
         // Safety: we're ensuring the lifetime of the named pipe.
         unsafe { named_pipe_info(self.io.as_raw_handle()) }
+    }
+
+    pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
+        let event = self.io.registration().readiness(interest).await?;
+        Ok(event.ready)
+    }
+
+    pub fn try_read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || (&*self.io).read(buf))
+    }
+
+    pub fn try_write(&self, buf: &[u8]) -> io::Result<usize> {
+        self.io
+            .registration()
+            .try_io(Interest::WRITABLE, || (&*self.io).write(buf))
     }
 }
 
