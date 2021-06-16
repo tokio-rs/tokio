@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623844396022,
+  "lastUpdate": 1623844399830,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -51422,6 +51422,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "uncontended_concurrent_single",
             "value": 713,
+            "range": "± 4",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "53383020+sb64@users.noreply.github.com",
+            "name": "sb64",
+            "username": "sb64"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e979ad7f2d101b7969d03a4af13dd9a132ee1ec5",
+          "message": "time: allow users to specify Interval behavior when delayed (#3721)",
+          "timestamp": "2021-06-16T13:51:27+02:00",
+          "tree_id": "2d184e1a67db0d8d3f0394bdc5ddfa16fb0a6398",
+          "url": "https://github.com/tokio-rs/tokio/commit/e979ad7f2d101b7969d03a4af13dd9a132ee1ec5"
+        },
+        "date": 1623844392389,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13469,
+            "range": "± 2793",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 808,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 540,
+            "range": "± 8",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13226,
+            "range": "± 2439",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 808,
             "range": "± 4",
             "unit": "ns/iter"
           }
