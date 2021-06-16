@@ -210,9 +210,15 @@ impl<T> Receiver<T> {
 
     /// Returns a reference to the most recently sent value.
     ///
+    /// This method does not mark the returned value as seen, so future calls to
+    /// [`changed`] may return immediately even if you have already seen the
+    /// value with a call to `borrow`.
+    ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
     /// could cause the send half to block. It is recommended to keep the borrow
     /// as short lived as possible.
+    ///
+    /// [`changed`]: Receiver::changed
     ///
     /// # Examples
     ///
@@ -230,8 +236,9 @@ impl<T> Receiver<T> {
     /// Returns a reference to the most recently sent value and mark that value
     /// as seen.
     ///
-    /// Any future calls to [`changed`] on this receiver will return immediately
-    /// if no new messages have been sent since `borrow_and_update` was called.
+    /// This method marks the value as seen, so [`changed`] will not return
+    /// immediately if the newest value is one previously returned by
+    /// `borrow_and_update`.
     ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
     /// could cause the send half to block. It is recommended to keep the borrow
@@ -244,11 +251,15 @@ impl<T> Receiver<T> {
         Ref { inner }
     }
 
-    /// Wait for a change notification
+    /// Wait for a change notification, then mark the newest value as seen.
     ///
-    /// Returns when a new value has been sent by the [`Sender`] since the last
-    /// time `changed()` was called. When the `Sender` half is dropped, `Err` is
-    /// returned.
+    /// If the newest value in the channel has not yet been marked seen when
+    /// this method is called, the method marks that value seen and returns
+    /// immediately. If the newest value has already been marked seen, then the
+    /// method sleeps until a new message is sent by the [`Sender`] connected to
+    /// this `Receiver`, or until the [`Sender`] is dropped.
+    ///
+    /// This method returns an error if and only if the [`Sender`] is dropped.
     ///
     /// [`Sender`]: struct@Sender
     ///
