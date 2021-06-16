@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623840416958,
+  "lastUpdate": 1623840454105,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -78419,6 +78419,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 776928,
             "range": "± 5887",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "thomas@archlinux.org",
+            "name": "brain0",
+            "username": "brain0"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4a93af4d2506c96acf9786154372fa26139f7312",
+          "message": "io: add get_{ref,mut} methods to AsyncFdReadyGuard and AsyncFdReadyMutGuard. (#3807)",
+          "timestamp": "2021-06-16T12:45:05+02:00",
+          "tree_id": "872920e236f42cb6d4740f5b54225d4b7342a064",
+          "url": "https://github.com/tokio-rs/tokio/commit/4a93af4d2506c96acf9786154372fa26139f7312"
+        },
+        "date": 1623840449002,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6948120,
+            "range": "± 2696774",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6267732,
+            "range": "± 1910281",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6699927,
+            "range": "± 2465864",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 310,
+            "range": "± 41",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 310,
+            "range": "± 28",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 310,
+            "range": "± 26",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 56175,
+            "range": "± 6451",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 964,
+            "range": "± 163",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1024683,
+            "range": "± 88634",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 754090,
+            "range": "± 44469",
             "unit": "ns/iter"
           }
         ]
