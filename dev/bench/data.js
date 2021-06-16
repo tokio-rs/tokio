@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623861839612,
+  "lastUpdate": 1623861845925,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -33763,6 +33763,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17072767,
             "range": "± 3180943",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d1aa2df80ecc19d014c909813700e39c2197c96e",
+          "message": "sync: add Receiver::borrow_and_update (#3813)",
+          "timestamp": "2021-06-16T18:42:05+02:00",
+          "tree_id": "085d64245f8f48df850ac626365c465fac70788d",
+          "url": "https://github.com/tokio-rs/tokio/commit/d1aa2df80ecc19d014c909813700e39c2197c96e"
+        },
+        "date": 1623861840659,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 179069,
+            "range": "± 42735",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 618657,
+            "range": "± 77381",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4102755,
+            "range": "± 792796",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19332498,
+            "range": "± 2719951",
             "unit": "ns/iter"
           }
         ]
