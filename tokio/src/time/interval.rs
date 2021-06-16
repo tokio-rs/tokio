@@ -301,7 +301,7 @@ pub enum MissedTickBehavior {
 }
 
 impl MissedTickBehavior {
-    /// Determine when the next tick should happen.
+    /// If a tick is missed, this method is called to determine when the next tick should happen.
     fn next_timeout(&self, timeout: Instant, now: Instant, period: Duration) -> Instant {
         match self {
             Self::Burst => timeout + period,
