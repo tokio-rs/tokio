@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623840410108,
+  "lastUpdate": 1623840416958,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -51063,6 +51063,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 975,
             "range": "± 135",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "thomas@archlinux.org",
+            "name": "brain0",
+            "username": "brain0"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4a93af4d2506c96acf9786154372fa26139f7312",
+          "message": "io: add get_{ref,mut} methods to AsyncFdReadyGuard and AsyncFdReadyMutGuard. (#3807)",
+          "timestamp": "2021-06-16T12:45:05+02:00",
+          "tree_id": "872920e236f42cb6d4740f5b54225d4b7342a064",
+          "url": "https://github.com/tokio-rs/tokio/commit/4a93af4d2506c96acf9786154372fa26139f7312"
+        },
+        "date": 1623840412237,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14989,
+            "range": "± 8061",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 912,
+            "range": "± 168",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 609,
+            "range": "± 116",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16678,
+            "range": "± 7200",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 958,
+            "range": "± 104",
             "unit": "ns/iter"
           }
         ]
