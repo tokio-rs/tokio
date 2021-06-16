@@ -157,7 +157,6 @@ macro_rules! cfg_macros {
         $(
             #[cfg(feature = "macros")]
             #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-            #[doc(inline)]
             $item
         )*
     }
@@ -178,6 +177,16 @@ macro_rules! cfg_net_unix {
         $(
             #[cfg(all(unix, feature = "net"))]
             #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_net_windows {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(any(docsrs, windows), feature = "net"))]
+            #[cfg_attr(docsrs, doc(cfg(all(windows, feature = "net"))))]
             $item
         )*
     }

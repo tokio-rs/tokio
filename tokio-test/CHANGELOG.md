@@ -1,3 +1,9 @@
+# 0.4.2 (May 14, 2021)
+
+- test: add `assert_elapsed!` macro ([#3728])
+
+[#3728]: https://github.com/tokio-rs/tokio/pull/3728
+
 # 0.4.1 (March 10, 2021)
 
 - Fix `io::Mock` to be `Send` and `Sync` ([#3594])

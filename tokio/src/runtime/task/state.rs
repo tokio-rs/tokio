@@ -29,12 +29,15 @@ const LIFECYCLE_MASK: usize = 0b11;
 const NOTIFIED: usize = 0b100;
 
 /// The join handle is still around
+#[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
 const JOIN_INTEREST: usize = 0b1_000;
 
 /// A join handle waker has been set
+#[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
 const JOIN_WAKER: usize = 0b10_000;
 
 /// The task has been forcibly cancelled.
+#[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
 const CANCELLED: usize = 0b100_000;
 
 /// All bits
@@ -52,7 +55,7 @@ const REF_ONE: usize = 1 << REF_COUNT_SHIFT;
 /// State a task is initialized with
 ///
 /// A task is initialized with two references: one for the scheduler and one for
-/// the `JoinHandle`. As the task starts with a `JoinHandle`, `JOIN_INTERST` is
+/// the `JoinHandle`. As the task starts with a `JoinHandle`, `JOIN_INTEREST` is
 /// set. A new task is immediately pushed into the run queue for execution and
 /// starts with the `NOTIFIED` flag set.
 const INITIAL_STATE: usize = (REF_ONE * 2) | JOIN_INTEREST | NOTIFIED;
@@ -64,7 +67,7 @@ impl State {
     pub(super) fn new() -> State {
         // A task is initialized with three references: one for the scheduler,
         // one for the `JoinHandle`, one for the task handle made available in
-        // release. As the task starts with a `JoinHandle`, `JOIN_INTERST` is
+        // release. As the task starts with a `JoinHandle`, `JOIN_INTEREST` is
         // set. A new task is immediately pushed into the run queue for
         // execution and starts with the `NOTIFIED` flag set.
         State {
@@ -306,7 +309,7 @@ impl State {
         let prev = self.val.fetch_add(REF_ONE, Relaxed);
 
         // If the reference count overflowed, abort.
-        if prev > isize::max_value() as usize {
+        if prev > isize::MAX as usize {
             process::abort();
         }
     }
@@ -410,7 +413,7 @@ impl Snapshot {
     }
 
     fn ref_inc(&mut self) {
-        assert!(self.0 <= isize::max_value() as usize);
+        assert!(self.0 <= isize::MAX as usize);
         self.0 += REF_ONE;
     }
 

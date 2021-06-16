@@ -6,13 +6,13 @@ name = "tokio-stream"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "tokio-stream-0.1.x" git tag.
-version = "0.1.5"
+version = "0.1.6"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-stream/0.1.5/tokio_stream"
+documentation = "https://docs.rs/tokio-stream/0.1.6/tokio_stream"
 description = """
 Utilities to work with `Stream` and `tokio`.
 """
@@ -31,7 +31,7 @@ signal = ["tokio/signal"]
 futures-core = { version = "0.3.0" }
 pin-project-lite = "0.2.0"
 tokio = { version = "1.2.0", path = "../tokio", features = ["sync"] }
-tokio-util = { version = "0.6.3", optional = true }
+tokio-util = { version = "0.6.3", path = "../tokio-util", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["full", "test-util"] }

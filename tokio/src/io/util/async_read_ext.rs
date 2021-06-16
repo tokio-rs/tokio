@@ -108,6 +108,8 @@ cfg_io_util! {
         /// This function does not provide any guarantees about whether it
         /// completes immediately or asynchronously
         ///
+        /// # Return
+        ///
         /// If the return value of this method is `Ok(n)`, then it must be
         /// guaranteed that `0 <= n <= buf.len()`. A nonzero `n` value indicates
         /// that the buffer `buf` has been filled in with `n` bytes of data from
@@ -180,9 +182,14 @@ cfg_io_util! {
         ///
         /// # Return
         ///
-        /// On a successful read, the number of read bytes is returned. If the
-        /// supplied buffer is not empty and the function returns `Ok(0)` then
-        /// the source has reached an "end-of-file" event.
+        /// A nonzero `n` value indicates that the buffer `buf` has been filled
+        /// in with `n` bytes of data from this source. If `n` is `0`, then it
+        /// can indicate one of two scenarios:
+        ///
+        /// 1. This reader has reached its "end of file" and will likely no longer
+        ///    be able to produce bytes. Note that this does not mean that the
+        ///    reader will *always* no longer be able to produce bytes.
+        /// 2. The buffer specified had a remaining capacity of zero.
         ///
         /// # Errors
         ///
@@ -579,7 +586,7 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut reader = Cursor::new(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
             ///
-            ///     assert_eq!(i64::min_value(), reader.read_i64().await?);
+            ///     assert_eq!(i64::MIN, reader.read_i64().await?);
             ///     Ok(())
             /// }
             /// ```
@@ -659,7 +666,7 @@ cfg_io_util! {
             ///         0, 0, 0, 0, 0, 0, 0, 0
             ///     ]);
             ///
-            ///     assert_eq!(i128::min_value(), reader.read_i128().await?);
+            ///     assert_eq!(i128::MIN, reader.read_i128().await?);
             ///     Ok(())
             /// }
             /// ```

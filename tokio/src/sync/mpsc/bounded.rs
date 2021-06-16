@@ -65,7 +65,7 @@ pub struct Receiver<T> {
 /// with backpressure.
 ///
 /// The channel will buffer up to the provided number of messages.  Once the
-/// buffer is full, attempts to `send` new messages will wait until a message is
+/// buffer is full, attempts to send new messages will wait until a message is
 /// received from the channel. The provided buffer capacity must be at least 1.
 ///
 /// All data sent on `Sender` will become available on `Receiver` in the same
@@ -76,7 +76,7 @@ pub struct Receiver<T> {
 ///
 /// If the `Receiver` is disconnected while trying to `send`, the `send` method
 /// will return a `SendError`. Similarly, if `Sender` is disconnected while
-/// trying to `recv`, the `recv` method will return a `RecvError`.
+/// trying to `recv`, the `recv` method will return `None`.
 ///
 /// # Panics
 ///
@@ -887,7 +887,7 @@ impl<T> Sender<T> {
     ///     let permit = tx.reserve().await.unwrap();
     ///     assert_eq!(tx.capacity(), 4);
     ///
-    ///     // Sending and receiving a value increases the caapcity by one.
+    ///     // Sending and receiving a value increases the capacity by one.
     ///     permit.send(());
     ///     rx.recv().await.unwrap();
     ///     assert_eq!(tx.capacity(), 5);

@@ -1,3 +1,13 @@
+# 0.6.7 (May 14, 2021)
+
+### Added
+
+- udp: make `UdpFramed` take `Borrow<UdpSocket>` ([#3451])
+- compat: implement `AsRawFd`/`AsRawHandle` for `Compat<T>` ([#3765])
+
+[#3451]: https://github.com/tokio-rs/tokio/pull/3451
+[#3765]: https://github.com/tokio-rs/tokio/pull/3765
+
 # 0.6.6 (April 12, 2021)
 
 ### Added

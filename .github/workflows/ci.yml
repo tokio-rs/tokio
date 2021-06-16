@@ -68,6 +68,13 @@ jobs:
         run: cargo hack test --each-feature
         working-directory: tests-build
 
+      # Build benchmarks. Run of benchmarks is done by bench.yml workflow.
+      - name: build benches
+        run: cargo build --benches
+        working-directory: benches
+        # bench.yml workflow runs benchmarks only on linux.
+        if: startsWith(matrix.os, 'ubuntu')
+
   valgrind:
     name: valgrind
     runs-on: ubuntu-latest
@@ -231,7 +238,7 @@ jobs:
           cargo hack --remove-dev-deps --workspace
           # Update Cargo.lock to minimal version dependencies.
           cargo update -Z minimal-versions
-          cargo check --all-features
+          cargo hack check --all-features --ignore-private
 
   fmt:
     name: fmt
@@ -258,7 +265,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
-        run: rustup update ${{ env.minrust }} && rustup default ${{ env.minrust }}
+        run: rustup update 1.52.1 && rustup default 1.52.1
       - name: Install clippy
         run: rustup component add clippy
 
