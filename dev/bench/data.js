@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623840454105,
+  "lastUpdate": 1623840708386,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -51117,6 +51117,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 958,
             "range": "± 104",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "teor@riseup.net",
+            "name": "teor",
+            "username": "teor2345"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "60bd40d52973690c1e58855bbae6aa2136512fb6",
+          "message": "time: fix typo in Instant::saturating_duration_since docs (#3864)",
+          "timestamp": "2021-06-16T12:50:30+02:00",
+          "tree_id": "e6aab2d4fc6dd8db8de8fb65f794f51f024ee42f",
+          "url": "https://github.com/tokio-rs/tokio/commit/60bd40d52973690c1e58855bbae6aa2136512fb6"
+        },
+        "date": 1623840704632,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13589,
+            "range": "± 3213",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 810,
+            "range": "± 10",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 541,
+            "range": "± 76",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13259,
+            "range": "± 2808",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 713,
+            "range": "± 4",
             "unit": "ns/iter"
           }
         ]
