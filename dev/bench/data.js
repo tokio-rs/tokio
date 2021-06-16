@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1623840748017,
+  "lastUpdate": 1623840752535,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -33457,6 +33457,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18163146,
             "range": "± 3246845",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "teor@riseup.net",
+            "name": "teor",
+            "username": "teor2345"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "60bd40d52973690c1e58855bbae6aa2136512fb6",
+          "message": "time: fix typo in Instant::saturating_duration_since docs (#3864)",
+          "timestamp": "2021-06-16T12:50:30+02:00",
+          "tree_id": "e6aab2d4fc6dd8db8de8fb65f794f51f024ee42f",
+          "url": "https://github.com/tokio-rs/tokio/commit/60bd40d52973690c1e58855bbae6aa2136512fb6"
+        },
+        "date": 1623840744760,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 189255,
+            "range": "± 9939",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 696147,
+            "range": "± 73251",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5458735,
+            "range": "± 689509",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19877981,
+            "range": "± 3661478",
             "unit": "ns/iter"
           }
         ]
