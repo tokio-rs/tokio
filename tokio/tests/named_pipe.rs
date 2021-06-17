@@ -152,7 +152,7 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
 async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
     use tokio::io::{AsyncBufReadExt as _, BufReader, Interest};
 
-    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-multi-client";
+    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-multi-client-ready";
     const N: usize = 10;
 
     // The first server needs to be constructed early so that clients can
