@@ -117,6 +117,65 @@ usually a good idea to first open an issue describing the change to solicit
 feedback and guidance. This will increase the likelihood of the PR getting
 merged.
 
+
+## Steps to follow for getting started
+Note: If you are a beginner and wondering what set of steps you should
+follow for getting started with contributing after you have found an issue, these
+are the recommended steps.
+
+1. [Fork](https://guides.github.com/activities/forking/) the main tokio repository
+and create your own branch with a suitable name(so that it's easy to recognise the branch
+later when raising a pull request).
+
+2. Clone your project, switch branches, and make the required changes locally.
+
+3. As mentioned above, Tokio uses features and for most cargo commands a `--all-features`
+flag needs to be added. So firstly check whether the project is compiling.
+
+    ```
+    cargo check --all-features
+    ```
+
+4. Rust has 2 types of tests, namely [integration tests](https://doc.rust-lang.org/rust-by-example/testing/integration_testing.html) and [documentation tests](https://doc.rust-lang.org/rustdoc/documentation-tests.html).
+
+    We have documentation tests that have to be written for every API.
+    [Reference](##documentation-tests) for practices we follow while writing documentation tests.
+    Run the command below to run all doc tests and check whether your doc test is passing.
+
+    ```
+    cargo test --doc --all-features
+    ```
+
+    On the other hand, Integration tests are specified in a test folder besides with the src directory. 
+    (Optional) All tests in the project can be run using
+
+    ```
+    cargo test --all-features
+    ```
+
+    If you want to test a particular feature because you are working on it and don't want to keep
+    running all the tests
+
+    ```
+    cargo test --test *test_name* --all-features
+    ```
+
+5. After checking that the tests are running we can generate the docs which the users of our
+library will refer to. Ofter documentation has links and syntax highlighting for easier understanding
+and readability. So this is a good time to generate the docs and check if they are as desired.
+
+    ```
+    cargo doc --all-features
+    ```
+
+    The above command generates the documentation inside the target/doc directory at the root level. 
+    A folder structure similar to our source code structure is generated.
+
+6. After running the above commands and verifying the tests pass and documentation is created properly
+you can commit your code and raise a pull request from your branch to the master branch 
+of the tokio project.
+
+
 ### Cargo Commands
 
 Due to the extensive use of features in Tokio, you will often need to add extra
