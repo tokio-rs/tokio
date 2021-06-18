@@ -371,12 +371,12 @@ impl NamedPipeClient {
     ///
     /// # Examples
     ///
-    /// Concurrently read and write to the stream on the same task without
+    /// Concurrently read and write to the pipe on the same task without
     /// splitting.
     ///
     /// ```no_run
     /// use tokio::io::Interest;
-    /// use use tokio::net::windows::named_pipe;
+    /// use tokio::net::windows::named_pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
@@ -438,7 +438,7 @@ impl NamedPipeClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use use tokio::net::windows::named_pipe;
+    /// use tokio::net::windows::named_pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
@@ -482,9 +482,8 @@ impl NamedPipeClient {
     /// Polls for read readiness.
     ///
     /// If the pipe is not currently ready for reading, this method will
-    /// store a clone of the `Waker` from the provided `Context`. When the unix
-    /// stream becomes ready for reading, `Waker::wake` will be called on the
-    /// waker.
+    /// store a clone of the `Waker` from the provided `Context`. When the pipe
+    /// becomes ready for reading, `Waker::wake` will be called on the waker.
     ///
     /// Note that on multiple calls to `poll_read_ready` or `poll_read`, only
     /// the `Waker` from the `Context` passed to the most recent call is
@@ -512,7 +511,7 @@ impl NamedPipeClient {
         self.io.registration().poll_read_ready(cx).map_ok(|_| ())
     }
 
-    /// Try to read data from the stream into the provided buffer, returning how
+    /// Try to read data from the pipe into the provided buffer, returning how
     /// many bytes were read.
     ///
     /// Receives any pending data from the pipe but does not wait for new data
@@ -535,7 +534,7 @@ impl NamedPipeClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use use tokio::net::windows::named_pipe;
+    /// use tokio::net::windows::named_pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
@@ -607,7 +606,7 @@ impl NamedPipeClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use use tokio::net::windows::named_pipe;
+    /// use tokio::net::windows::named_pipe;
     /// use std::error::Error;
     /// use std::io::{self, IoSliceMut};
     ///
@@ -619,7 +618,7 @@ impl NamedPipeClient {
     ///
     ///     loop {
     ///         // Wait for the socket to be readable
-    ///         stream.readable().await?;
+    ///         client.readable().await?;
     ///
     ///         // Creating the buffer **after** the `await` prevents it from
     ///         // being stored in the async task.
@@ -632,7 +631,7 @@ impl NamedPipeClient {
     ///
     ///         // Try to read data, this may still fail with `WouldBlock`
     ///         // if the readiness event is a false positive.
-    ///         match stream.try_read_vectored(&mut bufs) {
+    ///         match client.try_read_vectored(&mut bufs) {
     ///             Ok(0) => break,
     ///             Ok(n) => {
     ///                 println!("read {} bytes", n);
@@ -663,7 +662,7 @@ impl NamedPipeClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use use tokio::net::windows::named_pipe;
+    /// use tokio::net::windows::named_pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
@@ -749,7 +748,7 @@ impl NamedPipeClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use use tokio::net::windows::named_pipe;
+    /// use tokio::net::windows::named_pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
@@ -808,7 +807,7 @@ impl NamedPipeClient {
     /// # Examples
     ///
     /// ```no_run
-    /// use use tokio::net::windows::named_pipe;
+    /// use tokio::net::windows::named_pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
