@@ -299,4 +299,8 @@ cfg_rt! {
 
     mod unconstrained;
     pub use unconstrained::{unconstrained, Unconstrained};
+
+    cfg_trace! {
+        pub use spawn::spawn_named;
+    }
 }

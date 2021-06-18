@@ -131,7 +131,21 @@ cfg_rt! {
     {
         let spawn_handle = runtime::context::spawn_handle()
         .expect(CONTEXT_MISSING_ERROR);
-        let task = crate::util::trace::task(task, "task");
+        let task = crate::util::trace::task(task, "task", None);
         spawn_handle.spawn(task)
+    }
+
+    cfg_trace! {
+        #[cfg_attr(tokio_track_caller, track_caller)]
+        pub fn spawn_named<T>(name: impl Into<std::borrow::Cow<'static, str>>, task: T) -> JoinHandle<T::Output>
+        where
+            T: Future + Send + 'static,
+            T::Output: Send + 'static,
+        {
+            let spawn_handle = runtime::context::spawn_handle()
+                .expect(CONTEXT_MISSING_ERROR);
+            let task = crate::util::trace::task(task, "task", Some(name.into()));
+            spawn_handle.spawn(task)
+        }
     }
 }
