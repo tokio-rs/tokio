@@ -1,3 +1,11 @@
+# 1.7.1 (June 18, 2021)
+
+### Fixed
+
+- runtime: fix early task shutdown during runtime shutdown ([#3870])
+
+[#3870]: https://github.com/tokio-rs/tokio/pull/3870
+
 # 1.7.0 (June 15, 2021)
 
 ### Added
