@@ -145,7 +145,7 @@ impl Handle {
         F::Output: Send + 'static,
     {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task");
+        let future = crate::util::trace::task(future, "task", None);
         self.spawner.spawn(future)
     }
 
