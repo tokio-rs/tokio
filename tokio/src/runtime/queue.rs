@@ -124,9 +124,14 @@ impl<T> Local<T> {
                 // There is capacity for the task
                 break tail;
             } else if steal != real {
-                // Concurrently stealing, this will free up capacity, so
-                // only push the new task onto the inject queue
-                inject.push(task);
+                // Concurrently stealing, this will free up capacity, so only
+                // push the new task onto the inject queue
+                //
+                // If the task failes to be pushed on the injection queue, there
+                // is nothing to be done at this point as the task cannot be a
+                // newly spawned task. Shutting down this task is handled by the
+                // worker shutdown process.
+                let _ = inject.push(task);
                 return;
             } else {
                 // Push the current task and half of the queue into the
@@ -507,7 +512,11 @@ impl<T: 'static> Inject<T> {
     }
 
     /// Pushes a value into the queue.
-    pub(super) fn push(&self, task: task::Notified<T>)
+    ///
+    /// Returns `Err(task)` if pushing fails due to the queue being shutdown.
+    /// The caller is expected to call `shutdown()` on the task **if and only
+    /// if** it is a newly spawned task.
+    pub(super) fn push(&self, task: task::Notified<T>) -> Result<(), task::Notified<T>>
     where
         T: crate::runtime::task::Schedule,
     {
@@ -515,11 +524,7 @@ impl<T: 'static> Inject<T> {
         let mut p = self.pointers.lock();
 
         if p.is_closed {
-            // Drop the mutex to avoid a potential deadlock when
-            // re-entering.
-            drop(p);
-            task.shutdown();
-            return;
+            return Err(task);
         }
 
         // safety: only mutated with the lock held
@@ -538,6 +543,7 @@ impl<T: 'static> Inject<T> {
         p.tail = Some(task);
 
         self.len.store(len + 1, Release);
+        Ok(())
     }
 
     pub(super) fn push_batch(

@@ -9,6 +9,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
+#![deny(unused_must_use)]
 #![cfg_attr(docsrs, deny(broken_intra_doc_links))]
 #![doc(test(
     no_crate_inject,

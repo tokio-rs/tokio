@@ -94,7 +94,13 @@ impl Spawner {
         F::Output: Send + 'static,
     {
         let (task, handle) = task::joinable(future);
-        self.shared.schedule(task, false);
+
+        if let Err(task) = self.shared.schedule(task, false) {
+            // The newly spawned task could not be scheduled because the runtime
+            // is shutting down. The task must be explicitly shutdown at this point.
+            task.shutdown();
+        }
+
         handle
     }
 

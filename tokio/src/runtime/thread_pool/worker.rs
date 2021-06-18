@@ -709,16 +709,22 @@ impl task::Schedule for Arc<Worker> {
     }
 
     fn schedule(&self, task: Notified) {
-        self.shared.schedule(task, false);
+        // Because this is not a newly spawned task, if scheduling fails due to
+        // the runtime shutting down, there is no special work that must happen
+        // here.
+        let _ = self.shared.schedule(task, false);
     }
 
     fn yield_now(&self, task: Notified) {
-        self.shared.schedule(task, true);
+        // Because this is not a newly spawned task, if scheduling fails due to
+        // the runtime shutting down, there is no special work that must happen
+        // here.
+        let _ = self.shared.schedule(task, true);
     }
 }
 
 impl Shared {
-    pub(super) fn schedule(&self, task: Notified, is_yield: bool) {
+    pub(super) fn schedule(&self, task: Notified, is_yield: bool) -> Result<(), Notified> {
         CURRENT.with(|maybe_cx| {
             if let Some(cx) = maybe_cx {
                 // Make sure the task is part of the **current** scheduler.
@@ -726,15 +732,16 @@ impl Shared {
                     // And the current thread still holds a core
                     if let Some(core) = cx.core.borrow_mut().as_mut() {
                         self.schedule_local(core, task, is_yield);
-                        return;
+                        return Ok(());
                     }
                 }
             }
 
             // Otherwise, use the inject queue
-            self.inject.push(task);
+            self.inject.push(task)?;
             self.notify_parked();
-        });
+            Ok(())
+        })
     }
 
     fn schedule_local(&self, core: &mut Core, task: Notified, is_yield: bool) {
