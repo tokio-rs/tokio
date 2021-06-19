@@ -4,7 +4,7 @@ cfg_trace! {
 
         #[inline]
         #[cfg_attr(tokio_track_caller, track_caller)]
-        pub(crate) fn task<F>(task: F, kind: &'static str, name: Option<std::borrow::Cow<'static, str>>) -> Instrumented<F> {
+        pub(crate) fn task<F>(task: F, kind: &'static str, name: Option<&str>) -> Instrumented<F> {
             use tracing::instrument::Instrument;
             #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
@@ -31,7 +31,7 @@ cfg_trace! {
 cfg_not_trace! {
     cfg_rt! {
         #[inline]
-        pub(crate) fn task<F>(task: F, _: &'static str, _name: Option<std::borrow::Cow<'static, str>>) -> F {
+        pub(crate) fn task<F>(task: F, _: &'static str, _name: Option<&str>) -> F {
             // nop
             task
         }
