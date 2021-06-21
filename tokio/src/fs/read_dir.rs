@@ -1,5 +1,6 @@
-use crate::fs::{asyncify, sys};
+use crate::fs::asyncify;
 
+use cfg_if::cfg_if;
 use std::ffi::OsString;
 use std::fs::{FileType, Metadata};
 use std::future::Future;
@@ -9,6 +10,16 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
+
+cfg_if! {
+    if #[cfg(test)] {
+        use super::mocks::JoinHandle;
+        use super::mocks::spawn_blocking;
+    } else {
+        use crate::blocking::spawn_blocking;
+        use crate::blocking::JoinHandle;
+    }
+}
 
 /// Returns a stream over the entries within a directory.
 ///
@@ -50,7 +61,7 @@ pub struct ReadDir(State);
 #[derive(Debug)]
 enum State {
     Idle(Option<std::fs::ReadDir>),
-    Pending(sys::Blocking<(Option<io::Result<std::fs::DirEntry>>, std::fs::ReadDir)>),
+    Pending(JoinHandle<(Option<io::Result<std::fs::DirEntry>>, std::fs::ReadDir)>),
 }
 
 impl ReadDir {
@@ -84,7 +95,7 @@ impl ReadDir {
                 State::Idle(ref mut std) => {
                     let mut std = std.take().unwrap();
 
-                    self.0 = State::Pending(sys::run(move || {
+                    self.0 = State::Pending(spawn_blocking(move || {
                         let ret = std.next();
                         (ret, std)
                     }));
