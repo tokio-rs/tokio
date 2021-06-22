@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624367565504,
+  "lastUpdate": 1624367583725,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17927,6 +17927,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 489,
             "range": "± 12",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "53383020+sb64@users.noreply.github.com",
+            "name": "sb64",
+            "username": "sb64"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "845626410a2e42902882f9750a9f8e2b38cf5a36",
+          "message": "sync: implement From<T> for OnceCell<T> (#3877)",
+          "timestamp": "2021-06-22T15:11:01+02:00",
+          "tree_id": "53b9faf0e24729cdf15f5095ed9c3f0c0f6fc535",
+          "url": "https://github.com/tokio-rs/tokio/commit/845626410a2e42902882f9750a9f8e2b38cf5a36"
+        },
+        "date": 1624367578469,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 847,
+            "range": "± 107",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16134,
+            "range": "± 5404",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 854,
+            "range": "± 112",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14536,
+            "range": "± 4390",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 557,
+            "range": "± 54",
             "unit": "ns/iter"
           }
         ]
