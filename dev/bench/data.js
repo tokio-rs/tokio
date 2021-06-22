@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624122047943,
+  "lastUpdate": 1624367565504,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -51897,6 +51897,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 810,
             "range": "± 4",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "53383020+sb64@users.noreply.github.com",
+            "name": "sb64",
+            "username": "sb64"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "845626410a2e42902882f9750a9f8e2b38cf5a36",
+          "message": "sync: implement From<T> for OnceCell<T> (#3877)",
+          "timestamp": "2021-06-22T15:11:01+02:00",
+          "tree_id": "53b9faf0e24729cdf15f5095ed9c3f0c0f6fc535",
+          "url": "https://github.com/tokio-rs/tokio/commit/845626410a2e42902882f9750a9f8e2b38cf5a36"
+        },
+        "date": 1624367561614,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13614,
+            "range": "± 5558",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 819,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 541,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12659,
+            "range": "± 4984",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 817,
+            "range": "± 3",
             "unit": "ns/iter"
           }
         ]
