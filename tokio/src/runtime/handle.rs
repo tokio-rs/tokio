@@ -178,7 +178,6 @@ impl Handle {
     }
 
     #[cfg_attr(tokio_track_caller, track_caller)]
-
     pub(crate) fn spawn_blocking_inner<F, R>(&self, func: F, name: Option<&str>) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -210,6 +209,10 @@ impl Handle {
             );
             fut.instrument(span)
         };
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        drop(name);
+
         let (task, handle) = task::joinable(fut);
         let _ = self.blocking_spawner.spawn(task, &self);
         handle
