@@ -77,6 +77,18 @@ impl<T> Drop for OnceCell<T> {
     }
 }
 
+impl<T> From<T> for OnceCell<T> {
+    fn from(value: T) -> Self {
+        let semaphore = Semaphore::new(0);
+        semaphore.close();
+        OnceCell {
+            value_set: AtomicBool::new(true),
+            value: UnsafeCell::new(MaybeUninit::new(value)),
+            semaphore,
+        }
+    }
+}
+
 impl<T> OnceCell<T> {
     /// Creates a new uninitialized OnceCell instance.
     pub fn new() -> Self {
@@ -93,13 +105,7 @@ impl<T> OnceCell<T> {
     /// [`OnceCell::new`]: crate::sync::OnceCell::new
     pub fn new_with(value: Option<T>) -> Self {
         if let Some(v) = value {
-            let semaphore = Semaphore::new(0);
-            semaphore.close();
-            OnceCell {
-                value_set: AtomicBool::new(true),
-                value: UnsafeCell::new(MaybeUninit::new(v)),
-                semaphore,
-            }
+            OnceCell::from(v)
         } else {
             OnceCell::new()
         }
