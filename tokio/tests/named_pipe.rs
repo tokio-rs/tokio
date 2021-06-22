@@ -212,15 +212,12 @@ async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
             let mut write_buf_cursor = 0;
 
             loop {
-                // We need to sleep in the loop, as otherwise ready() will always
-                // return immediately since the pipe will essentially always be
-                // ready for writing, resulting in a busy loop that causes
-                // the runtime to actually never make forward progress
-                time::sleep(Duration::from_millis(10)).await;
+                let mut interest = Interest::READABLE;
+                if write_buf_cursor < write_buf.len() {
+                    interest |= Interest::WRITABLE;
+                }
 
-                let ready = client
-                    .ready(Interest::READABLE | Interest::WRITABLE)
-                    .await?;
+                let ready = client.ready(interest).await?;
 
                 if ready.is_readable() {
                     let buf = &mut read_buf[read_buf_cursor..];
