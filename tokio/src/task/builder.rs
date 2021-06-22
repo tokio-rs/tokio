@@ -1,5 +1,6 @@
 #![allow(unreachable_pub)]
-use crate::task::JoinHandle;
+use crate::util::error::CONTEXT_MISSING_ERROR;
+use crate::{runtime::context, task::JoinHandle};
 use std::future::Future;
 
 /// Factory which is used to configure the properties of a new task.
@@ -16,80 +17,89 @@ use std::future::Future;
 /// - [`spawn`] for executing [`Send`] futures on the runtime
 /// - [`spawn_blocking`] for executing blocking code in the
 ///   blocking thread pool.
+///
+/// ## Example
+///
+/// ```no_run
+/// use tokio::net::{TcpListener, TcpStream};
+///
+/// use std::io;
+///
+/// async fn process(socket: TcpStream) {
+///     // ...
+/// # drop(socket);
+/// }
+///
+/// #[tokio::main]
+/// async fn main() -> io::Result<()> {
+///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
+///
+///     loop {
+///         let (socket, socket) = listener.accept().await?;
+///
+///         tokio::task::Builder::new()
+///             .name(&format!("connection from {:?}", socket.ip()))
+///             .spawn(async move {
+///                 // Process each socket concurrently.
+///                 process(socket).await
+///             });
+///     }
+/// }
+/// ```
 #[derive(Default, Debug)]
 pub struct Builder<'a> {
     name: Option<&'a str>,
 }
 
 impl Builder<'_> {
-    /// Creates a new task builder
+    /// Creates a new task builder.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Assigns a name to the task which will be spawned
+    /// Assigns a name to the task which will be spawned.
     pub fn name<'b>(&self, name: &'b str) -> Builder<'b> {
         Builder { name: Some(name) }
     }
 
     /// Spawns a task on the executor.
     ///
-    /// See
-    /// [`task::spawn`][crate::task::spawn] for more details
+    /// See [`task::spawn`](crate::task::spawn) for
+    /// more details.
     #[cfg_attr(tokio_track_caller, track_caller)]
-    pub fn spawn<T>(self, future: T) -> JoinHandle<T::Output>
+    pub fn spawn<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        Fut: Future + Send + 'static,
+        Fut::Output: Send + 'static,
     {
         super::spawn::spawn_inner(future, self.name)
     }
 
     /// Spawns a task on the current thread.
     ///
-    /// See [`task::spawn_local`][crate::task::spawn_local]
-    /// for more details
+    /// See [`task::spawn_local`](crate::task::spawn_local)
+    /// for more details.
     #[cfg_attr(tokio_track_caller, track_caller)]
-    pub fn spawn_local<F>(self, future: F) -> JoinHandle<F::Output>
+    pub fn spawn_local<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
     where
-        F: Future + 'static,
-        F::Output: 'static,
+        Fut: Future + 'static,
+        Fut::Output: 'static,
     {
         super::local::spawn_local_inner(future, self.name)
     }
 
     /// Spawns blocking code on the blocking threadpool.
     ///
-    /// See [`task::spawn_blocking`][crate::task::spawn_blocking]
-    /// for more details
+    /// See [`task::spawn_blocking`](crate::task::spawn_blocking)
+    /// for more details.
     #[cfg_attr(tokio_track_caller, track_caller)]
     pub fn spawn_blocking<Function, Output>(self, function: Function) -> JoinHandle<Output>
     where
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
-        #[cfg(tokio_track_caller)]
-        let location = std::panic::Location::caller();
-        #[cfg(tokio_track_caller)]
-        let span = tracing::trace_span!(
-            target: "tokio::task",
-            "task",
-            kind = "blocking",
-            spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
-            task.name = %self.name.unwrap_or_default()
-        );
-
-        #[cfg(not(tokio_track_caller))]
-        let span = tracing::trace_span!(
-            target: "tokio::task",
-            "task",
-            kind = "blocking",
-            task.name = %self.name.unwrap_or_default()
-        );
-
-        crate::runtime::spawn_blocking(move || {
-            let _span = span.entered();
-            function()
-        })
+        context::current()
+            .expect(CONTEXT_MISSING_ERROR)
+            .spawn_blocking_inner(function, self.name)
     }
 }

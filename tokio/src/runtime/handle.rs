@@ -174,6 +174,16 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        self.spawn_blocking_inner(func, None)
+    }
+
+    #[cfg_attr(tokio_track_caller, track_caller)]
+
+    pub(crate) fn spawn_blocking_inner<F, R>(&self, func: F, name: Option<&str>) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
         let fut = BlockingTask::new(func);
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -187,6 +197,7 @@ impl Handle {
                 "task",
                 kind = %"blocking",
                 function = %std::any::type_name::<F>(),
+                task.name = %name.unwrap_or_default(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
             );
             #[cfg(not(tokio_track_caller))]
@@ -194,6 +205,7 @@ impl Handle {
                 target: "tokio::task",
                 "task",
                 kind = %"blocking",
+                task.name = %name.unwrap_or_default(),
                 function = %std::any::type_name::<F>(),
             );
             fut.instrument(span)
