@@ -48,22 +48,10 @@ where
             return Poll::Ready(Ok(0));
         }
 
-        let n = {
-            let mut buf = ReadBuf::from_buf(me.buf);
-            let ptr = buf.filled().as_ptr();
-            ready!(Pin::new(me.reader).poll_read(cx, &mut buf)?);
-
-            // Ensure the pointer does not change from under us
-            assert_eq!(ptr, buf.filled().as_ptr());
-            buf.filled().len()
-        };
-
-        // Safety: This is guaranteed to be the number of initialized (and read)
-        // bytes due to the invariants provided by `ReadBuf::filled`.
-        unsafe {
-            me.buf.advance_mut(n);
-        }
-
-        Poll::Ready(Ok(n))
+        let reader = me.reader;
+        ReadBuf::with_buf(me.buf, |buf| {
+            ready!(Pin::new(reader).poll_read(cx, buf))?;
+            Poll::Ready(Ok(buf.filled().len()))
+        })
     }
 }

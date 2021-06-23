@@ -111,23 +111,10 @@ mod util {
             return Poll::Ready(Ok(0));
         }
 
-        let n = {
-            let mut buf = ReadBuf::from_buf(buf);
-            let ptr = buf.filled().as_ptr();
-            ready!(io.poll_read(cx, &mut buf)?);
-
-            // Ensure the pointer does not change from under us
-            assert_eq!(ptr, buf.filled().as_ptr());
-            buf.filled().len()
-        };
-
-        // Safety: This is guaranteed to be the number of initialized (and read)
-        // bytes due to the invariants provided by `ReadBuf::filled`.
-        unsafe {
-            buf.advance_mut(n);
-        }
-
-        Poll::Ready(Ok(n))
+        ReadBuf::with_buf(buf, |buf| {
+            ready!(io.poll_read(cx, buf))?;
+            Poll::Ready(Ok(buf.filled().len()))
+        })
     }
 
     /// Try to write data from an implementer of the [`Buf`] trait to an

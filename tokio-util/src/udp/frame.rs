@@ -3,7 +3,7 @@ use crate::codec::{Decoder, Encoder};
 use futures_core::Stream;
 use tokio::{io::ReadBuf, net::UdpSocket};
 
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 use futures_core::ready;
 use futures_sink::Sink;
 use std::io;
@@ -82,17 +82,10 @@ where
             }
 
             // We're out of data. Try and fetch more data to decode
-            let mut read = ReadBuf::from_buf(&mut pin.rd);
-            let ptr = read.filled().as_ptr();
-            let res = ready!(pin.socket.borrow().poll_recv_from(cx, &mut read));
-
-            assert_eq!(ptr, read.filled().as_ptr());
-            let addr = res?;
-            // SAFETY: `ReadBuf` guarantees that `filled` has been initialized
-            unsafe {
-                let filled = read.filled().len();
-                pin.rd.advance_mut(filled);
-            }
+            let socket = &pin.socket;
+            let addr = ready!(ReadBuf::with_buf(&mut pin.rd, |read| socket
+                .borrow()
+                .poll_recv_from(cx, read)))?;
 
             pin.current_addr = Some(addr);
             pin.is_readable = true;

@@ -5,6 +5,10 @@
 use std::fmt;
 use std::mem::{self, MaybeUninit};
 
+cfg_io_util! {
+    use std::{io, task::Poll};
+}
+
 /// A wrapper around a byte buffer that is incrementally filled and initialized.
 ///
 /// This type is a sort of "double cursor". It tracks three regions in the
@@ -56,8 +60,7 @@ impl<'a> ReadBuf<'a> {
     }
 
     cfg_io_util! {
-        #[doc(hidden)]
-        pub fn from_buf(buf: &'a mut impl bytes::BufMut) -> ReadBuf<'a> {
+         fn from_buf(buf: &'a mut impl bytes::BufMut) -> ReadBuf<'a> {
             let buf = buf.chunk_mut();
             ReadBuf {
                 // SAFETY: ReadBuf guarantees that no uninitialized bytes are written to `buf`
@@ -68,6 +71,32 @@ impl<'a> ReadBuf<'a> {
                 filled: 0,
                 initialized: 0,
             }
+        }
+
+        #[doc(hidden)]
+        pub fn with_buf<R>(
+            buf: &'a mut impl bytes::BufMut,
+            f: impl FnOnce(&mut ReadBuf<'_>) -> Poll<io::Result<R>>,
+        ) -> Poll<io::Result<R>> {
+            let (n, r) = {
+                let mut buf = ReadBuf::from_buf(buf);
+                let ptr = buf.filled().as_ptr();
+
+                let r = ready!(f(&mut buf))?;
+
+
+                // Ensure the pointer does not change from under us
+                assert_eq!(ptr, buf.filled().as_ptr());
+                (buf.filled().len(), r)
+            };
+
+            // Safety: This is guaranteed to be the number of initialized (and read)
+            // bytes due to the invariants provided by `ReadBuf::filled`.
+            unsafe {
+                buf.advance_mut(n);
+            }
+
+            Poll::Ready(Ok(r))
         }
     }
 
