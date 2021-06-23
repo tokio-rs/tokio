@@ -60,7 +60,6 @@ mod util {
     use bytes::{Buf, BufMut};
     use futures_core::ready;
     use std::io::{self, IoSlice};
-    use std::mem::MaybeUninit;
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
@@ -113,9 +112,7 @@ mod util {
         }
 
         let n = {
-            let dst = buf.chunk_mut();
-            let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
-            let mut buf = ReadBuf::uninit(dst);
+            let mut buf = ReadBuf::from_buf(buf);
             let ptr = buf.filled().as_ptr();
             ready!(io.poll_read(cx, &mut buf)?);
 

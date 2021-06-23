@@ -55,6 +55,22 @@ impl<'a> ReadBuf<'a> {
         }
     }
 
+    cfg_io_util! {
+        #[doc(hidden)]
+        pub fn from_buf(buf: &'a mut impl bytes::BufMut) -> ReadBuf<'a> {
+            let buf = buf.chunk_mut();
+            ReadBuf {
+                // SAFETY: ReadBuf guarantees that no uninitialized bytes are written to `buf`
+                // (same guarantee as `UninitSlice`)
+                buf: unsafe {
+                    std::slice::from_raw_parts_mut(buf.as_mut_ptr() as *mut MaybeUninit<u8>, buf.len())
+                },
+                filled: 0,
+                initialized: 0,
+            }
+        }
+    }
+
     /// Returns the total capacity of the buffer.
     #[inline]
     pub fn capacity(&self) -> usize {
