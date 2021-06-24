@@ -404,7 +404,6 @@ impl NamedPipeClient {
     ///                     return Err(e.into());
     ///                 }
     ///             }
-    ///
     ///         }
     ///
     ///         if ready.is_writable() {
