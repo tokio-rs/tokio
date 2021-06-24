@@ -230,7 +230,7 @@ async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
                                 break;
                             }
                         }
-                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                             continue;
                         }
                         Err(e) => {
@@ -250,7 +250,7 @@ async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
                         Ok(n) => {
                             write_buf_cursor += n;
                         }
-                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                             continue;
                         }
                         Err(e) => {

@@ -48,7 +48,7 @@ async fn windows_main() -> io::Result<()> {
                             break;
                         }
                     }
-                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                         continue;
                     }
                     Err(e) => {
@@ -68,7 +68,7 @@ async fn windows_main() -> io::Result<()> {
                     Ok(n) => {
                         write_buf_cursor += n;
                     }
-                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                         continue;
                     }
                     Err(e) => {

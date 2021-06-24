@@ -397,7 +397,7 @@ impl NamedPipeClient {
     ///                 Ok(n) => {
     ///                     println!("read {} bytes", n);
     ///                 }
-    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                     continue;
     ///                 }
     ///                 Err(e) => {
@@ -414,7 +414,7 @@ impl NamedPipeClient {
     ///                 Ok(n) => {
     ///                     println!("write {} bytes", n);
     ///                 }
-    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                     continue;
     ///                 }
     ///                 Err(e) => {
@@ -451,7 +451,7 @@ impl NamedPipeClient {
     ///     let mut msg = vec![0; 1024];
     ///
     ///     loop {
-    ///         // Wait for the socket to be readable
+    ///         // Wait for the pipe to be readable
     ///         client.readable().await?;
     ///
     ///         // Try to read data, this may still fail with `WouldBlock`
@@ -461,7 +461,7 @@ impl NamedPipeClient {
     ///                 msg.truncate(n);
     ///                 break;
     ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                 continue;
     ///             }
     ///             Err(e) => {
@@ -545,7 +545,7 @@ impl NamedPipeClient {
     ///     let client = named_pipe::ClientOptions::new().open(PIPE_NAME)?;
     ///
     ///     loop {
-    ///         // Wait for the socket to be readable
+    ///         // Wait for the pipe to be readable
     ///         client.readable().await?;
     ///
     ///         // Creating the buffer **after** the `await` prevents it from
@@ -559,7 +559,7 @@ impl NamedPipeClient {
     ///             Ok(n) => {
     ///                 println!("read {} bytes", n);
     ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                 continue;
     ///             }
     ///             Err(e) => {
@@ -617,7 +617,7 @@ impl NamedPipeClient {
     ///     let client = named_pipe::ClientOptions::new().open(PIPE_NAME)?;
     ///
     ///     loop {
-    ///         // Wait for the socket to be readable
+    ///         // Wait for the pipe to be readable
     ///         client.readable().await?;
     ///
     ///         // Creating the buffer **after** the `await` prevents it from
@@ -636,7 +636,7 @@ impl NamedPipeClient {
     ///             Ok(n) => {
     ///                 println!("read {} bytes", n);
     ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                 continue;
     ///             }
     ///             Err(e) => {
@@ -673,7 +673,7 @@ impl NamedPipeClient {
     ///     let client = named_pipe::ClientOptions::new().open(PIPE_NAME)?;
     ///
     ///     loop {
-    ///         // Wait for the socket to be writable
+    ///         // Wait for the pipe to be writable
     ///         client.writable().await?;
     ///
     ///         // Try to write data, this may still fail with `WouldBlock`
@@ -682,7 +682,7 @@ impl NamedPipeClient {
     ///             Ok(n) => {
     ///                 break;
     ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                 continue;
     ///             }
     ///             Err(e) => {
@@ -759,7 +759,7 @@ impl NamedPipeClient {
     ///     let client = named_pipe::ClientOptions::new().open(PIPE_NAME)?;
     ///
     ///     loop {
-    ///         // Wait for the socket to be writable
+    ///         // Wait for the pipe to be writable
     ///         client.writable().await?;
     ///
     ///         // Try to write data, this may still fail with `WouldBlock`
@@ -768,7 +768,7 @@ impl NamedPipeClient {
     ///             Ok(n) => {
     ///                 break;
     ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                 continue;
     ///             }
     ///             Err(e) => {
@@ -820,7 +820,7 @@ impl NamedPipeClient {
     ///     let bufs = [io::IoSlice::new(b"hello "), io::IoSlice::new(b"world")];
     ///
     ///     loop {
-    ///         // Wait for the socket to be writable
+    ///         // Wait for the pipe to be writable
     ///         client.writable().await?;
     ///
     ///         // Try to write data, this may still fail with `WouldBlock`
@@ -829,7 +829,7 @@ impl NamedPipeClient {
     ///             Ok(n) => {
     ///                 break;
     ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                 continue;
     ///             }
     ///             Err(e) => {
@@ -1501,7 +1501,7 @@ impl ClientOptions {
     /// [enabled I/O]: crate::runtime::Builder::enable_io
     /// [Tokio Runtime]: crate::runtime::Runtime
     ///
-    /// A connect loop that waits until a socket becomes available looks like
+    /// A connect loop that waits until a pipe becomes available looks like
     /// this:
     ///
     /// ```no_run
