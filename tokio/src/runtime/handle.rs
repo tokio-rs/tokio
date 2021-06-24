@@ -211,7 +211,7 @@ impl Handle {
         };
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        drop(name);
+        let _ = name;
 
         let (task, handle) = task::joinable(fut);
         let _ = self.blocking_spawner.spawn(task, &self);
