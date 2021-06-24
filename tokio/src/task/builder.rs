@@ -35,10 +35,10 @@ use std::future::Future;
 ///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
 ///
 ///     loop {
-///         let (socket, socket) = listener.accept().await?;
+///         let (socket, _) = listener.accept().await?;
 ///
 ///         tokio::task::Builder::new()
-///             .name(&format!("connection from {:?}", socket.ip()))
+///             .name("tcp connection handler")
 ///             .spawn(async move {
 ///                 // Process each socket concurrently.
 ///                 process(socket).await
