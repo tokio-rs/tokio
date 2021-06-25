@@ -936,6 +936,97 @@ impl TcpStream {
             .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(bufs))
     }
 
+    /// Try to call a read I/O function, clearing read readiness if `f` returns
+    /// `WouldBlock`
+    ///
+    /// # Return value
+    ///
+    /// This functions returns exactly the same as `f`
+    pub fn try_read_io<R>(&self, f: impl FnMut() -> io::Result<R>) -> io::Result<R> {
+        self.io.registration().try_io(Interest::READABLE, f)
+    }
+
+    /// Polls for read readiness.
+    ///
+    /// If the tcp stream is not currently ready for reading, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the tcp
+    /// stream becomes ready for reading, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_read_io`, only the `Waker` from
+    /// the `Context` passed to the most recent call is scheduled to receive a
+    /// wakeup. (However, `poll_write_io` retains a second, independent waker.)
+    ///
+    /// This function is intended for cases where customized I/O operations
+    /// may change the readiness of the underlying socket.
+    /// If the `f` function returns an error `WouldBlock`, then the read
+    /// readiness will be cleared and returns `Poll::Pending`.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the tcp stream is not ready for reading.
+    /// * `Poll::Ready(Ok(R))` if the `f` returns `Ok(R)`.
+    /// * `Poll::Ready(Err(e))` if an error is encountered from `f` except `WouldBlock`.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_read_io<R>(
+        &self,
+        cx: &mut Context<'_>,
+        f: impl FnMut() -> io::Result<R>,
+    ) -> Poll<io::Result<R>> {
+        self.io.registration().poll_read_io(cx, f)
+    }
+
+    /// Try to call a write I/O function, clearing write readiness if `f` returns
+    /// `WouldBlock`
+    ///
+    /// # Return value
+    ///
+    /// This functions returns exactly the same as `f`
+    pub fn try_write_io<R>(&self, f: impl FnMut() -> io::Result<R>) -> io::Result<R> {
+        self.io.registration().try_io(Interest::WRITABLE, f)
+    }
+
+    /// Polls for write readiness and then calls the `f` for writing operation.
+    ///
+    /// If the tcp stream is not currently ready for writing, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the tcp
+    /// stream becomes ready for writing, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_write_io` only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_read_io` retains a
+    /// second, independent waker.)
+    ///
+    /// This function is intended for cases where customized I/O operations
+    /// may change the readiness of the underlying socket.
+    /// If the `f` function returns an error `WouldBlock`, then the write
+    /// readiness will be cleared and returns `Poll::Pending`.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the tcp stream is not ready for writing.
+    /// * `Poll::Ready(Ok(R))` if the `f` returns `Ok(R)`.
+    /// * `Poll::Ready(Err(e))` if an error is encountered from `f` except `WouldBlock`.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_write_io<R>(
+        &self,
+        cx: &mut Context<'_>,
+        f: impl FnMut() -> io::Result<R>,
+    ) -> Poll<io::Result<R>> {
+        self.io.registration().poll_write_io(cx, f)
+    }
+
     /// Receives data on the socket from the remote address to which it is
     /// connected, without removing that data from the queue. On success,
     /// returns the number of bytes peeked.
