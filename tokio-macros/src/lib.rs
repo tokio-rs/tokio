@@ -19,7 +19,9 @@
 extern crate proc_macro;
 
 mod entry;
+mod instrument;
 mod select;
+mod util;
 
 use proc_macro::TokenStream;
 
@@ -328,4 +330,16 @@ pub fn test_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
 #[doc(hidden)]
 pub fn select_priv_declare_output_enum(input: TokenStream) -> TokenStream {
     select::declare_output_enum(input)
+}
+
+#[proc_macro_attribute]
+#[doc(hidden)]
+pub fn instrument_resource(args: TokenStream, item: TokenStream) -> TokenStream {
+    instrument::add_resource_impl(args, item)
+}
+
+#[proc_macro_attribute]
+#[doc(hidden)]
+pub fn instrument_resource_op(args: TokenStream, item: TokenStream) -> TokenStream {
+    instrument::instrument_resource_op(args, item)
 }

@@ -12,6 +12,11 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+cfg_trace! {
+    use tokio_macros::instrument_resource;
+    use tokio_macros::instrument_resource_op;
+}
+
 cfg_io_util! {
     use bytes::BufMut;
 }
@@ -64,6 +69,10 @@ cfg_net! {
     /// the stream in one direction.
     ///
     /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
+    #[cfg_attr(
+        all(tokio_unstable, feature = "tracing"),
+        instrument_resource(resource_kind = "stream")
+    )]
     pub struct TcpStream {
         io: PollEvented<mio::net::TcpStream>,
     }
@@ -154,6 +163,13 @@ impl TcpStream {
 
     pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
         let io = PollEvented::new(connected)?;
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return Ok(TcpStream {
+            io,
+            span: Self::create_span(),
+        });
+
+        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         Ok(TcpStream { io })
     }
 
@@ -189,6 +205,14 @@ impl TcpStream {
     pub fn from_std(stream: std::net::TcpStream) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::from_std(stream);
         let io = PollEvented::new(io)?;
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return Ok(TcpStream {
+            io,
+            span: Self::create_span(),
+        });
+
+        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         Ok(TcpStream { io })
     }
 
@@ -324,6 +348,7 @@ impl TcpStream {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg_attr(all(tokio_unstable, feature = "tracing"), instrument_resource_op())]
     pub fn poll_peek(
         &self,
         cx: &mut Context<'_>,
@@ -380,7 +405,7 @@ impl TcpStream {
     ///             // if the readiness event is a false positive.
     ///             match stream.try_read(&mut data) {
     ///                 Ok(n) => {
-    ///                     println!("read {} bytes", n);        
+    ///                     println!("read {} bytes", n);
     ///                 }
     ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                     continue;
@@ -492,6 +517,7 @@ impl TcpStream {
     /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`readable`]: method@Self::readable
+    #[cfg_attr(all(tokio_unstable, feature = "tracing"), instrument_resource_op())]
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.io.registration().poll_read_ready(cx).map_ok(|_| ())
     }
@@ -793,6 +819,7 @@ impl TcpStream {
     /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`writable`]: method@Self::writable
+    #[cfg_attr(all(tokio_unstable, feature = "tracing"), instrument_resource_op())]
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.io.registration().poll_write_ready(cx).map_ok(|_| ())
     }
@@ -1152,6 +1179,7 @@ impl TcpStream {
         split_owned(self)
     }
 
+    #[cfg_attr(all(tokio_unstable, feature = "tracing"), instrument_resource_op())]
     pub(crate) fn poll_read_priv(
         &self,
         cx: &mut Context<'_>,
@@ -1161,6 +1189,7 @@ impl TcpStream {
         unsafe { self.io.poll_read(cx, buf) }
     }
 
+    #[cfg_attr(all(tokio_unstable, feature = "tracing"), instrument_resource_op())]
     pub(super) fn poll_write_priv(
         &self,
         cx: &mut Context<'_>,
@@ -1169,6 +1198,7 @@ impl TcpStream {
         self.io.poll_write(cx, buf)
     }
 
+    #[cfg_attr(all(tokio_unstable, feature = "tracing"), instrument_resource_op())]
     pub(super) fn poll_write_vectored_priv(
         &self,
         cx: &mut Context<'_>,

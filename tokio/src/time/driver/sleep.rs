@@ -6,6 +6,11 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
 
+cfg_trace! {
+    use tokio_macros::instrument_resource;
+    use tokio_macros::instrument_resource_op;
+}
+
 /// Waits until `deadline` is reached.
 ///
 /// No work is performed while awaiting on the sleep future to complete. `Sleep`
@@ -62,6 +67,15 @@ pub fn sleep(duration: Duration) -> Sleep {
         Some(deadline) => sleep_until(deadline),
         None => sleep_until(Instant::far_future()),
     }
+}
+
+#[cfg_attr(
+    all(tokio_unstable, feature = "tracing"),
+    instrument_resource(resource_kind = "timer", concrete_type = "Sleep")
+)]
+#[derive(Debug)]
+struct Inner {
+    deadline: Instant,
 }
 
 pin_project! {
@@ -157,7 +171,7 @@ pin_project! {
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct Sleep {
-        deadline: Instant,
+        inner: Inner,
 
         // The link between the `Sleep` instance and the timer that drives it.
         #[pin]
@@ -170,7 +184,20 @@ impl Sleep {
         let handle = Handle::current();
         let entry = TimerEntry::new(&handle, deadline);
 
-        Sleep { deadline, entry }
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return Sleep {
+            inner: Inner {
+                deadline,
+                span: Inner::create_span(),
+            },
+            entry,
+        };
+
+        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        Sleep {
+            inner: Inner { deadline },
+            entry,
+        }
     }
 
     pub(crate) fn far_future() -> Sleep {
@@ -179,7 +206,7 @@ impl Sleep {
 
     /// Returns the instant at which the future will complete.
     pub fn deadline(&self) -> Instant {
-        self.deadline
+        self.inner.deadline
     }
 
     /// Returns `true` if `Sleep` has elapsed.
@@ -219,9 +246,13 @@ impl Sleep {
     pub fn reset(self: Pin<&mut Self>, deadline: Instant) {
         let me = self.project();
         me.entry.reset(deadline);
-        *me.deadline = deadline;
+        (*me.inner).deadline = deadline;
     }
 
+    #[cfg_attr(
+        all(tokio_unstable, feature = "tracing"),
+        instrument_resource_op(resource_span_location = "inner")
+    )]
     fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
         let me = self.project();
 

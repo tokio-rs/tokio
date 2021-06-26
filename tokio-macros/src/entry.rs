@@ -1,3 +1,4 @@
+use crate::util;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned, ToTokens};
@@ -56,7 +57,7 @@ impl Configuration {
             return Err(syn::Error::new(span, "`flavor` set multiple times."));
         }
 
-        let runtime_str = parse_string(runtime, span, "flavor")?;
+        let runtime_str = util::parse_string(runtime, span, "flavor")?;
         let runtime =
             RuntimeFlavor::from_str(&runtime_str).map_err(|err| syn::Error::new(span, err))?;
         self.flavor = Some(runtime);
@@ -75,7 +76,7 @@ impl Configuration {
             ));
         }
 
-        let worker_threads = parse_int(worker_threads, span, "worker_threads")?;
+        let worker_threads = util::parse_int(worker_threads, span, "worker_threads")?;
         if worker_threads == 0 {
             return Err(syn::Error::new(span, "`worker_threads` may not be 0."));
         }
@@ -88,7 +89,7 @@ impl Configuration {
             return Err(syn::Error::new(span, "`start_paused` set multiple times."));
         }
 
-        let start_paused = parse_bool(start_paused, span, "start_paused")?;
+        let start_paused = util::parse_bool(start_paused, span, "start_paused")?;
         self.start_paused = Some((start_paused, span));
         Ok(())
     }
@@ -144,43 +145,6 @@ impl Configuration {
             worker_threads,
             start_paused,
         })
-    }
-}
-
-fn parse_int(int: syn::Lit, span: Span, field: &str) -> Result<usize, syn::Error> {
-    match int {
-        syn::Lit::Int(lit) => match lit.base10_parse::<usize>() {
-            Ok(value) => Ok(value),
-            Err(e) => Err(syn::Error::new(
-                span,
-                format!("Failed to parse value of `{}` as integer: {}", field, e),
-            )),
-        },
-        _ => Err(syn::Error::new(
-            span,
-            format!("Failed to parse value of `{}` as integer.", field),
-        )),
-    }
-}
-
-fn parse_string(int: syn::Lit, span: Span, field: &str) -> Result<String, syn::Error> {
-    match int {
-        syn::Lit::Str(s) => Ok(s.value()),
-        syn::Lit::Verbatim(s) => Ok(s.to_string()),
-        _ => Err(syn::Error::new(
-            span,
-            format!("Failed to parse value of `{}` as string.", field),
-        )),
-    }
-}
-
-fn parse_bool(bool: syn::Lit, span: Span, field: &str) -> Result<bool, syn::Error> {
-    match bool {
-        syn::Lit::Bool(b) => Ok(b.value),
-        _ => Err(syn::Error::new(
-            span,
-            format!("Failed to parse value of `{}` as bool.", field),
-        )),
     }
 }
 
