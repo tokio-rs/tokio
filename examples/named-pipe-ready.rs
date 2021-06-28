@@ -2,7 +2,7 @@ use std::io;
 
 #[cfg(windows)]
 async fn windows_main() -> io::Result<()> {
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Interest};
+    use tokio::io::Interest;
     use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
 
     const PIPE_NAME: &str = r"\\.\pipe\named-pipe-single-client";
@@ -13,11 +13,62 @@ async fn windows_main() -> io::Result<()> {
         // Note: we wait for a client to connect.
         server.connect().await?;
 
-        let mut server = BufReader::new(server);
+        let buf = {
+            let mut read_buf = [0u8; 5];
+            let mut read_buf_cursor = 0;
 
-        let mut buf = String::new();
-        server.read_line(&mut buf).await?;
-        server.write_all(b"pong\n").await?;
+            loop {
+                server.readable().await?;
+
+                let buf = &mut read_buf[read_buf_cursor..];
+
+                match server.try_read(buf) {
+                    Ok(n) => {
+                        read_buf_cursor += n;
+
+                        if read_buf_cursor == read_buf.len() {
+                            break;
+                        }
+                    }
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        continue;
+                    }
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
+            }
+
+            read_buf
+        };
+
+        {
+            let write_buf = b"pong\n";
+            let mut write_buf_cursor = 0;
+
+            loop {
+                let buf = &write_buf[write_buf_cursor..];
+
+                if buf.is_empty() {
+                    break;
+                }
+
+                server.writable().await?;
+
+                match server.try_write(buf) {
+                    Ok(n) => {
+                        write_buf_cursor += n;
+                    }
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        continue;
+                    }
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
+            }
+        }
+
         Ok::<_, io::Error>(buf)
     });
 
@@ -33,9 +84,12 @@ async fn windows_main() -> io::Result<()> {
         let mut write_buf_cursor = 0;
 
         loop {
-            let ready = client
-                .ready(Interest::READABLE | Interest::WRITABLE)
-                .await?;
+            let mut interest = Interest::READABLE;
+            if write_buf_cursor < write_buf.len() {
+                interest |= Interest::WRITABLE;
+            }
+
+            let ready = client.ready(interest).await?;
 
             if ready.is_readable() {
                 let buf = &mut read_buf[read_buf_cursor..];
@@ -85,7 +139,7 @@ async fn windows_main() -> io::Result<()> {
 
     let (server, client) = tokio::try_join!(server, client)?;
 
-    assert_eq!(server?, "ping\n");
+    assert_eq!(server?, *b"ping\n");
     assert_eq!(client?, "pong\n");
 
     Ok(())
