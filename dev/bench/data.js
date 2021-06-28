@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624870733022,
+  "lastUpdate": 1624870750944,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -34273,6 +34273,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19133663,
             "range": "± 2440378",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50248166+Milo123459@users.noreply.github.com",
+            "name": "Milo",
+            "username": "Milo123459"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ab0791b8175d85dd49be063400a211f0790dd6a9",
+          "message": "time: add wait alias to sleep (#3897)",
+          "timestamp": "2021-06-28T10:48:07+02:00",
+          "tree_id": "3e5d9234ad48ede9a478d832a430cf031b50962b",
+          "url": "https://github.com/tokio-rs/tokio/commit/ab0791b8175d85dd49be063400a211f0790dd6a9"
+        },
+        "date": 1624870746442,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 184600,
+            "range": "± 15799",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 665240,
+            "range": "± 99609",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5537428,
+            "range": "± 903157",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22093586,
+            "range": "± 4367884",
             "unit": "ns/iter"
           }
         ]
