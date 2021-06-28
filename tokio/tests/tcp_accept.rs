@@ -5,9 +5,9 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, oneshot};
 use tokio_test::{assert_ok, assert_pending};
 
+use std::future::Future;
 use std::io;
 use std::net::{IpAddr, SocketAddr};
-use std::future::Future;
 
 use futures::future::poll_fn;
 
