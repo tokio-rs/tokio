@@ -3,13 +3,10 @@
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, oneshot};
-use tokio_test::{assert_ok, assert_pending};
+use tokio_test::assert_ok;
 
-use std::future::Future;
 use std::io;
 use std::net::{IpAddr, SocketAddr};
-
-use futures::future::poll_fn;
 
 macro_rules! test_accept {
     ($(($ident:ident, $target:expr),)*) => {
@@ -157,25 +154,4 @@ async fn accept_many() {
     for _ in 0..N {
         notified_rx.recv().await.unwrap();
     }
-}
-
-#[tokio::test]
-async fn epollhup() -> io::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:0").await?;
-    let addr = listener.local_addr().unwrap();
-    let connect = TcpStream::connect(&addr);
-    tokio::pin!(connect);
-
-    // Poll `connect` once.
-    poll_fn(|cx| {
-        assert_pending!(connect.as_mut().poll(cx));
-        Poll::Ready(())
-    })
-    .await;
-
-    drop(listener);
-
-    let err = connect.await.unwrap_err();
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionReset);
-    Ok(())
 }
