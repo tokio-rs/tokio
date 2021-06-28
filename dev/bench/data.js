@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624869953196,
+  "lastUpdate": 1624869968523,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -34069,6 +34069,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19587914,
             "range": "± 3396088",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jake.shadle@embark-studios.com",
+            "name": "Jake Shadle",
+            "username": "Jake-Shadle"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "959c5c997f9ff19028819382f268e1ba95277df5",
+          "message": "net: add ready/try methods to NamedPipeClient (#3866)",
+          "timestamp": "2021-06-28T10:43:57+02:00",
+          "tree_id": "ec77103fde0f8bf8c10a7537407d5d2568ad9230",
+          "url": "https://github.com/tokio-rs/tokio/commit/959c5c997f9ff19028819382f268e1ba95277df5"
+        },
+        "date": 1624869962920,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 197178,
+            "range": "± 20736",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 728167,
+            "range": "± 102562",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5622332,
+            "range": "± 824150",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20558466,
+            "range": "± 3336717",
             "unit": "ns/iter"
           }
         ]
