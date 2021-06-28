@@ -381,6 +381,7 @@ async fn try_read_buf() -> std::io::Result<()> {
     Ok(())
 }
 
+// https://github.com/tokio-rs/tokio/issues/3879
 #[tokio::test]
 #[cfg(not(target_os = "macos"))]
 async fn epollhup() -> io::Result<()> {
