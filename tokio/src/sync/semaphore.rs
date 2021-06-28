@@ -162,6 +162,10 @@ impl Semaphore {
     /// Otherwise, this returns a [`SemaphorePermit`] representing the
     /// acquired permit.
     ///
+    /// This method uses a queue to fairly distribute permits in the order they
+    /// were requested. This means that the method is not cancellation safe, as
+    /// cancelling a call to `acquire` makes you lose your place in the queue.
+    ///
     /// # Examples
     ///
     /// ```

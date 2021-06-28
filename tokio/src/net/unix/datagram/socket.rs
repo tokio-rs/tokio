@@ -106,6 +106,10 @@ impl UnixDatagram {
     /// false-positive and attempting an operation will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
+    /// This method is cancellation safe in the sense that readiness events
+    /// cannot be lost when using it as the event in a [`select!`](crate::select)
+    /// statement.
+    ///
     /// # Examples
     ///
     /// Concurrently receive from and send to the socket on the same task
@@ -171,6 +175,10 @@ impl UnixDatagram {
     /// false-positive and attempting a `try_send()` will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
+    /// This method is cancellation safe in the sense that readiness events
+    /// cannot be lost when using it as the event in a [`select!`](crate::select)
+    /// statement.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -220,6 +228,10 @@ impl UnixDatagram {
     /// The function may complete without the socket being readable. This is a
     /// false-positive and attempting a `try_recv()` will return with
     /// `io::ErrorKind::WouldBlock`.
+    ///
+    /// This method is cancellation safe in the sense that readiness events
+    /// cannot be lost when using it as the event in a [`select!`](crate::select)
+    /// statement.
     ///
     /// # Examples
     ///
@@ -490,6 +502,11 @@ impl UnixDatagram {
 
     /// Sends data on the socket to the socket's peer.
     ///
+    /// This method is cancellation safe in the sense that if it is used as
+    /// the event in a [`tokio::select!`](crate::select) statement and some
+    /// other branch completes first, then it is guaranteed that the provided
+    /// message was not sent.
+    ///
     /// # Examples
     /// ```
     /// # use std::error::Error;
@@ -612,6 +629,9 @@ impl UnixDatagram {
     }
 
     /// Receives data from the socket.
+    ///
+    /// This method is cancellation safe, so it is not possible to lose messages
+    /// when using it as the event in a [`select!`](crate::select) statement.
     ///
     /// # Examples
     /// ```
@@ -820,6 +840,11 @@ impl UnixDatagram {
 
     /// Sends data on the socket to the specified address.
     ///
+    /// This method is cancellation safe in the sense that if it is used as
+    /// the event in a [`tokio::select!`](crate::select) statement and some
+    /// other branch completes first, then it is guaranteed that the provided
+    /// message was not sent.
+    ///
     /// # Examples
     /// ```
     /// # use std::error::Error;
@@ -862,6 +887,11 @@ impl UnixDatagram {
     }
 
     /// Receives data from the socket.
+    ///
+    /// This method is cancellation safe in the sense that if it is used as
+    /// the event in a [`tokio::select!`](crate::select) statement and some
+    /// other branch completes first, then it is guaranteed that no messages
+    /// have been received.
     ///
     /// # Examples
     /// ```

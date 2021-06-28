@@ -82,6 +82,9 @@ impl<T> UnboundedReceiver<T> {
     /// `None` is returned when all `Sender` halves have dropped, indicating
     /// that no further values can be sent on the channel.
     ///
+    /// This method is cancellation safe, so it is not possible to lose messages
+    /// when using it as the event in a [`select!`](crate::select) statement.
+    ///
     /// # Examples
     ///
     /// ```

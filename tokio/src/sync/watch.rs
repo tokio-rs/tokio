@@ -261,6 +261,10 @@ impl<T> Receiver<T> {
     ///
     /// This method returns an error if and only if the [`Sender`] is dropped.
     ///
+    /// This method is cancellation safe, so it is not possible to miss a change
+    /// notification when using it as the event in a [`select!`](crate::select)
+    /// statement.
+    ///
     /// [`Sender`]: struct@Sender
     ///
     /// # Examples

@@ -356,6 +356,10 @@ impl TcpStream {
     /// can be used to concurrently read / write to the same socket on a single
     /// task without splitting the socket.
     ///
+    /// This method is cancellation safe in the sense that readiness events
+    /// cannot be lost when using it as the event in a [`select!`](crate::select)
+    /// statement.
+    ///
     /// # Examples
     ///
     /// Concurrently read and write to the stream on the same task without
@@ -419,6 +423,10 @@ impl TcpStream {
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
+    ///
+    /// This method is cancellation safe in the sense that readiness events
+    /// cannot be lost when using it as the event in a [`select!`](crate::select)
+    /// statement.
     ///
     /// # Examples
     ///
@@ -724,6 +732,10 @@ impl TcpStream {
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
+    ///
+    /// This method is cancellation safe in the sense that readiness events
+    /// cannot be lost when using it as the event in a [`select!`](crate::select)
+    /// statement.
     ///
     /// # Examples
     ///
@@ -1151,6 +1163,12 @@ impl TcpStream {
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
+
+    // == Poll IO functions that takes `&self` ==
+    //
+    // To read or write without mutable access to the `UnixStream`, combine the
+    // `poll_read_ready` or `poll_write_ready` methods with the `try_read` or
+    // `try_write` methods.
 
     pub(crate) fn poll_read_priv(
         &self,

@@ -105,8 +105,10 @@ cfg_io_util! {
         /// async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
         /// ```
         ///
-        /// This function does not provide any guarantees about whether it
-        /// completes immediately or asynchronously
+        /// This method does not provide any guarantees about whether it
+        /// completes immediately or asynchronously, however the method is
+        /// cancellation safe, so it can safely be used as the event in a
+        /// [`select!`](crate::select) statement without loss of data.
         ///
         /// # Return
         ///
@@ -177,8 +179,10 @@ cfg_io_util! {
         /// Usually, only a single `read` syscall is issued, even if there is
         /// more space in the supplied buffer.
         ///
-        /// This function does not provide any guarantees about whether it
-        /// completes immediately or asynchronously
+        /// This method does not provide any guarantees about whether it
+        /// completes immediately or asynchronously, however the method is
+        /// cancellation safe, so it can safely be used as the event in a
+        /// [`select!`](crate::select) statement without loss of data.
         ///
         /// # Return
         ///
@@ -245,6 +249,9 @@ cfg_io_util! {
         ///
         /// This function reads as many bytes as necessary to completely fill
         /// the specified buffer `buf`.
+        ///
+        /// This method is not cancellation safe, and any partially read data is
+        /// lost on cancellation.
         ///
         /// # Errors
         ///

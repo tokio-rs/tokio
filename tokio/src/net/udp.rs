@@ -327,6 +327,10 @@ impl UdpSocket {
     /// false-positive and attempting an operation will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
+    /// This method is cancellation safe in the sense that readiness events
+    /// cannot be lost when using it as the event in a [`select!`](crate::select)
+    /// statement.
+    ///
     /// # Examples
     ///
     /// Concurrently receive from and send to the socket on the same task
@@ -390,6 +394,10 @@ impl UdpSocket {
     /// false-positive and attempting a `try_send()` will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
+    /// This method is cancellation safe in the sense that readiness events
+    /// cannot be lost when using it as the event in a [`select!`](crate::select)
+    /// statement.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -434,6 +442,11 @@ impl UdpSocket {
     ///
     /// The [`connect`] method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
+    ///
+    /// This method is cancellation safe in the sense that if it is used as
+    /// the event in a [`tokio::select!`](crate::select) statement and some
+    /// other branch completes first, then it is guaranteed that the provided
+    /// message was not sent.
     ///
     /// [`connect`]: method@Self::connect
     ///
@@ -559,6 +572,10 @@ impl UdpSocket {
     /// false-positive and attempting a `try_recv()` will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
+    /// This method is cancellation safe in the sense that readiness events
+    /// cannot be lost when using it as the event in a [`select!`](crate::select)
+    /// statement.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -612,6 +629,9 @@ impl UdpSocket {
     ///
     /// The [`connect`] method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
+    ///
+    /// This method is cancellation safe, so it is not possible to lose messages
+    /// when using it as the event in a [`select!`](crate::select) statement.
     ///
     /// [`connect`]: method@Self::connect
     ///
@@ -880,6 +900,11 @@ impl UdpSocket {
     /// This will return an error when the IP version of the local socket does
     /// not match that returned from [`ToSocketAddrs`].
     ///
+    /// This method is cancellation safe in the sense that if it is used as
+    /// the event in a [`tokio::select!`](crate::select) statement and some
+    /// other branch completes first, then it is guaranteed that the provided
+    /// message was not sent.
+    ///
     /// [`ToSocketAddrs`]: crate::net::ToSocketAddrs
     ///
     /// # Example
@@ -1004,6 +1029,9 @@ impl UdpSocket {
     /// The function must be called with valid byte array `buf` of sufficient
     /// size to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
+    ///
+    /// This method is cancellation safe, so it is not possible to lose messages
+    /// when using it as the event in a [`select!`](crate::select) statement.
     ///
     /// # Example
     ///

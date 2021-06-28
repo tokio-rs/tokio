@@ -125,6 +125,10 @@ impl TcpListener {
     /// established, the corresponding [`TcpStream`] and the remote peer's
     /// address will be returned.
     ///
+    /// This method is cancellation safe in the sense that new connections
+    /// cannot be lost when using it as the event in a [`select!`](crate::select)
+    /// statement.
+    ///
     /// [`TcpStream`]: struct@crate::net::TcpStream
     ///
     /// # Examples

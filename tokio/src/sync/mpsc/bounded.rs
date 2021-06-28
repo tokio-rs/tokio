@@ -132,13 +132,14 @@ impl<T> Receiver<T> {
     /// further values can ever be received from this `Receiver`. The channel is
     /// closed when all senders have been dropped, or when [`close`] is called.
     ///
+    /// This method is cancellation safe, so it is not possible to lose messages
+    /// when using it as the event in a [`select!`](crate::select) statement.
+    ///
     /// If there are no messages in the channel's buffer, but the channel has
     /// not yet been closed, this method will sleep until a message is sent or
-    /// the channel is closed.
-    ///
-    /// Note that if [`close`] is called, but there are still outstanding
-    /// [`Permits`] from before it was closed, the channel is not considered
-    /// closed by `recv` until the permits are released.
+    /// the channel is closed.  Note that if [`close`] is called, but there are
+    /// still outstanding [`Permits`] from before it was closed, the channel is
+    /// not considered closed by `recv` until the permits are released.
     ///
     /// [`close`]: Self::close
     /// [`Permits`]: struct@crate::sync::mpsc::Permit

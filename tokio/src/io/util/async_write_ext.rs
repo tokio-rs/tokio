@@ -80,6 +80,11 @@ cfg_io_util! {
         /// error. A call to `write` represents *at most one* attempt to write to
         /// any wrapped object.
         ///
+        /// This method is cancellation safe in the sense that if it is used as
+        /// the event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then it is guaranteed that no data was
+        /// written to this `AsyncWrite`.
+        ///
         /// # Return
         ///
         /// If the return value is `Ok(n)` then it must be guaranteed that `n <=
@@ -129,6 +134,11 @@ cfg_io_util! {
         ///
         /// See [`AsyncWrite::poll_write_vectored`] for more details.
         ///
+        /// This method is cancellation safe in the sense that if it is used as
+        /// the event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then it is guaranteed that no data was
+        /// written to this `AsyncWrite`.
+        ///
         /// # Examples
         ///
         /// ```no_run
@@ -177,6 +187,11 @@ cfg_io_util! {
         /// resume from the point that the first call to `write_buf` completed.
         /// A call to `write_buf` represents *at most one* attempt to write to any
         /// wrapped object.
+        ///
+        /// This method is cancellation safe in the sense that if it is used as
+        /// the event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then it is guaranteed that no data was
+        /// written to this `AsyncWrite`.
         ///
         /// # Return
         ///
@@ -299,6 +314,12 @@ cfg_io_util! {
         /// to be written. This method will not return until the entire buffer
         /// has been successfully written or such an error occurs. The first
         /// error generated from this method will be returned.
+        ///
+        /// This method is not cancellation safe. If it is used as the event
+        /// in a [`tokio::select!`](crate::select) statement and some other
+        /// branch completes first, then the provided buffer may have been
+        /// partially written, but future calls to `write_all` will start over
+        /// from the beginning of the buffer.
         ///
         /// # Errors
         ///
