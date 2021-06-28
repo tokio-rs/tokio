@@ -278,9 +278,10 @@ impl CancellationToken {
         }
     }
 
-    /// Returns a `DropGuard` for this token.
-    /// This guard will cancel this token (and all its children)
-    /// on drop unless disarmed.
+    /// Creates a `DropGuard` for this token.
+    ///
+    /// Returned guard will cancel this token (and all its children) on drop
+    /// unless disarmed.
     pub fn drop_guard(self) -> DropGuard {
         DropGuard { inner: Some(self) }
     }
