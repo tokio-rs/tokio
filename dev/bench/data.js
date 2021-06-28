@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624869972315,
+  "lastUpdate": 1624869985132,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -80099,6 +80099,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 720277,
             "range": "± 62219",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jake.shadle@embark-studios.com",
+            "name": "Jake Shadle",
+            "username": "Jake-Shadle"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "959c5c997f9ff19028819382f268e1ba95277df5",
+          "message": "net: add ready/try methods to NamedPipeClient (#3866)",
+          "timestamp": "2021-06-28T10:43:57+02:00",
+          "tree_id": "ec77103fde0f8bf8c10a7537407d5d2568ad9230",
+          "url": "https://github.com/tokio-rs/tokio/commit/959c5c997f9ff19028819382f268e1ba95277df5"
+        },
+        "date": 1624869979504,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6928077,
+            "range": "± 2030719",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6238427,
+            "range": "± 1892841",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6959796,
+            "range": "± 2208430",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 272,
+            "range": "± 36",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 273,
+            "range": "± 36",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 280,
+            "range": "± 28",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 27271,
+            "range": "± 2428",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 845,
+            "range": "± 100",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1009772,
+            "range": "± 123192",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 722702,
+            "range": "± 66258",
             "unit": "ns/iter"
           }
         ]
