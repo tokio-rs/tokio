@@ -148,6 +148,133 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
+    use tokio::io::{AsyncBufReadExt as _, BufReader, Interest};
+
+    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-multi-client-ready";
+    const N: usize = 10;
+
+    // The first server needs to be constructed early so that clients can
+    // be correctly connected. Otherwise calling .wait will cause the client to
+    // error.
+    let mut server = ServerOptions::new().create(PIPE_NAME)?;
+
+    let server = tokio::spawn(async move {
+        for _ in 0..N {
+            // Wait for client to connect.
+            server.connect().await?;
+            let mut inner = BufReader::new(server);
+
+            // Construct the next server to be connected before sending the one
+            // we already have of onto a task. This ensures that the server
+            // isn't closed (after it's done in the task) before a new one is
+            // available. Otherwise the client might error with
+            // `io::ErrorKind::NotFound`.
+            server = ServerOptions::new().create(PIPE_NAME)?;
+
+            let _ = tokio::spawn(async move {
+                let mut buf = String::new();
+                inner.read_line(&mut buf).await?;
+                inner.write_all(b"pong\n").await?;
+                inner.flush().await?;
+                Ok::<_, io::Error>(())
+            });
+        }
+
+        Ok::<_, io::Error>(())
+    });
+
+    let mut clients = Vec::new();
+
+    for _ in 0..N {
+        clients.push(tokio::spawn(async move {
+            // This showcases a generic connect loop.
+            //
+            // We immediately try to create a client, if it's not found or the
+            // pipe is busy we use the specialized wait function on the client
+            // builder.
+            let client = loop {
+                match ClientOptions::new().open(PIPE_NAME) {
+                    Ok(client) => break client,
+                    Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
+                    Err(e) if e.kind() == io::ErrorKind::NotFound => (),
+                    Err(e) => return Err(e),
+                }
+
+                // Wait for a named pipe to become available.
+                time::sleep(Duration::from_millis(50)).await;
+            };
+
+            let mut read_buf = [0u8; 5];
+            let mut read_buf_cursor = 0;
+            let write_buf = b"ping\n";
+            let mut write_buf_cursor = 0;
+
+            loop {
+                let mut interest = Interest::READABLE;
+                if write_buf_cursor < write_buf.len() {
+                    interest |= Interest::WRITABLE;
+                }
+
+                let ready = client.ready(interest).await?;
+
+                if ready.is_readable() {
+                    let buf = &mut read_buf[read_buf_cursor..];
+
+                    match client.try_read(buf) {
+                        Ok(n) => {
+                            read_buf_cursor += n;
+
+                            if read_buf_cursor == read_buf.len() {
+                                break;
+                            }
+                        }
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            continue;
+                        }
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    }
+                }
+
+                if ready.is_writable() {
+                    let buf = &write_buf[write_buf_cursor..];
+
+                    if buf.is_empty() {
+                        continue;
+                    }
+
+                    match client.try_write(buf) {
+                        Ok(n) => {
+                            write_buf_cursor += n;
+                        }
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            continue;
+                        }
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+
+            let buf = String::from_utf8_lossy(&read_buf).into_owned();
+
+            Ok::<_, io::Error>(buf)
+        }));
+    }
+
+    for client in clients {
+        let result = client.await?;
+        assert_eq!(result?, "pong\n");
+    }
+
+    server.await??;
+    Ok(())
+}
+
 // This tests what happens when a client tries to disconnect.
 #[tokio::test]
 async fn test_named_pipe_mode_message() -> io::Result<()> {

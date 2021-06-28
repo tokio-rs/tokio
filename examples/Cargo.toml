@@ -85,5 +85,9 @@ name = "named-pipe"
 path = "named-pipe.rs"
 
 [[example]]
+name = "named-pipe-ready"
+path = "named-pipe-ready.rs"
+
+[[example]]
 name = "named-pipe-multi-client"
 path = "named-pipe-multi-client.rs"
