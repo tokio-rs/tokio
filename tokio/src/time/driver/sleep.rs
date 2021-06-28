@@ -57,6 +57,7 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 /// [`interval`]: crate::time::interval()
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_for"))]
+#[cfg_attr(docsrs, doc(alias = "wait"))]
 pub fn sleep(duration: Duration) -> Sleep {
     match Instant::now().checked_add(duration) {
         Some(deadline) => sleep_until(deadline),
