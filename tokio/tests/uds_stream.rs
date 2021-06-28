@@ -382,6 +382,7 @@ async fn try_read_buf() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg(not(target_os = "macos"))]
 async fn epollhup() -> io::Result<()> {
     let dir = tempfile::Builder::new()
         .prefix("tokio-uds-tests")
