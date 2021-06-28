@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624870775284,
+  "lastUpdate": 1624876617530,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -34321,6 +34321,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22093586,
             "range": "± 4367884",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bagishov.mikail@yandex.ru",
+            "name": "Mikail Bagishov",
+            "username": "MikailBag"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d35ff7064f2e0f90764487f45606dba57f3beaba",
+          "message": "sync: add drop guard for cancellation token (#3839)",
+          "timestamp": "2021-06-28T12:34:58+02:00",
+          "tree_id": "b6f902a848460bbc2eeb5837416dd88b0f235bf7",
+          "url": "https://github.com/tokio-rs/tokio/commit/d35ff7064f2e0f90764487f45606dba57f3beaba"
+        },
+        "date": 1624876613470,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 162728,
+            "range": "± 6021",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 628273,
+            "range": "± 67537",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4982892,
+            "range": "± 869329",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17887988,
+            "range": "± 3339625",
             "unit": "ns/iter"
           }
         ]
