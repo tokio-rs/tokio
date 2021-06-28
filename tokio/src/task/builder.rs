@@ -51,15 +51,15 @@ pub struct Builder<'a> {
     name: Option<&'a str>,
 }
 
-impl Builder<'_> {
+impl<'a> Builder<'a> {
     /// Creates a new task builder.
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Assigns a name to the task which will be spawned.
-    pub fn name<'b>(&self, name: &'b str) -> Builder<'b> {
-        Builder { name: Some(name) }
+    pub fn name(&self, name: &'a str) -> Self {
+        Self { name: Some(name) }
     }
 
     /// Spawns a task on the executor.
