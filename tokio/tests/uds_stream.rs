@@ -2,7 +2,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(unix)]
 
-use std::future::Future;
 use std::io;
 use std::task::Poll;
 
@@ -397,6 +396,8 @@ async fn epollhup() -> io::Result<()> {
 
     // Poll `connect` once.
     poll_fn(|cx| {
+        use std::future::Future;
+
         assert_pending!(connect.as_mut().poll(cx));
         Poll::Ready(())
     })
