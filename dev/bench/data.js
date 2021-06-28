@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624367610839,
+  "lastUpdate": 1624869953196,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17981,6 +17981,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 557,
             "range": "± 54",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jake.shadle@embark-studios.com",
+            "name": "Jake Shadle",
+            "username": "Jake-Shadle"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "959c5c997f9ff19028819382f268e1ba95277df5",
+          "message": "net: add ready/try methods to NamedPipeClient (#3866)",
+          "timestamp": "2021-06-28T10:43:57+02:00",
+          "tree_id": "ec77103fde0f8bf8c10a7537407d5d2568ad9230",
+          "url": "https://github.com/tokio-rs/tokio/commit/959c5c997f9ff19028819382f268e1ba95277df5"
+        },
+        "date": 1624869948553,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 909,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15979,
+            "range": "± 6377",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 937,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15867,
+            "range": "± 6246",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 591,
+            "range": "± 18",
             "unit": "ns/iter"
           }
         ]
