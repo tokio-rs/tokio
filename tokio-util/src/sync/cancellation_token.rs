@@ -1,5 +1,6 @@
 //! An asynchronously awaitable `CancellationToken`.
 //! The token allows to signal a cancellation request to one or more tasks.
+pub(crate) mod guard;
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
@@ -10,6 +11,8 @@ use core::pin::Pin;
 use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
 use core::task::{Context, Poll, Waker};
+
+use guard::DropGuard;
 
 /// A token which can be used to signal a cancellation request to one or more
 /// tasks.
@@ -273,6 +276,14 @@ impl CancellationToken {
             wait_node: ListNode::new(WaitQueueEntry::new()),
             is_registered: false,
         }
+    }
+
+    /// Creates a `DropGuard` for this token.
+    ///
+    /// Returned guard will cancel this token (and all its children) on drop
+    /// unless disarmed.
+    pub fn drop_guard(self) -> DropGuard {
+        DropGuard { inner: Some(self) }
     }
 
     unsafe fn register(
