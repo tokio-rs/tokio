@@ -327,9 +327,12 @@ impl UdpSocket {
     /// false-positive and attempting an operation will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
-    /// This method is cancellation safe in the sense that readiness events
-    /// cannot be lost when using it as the event in a [`select!`](crate::select)
-    /// statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -394,9 +397,12 @@ impl UdpSocket {
     /// false-positive and attempting a `try_send()` will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
-    /// This method is cancellation safe in the sense that readiness events
-    /// cannot be lost when using it as the event in a [`select!`](crate::select)
-    /// statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -443,17 +449,18 @@ impl UdpSocket {
     /// The [`connect`] method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
     ///
-    /// This method is cancellation safe in the sense that if it is used as
-    /// the event in a [`tokio::select!`](crate::select) statement and some
-    /// other branch completes first, then it is guaranteed that the provided
-    /// message was not sent.
-    ///
     /// [`connect`]: method@Self::connect
     ///
     /// # Return
     ///
     /// On success, the number of bytes sent is returned, otherwise, the
     /// encountered error is returned.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `send` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that the message was not sent.
     ///
     /// # Examples
     ///
@@ -572,9 +579,12 @@ impl UdpSocket {
     /// false-positive and attempting a `try_recv()` will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
-    /// This method is cancellation safe in the sense that readiness events
-    /// cannot be lost when using it as the event in a [`select!`](crate::select)
-    /// statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -630,8 +640,12 @@ impl UdpSocket {
     /// The [`connect`] method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
     ///
-    /// This method is cancellation safe, so it is not possible to lose messages
-    /// when using it as the event in a [`select!`](crate::select) statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv_from` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// socket.
     ///
     /// [`connect`]: method@Self::connect
     ///
@@ -900,12 +914,13 @@ impl UdpSocket {
     /// This will return an error when the IP version of the local socket does
     /// not match that returned from [`ToSocketAddrs`].
     ///
-    /// This method is cancellation safe in the sense that if it is used as
-    /// the event in a [`tokio::select!`](crate::select) statement and some
-    /// other branch completes first, then it is guaranteed that the provided
-    /// message was not sent.
-    ///
     /// [`ToSocketAddrs`]: crate::net::ToSocketAddrs
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `send_to` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that the message was not sent.
     ///
     /// # Example
     ///
@@ -1030,8 +1045,12 @@ impl UdpSocket {
     /// size to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
     ///
-    /// This method is cancellation safe, so it is not possible to lose messages
-    /// when using it as the event in a [`select!`](crate::select) statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv_from` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// socket.
     ///
     /// # Example
     ///

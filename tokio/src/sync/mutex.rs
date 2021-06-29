@@ -277,9 +277,11 @@ impl<T: ?Sized> Mutex<T> {
     /// been acquired.  When the lock has been acquired, function returns a
     /// [`MutexGuard`].
     ///
+    /// # Cancel safety
+    ///
     /// This method uses a queue to fairly distribute locks in the order they
-    /// were requested. This means that the method is not cancellation safe, as
-    /// cancelling a call to `lock` makes you lose your place in the queue.
+    /// were requested. Cancelling a call to `lock` makes you lose your place in
+    /// the queue.
     ///
     /// # Examples
     ///
@@ -309,9 +311,11 @@ impl<T: ?Sized> Mutex<T> {
     /// method, and the guard will live for the `'static` lifetime, as it keeps
     /// the `Mutex` alive by holding an `Arc`.
     ///
+    /// # Cancel safety
+    ///
     /// This method uses a queue to fairly distribute locks in the order they
-    /// were requested. This means that the method is not cancellation safe, as
-    /// cancelling a call to `lock_owned` makes you lose your place in the queue.
+    /// were requested. Cancelling a call to `lock_owned` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///

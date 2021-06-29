@@ -89,7 +89,9 @@
 ///
 /// When using `select!` in a loop to receive messages from multiple sources,
 /// you should make sure that the receive call is cancellation safe to avoid
-/// losing messages. The lists in this section are not exhaustive.
+/// losing messages. This section goes through various common methods and
+/// describes whether they are cancel safe.  The lists in this section are not
+/// exhaustive.
 ///
 /// The following methods are cancellation safe:
 ///
@@ -130,8 +132,8 @@
 ///
 /// Be aware that cancelling something that is not cancellation safe is not
 /// necessarily wrong. For example, if you are cancelling a task because the
-/// application is shutting down, then you might not care that partially read
-/// data is lost.
+/// application is shutting down, then you probably don't care that partially
+/// read data is lost.
 ///
 /// # Examples
 ///

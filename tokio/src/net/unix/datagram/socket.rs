@@ -106,9 +106,12 @@ impl UnixDatagram {
     /// false-positive and attempting an operation will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
-    /// This method is cancellation safe in the sense that readiness events
-    /// cannot be lost when using it as the event in a [`select!`](crate::select)
-    /// statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -175,9 +178,12 @@ impl UnixDatagram {
     /// false-positive and attempting a `try_send()` will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
-    /// This method is cancellation safe in the sense that readiness events
-    /// cannot be lost when using it as the event in a [`select!`](crate::select)
-    /// statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -229,9 +235,12 @@ impl UnixDatagram {
     /// false-positive and attempting a `try_recv()` will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
-    /// This method is cancellation safe in the sense that readiness events
-    /// cannot be lost when using it as the event in a [`select!`](crate::select)
-    /// statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -502,10 +511,11 @@ impl UnixDatagram {
 
     /// Sends data on the socket to the socket's peer.
     ///
-    /// This method is cancellation safe in the sense that if it is used as
-    /// the event in a [`tokio::select!`](crate::select) statement and some
-    /// other branch completes first, then it is guaranteed that the provided
-    /// message was not sent.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `send` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that the message was not sent.
     ///
     /// # Examples
     /// ```
@@ -630,8 +640,12 @@ impl UnixDatagram {
 
     /// Receives data from the socket.
     ///
-    /// This method is cancellation safe, so it is not possible to lose messages
-    /// when using it as the event in a [`select!`](crate::select) statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// socket.
     ///
     /// # Examples
     /// ```
@@ -840,10 +854,11 @@ impl UnixDatagram {
 
     /// Sends data on the socket to the specified address.
     ///
-    /// This method is cancellation safe in the sense that if it is used as
-    /// the event in a [`tokio::select!`](crate::select) statement and some
-    /// other branch completes first, then it is guaranteed that the provided
-    /// message was not sent.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `send_to` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that the message was not sent.
     ///
     /// # Examples
     /// ```
@@ -888,10 +903,12 @@ impl UnixDatagram {
 
     /// Receives data from the socket.
     ///
-    /// This method is cancellation safe in the sense that if it is used as
-    /// the event in a [`tokio::select!`](crate::select) statement and some
-    /// other branch completes first, then it is guaranteed that no messages
-    /// have been received.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv_from` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// socket.
     ///
     /// # Examples
     /// ```

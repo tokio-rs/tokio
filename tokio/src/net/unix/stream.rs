@@ -60,9 +60,12 @@ impl UnixStream {
     /// can be used to concurrently read / write to the same socket on a single
     /// task without splitting the socket.
     ///
-    /// This method is cancellation safe in the sense that readiness events
-    /// cannot be lost when using it as the event in a [`select!`](crate::select)
-    /// statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -130,9 +133,12 @@ impl UnixStream {
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
     ///
-    /// This method is cancellation safe in the sense that readiness events
-    /// cannot be lost when using it as the event in a [`select!`](crate::select)
-    /// statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -443,9 +449,12 @@ impl UnixStream {
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
     ///
-    /// This method is cancellation safe in the sense that readiness events
-    /// cannot be lost when using it as the event in a [`select!`](crate::select)
-    /// statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///

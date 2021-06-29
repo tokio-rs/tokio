@@ -80,11 +80,6 @@ cfg_io_util! {
         /// error. A call to `write` represents *at most one* attempt to write to
         /// any wrapped object.
         ///
-        /// This method is cancellation safe in the sense that if it is used as
-        /// the event in a [`tokio::select!`](crate::select) statement and some
-        /// other branch completes first, then it is guaranteed that no data was
-        /// written to this `AsyncWrite`.
-        ///
         /// # Return
         ///
         /// If the return value is `Ok(n)` then it must be guaranteed that `n <=
@@ -101,6 +96,13 @@ cfg_io_util! {
         ///
         /// It is **not** considered an error if the entire buffer could not be
         /// written to this writer.
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is cancellation safe in the sense that if it is used as
+        /// the event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then it is guaranteed that no data was
+        /// written to this `AsyncWrite`.
         ///
         /// # Examples
         ///
@@ -133,6 +135,8 @@ cfg_io_util! {
         /// ```
         ///
         /// See [`AsyncWrite::poll_write_vectored`] for more details.
+        ///
+        /// # Cancel safety
         ///
         /// This method is cancellation safe in the sense that if it is used as
         /// the event in a [`tokio::select!`](crate::select) statement and some
@@ -188,11 +192,6 @@ cfg_io_util! {
         /// A call to `write_buf` represents *at most one* attempt to write to any
         /// wrapped object.
         ///
-        /// This method is cancellation safe in the sense that if it is used as
-        /// the event in a [`tokio::select!`](crate::select) statement and some
-        /// other branch completes first, then it is guaranteed that no data was
-        /// written to this `AsyncWrite`.
-        ///
         /// # Return
         ///
         /// If the return value is `Ok(n)` then it must be guaranteed that `n <=
@@ -209,6 +208,13 @@ cfg_io_util! {
         ///
         /// It is **not** considered an error if the entire buffer could not be
         /// written to this writer.
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is cancellation safe in the sense that if it is used as
+        /// the event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then it is guaranteed that no data was
+        /// written to this `AsyncWrite`.
         ///
         /// # Examples
         ///
@@ -258,6 +264,7 @@ cfg_io_util! {
         ///     while buf.has_remaining() {
         ///         self.write_buf(&mut buf).await?;
         ///     }
+        ///     Ok(())
         /// }
         /// ```
         ///
@@ -269,6 +276,15 @@ cfg_io_util! {
         /// The buffer is advanced after each chunk is successfully written. After failure,
         /// `src.chunk()` will return the chunk that failed to write.
         ///
+        /// # Cancel safety
+        ///
+        /// If `write_all_buf` is used as the event in a
+        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// completes first, then the data in the provided buffer may have been
+        /// partially written. However, it is guaranteed that the provided
+        /// buffer has been [advanced] by the amount of bytes that have been
+        /// partially written.
+        ///
         /// # Examples
         ///
         /// [`File`] implements [`AsyncWrite`] and [`Cursor`]`<&[u8]>` implements [`Buf`]:
@@ -276,6 +292,7 @@ cfg_io_util! {
         /// [`File`]: crate::fs::File
         /// [`Buf`]: bytes::Buf
         /// [`Cursor`]: std::io::Cursor
+        /// [advanced]: bytes::Buf::advance
         ///
         /// ```no_run
         /// use tokio::io::{self, AsyncWriteExt};
@@ -314,6 +331,8 @@ cfg_io_util! {
         /// to be written. This method will not return until the entire buffer
         /// has been successfully written or such an error occurs. The first
         /// error generated from this method will be returned.
+        ///
+        /// # Cancel safety
         ///
         /// This method is not cancellation safe. If it is used as the event
         /// in a [`tokio::select!`](crate::select) statement and some other

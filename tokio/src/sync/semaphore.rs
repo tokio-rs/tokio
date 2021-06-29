@@ -162,9 +162,11 @@ impl Semaphore {
     /// Otherwise, this returns a [`SemaphorePermit`] representing the
     /// acquired permit.
     ///
+    /// # Cancel safety
+    ///
     /// This method uses a queue to fairly distribute permits in the order they
-    /// were requested. This means that the method is not cancellation safe, as
-    /// cancelling a call to `acquire` makes you lose your place in the queue.
+    /// were requested. Cancelling a call to `acquire` makes you lose your place
+    /// in the queue.
     ///
     /// # Examples
     ///
@@ -201,6 +203,12 @@ impl Semaphore {
     /// If the semaphore has been closed, this returns an [`AcquireError`].
     /// Otherwise, this returns a [`SemaphorePermit`] representing the
     /// acquired permits.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute permits in the order they
+    /// were requested. Cancelling a call to `acquire_many` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///
@@ -306,6 +314,12 @@ impl Semaphore {
     /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
     /// acquired permit.
     ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute permits in the order they
+    /// were requested. Cancelling a call to `acquire_owned` makes you lose your
+    /// place in the queue.
+    ///
     /// # Examples
     ///
     /// ```
@@ -349,6 +363,12 @@ impl Semaphore {
     /// If the semaphore has been closed, this returns an [`AcquireError`].
     /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
     /// acquired permit.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute permits in the order they
+    /// were requested. Cancelling a call to `acquire_many_owned` makes you lose
+    /// your place in the queue.
     ///
     /// # Examples
     ///

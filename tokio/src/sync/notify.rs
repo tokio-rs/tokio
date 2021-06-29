@@ -246,6 +246,12 @@ impl Notify {
     ///
     /// [`notify_one()`]: Notify::notify_one
     ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute notifications in the order
+    /// they were requested. Cancelling a call to `notified` makes you lose your
+    /// place in the queue.
+    ///
     /// # Examples
     ///
     /// ```

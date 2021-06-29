@@ -129,9 +129,12 @@ impl UnixListener {
 
     /// Accepts a new incoming connection to this listener.
     ///
-    /// This method is cancellation safe in the sense that new connections
-    /// cannot be lost when using it as the event in a [`select!`](crate::select)
-    /// statement.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If the method is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that no new connections were
+    /// accepted by this method.
     pub async fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
         let (mio, addr) = self
             .io

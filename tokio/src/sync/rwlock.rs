@@ -299,6 +299,12 @@ impl<T: ?Sized> RwLock<T> {
     /// Returns an RAII guard which will drop this read access of the `RwLock`
     /// when dropped.
     ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `read` makes you lose your place in
+    /// the queue.
+    ///
     /// # Examples
     ///
     /// ```
@@ -356,6 +362,12 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// Returns an RAII guard which will drop this read access of the `RwLock`
     /// when dropped.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `read_owned` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///
@@ -501,6 +513,12 @@ impl<T: ?Sized> RwLock<T> {
     /// Returns an RAII guard which will drop the write access of this `RwLock`
     /// when dropped.
     ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `write` makes you lose your place
+    /// in the queue.
+    ///
     /// # Examples
     ///
     /// ```
@@ -542,6 +560,12 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// Returns an RAII guard which will drop the write access of this `RwLock`
     /// when dropped.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `write_owned` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///
