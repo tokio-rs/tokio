@@ -297,7 +297,14 @@ cfg_rt! {
         F: Future + 'static,
         F::Output: 'static,
     {
-        let future = crate::util::trace::task(future, "local");
+        spawn_local_inner(future, None)
+    }
+
+    pub(super) fn spawn_local_inner<F>(future: F, name: Option<&str>) -> JoinHandle<F::Output>
+    where F: Future + 'static,
+          F::Output: 'static
+    {
+        let future = crate::util::trace::task(future, "local", name);
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
@@ -381,7 +388,7 @@ impl LocalSet {
         F: Future + 'static,
         F::Output: 'static,
     {
-        let future = crate::util::trace::task(future, "local");
+        let future = crate::util::trace::task(future, "local", None);
         let (task, handle) = unsafe { task::joinable_local(future) };
         self.context.tasks.borrow_mut().queue.push_back(task);
         self.context.shared.waker.wake();
