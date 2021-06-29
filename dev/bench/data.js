@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624988282636,
+  "lastUpdate": 1624989010414,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -34627,6 +34627,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19472402,
             "range": "± 3295203",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "hi@jbr.me",
+            "name": "Jacob Rothstein",
+            "username": "jbr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8fa29cb00a486c0ffc28f295c749573cb58a8967",
+          "message": "rt: add tokio::task::Builder (#3881)\n\nAdds a builder API for spawning tasks. Initially, this enables the caller to name the spawned\r\ntask in order to provide better visibility into all tasks in the system.",
+          "timestamp": "2021-06-29T10:47:30-07:00",
+          "tree_id": "88b349d6ea5cf2f6877d01f6eb63c00f85b1de41",
+          "url": "https://github.com/tokio-rs/tokio/commit/8fa29cb00a486c0ffc28f295c749573cb58a8967"
+        },
+        "date": 1624989005117,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 201185,
+            "range": "± 9601",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 722740,
+            "range": "± 54825",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5527658,
+            "range": "± 973834",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 23127120,
+            "range": "± 5158980",
             "unit": "ns/iter"
           }
         ]
