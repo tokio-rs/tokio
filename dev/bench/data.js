@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624989019373,
+  "lastUpdate": 1624989026260,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -53037,6 +53037,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 716,
             "range": "± 4",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "hi@jbr.me",
+            "name": "Jacob Rothstein",
+            "username": "jbr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8fa29cb00a486c0ffc28f295c749573cb58a8967",
+          "message": "rt: add tokio::task::Builder (#3881)\n\nAdds a builder API for spawning tasks. Initially, this enables the caller to name the spawned\r\ntask in order to provide better visibility into all tasks in the system.",
+          "timestamp": "2021-06-29T10:47:30-07:00",
+          "tree_id": "88b349d6ea5cf2f6877d01f6eb63c00f85b1de41",
+          "url": "https://github.com/tokio-rs/tokio/commit/8fa29cb00a486c0ffc28f295c749573cb58a8967"
+        },
+        "date": 1624989020549,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16914,
+            "range": "± 6337",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1024,
+            "range": "± 34",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 657,
+            "range": "± 31",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16922,
+            "range": "± 9222",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 993,
+            "range": "± 68",
             "unit": "ns/iter"
           }
         ]
