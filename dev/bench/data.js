@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624988276867,
+  "lastUpdate": 1624988282636,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -34579,6 +34579,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17734043,
             "range": "± 3725717",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b521cc26895c6331c8ced6be72f8b3d9947a9fb3",
+          "message": "doc: document cancellation safety (#3900)\n\nThis patch documents cancellation safety. It also moves the \"Avoid racy if preconditions\"\r\nsection in the select! documentation since otherwise the first code block on the page\r\nshows how not to use it, which seems counterintuitive.",
+          "timestamp": "2021-06-29T10:35:42-07:00",
+          "tree_id": "d9f76895a087af0afa8b0e264aabe9e88e7af5bf",
+          "url": "https://github.com/tokio-rs/tokio/commit/b521cc26895c6331c8ced6be72f8b3d9947a9fb3"
+        },
+        "date": 1624988273104,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 193577,
+            "range": "± 26840",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 677069,
+            "range": "± 143176",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5122955,
+            "range": "± 1023365",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19472402,
+            "range": "± 3295203",
             "unit": "ns/iter"
           }
         ]
