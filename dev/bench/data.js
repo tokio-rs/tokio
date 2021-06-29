@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624991329874,
+  "lastUpdate": 1624991333776,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18413,6 +18413,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 594,
             "range": "± 75",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mikhail.zabaluev@gmail.com",
+            "name": "Mikhail Zabaluev",
+            "username": "mzabaluev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0531549b6ea66d22d301044910ddc6a77e8c7f1e",
+          "message": "io: efficient implementation of vectored writes for BufWriter (#3163)",
+          "timestamp": "2021-06-29T20:26:47+02:00",
+          "tree_id": "cf0b36a10b2b15f3bda1524259e8a3d1d69fc935",
+          "url": "https://github.com/tokio-rs/tokio/commit/0531549b6ea66d22d301044910ddc6a77e8c7f1e"
+        },
+        "date": 1624991325196,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 784,
+            "range": "± 77",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16969,
+            "range": "± 6837",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 838,
+            "range": "± 97",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16447,
+            "range": "± 6879",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 573,
+            "range": "± 158",
             "unit": "ns/iter"
           }
         ]
