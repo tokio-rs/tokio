@@ -174,6 +174,7 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
             if first_len >= me.buf.capacity() {
                 // The slice is at least as large as the buffering capacity,
                 // so it's better to write it directly, bypassing the buffer.
+                debug_assert!(me.buf.is_empty());
                 return me.inner.poll_write(cx, &bufs[0]);
             } else {
                 me.buf.extend_from_slice(&bufs[0]);
