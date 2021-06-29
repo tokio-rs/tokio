@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624954072655,
+  "lastUpdate": 1624988242662,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -52833,6 +52833,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 862,
             "range": "± 147",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b521cc26895c6331c8ced6be72f8b3d9947a9fb3",
+          "message": "doc: document cancellation safety (#3900)\n\nThis patch documents cancellation safety. It also moves the \"Avoid racy if preconditions\"\r\nsection in the select! documentation since otherwise the first code block on the page\r\nshows how not to use it, which seems counterintuitive.",
+          "timestamp": "2021-06-29T10:35:42-07:00",
+          "tree_id": "d9f76895a087af0afa8b0e264aabe9e88e7af5bf",
+          "url": "https://github.com/tokio-rs/tokio/commit/b521cc26895c6331c8ced6be72f8b3d9947a9fb3"
+        },
+        "date": 1624988238811,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13232,
+            "range": "± 3960",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 809,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 540,
+            "range": "± 70",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13474,
+            "range": "± 3857",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 716,
+            "range": "± 4",
             "unit": "ns/iter"
           }
         ]
