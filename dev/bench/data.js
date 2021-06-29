@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624991339185,
+  "lastUpdate": 1624991347071,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -82019,6 +82019,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 784723,
             "range": "± 17031",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mikhail.zabaluev@gmail.com",
+            "name": "Mikhail Zabaluev",
+            "username": "mzabaluev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0531549b6ea66d22d301044910ddc6a77e8c7f1e",
+          "message": "io: efficient implementation of vectored writes for BufWriter (#3163)",
+          "timestamp": "2021-06-29T20:26:47+02:00",
+          "tree_id": "cf0b36a10b2b15f3bda1524259e8a3d1d69fc935",
+          "url": "https://github.com/tokio-rs/tokio/commit/0531549b6ea66d22d301044910ddc6a77e8c7f1e"
+        },
+        "date": 1624991342248,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6279288,
+            "range": "± 3083668",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5910425,
+            "range": "± 2370443",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6360618,
+            "range": "± 2227162",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 235,
+            "range": "± 89",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 256,
+            "range": "± 120",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 253,
+            "range": "± 127",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 62481,
+            "range": "± 16549",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 828,
+            "range": "± 226",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 865731,
+            "range": "± 226281",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 631902,
+            "range": "± 114402",
             "unit": "ns/iter"
           }
         ]
