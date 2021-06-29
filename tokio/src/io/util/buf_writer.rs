@@ -136,7 +136,7 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
     fn poll_write_vectored(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        bufs: &[IoSlice<'_>],
+        mut bufs: &[IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
         if self.inner.is_write_vectored() {
             let total_len = bufs
@@ -157,27 +157,34 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
                 Poll::Ready(Ok(total_len))
             }
         } else {
-            let mut iter = bufs.iter();
-            let mut total_written = if let Some(buf) = iter.by_ref().find(|&buf| !buf.is_empty()) {
-                // This is the first non-empty slice to write, so if it does
-                // not fit in the buffer, we still get to flush and proceed.
-                if self.buf.len() + buf.len() > self.buf.capacity() {
-                    ready!(self.as_mut().flush_buf(cx))?;
+            let mut total_written = loop {
+                if bufs.is_empty() {
+                    return Poll::Ready(Ok(0));
                 }
-                let me = self.as_mut().project();
-                if buf.len() >= me.buf.capacity() {
-                    // The slice is at least as large as the buffering capacity,
-                    // so it's better to write it directly, bypassing the buffer.
-                    return me.inner.poll_write(cx, buf);
+                if bufs[0].is_empty() {
+                    bufs = &bufs[1..];
+                    continue;
                 } else {
-                    me.buf.extend_from_slice(buf);
-                    buf.len()
+                    let buf = &bufs[0];
+                    // This is the first non-empty slice to write, so if it does
+                    // not fit in the buffer, we still get to flush and proceed.
+                    if self.buf.len() + buf.len() > self.buf.capacity() {
+                        ready!(self.as_mut().flush_buf(cx))?;
+                    }
+                    let me = self.as_mut().project();
+                    if buf.len() >= me.buf.capacity() {
+                        // The slice is at least as large as the buffering capacity,
+                        // so it's better to write it directly, bypassing the buffer.
+                        return me.inner.poll_write(cx, buf);
+                    } else {
+                        me.buf.extend_from_slice(buf);
+                        bufs = &bufs[1..];
+                        break buf.len();
+                    }
                 }
-            } else {
-                return Poll::Ready(Ok(0));
             };
             debug_assert!(total_written != 0);
-            for buf in iter {
+            for buf in bufs {
                 let me = self.as_mut().project();
                 if me.buf.len() + buf.len() > me.buf.capacity() {
                     break;
