@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624989010414,
+  "lastUpdate": 1624989019373,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -81431,6 +81431,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 680019,
             "range": "± 2696",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "hi@jbr.me",
+            "name": "Jacob Rothstein",
+            "username": "jbr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8fa29cb00a486c0ffc28f295c749573cb58a8967",
+          "message": "rt: add tokio::task::Builder (#3881)\n\nAdds a builder API for spawning tasks. Initially, this enables the caller to name the spawned\r\ntask in order to provide better visibility into all tasks in the system.",
+          "timestamp": "2021-06-29T10:47:30-07:00",
+          "tree_id": "88b349d6ea5cf2f6877d01f6eb63c00f85b1de41",
+          "url": "https://github.com/tokio-rs/tokio/commit/8fa29cb00a486c0ffc28f295c749573cb58a8967"
+        },
+        "date": 1624989014227,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6701263,
+            "range": "± 2880673",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5933063,
+            "range": "± 2870105",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6446582,
+            "range": "± 2777697",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 267,
+            "range": "± 27",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 280,
+            "range": "± 66",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 263,
+            "range": "± 48",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 57841,
+            "range": "± 6266",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 895,
+            "range": "± 158",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 994112,
+            "range": "± 142426",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 727617,
+            "range": "± 152866",
             "unit": "ns/iter"
           }
         ]
