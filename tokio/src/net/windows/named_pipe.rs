@@ -163,7 +163,15 @@ impl NamedPipeServer {
     ///
     /// This corresponds to the [`ConnectNamedPipe`] system call.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancellation safe in the sense that if it is used as the
+    /// event in a [`select!`](crate::select) statement and some other branch
+    /// completes first, then no connection events have been lost.
+    ///
     /// [`ConnectNamedPipe`]: https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
+    ///
+    /// # Example
     ///
     /// ```no_run
     /// use tokio::net::windows::named_pipe::ServerOptions;

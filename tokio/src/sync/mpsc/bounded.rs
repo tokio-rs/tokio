@@ -134,11 +134,16 @@ impl<T> Receiver<T> {
     ///
     /// If there are no messages in the channel's buffer, but the channel has
     /// not yet been closed, this method will sleep until a message is sent or
-    /// the channel is closed.
+    /// the channel is closed.  Note that if [`close`] is called, but there are
+    /// still outstanding [`Permits`] from before it was closed, the channel is
+    /// not considered closed by `recv` until the permits are released.
     ///
-    /// Note that if [`close`] is called, but there are still outstanding
-    /// [`Permits`] from before it was closed, the channel is not considered
-    /// closed by `recv` until the permits are released.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
     ///
     /// [`close`]: Self::close
     /// [`Permits`]: struct@crate::sync::mpsc::Permit
@@ -335,6 +340,16 @@ impl<T> Sender<T> {
     /// [`close`]: Receiver::close
     /// [`Receiver`]: Receiver
     ///
+    /// # Cancel safety
+    ///
+    /// If `send` is used as the event in a [`tokio::select!`](crate::select)
+    /// statement and some other branch completes first, then it is guaranteed
+    /// that the message was not sent.
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// complete in the order they were requested.  Cancelling a call to
+    /// `send` makes you lose your place in the queue.
+    ///
     /// # Examples
     ///
     /// In the following example, each call to `send` will block until the
@@ -375,6 +390,11 @@ impl<T> Sender<T> {
     ///
     /// This allows the producers to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once the channel is closed, it stays closed
+    /// forever and all future calls to `closed` will return immediately.
     ///
     /// # Examples
     ///
@@ -617,6 +637,12 @@ impl<T> Sender<T> {
     /// [`Permit`]: Permit
     /// [`send`]: Permit::send
     ///
+    /// # Cancel safety
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// complete in the order they were requested.  Cancelling a call to
+    /// `reserve` makes you lose your place in the queue.
+    ///
     /// # Examples
     ///
     /// ```
@@ -665,6 +691,12 @@ impl<T> Sender<T> {
     ///
     /// Dropping the [`OwnedPermit`] without sending a message releases the
     /// capacity back to the channel.
+    ///
+    /// # Cancel safety
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// complete in the order they were requested.  Cancelling a call to
+    /// `reserve_owned` makes you lose your place in the queue.
     ///
     /// # Examples
     /// Sending a message using an [`OwnedPermit`]:

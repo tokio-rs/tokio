@@ -261,6 +261,13 @@ impl<T> Receiver<T> {
     ///
     /// This method returns an error if and only if the [`Sender`] is dropped.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If you use it as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that no values have been marked
+    /// seen by this call to `changed`.
+    ///
     /// [`Sender`]: struct@Sender
     ///
     /// # Examples
@@ -417,6 +424,11 @@ impl<T> Sender<T> {
     ///
     /// This allows the producer to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once the channel is closed, it stays closed
+    /// forever and all future calls to `closed` will return immediately.
     ///
     /// # Examples
     ///

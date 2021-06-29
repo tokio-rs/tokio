@@ -105,8 +105,8 @@ cfg_io_util! {
         /// async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
         /// ```
         ///
-        /// This function does not provide any guarantees about whether it
-        /// completes immediately or asynchronously
+        /// This method does not provide any guarantees about whether it
+        /// completes immediately or asynchronously.
         ///
         /// # Return
         ///
@@ -137,6 +137,12 @@ cfg_io_util! {
         /// If this function encounters any form of I/O or other error, an error
         /// variant will be returned. If an error is returned then it must be
         /// guaranteed that no bytes were read.
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is cancel safe. If you use it as the event in a
+        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// completes first, then it is guaranteed that no data was read.
         ///
         /// # Examples
         ///
@@ -177,8 +183,8 @@ cfg_io_util! {
         /// Usually, only a single `read` syscall is issued, even if there is
         /// more space in the supplied buffer.
         ///
-        /// This function does not provide any guarantees about whether it
-        /// completes immediately or asynchronously
+        /// This method does not provide any guarantees about whether it
+        /// completes immediately or asynchronously.
         ///
         /// # Return
         ///
@@ -196,6 +202,12 @@ cfg_io_util! {
         /// If this function encounters any form of I/O or other error, an error
         /// variant will be returned. If an error is returned then it must be
         /// guaranteed that no bytes were read.
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is cancel safe. If you use it as the event in a
+        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// completes first, then it is guaranteed that no data was read.
         ///
         /// # Examples
         ///
@@ -260,6 +272,13 @@ cfg_io_util! {
         /// If this operation returns an error, it is unspecified how many bytes
         /// it has read, but it will never read more than would be necessary to
         /// completely fill the buffer.
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is not cancellation safe. If the method is used as the
+        /// event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then some data may already have been
+        /// read into `buf`.
         ///
         /// # Examples
         ///

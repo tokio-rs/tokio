@@ -125,6 +125,13 @@ impl TcpListener {
     /// established, the corresponding [`TcpStream`] and the remote peer's
     /// address will be returned.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If the method is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that no new connections were
+    /// accepted by this method.
+    ///
     /// [`TcpStream`]: struct@crate::net::TcpStream
     ///
     /// # Examples

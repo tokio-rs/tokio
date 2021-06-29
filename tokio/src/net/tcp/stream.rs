@@ -356,6 +356,13 @@ impl TcpStream {
     /// can be used to concurrently read / write to the same socket on a single
     /// task without splitting the socket.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// Concurrently read and write to the stream on the same task without
@@ -419,6 +426,13 @@ impl TcpStream {
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -724,6 +738,13 @@ impl TcpStream {
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -1151,6 +1172,12 @@ impl TcpStream {
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
+
+    // == Poll IO functions that takes `&self` ==
+    //
+    // To read or write without mutable access to the `UnixStream`, combine the
+    // `poll_read_ready` or `poll_write_ready` methods with the `try_read` or
+    // `try_write` methods.
 
     pub(crate) fn poll_read_priv(
         &self,

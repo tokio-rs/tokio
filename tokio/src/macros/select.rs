@@ -23,10 +23,10 @@
 /// returns the result of evaluating the completed branch's `<handler>`
 /// expression.
 ///
-/// Additionally, each branch may include an optional `if` precondition. This
-/// precondition is evaluated **before** the `<async expression>`. If the
-/// precondition returns `false`, the branch is entirely disabled. This
-/// capability is useful when using `select!` within a loop.
+/// Additionally, each branch may include an optional `if` precondition. If the
+/// precondition returns `false`, then the branch is disabled. The provided
+/// `<async expression>` is still evaluated but the resulting future is never
+/// polled. This capability is useful when using `select!` within a loop.
 ///
 /// The complete lifecycle of a `select!` expression is as follows:
 ///
@@ -42,12 +42,10 @@
 ///    to the provided `<pattern>`, if the pattern matches, evaluate `<handler>`
 ///    and return. If the pattern **does not** match, disable the current branch
 ///    and for the remainder of the current call to `select!`. Continue from step 3.
-/// 5. If **all** branches are disabled, evaluate the `else` expression. If none
-///    is provided, panic.
+/// 5. If **all** branches are disabled, evaluate the `else` expression. If no
+///    else branch is provided, panic.
 ///
-/// # Notes
-///
-/// ### Runtime characteristics
+/// # Runtime characteristics
 ///
 /// By running all async expressions on the current task, the expressions are
 /// able to run **concurrently** but not in **parallel**. This means all
@@ -58,76 +56,7 @@
 ///
 /// [`tokio::spawn`]: crate::spawn
 ///
-/// ### Avoid racy `if` preconditions
-///
-/// Given that `if` preconditions are used to disable `select!` branches, some
-/// caution must be used to avoid missing values.
-///
-/// For example, here is **incorrect** usage of `sleep` with `if`. The objective
-/// is to repeatedly run an asynchronous task for up to 50 milliseconds.
-/// However, there is a potential for the `sleep` completion to be missed.
-///
-/// ```no_run
-/// use tokio::time::{self, Duration};
-///
-/// async fn some_async_work() {
-///     // do work
-/// }
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let sleep = time::sleep(Duration::from_millis(50));
-///     tokio::pin!(sleep);
-///
-///     while !sleep.is_elapsed() {
-///         tokio::select! {
-///             _ = &mut sleep, if !sleep.is_elapsed() => {
-///                 println!("operation timed out");
-///             }
-///             _ = some_async_work() => {
-///                 println!("operation completed");
-///             }
-///         }
-///     }
-/// }
-/// ```
-///
-/// In the above example, `sleep.is_elapsed()` may return `true` even if
-/// `sleep.poll()` never returned `Ready`. This opens up a potential race
-/// condition where `sleep` expires between the `while !sleep.is_elapsed()`
-/// check and the call to `select!` resulting in the `some_async_work()` call to
-/// run uninterrupted despite the sleep having elapsed.
-///
-/// One way to write the above example without the race would be:
-///
-/// ```
-/// use tokio::time::{self, Duration};
-///
-/// async fn some_async_work() {
-/// # time::sleep(Duration::from_millis(10)).await;
-///     // do work
-/// }
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let sleep = time::sleep(Duration::from_millis(50));
-///     tokio::pin!(sleep);
-///
-///     loop {
-///         tokio::select! {
-///             _ = &mut sleep => {
-///                 println!("operation timed out");
-///                 break;
-///             }
-///             _ = some_async_work() => {
-///                 println!("operation completed");
-///             }
-///         }
-///     }
-/// }
-/// ```
-///
-/// ### Fairness
+/// # Fairness
 ///
 /// By default, `select!` randomly picks a branch to check first. This provides
 /// some level of fairness when calling `select!` in a loop with branches that
@@ -151,10 +80,60 @@
 ///
 /// # Panics
 ///
-/// `select!` panics if all branches are disabled **and** there is no provided
-/// `else` branch. A branch is disabled when the provided `if` precondition
-/// returns `false` **or** when the pattern does not match the result of `<async
-/// expression>`.
+/// The `select!` macro panics if all branches are disabled **and** there is no
+/// provided `else` branch. A branch is disabled when the provided `if`
+/// precondition returns `false` **or** when the pattern does not match the
+/// result of `<async expression>`.
+///
+/// # Cancellation safety
+///
+/// When using `select!` in a loop to receive messages from multiple sources,
+/// you should make sure that the receive call is cancellation safe to avoid
+/// losing messages. This section goes through various common methods and
+/// describes whether they are cancel safe.  The lists in this section are not
+/// exhaustive.
+///
+/// The following methods are cancellation safe:
+///
+///  * [`tokio::sync::mpsc::Receiver::recv`](crate::sync::mpsc::Receiver::recv)
+///  * [`tokio::sync::mpsc::UnboundedReceiver::recv`](crate::sync::mpsc::UnboundedReceiver::recv)
+///  * [`tokio::sync::broadcast::Receiver::recv`](crate::sync::broadcast::Receiver::recv)
+///  * [`tokio::sync::watch::Receiver::changed`](crate::sync::watch::Receiver::changed)
+///  * [`tokio::net::TcpListener::accept`](crate::net::TcpListener::accept)
+///  * [`tokio::net::UnixListener::accept`](crate::net::UnixListener::accept)
+///  * [`tokio::io::AsyncReadExt::read`](crate::io::AsyncReadExt::read) on any `AsyncRead`
+///  * [`tokio::io::AsyncReadExt::read_buf`](crate::io::AsyncReadExt::read_buf) on any `AsyncRead`
+///  * [`tokio::io::AsyncWriteExt::write`](crate::io::AsyncWriteExt::write) on any `AsyncWrite`
+///  * [`tokio::io::AsyncWriteExt::write_buf`](crate::io::AsyncWriteExt::write_buf) on any `AsyncWrite`
+///  * [`tokio_stream::StreamExt::next`](https://docs.rs/tokio-stream/0.1/tokio_stream/trait.StreamExt.html#method.next) on any `Stream`
+///  * [`futures::stream::StreamExt::next`](https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html#method.next) on any `Stream`
+///
+/// The following methods are not cancellation safe and can lead to loss of data:
+///
+///  * [`tokio::io::AsyncReadExt::read_exact`](crate::io::AsyncReadExt::read_exact)
+///  * [`tokio::io::AsyncReadExt::read_to_end`](crate::io::AsyncReadExt::read_to_end)
+///  * [`tokio::io::AsyncReadExt::read_to_string`](crate::io::AsyncReadExt::read_to_string)
+///  * [`tokio::io::AsyncWriteExt::write_all`](crate::io::AsyncWriteExt::write_all)
+///
+/// The following methods are not cancellation safe because they use a queue for
+/// fairness and cancellation makes you lose your place in the queue:
+///
+///  * [`tokio::sync::Mutex::lock`](crate::sync::Mutex::lock)
+///  * [`tokio::sync::RwLock::read`](crate::sync::RwLock::read)
+///  * [`tokio::sync::RwLock::write`](crate::sync::RwLock::write)
+///  * [`tokio::sync::Semaphore::acquire`](crate::sync::Semaphore::acquire)
+///  * [`tokio::sync::Notify::notified`](crate::sync::Notify::notified)
+///
+/// To determine whether your own methods are cancellation safe, look for the
+/// location of uses of `.await`. This is because when an asynchronous method is
+/// cancelled, that always happens at an `.await`. If your function behaves
+/// correctly even if it is restarted while waiting at an `.await`, then it is
+/// cancellation safe.
+///
+/// Be aware that cancelling something that is not cancellation safe is not
+/// necessarily wrong. For example, if you are cancelling a task because the
+/// application is shutting down, then you probably don't care that partially
+/// read data is lost.
 ///
 /// # Examples
 ///
@@ -335,6 +314,77 @@
 ///                 break;
 ///             }
 ///         };
+///     }
+/// }
+/// ```
+///
+/// ## Avoid racy `if` preconditions
+///
+/// Given that `if` preconditions are used to disable `select!` branches, some
+/// caution must be used to avoid missing values.
+///
+/// For example, here is **incorrect** usage of `sleep` with `if`. The objective
+/// is to repeatedly run an asynchronous task for up to 50 milliseconds.
+/// However, there is a potential for the `sleep` completion to be missed.
+///
+/// ```no_run,should_panic
+/// use tokio::time::{self, Duration};
+///
+/// async fn some_async_work() {
+///     // do work
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let sleep = time::sleep(Duration::from_millis(50));
+///     tokio::pin!(sleep);
+///
+///     while !sleep.is_elapsed() {
+///         tokio::select! {
+///             _ = &mut sleep, if !sleep.is_elapsed() => {
+///                 println!("operation timed out");
+///             }
+///             _ = some_async_work() => {
+///                 println!("operation completed");
+///             }
+///         }
+///     }
+///
+///     panic!("This example shows how not to do it!");
+/// }
+/// ```
+///
+/// In the above example, `sleep.is_elapsed()` may return `true` even if
+/// `sleep.poll()` never returned `Ready`. This opens up a potential race
+/// condition where `sleep` expires between the `while !sleep.is_elapsed()`
+/// check and the call to `select!` resulting in the `some_async_work()` call to
+/// run uninterrupted despite the sleep having elapsed.
+///
+/// One way to write the above example without the race would be:
+///
+/// ```
+/// use tokio::time::{self, Duration};
+///
+/// async fn some_async_work() {
+/// # time::sleep(Duration::from_millis(10)).await;
+///     // do work
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let sleep = time::sleep(Duration::from_millis(50));
+///     tokio::pin!(sleep);
+///
+///     loop {
+///         tokio::select! {
+///             _ = &mut sleep => {
+///                 println!("operation timed out");
+///                 break;
+///             }
+///             _ = some_async_work() => {
+///                 println!("operation completed");
+///             }
+///         }
 ///     }
 /// }
 /// ```

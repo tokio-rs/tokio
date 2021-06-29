@@ -824,6 +824,13 @@ impl<T: Clone> Receiver<T> {
     /// the channel. A subsequent call to [`recv`] will return this value
     /// **unless** it has been since overwritten.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
+    ///
     /// [`Receiver`]: crate::sync::broadcast::Receiver
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
     ///
