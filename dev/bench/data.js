@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624990106167,
+  "lastUpdate": 1624991329874,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -34831,6 +34831,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22554968,
             "range": "± 4402660",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mikhail.zabaluev@gmail.com",
+            "name": "Mikhail Zabaluev",
+            "username": "mzabaluev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0531549b6ea66d22d301044910ddc6a77e8c7f1e",
+          "message": "io: efficient implementation of vectored writes for BufWriter (#3163)",
+          "timestamp": "2021-06-29T20:26:47+02:00",
+          "tree_id": "cf0b36a10b2b15f3bda1524259e8a3d1d69fc935",
+          "url": "https://github.com/tokio-rs/tokio/commit/0531549b6ea66d22d301044910ddc6a77e8c7f1e"
+        },
+        "date": 1624991323389,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 197826,
+            "range": "± 13511",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 718360,
+            "range": "± 117478",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5578771,
+            "range": "± 1367890",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 23132084,
+            "range": "± 5041927",
             "unit": "ns/iter"
           }
         ]
