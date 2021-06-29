@@ -150,7 +150,7 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
 
 #[tokio::test]
 async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
-    use tokio::io::{AsyncBufReadExt as _, BufReader, Interest};
+    use tokio::io::Interest;
 
     const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-multi-client-ready";
     const N: usize = 10;
@@ -164,7 +164,8 @@ async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
         for _ in 0..N {
             // Wait for client to connect.
             server.connect().await?;
-            let mut inner = BufReader::new(server);
+
+            let inner_server = server;
 
             // Construct the next server to be connected before sending the one
             // we already have of onto a task. This ensures that the server
@@ -174,10 +175,61 @@ async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
             server = ServerOptions::new().create(PIPE_NAME)?;
 
             let _ = tokio::spawn(async move {
-                let mut buf = String::new();
-                inner.read_line(&mut buf).await?;
-                inner.write_all(b"pong\n").await?;
-                inner.flush().await?;
+                let server = inner_server;
+
+                {
+                    let mut read_buf = [0u8; 5];
+                    let mut read_buf_cursor = 0;
+
+                    loop {
+                        server.readable().await?;
+
+                        let buf = &mut read_buf[read_buf_cursor..];
+
+                        match server.try_read(buf) {
+                            Ok(n) => {
+                                read_buf_cursor += n;
+
+                                if read_buf_cursor == read_buf.len() {
+                                    break;
+                                }
+                            }
+                            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                                continue;
+                            }
+                            Err(e) => {
+                                return Err(e);
+                            }
+                        }
+                    }
+                };
+
+                {
+                    let write_buf = b"pong\n";
+                    let mut write_buf_cursor = 0;
+
+                    loop {
+                        server.writable().await?;
+                        let buf = &write_buf[write_buf_cursor..];
+
+                        match server.try_write(buf) {
+                            Ok(n) => {
+                                write_buf_cursor += n;
+
+                                if write_buf_cursor == write_buf.len() {
+                                    break;
+                                }
+                            }
+                            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                                continue;
+                            }
+                            Err(e) => {
+                                return Err(e);
+                            }
+                        }
+                    }
+                }
+
                 Ok::<_, io::Error>(())
             });
         }
