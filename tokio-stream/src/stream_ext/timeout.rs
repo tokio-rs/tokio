@@ -69,7 +69,18 @@ impl<S: Stream> Stream for Timeout<S> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.stream.size_hint()
+        let (lower, upper) = self.stream.size_hint();
+
+        // The timeout stream may insert an error before and after each message
+        // from the underlying stream, but no more than one error between each
+        // message. Hence the upper bound is computed as 2x+1.
+
+        // Using a helper function to enable use of question mark operator.
+        fn twice_plus_one(value: Option<usize>) -> Option<usize> {
+            value?.checked_mul(2)?.checked_add(1)
+        }
+
+        (lower, twice_plus_one(upper))
     }
 }
 
