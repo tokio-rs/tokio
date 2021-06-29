@@ -157,36 +157,33 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
                 Poll::Ready(Ok(total_len))
             }
         } else {
-            let mut total_written = loop {
-                if bufs.is_empty() {
-                    return Poll::Ready(Ok(0));
-                }
-                if bufs[0].is_empty() {
-                    bufs = &bufs[1..];
-                    continue;
-                } else {
-                    let buf = &bufs[0];
-                    // This is the first non-empty slice to write, so if it does
-                    // not fit in the buffer, we still get to flush and proceed.
-                    if self.buf.len() + buf.len() > self.buf.capacity() {
-                        ready!(self.as_mut().flush_buf(cx))?;
-                    }
-                    let me = self.as_mut().project();
-                    if buf.len() >= me.buf.capacity() {
-                        // The slice is at least as large as the buffering capacity,
-                        // so it's better to write it directly, bypassing the buffer.
-                        return me.inner.poll_write(cx, buf);
-                    } else {
-                        me.buf.extend_from_slice(buf);
-                        bufs = &bufs[1..];
-                        break buf.len();
-                    }
-                }
-            };
+            // Remove empty buffers at the beginning of bufs.
+            while bufs.first().map(|buf| buf.len()) == Some(0) {
+                bufs = &bufs[1..];
+            }
+            if bufs.is_empty() {
+                return Poll::Ready(Ok(0));
+            }
+            // Flush if the first buffer doesn't fit.
+            let first_len = bufs[0].len();
+            if first_len > self.buf.capacity() - self.buf.len() {
+                ready!(self.as_mut().flush_buf(cx))?;
+                debug_assert!(self.buf.is_empty());
+            }
+            let me = self.as_mut().project();
+            if first_len >= me.buf.capacity() {
+                // The slice is at least as large as the buffering capacity,
+                // so it's better to write it directly, bypassing the buffer.
+                return me.inner.poll_write(cx, &bufs[0]);
+            } else {
+                me.buf.extend_from_slice(&bufs[0]);
+                bufs = &bufs[1..];
+            }
+            let mut total_written = first_len;
             debug_assert!(total_written != 0);
+            // Append the buffers that fit in the internal buffer.
             for buf in bufs {
-                let me = self.as_mut().project();
-                if me.buf.len() + buf.len() > me.buf.capacity() {
+                if buf.len() > me.buf.capacity() - me.buf.len() {
                     break;
                 } else {
                     me.buf.extend_from_slice(buf);
