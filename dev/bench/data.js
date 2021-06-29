@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624988268508,
+  "lastUpdate": 1624988276867,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18251,6 +18251,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 615,
             "range": "± 23",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b521cc26895c6331c8ced6be72f8b3d9947a9fb3",
+          "message": "doc: document cancellation safety (#3900)\n\nThis patch documents cancellation safety. It also moves the \"Avoid racy if preconditions\"\r\nsection in the select! documentation since otherwise the first code block on the page\r\nshows how not to use it, which seems counterintuitive.",
+          "timestamp": "2021-06-29T10:35:42-07:00",
+          "tree_id": "d9f76895a087af0afa8b0e264aabe9e88e7af5bf",
+          "url": "https://github.com/tokio-rs/tokio/commit/b521cc26895c6331c8ced6be72f8b3d9947a9fb3"
+        },
+        "date": 1624988271669,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 889,
+            "range": "± 126",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 19766,
+            "range": "± 10464",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 967,
+            "range": "± 109",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17004,
+            "range": "± 7238",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 569,
+            "range": "± 59",
             "unit": "ns/iter"
           }
         ]
