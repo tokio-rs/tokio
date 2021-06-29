@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1624989026260,
+  "lastUpdate": 1624989032034,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18305,6 +18305,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 569,
             "range": "± 59",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "hi@jbr.me",
+            "name": "Jacob Rothstein",
+            "username": "jbr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8fa29cb00a486c0ffc28f295c749573cb58a8967",
+          "message": "rt: add tokio::task::Builder (#3881)\n\nAdds a builder API for spawning tasks. Initially, this enables the caller to name the spawned\r\ntask in order to provide better visibility into all tasks in the system.",
+          "timestamp": "2021-06-29T10:47:30-07:00",
+          "tree_id": "88b349d6ea5cf2f6877d01f6eb63c00f85b1de41",
+          "url": "https://github.com/tokio-rs/tokio/commit/8fa29cb00a486c0ffc28f295c749573cb58a8967"
+        },
+        "date": 1624989026482,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 805,
+            "range": "± 172",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16054,
+            "range": "± 7758",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 797,
+            "range": "± 157",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16391,
+            "range": "± 7748",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 493,
+            "range": "± 122",
             "unit": "ns/iter"
           }
         ]
