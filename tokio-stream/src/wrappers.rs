@@ -69,3 +69,8 @@ cfg_fs! {
     mod read_dir;
     pub use read_dir::ReadDirStream;
 }
+
+cfg_rt! {
+    mod task_set;
+    pub use task_set::TaskSetStream;
+}
