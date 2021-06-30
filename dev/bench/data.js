@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625071244859,
+  "lastUpdate": 1625071259908,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -35035,6 +35035,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19658226,
             "range": "± 4355433",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b877629cb1678132611211b43b4b9e1b879e6b20",
+          "message": "net: handle HUP event with UnixStream (#3898)\n\nFixes: #3879",
+          "timestamp": "2021-06-30T09:39:06-07:00",
+          "tree_id": "ee0ddb7664bf7c5e136365d3e0b37937187dcfe9",
+          "url": "https://github.com/tokio-rs/tokio/commit/b877629cb1678132611211b43b4b9e1b879e6b20"
+        },
+        "date": 1625071254715,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 191822,
+            "range": "± 54459",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 668845,
+            "range": "± 218473",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5184166,
+            "range": "± 1236443",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19150486,
+            "range": "± 3765395",
             "unit": "ns/iter"
           }
         ]
