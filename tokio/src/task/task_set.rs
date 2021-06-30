@@ -1,8 +1,7 @@
 use crate::{
     future::poll_fn,
     runtime::Handle,
-    task::{JoinError, JoinHandle},
-    loom::sync::Mutex
+    task::{JoinError, JoinHandle}
 };
 use std::{
     future::Future,
@@ -15,7 +14,7 @@ use std::{
 /// It simplifies joining and helps to propagate panics.
 #[derive(Debug)]
 pub struct TaskSet<T> {
-    unfinished: Mutex<Vec<JoinHandle<T>>>,
+    unfinished: Vec<JoinHandle<T>>,
     // Used for all spawns.
     handle: Handle,
 }
@@ -35,18 +34,14 @@ impl<T> TaskSet<T> {
     /// and never panicks.
     pub fn new_with(handle: Handle) -> Self {
         TaskSet {
-            unfinished: Mutex::new(Vec::new()),
+            unfinished: Vec::new(),
             handle,
         }
     }
 
     /// Returns true if there are no unwaited tasks remaining.
-    ///
-    /// # Correctness
-    /// If concurrent calls to `spawn` are possible, `true` returned can be stale
-    /// (however `false` result is never stale).
     pub fn is_empty(&self) -> bool {
-        self.unfinished.lock().is_empty()
+        self.unfinished.is_empty()
     }
 
     /// Tries to wait for a finished task, with ability to handle failures.
@@ -66,11 +61,10 @@ impl<T> TaskSet<T> {
         if self.is_empty() {
             return Poll::Ready(None);
         }
-        let f = self.unfinished.get_mut();
-        for (i, task) in f.iter_mut().enumerate() {
+        for (i, task) in self.unfinished.iter_mut().enumerate() {
             let task = Pin::new(task);
             if let Poll::Ready(result) = task.poll(cx) {
-                f.swap_remove(i);
+                self.unfinished.swap_remove(i);
                 return Poll::Ready(Some(result));
             }
         }
@@ -123,18 +117,16 @@ impl<T> TaskSet<T> {
     }
 
     /// Cancels all running tasks.
-    pub fn cancel(&mut self) {
-        let f = self.unfinished.get_mut();
-        for t in f {
+    pub fn cancel(&self) {
+        for t in &self.unfinished {
             t.abort();
         }
     }
 }
 
 impl<T: Send + 'static> TaskSet<T> {
-    fn track(&self, handle: JoinHandle<T>) {
-        let mut f = self.unfinished.lock();
-        f.push(handle);
+    fn track(&mut self, handle: JoinHandle<T>) {
+        self.unfinished.push(handle);
     }
     /// Spawns a future onto this task set
     pub fn spawn<F: Future<Output = T> + Send + 'static>(&mut self, fut: F) {
