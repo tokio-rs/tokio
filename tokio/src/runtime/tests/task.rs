@@ -7,13 +7,13 @@ use std::sync::Arc;
 
 #[test]
 fn create_drop() {
-    let _ = task::joinable::<_, Runtime>(async { unreachable!() });
+    let _ = super::joinable::<_, Runtime>(async { unreachable!() });
 }
 
 #[test]
 fn schedule() {
     with(|rt| {
-        let (task, _) = task::joinable(async {
+        let (task, _) = super::joinable(async {
             crate::task::yield_now().await;
         });
 
@@ -26,7 +26,7 @@ fn schedule() {
 #[test]
 fn shutdown() {
     with(|rt| {
-        let (task, _) = task::joinable(async {
+        let (task, _) = super::joinable(async {
             loop {
                 crate::task::yield_now().await;
             }
