@@ -48,8 +48,6 @@ macro_rules! cfg_sync {
     }
 }
 
-
-
 macro_rules! cfg_rt {
     ($($item:item)*) => {
         $(
