@@ -122,7 +122,7 @@ jobs:
 
       # Run `tokio` with "unstable" cfg flag.
       - name: test tokio full --cfg unstable
-        run: cargo test --features full
+        run: cargo test --all-features
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
