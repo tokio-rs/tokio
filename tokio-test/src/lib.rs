@@ -10,7 +10,7 @@
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
 ))]
 
-//! Tokio and Futures based testing utilites
+//! Tokio and Futures based testing utilities
 
 pub mod io;
 

@@ -25,7 +25,7 @@ impl UCred {
     /// Gets PID (process ID) of the process.
     ///
     /// This is only implemented under Linux, Android, iOS, macOS, Solaris and
-    /// Illumos. On other plaforms this will always return `None`.
+    /// Illumos. On other platforms this will always return `None`.
     pub fn pid(&self) -> Option<pid_t> {
         self.pid
     }

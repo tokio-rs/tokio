@@ -84,9 +84,9 @@ cfg_io_readiness! {
 
 // The `ScheduledIo::readiness` (`AtomicUsize`) is packed full of goodness.
 //
-// | reserved | generation |  driver tick | readinesss |
-// |----------+------------+--------------+------------|
-// |   1 bit  |   7 bits   +    8 bits    +   16 bits  |
+// | reserved | generation |  driver tick | readiness |
+// |----------+------------+--------------+-----------|
+// |   1 bit  |   7 bits   +    8 bits    +   16 bits |
 
 const READINESS: bit::Pack = bit::Pack::least_significant(16);
 

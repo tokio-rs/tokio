@@ -413,7 +413,7 @@ impl Builder {
     /// Sets a custom timeout for a thread in the blocking pool.
     ///
     /// By default, the timeout for a thread is set to 10 seconds. This can
-    /// be overriden using .thread_keep_alive().
+    /// be overridden using .thread_keep_alive().
     ///
     /// # Example
     ///

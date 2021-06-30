@@ -163,7 +163,7 @@ where
             return;
         }
 
-        // By transitioning the lifcycle to `Running`, we have permission to
+        // By transitioning the lifecycle to `Running`, we have permission to
         // drop the future.
         let err = cancel_task(&self.core().stage);
         self.complete(Err(err), true)

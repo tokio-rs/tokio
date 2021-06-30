@@ -30,7 +30,7 @@ pub struct ReadHalf<'a>(&'a TcpStream);
 
 /// Borrowed write half of a [`TcpStream`], created by [`split`].
 ///
-/// Note that in the [`AsyncWrite`] implemenation of this type, [`poll_shutdown`] will
+/// Note that in the [`AsyncWrite`] implementation of this type, [`poll_shutdown`] will
 /// shut down the TCP stream in the write direction.
 ///
 /// Writing to an `WriteHalf` is usually done using the convenience methods found
@@ -57,7 +57,7 @@ impl ReadHalf<'_> {
     /// `Waker` from the `Context` passed to the most recent call is scheduled
     /// to receive a wakeup.
     ///
-    /// See the [`TcpStream::poll_peek`] level documenation for more details.
+    /// See the [`TcpStream::poll_peek`] level documentation for more details.
     ///
     /// # Examples
     ///
@@ -95,7 +95,7 @@ impl ReadHalf<'_> {
     /// connected, without removing that data from the queue. On success,
     /// returns the number of bytes peeked.
     ///
-    /// See the [`TcpStream::peek`] level documenation for more details.
+    /// See the [`TcpStream::peek`] level documentation for more details.
     ///
     /// [`TcpStream::peek`]: TcpStream::peek
     ///

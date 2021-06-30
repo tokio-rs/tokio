@@ -334,7 +334,7 @@ fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
     // something we can easily make assertions about, we'll run it in a
     // thread. When the test thread finishes, it will send a message on a
     // channel to this thread. We'll wait for that message with a fairly
-    // generous timeout, and if we don't recieve it, we assume the test
+    // generous timeout, and if we don't receive it, we assume the test
     // thread has hung.
     //
     // Note that it should definitely complete in under a minute, but just

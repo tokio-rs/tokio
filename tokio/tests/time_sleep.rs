@@ -349,7 +349,7 @@ async fn drop_from_wake() {
 
     assert!(
         !panicked.load(Ordering::SeqCst),
-        "paniced when dropping timers"
+        "panicked when dropping timers"
     );
 
     #[derive(Clone)]

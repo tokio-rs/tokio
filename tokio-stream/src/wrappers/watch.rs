@@ -11,7 +11,7 @@ use tokio::sync::watch::error::RecvError;
 /// A wrapper around [`tokio::sync::watch::Receiver`] that implements [`Stream`].
 ///
 /// This stream will always start by yielding the current value when the WatchStream is polled,
-/// regardles of whether it was the initial value or sent afterwards.
+/// regardless of whether it was the initial value or sent afterwards.
 ///
 /// # Examples
 ///

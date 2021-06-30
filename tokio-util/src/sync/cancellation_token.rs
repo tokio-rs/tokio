@@ -775,8 +775,8 @@ impl CancellationTokenState {
             return Poll::Ready(());
         }
 
-        // So far the token is not cancelled. However it could be cancelld before
-        // we get the chance to store the `Waker`. Therfore we need to check
+        // So far the token is not cancelled. However it could be cancelled before
+        // we get the chance to store the `Waker`. Therefore we need to check
         // for cancellation again inside the mutex.
         let mut guard = self.synchronized.lock().unwrap();
         if guard.is_cancelled {

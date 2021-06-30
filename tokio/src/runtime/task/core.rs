@@ -131,7 +131,7 @@ impl<S: Schedule> Scheduler<S> {
 
     /// Bind a scheduler to the task.
     ///
-    /// This only happens on the first poll and must be preceeded by a call to
+    /// This only happens on the first poll and must be preceded by a call to
     /// `is_bound` to determine if binding is appropriate or not.
     ///
     /// # Safety
@@ -220,7 +220,7 @@ impl<T: Future> CoreStage<T> {
     /// # Safety
     ///
     /// The caller must ensure it is safe to mutate the `state` field. This
-    /// requires ensuring mutal exclusion between any concurrent thread that
+    /// requires ensuring mutual exclusion between any concurrent thread that
     /// might modify the future or output field.
     ///
     /// The mutual exclusion is implemented by `Harness` and the `Lifecycle`
@@ -284,7 +284,7 @@ impl<T: Future> CoreStage<T> {
         use std::mem;
 
         self.stage.with_mut(|ptr| {
-            // Safety:: the caller ensures mutal exclusion to the field.
+            // Safety:: the caller ensures mutual exclusion to the field.
             match mem::replace(unsafe { &mut *ptr }, Stage::Consumed) {
                 Stage::Finished(output) => output,
                 _ => panic!("JoinHandle polled after completion"),
