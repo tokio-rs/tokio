@@ -234,7 +234,7 @@ impl Default for AnyDelimiterCodec {
     }
 }
 
-/// An error occured while encoding or decoding a chunk.
+/// An error occurred while encoding or decoding a chunk.
 #[derive(Debug)]
 pub enum AnyDelimiterCodecError {
     /// The maximum chunk length was exceeded.

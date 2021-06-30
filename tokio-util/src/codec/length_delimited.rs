@@ -486,7 +486,7 @@ impl LengthDelimitedCodec {
             // Skip the required bytes
             src.advance(self.builder.length_field_offset);
 
-            // match endianess
+            // match endianness
             let n = if self.builder.length_field_is_big_endian {
                 src.get_uint(field_len)
             } else {

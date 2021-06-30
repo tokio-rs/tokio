@@ -64,7 +64,7 @@ cfg_rt! {
 // # Warning
 //
 // This is hidden for a reason. Do not use without fully understanding
-// executors. Misuing can easily cause your program to deadlock.
+// executors. Misusing can easily cause your program to deadlock.
 cfg_rt_multi_thread! {
     pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
         // Reset in case the closure panics

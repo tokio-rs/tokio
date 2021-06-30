@@ -52,10 +52,10 @@ where
 
         buf = &buf[..crate::io::blocking::MAX_BUF];
 
-        // Now there are two possibilites.
+        // Now there are two possibilities.
         // If caller gave is binary buffer, we **should not** shrink it
         // anymore, because excessive shrinking hits performance.
-        // If caller gave as binary buffer, we  **must** additionaly
+        // If caller gave as binary buffer, we  **must** additionally
         // shrink it to strip incomplete char at the end of buffer.
         // that's why check we will perform now is allowed to have
         // false-positive.

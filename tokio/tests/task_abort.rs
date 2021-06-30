@@ -82,7 +82,7 @@ fn test_abort_without_panic_3662() {
         // `Inner::block_on` of `basic_scheduler.rs`.
         //
         // We cause the cleanup to happen by having a poll return Pending once
-        // so that the scheduler can go into the "auxilliary tasks" mode, at
+        // so that the scheduler can go into the "auxiliary tasks" mode, at
         // which point the task is removed from the scheduler.
         let i = tokio::spawn(async move {
             tokio::task::yield_now().await;

@@ -58,7 +58,7 @@ impl Interest {
         self.0.is_writable()
     }
 
-    /// Add together two `Interst` values.
+    /// Add together two `Interest` values.
     ///
     /// This function works from a `const` context.
     ///

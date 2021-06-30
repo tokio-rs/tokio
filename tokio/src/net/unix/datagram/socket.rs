@@ -974,7 +974,7 @@ impl UnixDatagram {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<SocketAddr>> {
         let (n, addr) = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uinitialized bytes.
+            // Safety: will not read the maybe uninitialized bytes.
             let b = unsafe {
                 &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
             };
@@ -1075,7 +1075,7 @@ impl UnixDatagram {
     /// [`connect`]: method@Self::connect
     pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         let n = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uinitialized bytes.
+            // Safety: will not read the maybe uninitialized bytes.
             let b = unsafe {
                 &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
             };

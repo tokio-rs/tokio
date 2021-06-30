@@ -1,4 +1,4 @@
-//! Benchmark implementation details of the theaded scheduler. These benches are
+//! Benchmark implementation details of the threaded scheduler. These benches are
 //! intended to be used as a form of regression testing and not as a general
 //! purpose benchmark demonstrating real-world performance.
 

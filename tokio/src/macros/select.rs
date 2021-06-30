@@ -289,7 +289,7 @@
 ///     loop {
 ///         tokio::select! {
 ///             // If you run this example without `biased;`, the polling order is
-///             // psuedo-random, and the assertions on the value of count will
+///             // pseudo-random, and the assertions on the value of count will
 ///             // (probably) fail.
 ///             biased;
 ///
@@ -467,7 +467,7 @@ macro_rules! select {
                 let mut is_pending = false;
 
                 // Choose a starting index to begin polling the futures at. In
-                // practice, this will either be a psuedo-randomly generrated
+                // practice, this will either be a pseudo-randomly generated
                 // number by default, or the constant 0 if `biased;` is
                 // supplied.
                 let start = $start;

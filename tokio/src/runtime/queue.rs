@@ -127,7 +127,7 @@ impl<T> Local<T> {
                 // Concurrently stealing, this will free up capacity, so only
                 // push the new task onto the inject queue
                 //
-                // If the task failes to be pushed on the injection queue, there
+                // If the task fails to be pushed on the injection queue, there
                 // is nothing to be done at this point as the task cannot be a
                 // newly spawned task. Shutting down this task is handled by the
                 // worker shutdown process.
