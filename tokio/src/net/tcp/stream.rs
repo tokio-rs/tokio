@@ -962,7 +962,7 @@ impl TcpStream {
     ///
     /// [`readable()`]: TcpStream::readable()
     /// [`ready()`]: TcpStream::ready()
-    pub fn try_read_io<R>(&self, f: impl FnMut() -> io::Result<R>) -> io::Result<R> {
+    pub fn try_read_io<R>(&self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
         self.io.registration().try_io(Interest::READABLE, f)
     }
 
@@ -1008,7 +1008,7 @@ impl TcpStream {
     /// # Return value
     ///
     /// This functions returns exactly the same as `f`
-    pub fn try_write_io<R>(&self, f: impl FnMut() -> io::Result<R>) -> io::Result<R> {
+    pub fn try_write_io<R>(&self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
         self.io.registration().try_io(Interest::WRITABLE, f)
     }
 
