@@ -694,8 +694,11 @@ impl UnixStream {
     /// The closure should attempt to read from the socket by manually calling the
     /// appropriate syscall. If the operation fails because the socket is not
     /// actually ready, then the closure should return a `WouldBlock` error and
-    /// the read readiness flag is cleared. Stores and wakes the clone of the
-    /// `Waker` just like it was not ready for reading.
+    /// the read readiness flag is cleared. The `Waker` from the provided `Context`
+    /// will be stored. When the unix stream becomes ready for reading, `Waker::wake`
+    /// will be called on the waker. The provided closure may be called multiple times
+    /// if the socket become ready right in the instance after the closure has returned
+    /// `WouldBlock`.
     ///
     /// Note that on multiple calls to `poll_read_io`, `poll_read`,
     /// `poll_read_ready` or `poll_peek`, only the `Waker` from the `Context`
@@ -772,8 +775,11 @@ impl UnixStream {
     /// The closure should attempt to write from the socket by manually calling the
     /// appropriate syscall. If the operation fails because the socket is not
     /// actually ready, then the closure should return a `WouldBlock` error and
-    /// the read readiness flag is cleared. Stores and wakes the clone of the
-    /// `Waker` just like it was not ready for writing.
+    /// the read readiness flag is cleared. The `Waker` from the provided `Context`
+    /// will be stored. When the unix stream becomes ready for reading, `Waker::wake`
+    /// will be called on the waker. The provided closure may be called multiple times
+    /// if the socket become ready right in the instance after the closure has returned
+    /// `WouldBlock`.
     ///
     /// Note that on multiple calls to `poll_write_io` only
     /// the `Waker` from the `Context` passed to the most recent call is
