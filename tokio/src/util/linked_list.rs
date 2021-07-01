@@ -614,24 +614,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn iter() {
-        let a = entry(5);
-        let b = entry(7);
-
-        let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
-
-        assert_eq!(0, list.iter().count());
-
-        list.push_front(a.as_ref());
-        list.push_front(b.as_ref());
-
-        let mut i = list.iter();
-        assert_eq!(7, i.next().unwrap().val);
-        assert_eq!(5, i.next().unwrap().val);
-        assert!(i.next().is_none());
-    }
-
     proptest::proptest! {
         #[test]
         fn fuzz_linked_list(ops: Vec<usize>) {
