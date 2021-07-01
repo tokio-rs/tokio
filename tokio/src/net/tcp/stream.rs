@@ -1002,12 +1002,32 @@ impl TcpStream {
         self.io.registration().poll_read_io(cx, f)
     }
 
-    /// Try to call a write I/O function, clearing write readiness if `f` returns
-    /// `WouldBlock`
+    /// Try to write from the socket using a user-provided IO operation.
     ///
-    /// # Return value
+    /// If the socket is ready for writing, the provided closure is called. The
+    /// closure should attempt to write from the socket by manually calling the
+    /// appropriate syscall. If the operation fails because the socket is not
+    /// actually ready, then the closure should return a `WouldBlock` error and
+    /// the write readiness flag is cleared. The return value of the closure is
+    /// then returned by `try_write_io`.
     ///
-    /// This functions returns exactly the same as `f`
+    /// If the socket is not ready for writing, then the closure is not called
+    /// and a `WouldBlock` error is returned.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the write operation using any of the
+    /// methods defined on the Tokio `TcpStream` type, as this will mess with
+    /// the readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// Usually, [`writable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`writable()`]: TcpStream::writable()
+    /// [`ready()`]: TcpStream::ready()
     pub fn try_write_io<R>(&self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
         self.io.registration().try_io(Interest::WRITABLE, f)
     }
