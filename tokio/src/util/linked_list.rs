@@ -236,37 +236,6 @@ impl<L: Link> Default for LinkedList<L, L::Target> {
     }
 }
 
-// ===== impl Iter =====
-
-cfg_rt_multi_thread! {
-    pub(crate) struct Iter<'a, T: Link> {
-        curr: Option<NonNull<T::Target>>,
-        _p: core::marker::PhantomData<&'a T>,
-    }
-
-    impl<L: Link> LinkedList<L, L::Target> {
-        pub(crate) fn iter(&self) -> Iter<'_, L> {
-            Iter {
-                curr: self.head,
-                _p: core::marker::PhantomData,
-            }
-        }
-    }
-
-    impl<'a, T: Link> Iterator for Iter<'a, T> {
-        type Item = &'a T::Target;
-
-        fn next(&mut self) -> Option<&'a T::Target> {
-            let curr = self.curr?;
-            // safety: the pointer references data contained by the list
-            self.curr = unsafe { T::pointers(curr).as_ref() }.get_next();
-
-            // safety: the value is still owned by the linked list.
-            Some(unsafe { &*curr.as_ptr() })
-        }
-    }
-}
-
 // ===== impl DrainFilter =====
 
 cfg_io_readiness! {

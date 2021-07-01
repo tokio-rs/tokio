@@ -13,6 +13,9 @@ mod join;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
 
+mod list;
+pub(super) use self::list::OwnedTasks;
+
 mod raw;
 use self::raw::RawTask;
 
@@ -20,11 +23,6 @@ mod state;
 use self::state::State;
 
 mod waker;
-
-cfg_rt_multi_thread! {
-    mod stack;
-    pub(crate) use self::stack::TransferStack;
-}
 
 use crate::future::Future;
 use crate::util::linked_list;
@@ -62,11 +60,10 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     fn bind(task: Task<Self>) -> Self;
 
     /// The task has completed work and is ready to be released. The scheduler
-    /// is free to drop it whenever.
+    /// should release it immediately and return it. The task module will batch
+    /// the ref-dec with setting other options.
     ///
-    /// If the scheduler can immediately release the task, it should return
-    /// it as part of the function. This enables the task module to batch
-    /// the ref-dec with other options.
+    /// If the scheduler has already released the task, then None is returned.
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>>;
 
     /// Schedule the task
