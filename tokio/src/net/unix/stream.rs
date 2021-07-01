@@ -683,22 +683,34 @@ impl UnixStream {
         self.io.registration().try_io(Interest::READABLE, f)
     }
 
-    /// Polls for read readiness.
+    /// Polls for read from the socket using a user-provided IO operation.
     ///
     /// If the unix stream is not currently ready for reading, this method will
     /// store a clone of the `Waker` from the provided `Context`. When the unix
     /// stream becomes ready for reading, `Waker::wake` will be called on the
     /// waker.
     ///
+    /// If the unix stream is ready for reading, the provided closure is called.
+    /// The closure should attempt to read from the socket by manually calling the
+    /// appropriate syscall. If the operation fails because the socket is not
+    /// actually ready, then the closure should return a `WouldBlock` error and
+    /// the read readiness flag is cleared. Stores and wakes the clone of the
+    /// `Waker` just like it was not ready for reading.
+    ///
     /// Note that on multiple calls to `poll_read_io`, `poll_read`,
     /// `poll_read_ready` or `poll_peek`, only the `Waker` from the `Context`
     /// passed to the most recent call is scheduled to receive a wakeup.
     /// (However, `poll_write_io` retains a second, independent waker.)
     ///
-    /// This function is intended for cases where customized I/O operations
-    /// may change the readiness of the underlying socket.
-    /// If the `f` function returns an error `WouldBlock`, then the read
-    /// readiness will be cleared and returns `Poll::Pending`.
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the read operation using any of the
+    /// methods defined on the Tokio `UnixStream` type, as this will mess with
+    /// the readiness flag and can cause the socket to behave incorrectly.
     ///
     /// # Return value
     ///
@@ -749,22 +761,34 @@ impl UnixStream {
         self.io.registration().try_io(Interest::WRITABLE, f)
     }
 
-    /// Polls for write readiness and then calls the `f` for writing operation.
+    /// Polls for write from the socket using a user-provided IO operation.
     ///
     /// If the unix stream is not currently ready for writing, this method will
     /// store a clone of the `Waker` from the provided `Context`. When the unix
     /// stream becomes ready for writing, `Waker::wake` will be called on the
     /// waker.
     ///
+    /// If the unix stream is ready for writing, the provided closure is called.
+    /// The closure should attempt to write from the socket by manually calling the
+    /// appropriate syscall. If the operation fails because the socket is not
+    /// actually ready, then the closure should return a `WouldBlock` error and
+    /// the read readiness flag is cleared. Stores and wakes the clone of the
+    /// `Waker` just like it was not ready for writing.
+    ///
     /// Note that on multiple calls to `poll_write_io` only
     /// the `Waker` from the `Context` passed to the most recent call is
     /// scheduled to receive a wakeup. (However, `poll_read_io` retains a
     /// second, independent waker.)
     ///
-    /// This function is intended for cases where customized I/O operations
-    /// may change the readiness of the underlying socket.
-    /// If the `f` function returns an error `WouldBlock`, then the write
-    /// readiness will be cleared and returns `Poll::Pending`.
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the write operation using any of the
+    /// methods defined on the Tokio `UnixStream` type, as this will mess with
+    /// the readiness flag and can cause the socket to behave incorrectly.
     ///
     /// # Return value
     ///
