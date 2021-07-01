@@ -1343,6 +1343,162 @@ impl NamedPipeClient {
             .registration()
             .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(buf))
     }
+
+    /// Try to read from the named pipe using a user-provided IO operation.
+    ///
+    /// If the named pipe is ready for reading, the provided closure is called. The
+    /// closure should attempt to read from the named pipe by manually calling the
+    /// appropriate syscall. If the operation fails because the named pipe is not
+    /// actually ready, then the closure should return a `WouldBlock` error and
+    /// the read readiness flag is cleared. The return value of the closure is
+    /// then returned by `try_read_io`.
+    ///
+    /// If the named pipe is not ready for reading, then the closure is not called
+    /// and a `WouldBlock` error is returned.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the named pipe that failed due to the named pipe not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the named pipe to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the read operation using any of the
+    /// methods defined on the Tokio `NamedPipeClient` type, as this will mess with
+    /// the readiness flag and can cause the named pipe to behave incorrectly.
+    ///
+    /// Usually, [`readable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`readable()`]: NamedPipeClient::readable()
+    /// [`ready()`]: NamedPipeClient::ready()
+    pub fn try_read_io<R>(&self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
+        self.io.registration().try_io(Interest::READABLE, f)
+    }
+
+    /// Polls for read from the socket using a user-provided IO operation.
+    ///
+    /// If the named pipe is not currently ready for reading, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the named
+    /// pipe becomes ready for reading, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// If the named pipe is ready for reading, the provided closure is called.
+    /// The closure should attempt to read from the socket by manually calling the
+    /// appropriate syscall. If the operation fails because the socket is not
+    /// actually ready, then the closure should return a `WouldBlock` error and
+    /// the read readiness flag is cleared. Stores and wakes the clone of the
+    /// `Waker` just like it was not ready for reading.
+    ///
+    /// Note that on multiple calls to `poll_read_io`, `poll_read`,
+    /// `poll_read_ready` or `poll_peek`, only the `Waker` from the `Context`
+    /// passed to the most recent call is scheduled to receive a wakeup.
+    /// (However, `poll_write_io` retains a second, independent waker.)
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the read operation using any of the
+    /// methods defined on the Tokio `NamedPipeClient` type, as this will mess with
+    /// the readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the named pipe is not ready for reading, or if `f` returns a `WouldBlock` error.
+    /// * `Poll::Ready(Ok(r))` if `f` returns `Ok(r)`.
+    /// * `Poll::Ready(Err(e))` if `f` returns an error other than `WouldBlock`, or if polling for readiness encounters an IO error.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_read_io<R>(
+        &self,
+        cx: &mut Context<'_>,
+        f: impl FnMut() -> io::Result<R>,
+    ) -> Poll<io::Result<R>> {
+        self.io.registration().poll_read_io(cx, f)
+    }
+
+    /// Try to write from the named pipe using a user-provided IO operation.
+    ///
+    /// If the named pipe is ready for writing, the provided closure is called. The
+    /// closure should attempt to write from the named pipe by manually calling the
+    /// appropriate syscall. If the operation fails because the named pipe is not
+    /// actually ready, then the closure should return a `WouldBlock` error and
+    /// the write readiness flag is cleared. The return value of the closure is
+    /// then returned by `try_write_io`.
+    ///
+    /// If the named pipe is not ready for writing, then the closure is not called
+    /// and a `WouldBlock` error is returned.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the named pipe that failed due to the named pipe not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the named pipe to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the write operation using any of the
+    /// methods defined on the Tokio `NamedPipeClient` type, as this will mess with
+    /// the readiness flag and can cause the named pipe to behave incorrectly.
+    ///
+    /// Usually, [`writable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`writable()`]: NamedPipeClient::writable()
+    /// [`ready()`]: NamedPipeClient::ready()
+    pub fn try_write_io<R>(&self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
+        self.io.registration().try_io(Interest::WRITABLE, f)
+    }
+
+    /// Polls for write from the socket using a user-provided IO operation.
+    ///
+    /// If the tcp stream is not currently ready for writing, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the tcp
+    /// stream becomes ready for writing, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// If the tcp stream is ready for writing, the provided closure is called.
+    /// The closure should attempt to write from the socket by manually calling the
+    /// appropriate syscall. If the operation fails because the socket is not
+    /// actually ready, then the closure should return a `WouldBlock` error and
+    /// the read readiness flag is cleared. Stores and wakes the clone of the
+    /// `Waker` just like it was not ready for writing.
+    ///
+    /// Note that on multiple calls to `poll_write_io` only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_read_io` retains a
+    /// second, independent waker.)
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the write operation using any of the
+    /// methods defined on the Tokio `TcpStream` type, as this will mess with
+    /// the readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the tcp stream is not ready for writing.
+    /// * `Poll::Ready(Ok(R))` if the `f` returns `Ok(R)`.
+    /// * `Poll::Ready(Err(e))` if an error is encountered from `f` except `WouldBlock`.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_write_io<R>(
+        &self,
+        cx: &mut Context<'_>,
+        f: impl FnMut() -> io::Result<R>,
+    ) -> Poll<io::Result<R>> {
+        self.io.registration().poll_write_io(cx, f)
+    }
 }
 
 impl AsyncRead for NamedPipeClient {
