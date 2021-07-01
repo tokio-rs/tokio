@@ -936,12 +936,32 @@ impl TcpStream {
             .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(bufs))
     }
 
-    /// Try to call a read I/O function, clearing read readiness if `f` returns
-    /// `WouldBlock`
+    /// Try to read from the socket using a user-provided IO operation.
     ///
-    /// # Return value
+    /// If the socket is ready for reading, the provided closure is called. The
+    /// closure should attempt to read from the socket by manually calling the
+    /// appropriate syscall. If the operation fails because the socket is not
+    /// actually ready, then the closure should return a `WouldBlock` error and
+    /// the read readiness flag is cleared. The return value of the closure is
+    /// then returned by `try_read_io`.
     ///
-    /// This functions returns exactly the same as `f`
+    /// If the socket is not ready for reading, then the closure is not called
+    /// and a `WouldBlock` error is returned.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the read operation using any of the
+    /// methods defined on the Tokio `TcpStream` type, as this will mess with
+    /// the readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// Usually, [`readable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`readable()`]: TcpStream::readable()
+    /// [`ready()`]: TcpStream::ready()
     pub fn try_read_io<R>(&self, f: impl FnMut() -> io::Result<R>) -> io::Result<R> {
         self.io.registration().try_io(Interest::READABLE, f)
     }
@@ -953,9 +973,10 @@ impl TcpStream {
     /// stream becomes ready for reading, `Waker::wake` will be called on the
     /// waker.
     ///
-    /// Note that on multiple calls to `poll_read_io`, only the `Waker` from
-    /// the `Context` passed to the most recent call is scheduled to receive a
-    /// wakeup. (However, `poll_write_io` retains a second, independent waker.)
+    /// Note that on multiple calls to `poll_read_io`, `poll_read`,
+    /// `poll_read_ready` or `poll_peek`, only the `Waker` from the `Context`
+    /// passed to the most recent call is scheduled to receive a wakeup.
+    /// (However, `poll_write_io` retains a second, independent waker.)
     ///
     /// This function is intended for cases where customized I/O operations
     /// may change the readiness of the underlying socket.
@@ -966,9 +987,9 @@ impl TcpStream {
     ///
     /// The function returns:
     ///
-    /// * `Poll::Pending` if the tcp stream is not ready for reading.
-    /// * `Poll::Ready(Ok(R))` if the `f` returns `Ok(R)`.
-    /// * `Poll::Ready(Err(e))` if an error is encountered from `f` except `WouldBlock`.
+    /// * `Poll::Pending` if the tcp stream is not ready for reading, or if `f` returns a `WouldBlock` error.
+    /// * `Poll::Ready(Ok(r))` if `f` returns `Ok(r)`.
+    /// * `Poll::Ready(Err(e))` if `f` returns an error other than `WouldBlock`, or if polling for readiness encounters an IO error.
     ///
     /// # Errors
     ///
