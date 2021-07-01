@@ -2,7 +2,7 @@ use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
-use crate::runtime::task::{self, JoinHandle, Schedule, Task, OwnedTasks};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::sync::notify::Notify;
 use crate::util::{waker_ref, Wake, WakerRef};
 
@@ -402,9 +402,7 @@ impl Schedule for Arc<Shared> {
 
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
         // SAFETY: Inserted into the list in bind above.
-        unsafe {
-            self.owned.remove(task)
-        }
+        unsafe { self.owned.remove(task) }
     }
 
     fn schedule(&self, task: task::Notified<Self>) {

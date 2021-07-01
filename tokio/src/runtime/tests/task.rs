@@ -1,4 +1,4 @@
-use crate::runtime::task::{self, Schedule, Task, OwnedTasks};
+use crate::runtime::task::{self, OwnedTasks, Schedule, Task};
 use crate::util::TryLock;
 
 use std::collections::VecDeque;

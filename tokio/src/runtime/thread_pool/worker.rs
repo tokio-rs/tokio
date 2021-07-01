@@ -11,9 +11,9 @@ use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
+use crate::runtime::task::OwnedTasks;
 use crate::runtime::thread_pool::{AtomicCell, Idle};
 use crate::runtime::{queue, task};
-use crate::runtime::task::OwnedTasks;
 use crate::util::FastRand;
 
 use std::cell::RefCell;
@@ -142,10 +142,7 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
             rand: FastRand::new(seed()),
         }));
 
-        remotes.push(Remote {
-            steal,
-            unpark,
-        });
+        remotes.push(Remote { steal, unpark });
     }
 
     let shared = Arc::new(Shared {
