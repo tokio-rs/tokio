@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625261132836,
+  "lastUpdate": 1625261157435,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -35599,6 +35599,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17692082,
             "range": "± 2685271",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8170e2787c21dd3bf9dbfda3ab8c770c16d51180",
+          "message": "sync: fix watch wrapper (#3914)",
+          "timestamp": "2021-07-02T23:24:02+02:00",
+          "tree_id": "4a830c6b254c483a2c61cff7c73ee01fd63c11a3",
+          "url": "https://github.com/tokio-rs/tokio/commit/8170e2787c21dd3bf9dbfda3ab8c770c16d51180"
+        },
+        "date": 1625261152478,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 210833,
+            "range": "± 29436",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 762215,
+            "range": "± 77886",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5623792,
+            "range": "± 1367478",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 23530280,
+            "range": "± 4408284",
             "unit": "ns/iter"
           }
         ]
