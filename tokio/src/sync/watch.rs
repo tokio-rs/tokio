@@ -247,7 +247,7 @@ impl<T> Receiver<T> {
     /// [`changed`]: Receiver::changed
     pub fn borrow_and_update(&mut self) -> Ref<'_, T> {
         let inner = self.shared.value.read().unwrap();
-        self.version = self.shared.version.load(SeqCst);
+        self.version = self.shared.version.load(SeqCst) & !CLOSED;
         Ref { inner }
     }
 
