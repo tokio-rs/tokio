@@ -1,3 +1,41 @@
+# 1.8.0 (July 2, 2021)
+
+### Added
+
+- io: add `get_{ref,mut}` methods to `AsyncFdReadyGuard` and `AsyncFdReadyMutGuard` ([#3807])
+- io: efficient implementation of vectored writes for `BufWriter` ([#3163])
+- net: add ready/try methods to `NamedPipe{Client,Server}` ([#3866], [#3899])
+- sync: add `watch::Receiver::borrow_and_update` ([#3813])
+- sync: implement `From<T>` for `OnceCell<T>` ([#3877])
+- time: allow users to specify Interval behaviour when delayed ([#3721])
+
+### Added (unstable)
+
+- rt: add `tokio::task::Builder` ([#3881])
+
+### Fixed
+
+- net: handle HUP event with `UnixStream` ([#3898])
+
+### Documented
+
+- doc: document cancellation safety ([#3900])
+- time: add wait alias to sleep ([#3897])
+- time: document auto-advancing behaviour of runtime ([#3763])
+
+[#3163]: https://github.com/tokio-rs/tokio/pull/3163
+[#3721]: https://github.com/tokio-rs/tokio/pull/3721
+[#3763]: https://github.com/tokio-rs/tokio/pull/3763
+[#3807]: https://github.com/tokio-rs/tokio/pull/3807
+[#3813]: https://github.com/tokio-rs/tokio/pull/3813
+[#3866]: https://github.com/tokio-rs/tokio/pull/3866
+[#3877]: https://github.com/tokio-rs/tokio/pull/3877
+[#3881]: https://github.com/tokio-rs/tokio/pull/3881
+[#3897]: https://github.com/tokio-rs/tokio/pull/3897
+[#3898]: https://github.com/tokio-rs/tokio/pull/3898
+[#3899]: https://github.com/tokio-rs/tokio/pull/3899
+[#3900]: https://github.com/tokio-rs/tokio/pull/3900
+
 # 1.7.1 (June 18, 2021)
 
 ### Fixed
