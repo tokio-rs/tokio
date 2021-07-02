@@ -17,10 +17,7 @@ async fn message_not_twice() {
         }
     });
 
-    let task = tokio::spawn(async move {
-        while stream.next().await.is_some() {
-        }
-    });
+    let task = tokio::spawn(async move { while stream.next().await.is_some() {} });
 
     // Send goodbye just once
     tx.send("goodbye").unwrap();
