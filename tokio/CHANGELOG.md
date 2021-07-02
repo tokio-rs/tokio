@@ -5,10 +5,13 @@
 - io: add `get_{ref,mut}` methods to `AsyncFdReadyGuard` and `AsyncFdReadyMutGuard` ([#3807])
 - io: efficient implementation of vectored writes for `BufWriter` ([#3163])
 - net: add ready/try methods to `NamedPipe{Client,Server}` ([#3866], [#3899])
-- rt: add `tokio::task::Builder` ([#3881])
 - sync: add `watch::Receiver::borrow_and_update` ([#3813])
 - sync: implement `From<T>` for `OnceCell<T>` ([#3877])
 - time: allow users to specify Interval behaviour when delayed ([#3721])
+
+### Added (unstable)
+
+- rt: add `tokio::task::Builder` ([#3881])
 
 ### Fixed
 
