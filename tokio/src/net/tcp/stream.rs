@@ -966,7 +966,7 @@ impl TcpStream {
         self.io.registration().try_io(Interest::READABLE, f)
     }
 
-    /// Polls for read from the socket using a user-provided IO operation.
+    /// Poll for read readiness, then reads from the socket using a user-provided IO operation.
     ///
     /// If the tcp stream is not currently ready for reading, this method will
     /// store a clone of the `Waker` from the provided `Context`. When the tcp
@@ -980,7 +980,7 @@ impl TcpStream {
     /// the read readiness flag is cleared. The `Waker` from the provided `Context`
     /// will be stored. When the tcp stream becomes ready for reading, `Waker::wake`
     /// will be called on the waker. The provided closure may be called multiple times
-    /// if the socket become ready right in the instance after the closure has returned
+    /// if the socket become ready in the instant after the closure has returned
     /// `WouldBlock`.
     ///
     /// Note that on multiple calls to `poll_read_io`, `poll_read`,
@@ -1047,7 +1047,7 @@ impl TcpStream {
         self.io.registration().try_io(Interest::WRITABLE, f)
     }
 
-    /// Polls for write from the socket using a user-provided IO operation.
+    /// Poll for write readiness, then writes to the socket using a user-provided IO operation.
     ///
     /// If the tcp stream is not currently ready for writing, this method will
     /// store a clone of the `Waker` from the provided `Context`. When the tcp
@@ -1061,7 +1061,7 @@ impl TcpStream {
     /// the read readiness flag is cleared. The `Waker` from the provided `Context`
     /// will be stored. When the tcp stream becomes ready for writing, `Waker::wake`
     /// will be called on the waker. The provided closure may be called multiple times
-    /// if the socket become ready right in the instance after the closure has returned
+    /// if the socket become ready in the instant after the closure has returned
     /// `WouldBlock`.
     ///
     /// Note that on multiple calls to `poll_write_io` only
@@ -1083,9 +1083,9 @@ impl TcpStream {
     ///
     /// The function returns:
     ///
-    /// * `Poll::Pending` if the tcp stream is not ready for writing.
-    /// * `Poll::Ready(Ok(R))` if the `f` returns `Ok(R)`.
-    /// * `Poll::Ready(Err(e))` if an error is encountered from `f` except `WouldBlock`.
+    /// * `Poll::Pending` if the tcp stream is not ready for writing, or if `f` returns a `WouldBlock` error.
+    /// * `Poll::Ready(Ok(r))` if `f` returns `Ok(r)`.
+    /// * `Poll::Ready(Err(e))` if `f` returns an error other than `WouldBlock`, or if polling for readiness encounters an IO error.
     ///
     /// # Errors
     ///
