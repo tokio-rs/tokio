@@ -1200,57 +1200,6 @@ impl UdpSocket {
         self.io.registration().try_io(Interest::READABLE, f)
     }
 
-    /// Poll for read readiness, then reads from the socket using a user-provided IO operation.
-    ///
-    /// If the udp socket is not currently ready for reading, this method will
-    /// store a clone of the `Waker` from the provided `Context`. When the udp
-    /// socket becomes ready for reading, `Waker::wake` will be called on the
-    /// waker.
-    ///
-    /// If the udp socket is ready for reading, the provided closure is called.
-    /// The closure should attempt to read from the socket by manually calling the
-    /// appropriate syscall. If the operation fails because the socket is not
-    /// actually ready, then the closure should return a `WouldBlock` error and
-    /// the read readiness flag is cleared. The `Waker` from the provided `Context`
-    /// will be stored. When the udp socket becomes ready for reading, `Waker::wake`
-    /// will be called on the waker. The provided closure may be called multiple times
-    /// if the socket become ready in the instance after the closure has returned
-    /// `WouldBlock`.
-    ///
-    /// Note that on multiple calls to `poll_read_io`, `poll_read`,
-    /// `poll_read_ready` or `poll_peek`, only the `Waker` from the `Context`
-    /// passed to the most recent call is scheduled to receive a wakeup.
-    /// (However, `poll_write_io` retains a second, independent waker.)
-    ///
-    /// The closure should only return a `WouldBlock` error if it has performed
-    /// an IO operation on the socket that failed due to the socket not being
-    /// ready. Returning a `WouldBlock` error in any other situation will
-    /// incorrectly clear the readiness flag, which can cause the socket to
-    /// behave incorrectly.
-    ///
-    /// The closure should not perform the read operation using any of the
-    /// methods defined on the Tokio `UdpSocket` type, as this will mess with
-    /// the readiness flag and can cause the socket to behave incorrectly.
-    ///
-    /// # Return value
-    ///
-    /// The function returns:
-    ///
-    /// * `Poll::Pending` if the udp socket is not ready for reading, or if `f` returns a `WouldBlock` error.
-    /// * `Poll::Ready(Ok(r))` if `f` returns `Ok(r)`.
-    /// * `Poll::Ready(Err(e))` if `f` returns an error other than `WouldBlock`, or if polling for readiness encounters an IO error.
-    ///
-    /// # Errors
-    ///
-    /// This function may encounter any standard I/O error except `WouldBlock`.
-    pub fn poll_read_io<R>(
-        &self,
-        cx: &mut Context<'_>,
-        f: impl FnMut() -> io::Result<R>,
-    ) -> Poll<io::Result<R>> {
-        self.io.registration().poll_read_io(cx, f)
-    }
-
     /// Try to write from the socket using a user-provided IO operation.
     ///
     /// If the socket is ready for writing, the provided closure is called. The
@@ -1279,57 +1228,6 @@ impl UdpSocket {
     /// [`ready()`]: UdpSocket::ready()
     pub fn try_write_io<R>(&self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
         self.io.registration().try_io(Interest::WRITABLE, f)
-    }
-
-    /// Poll for write readiness, then writes to the socket using a user-provided IO operation.
-    ///
-    /// If the udp socket is not currently ready for writing, this method will
-    /// store a clone of the `Waker` from the provided `Context`. When the udp
-    /// socket becomes ready for writing, `Waker::wake` will be called on the
-    /// waker.
-    ///
-    /// If the udp socket is ready for writing, the provided closure is called.
-    /// The closure should attempt to write from the socket by manually calling the
-    /// appropriate syscall. If the operation fails because the socket is not
-    /// actually ready, then the closure should return a `WouldBlock` error and
-    /// the read readiness flag is cleared. The `Waker` from the provided `Context`
-    /// will be stored. When the udp socket becomes ready for reading, `Waker::wake`
-    /// will be called on the waker. The provided closure may be called multiple times
-    /// if the socket become ready in the instance after the closure has returned
-    /// `WouldBlock`.
-    ///
-    /// Note that on multiple calls to `poll_write_io` only
-    /// the `Waker` from the `Context` passed to the most recent call is
-    /// scheduled to receive a wakeup. (However, `poll_read_io` retains a
-    /// second, independent waker.)
-    ///
-    /// The closure should only return a `WouldBlock` error if it has performed
-    /// an IO operation on the socket that failed due to the socket not being
-    /// ready. Returning a `WouldBlock` error in any other situation will
-    /// incorrectly clear the readiness flag, which can cause the socket to
-    /// behave incorrectly.
-    ///
-    /// The closure should not perform the write operation using any of the
-    /// methods defined on the Tokio `UdpSocket` type, as this will mess with
-    /// the readiness flag and can cause the socket to behave incorrectly.
-    ///
-    /// # Return value
-    ///
-    /// The function returns:
-    ///
-    /// * `Poll::Pending` if the udp socket is not ready for writing, or if `f` returns a `WouldBlock` error.
-    /// * `Poll::Ready(Ok(r))` if `f` returns `Ok(r)`.
-    /// * `Poll::Ready(Err(e))` if `f` returns an error other than `WouldBlock`, or if polling for readiness encounters an IO error.
-    ///
-    /// # Errors
-    ///
-    /// This function may encounter any standard I/O error except `WouldBlock`.
-    pub fn poll_write_io<R>(
-        &self,
-        cx: &mut Context<'_>,
-        f: impl FnMut() -> io::Result<R>,
-    ) -> Poll<io::Result<R>> {
-        self.io.registration().poll_write_io(cx, f)
     }
 
     /// Receives data from the socket, without removing it from the input queue.
