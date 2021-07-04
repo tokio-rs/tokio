@@ -7,6 +7,13 @@ use std::{io, path::Path};
 ///
 /// This is the async equivalent of [`std::fs::write`][std].
 ///
+/// This operation is blocking. However, tokio runs it in a
+/// background thread pool dedicated to blocking operations, using
+/// [`block_in_place`].
+///
+/// [`block_in_place`]: crate::task::block_in_place
+
+///
 /// [std]: fn@std::fs::write
 ///
 /// # Examples

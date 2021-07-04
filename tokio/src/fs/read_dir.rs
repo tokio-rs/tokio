@@ -13,6 +13,13 @@ use std::task::Poll;
 /// Returns a stream over the entries within a directory.
 ///
 /// This is an async version of [`std::fs::read_dir`](std::fs::read_dir)
+///
+/// This operation is blocking. However, tokio runs it in a
+/// background thread pool dedicated to blocking operations, using
+/// [`block_in_place`].
+///
+/// [`block_in_place`]: crate::task::block_in_place
+
 pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
     let path = path.as_ref().to_owned();
     let std = asyncify(|| std::fs::read_dir(path)).await?;
