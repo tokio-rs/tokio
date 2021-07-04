@@ -9,8 +9,10 @@
 mod read_buf;
 mod reader_stream;
 mod stream_reader;
+mod utf8_reader;
 
 pub use self::read_buf::read_buf;
 pub use self::reader_stream::ReaderStream;
 pub use self::stream_reader::StreamReader;
+pub use self::utf8_reader::Utf8Reader;
 pub use crate::util::{poll_read_buf, poll_write_buf};
