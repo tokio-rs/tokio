@@ -31,15 +31,10 @@ impl UCred {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "openbsd"))]
 pub(crate) use self::impl_linux::get_peer_cred;
 
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd"))]
 pub(crate) use self::impl_bsd::get_peer_cred;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -48,14 +43,20 @@ pub(crate) use self::impl_macos::get_peer_cred;
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub(crate) use self::impl_solaris::get_peer_cred;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "openbsd"))]
 pub(crate) mod impl_linux {
     use crate::net::unix::UnixStream;
 
     use libc::{c_void, getsockopt, socklen_t, SOL_SOCKET, SO_PEERCRED};
     use std::{io, mem};
 
+    #[cfg(target_os = "openbsd")]
+    use libc::sockpeercred;
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     use libc::ucred;
+    #[cfg(target_os = "openbsd")]
+    #[allow(non_camel_case_types)]
+    type ucred = sockpeercred;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         use std::os::unix::io::AsRawFd;
@@ -97,12 +98,7 @@ pub(crate) mod impl_linux {
     }
 }
 
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd"))]
 pub(crate) mod impl_bsd {
     use crate::net::unix::UnixStream;
 
