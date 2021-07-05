@@ -561,6 +561,32 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
             marker: marker::PhantomData,
         })
     }
+
+    /// Returns a reference to the original `Mutex`.
+    ///
+    /// ```
+    /// use tokio::sync::{Mutex, MutexGuard};
+    ///
+    /// async fn unlock_and_relock<'l>(guard: MutexGuard<'l, u32>) -> MutexGuard<'l, u32> {
+    ///     println!("1. contains: {:?}", *guard);
+    ///     let mutex = MutexGuard::mutex(&guard);
+    ///     drop(guard);
+    ///     let guard = mutex.lock().await;
+    ///     println!("2. contains: {:?}", *guard);
+    ///     guard
+    /// }
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #     let mutex = Mutex::new(0u32);
+    /// #     let guard = mutex.lock().await;
+    /// #     unlock_and_relock(guard).await;
+    /// # }
+    /// ```
+    #[inline]
+    pub fn mutex(this: &Self) -> &'a Mutex<T> {
+        this.lock
+    }
 }
 
 impl<T: ?Sized> Drop for MutexGuard<'_, T> {
