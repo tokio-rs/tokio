@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625472068786,
+  "lastUpdate": 1625494347741,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -35749,6 +35749,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20020254,
             "range": "± 3522820",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jqnk124@gmail.com",
+            "name": "oiovoyo",
+            "username": "oiovoyo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2e7de1ae1d4efb6d0fc6053a1fa22c1e0f91cc52",
+          "message": "stream: modify HashMap to StreamMap in example. (#3925)",
+          "timestamp": "2021-07-05T16:10:55+02:00",
+          "tree_id": "efa2505d00907a0238d18a47d9f00a585a163c9f",
+          "url": "https://github.com/tokio-rs/tokio/commit/2e7de1ae1d4efb6d0fc6053a1fa22c1e0f91cc52"
+        },
+        "date": 1625494343547,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 167825,
+            "range": "± 2692",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 592954,
+            "range": "± 42312",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4849872,
+            "range": "± 598274",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 16962500,
+            "range": "± 3332575",
             "unit": "ns/iter"
           }
         ]
