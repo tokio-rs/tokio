@@ -15,11 +15,11 @@ use std::{io, path::Path};
 ///
 /// This operation is blocking. However, tokio runs it in a
 /// background thread pool dedicated to blocking operations, using
-/// [`block_in_place`].
+/// [`spawn_blocking`].
 ///
 /// [`File::open`]: super::File::open
 /// [`read_to_end`]: crate::io::AsyncReadExt::read_to_end
-/// [`block_in_place`]: crate::task::block_in_place
+/// [`spawn_blocking`]: crate::task::spawn_blocking
 ///
 /// # Errors
 ///
