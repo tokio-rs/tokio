@@ -14,9 +14,7 @@ use std::task::Poll;
 ///
 /// This is an async version of [`std::fs::read_dir`](std::fs::read_dir)
 ///
-/// This operation is blocking. However, tokio runs it in a
-/// background thread pool dedicated to blocking operations, using
-/// [`spawn_blocking`].
+/// This operation is implemented by running the equivalent blocking operation on a separate thread pool using [`spawn_blocking`].
 ///
 /// [`spawn_blocking`]: crate::task::spawn_blocking
 
