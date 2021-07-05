@@ -113,6 +113,33 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
             _p: PhantomData,
         })
     }
+
+    /// Returns a reference to the original `Arc<RwLock>`.
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::{OwnedRwLockReadGuard, RwLock};
+    ///
+    /// async fn unlock_and_relock(guard: OwnedRwLockReadGuard<u32>) -> OwnedRwLockReadGuard<u32> {
+    ///     println!("1. contains: {:?}", *guard);
+    ///     let mutex: Arc<RwLock<u32>> = OwnedRwLockReadGuard::rwlock(&guard).clone();
+    ///     drop(guard);
+    ///     let guard = mutex.read_owned().await;
+    ///     println!("2. contains: {:?}", *guard);
+    ///     guard
+    /// }
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #     let rwlock = Arc::new(RwLock::new(0u32));
+    /// #     let guard = rwlock.read_owned().await;
+    /// #     unlock_and_relock(guard).await;
+    /// # }
+    /// ```
+    #[inline]
+    pub fn rwlock(this: &Self) -> &Arc<RwLock<T>> {
+        &this.lock
+    }
 }
 
 impl<T: ?Sized, U: ?Sized> ops::Deref for OwnedRwLockReadGuard<T, U> {
