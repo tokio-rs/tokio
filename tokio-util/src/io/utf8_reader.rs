@@ -51,7 +51,7 @@ fn len_of_complete_or_invalid_utf8_bytes(slice: &[u8]) -> usize {
             // A valid first byte to a UTF-8 sequence that we expect to take
             // either 2, 3, or 4 bytes. Here, we must do additional checking to
             // verify if this is a valid UTF-8 sequence.
-            Some(num_bytes @ 2 | num_bytes @ 3 | num_bytes @ 4) => {
+            Some(num_bytes @ 2) | Some(num_bytes @ 3) | Some(num_bytes @ 4) => {
                 // We try to go through the next [num_bytes - 1] bytes,
                 // validating each one in turn. If there are not enough bytes,
                 // we return `cursor`, because we have an incomplete UTF-8
