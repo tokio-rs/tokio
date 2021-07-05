@@ -123,7 +123,7 @@ pin_project! {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let SOME_SOURCE = "😀😬😁😂😃".as_bytes();
+    /// # const SOME_SOURCE: &[u8] = "😀😬😁😂😃".as_bytes();
     /// // Some `AsyncRead` that yields the bytes that make up the string
     /// // "😀😬😁😂😃". This is helpful for demonstration purposes because each
     /// // emoji takes up 4 bytes
@@ -199,7 +199,7 @@ impl<R> Utf8Reader<R> {
     /// ```
     /// use tokio_util::io::Utf8Reader;
     ///
-    /// # let INNER_READER = ();
+    /// # const INNER_READER: () = ();
     /// let utf8_reader = Utf8Reader::new(INNER_READER);
     /// ```
     pub const fn new(inner: R) -> Self {
@@ -216,7 +216,7 @@ impl<R> Utf8Reader<R> {
     /// ```
     /// use tokio_util::io::Utf8Reader;
     ///
-    /// # let INNER_READER = ();
+    /// # const INNER_READER: () = ();
     /// let utf8_reader = Utf8Reader::new(INNER_READER);
     ///
     /// // ... later on ...
