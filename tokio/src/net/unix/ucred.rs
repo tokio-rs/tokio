@@ -54,12 +54,9 @@ pub(crate) mod impl_linux {
     use std::{io, mem};
 
     #[cfg(target_os = "openbsd")]
-    use libc::sockpeercred;
+    use libc::sockpeercred as ucred;
     #[cfg(any(target_os = "linux", target_os = "android"))]
     use libc::ucred;
-    #[cfg(target_os = "openbsd")]
-    #[allow(non_camel_case_types)]
-    type ucred = sockpeercred;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         use std::os::unix::io::AsRawFd;
@@ -142,6 +139,7 @@ pub(crate) mod impl_netbsd {
         }
     }
 }
+
 #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
 pub(crate) mod impl_bsd {
     use crate::net::unix::UnixStream;
