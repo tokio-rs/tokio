@@ -1,6 +1,6 @@
 use std::{
     io,
-    num::NonZeroU8,
+    // num::NonZeroU8,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -9,77 +9,32 @@ use futures_core::ready;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncBufRead, AsyncRead, ReadBuf};
 
-/// Given the first byte in a UTF-8 sequence, determine how many bytes total,
-/// including the one passed in, to expect to be in the proceeding UTF-8
-/// sequence. Returns `None` if the byte is not a valid first UTF-8 byte.
-#[allow(clippy::unusual_byte_groupings)]
-fn num_utf8_bytes(byte: u8) -> Option<NonZeroU8> {
-    match byte {
-        // SAFETY: all integers passed in are hard-coded non-zero integers
-        0b0_0000000..=0b0_1111111 => Some(unsafe { NonZeroU8::new_unchecked(1) }),
-        0b110_00000..=0b110_11111 => Some(unsafe { NonZeroU8::new_unchecked(2) }),
-        0b1110_0000..=0b1110_1111 => Some(unsafe { NonZeroU8::new_unchecked(3) }),
-        0b11110_000..=0b11110_111 => Some(unsafe { NonZeroU8::new_unchecked(4) }),
-        _ => None,
-    }
-}
-
-/// Determine whether the given byte is a continuation of a UTF-8 sequence or
-/// not. That is, whether the given byte starts with the bits `01` or not.
-#[allow(clippy::unusual_byte_groupings)]
-fn is_continuation_byte(byte: u8) -> bool {
-    (0b10_000000..=0b10_111111).contains(&byte)
-}
-
 /// Given a slice of bytes, determine how much of it is complete UTF-8. If there
 /// is an incomplete UTF-8 sequence at the end, exclude that from the length
 /// returned. Any invalid bytes are added to the length (in essence, ignored).
 /// The intent is to pass the slice of bytes to the user and let them handle any
 /// invalid bytes in the way they most prefer.
 fn len_of_complete_or_invalid_utf8_bytes(slice: &[u8]) -> usize {
-    let mut iter = slice.iter();
-    let mut cursor = 0;
-    while cursor < slice.len() {
-        let next = match iter.next() {
-            Some(&byte) => byte,
-            None => break,
-        };
-        match num_utf8_bytes(next).map(|n| n.get()) {
-            // Either an invalid byte or ASCII character. In either case, we
-            // increment `cursor` and move on to the next iteration.
-            None | Some(1) => cursor += 1,
-            // A valid first byte to a UTF-8 sequence that we expect to take
-            // either 2, 3, or 4 bytes. Here, we must do additional checking to
-            // verify if this is a valid UTF-8 sequence.
-            Some(num_bytes @ 2) | Some(num_bytes @ 3) | Some(num_bytes @ 4) => {
-                // We try to go through the next [num_bytes - 1] bytes,
-                // validating each one in turn. If there are not enough bytes,
-                // we return `cursor`, because we have an incomplete UTF-8
-                // sequence as far as we can tell. If any byte is invalid, we
-                // increment `cursor` up to the invalid byte and break out of
-                // the loop, starting the next iteration of the outer loop. If
-                // we have all valid bytes, we increment `cursor` to the end of
-                // the valid UTF-8 sequence that we just found.
-                for i in 2..=num_bytes {
-                    match iter.next() {
-                        Some(&next) => {
-                            if is_continuation_byte(next) {
-                                if i == num_bytes {
-                                    cursor += num_bytes as usize;
-                                }
-                            } else {
-                                cursor += i as usize;
-                                break;
-                            }
-                        }
-                        None => return cursor,
-                    }
+    let mut index = 0;
+    loop {
+        match std::str::from_utf8(&slice[index..]) {
+            Ok(_) => break slice.len(),
+            Err(err) => {
+                let valid_up_to = err.valid_up_to();
+                match err.error_len() {
+                    // Reached an unexpected end, return where we're valid up
+                    // to. We have to add `index` because `valid_up_to` only
+                    // pertains to `&slice[index..]`, but we want it relative to
+                    // `slice`. `index` will always exclude either valid UTF-8
+                    // or invalid bytes from `slice`, but not partial UTF-8
+                    // sequences at the end.
+                    None => break index + valid_up_to,
+                    // Invalid byte, ignore it
+                    Some(len) => index += valid_up_to + len,
                 }
             }
-            _ => unreachable!(),
         }
     }
-    cursor
 }
 
 #[derive(Debug, Clone, Copy)]
