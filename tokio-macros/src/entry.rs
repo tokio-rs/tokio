@@ -201,17 +201,13 @@ fn parse_knobs(
     for arg in args {
         match arg {
             syn::NestedMeta::Meta(syn::Meta::NameValue(namevalue)) => {
-                let ident = namevalue.path.get_ident();
-                if ident.is_none() {
+                let ident = if let Some(ident) = namevalue.path.get_ident() {
+                    ident.to_string().to_lowercase()
+                } else {
                     let msg = "Must have specified ident";
                     return Err(syn::Error::new_spanned(namevalue, msg));
-                }
-                match ident
-                    .expect("Must have specified ident")
-                    .to_string()
-                    .to_lowercase()
-                    .as_str()
-                {
+                };
+                match ident.as_str() {
                     "worker_threads" => {
                         config.set_worker_threads(
                             namevalue.lit.clone(),
