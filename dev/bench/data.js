@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625472030446,
+  "lastUpdate": 1625472034433,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -35647,6 +35647,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 23530280,
             "range": "± 4408284",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "37e60fc7f9b6a1e9c89e1b05b8e38d88e4f829c9",
+          "message": "chore: fix new clippy complaint (#3915)",
+          "timestamp": "2021-07-05T09:58:49+02:00",
+          "tree_id": "fc0e306ba9d67d0e528072a97bc3b6770d13bb5e",
+          "url": "https://github.com/tokio-rs/tokio/commit/37e60fc7f9b6a1e9c89e1b05b8e38d88e4f829c9"
+        },
+        "date": 1625472029626,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 184574,
+            "range": "± 13641",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 678718,
+            "range": "± 90441",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5206926,
+            "range": "± 1089452",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20020254,
+            "range": "± 3522820",
             "unit": "ns/iter"
           }
         ]
