@@ -206,7 +206,12 @@ fn parse_knobs(
                     let msg = "Must have specified ident";
                     return Err(syn::Error::new_spanned(namevalue, msg));
                 }
-                match ident.unwrap().to_string().to_lowercase().as_str() {
+                match ident
+                    .expect("Must have specified ident")
+                    .to_string()
+                    .to_lowercase()
+                    .as_str()
+                {
                     "worker_threads" => {
                         config.set_worker_threads(
                             namevalue.lit.clone(),
@@ -244,7 +249,10 @@ fn parse_knobs(
                     let msg = "Must have specified ident";
                     return Err(syn::Error::new_spanned(path, msg));
                 }
-                let name = ident.unwrap().to_string().to_lowercase();
+                let name = ident
+                    .expect("Must have specified ident")
+                    .to_string()
+                    .to_lowercase();
                 let msg = match name.as_str() {
                     "threaded_scheduler" | "multi_thread" => {
                         format!(
@@ -326,11 +334,11 @@ fn parse_knobs(
             #rt
                 .enable_all()
                 .build()
-                .unwrap()
+                .expect("Failed building the Runtime")
                 .block_on(async #body)
         }
     })
-    .unwrap();
+    .expect("Parsing failure");
     input.block.brace_token = brace_token;
 
     let result = quote! {
