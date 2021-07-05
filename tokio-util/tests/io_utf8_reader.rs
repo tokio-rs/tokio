@@ -194,7 +194,7 @@ impl<'a, I: Iterator<Item = usize> + Unpin> AsyncRead for Splitter<'a, I> {
 
 #[tokio::test]
 async fn split_utf8() {
-    let reader = Utf8Reader::new(Splitter::new(EMOJIS, [6, 13, 16]));
+    let reader = Utf8Reader::new(Splitter::new(EMOJIS, vec![6, 13, 16]));
     task::spawn(reader).enter(|cx, mut me| {
         let mut buf = [0; 30];
         let mut buf = ReadBuf::new(&mut buf);
