@@ -364,7 +364,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::StreamMap;
+    /// use tokio_stream::{StreamMap, pending};
     ///
     /// let mut a = StreamMap::new();
     /// assert!(a.is_empty());
