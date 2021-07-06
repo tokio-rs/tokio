@@ -68,8 +68,6 @@ fn test_abort_without_panic_3662() {
             // dropped (but not in this thread).
             assert!(!drop_flag2.load(Ordering::SeqCst));
             j.abort();
-            // TODO: is this guaranteed at this point?
-            // assert!(drop_flag2.load(Ordering::SeqCst));
             j
         })
         .join()
