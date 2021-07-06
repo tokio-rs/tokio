@@ -583,9 +583,7 @@ impl task::Schedule for Arc<Worker> {
 
     fn release(&self, task: &Task) -> Option<Task> {
         // SAFETY: Inserted into owned in bind.
-        let res = unsafe { self.shared.owned.remove(task) };
-
-        res
+        unsafe { self.shared.owned.remove(task) }
     }
 
     fn schedule(&self, task: Notified) {
