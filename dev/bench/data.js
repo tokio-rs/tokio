@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625569631202,
+  "lastUpdate": 1625569634799,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -55221,6 +55221,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 838,
             "range": "± 134",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "devnexen@gmail.com",
+            "name": "David CARLIER",
+            "username": "devnexen"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8148b2107c754cf5460d37ddedfff841de97007f",
+          "message": "net: make ucred return pid field for OpenBSD (#3919)",
+          "timestamp": "2021-07-06T11:15:15+02:00",
+          "tree_id": "0c7a2fe631fe5497263efc02ec636ae961f22820",
+          "url": "https://github.com/tokio-rs/tokio/commit/8148b2107c754cf5460d37ddedfff841de97007f"
+        },
+        "date": 1625569628520,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15482,
+            "range": "± 5622",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 912,
+            "range": "± 77",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 607,
+            "range": "± 59",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16696,
+            "range": "± 8593",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 941,
+            "range": "± 95",
             "unit": "ns/iter"
           }
         ]
