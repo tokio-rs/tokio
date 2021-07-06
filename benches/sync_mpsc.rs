@@ -30,22 +30,26 @@ fn create_100_000_medium(b: &mut Bencher) {
 }
 
 fn send_medium(b: &mut Bencher) {
+    let rt = rt();
+
     b.iter(|| {
         let (tx, mut rx) = mpsc::channel::<Medium>(1000);
 
-        let _ = tx.try_send([0; 64]);
+        let _ = rt.block_on(tx.send([0; 64]));
 
-        rx.try_recv().unwrap();
+        rt.block_on(rx.recv()).unwrap();
     });
 }
 
 fn send_large(b: &mut Bencher) {
+    let rt = rt();
+
     b.iter(|| {
         let (tx, mut rx) = mpsc::channel::<Large>(1000);
 
-        let _ = tx.try_send([[0; 64]; 64]);
+        let _ = rt.block_on(tx.send([[0; 64]; 64]));
 
-        rx.try_recv().unwrap();
+        rt.block_on(rx.recv()).unwrap();
     });
 }
 

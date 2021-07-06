@@ -8,37 +8,37 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
-#[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
-
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+
+cfg_io_util! {
+    use bytes::BufMut;
+}
 
 cfg_net! {
     /// A TCP stream between a local and a remote socket.
     ///
     /// A TCP stream can either be created by connecting to an endpoint, via the
-    /// [`connect`] method, or by [accepting] a connection from a [listener].
+    /// [`connect`] method, or by [accepting] a connection from a [listener]. A
+    /// TCP stream can also be created via the [`TcpSocket`] type.
     ///
     /// Reading and writing to a `TcpStream` is usually done using the
     /// convenience methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`]
-    /// traits. Examples import these traits through [the prelude].
+    /// traits.
     ///
     /// [`connect`]: method@TcpStream::connect
     /// [accepting]: method@crate::net::TcpListener::accept
     /// [listener]: struct@crate::net::TcpListener
+    /// [`TcpSocket`]: struct@crate::net::TcpSocket
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-    /// [the prelude]: crate::prelude
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncWriteExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
@@ -57,6 +57,13 @@ cfg_net! {
     ///
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    ///
+    /// To shut down the stream in the write direction, you can call the
+    /// [`shutdown()`] method. This will cause the other peer to receive a read of
+    /// length 0, indicating that no more data will be sent. This only closes
+    /// the stream in one direction.
+    ///
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub struct TcpStream {
         io: PollEvented<mio::net::TcpStream>,
     }
@@ -66,22 +73,23 @@ impl TcpStream {
     /// Opens a TCP connection to a remote host.
     ///
     /// `addr` is an address of the remote host. Anything which implements the
-    /// [`ToSocketAddrs`] trait can be supplied as the address. Note that
-    /// strings only implement this trait when the **`net`** feature is enabled,
-    /// as strings may contain domain names that need to be resolved.
+    /// [`ToSocketAddrs`] trait can be supplied as the address.  If `addr`
+    /// yields multiple addresses, connect will be attempted with each of the
+    /// addresses until a connection is successful. If none of the addresses
+    /// result in a successful connection, the error returned from the last
+    /// connection attempt (the last address) is returned.
     ///
-    /// If `addr` yields multiple addresses, connect will be attempted with each
-    /// of the addresses until a connection is successful. If none of the
-    /// addresses result in a successful connection, the error returned from the
-    /// last connection attempt (the last address) is returned.
+    /// To configure the socket before connecting, you can use the [`TcpSocket`]
+    /// type.
     ///
     /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+    /// [`TcpSocket`]: struct@crate::net::TcpSocket
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncWriteExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
@@ -186,7 +194,7 @@ impl TcpStream {
 
     /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
     ///
-    /// The returned [`std::net::TcpStream`] will have `nonblocking mode` set as `true`.
+    /// The returned [`std::net::TcpStream`] will have nonblocking mode set as `true`.
     /// Use [`set_nonblocking`] to change the blocking mode if needed.
     ///
     /// # Examples
@@ -221,6 +229,7 @@ impl TcpStream {
     pub fn into_std(self) -> io::Result<std::net::TcpStream> {
         #[cfg(unix)]
         {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
             self.io
                 .into_inner()
                 .map(|io| io.into_raw_fd())
@@ -229,6 +238,7 @@ impl TcpStream {
 
         #[cfg(windows)]
         {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
             self.io
                 .into_inner()
                 .map(|io| io.into_raw_socket())
@@ -275,6 +285,11 @@ impl TcpStream {
     /// Attempts to receive data on the socket, without removing that data from
     /// the queue, registering the current task for wakeup if data is not yet
     /// available.
+    ///
+    /// Note that on multiple calls to `poll_peek`, `poll_read` or
+    /// `poll_read_ready`, only the `Waker` from the `Context` passed to the
+    /// most recent call is scheduled to receive a wakeup. (However,
+    /// `poll_write` retains a second, independent waker.)
     ///
     /// # Return value
     ///
@@ -341,6 +356,13 @@ impl TcpStream {
     /// can be used to concurrently read / write to the same socket on a single
     /// task without splitting the socket.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// Concurrently read and write to the stream on the same task without
@@ -405,6 +427,13 @@ impl TcpStream {
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -450,9 +479,31 @@ impl TcpStream {
 
     /// Polls for read readiness.
     ///
+    /// If the tcp stream is not currently ready for reading, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the tcp
+    /// stream becomes ready for reading, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_read_ready`, `poll_read` or
+    /// `poll_peek`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup. (However,
+    /// `poll_write_ready` retains a second, independent waker.)
+    ///
     /// This function is intended for cases where creating and pinning a future
     /// via [`readable`] is not feasible. Where possible, using [`readable`] is
     /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the tcp stream is not ready for reading.
+    /// * `Poll::Ready(Ok(()))` if the tcp stream is ready for reading.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`readable`]: method@Self::readable
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -526,10 +577,174 @@ impl TcpStream {
             .try_io(Interest::READABLE, || (&*self.io).read(buf))
     }
 
+    /// Try to read data from the stream into the provided buffers, returning
+    /// how many bytes were read.
+    ///
+    /// Data is copied to fill each buffer in order, with the final buffer
+    /// written to possibly being only partially filled. This method behaves
+    /// equivalently to a single call to [`try_read()`] with concatenated
+    /// buffers.
+    ///
+    /// Receives any pending data from the socket but does not wait for new data
+    /// to arrive. On success, returns the number of bytes read. Because
+    /// `try_read_vectored()` is non-blocking, the buffer does not have to be
+    /// stored by the async task and can exist entirely on the stack.
+    ///
+    /// Usually, [`readable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`try_read()`]: TcpStream::try_read()
+    /// [`readable()`]: TcpStream::readable()
+    /// [`ready()`]: TcpStream::ready()
+    ///
+    /// # Return
+    ///
+    /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+    /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
+    /// and will no longer yield data. If the stream is not ready to read data
+    /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use std::error::Error;
+    /// use std::io::{self, IoSliceMut};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be readable
+    ///         stream.readable().await?;
+    ///
+    ///         // Creating the buffer **after** the `await` prevents it from
+    ///         // being stored in the async task.
+    ///         let mut buf_a = [0; 512];
+    ///         let mut buf_b = [0; 1024];
+    ///         let mut bufs = [
+    ///             IoSliceMut::new(&mut buf_a),
+    ///             IoSliceMut::new(&mut buf_b),
+    ///         ];
+    ///
+    ///         // Try to read data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match stream.try_read_vectored(&mut bufs) {
+    ///             Ok(0) => break,
+    ///             Ok(n) => {
+    ///                 println!("read {} bytes", n);
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn try_read_vectored(&self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
+        use std::io::Read;
+
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || (&*self.io).read_vectored(bufs))
+    }
+
+    cfg_io_util! {
+        /// Try to read data from the stream into the provided buffer, advancing the
+        /// buffer's internal cursor, returning how many bytes were read.
+        ///
+        /// Receives any pending data from the socket but does not wait for new data
+        /// to arrive. On success, returns the number of bytes read. Because
+        /// `try_read_buf()` is non-blocking, the buffer does not have to be stored by
+        /// the async task and can exist entirely on the stack.
+        ///
+        /// Usually, [`readable()`] or [`ready()`] is used with this function.
+        ///
+        /// [`readable()`]: TcpStream::readable()
+        /// [`ready()`]: TcpStream::ready()
+        ///
+        /// # Return
+        ///
+        /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+        /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
+        /// and will no longer yield data. If the stream is not ready to read data
+        /// `Err(io::ErrorKind::WouldBlock)` is returned.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpStream;
+        /// use std::error::Error;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> Result<(), Box<dyn Error>> {
+        ///     // Connect to a peer
+        ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+        ///
+        ///     loop {
+        ///         // Wait for the socket to be readable
+        ///         stream.readable().await?;
+        ///
+        ///         let mut buf = Vec::with_capacity(4096);
+        ///
+        ///         // Try to read data, this may still fail with `WouldBlock`
+        ///         // if the readiness event is a false positive.
+        ///         match stream.try_read_buf(&mut buf) {
+        ///             Ok(0) => break,
+        ///             Ok(n) => {
+        ///                 println!("read {} bytes", n);
+        ///             }
+        ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+        ///                 continue;
+        ///             }
+        ///             Err(e) => {
+        ///                 return Err(e.into());
+        ///             }
+        ///         }
+        ///     }
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().try_io(Interest::READABLE, || {
+                use std::io::Read;
+
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `TcpStream::read` to have filled up `n` bytes in the
+                // buffer.
+                let n = (&*self.io).read(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok(n)
+            })
+        }
+    }
+
     /// Wait for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -572,9 +787,31 @@ impl TcpStream {
 
     /// Polls for write readiness.
     ///
+    /// If the tcp stream is not currently ready for writing, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the tcp
+    /// stream becomes ready for writing, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_write_ready` or `poll_write`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_read_ready` retains a
+    /// second, independent waker.)
+    ///
     /// This function is intended for cases where creating and pinning a future
     /// via [`writable`] is not feasible. Where possible, using [`writable`] is
     /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the tcp stream is not ready for writing.
+    /// * `Poll::Ready(Ok(()))` if the tcp stream is ready for writing.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`writable`]: method@Self::writable
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -637,6 +874,68 @@ impl TcpStream {
             .try_io(Interest::WRITABLE, || (&*self.io).write(buf))
     }
 
+    /// Try to write several buffers to the stream, returning how many bytes
+    /// were written.
+    ///
+    /// Data is written from each buffer in order, with the final buffer read
+    /// from possible being only partially consumed. This method behaves
+    /// equivalently to a single call to [`try_write()`] with concatenated
+    /// buffers.
+    ///
+    /// This function is usually paired with `writable()`.
+    ///
+    /// [`try_write()`]: TcpStream::try_write()
+    ///
+    /// # Return
+    ///
+    /// If data is successfully written, `Ok(n)` is returned, where `n` is the
+    /// number of bytes written. If the stream is not ready to write data,
+    /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     let bufs = [io::IoSlice::new(b"hello "), io::IoSlice::new(b"world")];
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be writable
+    ///         stream.writable().await?;
+    ///
+    ///         // Try to write data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match stream.try_write_vectored(&bufs) {
+    ///             Ok(n) => {
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn try_write_vectored(&self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
+        use std::io::Write;
+
+        self.io
+            .registration()
+            .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(bufs))
+    }
+
     /// Receives data on the socket from the remote address to which it is
     /// connected, without removing that data from the queue. On success,
     /// returns the number of bytes peeked.
@@ -648,7 +947,7 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncReadExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
@@ -686,26 +985,7 @@ impl TcpStream {
     /// This function will cause all pending and future I/O on the specified
     /// portions to return immediately with an appropriate value (see the
     /// documentation of `Shutdown`).
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    /// use std::error::Error;
-    /// use std::net::Shutdown;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    ///     // Shutdown the stream
-    ///     stream.shutdown(Shutdown::Write)?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+    pub(super) fn shutdown_std(&self, how: Shutdown) -> io::Result<()> {
         self.io.shutdown(how)
     }
 
@@ -810,11 +1090,13 @@ impl TcpStream {
     fn to_mio(&self) -> mio::net::TcpSocket {
         #[cfg(windows)]
         {
+            use std::os::windows::io::{AsRawSocket, FromRawSocket};
             unsafe { mio::net::TcpSocket::from_raw_socket(self.as_raw_socket()) }
         }
 
         #[cfg(unix)]
         {
+            use std::os::unix::io::{AsRawFd, FromRawFd};
             unsafe { mio::net::TcpSocket::from_raw_fd(self.as_raw_fd()) }
         }
     }
@@ -883,24 +1165,19 @@ impl TcpStream {
     /// this comes at the cost of a heap allocation.
     ///
     /// **Note:** Dropping the write half will shut down the write half of the TCP
-    /// stream. This is equivalent to calling [`shutdown(Write)`] on the `TcpStream`.
+    /// stream. This is equivalent to calling [`shutdown()`] on the `TcpStream`.
     ///
     /// [`split`]: TcpStream::split()
-    /// [`shutdown(Write)`]: fn@crate::net::TcpStream::shutdown
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
 
     // == Poll IO functions that takes `&self` ==
     //
-    // They are not public because (taken from the doc of `PollEvented`):
-    //
-    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
-    // caller must ensure that there are at most two tasks that use a
-    // `PollEvented` instance concurrently. One for reading and one for writing.
-    // While violating this requirement is "safe" from a Rust memory model point
-    // of view, it will result in unexpected behavior in the form of lost
-    // notifications and tasks hanging.
+    // To read or write without mutable access to the `UnixStream`, combine the
+    // `poll_read_ready` or `poll_write_ready` methods with the `try_read` or
+    // `try_write` methods.
 
     pub(crate) fn poll_read_priv(
         &self,
@@ -980,7 +1257,7 @@ impl AsyncWrite for TcpStream {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.shutdown(std::net::Shutdown::Write)?;
+        self.shutdown_std(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
     }
 }

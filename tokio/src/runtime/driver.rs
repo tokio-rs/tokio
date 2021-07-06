@@ -23,7 +23,7 @@ cfg_io_driver! {
             let io_handle = io_driver.handle();
 
             let (signal_driver, signal_handle) = create_signal_driver(io_driver)?;
-            let process_driver = create_process_driver(signal_driver)?;
+            let process_driver = create_process_driver(signal_driver);
 
             (Either::A(process_driver), Some(io_handle), signal_handle)
         } else {
@@ -80,7 +80,7 @@ cfg_not_signal_internal! {
 cfg_process_driver! {
     type ProcessDriver = crate::process::unix::driver::Driver;
 
-    fn create_process_driver(signal_driver: SignalDriver) -> io::Result<ProcessDriver> {
+    fn create_process_driver(signal_driver: SignalDriver) -> ProcessDriver {
         crate::process::unix::driver::Driver::new(signal_driver)
     }
 }
@@ -89,8 +89,8 @@ cfg_not_process_driver! {
     cfg_io_driver! {
         type ProcessDriver = SignalDriver;
 
-        fn create_process_driver(signal_driver: SignalDriver) -> io::Result<ProcessDriver> {
-            Ok(signal_driver)
+        fn create_process_driver(signal_driver: SignalDriver) -> ProcessDriver {
+            signal_driver
         }
     }
 }
@@ -103,8 +103,8 @@ cfg_time! {
     pub(crate) type Clock = crate::time::Clock;
     pub(crate) type TimeHandle = Option<crate::time::driver::Handle>;
 
-    fn create_clock() -> Clock {
-        crate::time::Clock::new()
+    fn create_clock(enable_pausing: bool, start_paused: bool) -> Clock {
+        crate::time::Clock::new(enable_pausing, start_paused)
     }
 
     fn create_time_driver(
@@ -131,7 +131,7 @@ cfg_not_time! {
     pub(crate) type Clock = ();
     pub(crate) type TimeHandle = ();
 
-    fn create_clock() -> Clock {
+    fn create_clock(_enable_pausing: bool, _start_paused: bool) -> Clock {
         ()
     }
 
@@ -161,13 +161,16 @@ pub(crate) struct Resources {
 pub(crate) struct Cfg {
     pub(crate) enable_io: bool,
     pub(crate) enable_time: bool,
+    pub(crate) enable_pause_time: bool,
+    pub(crate) start_paused: bool,
 }
 
 impl Driver {
     pub(crate) fn new(cfg: Cfg) -> io::Result<(Self, Resources)> {
         let (io_stack, io_handle, signal_handle) = create_io_stack(cfg.enable_io)?;
 
-        let clock = create_clock();
+        let clock = create_clock(cfg.enable_pause_time, cfg.start_paused);
+
         let (time_driver, time_handle) =
             create_time_driver(cfg.enable_time, io_stack, clock.clone());
 

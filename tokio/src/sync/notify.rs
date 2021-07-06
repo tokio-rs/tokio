@@ -140,7 +140,7 @@ struct Waiter {
     _p: PhantomPinned,
 }
 
-/// Future returned from `notified()`
+/// Future returned from [`Notify::notified()`]
 #[derive(Debug)]
 pub struct Notified<'a> {
     /// The `Notify` being received on.
@@ -192,6 +192,10 @@ fn inc_num_notify_waiters_calls(data: usize) -> usize {
     data + (1 << NOTIFY_WAITERS_SHIFT)
 }
 
+fn atomic_inc_num_notify_waiters_calls(data: &AtomicUsize) {
+    data.fetch_add(1 << NOTIFY_WAITERS_SHIFT, SeqCst);
+}
+
 impl Notify {
     /// Create a new `Notify`, initialized without a permit.
     ///
@@ -241,6 +245,12 @@ impl Notify {
     /// for a permit to be made available by the next call to `notify_one()`.
     ///
     /// [`notify_one()`]: Notify::notify_one
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute notifications in the order
+    /// they were requested. Cancelling a call to `notified` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///
@@ -312,6 +322,8 @@ impl Notify {
     ///     notify.notify_one();
     /// }
     /// ```
+    // Alias for old name in 0.x
+    #[cfg_attr(docsrs, doc(alias = "notify"))]
     pub fn notify_one(&self) {
         // Load the current state
         let mut curr = self.state.load(SeqCst);
@@ -349,8 +361,8 @@ impl Notify {
     /// Notifies all waiting tasks
     ///
     /// If a task is currently waiting, that task is notified. Unlike with
-    /// `notify()`, no permit is stored to be used by the next call to
-    /// [`notified().await`]. The purpose of this method is to notify all
+    /// `notify_one()`, no permit is stored to be used by the next call to
+    /// `notified().await`. The purpose of this method is to notify all
     /// already registered waiters. Registering for notification is done by
     /// acquiring an instance of the `Notified` future via calling `notified()`.
     ///
@@ -392,11 +404,9 @@ impl Notify {
         let curr = self.state.load(SeqCst);
 
         if let EMPTY | NOTIFIED = get_state(curr) {
-            // There are no waiting tasks. In this case, no synchronization is
-            // established between `notify` and `notified().await`.
-            // All we need to do is increment the number of times this
-            // method was called.
-            self.state.store(inc_num_notify_waiters_calls(curr), SeqCst);
+            // There are no waiting tasks. All we need to do is increment the
+            // number of times this method was called.
+            atomic_inc_num_notify_waiters_calls(&self.state);
             return;
         }
 
@@ -679,35 +689,17 @@ impl Drop for Notified<'_> {
             let mut waiters = notify.waiters.lock();
             let mut notify_state = notify.state.load(SeqCst);
 
-            // `Notify.state` may be in any of the three states (Empty, Waiting,
-            // Notified). It doesn't actually matter what the atomic is set to
-            // at this point. We hold the lock and will ensure the atomic is in
-            // the correct state once the lock is dropped.
-            //
-            // Because the atomic state is not checked, at first glance, it may
-            // seem like this routine does not handle the case where the
-            // receiver is notified but has not yet observed the notification.
-            // If this happens, no matter how many notifications happen between
-            // this receiver being notified and the receive future dropping, all
-            // we need to do is ensure that one notification is returned back to
-            // the `Notify`. This is done by calling `notify_locked` if `self`
-            // has the `notified` flag set.
-
-            // remove the entry from the list
+            // remove the entry from the list (if not already removed)
             //
             // safety: the waiter is only added to `waiters` by virtue of it
             // being the only `LinkedList` available to the type.
             unsafe { waiters.remove(NonNull::new_unchecked(waiter.get())) };
 
             if waiters.is_empty() {
-                notify_state = set_state(notify_state, EMPTY);
-                // If the state *should* be `NOTIFIED`, the call to
-                // `notify_locked` below will end up doing the
-                // `store(NOTIFIED)`. If a concurrent receiver races and
-                // observes the incorrect `EMPTY` state, it will then obtain the
-                // lock and block until `notify.state` is in the correct final
-                // state.
-                notify.state.store(notify_state, SeqCst);
+                if let WAITING = get_state(notify_state) {
+                    notify_state = set_state(notify_state, EMPTY);
+                    notify.state.store(notify_state, SeqCst);
+                }
             }
 
             // See if the node was notified but not received. In this case, if

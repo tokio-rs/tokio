@@ -2,18 +2,17 @@
 name = "tokio"
 # When releasing to crates.io:
 # - Remove path dependencies
-# - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.0.x" git tag.
-version = "1.0.0"
+version = "1.8.0"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/1.0.0/tokio/"
+documentation = "https://docs.rs/tokio/1.8.0/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -22,7 +21,6 @@ backed applications.
 """
 categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
-publish = false
 
 [features]
 # Include nothing by default
@@ -40,7 +38,6 @@ full = [
   "rt",
   "rt-multi-thread",
   "signal",
-  "stream",
   "sync",
   "time",
 ]
@@ -57,6 +54,7 @@ net = [
   "mio/tcp",
   "mio/udp",
   "mio/uds",
+  "winapi/namedpipeapi",
 ]
 process = [
   "bytes",
@@ -69,7 +67,7 @@ process = [
   "winapi/threadpoollegacyapiset",
 ]
 # Includes basic task execution capabilities
-rt = ["slab"]
+rt = []
 rt-multi-thread = [
   "num_cpus",
   "rt",
@@ -83,25 +81,26 @@ signal = [
   "signal-hook-registry",
   "winapi/consoleapi",
 ]
-stream = ["futures-core"]
 sync = []
 test-util = []
 time = []
 
 [dependencies]
-tokio-macros = { version = "1.0.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "1.1.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.0"
 
 # Everything else is optional...
-bytes = { version = "0.6.0", optional = true }
-futures-core = { version = "0.3.0", optional = true }
+bytes = { version = "1.0.0", optional = true }
 once_cell = { version = "1.5.2", optional = true }
 memchr = { version = "2.2", optional = true }
 mio = { version = "0.7.6", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.11.0", optional = true }
-slab = { version = "0.4.1", optional = true }
+
+# Currently unstable. The API exposed by these features may be broken at any time.
+# Requires `--cfg tokio_unstable` to enable.
+[target.'cfg(tokio_unstable)'.dependencies]
 tracing = { version = "0.1.21", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
@@ -117,14 +116,21 @@ version = "0.3.8"
 default-features = false
 optional = true
 
+[target.'cfg(windows)'.dev-dependencies.ntapi]
+version = "0.3.6"
+
 [dev-dependencies]
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
+tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
-proptest = "0.10.0"
+proptest = "1"
+rand = "0.8.0"
 tempfile = "3.1.0"
+async-stream = "0.3"
+socket2 = "0.4"
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.3.5", features = ["futures", "checkpoint"] }
+loom = { version = "0.5", features = ["futures", "checkpoint"] }
 
 [build-dependencies]
 autocfg = "1" # Needed for conditionally enabling `track-caller`

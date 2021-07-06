@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
+
 //! A single-producer, multi-consumer channel that only retains the *last* sent
 //! value.
 //!
@@ -51,7 +53,7 @@
 //! [`Sender::is_closed`]: crate::sync::watch::Sender::is_closed
 //! [`Sender::closed`]: crate::sync::watch::Sender::closed
 
-use crate::sync::Notify;
+use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::{Relaxed, SeqCst};
@@ -61,6 +63,11 @@ use std::ops;
 /// Receives values from the associated [`Sender`](struct@Sender).
 ///
 /// Instances are created by the [`channel`](fn@channel) function.
+///
+/// To turn this receiver into a `Stream`, you can use the [`WatchStream`]
+/// wrapper.
+///
+/// [`WatchStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.WatchStream.html
 #[derive(Debug)]
 pub struct Receiver<T> {
     /// Pointer to the shared state
@@ -193,11 +200,25 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
 }
 
 impl<T> Receiver<T> {
-    /// Returns a reference to the most recently sent value
+    fn from_shared(version: usize, shared: Arc<Shared<T>>) -> Self {
+        // No synchronization necessary as this is only used as a counter and
+        // not memory access.
+        shared.ref_count_rx.fetch_add(1, Relaxed);
+
+        Self { shared, version }
+    }
+
+    /// Returns a reference to the most recently sent value.
+    ///
+    /// This method does not mark the returned value as seen, so future calls to
+    /// [`changed`] may return immediately even if you have already seen the
+    /// value with a call to `borrow`.
     ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
     /// could cause the send half to block. It is recommended to keep the borrow
     /// as short lived as possible.
+    ///
+    /// [`changed`]: Receiver::changed
     ///
     /// # Examples
     ///
@@ -212,11 +233,40 @@ impl<T> Receiver<T> {
         Ref { inner }
     }
 
-    /// Wait for a change notification
+    /// Returns a reference to the most recently sent value and mark that value
+    /// as seen.
     ///
-    /// Returns when a new value has been sent by the [`Sender`] since the last
-    /// time `changed()` was called. When the `Sender` half is dropped, `Err` is
-    /// returned.
+    /// This method marks the value as seen, so [`changed`] will not return
+    /// immediately if the newest value is one previously returned by
+    /// `borrow_and_update`.
+    ///
+    /// Outstanding borrows hold a read lock. This means that long lived borrows
+    /// could cause the send half to block. It is recommended to keep the borrow
+    /// as short lived as possible.
+    ///
+    /// [`changed`]: Receiver::changed
+    pub fn borrow_and_update(&mut self) -> Ref<'_, T> {
+        let inner = self.shared.value.read().unwrap();
+        self.version = self.shared.version.load(SeqCst) & !CLOSED;
+        Ref { inner }
+    }
+
+    /// Wait for a change notification, then mark the newest value as seen.
+    ///
+    /// If the newest value in the channel has not yet been marked seen when
+    /// this method is called, the method marks that value seen and returns
+    /// immediately. If the newest value has already been marked seen, then the
+    /// method sleeps until a new message is sent by the [`Sender`] connected to
+    /// this `Receiver`, or until the [`Sender`] is dropped.
+    ///
+    /// This method returns an error if and only if the [`Sender`] is dropped.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If you use it as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that no values have been marked
+    /// seen by this call to `changed`.
     ///
     /// [`Sender`]: struct@Sender
     ///
@@ -255,6 +305,12 @@ impl<T> Receiver<T> {
             // loop around again in case the wake-up was spurious
         }
     }
+
+    cfg_process_driver! {
+        pub(crate) fn try_has_changed(&mut self) -> Option<Result<(), error::RecvError>> {
+            maybe_changed(&self.shared, &mut self.version)
+        }
+    }
 }
 
 fn maybe_changed<T>(
@@ -284,11 +340,7 @@ impl<T> Clone for Receiver<T> {
         let version = self.version;
         let shared = self.shared.clone();
 
-        // No synchronization necessary as this is only used as a counter and
-        // not memory access.
-        shared.ref_count_rx.fetch_add(1, Relaxed);
-
-        Receiver { version, shared }
+        Self::from_shared(version, shared)
     }
 }
 
@@ -311,10 +363,21 @@ impl<T> Sender<T> {
             return Err(error::SendError { inner: value });
         }
 
-        *self.shared.value.write().unwrap() = value;
+        {
+            // Acquire the write lock and update the value.
+            let mut lock = self.shared.value.write().unwrap();
+            *lock = value;
 
-        // Update the version. 2 is used so that the CLOSED bit is not set.
-        self.shared.version.fetch_add(2, SeqCst);
+            // Update the version. 2 is used so that the CLOSED bit is not set.
+            self.shared.version.fetch_add(2, SeqCst);
+
+            // Release the write lock.
+            //
+            // Incrementing the version counter while holding the lock ensures
+            // that receivers are able to figure out the version number of the
+            // value they are currently looking at.
+            drop(lock);
+        }
 
         // Notify all watchers
         self.shared.notify_rx.notify_waiters();
@@ -362,6 +425,11 @@ impl<T> Sender<T> {
     /// This allows the producer to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once the channel is closed, it stays closed
+    /// forever and all future calls to `closed` will return immediately.
+    ///
     /// # Examples
     ///
     /// ```
@@ -390,6 +458,37 @@ impl<T> Sender<T> {
 
         notified.await;
         debug_assert_eq!(0, self.shared.ref_count_rx.load(Relaxed));
+    }
+
+    cfg_signal_internal! {
+        pub(crate) fn subscribe(&self) -> Receiver<T> {
+            let shared = self.shared.clone();
+            let version = shared.version.load(SeqCst);
+
+            Receiver::from_shared(version, shared)
+        }
+    }
+
+    /// Returns the number of receivers that currently exist
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx1) = watch::channel("hello");
+    ///
+    ///     assert_eq!(1, tx.receiver_count());
+    ///
+    ///     let mut _rx2 = rx1.clone();
+    ///
+    ///     assert_eq!(2, tx.receiver_count());
+    /// }
+    /// ```
+    pub fn receiver_count(&self) -> usize {
+        self.shared.ref_count_rx.load(Relaxed)
     }
 }
 

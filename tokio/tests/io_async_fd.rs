@@ -201,7 +201,10 @@ async fn reset_readable() {
 
     let mut guard = readable.await.unwrap();
 
-    guard.with_io(|| afd_a.get_ref().read(&mut [0])).unwrap();
+    guard
+        .try_io(|_| afd_a.get_ref().read(&mut [0]))
+        .unwrap()
+        .unwrap();
 
     // `a` is not readable, but the reactor still thinks it is
     // (because we have not observed a not-ready error yet)
@@ -233,12 +236,10 @@ async fn reset_writable() {
     let mut guard = afd_a.writable().await.unwrap();
 
     // Write until we get a WouldBlock. This also clears the ready state.
-    loop {
-        if let Err(e) = guard.with_io(|| afd_a.get_ref().write(&[0; 512][..])) {
-            assert_eq!(ErrorKind::WouldBlock, e.kind());
-            break;
-        }
-    }
+    while guard
+        .try_io(|_| afd_a.get_ref().write(&[0; 512][..]))
+        .is_ok()
+    {}
 
     // Writable state should be cleared now.
     let writable = afd_a.writable();
@@ -313,9 +314,7 @@ async fn reregister() {
 }
 
 #[tokio::test]
-async fn with_poll() {
-    use std::task::Poll;
-
+async fn try_io() {
     let (a, mut b) = socketpair();
 
     b.write_all(b"0").unwrap();
@@ -327,13 +326,13 @@ async fn with_poll() {
     afd_a.get_ref().read_exact(&mut [0]).unwrap();
 
     // Should not clear the readable state
-    let _ = guard.with_poll(|| Poll::Ready(()));
+    let _ = guard.try_io(|_| Ok(()));
 
     // Still readable...
     let _ = afd_a.readable().await.unwrap();
 
     // Should clear the readable state
-    let _ = guard.with_poll(|| Poll::Pending::<()>);
+    let _ = guard.try_io(|_| io::Result::<()>::Err(ErrorKind::WouldBlock.into()));
 
     // Assert not readable
     let readable = afd_a.readable();

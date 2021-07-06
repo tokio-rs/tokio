@@ -53,6 +53,7 @@
 //! refuse to mark the timer as pending.
 
 use crate::loom::cell::UnsafeCell;
+use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::atomic::Ordering;
 
 use crate::sync::AtomicWaker;
@@ -67,82 +68,9 @@ use std::{marker::PhantomPinned, pin::Pin, ptr::NonNull};
 
 type TimerResult = Result<(), crate::time::error::Error>;
 
-const STATE_DEREGISTERED: u64 = u64::max_value();
+const STATE_DEREGISTERED: u64 = u64::MAX;
 const STATE_PENDING_FIRE: u64 = STATE_DEREGISTERED - 1;
 const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
-
-/// Not all platforms support 64-bit compare-and-swap. This hack replaces the
-/// AtomicU64 with a mutex around a u64 on platforms that don't. This is slow,
-/// unfortunately, but 32-bit platforms are a bit niche so it'll do for now.
-///
-/// Note: We use "x86 or 64-bit pointers" as the condition here because
-/// target_has_atomic is not stable.
-#[cfg(all(
-    not(tokio_force_time_entry_locked),
-    any(target_arch = "x86", target_pointer_width = "64")
-))]
-type AtomicU64 = crate::loom::sync::atomic::AtomicU64;
-
-#[cfg(not(all(
-    not(tokio_force_time_entry_locked),
-    any(target_arch = "x86", target_pointer_width = "64")
-)))]
-#[derive(Debug)]
-struct AtomicU64 {
-    inner: crate::loom::sync::Mutex<u64>,
-}
-
-#[cfg(not(all(
-    not(tokio_force_time_entry_locked),
-    any(target_arch = "x86", target_pointer_width = "64")
-)))]
-impl AtomicU64 {
-    fn new(v: u64) -> Self {
-        Self {
-            inner: crate::loom::sync::Mutex::new(v),
-        }
-    }
-
-    fn load(&self, _order: Ordering) -> u64 {
-        debug_assert_ne!(_order, Ordering::SeqCst); // we only provide AcqRel with the lock
-        *self.inner.lock()
-    }
-
-    fn store(&self, v: u64, _order: Ordering) {
-        debug_assert_ne!(_order, Ordering::SeqCst); // we only provide AcqRel with the lock
-        *self.inner.lock() = v;
-    }
-
-    fn compare_exchange(
-        &self,
-        current: u64,
-        new: u64,
-        _success: Ordering,
-        _failure: Ordering,
-    ) -> Result<u64, u64> {
-        debug_assert_ne!(_success, Ordering::SeqCst); // we only provide AcqRel with the lock
-        debug_assert_ne!(_failure, Ordering::SeqCst);
-
-        let mut lock = self.inner.lock();
-
-        if *lock == current {
-            *lock = new;
-            Ok(current)
-        } else {
-            Err(*lock)
-        }
-    }
-
-    fn compare_exchange_weak(
-        &self,
-        current: u64,
-        new: u64,
-        success: Ordering,
-        failure: Ordering,
-    ) -> Result<u64, u64> {
-        self.compare_exchange(current, new, success, failure)
-    }
-}
 
 /// This structure holds the current shared state of the timer - its scheduled
 /// time (if registered), or otherwise the result of the timer completing, as
@@ -157,10 +85,10 @@ impl AtomicU64 {
 /// requires only the driver lock.
 pub(super) struct StateCell {
     /// Holds either the scheduled expiration time for this timer, or (if the
-    /// timer has been fired and is unregistered), [`u64::max_value()`].
+    /// timer has been fired and is unregistered), `u64::MAX`.
     state: AtomicU64,
     /// If the timer is fired (an Acquire order read on state shows
-    /// `u64::max_value()`), holds the result that should be returned from
+    /// `u64::MAX`), holds the result that should be returned from
     /// polling the timer. Otherwise, the contents are unspecified and reading
     /// without holding the driver lock is undefined behavior.
     result: UnsafeCell<TimerResult>,
@@ -197,7 +125,7 @@ impl StateCell {
     fn when(&self) -> Option<u64> {
         let cur_state = self.state.load(Ordering::Relaxed);
 
-        if cur_state == u64::max_value() {
+        if cur_state == u64::MAX {
             None
         } else {
             Some(cur_state)
@@ -300,7 +228,7 @@ impl StateCell {
     /// expiration time.
     ///
     /// While this function is memory-safe, it should only be called from a
-    /// context holding both `&mut TimerEntry` and the driver lock.    
+    /// context holding both `&mut TimerEntry` and the driver lock.
     fn set_expiration(&self, timestamp: u64) {
         debug_assert!(timestamp < STATE_MIN_VALUE);
 
@@ -343,7 +271,7 @@ impl StateCell {
     /// ordering, but is conservative - if it returns false, the timer is
     /// definitely _not_ registered.
     pub(super) fn might_be_registered(&self) -> bool {
-        self.state.load(Ordering::Relaxed) != u64::max_value()
+        self.state.load(Ordering::Relaxed) != u64::MAX
     }
 }
 
@@ -367,6 +295,8 @@ pub(super) struct TimerEntry {
     /// Initial deadline for the timer. This is used to register on the first
     /// poll, as we can't register prior to being pinned.
     initial_deadline: Option<Instant>,
+    /// Ensure the type is !Unpin
+    _m: std::marker::PhantomPinned,
 }
 
 unsafe impl Send for TimerEntry {}
@@ -556,6 +486,7 @@ impl TimerEntry {
             driver,
             inner: StdUnsafeCell::new(TimerShared::new()),
             initial_deadline: Some(deadline),
+            _m: std::marker::PhantomPinned,
         }
     }
 
@@ -612,6 +543,10 @@ impl TimerEntry {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), super::Error>> {
+        if self.driver.is_shutdown() {
+            panic!("{}", crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR);
+        }
+
         if let Some(deadline) = self.initial_deadline {
             self.as_mut().reset(deadline);
         }
@@ -656,7 +591,7 @@ impl TimerHandle {
         match self.inner.as_ref().state.mark_pending(not_after) {
             Ok(()) => {
                 // mark this as being on the pending queue in cached_when
-                self.inner.as_ref().set_cached_when(u64::max_value());
+                self.inner.as_ref().set_cached_when(u64::MAX);
                 Ok(())
             }
             Err(tick) => {

@@ -19,7 +19,9 @@ jobs:
         run: rustup update stable
 
       - name: Install Valgrind
-        run: sudo apt-get install -y valgrind
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y valgrind
 
       # Compiles each of the stress test examples.
       - name: Compile stress test examples

@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-util/0.6.0")]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
@@ -6,7 +5,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![cfg_attr(docsrs, deny(broken_intra_doc_links))]
+#![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
@@ -46,12 +45,13 @@ cfg_rt! {
     pub mod context;
 }
 
+cfg_time! {
+    pub mod time;
+}
+
 pub mod sync;
 
 pub mod either;
-
-#[cfg(feature = "time")]
-pub mod time;
 
 #[cfg(any(feature = "io", feature = "codec"))]
 mod util {
@@ -72,7 +72,7 @@ mod util {
     ///
     /// ```
     /// use bytes::{Bytes, BytesMut};
-    /// use tokio::stream;
+    /// use tokio_stream as stream;
     /// use tokio::io::Result;
     /// use tokio_util::io::{StreamReader, poll_read_buf};
     /// use futures::future::poll_fn;
@@ -113,7 +113,7 @@ mod util {
         }
 
         let n = {
-            let dst = buf.bytes_mut();
+            let dst = buf.chunk_mut();
             let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
             let mut buf = ReadBuf::uninit(dst);
             let ptr = buf.filled().as_ptr();
@@ -187,10 +187,10 @@ mod util {
 
         let n = if io.is_write_vectored() {
             let mut slices = [IoSlice::new(&[]); MAX_BUFS];
-            let cnt = buf.bytes_vectored(&mut slices);
+            let cnt = buf.chunks_vectored(&mut slices);
             ready!(io.poll_write_vectored(cx, &slices[..cnt]))?
         } else {
-            ready!(io.poll_write(cx, buf.bytes()))?
+            ready!(io.poll_write(cx, buf.chunk()))?
         };
 
         buf.advance(n);

@@ -15,7 +15,7 @@ use std::task::Poll;
 #[derive(Debug)]
 pub(crate) struct Reaper<W, Q, S>
 where
-    W: Wait + Unpin,
+    W: Wait,
     Q: OrphanQueue<W>,
 {
     inner: Option<W>,
@@ -25,7 +25,7 @@ where
 
 impl<W, Q, S> Deref for Reaper<W, Q, S>
 where
-    W: Wait + Unpin,
+    W: Wait,
     Q: OrphanQueue<W>,
 {
     type Target = W;
@@ -37,7 +37,7 @@ where
 
 impl<W, Q, S> Reaper<W, Q, S>
 where
-    W: Wait + Unpin,
+    W: Wait,
     Q: OrphanQueue<W>,
 {
     pub(crate) fn new(inner: W, orphan_queue: Q, signal: S) -> Self {
@@ -61,7 +61,7 @@ impl<W, Q, S> Future for Reaper<W, Q, S>
 where
     W: Wait + Unpin,
     Q: OrphanQueue<W> + Unpin,
-    S: InternalStream,
+    S: InternalStream + Unpin,
 {
     type Output = io::Result<ExitStatus>;
 
@@ -106,7 +106,7 @@ where
 
 impl<W, Q, S> Kill for Reaper<W, Q, S>
 where
-    W: Kill + Wait + Unpin,
+    W: Kill + Wait,
     Q: OrphanQueue<W>,
 {
     fn kill(&mut self) -> io::Result<()> {
@@ -116,7 +116,7 @@ where
 
 impl<W, Q, S> Drop for Reaper<W, Q, S>
 where
-    W: Wait + Unpin,
+    W: Wait,
     Q: OrphanQueue<W>,
 {
     fn drop(&mut self) {
@@ -134,7 +134,6 @@ mod test {
     use super::*;
 
     use crate::process::unix::orphan::test::MockQueue;
-    use crate::sync::mpsc::error::TryRecvError;
     use futures::future::FutureExt;
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
@@ -206,10 +205,6 @@ mod test {
                 None => Poll::Pending,
             }
         }
-
-        fn try_recv(&mut self) -> Result<(), TryRecvError> {
-            unimplemented!();
-        }
     }
 
     #[test]
@@ -229,7 +224,6 @@ mod test {
         assert!(grim.poll_unpin(&mut context).is_pending());
         assert_eq!(1, grim.signal.total_polls);
         assert_eq!(1, grim.total_waits);
-        assert_eq!(0, grim.orphan_queue.total_reaps.get());
         assert!(grim.orphan_queue.all_enqueued.borrow().is_empty());
 
         // Not yet exited, couldn't register interest the first time
@@ -237,7 +231,6 @@ mod test {
         assert!(grim.poll_unpin(&mut context).is_pending());
         assert_eq!(3, grim.signal.total_polls);
         assert_eq!(3, grim.total_waits);
-        assert_eq!(0, grim.orphan_queue.total_reaps.get());
         assert!(grim.orphan_queue.all_enqueued.borrow().is_empty());
 
         // Exited
@@ -250,7 +243,6 @@ mod test {
         }
         assert_eq!(4, grim.signal.total_polls);
         assert_eq!(4, grim.total_waits);
-        assert_eq!(0, grim.orphan_queue.total_reaps.get());
         assert!(grim.orphan_queue.all_enqueued.borrow().is_empty());
     }
 
@@ -265,7 +257,6 @@ mod test {
 
         grim.kill().unwrap();
         assert_eq!(1, grim.total_kills);
-        assert_eq!(0, grim.orphan_queue.total_reaps.get());
         assert!(grim.orphan_queue.all_enqueued.borrow().is_empty());
     }
 
@@ -281,7 +272,6 @@ mod test {
 
             drop(grim);
 
-            assert_eq!(0, queue.total_reaps.get());
             assert!(queue.all_enqueued.borrow().is_empty());
         }
 
@@ -299,7 +289,6 @@ mod test {
             let grim = Reaper::new(&mut mock, &queue, MockStream::new(vec![]));
             drop(grim);
 
-            assert_eq!(0, queue.total_reaps.get());
             assert_eq!(1, queue.all_enqueued.borrow().len());
         }
 

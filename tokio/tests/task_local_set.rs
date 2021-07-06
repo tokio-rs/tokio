@@ -1,6 +1,11 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use futures::{
+    future::{pending, ready},
+    FutureExt,
+};
+
 use tokio::runtime::{self, Runtime};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{self, LocalSet};
@@ -329,7 +334,7 @@ fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
     // something we can easily make assertions about, we'll run it in a
     // thread. When the test thread finishes, it will send a message on a
     // channel to this thread. We'll wait for that message with a fairly
-    // generous timeout, and if we don't recieve it, we assume the test
+    // generous timeout, and if we don't receive it, we assume the test
     // thread has hung.
     //
     // Note that it should definitely complete in under a minute, but just
@@ -484,6 +489,15 @@ async fn acquire_mutex_in_drop() {
 
     // Drop the LocalSet
     drop(local);
+}
+
+#[tokio::test]
+async fn spawn_wakes_localset() {
+    let local = LocalSet::new();
+    futures::select! {
+        _ = local.run_until(pending::<()>()).fuse() => unreachable!(),
+        ret = async { local.spawn_local(ready(())).await.unwrap()}.fuse() => ret
+    }
 }
 
 fn rt() -> Runtime {

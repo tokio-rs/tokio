@@ -43,9 +43,9 @@ use std::task::{Context, Poll};
 pub trait AsyncRead {
     /// Attempts to read from the `AsyncRead` into `buf`.
     ///
-    /// On success, returns `Poll::Ready(Ok(()))` and fills `buf` with data
-    /// read. If no data was read (`buf.filled().is_empty()`) it implies that
-    /// EOF has been reached.
+    /// On success, returns `Poll::Ready(Ok(()))` and places data in the
+    /// unfilled portion of `buf`. If no data was read (`buf.filled().len()` is
+    /// unchanged), it implies that EOF has been reached.
     ///
     /// If no data is available for reading, the method returns `Poll::Pending`
     /// and arranges for the current task (via `cx.waker()`) to receive a

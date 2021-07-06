@@ -67,7 +67,7 @@ pub enum Either<L, R> {
 }
 
 /// A small helper macro which reduces amount of boilerplate in the actual trait method implementation.
-/// It takes an invokation of method as an argument (e.g. `self.poll(cx)`), and redirects it to either
+/// It takes an invocation of method as an argument (e.g. `self.poll(cx)`), and redirects it to either
 /// enum variant held in `self`.
 macro_rules! delegate_call {
     ($self:ident.$method:ident($($args:ident),+)) => {
@@ -167,10 +167,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::{
-        io::{repeat, AsyncReadExt, Repeat},
-        stream::{once, Once, StreamExt},
-    };
+    use tokio::io::{repeat, AsyncReadExt, Repeat};
+    use tokio_stream::{once, Once, StreamExt};
 
     #[tokio::test]
     async fn either_is_stream() {

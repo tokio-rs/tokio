@@ -9,7 +9,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
-use tokio::stream::Stream;
+use tokio_stream::Stream;
 
 /// TODO: dox
 pub fn spawn<T>(task: T) -> Spawn<T> {
@@ -180,7 +180,7 @@ impl ThreadWaker {
         }
     }
 
-    /// Clears any previously received wakes, avoiding potential spurrious
+    /// Clears any previously received wakes, avoiding potential spurious
     /// wake notifications. This should only be called immediately before running the
     /// task.
     fn clear(&self) {

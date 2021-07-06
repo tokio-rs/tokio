@@ -33,6 +33,10 @@ impl<T> fmt::Debug for UnboundedSender<T> {
 ///
 /// Instances are created by the
 /// [`unbounded_channel`](unbounded_channel) function.
+///
+/// This receiver can be turned into a `Stream` using [`UnboundedReceiverStream`].
+///
+/// [`UnboundedReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.UnboundedReceiverStream.html
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
@@ -73,14 +77,17 @@ impl<T> UnboundedReceiver<T> {
         UnboundedReceiver { chan }
     }
 
-    fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.chan.recv(cx)
-    }
-
     /// Receives the next value for this receiver.
     ///
     /// `None` is returned when all `Sender` halves have dropped, indicating
     /// that no further values can be sent on the channel.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
     ///
     /// # Examples
     ///
@@ -159,14 +166,24 @@ impl<T> UnboundedReceiver<T> {
     pub fn close(&mut self) {
         self.chan.close();
     }
-}
 
-#[cfg(feature = "stream")]
-impl<T> crate::stream::Stream for UnboundedReceiver<T> {
-    type Item = T;
-
-    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.poll_recv(cx)
+    /// Polls to receive the next message on this channel.
+    ///
+    /// This method returns:
+    ///
+    ///  * `Poll::Pending` if no messages are available but the channel is not
+    ///    closed.
+    ///  * `Poll::Ready(Some(message))` if a message is available.
+    ///  * `Poll::Ready(None)` if the channel has been closed and all messages
+    ///    sent before it was closed have been received.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when a message is sent on any
+    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// `poll_recv`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup.
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        self.chan.recv(cx)
     }
 }
 
@@ -231,6 +248,11 @@ impl<T> UnboundedSender<T> {
     /// This allows the producers to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once the channel is closed, it stays closed
+    /// forever and all future calls to `closed` will return immediately.
+    ///
     /// # Examples
     ///
     /// ```
@@ -260,6 +282,7 @@ impl<T> UnboundedSender<T> {
     pub async fn closed(&self) {
         self.chan.closed().await
     }
+
     /// Checks if the channel has been closed. This happens when the
     /// [`UnboundedReceiver`] is dropped, or when the
     /// [`UnboundedReceiver::close`] method is called.
@@ -280,5 +303,21 @@ impl<T> UnboundedSender<T> {
     /// ```
     pub fn is_closed(&self) -> bool {
         self.chan.is_closed()
+    }
+
+    /// Returns `true` if senders belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+    /// let  tx2 = tx.clone();
+    /// assert!(tx.same_channel(&tx2));
+    ///
+    /// let (tx3, rx3) = tokio::sync::mpsc::unbounded_channel::<()>();
+    /// assert!(!tx3.same_channel(&tx2));
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        self.chan.same_channel(&other.chan)
     }
 }

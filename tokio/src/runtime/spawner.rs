@@ -1,8 +1,7 @@
 cfg_rt! {
+    use crate::future::Future;
     use crate::runtime::basic_scheduler;
     use crate::task::JoinHandle;
-
-    use std::future::Future;
 }
 
 cfg_rt_multi_thread! {

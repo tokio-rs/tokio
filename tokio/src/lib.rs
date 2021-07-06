@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio/1.0.0")]
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
@@ -10,7 +9,8 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![cfg_attr(docsrs, deny(broken_intra_doc_links))]
+#![deny(unused_must_use)]
+#![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
@@ -57,7 +57,7 @@
 //! enabling the `full` feature flag:
 //!
 //! ```toml
-//! tokio = { version = "0.3", features = ["full"] }
+//! tokio = { version = "1", features = ["full"] }
 //! ```
 //!
 //! ### Authoring applications
@@ -72,12 +72,12 @@
 //! This example shows the quickest way to get started with Tokio.
 //!
 //! ```toml
-//! tokio = { version = "0.3", features = ["full"] }
+//! tokio = { version = "1", features = ["full"] }
 //! ```
 //!
 //! ### Authoring libraries
 //!
-//! As a library author your goal should be to provide the lighest weight crate
+//! As a library author your goal should be to provide the lightest weight crate
 //! that is based on Tokio. To achieve this you should ensure that you only enable
 //! the features you need. This allows users to pick up your crate without having
 //! to enable unnecessary features.
@@ -88,7 +88,7 @@
 //! needs to `tokio::spawn` and use a `TcpStream`.
 //!
 //! ```toml
-//! tokio = { version = "0.3", features = ["rt", "net"] }
+//! tokio = { version = "1", features = ["rt", "net"] }
 //! ```
 //!
 //! ## Working With Tasks
@@ -254,7 +254,7 @@
 //!
 //! ```no_run
 //! use tokio::net::TcpListener;
-//! use tokio::prelude::*;
+//! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -301,7 +301,7 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all Tokio public API features listed below.
+//! - `full`: Enables all Tokio public API features listed below except `test-util`.
 //! - `rt`: Enables `tokio::spawn`, the basic (current thread) scheduler,
 //!         and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
@@ -314,11 +314,9 @@
 //! - `process`: Enables `tokio::process` types.
 //! - `macros`: Enables `#[tokio::main]` and `#[tokio::test]` macros.
 //! - `sync`: Enables all `tokio::sync` types.
-//! - `stream`: Enables optional `Stream` implementations for types within Tokio.
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
-//! - `tracing`: Enables tracing events
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
@@ -332,6 +330,15 @@
 //! - `parking_lot`: As a potential optimization, use the _parking_lot_ crate's
 //! synchronization primitives internally. MSRV may increase according to the
 //! _parking_lot_ release in use.
+//!
+//! ### Unstable features
+//!
+//! These feature flags enable **unstable** features. The public API may break in 1.x
+//! releases. To enable these features, the `--cfg tokio_unstable` must be passed to
+//! `rustc` when compiling. This is easiest done using the `RUSTFLAGS` env variable:
+//! `RUSTFLAGS="--cfg tokio_unstable"`.
+//!
+//! - `tracing`: Enables tracing events.
 //!
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 
@@ -354,8 +361,6 @@ pub mod net;
 
 mod loom;
 mod park;
-
-pub mod prelude;
 
 cfg_process! {
     pub mod process;
@@ -381,10 +386,6 @@ cfg_signal_internal! {
     pub(crate) mod signal;
 }
 
-cfg_stream! {
-    pub mod stream;
-}
-
 cfg_sync! {
     pub mod sync;
 }
@@ -403,6 +404,67 @@ cfg_time! {
 
 mod util;
 
+/// Due to the `Stream` trait's inclusion in `std` landing later than Tokio's 1.0
+/// release, most of the Tokio stream utilities have been moved into the [`tokio-stream`]
+/// crate.
+///
+/// # Why was `Stream` not included in Tokio 1.0?
+///
+/// Originally, we had planned to ship Tokio 1.0 with a stable `Stream` type
+/// but unfortunately the [RFC] had not been merged in time for `Stream` to
+/// reach `std` on a stable compiler in time for the 1.0 release of Tokio. For
+/// this reason, the team has decided to move all `Stream` based utilities to
+/// the [`tokio-stream`] crate. While this is not ideal, once `Stream` has made
+/// it into the standard library and the MSRV period has passed, we will implement
+/// stream for our different types.
+///
+/// While this may seem unfortunate, not all is lost as you can get much of the
+/// `Stream` support with `async/await` and `while let` loops. It is also possible
+/// to create a `impl Stream` from `async fn` using the [`async-stream`] crate.
+///
+/// [`tokio-stream`]: https://docs.rs/tokio-stream
+/// [`async-stream`]: https://docs.rs/async-stream
+/// [RFC]: https://github.com/rust-lang/rfcs/pull/2996
+///
+/// # Example
+///
+/// Convert a [`sync::mpsc::Receiver`] to an `impl Stream`.
+///
+/// ```rust,no_run
+/// use tokio::sync::mpsc;
+///
+/// let (tx, mut rx) = mpsc::channel::<usize>(16);
+///
+/// let stream = async_stream::stream! {
+///     while let Some(item) = rx.recv().await {
+///         yield item;
+///     }
+/// };
+/// ```
+pub mod stream {}
+
+// local re-exports of platform specific things, allowing for decent
+// documentation to be shimmed in on docs.rs
+
+#[cfg(docsrs)]
+pub mod doc;
+
+#[cfg(docsrs)]
+#[allow(unused)]
+pub(crate) use self::doc::os;
+
+#[cfg(not(docsrs))]
+#[allow(unused)]
+pub(crate) use std::os;
+
+#[cfg(docsrs)]
+#[allow(unused)]
+pub(crate) use self::doc::winapi;
+
+#[cfg(all(not(docsrs), windows, feature = "net"))]
+#[allow(unused)]
+pub(crate) use ::winapi;
+
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**
     /// intended to be used as part of the public API and is permitted to
@@ -411,21 +473,23 @@ cfg_macros! {
     pub use tokio_macros::select_priv_declare_output_enum;
 
     cfg_rt! {
-        cfg_rt_multi_thread! {
-            // This is the docs.rs case (with all features) so make sure macros
-            // is included in doc(cfg).
+        #[cfg(feature = "rt-multi-thread")]
+        #[cfg(not(test))] // Work around for rust-lang/rust#62127
+        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[doc(inline)]
+        pub use tokio_macros::main;
 
-            #[cfg(not(test))] // Work around for rust-lang/rust#62127
-            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-            pub use tokio_macros::main;
-
-            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-            pub use tokio_macros::test;
-        }
+        #[cfg(feature = "rt-multi-thread")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[doc(inline)]
+        pub use tokio_macros::test;
 
         cfg_not_rt_multi_thread! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
+            #[doc(inline)]
             pub use tokio_macros::main_rt as main;
+
+            #[doc(inline)]
             pub use tokio_macros::test_rt as test;
         }
     }
@@ -433,7 +497,10 @@ cfg_macros! {
     // Always fail if rt is not enabled.
     cfg_not_rt! {
         #[cfg(not(test))]
+        #[doc(inline)]
         pub use tokio_macros::main_fail as main;
+
+        #[doc(inline)]
         pub use tokio_macros::test_fail as test;
     }
 }

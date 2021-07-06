@@ -9,11 +9,15 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+cfg_io_util! {
+    use bytes::BufMut;
+}
 
 cfg_net_unix! {
     /// A structure representing a connected Unix socket.
@@ -21,6 +25,13 @@ cfg_net_unix! {
     /// This socket can be connected directly with `UnixStream::connect` or accepted
     /// from a listener with `UnixListener::incoming`. Additionally, a pair of
     /// anonymous Unix sockets can be created with `UnixStream::pair`.
+    ///
+    /// To shut down the stream in the write direction, you can call the
+    /// [`shutdown()`] method. This will cause the other peer to receive a read of
+    /// length 0, indicating that no more data will be sent. This only closes
+    /// the stream in one direction.
+    ///
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub struct UnixStream {
         io: PollEvented<mio::net::UnixStream>,
     }
@@ -40,6 +51,11 @@ impl UnixStream {
         let stream = UnixStream::new(stream)?;
 
         poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;
+
+        if let Some(e) = stream.io.take_error()? {
+            return Err(e);
+        }
+
         Ok(stream)
     }
 
@@ -48,6 +64,13 @@ impl UnixStream {
     /// This function is usually paired with `try_read()` or `try_write()`. It
     /// can be used to concurrently read / write to the same socket on a single
     /// task without splitting the socket.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -115,6 +138,13 @@ impl UnixStream {
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -162,9 +192,31 @@ impl UnixStream {
 
     /// Polls for read readiness.
     ///
+    /// If the unix stream is not currently ready for reading, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the unix
+    /// stream becomes ready for reading, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_read_ready` or `poll_read`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_write_ready` retains a
+    /// second, independent waker.)
+    ///
     /// This function is intended for cases where creating and pinning a future
     /// via [`readable`] is not feasible. Where possible, using [`readable`] is
     /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the unix stream is not ready for reading.
+    /// * `Poll::Ready(Ok(()))` if the unix stream is ready for reading.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`readable`]: method@Self::readable
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -238,10 +290,176 @@ impl UnixStream {
             .try_io(Interest::READABLE, || (&*self.io).read(buf))
     }
 
+    /// Try to read data from the stream into the provided buffers, returning
+    /// how many bytes were read.
+    ///
+    /// Data is copied to fill each buffer in order, with the final buffer
+    /// written to possibly being only partially filled. This method behaves
+    /// equivalently to a single call to [`try_read()`] with concatenated
+    /// buffers.
+    ///
+    /// Receives any pending data from the socket but does not wait for new data
+    /// to arrive. On success, returns the number of bytes read. Because
+    /// `try_read_vectored()` is non-blocking, the buffer does not have to be
+    /// stored by the async task and can exist entirely on the stack.
+    ///
+    /// Usually, [`readable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`try_read()`]: UnixStream::try_read()
+    /// [`readable()`]: UnixStream::readable()
+    /// [`ready()`]: UnixStream::ready()
+    ///
+    /// # Return
+    ///
+    /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+    /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
+    /// and will no longer yield data. If the stream is not ready to read data
+    /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    /// use std::error::Error;
+    /// use std::io::{self, IoSliceMut};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let bind_path = dir.path().join("bind_path");
+    ///     let stream = UnixStream::connect(bind_path).await?;
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be readable
+    ///         stream.readable().await?;
+    ///
+    ///         // Creating the buffer **after** the `await` prevents it from
+    ///         // being stored in the async task.
+    ///         let mut buf_a = [0; 512];
+    ///         let mut buf_b = [0; 1024];
+    ///         let mut bufs = [
+    ///             IoSliceMut::new(&mut buf_a),
+    ///             IoSliceMut::new(&mut buf_b),
+    ///         ];
+    ///
+    ///         // Try to read data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match stream.try_read_vectored(&mut bufs) {
+    ///             Ok(0) => break,
+    ///             Ok(n) => {
+    ///                 println!("read {} bytes", n);
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn try_read_vectored(&self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || (&*self.io).read_vectored(bufs))
+    }
+
+    cfg_io_util! {
+        /// Try to read data from the stream into the provided buffer, advancing the
+        /// buffer's internal cursor, returning how many bytes were read.
+        ///
+        /// Receives any pending data from the socket but does not wait for new data
+        /// to arrive. On success, returns the number of bytes read. Because
+        /// `try_read_buf()` is non-blocking, the buffer does not have to be stored by
+        /// the async task and can exist entirely on the stack.
+        ///
+        /// Usually, [`readable()`] or [`ready()`] is used with this function.
+        ///
+        /// [`readable()`]: UnixStream::readable()
+        /// [`ready()`]: UnixStream::ready()
+        ///
+        /// # Return
+        ///
+        /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+        /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
+        /// and will no longer yield data. If the stream is not ready to read data
+        /// `Err(io::ErrorKind::WouldBlock)` is returned.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::UnixStream;
+        /// use std::error::Error;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> Result<(), Box<dyn Error>> {
+        ///     // Connect to a peer
+        ///     let dir = tempfile::tempdir().unwrap();
+        ///     let bind_path = dir.path().join("bind_path");
+        ///     let stream = UnixStream::connect(bind_path).await?;
+        ///
+        ///     loop {
+        ///         // Wait for the socket to be readable
+        ///         stream.readable().await?;
+        ///
+        ///         let mut buf = Vec::with_capacity(4096);
+        ///
+        ///         // Try to read data, this may still fail with `WouldBlock`
+        ///         // if the readiness event is a false positive.
+        ///         match stream.try_read_buf(&mut buf) {
+        ///             Ok(0) => break,
+        ///             Ok(n) => {
+        ///                 println!("read {} bytes", n);
+        ///             }
+        ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+        ///                 continue;
+        ///             }
+        ///             Err(e) => {
+        ///                 return Err(e.into());
+        ///             }
+        ///         }
+        ///     }
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().try_io(Interest::READABLE, || {
+                use std::io::Read;
+
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `UnixStream::read` to have filled up `n` bytes in the
+                // buffer.
+                let n = (&*self.io).read(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok(n)
+            })
+        }
+    }
+
     /// Wait for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -286,9 +504,31 @@ impl UnixStream {
 
     /// Polls for write readiness.
     ///
+    /// If the unix stream is not currently ready for writing, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the unix
+    /// stream becomes ready for writing, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_write_ready` or `poll_write`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_read_ready` retains a
+    /// second, independent waker.)
+    ///
     /// This function is intended for cases where creating and pinning a future
     /// via [`writable`] is not feasible. Where possible, using [`writable`] is
     /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the unix stream is not ready for writing.
+    /// * `Poll::Ready(Ok(()))` if the unix stream is ready for writing.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`writable`]: method@Self::writable
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -351,6 +591,68 @@ impl UnixStream {
             .try_io(Interest::WRITABLE, || (&*self.io).write(buf))
     }
 
+    /// Try to write several buffers to the stream, returning how many bytes
+    /// were written.
+    ///
+    /// Data is written from each buffer in order, with the final buffer read
+    /// from possible being only partially consumed. This method behaves
+    /// equivalently to a single call to [`try_write()`] with concatenated
+    /// buffers.
+    ///
+    /// This function is usually paired with `writable()`.
+    ///
+    /// [`try_write()`]: UnixStream::try_write()
+    ///
+    /// # Return
+    ///
+    /// If data is successfully written, `Ok(n)` is returned, where `n` is the
+    /// number of bytes written. If the stream is not ready to write data,
+    /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let bind_path = dir.path().join("bind_path");
+    ///     let stream = UnixStream::connect(bind_path).await?;
+    ///
+    ///     let bufs = [io::IoSlice::new(b"hello "), io::IoSlice::new(b"world")];
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be writable
+    ///         stream.writable().await?;
+    ///
+    ///         // Try to write data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match stream.try_write_vectored(&bufs) {
+    ///             Ok(n) => {
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn try_write_vectored(&self, buf: &[io::IoSlice<'_>]) -> io::Result<usize> {
+        self.io
+            .registration()
+            .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(buf))
+    }
+
     /// Creates new `UnixStream` from a `std::os::unix::net::UnixStream`.
     ///
     /// This function is intended to be used to wrap a UnixStream from the
@@ -370,6 +672,51 @@ impl UnixStream {
         let io = PollEvented::new(stream)?;
 
         Ok(UnixStream { io })
+    }
+
+    /// Turn a [`tokio::net::UnixStream`] into a [`std::os::unix::net::UnixStream`].
+    ///
+    /// The returned [`std::os::unix::net::UnixStream`] will have nonblocking
+    /// mode set as `true`.  Use [`set_nonblocking`] to change the blocking
+    /// mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::error::Error;
+    /// use std::io::Read;
+    /// use tokio::net::UnixListener;
+    /// # use tokio::net::UnixStream;
+    /// # use tokio::io::AsyncWriteExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let bind_path = dir.path().join("bind_path");
+    ///
+    ///     let mut data = [0u8; 12];
+    ///     let listener = UnixListener::bind(&bind_path)?;
+    /// #   let handle = tokio::spawn(async {
+    /// #       let mut stream = UnixStream::connect(bind_path).await.unwrap();
+    /// #       stream.write(b"Hello world!").await.unwrap();
+    /// #   });
+    ///     let (tokio_unix_stream, _) = listener.accept().await?;
+    ///     let mut std_unix_stream = tokio_unix_stream.into_std()?;
+    /// #   handle.await.expect("The task being joined has panicked");
+    ///     std_unix_stream.set_nonblocking(false)?;
+    ///     std_unix_stream.read_exact(&mut data)?;
+    /// #   assert_eq!(b"Hello world!", &data);
+    ///     Ok(())
+    /// }
+    /// ```
+    /// [`tokio::net::UnixStream`]: UnixStream
+    /// [`std::os::unix::net::UnixStream`]: std::os::unix::net::UnixStream
+    /// [`set_nonblocking`]: fn@std::os::unix::net::UnixStream::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::os::unix::net::UnixStream> {
+        self.io
+            .into_inner()
+            .map(|io| io.into_raw_fd())
+            .map(|raw_fd| unsafe { std::os::unix::net::UnixStream::from_raw_fd(raw_fd) })
     }
 
     /// Creates an unnamed pair of connected sockets.
@@ -415,7 +762,7 @@ impl UnixStream {
     /// This function will cause all pending and future I/O calls on the
     /// specified portions to immediately return with an appropriate value
     /// (see the documentation of `Shutdown`).
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+    pub(super) fn shutdown_std(&self, how: Shutdown) -> io::Result<()> {
         self.io.shutdown(how)
     }
 
@@ -440,10 +787,10 @@ impl UnixStream {
     /// this comes at the cost of a heap allocation.
     ///
     /// **Note:** Dropping the write half will shut down the write half of the
-    /// stream. This is equivalent to calling [`shutdown(Write)`] on the `UnixStream`.
+    /// stream. This is equivalent to calling [`shutdown()`] on the `UnixStream`.
     ///
     /// [`split`]: Self::split()
-    /// [`shutdown(Write)`]: fn@Self::shutdown
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
@@ -497,7 +844,7 @@ impl AsyncWrite for UnixStream {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.shutdown(std::net::Shutdown::Write)?;
+        self.shutdown_std(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
     }
 }
@@ -505,14 +852,9 @@ impl AsyncWrite for UnixStream {
 impl UnixStream {
     // == Poll IO functions that takes `&self` ==
     //
-    // They are not public because (taken from the doc of `PollEvented`):
-    //
-    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
-    // caller must ensure that there are at most two tasks that use a
-    // `PollEvented` instance concurrently. One for reading and one for writing.
-    // While violating this requirement is "safe" from a Rust memory model point
-    // of view, it will result in unexpected behavior in the form of lost
-    // notifications and tasks hanging.
+    // To read or write without mutable access to the `UnixStream`, combine the
+    // `poll_read_ready` or `poll_write_ready` methods with the `try_read` or
+    // `try_write` methods.
 
     pub(crate) fn poll_read_priv(
         &self,

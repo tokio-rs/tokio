@@ -4,11 +4,11 @@ use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::shutdown;
-use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
+use crate::util::error::CONTEXT_MISSING_ERROR;
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -60,7 +60,7 @@ struct Shared {
     /// Prior to shutdown, we clean up JoinHandles by having each timed-out
     /// thread join on the previous timed-out thread. This is not strictly
     /// necessary but helps avoid Valgrind false positives, see
-    /// https://github.com/tokio-rs/tokio/commit/646fbae76535e397ef79dbcaacb945d4c829f666
+    /// <https://github.com/tokio-rs/tokio/commit/646fbae76535e397ef79dbcaacb945d4c829f666>
     /// for more information.
     last_exiting_thread: Option<thread::JoinHandle<()>>,
     /// This holds the JoinHandles for all running threads; on shutdown, the thread
@@ -81,20 +81,8 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let rt = context::current().expect("not currently running on the Tokio runtime.");
+    let rt = context::current().expect(CONTEXT_MISSING_ERROR);
     rt.spawn_blocking(func)
-}
-
-#[allow(dead_code)]
-pub(crate) fn try_spawn_blocking<F, R>(func: F) -> Result<(), ()>
-where
-    F: FnOnce() -> R + Send + 'static,
-    R: Send + 'static,
-{
-    let rt = context::current().expect("not currently running on the Tokio runtime.");
-
-    let (task, _handle) = task::joinable(BlockingTask::new(func));
-    rt.blocking_spawner.spawn(task, &rt)
 }
 
 // ===== impl BlockingPool =====
@@ -150,7 +138,7 @@ impl BlockingPool {
         self.spawner.inner.condvar.notify_all();
 
         let last_exited_thread = std::mem::take(&mut shared.last_exiting_thread);
-        let workers = std::mem::replace(&mut shared.worker_threads, HashMap::new());
+        let workers = std::mem::take(&mut shared.worker_threads);
 
         drop(shared);
 

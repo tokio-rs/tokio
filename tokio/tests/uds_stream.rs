@@ -90,7 +90,7 @@ async fn try_read_write() -> std::io::Result<()> {
         tokio::task::yield_now().await;
     }
 
-    // Fill the write buffer
+    // Fill the write buffer using non-vectored I/O
     loop {
         // Still ready
         let mut writable = task::spawn(client.writable());
@@ -110,7 +110,7 @@ async fn try_read_write() -> std::io::Result<()> {
         let mut writable = task::spawn(client.writable());
         assert_pending!(writable.poll());
 
-        // Drain the socket from the server end
+        // Drain the socket from the server end using non-vectored I/O
         let mut read = vec![0; written.len()];
         let mut i = 0;
 
@@ -118,6 +118,51 @@ async fn try_read_write() -> std::io::Result<()> {
             server.readable().await?;
 
             match server.try_read(&mut read[i..]) {
+                Ok(n) => i += n,
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("error = {:?}", e),
+            }
+        }
+
+        assert_eq!(read, written);
+    }
+
+    written.clear();
+    client.writable().await.unwrap();
+
+    // Fill the write buffer using vectored I/O
+    let msg_bufs: Vec<_> = msg.chunks(3).map(io::IoSlice::new).collect();
+    loop {
+        // Still ready
+        let mut writable = task::spawn(client.writable());
+        assert_ready_ok!(writable.poll());
+
+        match client.try_write_vectored(&msg_bufs) {
+            Ok(n) => written.extend(&msg[..n]),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                break;
+            }
+            Err(e) => panic!("error = {:?}", e),
+        }
+    }
+
+    {
+        // Write buffer full
+        let mut writable = task::spawn(client.writable());
+        assert_pending!(writable.poll());
+
+        // Drain the socket from the server end using vectored I/O
+        let mut read = vec![0; written.len()];
+        let mut i = 0;
+
+        while i < read.len() {
+            server.readable().await?;
+
+            let mut bufs: Vec<_> = read[i..]
+                .chunks_mut(0x10000)
+                .map(io::IoSliceMut::new)
+                .collect();
+            match server.try_read_vectored(&mut bufs) {
                 Ok(n) => i += n,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
                 Err(e) => panic!("error = {:?}", e),
@@ -251,4 +296,116 @@ fn write_until_pending(stream: &mut UnixStream) {
             }
         }
     }
+}
+
+#[tokio::test]
+async fn try_read_buf() -> std::io::Result<()> {
+    let msg = b"hello world";
+
+    let dir = tempfile::tempdir()?;
+    let bind_path = dir.path().join("bind.sock");
+
+    // Create listener
+    let listener = UnixListener::bind(&bind_path)?;
+
+    // Create socket pair
+    let client = UnixStream::connect(&bind_path).await?;
+
+    let (server, _) = listener.accept().await?;
+    let mut written = msg.to_vec();
+
+    // Track the server receiving data
+    let mut readable = task::spawn(server.readable());
+    assert_pending!(readable.poll());
+
+    // Write data.
+    client.writable().await?;
+    assert_eq!(msg.len(), client.try_write(msg)?);
+
+    // The task should be notified
+    while !readable.is_woken() {
+        tokio::task::yield_now().await;
+    }
+
+    // Fill the write buffer
+    loop {
+        // Still ready
+        let mut writable = task::spawn(client.writable());
+        assert_ready_ok!(writable.poll());
+
+        match client.try_write(msg) {
+            Ok(n) => written.extend(&msg[..n]),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                break;
+            }
+            Err(e) => panic!("error = {:?}", e),
+        }
+    }
+
+    {
+        // Write buffer full
+        let mut writable = task::spawn(client.writable());
+        assert_pending!(writable.poll());
+
+        // Drain the socket from the server end
+        let mut read = Vec::with_capacity(written.len());
+        let mut i = 0;
+
+        while i < read.capacity() {
+            server.readable().await?;
+
+            match server.try_read_buf(&mut read) {
+                Ok(n) => i += n,
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("error = {:?}", e),
+            }
+        }
+
+        assert_eq!(read, written);
+    }
+
+    // Now, we listen for shutdown
+    drop(client);
+
+    loop {
+        let ready = server.ready(Interest::READABLE).await?;
+
+        if ready.is_read_closed() {
+            break;
+        } else {
+            tokio::task::yield_now().await;
+        }
+    }
+
+    Ok(())
+}
+
+// https://github.com/tokio-rs/tokio/issues/3879
+#[tokio::test]
+#[cfg(not(target_os = "macos"))]
+async fn epollhup() -> io::Result<()> {
+    let dir = tempfile::Builder::new()
+        .prefix("tokio-uds-tests")
+        .tempdir()
+        .unwrap();
+    let sock_path = dir.path().join("connect.sock");
+
+    let listener = UnixListener::bind(&sock_path)?;
+    let connect = UnixStream::connect(&sock_path);
+    tokio::pin!(connect);
+
+    // Poll `connect` once.
+    poll_fn(|cx| {
+        use std::future::Future;
+
+        assert_pending!(connect.as_mut().poll(cx));
+        Poll::Ready(())
+    })
+    .await;
+
+    drop(listener);
+
+    let err = connect.await.unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::ConnectionReset);
+    Ok(())
 }

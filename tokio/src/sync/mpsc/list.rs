@@ -140,11 +140,11 @@ impl<T> Tx<T> {
                 //
                 // Acquire is not needed as any "actual" value is not accessed.
                 // At this point, the linked list is walked to acquire blocks.
-                let actual =
-                    self.block_tail
-                        .compare_and_swap(block_ptr, next_block.as_ptr(), Release);
-
-                if actual == block_ptr {
+                if self
+                    .block_tail
+                    .compare_exchange(block_ptr, next_block.as_ptr(), Release, Relaxed)
+                    .is_ok()
+                {
                     // Synchronize with any senders
                     let tail_position = self.tail_position.fetch_add(0, Release);
 
@@ -191,7 +191,7 @@ impl<T> Tx<T> {
 
         // TODO: Unify this logic with Block::grow
         for _ in 0..3 {
-            match curr.as_ref().try_push(&mut block, AcqRel) {
+            match curr.as_ref().try_push(&mut block, AcqRel, Acquire) {
                 Ok(_) => {
                     reused = true;
                     break;

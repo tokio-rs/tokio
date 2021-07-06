@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "net"), allow(unreachable_pub))]
+#![cfg_attr(not(feature = "net"), allow(dead_code, unreachable_pub))]
 
 use crate::io::driver::Ready;
 
@@ -58,7 +58,7 @@ impl Interest {
         self.0.is_writable()
     }
 
-    /// Add together two `Interst` values.
+    /// Add together two `Interest` values.
     ///
     /// This function works from a `const` context.
     ///

@@ -3,10 +3,10 @@ use std::cell::Cell;
 /// Fast random number generate
 ///
 /// Implement xorshift64+: 2 32-bit xorshift sequences added together.
-/// Shift triplet [17,7,16] was calculated as indicated in Marsaglia's
-/// Xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf
+/// Shift triplet `[17,7,16]` was calculated as indicated in Marsaglia's
+/// Xorshift paper: <https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf>
 /// This generator passes the SmallCrush suite, part of TestU01 framework:
-/// http://simul.iro.umontreal.ca/testu01/tu01.html
+/// <http://simul.iro.umontreal.ca/testu01/tu01.html>
 #[derive(Debug)]
 pub(crate) struct FastRand {
     one: Cell<u32>,
@@ -52,7 +52,7 @@ impl FastRand {
 }
 
 // Used by the select macro and `StreamMap`
-#[cfg(any(feature = "macros", feature = "stream"))]
+#[cfg(any(feature = "macros"))]
 #[doc(hidden)]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub fn thread_rng_n(n: u32) -> u32 {

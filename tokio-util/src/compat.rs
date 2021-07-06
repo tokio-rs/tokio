@@ -48,7 +48,7 @@ impl<T: futures_io::AsyncWrite> FuturesAsyncWriteCompatExt for T {}
 
 /// Extension trait that allows converting a type implementing
 /// `tokio::io::AsyncRead` to implement `futures_io::AsyncRead`.
-pub trait Tokio02AsyncReadCompatExt: tokio::io::AsyncRead {
+pub trait TokioAsyncReadCompatExt: tokio::io::AsyncRead {
     /// Wraps `self` with a compatibility layer that implements
     /// `futures_io::AsyncRead`.
     fn compat(self) -> Compat<Self>
@@ -59,11 +59,11 @@ pub trait Tokio02AsyncReadCompatExt: tokio::io::AsyncRead {
     }
 }
 
-impl<T: tokio::io::AsyncRead> Tokio02AsyncReadCompatExt for T {}
+impl<T: tokio::io::AsyncRead> TokioAsyncReadCompatExt for T {}
 
 /// Extension trait that allows converting a type implementing
 /// `tokio::io::AsyncWrite` to implement `futures_io::AsyncWrite`.
-pub trait Tokio02AsyncWriteCompatExt: tokio::io::AsyncWrite {
+pub trait TokioAsyncWriteCompatExt: tokio::io::AsyncWrite {
     /// Wraps `self` with a compatibility layer that implements
     /// `futures_io::AsyncWrite`.
     fn compat_write(self) -> Compat<Self>
@@ -74,7 +74,7 @@ pub trait Tokio02AsyncWriteCompatExt: tokio::io::AsyncWrite {
     }
 }
 
-impl<T: tokio::io::AsyncWrite> Tokio02AsyncWriteCompatExt for T {}
+impl<T: tokio::io::AsyncWrite> TokioAsyncWriteCompatExt for T {}
 
 // === impl Compat ===
 
@@ -213,5 +213,19 @@ where
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         tokio::io::AsyncWrite::poll_shutdown(self.project().inner, cx)
+    }
+}
+
+#[cfg(unix)]
+impl<T: std::os::unix::io::AsRawFd> std::os::unix::io::AsRawFd for Compat<T> {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        self.inner.as_raw_fd()
+    }
+}
+
+#[cfg(windows)]
+impl<T: std::os::windows::io::AsRawHandle> std::os::windows::io::AsRawHandle for Compat<T> {
+    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
+        self.inner.as_raw_handle()
     }
 }

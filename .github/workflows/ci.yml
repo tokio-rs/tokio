@@ -1,15 +1,15 @@
 on:
   push:
-    branches: ["master"]
+    branches: ["master", "tokio-*.x"]
   pull_request:
-    branches: ["master"]
+    branches: ["master", "tokio-*.x"]
 
 name: CI
 
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
-  nightly: nightly-2020-09-21
+  nightly: nightly-2021-04-25
   minrust: 1.45.2
 
 jobs:
@@ -28,6 +28,7 @@ jobs:
       - clippy
       - docs
       - loom
+      - valgrind
     steps:
       - run: exit 0
 
@@ -67,6 +68,44 @@ jobs:
         run: cargo hack test --each-feature
         working-directory: tests-build
 
+      # Build benchmarks. Run of benchmarks is done by bench.yml workflow.
+      - name: build benches
+        run: cargo build --benches
+        working-directory: benches
+        # bench.yml workflow runs benchmarks only on linux.
+        if: startsWith(matrix.os, 'ubuntu')
+
+  valgrind:
+    name: valgrind
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+
+      - name: Install Valgrind
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y valgrind
+
+      # Compile tests
+      - name: cargo build test-mem
+        run: cargo build --features rt-net --bin test-mem
+        working-directory: tests-integration
+
+      # Run with valgrind
+      - name: Run valgrind test-mem
+        run: valgrind  --leak-check=full --show-leak-kinds=all ./target/debug/test-mem
+
+      # Compile tests
+      - name: cargo build test-process-signal
+        run: cargo build --features rt-process-signal --bin test-process-signal
+        working-directory: tests-integration
+
+      # Run with valgrind
+      - name: Run valgrind test-process-signal
+        run: valgrind --leak-check=full --show-leak-kinds=all ./target/debug/test-process-signal
+
   test-unstable:
     name: test tokio full --unstable
     runs-on: ${{ matrix.os }}
@@ -83,7 +122,7 @@ jobs:
 
       # Run `tokio` with "unstable" cfg flag.
       - name: test tokio full --cfg unstable
-        run: cargo test --features full
+        run: cargo test --all-features
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
@@ -199,7 +238,7 @@ jobs:
           cargo hack --remove-dev-deps --workspace
           # Update Cargo.lock to minimal version dependencies.
           cargo update -Z minimal-versions
-          cargo check --all-features
+          cargo hack check --all-features --ignore-private
 
   fmt:
     name: fmt
@@ -226,13 +265,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
-        run: rustup update ${{ env.minrust }} && rustup default ${{ env.minrust }}
+        run: rustup update 1.52.1 && rustup default 1.52.1
       - name: Install clippy
         run: rustup component add clippy
 
       # Run clippy
       - name: "clippy --all"
-        run: cargo clippy --all --tests
+        run: cargo clippy --all --tests --all-features
 
   docs:
     name: docs
@@ -245,9 +284,9 @@ jobs:
           override: true
 
       - name: "doc --lib --all-features"
-        run: cargo doc --lib --no-deps --all-features
+        run: cargo doc --lib --no-deps --all-features --document-private-items
         env:
-          RUSTDOCFLAGS: --cfg docsrs
+          RUSTDOCFLAGS: --cfg docsrs -Dwarnings
 
   loom:
     name: loom

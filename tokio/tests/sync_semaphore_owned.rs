@@ -16,6 +16,22 @@ fn try_acquire() {
     assert!(p3.is_ok());
 }
 
+#[test]
+fn try_acquire_many() {
+    let sem = Arc::new(Semaphore::new(42));
+    {
+        let p1 = sem.clone().try_acquire_many_owned(42);
+        assert!(p1.is_ok());
+        let p2 = sem.clone().try_acquire_owned();
+        assert!(p2.is_err());
+    }
+    let p3 = sem.clone().try_acquire_many_owned(32);
+    assert!(p3.is_ok());
+    let p4 = sem.clone().try_acquire_many_owned(10);
+    assert!(p4.is_ok());
+    assert!(sem.try_acquire_owned().is_err());
+}
+
 #[tokio::test]
 async fn acquire() {
     let sem = Arc::new(Semaphore::new(1));
@@ -26,6 +42,21 @@ async fn acquire() {
     });
     drop(p1);
     j.await.unwrap();
+}
+
+#[tokio::test]
+async fn acquire_many() {
+    let semaphore = Arc::new(Semaphore::new(42));
+    let permit32 = semaphore.clone().try_acquire_many_owned(32).unwrap();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let join_handle = tokio::spawn(async move {
+        let _permit10 = semaphore.clone().acquire_many_owned(10).await.unwrap();
+        sender.send(()).unwrap();
+        let _permit32 = semaphore.acquire_many_owned(32).await.unwrap();
+    });
+    receiver.await.unwrap();
+    drop(permit32);
+    join_handle.await.unwrap();
 }
 
 #[tokio::test]

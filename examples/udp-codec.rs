@@ -9,8 +9,8 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::net::UdpSocket;
-use tokio::stream::StreamExt;
 use tokio::{io, time};
+use tokio_stream::StreamExt;
 use tokio_util::codec::BytesCodec;
 use tokio_util::udp::UdpFramed;
 
@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let b = pong(&mut b);
 
     // Run both futures simultaneously of `a` and `b` sending messages back and forth.
-    match futures::future::try_join(a, b).await {
+    match tokio::try_join!(a, b) {
         Err(e) => println!("an error occurred; error = {:?}", e),
         _ => println!("done!"),
     }

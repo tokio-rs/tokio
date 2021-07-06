@@ -55,48 +55,19 @@ impl<T> From<SendError<T>> for TrySendError<T> {
 
 /// Error returned by `Receiver`.
 #[derive(Debug)]
+#[doc(hidden)]
+#[deprecated(note = "This type is unused because recv returns an Option.")]
 pub struct RecvError(());
 
+#[allow(deprecated)]
 impl fmt::Display for RecvError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "channel closed")
     }
 }
 
+#[allow(deprecated)]
 impl Error for RecvError {}
-
-// ===== TryRecvError =====
-
-feature! {
-    #![all(unix, any(feature = "signal", feature = "process"))]
-
-    /// This enumeration is the list of the possible reasons that try_recv
-    /// could not return data when called.
-    #[derive(Debug, PartialEq)]
-    pub(crate) enum TryRecvError {
-        /// This channel is currently empty, but the Sender(s) have not yet
-        /// disconnected, so data may yet become available.
-        Empty,
-        /// The channel's sending half has been closed, and there will
-        /// never be any more data received on it.
-        Closed,
-    }
-
-    impl fmt::Display for TryRecvError {
-        fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(
-                fmt,
-                "{}",
-                match self {
-                    TryRecvError::Empty => "channel empty",
-                    TryRecvError::Closed => "channel closed",
-                }
-            )
-        }
-    }
-
-    impl Error for TryRecvError {}
-}
 
 cfg_time! {
     // ===== SendTimeoutError =====

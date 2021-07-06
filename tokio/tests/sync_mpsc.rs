@@ -13,6 +13,10 @@ use tokio_test::{
 
 use std::sync::Arc;
 
+mod support {
+    pub(crate) mod mpsc_stream;
+}
+
 trait AssertSend: Send {}
 impl AssertSend for mpsc::Sender<i32> {}
 impl AssertSend for mpsc::Receiver<i32> {}
@@ -80,9 +84,10 @@ async fn reserve_disarm() {
 
 #[tokio::test]
 async fn send_recv_stream_with_buffer() {
-    use tokio::stream::StreamExt;
+    use tokio_stream::StreamExt;
 
-    let (tx, mut rx) = mpsc::channel::<i32>(16);
+    let (tx, rx) = support::mpsc_stream::channel_stream::<i32>(16);
+    let mut rx = Box::pin(rx);
 
     tokio::spawn(async move {
         assert_ok!(tx.send(1).await);
@@ -178,9 +183,11 @@ async fn async_send_recv_unbounded() {
 
 #[tokio::test]
 async fn send_recv_stream_unbounded() {
-    use tokio::stream::StreamExt;
+    use tokio_stream::StreamExt;
 
-    let (tx, mut rx) = mpsc::unbounded_channel::<i32>();
+    let (tx, rx) = support::mpsc_stream::unbounded_channel_stream::<i32>();
+
+    let mut rx = Box::pin(rx);
 
     tokio::spawn(async move {
         assert_ok!(tx.send(1));
@@ -318,6 +325,29 @@ async fn try_send_fail() {
 
     assert_eq!(rx.recv().await, Some("goodbye"));
     assert!(rx.recv().await.is_none());
+}
+
+#[tokio::test]
+async fn try_reserve_fails() {
+    let (tx, mut rx) = mpsc::channel(1);
+
+    let permit = tx.try_reserve().unwrap();
+
+    // This should fail
+    match assert_err!(tx.try_reserve()) {
+        TrySendError::Full(()) => {}
+        _ => panic!(),
+    }
+
+    permit.send("foo");
+
+    assert_eq!(rx.recv().await, Some("foo"));
+
+    // Dropping permit releases the slot.
+    let permit = tx.try_reserve().unwrap();
+    drop(permit);
+
+    let _permit = tx.try_reserve().unwrap();
 }
 
 #[tokio::test]

@@ -359,7 +359,8 @@
 //!             let mut conf = rx.borrow().clone();
 //!
 //!             let mut op_start = Instant::now();
-//!             let mut sleep = time::sleep_until(op_start + conf.timeout);
+//!             let sleep = time::sleep_until(op_start + conf.timeout);
+//!             tokio::pin!(sleep);
 //!
 //!             loop {
 //!                 tokio::select! {
@@ -371,14 +372,14 @@
 //!                         op_start = Instant::now();
 //!
 //!                         // Restart the timeout
-//!                         sleep = time::sleep_until(op_start + conf.timeout);
+//!                         sleep.set(time::sleep_until(op_start + conf.timeout));
 //!                     }
 //!                     _ = rx.changed() => {
 //!                         conf = rx.borrow().clone();
 //!
 //!                         // The configuration has been updated. Update the
 //!                         // `sleep` using the new `timeout` value.
-//!                         sleep.reset(op_start + conf.timeout);
+//!                         sleep.as_mut().reset(op_start + conf.timeout);
 //!                     }
 //!                     _ = &mut op => {
 //!                         // The operation completed!
@@ -427,6 +428,11 @@
 //!   bounding of any kind.
 
 cfg_sync! {
+    /// Named future types.
+    pub mod futures {
+        pub use super::notify::Notified;
+    }
+
     mod barrier;
     pub use barrier::{Barrier, BarrierWaitResult};
 
@@ -435,7 +441,7 @@ cfg_sync! {
     pub mod mpsc;
 
     mod mutex;
-    pub use mutex::{Mutex, MutexGuard, TryLockError, OwnedMutexGuard};
+    pub use mutex::{Mutex, MutexGuard, TryLockError, OwnedMutexGuard, MappedMutexGuard};
 
     pub(crate) mod notify;
     pub use notify::Notify;
@@ -443,23 +449,32 @@ cfg_sync! {
     pub mod oneshot;
 
     pub(crate) mod batch_semaphore;
+    pub use batch_semaphore::{AcquireError, TryAcquireError};
+
     mod semaphore;
-    pub use semaphore::{Semaphore, SemaphorePermit, OwnedSemaphorePermit, TryAcquireError};
+    pub use semaphore::{Semaphore, SemaphorePermit, OwnedSemaphorePermit};
 
     mod rwlock;
-    pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+    pub use rwlock::RwLock;
+    pub use rwlock::owned_read_guard::OwnedRwLockReadGuard;
+    pub use rwlock::owned_write_guard::OwnedRwLockWriteGuard;
+    pub use rwlock::owned_write_guard_mapped::OwnedRwLockMappedWriteGuard;
+    pub use rwlock::read_guard::RwLockReadGuard;
+    pub use rwlock::write_guard::RwLockWriteGuard;
+    pub use rwlock::write_guard_mapped::RwLockMappedWriteGuard;
 
     mod task;
     pub(crate) use task::AtomicWaker;
+
+    mod once_cell;
+    pub use self::once_cell::{OnceCell, SetError};
 
     pub mod watch;
 }
 
 cfg_not_sync! {
-    #[cfg(any(feature = "fs", feature = "signal", all(unix, feature = "process")))]
-    pub(crate) mod batch_semaphore;
-
     cfg_fs! {
+        pub(crate) mod batch_semaphore;
         mod mutex;
         pub(crate) use mutex::Mutex;
     }
@@ -467,20 +482,16 @@ cfg_not_sync! {
     #[cfg(any(feature = "rt", feature = "signal", all(unix, feature = "process")))]
     pub(crate) mod notify;
 
+    #[cfg(any(feature = "rt", all(windows, feature = "process")))]
+    pub(crate) mod oneshot;
+
     cfg_atomic_waker_impl! {
         mod task;
         pub(crate) use task::AtomicWaker;
     }
 
-    #[cfg(any(
-            feature = "rt",
-            feature = "process",
-            feature = "signal"))]
-    pub(crate) mod oneshot;
-
-    cfg_signal_internal! {
-        pub(crate) mod mpsc;
-    }
+    #[cfg(any(feature = "signal", all(unix, feature = "process")))]
+    pub(crate) mod watch;
 }
 
 /// Unit tests

@@ -29,7 +29,6 @@ the Rust programming language. It is:
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/tokio/tutorial) |
 [API Docs](https://docs.rs/tokio/latest/tokio) |
-[Roadmap](https://github.com/tokio-rs/tokio/blob/master/ROADMAP.md) |
 [Chat](https://discord.gg/tokio)
 
 ## Overview
@@ -51,15 +50,23 @@ an asynchronous application.
 
 ## Example
 
-A basic TCP echo server with Tokio:
+A basic TCP echo server with Tokio.
+
+Make sure you activated the full features of the tokio crate on Cargo.toml:
+
+```toml
+[dependencies]
+tokio = { version = "1.8.0", features = ["full"] }
+```
+Then, on your main.rs:
 
 ```rust,no_run
 use tokio::net::TcpListener;
-use tokio::prelude::*;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
 
     loop {
         let (mut socket, _) = listener.accept().await?;

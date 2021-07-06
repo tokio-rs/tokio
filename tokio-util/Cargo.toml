@@ -2,23 +2,21 @@
 name = "tokio-util"
 # When releasing to crates.io:
 # - Remove path dependencies
-# - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "tokio-util-0.6.x" git tag.
-version = "0.6.0"
+version = "0.6.7"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-util/0.5.1/tokio_util"
+documentation = "https://docs.rs/tokio-util/0.6.7/tokio_util"
 description = """
 Additional utilities for working with Tokio.
 """
 categories = ["asynchronous"]
-publish = false
 
 [features]
 # No features on by default
@@ -29,7 +27,7 @@ full = ["codec", "compat", "io", "time", "net", "rt"]
 
 net = ["tokio/net"]
 compat = ["futures-io",]
-codec = ["tokio/stream"]
+codec = []
 time = ["tokio/time","slab"]
 io = []
 rt = ["tokio/rt"]
@@ -37,9 +35,9 @@ rt = ["tokio/rt"]
 __docs_rs = ["futures-util"]
 
 [dependencies]
-tokio = { version = "1.0.0", path = "../tokio" }
+tokio = { version = "1.0.0", path = "../tokio", features = ["sync"] }
 
-bytes = "0.6.0"
+bytes = "1.0.0"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
 futures-io = { version = "0.3.0", optional = true }
@@ -51,7 +49,9 @@ slab = { version = "0.4.1", optional = true } # Backs `DelayQueue`
 [dev-dependencies]
 tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
+tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
+async-stream = "0.3.0"
 futures = "0.3.0"
 futures-test = "0.3.5"
 

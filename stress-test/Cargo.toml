@@ -11,4 +11,4 @@ publish = false
 tokio = { path = "../tokio/", features = ["full"] }
 
 [dev-dependencies]
-rand = "0.7.3"
+rand = "0.8"

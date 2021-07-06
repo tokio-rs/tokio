@@ -1,7 +1,8 @@
 use crate::codec::framed_impl::{FramedImpl, ReadFrame};
 use crate::codec::Decoder;
 
-use tokio::{io::AsyncRead, stream::Stream};
+use futures_core::Stream;
+use tokio::io::AsyncRead;
 
 use bytes::BytesMut;
 use futures_sink::Sink;
@@ -13,7 +14,7 @@ use std::task::{Context, Poll};
 pin_project! {
     /// A [`Stream`] of messages decoded from an [`AsyncRead`].
     ///
-    /// [`Stream`]: tokio::stream::Stream
+    /// [`Stream`]: futures_core::Stream
     /// [`AsyncRead`]: tokio::io::AsyncRead
     pub struct FramedRead<T, D> {
         #[pin]
@@ -75,6 +76,16 @@ impl<T, D> FramedRead<T, D> {
     /// being worked with.
     pub fn get_mut(&mut self) -> &mut T {
         &mut self.inner.inner
+    }
+
+    /// Returns a pinned mutable reference to the underlying I/O stream wrapped by
+    /// `FramedRead`.
+    ///
+    /// Note that care should be taken to not tamper with the underlying stream
+    /// of data coming in as it may corrupt the stream of frames otherwise
+    /// being worked with.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut T> {
+        self.project().inner.project().inner
     }
 
     /// Consumes the `FramedRead`, returning its underlying I/O stream.

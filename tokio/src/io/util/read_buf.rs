@@ -50,7 +50,7 @@ where
         }
 
         let n = {
-            let dst = me.buf.bytes_mut();
+            let dst = me.buf.chunk_mut();
             let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
             let mut buf = ReadBuf::uninit(dst);
             let ptr = buf.filled().as_ptr();

@@ -14,7 +14,7 @@ cfg_io_driver! {
 ))]
 pub(crate) mod linked_list;
 
-#[cfg(any(feature = "rt-multi-thread", feature = "macros", feature = "stream"))]
+#[cfg(any(feature = "rt-multi-thread", feature = "macros"))]
 mod rand;
 
 cfg_rt! {
@@ -24,7 +24,7 @@ cfg_rt! {
 }
 
 cfg_rt_multi_thread! {
-    pub(crate) use rand::FastRand;
+    pub(crate) use self::rand::FastRand;
 
     mod try_lock;
     pub(crate) use try_lock::TryLock;
@@ -32,6 +32,15 @@ cfg_rt_multi_thread! {
 
 pub(crate) mod trace;
 
-#[cfg(any(feature = "macros", feature = "stream"))]
+#[cfg(any(feature = "macros"))]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
-pub use rand::thread_rng_n;
+pub use self::rand::thread_rng_n;
+
+#[cfg(any(
+    feature = "rt",
+    feature = "time",
+    feature = "net",
+    feature = "process",
+    all(unix, feature = "signal")
+))]
+pub(crate) mod error;
