@@ -65,7 +65,7 @@ fn test_abort_without_panic_3662() {
             // This runs in a separate thread so it doesn't have immediate
             // thread-local access to the executor. It does however transition
             // the underlying task to be completed, which will cause it to be
-            // dropped (in this thread no less).
+            // dropped (but not in this thread).
             assert!(!drop_flag2.load(Ordering::SeqCst));
             j.abort();
             // TODO: is this guaranteed at this point?
@@ -75,8 +75,8 @@ fn test_abort_without_panic_3662() {
         .join()
         .unwrap();
 
-        assert!(drop_flag.load(Ordering::SeqCst));
         let result = task.await;
+        assert!(drop_flag.load(Ordering::SeqCst));
         assert!(result.unwrap_err().is_cancelled());
 
         // Note: We do the following to trigger a deferred task cleanup.
