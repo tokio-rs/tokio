@@ -306,7 +306,7 @@ cfg_rt! {
     }
 
     /// Task-related futures.
-    pub mod future {
+    pub mod futures {
         pub use super::task_local::TaskLocalFuture;
     }
 }
