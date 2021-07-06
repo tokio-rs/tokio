@@ -36,6 +36,16 @@
 [#3899]: https://github.com/tokio-rs/tokio/pull/3899
 [#3900]: https://github.com/tokio-rs/tokio/pull/3900
 
+# 1.7.2 (July 6, 2021)
+
+Forward ports 1.5.1 fixes.
+
+### Fixed
+
+- runtime: remotely abort tasks on `JoinHandle::abort` ([#3934])
+
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
+
 # 1.7.1 (June 18, 2021)
 
 ### Fixed
@@ -77,6 +87,16 @@
 [#3838]: https://github.com/tokio-rs/tokio/pull/3838
 [#3840]: https://github.com/tokio-rs/tokio/pull/3840
 [#3850]: https://github.com/tokio-rs/tokio/pull/3850
+
+# 1.6.3 (July 6, 2021)
+
+Forward ports 1.5.1 fixes.
+
+### Fixed
+
+- runtime: remotely abort tasks on `JoinHandle::abort` ([#3934])
+
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
 
 # 1.6.2 (June 14, 2021)
 
@@ -139,6 +159,14 @@ a kernel bug. ([#3803])
 [#3774]: https://github.com/tokio-rs/tokio/pull/3774
 [#3775]: https://github.com/tokio-rs/tokio/pull/3775
 [#3780]: https://github.com/tokio-rs/tokio/pull/3780
+
+# 1.5.1 (July 6, 2021)
+
+### Fixed
+
+- runtime: remotely abort tasks on `JoinHandle::abort` ([#3934])
+
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
 
 # 1.5.0 (April 12, 2021)
 
