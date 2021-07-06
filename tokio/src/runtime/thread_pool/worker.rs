@@ -566,11 +566,6 @@ impl Worker {
     fn inject(&self) -> &queue::Inject<Arc<Worker>> {
         &self.shared.inject
     }
-
-    /// Return a reference to this worker's remote data
-    fn remote(&self) -> &Remote {
-        &self.shared.remotes[self.index]
-    }
 }
 
 impl task::Schedule for Arc<Worker> {
