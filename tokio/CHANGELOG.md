@@ -1,3 +1,13 @@
+# 1.7.2 (July 6, 2021)
+
+Forward ports 1.5.1 fixes.
+
+### Fixed
+
+- runtime: remotely abort tasks on `JoinHandle::abort` ([#3934])
+
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
+
 # 1.7.1 (June 18, 2021)
 
 ### Fixed
