@@ -16,6 +16,9 @@ mod ready;
 mod thread_local;
 
 #[macro_use]
+mod instrument;
+
+#[macro_use]
 #[cfg(feature = "rt")]
 pub(crate) mod scoped_tls;
 

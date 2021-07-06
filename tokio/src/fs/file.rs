@@ -19,67 +19,69 @@ use std::task::Context;
 use std::task::Poll;
 use std::task::Poll::*;
 
-/// A reference to an open file on the filesystem.
-///
-/// This is a specialized version of [`std::fs::File`][std] for usage from the
-/// Tokio runtime.
-///
-/// An instance of a `File` can be read and/or written depending on what options
-/// it was opened with. Files also implement [`AsyncSeek`] to alter the logical
-/// cursor that the file contains internally.
-///
-/// A file will not be closed immediately when it goes out of scope if there
-/// are any IO operations that have not yet completed. To ensure that a file is
-/// closed immediately when it is dropped, you should call [`flush`] before
-/// dropping it. Note that this does not ensure that the file has been fully
-/// written to disk; the operating system might keep the changes around in an
-/// in-memory buffer. See the [`sync_all`] method for telling the OS to write
-/// the data to disk.
-///
-/// Reading and writing to a `File` is usually done using the convenience
-/// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
-///
-/// [std]: struct@std::fs::File
-/// [`AsyncSeek`]: trait@crate::io::AsyncSeek
-/// [`flush`]: fn@crate::io::AsyncWriteExt::flush
-/// [`sync_all`]: fn@crate::fs::File::sync_all
-/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
-/// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-///
-/// # Examples
-///
-/// Create a new file and asynchronously write bytes to it:
-///
-/// ```no_run
-/// use tokio::fs::File;
-/// use tokio::io::AsyncWriteExt; // for write_all()
-///
-/// # async fn dox() -> std::io::Result<()> {
-/// let mut file = File::create("foo.txt").await?;
-/// file.write_all(b"hello, world!").await?;
-/// # Ok(())
-/// # }
-/// ```
-///
-/// Read the contents of a file into a buffer
-///
-/// ```no_run
-/// use tokio::fs::File;
-/// use tokio::io::AsyncReadExt; // for read_to_end()
-///
-/// # async fn dox() -> std::io::Result<()> {
-/// let mut file = File::open("foo.txt").await?;
-///
-/// let mut contents = vec![];
-/// file.read_to_end(&mut contents).await?;
-///
-/// println!("len = {}", contents.len());
-/// # Ok(())
-/// # }
-/// ```
-pub struct File {
-    std: Arc<sys::File>,
-    inner: Mutex<Inner>,
+instrument_resource! {
+    /// A reference to an open file on the filesystem.
+    ///
+    /// This is a specialized version of [`std::fs::File`][std] for usage from the
+    /// Tokio runtime.
+    ///
+    /// An instance of a `File` can be read and/or written depending on what options
+    /// it was opened with. Files also implement [`AsyncSeek`] to alter the logical
+    /// cursor that the file contains internally.
+    ///
+    /// A file will not be closed immediately when it goes out of scope if there
+    /// are any IO operations that have not yet completed. To ensure that a file is
+    /// closed immediately when it is dropped, you should call [`flush`] before
+    /// dropping it. Note that this does not ensure that the file has been fully
+    /// written to disk; the operating system might keep the changes around in an
+    /// in-memory buffer. See the [`sync_all`] method for telling the OS to write
+    /// the data to disk.
+    ///
+    /// Reading and writing to a `File` is usually done using the convenience
+    /// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
+    ///
+    /// [std]: struct@std::fs::File
+    /// [`AsyncSeek`]: trait@crate::io::AsyncSeek
+    /// [`flush`]: fn@crate::io::AsyncWriteExt::flush
+    /// [`sync_all`]: fn@crate::fs::File::sync_all
+    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    ///
+    /// # Examples
+    ///
+    /// Create a new file and asynchronously write bytes to it:
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    /// use tokio::io::AsyncWriteExt; // for write_all()
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut file = File::create("foo.txt").await?;
+    /// file.write_all(b"hello, world!").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Read the contents of a file into a buffer
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    /// use tokio::io::AsyncReadExt; // for read_to_end()
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut file = File::open("foo.txt").await?;
+    ///
+    /// let mut contents = vec![];
+    /// file.read_to_end(&mut contents).await?;
+    ///
+    /// println!("len = {}", contents.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub struct File {
+        std: Arc<sys::File>,
+        inner: Mutex<Inner>,
+    }
 }
 
 struct Inner {
@@ -200,13 +202,19 @@ impl File {
     /// let file = tokio::fs::File::from_std(std_file);
     /// ```
     pub fn from_std(std: sys::File) -> File {
-        File {
-            std: Arc::new(std),
-            inner: Mutex::new(Inner {
-                state: State::Idle(Some(Buf::with_capacity(0))),
-                last_write_err: None,
-                pos: 0,
-            }),
+        let std = Arc::new(std);
+        let inner = Mutex::new(Inner {
+            state: State::Idle(Some(Buf::with_capacity(0))),
+            last_write_err: None,
+            pos: 0,
+        });
+
+        new_instrumented_resource! {
+            FileSystem,
+            File {
+                std,
+                inner,
+            }
         }
     }
 

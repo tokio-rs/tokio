@@ -15,57 +15,58 @@ use std::time::Duration;
 cfg_io_util! {
     use bytes::BufMut;
 }
-
 cfg_net! {
-    /// A TCP stream between a local and a remote socket.
-    ///
-    /// A TCP stream can either be created by connecting to an endpoint, via the
-    /// [`connect`] method, or by [accepting] a connection from a [listener]. A
-    /// TCP stream can also be created via the [`TcpSocket`] type.
-    ///
-    /// Reading and writing to a `TcpStream` is usually done using the
-    /// convenience methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`]
-    /// traits.
-    ///
-    /// [`connect`]: method@TcpStream::connect
-    /// [accepting]: method@crate::net::TcpListener::accept
-    /// [listener]: struct@crate::net::TcpListener
-    /// [`TcpSocket`]: struct@crate::net::TcpSocket
-    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
-    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    /// use tokio::io::AsyncWriteExt;
-    /// use std::error::Error;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    ///     // Write some data.
-    ///     stream.write_all(b"hello world!").await?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
-    ///
-    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
-    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-    ///
-    /// To shut down the stream in the write direction, you can call the
-    /// [`shutdown()`] method. This will cause the other peer to receive a read of
-    /// length 0, indicating that no more data will be sent. This only closes
-    /// the stream in one direction.
-    ///
-    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
-    pub struct TcpStream {
-        io: PollEvented<mio::net::TcpStream>,
+    instrument_resource! {
+        /// A TCP stream between a local and a remote socket.
+        ///
+        /// A TCP stream can either be created by connecting to an endpoint, via the
+        /// [`connect`] method, or by [accepting] a connection from a [listener]. A
+        /// TCP stream can also be created via the [`TcpSocket`] type.
+        ///
+        /// Reading and writing to a `TcpStream` is usually done using the
+        /// convenience methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`]
+        /// traits.
+        ///
+        /// [`connect`]: method@TcpStream::connect
+        /// [accepting]: method@crate::net::TcpListener::accept
+        /// [listener]: struct@crate::net::TcpListener
+        /// [`TcpSocket`]: struct@crate::net::TcpSocket
+        /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+        /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpStream;
+        /// use tokio::io::AsyncWriteExt;
+        /// use std::error::Error;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> Result<(), Box<dyn Error>> {
+        ///     // Connect to a peer
+        ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
+        ///
+        ///     // Write some data.
+        ///     stream.write_all(b"hello world!").await?;
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        ///
+        /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+        ///
+        /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+        /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+        ///
+        /// To shut down the stream in the write direction, you can call the
+        /// [`shutdown()`] method. This will cause the other peer to receive a read of
+        /// length 0, indicating that no more data will be sent. This only closes
+        /// the stream in one direction.
+        ///
+        /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
+        pub struct TcpStream {
+            io: PollEvented<mio::net::TcpStream>,
+        }
     }
 }
 
@@ -154,7 +155,7 @@ impl TcpStream {
 
     pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
         let io = PollEvented::new(connected)?;
-        Ok(TcpStream { io })
+        Ok(new_instrumented_resource!(Network, TcpStream { io }))
     }
 
     /// Creates new `TcpStream` from a `std::net::TcpStream`.
@@ -189,7 +190,7 @@ impl TcpStream {
     pub fn from_std(stream: std::net::TcpStream) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::from_std(stream);
         let io = PollEvented::new(io)?;
-        Ok(TcpStream { io })
+        Ok(new_instrumented_resource!(Network, TcpStream { io }))
     }
 
     /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
@@ -387,7 +388,7 @@ impl TcpStream {
     ///             // if the readiness event is a false positive.
     ///             match stream.try_read(&mut data) {
     ///                 Ok(n) => {
-    ///                     println!("read {} bytes", n);        
+    ///                     println!("read {} bytes", n);
     ///                 }
     ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                     continue;
@@ -1178,22 +1179,25 @@ impl TcpStream {
     // To read or write without mutable access to the `UnixStream`, combine the
     // `poll_read_ready` or `poll_write_ready` methods with the `try_read` or
     // `try_write` methods.
-
-    pub(crate) fn poll_read_priv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        // Safety: `TcpStream::read` correctly handles reads into uninitialized memory
-        unsafe { self.io.poll_read(cx, buf) }
+    instrument_resource_op! {
+        pub(crate) fn poll_read_priv(
+            &self,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            // Safety: `TcpStream::read` correctly handles reads into uninitialized memory
+            unsafe { self.io.poll_read(cx, buf) }
+        }
     }
 
-    pub(super) fn poll_write_priv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        self.io.poll_write(cx, buf)
+    instrument_resource_op! {
+        pub(super) fn poll_write_priv(
+            &self,
+            cx: &mut Context<'_>,
+            buf: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            self.io.poll_write(cx, buf)
+        }
     }
 
     pub(super) fn poll_write_vectored_priv(

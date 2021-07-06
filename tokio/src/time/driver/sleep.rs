@@ -1,7 +1,6 @@
 use crate::time::driver::{Handle, TimerEntry};
 use crate::time::{error::Error, Duration, Instant};
 
-use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
@@ -65,7 +64,8 @@ pub fn sleep(duration: Duration) -> Sleep {
     }
 }
 
-pin_project! {
+instrument_resource! {
+    pin_project,
     /// Future returned by [`sleep`](sleep) and [`sleep_until`](sleep_until).
     ///
     /// This type does not implement the `Unpin` trait, which means that if you
@@ -171,7 +171,7 @@ impl Sleep {
         let handle = Handle::current();
         let entry = TimerEntry::new(&handle, deadline);
 
-        Sleep { deadline, entry }
+        new_instrumented_resource!(Timer, Sleep { deadline, entry })
     }
 
     pub(crate) fn far_future() -> Sleep {
@@ -222,17 +222,17 @@ impl Sleep {
         me.entry.reset(deadline);
         *me.deadline = deadline;
     }
+    instrument_resource_op! {
+        fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+            let me = self.project();
+            // Keep track of task budget
+            let coop = ready!(crate::coop::poll_proceed(cx));
 
-    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
-        let me = self.project();
-
-        // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
-
-        me.entry.poll_elapsed(cx).map(move |r| {
-            coop.made_progress();
-            r
-        })
+            me.entry.poll_elapsed(cx).map(move |r| {
+                coop.made_progress();
+                r
+            })
+        }
     }
 }
 
