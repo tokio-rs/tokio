@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625569634799,
+  "lastUpdate": 1625569639704,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19061,6 +19061,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 594,
             "range": "± 75",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "devnexen@gmail.com",
+            "name": "David CARLIER",
+            "username": "devnexen"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8148b2107c754cf5460d37ddedfff841de97007f",
+          "message": "net: make ucred return pid field for OpenBSD (#3919)",
+          "timestamp": "2021-07-06T11:15:15+02:00",
+          "tree_id": "0c7a2fe631fe5497263efc02ec636ae961f22820",
+          "url": "https://github.com/tokio-rs/tokio/commit/8148b2107c754cf5460d37ddedfff841de97007f"
+        },
+        "date": 1625569633994,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 820,
+            "range": "± 102",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13672,
+            "range": "± 6743",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 848,
+            "range": "± 88",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13974,
+            "range": "± 7027",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 527,
+            "range": "± 54",
             "unit": "ns/iter"
           }
         ]
