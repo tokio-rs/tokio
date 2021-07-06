@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625576586084,
+  "lastUpdate": 1625576604374,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -36211,6 +36211,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22314213,
             "range": "± 4044889",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "80f0801e1905737228c58b45f09394a2f7378685",
+          "message": "tokio-macros: compat with clippy::unwrap_used (#3926)",
+          "timestamp": "2021-07-06T15:01:13+02:00",
+          "tree_id": "f15794b134d53f8f4a9c64afd36d8f0b3c685295",
+          "url": "https://github.com/tokio-rs/tokio/commit/80f0801e1905737228c58b45f09394a2f7378685"
+        },
+        "date": 1625576598734,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 205987,
+            "range": "± 45831",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 732591,
+            "range": "± 112010",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5174317,
+            "range": "± 788352",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20556848,
+            "range": "± 3613228",
             "unit": "ns/iter"
           }
         ]
