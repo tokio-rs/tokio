@@ -192,7 +192,7 @@ impl<T> JoinHandle<T> {
     /// ```
     pub fn abort(&self) {
         if let Some(raw) = self.raw {
-            raw.shutdown();
+            raw.remote_abort();
         }
     }
 }
