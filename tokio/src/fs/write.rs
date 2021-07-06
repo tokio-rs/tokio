@@ -11,8 +11,6 @@ use std::{io, path::Path};
 /// on a separate thread pool using [`spawn_blocking`].
 ///
 /// [`spawn_blocking`]: crate::task::spawn_blocking
-
-///
 /// [std]: fn@std::fs::write
 ///
 /// # Examples
