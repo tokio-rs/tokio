@@ -1,6 +1,4 @@
 cfg_trace! {
-    #[macro_export]
-    #[doc(hidden)]
     macro_rules! instrument_resource {
         (
             pin_project,
@@ -46,8 +44,6 @@ cfg_trace! {
     }
 
 
-    #[macro_export]
-    #[doc(hidden)]
     macro_rules! new_instrumented_resource {
         (
             $resource_type:ident,
@@ -68,8 +64,6 @@ cfg_trace! {
         };
     }
 
-    #[macro_export]
-    #[doc(hidden)]
     macro_rules! instrument_resource_op {
         (
             $( #[$attr:meta] )*
@@ -101,8 +95,6 @@ cfg_trace! {
 }
 
 cfg_not_trace! {
-    #[macro_export]
-    #[doc(hidden)]
     macro_rules! instrument_resource {
         (pin_project, $($t:tt)*) => {
             pin_project_lite::pin_project! {
@@ -114,16 +106,12 @@ cfg_not_trace! {
         }
     }
 
-    #[macro_export]
-    #[doc(hidden)]
     macro_rules! new_instrumented_resource {
         ($resource_type:ident, $($t:tt)*) => {
             $($t)*
         }
     }
 
-    #[macro_export]
-    #[doc(hidden)]
     macro_rules! instrument_resource_op {
         ($($t:tt)*) => {
             $($t)*
