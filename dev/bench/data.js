@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625581612395,
+  "lastUpdate": 1625581616306,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -36259,6 +36259,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20556848,
             "range": "± 3613228",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4818c2ed052549825da7bd59df2cf0da808e66c4",
+          "message": "fs: document performance considerations (#3920)",
+          "timestamp": "2021-07-06T16:25:13+02:00",
+          "tree_id": "96c906a4298ae519d2dcf02f63b61f91dec2a1a6",
+          "url": "https://github.com/tokio-rs/tokio/commit/4818c2ed052549825da7bd59df2cf0da808e66c4"
+        },
+        "date": 1625581608640,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 156159,
+            "range": "± 18806",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 591193,
+            "range": "± 32087",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4540322,
+            "range": "± 960336",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18033144,
+            "range": "± 2966158",
             "unit": "ns/iter"
           }
         ]
