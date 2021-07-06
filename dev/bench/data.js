@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625569639704,
+  "lastUpdate": 1625569647217,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -84899,6 +84899,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 704185,
             "range": "± 122628",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "devnexen@gmail.com",
+            "name": "David CARLIER",
+            "username": "devnexen"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8148b2107c754cf5460d37ddedfff841de97007f",
+          "message": "net: make ucred return pid field for OpenBSD (#3919)",
+          "timestamp": "2021-07-06T11:15:15+02:00",
+          "tree_id": "0c7a2fe631fe5497263efc02ec636ae961f22820",
+          "url": "https://github.com/tokio-rs/tokio/commit/8148b2107c754cf5460d37ddedfff841de97007f"
+        },
+        "date": 1625569641684,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6247086,
+            "range": "± 3311153",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5872227,
+            "range": "± 1605640",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6445525,
+            "range": "± 2277972",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 258,
+            "range": "± 63",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 265,
+            "range": "± 48",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 266,
+            "range": "± 53",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 53834,
+            "range": "± 5753",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 870,
+            "range": "± 56",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 928752,
+            "range": "± 100966",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 662040,
+            "range": "± 112947",
             "unit": "ns/iter"
           }
         ]
