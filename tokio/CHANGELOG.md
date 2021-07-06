@@ -60,6 +60,14 @@ a kernel bug. ([#3803])
 [#3775]: https://github.com/tokio-rs/tokio/pull/3775
 [#3780]: https://github.com/tokio-rs/tokio/pull/3780
 
+# 1.5.1 (July 6, 2021)
+
+### Fixed
+
+- runtime: remotely abort tasks on `JoinHandle::abort` ([#3934])
+
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
+
 # 1.5.0 (April 12, 2021)
 
 ### Added
