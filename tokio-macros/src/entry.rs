@@ -201,12 +201,14 @@ fn parse_knobs(
     for arg in args {
         match arg {
             syn::NestedMeta::Meta(syn::Meta::NameValue(namevalue)) => {
-                let ident = if let Some(ident) = namevalue.path.get_ident() {
-                    ident.to_string().to_lowercase()
-                } else {
-                    let msg = "Must have specified ident";
-                    return Err(syn::Error::new_spanned(namevalue, msg));
-                };
+                let ident = namevalue
+                    .path
+                    .get_ident()
+                    .ok_or_else(|| {
+                        syn::Error::new_spanned(&namevalue, "Must have specified ident")
+                    })?
+                    .to_string()
+                    .to_lowercase();
                 match ident.as_str() {
                     "worker_threads" => {
                         config.set_worker_threads(
@@ -240,13 +242,9 @@ fn parse_knobs(
                 }
             }
             syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
-                let ident = path.get_ident();
-                if ident.is_none() {
-                    let msg = "Must have specified ident";
-                    return Err(syn::Error::new_spanned(path, msg));
-                }
-                let name = ident
-                    .expect("Must have specified ident")
+                let name = path
+                    .get_ident()
+                    .ok_or_else(|| syn::Error::new_spanned(&path, "Must have specified ident"))?
                     .to_string()
                     .to_lowercase();
                 let msg = match name.as_str() {
