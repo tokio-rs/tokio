@@ -590,16 +590,6 @@ impl task::Schedule for Arc<Worker> {
         // SAFETY: Inserted into owned in bind.
         let res = unsafe { self.shared.owned.remove(task) };
 
-        // TODO: Is this still necessary?
-        //
-        // The worker core has been handed off to another thread. In the
-        // event that the scheduler is currently shutting down, the thread
-        // that owns the task may be waiting on the release to complete
-        // shutdown.
-        if self.inject().is_closed() {
-            self.remote().unpark.unpark();
-        }
-
         res
     }
 
