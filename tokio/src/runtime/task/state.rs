@@ -180,6 +180,15 @@ impl State {
         prev.will_need_queueing()
     }
 
+    /// Set the cancelled bit and transition the state to `NOTIFIED`.
+    ///
+    /// Returns `true` if the task needs to be submitted to the pool for
+    /// execution
+    pub(super) fn transition_to_notified_and_cancel(&self) -> bool {
+        let prev = Snapshot(self.val.fetch_or(NOTIFIED | CANCELLED, AcqRel));
+        prev.will_need_queueing()
+    }
+
     /// Set the `CANCELLED` bit and attempt to transition to `Running`.
     ///
     /// Returns `true` if the transition to `Running` succeeded.

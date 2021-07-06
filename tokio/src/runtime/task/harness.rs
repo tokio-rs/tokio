@@ -169,6 +169,17 @@ where
         self.complete(Err(err), true)
     }
 
+    /// Remotely abort the task
+    ///
+    /// This is similar to `shutdown` except that it asks the runtime to perform
+    /// the shutdown. This is necessary to avoid the shutdown happening in the
+    /// wrong thread for non-Send tasks.
+    pub(super) fn remote_abort(self) {
+        if self.header().state.transition_to_notified_and_cancel() {
+            self.core().scheduler.schedule(Notified(self.to_task()));
+        }
+    }
+
     // ====== internal ======
 
     fn complete(self, output: super::Result<T::Output>, is_join_interested: bool) {

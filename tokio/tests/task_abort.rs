@@ -1,6 +1,9 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use std::thread::sleep;
+use std::time::Duration;
+
 /// Checks that a suspended task can be aborted without panicking as reported in
 /// issue #3157: <https://github.com/tokio-rs/tokio/issues/3157>.
 #[test]
@@ -62,18 +65,16 @@ fn test_abort_without_panic_3662() {
             // This runs in a separate thread so it doesn't have immediate
             // thread-local access to the executor. It does however transition
             // the underlying task to be completed, which will cause it to be
-            // dropped (in this thread no less).
+            // dropped (but not in this thread).
             assert!(!drop_flag2.load(Ordering::SeqCst));
             j.abort();
-            // TODO: is this guaranteed at this point?
-            // assert!(drop_flag2.load(Ordering::SeqCst));
             j
         })
         .join()
         .unwrap();
 
-        assert!(drop_flag.load(Ordering::SeqCst));
         let result = task.await;
+        assert!(drop_flag.load(Ordering::SeqCst));
         assert!(result.unwrap_err().is_cancelled());
 
         // Note: We do the following to trigger a deferred task cleanup.
@@ -90,4 +91,50 @@ fn test_abort_without_panic_3662() {
 
         i.await.unwrap();
     });
+}
+
+/// Checks that a suspended LocalSet task can be aborted from a remote thread
+/// without panicking and without running the tasks destructor on the wrong thread.
+/// <https://github.com/tokio-rs/tokio/issues/3929>
+#[test]
+fn remote_abort_local_set_3929() {
+    struct DropCheck {
+        created_on: std::thread::ThreadId,
+        not_send: std::marker::PhantomData<*const ()>,
+    }
+
+    impl DropCheck {
+        fn new() -> Self {
+            Self {
+                created_on: std::thread::current().id(),
+                not_send: std::marker::PhantomData,
+            }
+        }
+    }
+    impl Drop for DropCheck {
+        fn drop(&mut self) {
+            if std::thread::current().id() != self.created_on {
+                panic!("non-Send value dropped in another thread!");
+            }
+        }
+    }
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    let local = tokio::task::LocalSet::new();
+
+    let check = DropCheck::new();
+    let jh = local.spawn_local(async move {
+        futures::future::pending::<()>().await;
+        drop(check);
+    });
+
+    let jh2 = std::thread::spawn(move || {
+        sleep(Duration::from_millis(50));
+        jh.abort();
+    });
+
+    rt.block_on(local);
+    jh2.join().unwrap();
 }
