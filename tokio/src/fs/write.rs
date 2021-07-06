@@ -7,6 +7,10 @@ use std::{io, path::Path};
 ///
 /// This is the async equivalent of [`std::fs::write`][std].
 ///
+/// This operation is implemented by running the equivalent blocking operation
+/// on a separate thread pool using [`spawn_blocking`].
+///
+/// [`spawn_blocking`]: crate::task::spawn_blocking
 /// [std]: fn@std::fs::write
 ///
 /// # Examples
