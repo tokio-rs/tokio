@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625563049366,
+  "lastUpdate": 1625569631202,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -36055,6 +36055,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19464646,
             "range": "± 3272508",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "devnexen@gmail.com",
+            "name": "David CARLIER",
+            "username": "devnexen"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8148b2107c754cf5460d37ddedfff841de97007f",
+          "message": "net: make ucred return pid field for OpenBSD (#3919)",
+          "timestamp": "2021-07-06T11:15:15+02:00",
+          "tree_id": "0c7a2fe631fe5497263efc02ec636ae961f22820",
+          "url": "https://github.com/tokio-rs/tokio/commit/8148b2107c754cf5460d37ddedfff841de97007f"
+        },
+        "date": 1625569626144,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 204378,
+            "range": "± 11616",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 722119,
+            "range": "± 86849",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5448886,
+            "range": "± 803859",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22314213,
+            "range": "± 4044889",
             "unit": "ns/iter"
           }
         ]
