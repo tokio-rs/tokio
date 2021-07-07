@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625646002748,
+  "lastUpdate": 1625646266829,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -36565,6 +36565,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20635543,
             "range": "± 3030616",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "distinct": true,
+          "id": "ae233c1e9f643d7fe589409caa4c6852249cd773",
+          "message": "Merge branch 'upstream/merge-1.8.1' into 'master'",
+          "timestamp": "2021-07-07T10:22:13+02:00",
+          "tree_id": "e9c11d8232a150b204892d40202204451fd92b43",
+          "url": "https://github.com/tokio-rs/tokio/commit/ae233c1e9f643d7fe589409caa4c6852249cd773"
+        },
+        "date": 1625646261892,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 185869,
+            "range": "± 29517",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 644786,
+            "range": "± 89899",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5140478,
+            "range": "± 1524507",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20037970,
+            "range": "± 3917522",
             "unit": "ns/iter"
           }
         ]
