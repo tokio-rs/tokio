@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625648404097,
+  "lastUpdate": 1625648413219,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -36925,6 +36925,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 23190727,
             "range": "± 5583383",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c505a2f81aa7a73d95bd2b0c56a5a5205054656e",
+          "message": "chore: prepare tokio-macros 1.3.0 (#3931)",
+          "timestamp": "2021-07-07T10:58:02+02:00",
+          "tree_id": "4faf05de800a3af31df2d2e3d8e7d0b908b9a6ed",
+          "url": "https://github.com/tokio-rs/tokio/commit/c505a2f81aa7a73d95bd2b0c56a5a5205054656e"
+        },
+        "date": 1625648400463,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 229093,
+            "range": "± 38532",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 945655,
+            "range": "± 176735",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6007662,
+            "range": "± 1628573",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21162399,
+            "range": "± 4140027",
             "unit": "ns/iter"
           }
         ]
