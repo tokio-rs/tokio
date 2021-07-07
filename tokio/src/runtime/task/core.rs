@@ -66,9 +66,6 @@ pub(crate) struct Header {
     /// Pointer to next task, used with the injection queue
     pub(crate) queue_next: UnsafeCell<Option<NonNull<Header>>>,
 
-    /// Pointer to the next task in the transfer stack
-    pub(super) stack_next: UnsafeCell<Option<NonNull<Header>>>,
-
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
 
@@ -104,7 +101,6 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 state,
                 owned: UnsafeCell::new(linked_list::Pointers::new()),
                 queue_next: UnsafeCell::new(None),
-                stack_next: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 id,
@@ -299,13 +295,6 @@ impl<T: Future> CoreStage<T> {
 
 cfg_rt_multi_thread! {
     impl Header {
-        pub(crate) fn shutdown(&self) {
-            use crate::runtime::task::RawTask;
-
-            let task = unsafe { RawTask::from_raw(self.into()) };
-            task.shutdown();
-        }
-
         pub(crate) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
             self.queue_next.with_mut(|ptr| *ptr = next);
         }
