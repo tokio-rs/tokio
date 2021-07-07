@@ -35,7 +35,7 @@ pub(super) struct Inner<T: 'static> {
     tail: AtomicU16,
 
     /// Elements
-    buffer: Box<[UnsafeCell<MaybeUninit<task::Notified<T>>>]>,
+    buffer: Box<[UnsafeCell<MaybeUninit<task::Notified<T>>>; LOCAL_QUEUE_CAPACITY]>,
 }
 
 unsafe impl<T> Send for Inner<T> {}
@@ -52,6 +52,13 @@ const LOCAL_QUEUE_CAPACITY: usize = 4;
 
 const MASK: usize = LOCAL_QUEUE_CAPACITY - 1;
 
+fn make_fixed_size<T>(buffer: Box<[T]>) -> Box<[T; LOCAL_QUEUE_CAPACITY]> {
+    assert_eq!(buffer.len(), LOCAL_QUEUE_CAPACITY);
+
+    // SAFETY: We check that the length is correct.
+    unsafe { Box::from_raw(Box::into_raw(buffer).cast()) }
+}
+
 /// Create a new local run-queue
 pub(super) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
     let mut buffer = Vec::with_capacity(LOCAL_QUEUE_CAPACITY);
@@ -63,7 +70,7 @@ pub(super) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
     let inner = Arc::new(Inner {
         head: AtomicU32::new(0),
         tail: AtomicU16::new(0),
-        buffer: buffer.into(),
+        buffer: make_fixed_size(buffer.into_boxed_slice()),
     });
 
     let local = Local {
@@ -200,7 +207,7 @@ impl<T> Local<T> {
 
         /// An iterator the takes elements out of the run queue.
         struct BatchTaskIter<'a, T: 'static> {
-            buffer: &'a [UnsafeCell<MaybeUninit<task::Notified<T>>>],
+            buffer: &'a [UnsafeCell<MaybeUninit<task::Notified<T>>>; LOCAL_QUEUE_CAPACITY],
             head: u32,
             i: u32,
         }
