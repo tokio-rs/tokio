@@ -1,4 +1,4 @@
-# 1.3.0 (July 6, 2021)
+# 1.3.0 (July 7, 2021)
 
 - macros: don't trigger `clippy::unwrap_used` ([#3926])
 
