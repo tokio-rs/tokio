@@ -488,65 +488,67 @@ impl File {
 }
 
 impl AsyncRead for File {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        dst: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        let me = self.get_mut();
-        let inner = me.inner.get_mut();
+    instrument_resource_op! {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            dst: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            let me = self.get_mut();
+            let inner = me.inner.get_mut();
 
-        loop {
-            match inner.state {
-                Idle(ref mut buf_cell) => {
-                    let mut buf = buf_cell.take().unwrap();
+            loop {
+                match inner.state {
+                    Idle(ref mut buf_cell) => {
+                        let mut buf = buf_cell.take().unwrap();
 
-                    if !buf.is_empty() {
-                        buf.copy_to(dst);
-                        *buf_cell = Some(buf);
-                        return Ready(Ok(()));
-                    }
-
-                    buf.ensure_capacity_for(dst);
-                    let std = me.std.clone();
-
-                    inner.state = Busy(sys::run(move || {
-                        let res = buf.read_from(&mut &*std);
-                        (Operation::Read(res), buf)
-                    }));
-                }
-                Busy(ref mut rx) => {
-                    let (op, mut buf) = ready!(Pin::new(rx).poll(cx))?;
-
-                    match op {
-                        Operation::Read(Ok(_)) => {
+                        if !buf.is_empty() {
                             buf.copy_to(dst);
-                            inner.state = Idle(Some(buf));
+                            *buf_cell = Some(buf);
                             return Ready(Ok(()));
                         }
-                        Operation::Read(Err(e)) => {
-                            assert!(buf.is_empty());
 
-                            inner.state = Idle(Some(buf));
-                            return Ready(Err(e));
-                        }
-                        Operation::Write(Ok(_)) => {
-                            assert!(buf.is_empty());
-                            inner.state = Idle(Some(buf));
-                            continue;
-                        }
-                        Operation::Write(Err(e)) => {
-                            assert!(inner.last_write_err.is_none());
-                            inner.last_write_err = Some(e.kind());
-                            inner.state = Idle(Some(buf));
-                        }
-                        Operation::Seek(result) => {
-                            assert!(buf.is_empty());
-                            inner.state = Idle(Some(buf));
-                            if let Ok(pos) = result {
-                                inner.pos = pos;
+                        buf.ensure_capacity_for(dst);
+                        let std = me.std.clone();
+
+                        inner.state = Busy(sys::run(move || {
+                            let res = buf.read_from(&mut &*std);
+                            (Operation::Read(res), buf)
+                        }));
+                    }
+                    Busy(ref mut rx) => {
+                        let (op, mut buf) = ready!(Pin::new(rx).poll(cx))?;
+
+                        match op {
+                            Operation::Read(Ok(_)) => {
+                                buf.copy_to(dst);
+                                inner.state = Idle(Some(buf));
+                                return Ready(Ok(()));
                             }
-                            continue;
+                            Operation::Read(Err(e)) => {
+                                assert!(buf.is_empty());
+
+                                inner.state = Idle(Some(buf));
+                                return Ready(Err(e));
+                            }
+                            Operation::Write(Ok(_)) => {
+                                assert!(buf.is_empty());
+                                inner.state = Idle(Some(buf));
+                                continue;
+                            }
+                            Operation::Write(Err(e)) => {
+                                assert!(inner.last_write_err.is_none());
+                                inner.last_write_err = Some(e.kind());
+                                inner.state = Idle(Some(buf));
+                            }
+                            Operation::Seek(result) => {
+                                assert!(buf.is_empty());
+                                inner.state = Idle(Some(buf));
+                                if let Ok(pos) = result {
+                                    inner.pos = pos;
+                                }
+                                continue;
+                            }
                         }
                     }
                 }
@@ -618,64 +620,66 @@ impl AsyncSeek for File {
 }
 
 impl AsyncWrite for File {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        src: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        let me = self.get_mut();
-        let inner = me.inner.get_mut();
+    instrument_resource_op! {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            src: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            let me = self.get_mut();
+            let inner = me.inner.get_mut();
 
-        if let Some(e) = inner.last_write_err.take() {
-            return Ready(Err(e.into()));
-        }
+            if let Some(e) = inner.last_write_err.take() {
+                return Ready(Err(e.into()));
+            }
 
-        loop {
-            match inner.state {
-                Idle(ref mut buf_cell) => {
-                    let mut buf = buf_cell.take().unwrap();
+            loop {
+                match inner.state {
+                    Idle(ref mut buf_cell) => {
+                        let mut buf = buf_cell.take().unwrap();
 
-                    let seek = if !buf.is_empty() {
-                        Some(SeekFrom::Current(buf.discard_read()))
-                    } else {
-                        None
-                    };
-
-                    let n = buf.copy_from(src);
-                    let std = me.std.clone();
-
-                    inner.state = Busy(sys::run(move || {
-                        let res = if let Some(seek) = seek {
-                            (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
+                        let seek = if !buf.is_empty() {
+                            Some(SeekFrom::Current(buf.discard_read()))
                         } else {
-                            buf.write_to(&mut &*std)
+                            None
                         };
 
-                        (Operation::Write(res), buf)
-                    }));
+                        let n = buf.copy_from(src);
+                        let std = me.std.clone();
 
-                    return Ready(Ok(n));
-                }
-                Busy(ref mut rx) => {
-                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
-                    inner.state = Idle(Some(buf));
+                        inner.state = Busy(sys::run(move || {
+                            let res = if let Some(seek) = seek {
+                                (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
+                            } else {
+                                buf.write_to(&mut &*std)
+                            };
 
-                    match op {
-                        Operation::Read(_) => {
-                            // We don't care about the result here. The fact
-                            // that the cursor has advanced will be reflected in
-                            // the next iteration of the loop
-                            continue;
-                        }
-                        Operation::Write(res) => {
-                            // If the previous write was successful, continue.
-                            // Otherwise, error.
-                            res?;
-                            continue;
-                        }
-                        Operation::Seek(_) => {
-                            // Ignore the seek
-                            continue;
+                            (Operation::Write(res), buf)
+                        }));
+
+                        return Ready(Ok(n));
+                    }
+                    Busy(ref mut rx) => {
+                        let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
+                        inner.state = Idle(Some(buf));
+
+                        match op {
+                            Operation::Read(_) => {
+                                // We don't care about the result here. The fact
+                                // that the cursor has advanced will be reflected in
+                                // the next iteration of the loop
+                                continue;
+                            }
+                            Operation::Write(res) => {
+                                // If the previous write was successful, continue.
+                                // Otherwise, error.
+                                res?;
+                                continue;
+                            }
+                            Operation::Seek(_) => {
+                                // Ignore the seek
+                                continue;
+                            }
                         }
                     }
                 }

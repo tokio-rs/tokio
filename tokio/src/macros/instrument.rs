@@ -15,7 +15,7 @@ cfg_trace! {
             pin_project_lite::pin_project! {
                 $(#[$meta])*
                 $visibility struct $struct_name {
-                    __resource_span: tracing::Span,
+                    resource_span: tracing::Span,
                     $(
                     $(#[$field_attrs])*
                     $field_vis $field_name : $field_type,
@@ -34,7 +34,7 @@ cfg_trace! {
         ) => {
             $(#[$meta])*
             $vis struct $struct_name {
-                __resource_span: tracing::Span,
+                resource_span: tracing::Span,
                 $(
                 $(#[$field_attrs])*
                 $field_vis $field_name : $field_type,
@@ -52,7 +52,7 @@ cfg_trace! {
             }
         ) => {
             $struct {
-                __resource_span:tracing::trace_span!(
+                resource_span:tracing::trace_span!(
                     "resource",
                     concrete_type = stringify!($struct),
                     kind = stringify!($resource_type)
@@ -67,15 +67,22 @@ cfg_trace! {
     macro_rules! instrument_resource_op {
         (
             $( #[$attr:meta] )*
+            $vis:vis fn $name:ident(&mut $self: ident, $($arg_name:ident : $arg_ty:ty),* $(,)*) $(-> $ret:ty)?
+            $body:block
+        ) => {
+            $vis fn $name(&mut $self, $($arg_name : $arg_ty,)*) $(-> $ret)? {
+                let __resource_span_guard = $self.resource_span.enter();
+                $body
+            }
+        };
+        (
+            $( #[$attr:meta] )*
             $vis:vis fn $name:ident(&$self: ident, $($arg_name:ident : $arg_ty:ty),* $(,)*) $(-> $ret:ty)?
             $body:block
         ) => {
             $vis fn $name(&$self, $($arg_name : $arg_ty,)*) $(-> $ret)? {
-                let __resource_span = $self.__resource_span.clone();
-                let __resource_span_guard = __resource_span.enter();
-                let result =  (|| $body)();
-                drop(__resource_span_guard);
-                result
+                let __resource_span_guard = $self.resource_span.enter();
+                $body
             }
         };
         (
@@ -84,11 +91,9 @@ cfg_trace! {
             $body:block
         ) => {
             $vis fn $name($self : $self_type, $($arg_name : $arg_ty,)*) $(-> $ret)? {
-                let __resource_span = $self.__resource_span.clone();
-                let __resource_span_guard = __resource_span.enter();
-                let result =  (|| $body)();
-                drop(__resource_span_guard);
-                result
+                let span = $self.resource_span.clone();
+                let __resource_span_guard = span.enter();
+                $body
             }
         };
     }
