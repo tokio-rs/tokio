@@ -413,6 +413,54 @@ fn read_single_multi_frame_one_packet_length_includes_head() {
 }
 
 #[test]
+fn read_signed_field() {
+    let mut d: Vec<u8> = vec![];
+    d.extend_from_slice(b"\x00\x00\x00\x09abcdefghi");
+    d.extend_from_slice(b"\x00\x00\x00\x03123");
+    d.extend_from_slice(b"\x00\x00\x00\x0bhello world");
+
+    let io = length_delimited::Builder::new().signed().new_read(mock! {
+        data(&d),
+    });
+    pin_mut!(io);
+
+    assert_next_eq!(io, b"abcdefghi");
+    assert_next_eq!(io, b"123");
+    assert_next_eq!(io, b"hello world");
+    assert_done!(io);
+}
+
+#[test]
+fn read_negative_field() {
+    let mut d: Vec<u8> = vec![];
+    d.extend_from_slice(b"\xff\xff\xff\xffabcdefghi");
+
+    let io = length_delimited::Builder::new().signed().new_read(mock! {
+        data(&d),
+    });
+    pin_mut!(io);
+
+    assert_next_err!(io);
+}
+
+#[test]
+fn write_single_frame_signed() {
+    let io = length_delimited::Builder::new().signed().new_write(mock! {
+        data(b"\x00\x00\x00\x09"),
+        data(b"abcdefghi"),
+        flush(),
+    });
+    pin_mut!(io);
+
+    task::spawn(()).enter(|cx, _| {
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert!(io.get_ref().calls.is_empty());
+    });
+}
+
+#[test]
 fn write_single_frame_length_adjusted() {
     let io = length_delimited::Builder::new()
         .length_adjustment(-2)

@@ -377,6 +377,7 @@ use crate::codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use std::convert::TryInto;
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
 use std::{cmp, fmt};
@@ -406,6 +407,9 @@ pub struct Builder {
 
     // Length field byte order (little or big endian)
     length_field_is_big_endian: bool,
+
+    // Length field is signed integer
+    length_field_is_signed: bool,
 }
 
 /// An error when the number of bytes read is more than max frame length.
@@ -486,11 +490,26 @@ impl LengthDelimitedCodec {
             // Skip the required bytes
             src.advance(self.builder.length_field_offset);
 
-            // match endianness
-            let n = if self.builder.length_field_is_big_endian {
-                src.get_uint(field_len)
-            } else {
-                src.get_uint_le(field_len)
+            // match signedness and endianness
+            let n: u64 = match (
+                self.builder.length_field_is_signed,
+                self.builder.length_field_is_big_endian,
+            ) {
+                // `try_into` ensures we didn't read a negative number
+                (true, true) => src.get_int(field_len).try_into().map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        LengthDelimitedCodecError { _priv: () },
+                    )
+                })?,
+                (true, false) => src.get_int_le(field_len).try_into().map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        LengthDelimitedCodecError { _priv: () },
+                    )
+                })?,
+                (false, true) => src.get_uint(field_len),
+                (false, false) => src.get_uint_le(field_len),
             };
 
             if n > self.builder.max_frame_len as u64 {
@@ -608,10 +627,14 @@ impl Encoder<Bytes> for LengthDelimitedCodec {
         // length field (plus adjustment).
         dst.reserve(self.builder.length_field_len + n);
 
-        if self.builder.length_field_is_big_endian {
-            dst.put_uint(n as u64, self.builder.length_field_len);
-        } else {
-            dst.put_uint_le(n as u64, self.builder.length_field_len);
+        match (
+            self.builder.length_field_is_signed,
+            self.builder.length_field_is_big_endian,
+        ) {
+            (true, true) => dst.put_int(n as i64, self.builder.length_field_len),
+            (true, false) => dst.put_int_le(n as i64, self.builder.length_field_len),
+            (false, true) => dst.put_uint(n as u64, self.builder.length_field_len),
+            (false, false) => dst.put_uint_le(n as u64, self.builder.length_field_len),
         }
 
         // Write the frame to the buffer
@@ -668,6 +691,9 @@ impl Builder {
 
             // Default to reading the length field in network (big) endian.
             length_field_is_big_endian: true,
+
+            // Default to reading length as usigned int
+            length_field_is_signed: false,
         }
     }
 
@@ -744,6 +770,57 @@ impl Builder {
         } else {
             self.little_endian()
         }
+    }
+
+    /// Read the length field as an unsigned integer.
+    ///
+    /// The default setting is unsigned.
+    ///
+    /// This configuration option applies to both encoding and decoding.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::io::AsyncRead;
+    /// use tokio_util::codec::LengthDelimitedCodec;
+    ///
+    /// # fn bind_read<T: AsyncRead>(io: T) {
+    /// LengthDelimitedCodec::builder()
+    ///     .unsigned()
+    ///     .new_read(io);
+    /// # }
+    /// # pub fn main() {}
+    /// ```
+    pub fn unsigned(&mut self) -> &mut Self {
+        self.length_field_is_signed = false;
+        self
+    }
+
+    /// Read the length field as an signed integer. The integer is guarunteed
+    /// not to be negative prior to any adjustments being applied. This setting
+    /// is intended for compatability with languages that lack an unsigned
+    /// representation.
+    ///
+    /// The default setting is unsigned.
+    ///
+    /// This configuration option applies to both encoding and decoding.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::io::AsyncRead;
+    /// use tokio_util::codec::LengthDelimitedCodec;
+    ///
+    /// # fn bind_read<T: AsyncRead>(io: T) {
+    /// LengthDelimitedCodec::builder()
+    ///     .signed()
+    ///     .new_read(io);
+    /// # }
+    /// # pub fn main() {}
+    /// ```
+    pub fn signed(&mut self) -> &mut Self {
+        self.length_field_is_signed = true;
+        self
     }
 
     /// Sets the max frame length
