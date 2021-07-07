@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625645980625,
+  "lastUpdate": 1625645984243,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -36517,6 +36517,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18102030,
             "range": "± 3559254",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "be26ca762521a0f5db58fe3814d738719ac20b77",
+          "message": "sync: wrap state in helper struct (#3922)",
+          "timestamp": "2021-07-07T10:17:47+02:00",
+          "tree_id": "8f8716ce3a4383ab403e43799a114e7034e6c014",
+          "url": "https://github.com/tokio-rs/tokio/commit/be26ca762521a0f5db58fe3814d738719ac20b77"
+        },
+        "date": 1625645978062,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 209286,
+            "range": "± 33193",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 755287,
+            "range": "± 148286",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5812035,
+            "range": "± 1021177",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20635543,
+            "range": "± 3030616",
             "unit": "ns/iter"
           }
         ]
