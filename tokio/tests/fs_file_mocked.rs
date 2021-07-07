@@ -22,6 +22,24 @@ macro_rules! cfg_io_std {
 
 use futures::future;
 
+macro_rules! instrument_resource {
+    ($($t:tt)*) => {
+        $($t)*
+    }
+}
+
+macro_rules! new_instrumented_resource {
+    ($resource_type:ident, $($t:tt)*) => {
+        $($t)*
+    }
+}
+
+macro_rules! instrument_resource_op {
+    ($($t:tt)*) => {
+        $($t)*
+    }
+}
+
 // Load source
 #[allow(warnings)]
 #[path = "../src/fs/file.rs"]
