@@ -9,6 +9,9 @@ pub use self::error::JoinError;
 mod harness;
 use self::harness::Harness;
 
+mod inject;
+pub(super) use self::inject::Inject;
+
 mod join;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
