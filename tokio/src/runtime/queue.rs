@@ -152,9 +152,12 @@ impl<T> Local<T> {
         tail: u16,
         inject: &Inject<T>,
     ) -> Result<(), task::Notified<T>> {
-        const BATCH_LEN: usize = LOCAL_QUEUE_CAPACITY / 2 + 1;
+        /// How many elements are we taking from the local queue.
+        ///
+        /// This is one less than the number of tasks pushed to the inject
+        /// queue as we are also inserting the `task` argument.
+        const NUM_TASKS_TAKEN: u16 = (LOCAL_QUEUE_CAPACITY / 2) as u16;
 
-        let n = (LOCAL_QUEUE_CAPACITY / 2) as u16;
         assert_eq!(
             tail.wrapping_sub(head) as usize,
             LOCAL_QUEUE_CAPACITY,
@@ -180,7 +183,10 @@ impl<T> Local<T> {
             .head
             .compare_exchange(
                 prev,
-                pack(head.wrapping_add(n), head.wrapping_add(n)),
+                pack(
+                    head.wrapping_add(NUM_TASKS_TAKEN),
+                    head.wrapping_add(NUM_TASKS_TAKEN),
+                ),
                 Release,
                 Relaxed,
             )
@@ -192,41 +198,41 @@ impl<T> Local<T> {
             return Err(task);
         }
 
-        // link the tasks
-        for i in 0..n {
-            let j = i + 1;
+        /// An iterator the takes elements out of the run queue.
+        struct BatchTaskIter<'a, T: 'static> {
+            buffer: &'a [UnsafeCell<MaybeUninit<task::Notified<T>>>],
+            head: u32,
+            i: u32,
+        }
+        impl<'a, T: 'static> Iterator for BatchTaskIter<'a, T> {
+            type Item = task::Notified<T>;
 
-            let i_idx = i.wrapping_add(head) as usize & MASK;
-            let j_idx = j.wrapping_add(head) as usize & MASK;
+            #[inline]
+            fn next(&mut self) -> Option<task::Notified<T>> {
+                if self.i == u32::from(NUM_TASKS_TAKEN) {
+                    None
+                } else {
+                    let i_idx = self.i.wrapping_add(self.head) as usize & MASK;
+                    let slot = &self.buffer[i_idx];
 
-            // Get the next pointer
-            let next = if j == n {
-                // The last task in the local queue being moved
-                task.header().into()
-            } else {
-                // safety: The above CAS prevents a stealer from accessing these
-                // tasks and we are the only producer.
-                self.inner.buffer[j_idx].with(|ptr| unsafe {
-                    let value = (*ptr).as_ptr();
-                    (*value).header().into()
-                })
-            };
+                    // safety: Our CAS from before has assumed exclusive ownership
+                    // of the task pointers in this range.
+                    let task = slot.with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
 
-            // safety: the above CAS prevents a stealer from accessing these
-            // tasks and we are the only producer.
-            self.inner.buffer[i_idx].with_mut(|ptr| unsafe {
-                let ptr = (*ptr).as_ptr();
-                (*ptr).header().set_next(Some(next))
-            });
+                    self.i += 1;
+                    Some(task)
+                }
+            }
         }
 
-        // safety: the above CAS prevents a stealer from accessing these tasks
-        // and we are the only producer.
-        let head = self.inner.buffer[head as usize & MASK]
-            .with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
-
-        // Push the tasks onto the inject queue
-        inject.push_batch(head, task, BATCH_LEN);
+        // safety: The CAS above ensures that no consumer will look at these
+        // values again, and we are the only producer.
+        let batch_iter = BatchTaskIter {
+            buffer: &*self.inner.buffer,
+            head: head as u32,
+            i: 0,
+        };
+        inject.push_batch(batch_iter.chain(std::iter::once(task)));
 
         Ok(())
     }

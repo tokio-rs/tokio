@@ -137,10 +137,6 @@ cfg_rt_multi_thread! {
         pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
             Notified(Task::from_raw(ptr))
         }
-
-        pub(crate) fn header(&self) -> &Header {
-            self.0.header()
-        }
     }
 
     impl<S: 'static> Task<S> {

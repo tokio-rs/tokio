@@ -108,15 +108,50 @@ impl<T: 'static> Inject<T> {
         Ok(())
     }
 
-    pub(crate) fn push_batch(
+    /// Pushes several values into the queue.
+    ///
+    /// SAFETY: The caller should ensure that we have exclusive access to the
+    /// `queue_next` field in the provided tasks.
+    #[inline]
+    pub(crate) fn push_batch<I>(&self, mut iter: I)
+    where
+        I: Iterator<Item = task::Notified<T>>,
+    {
+        let first = match iter.next() {
+            Some(first) => first.into_raw(),
+            None => return,
+        };
+
+        // Link up all the tasks.
+        let mut prev = first;
+        let mut counter = 1;
+
+        // We are going to be called with an `std::iter::Chain`, and that
+        // iterator overrides `for_each` to something that is easier for the
+        // compiler to optimize than a loop.
+        iter.map(|next| next.into_raw()).for_each(|next| {
+            // safety: The caller guarantees exclusive access to this field.
+            set_next(prev, Some(next));
+            prev = next;
+            counter += 1;
+        });
+
+        // Now that the tasks are linked together, insert them into the
+        // linked list.
+        self.push_batch_inner(first, prev, counter);
+    }
+
+    /// Insert several tasks that have been linked together into the queue.
+    ///
+    /// The provided head and tail may be be the same task. In this case, a
+    /// single task is inserted.
+    #[inline]
+    fn push_batch_inner(
         &self,
-        batch_head: task::Notified<T>,
-        batch_tail: task::Notified<T>,
+        batch_head: NonNull<task::Header>,
+        batch_tail: NonNull<task::Header>,
         num: usize,
     ) {
-        let batch_head = batch_head.into_raw();
-        let batch_tail = batch_tail.into_raw();
-
         debug_assert!(get_next(batch_tail).is_none());
 
         let mut p = self.pointers.lock();

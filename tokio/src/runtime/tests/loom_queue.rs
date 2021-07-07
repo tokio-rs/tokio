@@ -1,5 +1,5 @@
 use crate::runtime::queue;
-use crate::runtime::task::{self, Schedule, Task};
+use crate::runtime::task::{self, Inject, Schedule, Task};
 
 use loom::thread;
 
@@ -7,7 +7,7 @@ use loom::thread;
 fn basic() {
     loom::model(|| {
         let (steal, mut local) = queue::local();
-        let inject = queue::Inject::new();
+        let inject = Inject::new();
 
         let th = thread::spawn(move || {
             let (_, mut local) = queue::local();
@@ -61,7 +61,7 @@ fn basic() {
 fn steal_overflow() {
     loom::model(|| {
         let (steal, mut local) = queue::local();
-        let inject = queue::Inject::new();
+        let inject = Inject::new();
 
         let th = thread::spawn(move || {
             let (_, mut local) = queue::local();
@@ -129,7 +129,7 @@ fn multi_stealer() {
 
     loom::model(|| {
         let (steal, mut local) = queue::local();
-        let inject = queue::Inject::new();
+        let inject = Inject::new();
 
         // Push work
         for _ in 0..NUM_TASKS {
@@ -166,7 +166,7 @@ fn chained_steal() {
     loom::model(|| {
         let (s1, mut l1) = queue::local();
         let (s2, mut l2) = queue::local();
-        let inject = queue::Inject::new();
+        let inject = Inject::new();
 
         // Load up some tasks
         for _ in 0..4 {
