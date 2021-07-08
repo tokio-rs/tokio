@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625741789322,
+  "lastUpdate": 1625741792565,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -56991,6 +56991,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 990,
             "range": "± 50",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "moritz.gunz@gmail.com",
+            "name": "Moritz Gunz",
+            "username": "NeoLegends"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c6fbb9aeb1f8f52055d0fc506f8ac2ffac700bfe",
+          "message": "task: expose nameable future for TaskLocal::scope (#3273)",
+          "timestamp": "2021-07-08T12:54:31+02:00",
+          "tree_id": "32c83f52e65d787b2e5cc13102efb3015115374d",
+          "url": "https://github.com/tokio-rs/tokio/commit/c6fbb9aeb1f8f52055d0fc506f8ac2ffac700bfe"
+        },
+        "date": 1625741783223,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 17562,
+            "range": "± 8884",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 971,
+            "range": "± 151",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 698,
+            "range": "± 214",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 17573,
+            "range": "± 7115",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 959,
+            "range": "± 128",
             "unit": "ns/iter"
           }
         ]
