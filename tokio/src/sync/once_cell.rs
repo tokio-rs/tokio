@@ -63,7 +63,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let result = get_global_integer();
+///     let result = get_global_integer().await;
 ///     assert_eq!(*result, 2);
 /// }
 /// ```
