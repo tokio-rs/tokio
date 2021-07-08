@@ -262,10 +262,10 @@ mod unix_signal {
 #[cfg(windows)]
 mod windows_signal {
     use super::*;
-    assert_value!(tokio::signal::unix::CtrlC: Send & Sync & Unpin);
-    assert_value!(tokio::signal::unix::CtrlBreak: Send & Sync & Unpin);
-    async_assert_fn!(tokio::signal::unix::CtrlC::recv(_): Send & Sync & !Unpin);
-    async_assert_fn!(tokio::signal::unix::CtrlBreak::recv(_): Send & Sync & !Unpin);
+    assert_value!(tokio::signal::windows::CtrlC: Send & Sync & Unpin);
+    assert_value!(tokio::signal::windows::CtrlBreak: Send & Sync & Unpin);
+    async_assert_fn!(tokio::signal::windows::CtrlC::recv(_): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::signal::windows::CtrlBreak::recv(_): Send & Sync & !Unpin);
 }
 
 assert_value!(tokio::sync::AcquireError: Send & Sync & Unpin);
