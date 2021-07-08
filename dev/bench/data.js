@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625741785520,
+  "lastUpdate": 1625741789322,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -37231,6 +37231,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20541114,
             "range": "± 3810923",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "moritz.gunz@gmail.com",
+            "name": "Moritz Gunz",
+            "username": "NeoLegends"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c6fbb9aeb1f8f52055d0fc506f8ac2ffac700bfe",
+          "message": "task: expose nameable future for TaskLocal::scope (#3273)",
+          "timestamp": "2021-07-08T12:54:31+02:00",
+          "tree_id": "32c83f52e65d787b2e5cc13102efb3015115374d",
+          "url": "https://github.com/tokio-rs/tokio/commit/c6fbb9aeb1f8f52055d0fc506f8ac2ffac700bfe"
+        },
+        "date": 1625741780583,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 246692,
+            "range": "± 60629",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1126443,
+            "range": "± 251714",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 7037902,
+            "range": "± 2325293",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22475300,
+            "range": "± 5678874",
             "unit": "ns/iter"
           }
         ]
