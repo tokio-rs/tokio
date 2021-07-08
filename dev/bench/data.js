@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625648854275,
+  "lastUpdate": 1625741785520,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19655,6 +19655,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 588,
             "range": "± 47",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "moritz.gunz@gmail.com",
+            "name": "Moritz Gunz",
+            "username": "NeoLegends"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c6fbb9aeb1f8f52055d0fc506f8ac2ffac700bfe",
+          "message": "task: expose nameable future for TaskLocal::scope (#3273)",
+          "timestamp": "2021-07-08T12:54:31+02:00",
+          "tree_id": "32c83f52e65d787b2e5cc13102efb3015115374d",
+          "url": "https://github.com/tokio-rs/tokio/commit/c6fbb9aeb1f8f52055d0fc506f8ac2ffac700bfe"
+        },
+        "date": 1625741779757,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 875,
+            "range": "± 132",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 19908,
+            "range": "± 9876",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 948,
+            "range": "± 187",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 18099,
+            "range": "± 8629",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 571,
+            "range": "± 101",
             "unit": "ns/iter"
           }
         ]
