@@ -115,7 +115,7 @@ impl<T: 'static> LocalKey<T> {
     /// }).await;
     /// # }
     /// ```
-    pub async fn scope<F>(&'static self, value: T, f: F) -> F::Output
+    pub fn scope<F>(&'static self, value: T, f: F) -> TaskLocalFuture<T, F>
     where
         F: Future,
     {
@@ -124,7 +124,6 @@ impl<T: 'static> LocalKey<T> {
             slot: Some(value),
             future: f,
         }
-        .await
     }
 
     /// Sets a value `T` as the task-local value for the closure `F`.
@@ -206,7 +205,31 @@ impl<T: 'static> fmt::Debug for LocalKey<T> {
 }
 
 pin_project! {
-    struct TaskLocalFuture<T: StaticLifetime, F> {
+    /// A future that sets a value `T` of a task local for the future `F` during
+    /// its execution.
+    ///
+    /// The value of the task-local must be `'static` and will be dropped on the
+    /// completion of the future.
+    ///
+    /// Created by the function [`LocalKey::scope`](self::LocalKey::scope).
+    ///
+    /// ### Examples
+    ///
+    /// ```
+    /// # async fn dox() {
+    /// tokio::task_local! {
+    ///     static NUMBER: u32;
+    /// }
+    ///
+    /// NUMBER.scope(1, async move {
+    ///     println!("task local value: {}", NUMBER.get());
+    /// }).await;
+    /// # }
+    /// ```
+    pub struct TaskLocalFuture<T, F>
+    where
+        T: 'static
+    {
         local: &'static LocalKey<T>,
         slot: Option<T>,
         #[pin]
@@ -251,10 +274,6 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
         self.with_task(|f| f.poll(cx))
     }
 }
-
-// Required to make `pin_project` happy.
-trait StaticLifetime: 'static {}
-impl<T: 'static> StaticLifetime for T {}
 
 /// An error returned by [`LocalKey::try_with`](method@LocalKey::try_with).
 #[derive(Clone, Copy, Eq, PartialEq)]

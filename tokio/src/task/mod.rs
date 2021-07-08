@@ -304,4 +304,9 @@ cfg_rt! {
         mod builder;
         pub use builder::Builder;
     }
+
+    /// Task-related futures.
+    pub mod futures {
+        pub use super::task_local::TaskLocalFuture;
+    }
 }
