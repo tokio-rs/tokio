@@ -46,7 +46,7 @@ impl<T: Stack> Level<T> {
             () => {
                 T::default()
             };
-        };
+        }
 
         Level {
             level,
