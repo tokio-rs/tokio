@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625746225261,
+  "lastUpdate": 1625746462097,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -37483,6 +37483,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19356396,
             "range": "± 3564243",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zonyitoo@users.noreply.github.com",
+            "name": "ty",
+            "username": "zonyitoo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c306bf853a1f8423b154f17fa47926f04eecd9b4",
+          "message": "net: allow customized I/O operations for TcpStream (#3888)",
+          "timestamp": "2021-07-08T13:02:40+02:00",
+          "tree_id": "072d2de21dbb7e581c735b1368c2fa917dda99e6",
+          "url": "https://github.com/tokio-rs/tokio/commit/c306bf853a1f8423b154f17fa47926f04eecd9b4"
+        },
+        "date": 1625746457024,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 189281,
+            "range": "± 7562",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 934908,
+            "range": "± 147376",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6115608,
+            "range": "± 1363324",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19672190,
+            "range": "± 3814086",
             "unit": "ns/iter"
           }
         ]
