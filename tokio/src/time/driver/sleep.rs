@@ -171,7 +171,7 @@ impl Sleep {
         let handle = Handle::current();
         let entry = TimerEntry::new(&handle, deadline);
 
-        new_instrumented_resource!(Timer, Sleep { deadline, entry })
+        new_instrumented_resource!("timer", Sleep { deadline, entry })
     }
 
     pub(crate) fn far_future() -> Sleep {

@@ -155,7 +155,7 @@ impl TcpStream {
 
     pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
         let io = PollEvented::new(connected)?;
-        Ok(new_instrumented_resource!(Network, TcpStream { io }))
+        Ok(new_instrumented_resource!("network", TcpStream { io }))
     }
 
     /// Creates new `TcpStream` from a `std::net::TcpStream`.
@@ -190,7 +190,7 @@ impl TcpStream {
     pub fn from_std(stream: std::net::TcpStream) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::from_std(stream);
         let io = PollEvented::new(io)?;
-        Ok(new_instrumented_resource!(Network, TcpStream { io }))
+        Ok(new_instrumented_resource!("network", TcpStream { io }))
     }
 
     /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].

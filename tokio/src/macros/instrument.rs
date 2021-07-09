@@ -46,16 +46,16 @@ cfg_trace! {
 
     macro_rules! new_instrumented_resource {
         (
-            $resource_type:ident,
+            $resource_type:literal,
             $struct:ident {
             $($field:ident),* $(,)* // Handle non shorthand initialization
             }
         ) => {
             $struct {
-                resource_span:tracing::trace_span!(
+                resource_span: tracing::trace_span!(
                     "resource",
                     concrete_type = stringify!($struct),
-                    kind = stringify!($resource_type)
+                    kind = $resource_type
                 ),
                 $(
                     $field,
@@ -71,7 +71,7 @@ cfg_trace! {
             $body:block
         ) => {
             $vis fn $name(&mut $self, $($arg_name : $arg_ty,)*) $(-> $ret)? {
-                let __resource_span_guard = $self.resource_span.enter();
+                let _resource_span_guard = $self.resource_span.enter();
                 $body
             }
         };
@@ -81,7 +81,7 @@ cfg_trace! {
             $body:block
         ) => {
             $vis fn $name(&$self, $($arg_name : $arg_ty,)*) $(-> $ret)? {
-                let __resource_span_guard = $self.resource_span.enter();
+                let _resource_span_guard = $self.resource_span.enter();
                 $body
             }
         };
@@ -91,8 +91,7 @@ cfg_trace! {
             $body:block
         ) => {
             $vis fn $name($self : $self_type, $($arg_name : $arg_ty,)*) $(-> $ret)? {
-                let span = $self.resource_span.clone();
-                let __resource_span_guard = span.enter();
+                let _span = $self.resource_span.clone().entered();
                 $body
             }
         };
@@ -112,7 +111,7 @@ cfg_not_trace! {
     }
 
     macro_rules! new_instrumented_resource {
-        ($resource_type:ident, $($t:tt)*) => {
+        ($resource_type:literal, $($t:tt)*) => {
             $($t)*
         }
     }

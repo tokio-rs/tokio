@@ -29,7 +29,7 @@ macro_rules! instrument_resource {
 }
 
 macro_rules! new_instrumented_resource {
-    ($resource_type:ident, $($t:tt)*) => {
+    ($resource_type:literal, $($t:tt)*) => {
         $($t)*
     }
 }

@@ -210,7 +210,7 @@ impl File {
         });
 
         new_instrumented_resource! {
-            FileSystem,
+            "fileSystem",
             File {
                 std,
                 inner,
