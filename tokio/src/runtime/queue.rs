@@ -52,10 +52,14 @@ const LOCAL_QUEUE_CAPACITY: usize = 4;
 
 const MASK: usize = LOCAL_QUEUE_CAPACITY - 1;
 
+// Constructing the fixed size array directly is very awkward. The only way to
+// do it is to repeat `UnsafeCell::new(MaybeUninit::uninit())` 256 times, as
+// the contents are not Copy. The trick with defining a const doesn't work for
+// generic types.
 fn make_fixed_size<T>(buffer: Box<[T]>) -> Box<[T; LOCAL_QUEUE_CAPACITY]> {
     assert_eq!(buffer.len(), LOCAL_QUEUE_CAPACITY);
 
-    // SAFETY: We check that the length is correct.
+    // safety: We check that the length is correct.
     unsafe { Box::from_raw(Box::into_raw(buffer).cast()) }
 }
 
@@ -202,7 +206,7 @@ impl<T> Local<T> {
             return Err(task);
         }
 
-        /// An iterator the takes elements out of the run queue.
+        /// An iterator that takes elements out of the run queue.
         struct BatchTaskIter<'a, T: 'static> {
             buffer: &'a [UnsafeCell<MaybeUninit<task::Notified<T>>>; LOCAL_QUEUE_CAPACITY],
             head: u32,
