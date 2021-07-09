@@ -1,5 +1,5 @@
 //! Runs `!Send` futures on the current thread.
-use crate::runtime::task::{self, JoinHandle, Task, OwnedTasks};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Task};
 use crate::sync::AtomicWaker;
 
 use std::cell::{Cell, RefCell};
