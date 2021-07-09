@@ -54,11 +54,11 @@ const REF_ONE: usize = 1 << REF_COUNT_SHIFT;
 
 /// State a task is initialized with
 ///
-/// A task is initialized with two references: one for the scheduler and one for
+/// A task is initialized with three references: two for the scheduler and one for
 /// the `JoinHandle`. As the task starts with a `JoinHandle`, `JOIN_INTEREST` is
 /// set. A new task is immediately pushed into the run queue for execution and
 /// starts with the `NOTIFIED` flag set.
-const INITIAL_STATE: usize = (REF_ONE * 2) | JOIN_INTEREST | NOTIFIED;
+const INITIAL_STATE: usize = (REF_ONE * 3) | JOIN_INTEREST | NOTIFIED;
 
 /// All transitions are performed via RMW operations. This establishes an
 /// unambiguous modification order.
@@ -82,10 +82,8 @@ impl State {
 
     /// Attempt to transition the lifecycle to `Running`.
     ///
-    /// If `ref_inc` is set, the reference count is also incremented.
-    ///
     /// The `NOTIFIED` bit is always unset.
-    pub(super) fn transition_to_running(&self, ref_inc: bool) -> UpdateResult {
+    pub(super) fn transition_to_running(&self) -> UpdateResult {
         self.fetch_update(|curr| {
             assert!(curr.is_notified());
 
@@ -93,10 +91,6 @@ impl State {
 
             if !next.is_idle() {
                 return None;
-            }
-
-            if ref_inc {
-                next.ref_inc();
             }
 
             next.set_running();
@@ -327,6 +321,12 @@ impl State {
     pub(super) fn ref_dec(&self) -> bool {
         let prev = Snapshot(self.val.fetch_sub(REF_ONE, AcqRel));
         prev.ref_count() == 1
+    }
+
+    /// Returns `true` if the task should be released.
+    pub(super) fn ref_dec_twice(&self) -> bool {
+        let prev = Snapshot(self.val.fetch_sub(2*REF_ONE, AcqRel));
+        prev.ref_count() == 2
     }
 
     fn fetch_update<F>(&self, mut f: F) -> Result<Snapshot, Snapshot>

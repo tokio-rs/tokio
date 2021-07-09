@@ -127,27 +127,17 @@ impl<S: Schedule> Scheduler<S> {
 
     /// Bind a scheduler to the task.
     ///
-    /// This only happens on the first poll and must be preceded by a call to
-    /// `is_bound` to determine if binding is appropriate or not.
+    /// This happens as part of the conversion from UnboundTask to other kinds
+    /// of task reference.
     ///
     /// # Safety
     ///
     /// Binding must not be done concurrently since it will mutate the task
     /// core through a shared reference.
-    pub(super) fn bind_scheduler(&self, task: Task<S>) {
-        // This function may be called concurrently, but the __first__ time it
-        // is called, the caller has unique access to this field. All subsequent
-        // concurrent calls will be via the `Waker`, which will "happens after"
-        // the first poll.
-        //
-        // In other words, it is always safe to read the field and it is safe to
-        // write to the field when it is `None`.
+    pub(super) fn bind_scheduler(&self, scheduler: S) {
         debug_assert!(!self.is_bound());
 
-        // Bind the task to the scheduler
-        let scheduler = S::bind(task);
-
-        // Safety: As `scheduler` is not set, this is the first poll
+        // Safety: The caller guarantees exclusive access to this field.
         self.scheduler.with_mut(|ptr| unsafe {
             *ptr = Some(scheduler);
         });

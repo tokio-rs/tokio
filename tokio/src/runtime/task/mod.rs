@@ -19,7 +19,7 @@ mod join;
 pub use self::join::JoinHandle;
 
 mod list;
-pub(crate) use self::list::OwnedTasks;
+pub(crate) use self::list::{LocalOwnedTasks, OwnedTasks};
 
 mod raw;
 use self::raw::RawTask;
@@ -50,6 +50,59 @@ unsafe impl<S> Sync for Task<S> {}
 #[repr(transparent)]
 pub(crate) struct Notified<S: 'static>(Task<S>);
 
+/// A task not yet bound to an executor. This object holds two ref-counts to
+/// the task to enable it to be split into two for free.
+pub(crate) struct UnboundTask<T, S: 'static> {
+    raw: RawTask,
+    _p: PhantomData<(T, S)>,
+}
+
+impl<T: 'static + Future, S: 'static + Schedule> UnboundTask<T, S> {
+    /// Bind a scheduler to this task, then split it into two task references.
+    fn bind_and_split(self, scheduler: S) -> (Notified<S>, Task<S>) {
+        // safety: We know what the future type is.
+        let harness = unsafe {
+            Harness::<T, S>::from_raw(self.raw.header().into())
+        };
+        harness.bind_scheduler(scheduler);
+
+        let task1 = Task {
+            raw: self.raw,
+            _p: PhantomData,
+        };
+
+        let task2 = Task {
+            raw: self.raw,
+            _p: PhantomData,
+        };
+
+        // Don't run destructor.
+        mem::forget(self);
+
+        (Notified(task1), task2)
+    }
+
+    // This method is used by the blocking spawner.
+    pub(crate) fn into_notified(self) -> Notified<S>
+    where
+        T: Send,
+    {
+        // We need to drop a reference to do this conversion as UnboundTask has
+        // two ref-counts.
+        self.raw.header().state.ref_dec();
+
+        let task = Task {
+            raw: self.raw,
+            _p: PhantomData,
+        };
+
+        // Don't run destructor.
+        mem::forget(self);
+
+        Notified(task)
+    }
+}
+
 unsafe impl<S: Schedule> Send for Notified<S> {}
 unsafe impl<S: Schedule> Sync for Notified<S> {}
 
@@ -57,13 +110,6 @@ unsafe impl<S: Schedule> Sync for Notified<S> {}
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
 pub(crate) trait Schedule: Sync + Sized + 'static {
-    /// Bind a task to the executor.
-    ///
-    /// Guaranteed to be called from the thread that called `poll` on the task.
-    /// The returned `Schedule` instance is associated with the task and is used
-    /// as `&self` in the other methods on this trait.
-    fn bind(task: Task<Self>) -> Self;
-
     /// The task has completed work and is ready to be released. The scheduler
     /// should release it immediately and return it. The task module will batch
     /// the ref-dec with setting other options.
@@ -82,42 +128,27 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
 }
 
 cfg_rt! {
-    /// Create a new task with an associated join handle
-    pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
-    where
-        T: Future + Send + 'static,
-        S: Schedule,
-    {
-        let raw = RawTask::new::<_, S>(task);
-
-        let task = Task {
-            raw,
-            _p: PhantomData,
-        };
-
-        let join = JoinHandle::new(raw);
-
-        (Notified(task), join)
-    }
-}
-
-cfg_rt! {
-    /// Create a new `!Send` task with an associated join handle
-    pub(crate) unsafe fn joinable_local<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
+    /// Create a new task with an associated join handle.
+    ///
+    /// This method does not require the future to be Send, as it may be called
+    /// by a LocalSet. However, to bind it to an OwnedTasks that isn't local,
+    /// the future must be Send. This is enforced by the UnboundTask type
+    /// remembering the type of future.
+    pub(crate) fn joinable<T, S>(task: T) -> (UnboundTask<T, S>, JoinHandle<T::Output>)
     where
         T: Future + 'static,
         S: Schedule,
     {
         let raw = RawTask::new::<_, S>(task);
 
-        let task = Task {
+        let unbound = UnboundTask {
             raw,
             _p: PhantomData,
         };
 
         let join = JoinHandle::new(raw);
 
-        (Notified(task), join)
+        (unbound, join)
     }
 }
 
@@ -180,6 +211,18 @@ impl<S: 'static> Drop for Task<S> {
     fn drop(&mut self) {
         // Decrement the ref count
         if self.header().state.ref_dec() {
+            // Deallocate if this is the final ref count
+            self.raw.dealloc();
+        }
+    }
+}
+
+impl<T, S: 'static> Drop for UnboundTask<T, S> {
+    fn drop(&mut self) {
+        self.raw.shutdown();
+
+        // Decrement the ref count twice as an UnboundTask holds two ref-counts.
+        if self.raw.header().state.ref_dec_twice() {
             // Deallocate if this is the final ref count
             self.raw.dealloc();
         }

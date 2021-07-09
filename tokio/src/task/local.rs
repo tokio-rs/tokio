@@ -1,5 +1,5 @@
 //! Runs `!Send` futures on the current thread.
-use crate::runtime::task::{self, JoinHandle, OwnedTasks, Task};
+use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
 use crate::sync::AtomicWaker;
 
 use std::cell::{Cell, RefCell};
@@ -232,7 +232,7 @@ struct Context {
 
 struct Tasks {
     /// Collection of all active tasks spawned onto this executor.
-    owned: OwnedTasks<Arc<Shared>>,
+    owned: LocalOwnedTasks<Arc<Shared>>,
 
     /// Local run queue sender and receiver.
     queue: VecDeque<task::Notified<Arc<Shared>>>,
@@ -308,10 +308,12 @@ cfg_rt! {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
 
-            // Safety: Tasks are only polled and dropped from the thread that
-            // spawns them.
-            let (task, handle) = unsafe { task::joinable_local(future) };
-            cx.tasks.borrow_mut().queue.push_back(task);
+            let (task, handle) = task::joinable(future);
+            let mut tasks = cx.tasks.borrow_mut();
+            match tasks.owned.bind(task, cx.shared.clone()) {
+                Ok(task) => tasks.queue.push_back(task),
+                Err(task) => drop(task),
+            }
             handle
         })
     }
@@ -333,7 +335,7 @@ impl LocalSet {
             tick: Cell::new(0),
             context: Context {
                 tasks: RefCell::new(Tasks {
-                    owned: OwnedTasks::new(),
+                    owned: LocalOwnedTasks::new(),
                     queue: VecDeque::with_capacity(INITIAL_CAPACITY),
                 }),
                 shared: Arc::new(Shared {
@@ -388,8 +390,14 @@ impl LocalSet {
         F::Output: 'static,
     {
         let future = crate::util::trace::task(future, "local", None);
-        let (task, handle) = unsafe { task::joinable_local(future) };
-        self.context.tasks.borrow_mut().queue.push_back(task);
+        let (task, handle) = task::joinable(future);
+        {
+            let mut tasks = self.context.tasks.borrow_mut();
+            match tasks.owned.bind(task, self.context.shared.clone()) {
+                Ok(task) => tasks.queue.push_back(task),
+                Err(task) => drop(task),
+            }
+        }
         self.context.shared.waker.wake();
         handle
     }
@@ -594,6 +602,10 @@ impl Default for LocalSet {
 impl Drop for LocalSet {
     fn drop(&mut self) {
         self.with(|| {
+            // Close the LocalOwnedTasks to prevent spawning new tasks in the
+            // destructor of tasks being shut down in this destructor.
+            self.context.tasks.borrow_mut().owned.close();
+
             // Loop required here to ensure borrow is dropped between iterations
             #[allow(clippy::while_let_loop)]
             loop {
@@ -672,14 +684,6 @@ impl Shared {
 }
 
 impl task::Schedule for Arc<Shared> {
-    fn bind(task: Task<Self>) -> Arc<Shared> {
-        CURRENT.with(|maybe_cx| {
-            let cx = maybe_cx.expect("scheduler context missing");
-            cx.tasks.borrow_mut().owned.push_front(task);
-            cx.shared.clone()
-        })
-    }
-
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
@@ -687,7 +691,7 @@ impl task::Schedule for Arc<Shared> {
             assert!(cx.shared.ptr_eq(self));
 
             // safety: task must be contained by list. It is inserted into the
-            // list in `bind`.
+            // list when spawning.
             unsafe { cx.tasks.borrow_mut().owned.remove(&task) }
         })
     }
