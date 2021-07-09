@@ -78,10 +78,7 @@ impl<T: 'static> Inject<T> {
     /// Returns `Err(task)` if pushing fails due to the queue being shutdown.
     /// The caller is expected to call `shutdown()` on the task **if and only
     /// if** it is a newly spawned task.
-    pub(crate) fn push(&self, task: task::Notified<T>) -> Result<(), task::Notified<T>>
-    where
-        T: crate::runtime::task::Schedule,
-    {
+    pub(crate) fn push(&self, task: task::Notified<T>) -> Result<(), task::Notified<T>> {
         // Acquire queue lock
         let mut p = self.pointers.lock();
 

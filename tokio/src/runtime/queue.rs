@@ -89,10 +89,7 @@ impl<T> Local<T> {
     }
 
     /// Pushes a task to the back of the local queue, skipping the LIFO slot.
-    pub(super) fn push_back(&mut self, mut task: task::Notified<T>, inject: &Inject<T>)
-    where
-        T: crate::runtime::task::Schedule,
-    {
+    pub(super) fn push_back(&mut self, mut task: task::Notified<T>, inject: &Inject<T>) {
         let tail = loop {
             let head = self.inner.head.load(Acquire);
             let (steal, real) = unpack(head);
