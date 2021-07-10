@@ -88,8 +88,14 @@ async fn try_send_recv_never_block() -> io::Result<()> {
 
         match dgram1.try_send(payload) {
             Err(err) => match err.kind() {
-                io::ErrorKind::WouldBlock | io::ErrorKind::Other => break,
-                _ => unreachable!("unexpected error {:?}", err),
+                io::ErrorKind::WouldBlock => break,
+                _ => {
+                    let errno = err.raw_os_error().expect("Not an errno?");
+                    if errno == libc::ENOBUFS {
+                        break;
+                    }
+                    unreachable!("unexpected error {:?}", err);
+                }
             },
             Ok(len) => {
                 assert_eq!(len, payload.len());
@@ -292,8 +298,14 @@ async fn try_recv_buf_never_block() -> io::Result<()> {
 
         match dgram1.try_send(payload) {
             Err(err) => match err.kind() {
-                io::ErrorKind::WouldBlock | io::ErrorKind::Other => break,
-                _ => unreachable!("unexpected error {:?}", err),
+                io::ErrorKind::WouldBlock => break,
+                _ => {
+                    let errno = err.raw_os_error().expect("Not an errno?");
+                    if errno == libc::ENOBUFS {
+                        break;
+                    }
+                    unreachable!("unexpected error {:?}", err);
+                }
             },
             Ok(len) => {
                 assert_eq!(len, payload.len());
