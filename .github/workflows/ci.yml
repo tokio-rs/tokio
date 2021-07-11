@@ -9,7 +9,7 @@ name: CI
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
-  nightly: nightly-2021-04-25
+  nightly: nightly-2021-07-09
   minrust: 1.45.2
 
 jobs:
