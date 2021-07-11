@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625990067589,
+  "lastUpdate": 1625990081429,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -37585,6 +37585,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19672190,
             "range": "± 3814086",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "127983e5b4ac36e780fbdafddca1da349cdb6453",
+          "message": "tests: update Nix to 0.22.0 (#3951)",
+          "timestamp": "2021-07-11T09:53:04+02:00",
+          "tree_id": "e8b016913ba0e8a1986054360fb8df23b6b06a24",
+          "url": "https://github.com/tokio-rs/tokio/commit/127983e5b4ac36e780fbdafddca1da349cdb6453"
+        },
+        "date": 1625990076578,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 185132,
+            "range": "± 34306",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 779000,
+            "range": "± 184442",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4806781,
+            "range": "± 1307935",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 15806800,
+            "range": "± 2723762",
             "unit": "ns/iter"
           }
         ]
