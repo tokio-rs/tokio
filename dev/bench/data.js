@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1625990081429,
+  "lastUpdate": 1625990093837,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19871,6 +19871,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 588,
             "range": "± 20",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "127983e5b4ac36e780fbdafddca1da349cdb6453",
+          "message": "tests: update Nix to 0.22.0 (#3951)",
+          "timestamp": "2021-07-11T09:53:04+02:00",
+          "tree_id": "e8b016913ba0e8a1986054360fb8df23b6b06a24",
+          "url": "https://github.com/tokio-rs/tokio/commit/127983e5b4ac36e780fbdafddca1da349cdb6453"
+        },
+        "date": 1625990088558,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 912,
+            "range": "± 55",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15892,
+            "range": "± 5119",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 911,
+            "range": "± 57",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17144,
+            "range": "± 5972",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 588,
+            "range": "± 52",
             "unit": "ns/iter"
           }
         ]
