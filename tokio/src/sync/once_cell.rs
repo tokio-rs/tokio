@@ -257,29 +257,29 @@ impl<T> OnceCell<T> {
     /// [`SetError::AlreadyInitializedError`]: crate::sync::SetError::AlreadyInitializedError
     /// [`SetError::InitializingError`]: crate::sync::SetError::InitializingError
     pub fn set(&self, value: T) -> Result<(), SetError<T>> {
-        if !self.initialized() {
-            // Another task might be initializing the cell, in which case
-            // `try_acquire` will return an error. If we succeed to acquire the
-            // permit, then we can set the value.
-            match self.semaphore.try_acquire() {
-                Ok(permit) => {
-                    debug_assert!(!self.initialized());
-                    self.set_value(value, permit);
-                    Ok(())
-                }
-                Err(TryAcquireError::NoPermits) => {
-                    // Some other task is holding the permit. That task is
-                    // currently trying to initialize the value.
-                    Err(SetError::InitializingError(value))
-                }
-                Err(TryAcquireError::Closed) => {
-                    // The semaphore was closed. Some other task has initialized
-                    // the value.
-                    Err(SetError::AlreadyInitializedError(value))
-                }
+        if self.initialized() {
+            return Err(SetError::AlreadyInitializedError(value));
+        }
+
+        // Another task might be initializing the cell, in which case
+        // `try_acquire` will return an error. If we succeed to acquire the
+        // permit, then we can set the value.
+        match self.semaphore.try_acquire() {
+            Ok(permit) => {
+                debug_assert!(!self.initialized());
+                self.set_value(value, permit);
+                Ok(())
             }
-        } else {
-            Err(SetError::AlreadyInitializedError(value))
+            Err(TryAcquireError::NoPermits) => {
+                // Some other task is holding the permit. That task is
+                // currently trying to initialize the value.
+                Err(SetError::InitializingError(value))
+            }
+            Err(TryAcquireError::Closed) => {
+                // The semaphore was closed. Some other task has initialized
+                // the value.
+                Err(SetError::AlreadyInitializedError(value))
+            }
         }
     }
 
