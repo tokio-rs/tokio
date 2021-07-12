@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626093824533,
+  "lastUpdate": 1626093828456,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -38251,6 +38251,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20200978,
             "range": "± 4582931",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6610ba9bd6b6a48d59f80573b5fa307972ace55a",
+          "message": "runtime: use OwnedTasks in LocalSet (#3950)",
+          "timestamp": "2021-07-12T14:42:00+02:00",
+          "tree_id": "8cde86488ad419d9401ef40ef121ece63a088323",
+          "url": "https://github.com/tokio-rs/tokio/commit/6610ba9bd6b6a48d59f80573b5fa307972ace55a"
+        },
+        "date": 1626093822680,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 203749,
+            "range": "± 34396",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 940514,
+            "range": "± 242652",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5778926,
+            "range": "± 2040463",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20816725,
+            "range": "± 4930590",
             "unit": "ns/iter"
           }
         ]
