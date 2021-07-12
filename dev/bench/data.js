@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626082737683,
+  "lastUpdate": 1626092358274,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -58293,6 +58293,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 980,
             "range": "± 199",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3fd88dac644728a9ae9ffa8bc518b090d90ed51b",
+          "message": "net: fix the uds_datagram tests with the latest nightly stdlib (#3952)",
+          "timestamp": "2021-07-12T11:36:50+02:00",
+          "tree_id": "2f9a7ed5bea20e065731650fec8549e89bfdec9c",
+          "url": "https://github.com/tokio-rs/tokio/commit/3fd88dac644728a9ae9ffa8bc518b090d90ed51b"
+        },
+        "date": 1626092352737,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15868,
+            "range": "± 5752",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1011,
+            "range": "± 20",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 659,
+            "range": "± 28",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16517,
+            "range": "± 7030",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 989,
+            "range": "± 57",
             "unit": "ns/iter"
           }
         ]
