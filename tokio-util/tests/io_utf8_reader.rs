@@ -10,16 +10,14 @@ use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 use tokio_util::io::Utf8Reader;
 
 const EMPTY: &[u8] = b"";
-const ENGLISH: &[u8] = b"test string";
+const ONE_BYTE_UTF8: &[u8] = b"test string";
 // "test string" Google-translated to Arabic
-// each Unicode character is 2 bytes in width
-const ARABIC: &[u8] = "سلسلة الاختبار".as_bytes();
+const TWO_BYTE_UTF8: &[u8] = "سلسلة الاختبار".as_bytes();
 // "test string" Google-translated to Chinese
-// each Unicode character is 3 bytes in width
-const CHINESE: &[u8] = "测试字符串".as_bytes();
-// each Unicode character is 4 bytes in width
-const EMOJIS: &[u8] = "😀😬😁😂😃".as_bytes();
+const THREE_BYTE_UTF8: &[u8] = "测试字符串".as_bytes();
+const FOUR_BYTE_UTF8: &[u8] = "😀😬😁😂😃".as_bytes();
 
+#[derive(Debug)]
 struct MaybePending<'a> {
     inner: &'a [u8],
     ready_read: bool,
@@ -99,62 +97,44 @@ macro_rules! run_tests {
 }
 
 #[tokio::test]
-async fn empty() {
-    run_tests!(EMPTY, EMPTY);
-}
-
-#[tokio::test]
-async fn english() {
+async fn parser_works() {
     run_tests! {
-        ENGLISH, ENGLISH;
-        &ENGLISH[1..], &ENGLISH[1..];
-    };
-}
+        EMPTY, EMPTY;
 
-#[tokio::test]
-async fn arabic() {
-    run_tests! {
-        ARABIC, ARABIC;
-        &ARABIC[1..], &ARABIC[1..];
-        &ARABIC[2..], &ARABIC[2..];
-        &ARABIC[..(ARABIC.len() - 1)], &ARABIC[..(ARABIC.len() - 2)];
-        &ARABIC[..(ARABIC.len() - 2)], &ARABIC[..(ARABIC.len() - 2)];
-    }
-}
+        ONE_BYTE_UTF8, ONE_BYTE_UTF8;
+        &ONE_BYTE_UTF8[1..], &ONE_BYTE_UTF8[1..];
 
-#[tokio::test]
-async fn chinese() {
-    run_tests! {
-        CHINESE, CHINESE;
-        &CHINESE[1..], &CHINESE[1..];
-        &CHINESE[2..], &CHINESE[2..];
-        &CHINESE[3..], &CHINESE[3..];
-        &CHINESE[..(CHINESE.len() - 1)], &CHINESE[..(CHINESE.len() - 3)];
-        &CHINESE[..(CHINESE.len() - 2)], &CHINESE[..(CHINESE.len() - 3)];
-        &CHINESE[..(CHINESE.len() - 3)], &CHINESE[..(CHINESE.len() - 3)];
-    }
-}
+        TWO_BYTE_UTF8, TWO_BYTE_UTF8;
+        &TWO_BYTE_UTF8[1..], &TWO_BYTE_UTF8[1..];
+        &TWO_BYTE_UTF8[2..], &TWO_BYTE_UTF8[2..];
+        &TWO_BYTE_UTF8[..(TWO_BYTE_UTF8.len() - 1)], &TWO_BYTE_UTF8[..(TWO_BYTE_UTF8.len() - 2)];
+        &TWO_BYTE_UTF8[..(TWO_BYTE_UTF8.len() - 2)], &TWO_BYTE_UTF8[..(TWO_BYTE_UTF8.len() - 2)];
 
-#[tokio::test]
-async fn emojis() {
-    run_tests! {
-        EMOJIS, EMOJIS;
-        &EMOJIS[1..], &EMOJIS[1..];
-        &EMOJIS[2..], &EMOJIS[2..];
-        &EMOJIS[3..], &EMOJIS[3..];
-        &EMOJIS[4..], &EMOJIS[4..];
-        &EMOJIS[..(EMOJIS.len() - 1)], &EMOJIS[..(EMOJIS.len() - 4)];
-        &EMOJIS[..(EMOJIS.len() - 2)], &EMOJIS[..(EMOJIS.len() - 4)];
-        &EMOJIS[..(EMOJIS.len() - 3)], &EMOJIS[..(EMOJIS.len() - 4)];
-        &EMOJIS[..(EMOJIS.len() - 4)], &EMOJIS[..(EMOJIS.len() - 4)];
+        THREE_BYTE_UTF8, THREE_BYTE_UTF8;
+        &THREE_BYTE_UTF8[1..], &THREE_BYTE_UTF8[1..];
+        &THREE_BYTE_UTF8[2..], &THREE_BYTE_UTF8[2..];
+        &THREE_BYTE_UTF8[3..], &THREE_BYTE_UTF8[3..];
+        &THREE_BYTE_UTF8[..(THREE_BYTE_UTF8.len() - 1)], &THREE_BYTE_UTF8[..(THREE_BYTE_UTF8.len() - 3)];
+        &THREE_BYTE_UTF8[..(THREE_BYTE_UTF8.len() - 2)], &THREE_BYTE_UTF8[..(THREE_BYTE_UTF8.len() - 3)];
+        &THREE_BYTE_UTF8[..(THREE_BYTE_UTF8.len() - 3)], &THREE_BYTE_UTF8[..(THREE_BYTE_UTF8.len() - 3)];
+
+        FOUR_BYTE_UTF8, FOUR_BYTE_UTF8;
+        &FOUR_BYTE_UTF8[1..], &FOUR_BYTE_UTF8[1..];
+        &FOUR_BYTE_UTF8[2..], &FOUR_BYTE_UTF8[2..];
+        &FOUR_BYTE_UTF8[3..], &FOUR_BYTE_UTF8[3..];
+        &FOUR_BYTE_UTF8[4..], &FOUR_BYTE_UTF8[4..];
+        &FOUR_BYTE_UTF8[..(FOUR_BYTE_UTF8.len() - 1)], &FOUR_BYTE_UTF8[..(FOUR_BYTE_UTF8.len() - 4)];
+        &FOUR_BYTE_UTF8[..(FOUR_BYTE_UTF8.len() - 2)], &FOUR_BYTE_UTF8[..(FOUR_BYTE_UTF8.len() - 4)];
+        &FOUR_BYTE_UTF8[..(FOUR_BYTE_UTF8.len() - 3)], &FOUR_BYTE_UTF8[..(FOUR_BYTE_UTF8.len() - 4)];
+        &FOUR_BYTE_UTF8[..(FOUR_BYTE_UTF8.len() - 4)], &FOUR_BYTE_UTF8[..(FOUR_BYTE_UTF8.len() - 4)];
     }
 }
 
 #[tokio::test]
 async fn middle_is_invalid() {
-    let mut middle_invalid = [0u8; EMOJIS.len() - 2];
-    middle_invalid[..9].copy_from_slice(&EMOJIS[..9]);
-    middle_invalid[9..].copy_from_slice(&EMOJIS[11..]);
+    let mut middle_invalid = [0u8; FOUR_BYTE_UTF8.len() - 2];
+    middle_invalid[..9].copy_from_slice(&FOUR_BYTE_UTF8[..9]);
+    middle_invalid[9..].copy_from_slice(&FOUR_BYTE_UTF8[11..]);
     run_tests! {
         &middle_invalid[..], &middle_invalid[..];
         &middle_invalid[..(middle_invalid.len() - 2)], &middle_invalid[..(middle_invalid.len() - 4)];
@@ -194,21 +174,46 @@ impl<'a, I: Iterator<Item = usize> + Unpin> AsyncRead for Splitter<'a, I> {
 
 #[tokio::test]
 async fn split_utf8() {
-    let reader = Utf8Reader::new(Splitter::new(EMOJIS, vec![6, 13, 16]));
+    let reader = Utf8Reader::new(Splitter::new(FOUR_BYTE_UTF8, vec![6, 13, 16]));
     task::spawn(reader).enter(|cx, mut me| {
         let mut buf = [0; 30];
         let mut buf = ReadBuf::new(&mut buf);
 
         assert_ready_ok!(me.as_mut().poll_read(cx, &mut buf));
-        assert_eq!(buf.filled(), &EMOJIS[..4]);
+        assert_eq!(buf.filled(), &FOUR_BYTE_UTF8[..4]);
 
         assert_ready_ok!(me.as_mut().poll_read(cx, &mut buf));
-        assert_eq!(buf.filled(), &EMOJIS[..12]);
+        assert_eq!(buf.filled(), &FOUR_BYTE_UTF8[..12]);
 
         assert_ready_ok!(me.as_mut().poll_read(cx, &mut buf));
-        assert_eq!(buf.filled(), &EMOJIS[..16]);
+        assert_eq!(buf.filled(), &FOUR_BYTE_UTF8[..16]);
 
         assert_ready_ok!(me.poll_read(cx, &mut buf));
-        assert_eq!(buf.filled(), EMOJIS);
+        assert_eq!(buf.filled(), FOUR_BYTE_UTF8);
     })
+}
+
+#[tokio::test]
+async fn only_partial_char() {
+    let reader = Utf8Reader::new(&FOUR_BYTE_UTF8[..3]);
+    task::spawn(reader).enter(|cx, me| {
+        assert_ne!(assert_ready_ok!(me.poll_fill_buf(cx)), b"");
+    });
+}
+
+#[tokio::test]
+async fn too_short_read_buf() {
+    let mut buf = [0; 3];
+    let mut buf = ReadBuf::new(&mut buf);
+
+    let reader = Utf8Reader::new(MaybePending::new(FOUR_BYTE_UTF8));
+
+    let mut task = task::spawn(reader);
+    task.enter(|cx, mut reader| {
+        assert_pending!(reader.as_mut().poll_read(cx, &mut buf));
+        assert_eq!(buf.filled().len(), 0);
+        assert_ready_ok!(reader.as_mut().poll_read(cx, &mut buf));
+        assert_eq!(buf.filled().len(), 3);
+        assert_eq!(buf.filled(), &FOUR_BYTE_UTF8[..3]);
+    });
 }
