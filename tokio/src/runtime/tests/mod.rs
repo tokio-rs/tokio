@@ -1,21 +1,28 @@
-#[cfg(not(all(tokio_unstable, feature = "tracing")))]
-use crate::runtime::task::joinable;
-
-#[cfg(all(tokio_unstable, feature = "tracing"))]
 use self::joinable_wrapper::joinable;
 
-#[cfg(all(tokio_unstable, feature = "tracing"))]
 mod joinable_wrapper {
     use crate::runtime::task::{JoinHandle, Notified, Schedule};
-    use tracing::Instrument;
 
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
     where
         T: std::future::Future + Send + 'static,
         S: Schedule,
     {
+        use tracing::Instrument;
         let span = tracing::trace_span!("test_span");
-        crate::runtime::task::joinable(task.instrument(span))
+        let (task, handle) = crate::runtime::task::joinable(task.instrument(span));
+        (task.into_notified(), handle)
+    }
+
+    #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+    pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
+    where
+        T: std::future::Future + Send + 'static,
+        S: Schedule,
+    {
+        let (task, handle) = crate::runtime::task::joinable(task);
+        (task.into_notified(), handle)
     }
 }
 
