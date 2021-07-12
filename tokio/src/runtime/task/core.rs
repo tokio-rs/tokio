@@ -9,13 +9,13 @@
 //! Make sure to consult the relevant safety section of each function before
 //! use.
 
+use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
 use crate::runtime::task::{Notified, Schedule, Task};
 use crate::util::linked_list;
 
-use std::future::Future;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
@@ -66,11 +66,12 @@ pub(crate) struct Header {
     /// Pointer to next task, used with the injection queue
     pub(crate) queue_next: UnsafeCell<Option<NonNull<Header>>>,
 
-    /// Pointer to the next task in the transfer stack
-    pub(super) stack_next: UnsafeCell<Option<NonNull<Header>>>,
-
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
+
+    /// The tracing ID for this instrumented task.
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(super) id: Option<tracing::Id>,
 }
 
 unsafe impl Send for Header {}
@@ -93,13 +94,16 @@ impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
     pub(super) fn new(future: T, state: State) -> Box<Cell<T, S>> {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let id = future.id();
         Box::new(Cell {
             header: Header {
                 state,
                 owned: UnsafeCell::new(linked_list::Pointers::new()),
                 queue_next: UnsafeCell::new(None),
-                stack_next: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                id,
             },
             core: Core {
                 scheduler: Scheduler {
@@ -123,7 +127,7 @@ impl<S: Schedule> Scheduler<S> {
 
     /// Bind a scheduler to the task.
     ///
-    /// This only happens on the first poll and must be preceeded by a call to
+    /// This only happens on the first poll and must be preceded by a call to
     /// `is_bound` to determine if binding is appropriate or not.
     ///
     /// # Safety
@@ -212,7 +216,7 @@ impl<T: Future> CoreStage<T> {
     /// # Safety
     ///
     /// The caller must ensure it is safe to mutate the `state` field. This
-    /// requires ensuring mutal exclusion between any concurrent thread that
+    /// requires ensuring mutual exclusion between any concurrent thread that
     /// might modify the future or output field.
     ///
     /// The mutual exclusion is implemented by `Harness` and the `Lifecycle`
@@ -276,7 +280,7 @@ impl<T: Future> CoreStage<T> {
         use std::mem;
 
         self.stage.with_mut(|ptr| {
-            // Safety:: the caller ensures mutal exclusion to the field.
+            // Safety:: the caller ensures mutual exclusion to the field.
             match mem::replace(unsafe { &mut *ptr }, Stage::Consumed) {
                 Stage::Finished(output) => output,
                 _ => panic!("JoinHandle polled after completion"),
@@ -291,13 +295,6 @@ impl<T: Future> CoreStage<T> {
 
 cfg_rt_multi_thread! {
     impl Header {
-        pub(crate) fn shutdown(&self) {
-            use crate::runtime::task::RawTask;
-
-            let task = unsafe { RawTask::from_raw(self.into()) };
-            task.shutdown();
-        }
-
         pub(crate) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
             self.queue_next.with_mut(|ptr| *ptr = next);
         }

@@ -7,7 +7,7 @@
 //! configurable.
 
 cfg_not_test_util! {
-    use crate::time::{Duration, Instant};
+    use crate::time::{Instant};
 
     #[derive(Debug, Clone)]
     pub(crate) struct Clock {}
@@ -23,14 +23,6 @@ cfg_not_test_util! {
 
         pub(crate) fn now(&self) -> Instant {
             now()
-        }
-
-        pub(crate) fn is_paused(&self) -> bool {
-            false
-        }
-
-        pub(crate) fn advance(&self, _dur: Duration) {
-            unreachable!();
         }
     }
 }
@@ -85,6 +77,15 @@ cfg_test_util! {
     ///
     /// Panics if time is already frozen or if called from outside of a
     /// `current_thread` Tokio runtime.
+    ///
+    /// # Auto-advance
+    ///
+    /// If time is paused and the runtime has no work to do, the clock is
+    /// auto-advanced to the next pending timer. This means that [`Sleep`] or
+    /// other timer-backed primitives can cause the runtime to advance the
+    /// current time when awaited.
+    ///
+    /// [`Sleep`]: crate::time::Sleep
     pub fn pause() {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.pause();
@@ -119,12 +120,17 @@ cfg_test_util! {
     ///
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
+    ///
+    /// # Auto-advance
+    ///
+    /// If the time is paused and there is no work to do, the runtime advances
+    /// time to the next timer. See [`pause`](pause#auto-advance) for more
+    /// details.
     pub async fn advance(duration: Duration) {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
-        let until = clock.now() + duration;
         clock.advance(duration);
 
-        crate::time::sleep_until(until).await;
+        crate::task::yield_now().await;
     }
 
     /// Return the current instant, factoring in frozen time.

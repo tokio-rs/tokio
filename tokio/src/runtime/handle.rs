@@ -145,7 +145,7 @@ impl Handle {
         F::Output: Send + 'static,
     {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task");
+        let future = crate::util::trace::task(future, "task", None);
         self.spawner.spawn(future)
     }
 
@@ -174,8 +174,20 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        self.spawn_blocking_inner(func, None)
+    }
+
+    #[cfg_attr(tokio_track_caller, track_caller)]
+    pub(crate) fn spawn_blocking_inner<F, R>(&self, func: F, name: Option<&str>) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let fut = BlockingTask::new(func);
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let func = {
+        let fut = {
+            use tracing::Instrument;
             #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
             #[cfg(tokio_track_caller)]
@@ -184,6 +196,7 @@ impl Handle {
                 "task",
                 kind = %"blocking",
                 function = %std::any::type_name::<F>(),
+                task.name = %name.unwrap_or_default(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
             );
             #[cfg(not(tokio_track_caller))]
@@ -191,14 +204,16 @@ impl Handle {
                 target: "tokio::task",
                 "task",
                 kind = %"blocking",
+                task.name = %name.unwrap_or_default(),
                 function = %std::any::type_name::<F>(),
             );
-            move || {
-                let _g = span.enter();
-                func()
-            }
+            fut.instrument(span)
         };
-        let (task, handle) = task::joinable(BlockingTask::new(func));
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let _ = name;
+
+        let (task, handle) = task::joinable(fut);
         let _ = self.blocking_spawner.spawn(task, &self);
         handle
     }

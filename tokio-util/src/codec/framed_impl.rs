@@ -124,7 +124,7 @@ where
         // to a combination of the `is_readable` and `eof` flags. States persist across
         // loop entries and most state transitions occur with a return.
         //
-        // The intitial state is `reading`.
+        // The initial state is `reading`.
         //
         // | state   | eof   | is_readable |
         // |---------|-------|-------------|
@@ -155,10 +155,10 @@ where
             // Both signal that there is no such data by returning `None`.
             //
             // If `decode` couldn't read a frame and the upstream source has returned eof,
-            // `decode_eof` will attemp to decode the remaining bytes as closing frames.
+            // `decode_eof` will attempt to decode the remaining bytes as closing frames.
             //
             // If the underlying AsyncRead is resumable, we may continue after an EOF,
-            // but must finish emmiting all of it's associated `decode_eof` frames.
+            // but must finish emitting all of it's associated `decode_eof` frames.
             // Furthermore, we don't want to emit any `decode_eof` frames on retried
             // reads after an EOF unless we've actually read more data.
             if state.is_readable {

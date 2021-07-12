@@ -9,9 +9,17 @@ pub use self::error::JoinError;
 mod harness;
 use self::harness::Harness;
 
+cfg_rt_multi_thread! {
+    mod inject;
+    pub(super) use self::inject::Inject;
+}
+
 mod join;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
+
+mod list;
+pub(crate) use self::list::OwnedTasks;
 
 mod raw;
 use self::raw::RawTask;
@@ -21,14 +29,9 @@ use self::state::State;
 
 mod waker;
 
-cfg_rt_multi_thread! {
-    mod stack;
-    pub(crate) use self::stack::TransferStack;
-}
-
+use crate::future::Future;
 use crate::util::linked_list;
 
-use std::future::Future;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{fmt, mem};
@@ -62,11 +65,10 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     fn bind(task: Task<Self>) -> Self;
 
     /// The task has completed work and is ready to be released. The scheduler
-    /// is free to drop it whenever.
+    /// should release it immediately and return it. The task module will batch
+    /// the ref-dec with setting other options.
     ///
-    /// If the scheduler can immediately release the task, it should return
-    /// it as part of the function. This enables the task module to batch
-    /// the ref-dec with other options.
+    /// If the scheduler has already released the task, then None is returned.
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>>;
 
     /// Schedule the task
@@ -136,10 +138,6 @@ cfg_rt_multi_thread! {
     impl<S: 'static> Notified<S> {
         pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
             Notified(Task::from_raw(ptr))
-        }
-
-        pub(crate) fn header(&self) -> &Header {
-            self.0.header()
         }
     }
 

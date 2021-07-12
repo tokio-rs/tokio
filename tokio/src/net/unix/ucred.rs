@@ -25,21 +25,19 @@ impl UCred {
     /// Gets PID (process ID) of the process.
     ///
     /// This is only implemented under Linux, Android, iOS, macOS, Solaris and
-    /// Illumos. On other plaforms this will always return `None`.
+    /// Illumos. On other platforms this will always return `None`.
     pub fn pid(&self) -> Option<pid_t> {
         self.pid
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "openbsd"))]
 pub(crate) use self::impl_linux::get_peer_cred;
 
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
+#[cfg(any(target_os = "netbsd"))]
+pub(crate) use self::impl_netbsd::get_peer_cred;
+
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
 pub(crate) use self::impl_bsd::get_peer_cred;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -48,13 +46,16 @@ pub(crate) use self::impl_macos::get_peer_cred;
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub(crate) use self::impl_solaris::get_peer_cred;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "openbsd"))]
 pub(crate) mod impl_linux {
     use crate::net::unix::UnixStream;
 
     use libc::{c_void, getsockopt, socklen_t, SOL_SOCKET, SO_PEERCRED};
     use std::{io, mem};
 
+    #[cfg(target_os = "openbsd")]
+    use libc::sockpeercred as ucred;
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     use libc::ucred;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
@@ -97,12 +98,49 @@ pub(crate) mod impl_linux {
     }
 }
 
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
+#[cfg(any(target_os = "netbsd"))]
+pub(crate) mod impl_netbsd {
+    use crate::net::unix::UnixStream;
+
+    use libc::{c_void, getsockopt, socklen_t, unpcbid, LOCAL_PEEREID, SOL_SOCKET};
+    use std::io;
+    use std::mem::size_of;
+    use std::os::unix::io::AsRawFd;
+
+    pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
+        unsafe {
+            let raw_fd = sock.as_raw_fd();
+
+            let mut unpcbid = unpcbid {
+                unp_pid: 0,
+                unp_euid: 0,
+                unp_egid: 0,
+            };
+
+            let unpcbid_size = size_of::<unpcbid>();
+            let mut unpcbid_size = unpcbid_size as socklen_t;
+
+            let ret = getsockopt(
+                raw_fd,
+                SOL_SOCKET,
+                LOCAL_PEEREID,
+                &mut unpcbid as *mut unpcbid as *mut c_void,
+                &mut unpcbid_size,
+            );
+            if ret == 0 && unpcbid_size as usize == size_of::<unpcbid>() {
+                Ok(super::UCred {
+                    uid: unpcbid.unp_euid,
+                    gid: unpcbid.unp_egid,
+                    pid: Some(unpcbid.unp_pid),
+                })
+            } else {
+                Err(io::Error::last_os_error())
+            }
+        }
+    }
+}
+
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
 pub(crate) mod impl_bsd {
     use crate::net::unix::UnixStream;
 

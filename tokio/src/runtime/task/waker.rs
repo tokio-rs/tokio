@@ -1,7 +1,7 @@
+use crate::future::Future;
 use crate::runtime::task::harness::Harness;
 use crate::runtime::task::{Header, Schedule};
 
-use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::ops;
@@ -44,12 +44,38 @@ impl<S> ops::Deref for WakerRef<'_, S> {
     }
 }
 
+cfg_trace! {
+    macro_rules! trace {
+        ($harness:expr, $op:expr) => {
+            if let Some(id) = $harness.id() {
+                tracing::trace!(
+                    target: "tokio::task::waker",
+                    op = $op,
+                    task.id = id.into_u64(),
+                );
+            }
+        }
+    }
+}
+
+cfg_not_trace! {
+    macro_rules! trace {
+        ($harness:expr, $op:expr) => {
+            // noop
+            let _ = &$harness;
+        }
+    }
+}
+
 unsafe fn clone_waker<T, S>(ptr: *const ()) -> RawWaker
 where
     T: Future,
     S: Schedule,
 {
     let header = ptr as *const Header;
+    let ptr = NonNull::new_unchecked(ptr as *mut Header);
+    let harness = Harness::<T, S>::from_raw(ptr);
+    trace!(harness, "waker.clone");
     (*header).state.ref_inc();
     raw_waker::<T, S>(header)
 }
@@ -61,6 +87,7 @@ where
 {
     let ptr = NonNull::new_unchecked(ptr as *mut Header);
     let harness = Harness::<T, S>::from_raw(ptr);
+    trace!(harness, "waker.drop");
     harness.drop_reference();
 }
 
@@ -71,6 +98,7 @@ where
 {
     let ptr = NonNull::new_unchecked(ptr as *mut Header);
     let harness = Harness::<T, S>::from_raw(ptr);
+    trace!(harness, "waker.wake");
     harness.wake_by_val();
 }
 
@@ -82,6 +110,7 @@ where
 {
     let ptr = NonNull::new_unchecked(ptr as *mut Header);
     let harness = Harness::<T, S>::from_raw(ptr);
+    trace!(harness, "waker.wake_by_ref");
     harness.wake_by_ref();
 }
 

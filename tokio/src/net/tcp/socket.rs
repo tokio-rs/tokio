@@ -482,6 +482,48 @@ impl TcpSocket {
         let mio = self.inner.listen(backlog)?;
         TcpListener::new(mio)
     }
+
+    /// Converts a [`std::net::TcpStream`] into a `TcpSocket`. The provided
+    /// socket must not have been connected prior to calling this function. This
+    /// function is typically used together with crates such as [`socket2`] to
+    /// configure socket options that are not available on `TcpSocket`.
+    ///
+    /// [`std::net::TcpStream`]: struct@std::net::TcpStream
+    /// [`socket2`]: https://docs.rs/socket2/
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::net::TcpSocket;
+    /// use socket2::{Domain, Socket, Type};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> std::io::Result<()> {
+    ///     
+    ///     let socket2_socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
+    ///
+    ///     let socket = TcpSocket::from_std_stream(socket2_socket.into());
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn from_std_stream(std_stream: std::net::TcpStream) -> TcpSocket {
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
+
+            let raw_fd = std_stream.into_raw_fd();
+            unsafe { TcpSocket::from_raw_fd(raw_fd) }
+        }
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+
+            let raw_socket = std_stream.into_raw_socket();
+            unsafe { TcpSocket::from_raw_socket(raw_socket) }
+        }
+    }
 }
 
 impl fmt::Debug for TcpSocket {

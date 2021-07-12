@@ -1,3 +1,5 @@
+#![allow(clippy::diverging_sub_expression)]
+
 use std::rc::Rc;
 
 #[allow(dead_code)]

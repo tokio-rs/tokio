@@ -1,5 +1,4 @@
-use crate::runtime::task::{self, Schedule, Task};
-use crate::util::linked_list::{Link, LinkedList};
+use crate::runtime::task::{self, OwnedTasks, Schedule, Task};
 use crate::util::TryLock;
 
 use std::collections::VecDeque;
@@ -7,13 +6,13 @@ use std::sync::Arc;
 
 #[test]
 fn create_drop() {
-    let _ = task::joinable::<_, Runtime>(async { unreachable!() });
+    let _ = super::joinable::<_, Runtime>(async { unreachable!() });
 }
 
 #[test]
 fn schedule() {
     with(|rt| {
-        let (task, _) = task::joinable(async {
+        let (task, _) = super::joinable(async {
             crate::task::yield_now().await;
         });
 
@@ -26,7 +25,7 @@ fn schedule() {
 #[test]
 fn shutdown() {
     with(|rt| {
-        let (task, _) = task::joinable(async {
+        let (task, _) = super::joinable(async {
             loop {
                 crate::task::yield_now().await;
             }
@@ -51,10 +50,9 @@ fn with(f: impl FnOnce(Runtime)) {
     let _reset = Reset;
 
     let rt = Runtime(Arc::new(Inner {
-        released: task::TransferStack::new(),
+        owned: OwnedTasks::new(),
         core: TryLock::new(Core {
             queue: VecDeque::new(),
-            tasks: LinkedList::new(),
         }),
     }));
 
@@ -66,13 +64,12 @@ fn with(f: impl FnOnce(Runtime)) {
 struct Runtime(Arc<Inner>);
 
 struct Inner {
-    released: task::TransferStack<Runtime>,
     core: TryLock<Core>,
+    owned: OwnedTasks<Runtime>,
 }
 
 struct Core {
     queue: VecDeque<task::Notified<Runtime>>,
-    tasks: LinkedList<Task<Runtime>, <Task<Runtime> as Link>::Target>,
 }
 
 static CURRENT: TryLock<Option<Runtime>> = TryLock::new(None);
@@ -91,8 +88,6 @@ impl Runtime {
             task.run();
         }
 
-        self.0.maintenance();
-
         n
     }
 
@@ -107,7 +102,7 @@ impl Runtime {
     fn shutdown(&self) {
         let mut core = self.0.core.try_lock().unwrap();
 
-        for task in core.tasks.iter() {
+        while let Some(task) = self.0.owned.pop_back() {
             task.shutdown();
         }
 
@@ -117,40 +112,20 @@ impl Runtime {
 
         drop(core);
 
-        while !self.0.core.try_lock().unwrap().tasks.is_empty() {
-            self.0.maintenance();
-        }
-    }
-}
-
-impl Inner {
-    fn maintenance(&self) {
-        use std::mem::ManuallyDrop;
-
-        for task in self.released.drain() {
-            let task = ManuallyDrop::new(task);
-
-            // safety: see worker.rs
-            unsafe {
-                let ptr = task.header().into();
-                self.core.try_lock().unwrap().tasks.remove(ptr);
-            }
-        }
+        assert!(self.0.owned.is_empty());
     }
 }
 
 impl Schedule for Runtime {
     fn bind(task: Task<Self>) -> Runtime {
         let rt = CURRENT.try_lock().unwrap().as_ref().unwrap().clone();
-        rt.0.core.try_lock().unwrap().tasks.push_front(task);
+        rt.0.owned.push_front(task);
         rt
     }
 
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
         // safety: copying worker.rs
-        let task = unsafe { Task::from_raw(task.header().into()) };
-        self.0.released.push(task);
-        None
+        unsafe { self.0.owned.remove(task) }
     }
 
     fn schedule(&self, task: task::Notified<Self>) {

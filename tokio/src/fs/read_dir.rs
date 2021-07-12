@@ -13,6 +13,11 @@ use std::task::Poll;
 /// Returns a stream over the entries within a directory.
 ///
 /// This is an async version of [`std::fs::read_dir`](std::fs::read_dir)
+///
+/// This operation is implemented by running the equivalent blocking
+/// operation on a separate thread pool using [`spawn_blocking`].
+///
+/// [`spawn_blocking`]: crate::task::spawn_blocking
 pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
     let path = path.as_ref().to_owned();
     let std = asyncify(|| std::fs::read_dir(path)).await?;

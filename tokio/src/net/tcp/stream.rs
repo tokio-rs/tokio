@@ -356,6 +356,13 @@ impl TcpStream {
     /// can be used to concurrently read / write to the same socket on a single
     /// task without splitting the socket.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// Concurrently read and write to the stream on the same task without
@@ -419,6 +426,13 @@ impl TcpStream {
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -725,6 +739,13 @@ impl TcpStream {
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -913,6 +934,41 @@ impl TcpStream {
         self.io
             .registration()
             .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(bufs))
+    }
+
+    /// Try to perform IO operation from the socket using a user-provided IO operation.
+    ///
+    /// If the socket is ready, the provided closure is called. The
+    /// closure should attempt to perform IO operation from the socket by manually calling the
+    /// appropriate syscall. If the operation fails because the socket is not
+    /// actually ready, then the closure should return a `WouldBlock` error and
+    /// the readiness flag is cleared. The return value of the closure is
+    /// then returned by `try_io`.
+    ///
+    /// If the socket is not ready, then the closure is not called
+    /// and a `WouldBlock` error is returned.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the read operation using any of the
+    /// methods defined on the Tokio `TcpStream` type, as this will mess with
+    /// the readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`readable()`]: TcpStream::readable()
+    /// [`writable()`]: TcpStream::writable()
+    /// [`ready()`]: TcpStream::ready()
+    pub fn try_io<R>(
+        &self,
+        interest: Interest,
+        f: impl FnOnce() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.io.registration().try_io(interest, f)
     }
 
     /// Receives data on the socket from the remote address to which it is
@@ -1151,6 +1207,12 @@ impl TcpStream {
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
+
+    // == Poll IO functions that takes `&self` ==
+    //
+    // To read or write without mutable access to the `UnixStream`, combine the
+    // `poll_read_ready` or `poll_write_ready` methods with the `try_read` or
+    // `try_write` methods.
 
     pub(crate) fn poll_read_priv(
         &self,

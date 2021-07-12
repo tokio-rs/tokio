@@ -9,7 +9,7 @@ name: CI
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
-  nightly: nightly-2021-04-25
+  nightly: nightly-2021-07-09
   minrust: 1.45.2
 
 jobs:
@@ -122,7 +122,7 @@ jobs:
 
       # Run `tokio` with "unstable" cfg flag.
       - name: test tokio full --cfg unstable
-        run: cargo test --features full
+        run: cargo test --all-features
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
@@ -265,7 +265,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
-        run: rustup update ${{ env.minrust }} && rustup default ${{ env.minrust }}
+        run: rustup update 1.52.1 && rustup default 1.52.1
       - name: Install clippy
         run: rustup component add clippy
 

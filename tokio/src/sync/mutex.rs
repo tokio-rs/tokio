@@ -273,9 +273,15 @@ impl<T: ?Sized> Mutex<T> {
         }
     }
 
-    /// Locks this mutex, causing the current task
-    /// to yield until the lock has been acquired.
-    /// When the lock has been acquired, function returns a [`MutexGuard`].
+    /// Locks this mutex, causing the current task to yield until the lock has
+    /// been acquired.  When the lock has been acquired, function returns a
+    /// [`MutexGuard`].
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `lock` makes you lose your place in
+    /// the queue.
     ///
     /// # Examples
     ///
@@ -304,6 +310,12 @@ impl<T: ?Sized> Mutex<T> {
     /// it. Therefore, the `Mutex` must be wrapped in an `Arc` to call this
     /// method, and the guard will live for the `'static` lifetime, as it keeps
     /// the `Mutex` alive by holding an `Arc`.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `lock_owned` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///

@@ -11,7 +11,7 @@ use tokio::sync::watch::error::RecvError;
 /// A wrapper around [`tokio::sync::watch::Receiver`] that implements [`Stream`].
 ///
 /// This stream will always start by yielding the current value when the WatchStream is polled,
-/// regardles of whether it was the initial value or sent afterwards.
+/// regardless of whether it was the initial value or sent afterwards.
 ///
 /// # Examples
 ///
@@ -72,10 +72,10 @@ impl<T: Clone + 'static + Send + Sync> Stream for WatchStream<T> {
     type Item = T;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let (result, rx) = ready!(self.inner.poll(cx));
+        let (result, mut rx) = ready!(self.inner.poll(cx));
         match result {
             Ok(_) => {
-                let received = (*rx.borrow()).clone();
+                let received = (*rx.borrow_and_update()).clone();
                 self.inner.set(make_future(rx));
                 Poll::Ready(Some(received))
             }

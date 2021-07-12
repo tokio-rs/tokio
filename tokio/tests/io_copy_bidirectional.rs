@@ -42,7 +42,7 @@ where
 {
     // We run the test twice, with streams passed to copy_bidirectional in
     // different orders, in order to ensure that the two arguments are
-    // interchangable.
+    // interchangeable.
 
     let (a, mut a1) = make_socketpair().await;
     let (b, mut b1) = make_socketpair().await;

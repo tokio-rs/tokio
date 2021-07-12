@@ -379,3 +379,33 @@ async fn try_read_buf() -> std::io::Result<()> {
 
     Ok(())
 }
+
+// https://github.com/tokio-rs/tokio/issues/3879
+#[tokio::test]
+#[cfg(not(target_os = "macos"))]
+async fn epollhup() -> io::Result<()> {
+    let dir = tempfile::Builder::new()
+        .prefix("tokio-uds-tests")
+        .tempdir()
+        .unwrap();
+    let sock_path = dir.path().join("connect.sock");
+
+    let listener = UnixListener::bind(&sock_path)?;
+    let connect = UnixStream::connect(&sock_path);
+    tokio::pin!(connect);
+
+    // Poll `connect` once.
+    poll_fn(|cx| {
+        use std::future::Future;
+
+        assert_pending!(connect.as_mut().poll(cx));
+        Poll::Ready(())
+    })
+    .await;
+
+    drop(listener);
+
+    let err = connect.await.unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::ConnectionReset);
+    Ok(())
+}

@@ -299,4 +299,14 @@ cfg_rt! {
 
     mod unconstrained;
     pub use unconstrained::{unconstrained, Unconstrained};
+
+    cfg_trace! {
+        mod builder;
+        pub use builder::Builder;
+    }
+
+    /// Task-related futures.
+    pub mod futures {
+        pub use super::task_local::TaskLocalFuture;
+    }
 }

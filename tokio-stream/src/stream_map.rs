@@ -364,11 +364,11 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::HashMap;
+    /// use tokio_stream::{StreamMap, pending};
     ///
-    /// let mut a = HashMap::new();
+    /// let mut a = StreamMap::new();
     /// assert!(a.is_empty());
-    /// a.insert(1, "a");
+    /// a.insert(1, pending::<i32>());
     /// assert!(!a.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {

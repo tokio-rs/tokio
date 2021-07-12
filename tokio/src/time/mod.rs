@@ -3,21 +3,21 @@
 //! This module provides a number of types for executing code after a set period
 //! of time.
 //!
-//! * `Sleep` is a future that does no work and completes at a specific `Instant`
+//! * [`Sleep`] is a future that does no work and completes at a specific [`Instant`]
 //!   in time.
 //!
-//! * `Interval` is a stream yielding a value at a fixed period. It is
-//!   initialized with a `Duration` and repeatedly yields each time the duration
+//! * [`Interval`] is a stream yielding a value at a fixed period. It is
+//!   initialized with a [`Duration`] and repeatedly yields each time the duration
 //!   elapses.
 //!
-//! * `Timeout`: Wraps a future or stream, setting an upper bound to the amount
+//! * [`Timeout`]: Wraps a future or stream, setting an upper bound to the amount
 //!   of time it is allowed to execute. If the future or stream does not
 //!   complete in time, then it is canceled and an error is returned.
 //!
 //! These types are sufficient for handling a large number of scenarios
 //! involving time.
 //!
-//! These types must be used from within the context of the `Runtime`.
+//! These types must be used from within the context of the [`Runtime`](crate::runtime::Runtime).
 //!
 //! # Examples
 //!
@@ -55,8 +55,8 @@
 //! A simple example using [`interval`] to execute a task every two seconds.
 //!
 //! The difference between [`interval`] and [`sleep`] is that an [`interval`]
-//! measures the time since the last tick, which means that `.tick().await`
-//! may wait for a shorter time than the duration specified for the interval
+//! measures the time since the last tick, which means that `.tick().await` may
+//! wait for a shorter time than the duration specified for the interval
 //! if some time has passed between calls to `.tick().await`.
 //!
 //! If the tick in the example below was replaced with [`sleep`], the task
@@ -81,7 +81,6 @@
 //! }
 //! ```
 //!
-//! [`sleep`]: crate::time::sleep()
 //! [`interval`]: crate::time::interval()
 
 mod clock;
@@ -100,7 +99,7 @@ mod instant;
 pub use self::instant::Instant;
 
 mod interval;
-pub use interval::{interval, interval_at, Interval};
+pub use interval::{interval, interval_at, Interval, MissedTickBehavior};
 
 mod timeout;
 #[doc(inline)]

@@ -1,9 +1,9 @@
+use crate::future::Future;
 use crate::runtime::task::core::{Cell, Core, CoreStage, Header, Scheduler, Trailer};
 use crate::runtime::task::state::Snapshot;
 use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{JoinError, Notified, Schedule, Task};
 
-use std::future::Future;
 use std::mem;
 use std::panic;
 use std::ptr::NonNull;
@@ -146,6 +146,11 @@ where
         }
     }
 
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(super) fn id(&self) -> Option<&tracing::Id> {
+        self.header().id.as_ref()
+    }
+
     /// Forcibly shutdown the task
     ///
     /// Attempt to transition to `Running` in order to forcibly shutdown the
@@ -158,10 +163,21 @@ where
             return;
         }
 
-        // By transitioning the lifcycle to `Running`, we have permission to
+        // By transitioning the lifecycle to `Running`, we have permission to
         // drop the future.
         let err = cancel_task(&self.core().stage);
         self.complete(Err(err), true)
+    }
+
+    /// Remotely abort the task
+    ///
+    /// This is similar to `shutdown` except that it asks the runtime to perform
+    /// the shutdown. This is necessary to avoid the shutdown happening in the
+    /// wrong thread for non-Send tasks.
+    pub(super) fn remote_abort(self) {
+        if self.header().state.transition_to_notified_and_cancel() {
+            self.core().scheduler.schedule(Notified(self.to_task()));
+        }
     }
 
     // ====== internal ======

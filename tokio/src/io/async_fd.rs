@@ -540,6 +540,16 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
             result => Ok(result),
         }
     }
+
+    /// Returns a shared reference to the inner [`AsyncFd`].
+    pub fn get_ref(&self) -> &AsyncFd<Inner> {
+        self.async_fd
+    }
+
+    /// Returns a shared reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner(&self) -> &Inner {
+        self.get_ref().get_ref()
+    }
 }
 
 impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
@@ -600,6 +610,26 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
             Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
             result => Ok(result),
         }
+    }
+
+    /// Returns a shared reference to the inner [`AsyncFd`].
+    pub fn get_ref(&self) -> &AsyncFd<Inner> {
+        self.async_fd
+    }
+
+    /// Returns a mutable reference to the inner [`AsyncFd`].
+    pub fn get_mut(&mut self) -> &mut AsyncFd<Inner> {
+        self.async_fd
+    }
+
+    /// Returns a shared reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner(&self) -> &Inner {
+        self.get_ref().get_ref()
+    }
+
+    /// Returns a mutable reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner_mut(&mut self) -> &mut Inner {
+        self.get_mut().get_mut()
     }
 }
 
