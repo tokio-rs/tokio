@@ -11,7 +11,7 @@ use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
-use crate::runtime::task::OwnedTasks;
+use crate::runtime::task::{Inject, OwnedTasks};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
 use crate::runtime::{queue, task};
 use crate::util::FastRand;
@@ -70,7 +70,7 @@ pub(super) struct Shared {
     remotes: Box<[Remote]>,
 
     /// Submit work to the scheduler while **not** currently on a worker thread.
-    inject: queue::Inject<Arc<Worker>>,
+    inject: Inject<Arc<Worker>>,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -147,7 +147,7 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
 
     let shared = Arc::new(Shared {
         remotes: remotes.into_boxed_slice(),
-        inject: queue::Inject::new(),
+        inject: Inject::new(),
         idle: Idle::new(size),
         owned: OwnedTasks::new(),
         shutdown_cores: Mutex::new(vec![]),
@@ -563,7 +563,7 @@ impl Core {
 
 impl Worker {
     /// Returns a reference to the scheduler's injection queue
-    fn inject(&self) -> &queue::Inject<Arc<Worker>> {
+    fn inject(&self) -> &Inject<Arc<Worker>> {
         &self.shared.inject
     }
 }

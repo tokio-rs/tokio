@@ -9,6 +9,11 @@ pub use self::error::JoinError;
 mod harness;
 use self::harness::Harness;
 
+cfg_rt_multi_thread! {
+    mod inject;
+    pub(super) use self::inject::Inject;
+}
+
 mod join;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
@@ -133,10 +138,6 @@ cfg_rt_multi_thread! {
     impl<S: 'static> Notified<S> {
         pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
             Notified(Task::from_raw(ptr))
-        }
-
-        pub(crate) fn header(&self) -> &Header {
-            self.0.header()
         }
     }
 

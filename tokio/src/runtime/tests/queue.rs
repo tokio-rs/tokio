@@ -1,5 +1,5 @@
 use crate::runtime::queue;
-use crate::runtime::task::{self, Schedule, Task};
+use crate::runtime::task::{self, Inject, Schedule, Task};
 
 use std::thread;
 use std::time::Duration;
@@ -7,7 +7,7 @@ use std::time::Duration;
 #[test]
 fn fits_256() {
     let (_, mut local) = queue::local();
-    let inject = queue::Inject::new();
+    let inject = Inject::new();
 
     for _ in 0..256 {
         let (task, _) = super::joinable::<_, Runtime>(async {});
@@ -22,7 +22,7 @@ fn fits_256() {
 #[test]
 fn overflow() {
     let (_, mut local) = queue::local();
-    let inject = queue::Inject::new();
+    let inject = Inject::new();
 
     for _ in 0..257 {
         let (task, _) = super::joinable::<_, Runtime>(async {});
@@ -46,7 +46,7 @@ fn overflow() {
 fn steal_batch() {
     let (steal1, mut local1) = queue::local();
     let (_, mut local2) = queue::local();
-    let inject = queue::Inject::new();
+    let inject = Inject::new();
 
     for _ in 0..4 {
         let (task, _) = super::joinable::<_, Runtime>(async {});
@@ -78,7 +78,7 @@ fn stress1() {
 
     for _ in 0..NUM_ITER {
         let (steal, mut local) = queue::local();
-        let inject = queue::Inject::new();
+        let inject = Inject::new();
 
         let th = thread::spawn(move || {
             let (_, mut local) = queue::local();
@@ -134,7 +134,7 @@ fn stress2() {
 
     for _ in 0..NUM_ITER {
         let (steal, mut local) = queue::local();
-        let inject = queue::Inject::new();
+        let inject = Inject::new();
 
         let th = thread::spawn(move || {
             let (_, mut local) = queue::local();
