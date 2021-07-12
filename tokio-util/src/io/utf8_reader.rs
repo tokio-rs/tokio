@@ -1,7 +1,6 @@
 use std::{
     hint::unreachable_unchecked,
     io,
-    // num::NonZeroU8,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -36,14 +35,6 @@ fn len_of_complete_or_invalid_utf8_bytes(slice: &[u8]) -> usize {
             }
         }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum ScrapState {
-    // This should only be used after the underlying reader has returned `Ready`
-    // and before it has been polled again (in between reads).
-    Scrap([u8; 3], usize),
-    NoScrap,
 }
 
 pin_project! {
@@ -135,7 +126,8 @@ pin_project! {
     pub struct Utf8Reader<R> {
         #[pin]
         inner: R,
-        scrap_state: ScrapState,
+        read_scrap: Option<([u8; 3], usize)>,
+        read_buf_scrap: Option<([u8; 4], usize)>,
     }
 }
 
@@ -161,7 +153,8 @@ impl<R> Utf8Reader<R> {
     pub const fn new(inner: R) -> Self {
         Self {
             inner,
-            scrap_state: ScrapState::NoScrap,
+            read_scrap: None,
+            read_buf_scrap: None,
         }
     }
 
@@ -331,4 +324,26 @@ impl<R: AsyncBufRead> AsyncBufRead for Utf8Reader<R> {
             None => me.inner.consume(amt),
         }
     }
+}
+
+macro_rules! scrap_functions {
+    ($($name:ident => $size:literal);+ $(;)?) => {
+        $(fn $name(scrap: &[u8]) -> Option<([u8; $size], usize)> {
+            if scrap.len() == 0 {
+                return None;
+            }
+
+            let mut result = [0; $size];
+            debug_assert!(scrap.len() <= $size, "scrap is too long");
+            let len = std::cmp::min(scrap.len(), 3);
+            result[..len].copy_from_slice(&scrap[..len]);
+
+            Some((result, len))
+        })+
+    };
+}
+
+scrap_functions! {
+    make_read_scrap => 3;
+    make_read_buf_scrap => 4;
 }
