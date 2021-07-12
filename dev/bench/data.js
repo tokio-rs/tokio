@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626092358274,
+  "lastUpdate": 1626092361470,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -38095,6 +38095,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19728198,
             "range": "± 6063526",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3fd88dac644728a9ae9ffa8bc518b090d90ed51b",
+          "message": "net: fix the uds_datagram tests with the latest nightly stdlib (#3952)",
+          "timestamp": "2021-07-12T11:36:50+02:00",
+          "tree_id": "2f9a7ed5bea20e065731650fec8549e89bfdec9c",
+          "url": "https://github.com/tokio-rs/tokio/commit/3fd88dac644728a9ae9ffa8bc518b090d90ed51b"
+        },
+        "date": 1626092355819,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 186950,
+            "range": "± 50207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 995208,
+            "range": "± 232362",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5618515,
+            "range": "± 1728947",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20200978,
+            "range": "± 4582931",
             "unit": "ns/iter"
           }
         ]
