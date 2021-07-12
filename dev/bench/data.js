@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626078810918,
+  "lastUpdate": 1626078818007,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19925,6 +19925,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 588,
             "range": "± 52",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3b38ebd7f5d50611193f942c31c57262f263be33",
+          "message": "runtime: move inject queue to `tokio::runtime::task` (#3939)",
+          "timestamp": "2021-07-12T10:31:36+02:00",
+          "tree_id": "ed5c8eb458d2554fddaccf482f85c3b92822cf9a",
+          "url": "https://github.com/tokio-rs/tokio/commit/3b38ebd7f5d50611193f942c31c57262f263be33"
+        },
+        "date": 1626078812477,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 865,
+            "range": "± 153",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 17881,
+            "range": "± 8226",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 890,
+            "range": "± 152",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17690,
+            "range": "± 9866",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 575,
+            "range": "± 86",
             "unit": "ns/iter"
           }
         ]
