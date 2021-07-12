@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626081650328,
+  "lastUpdate": 1626081660021,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -37843,6 +37843,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20280815,
             "range": "± 4134192",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "80d8d40a341e37f6c416cc46d30dd3e7d601c972",
+          "message": "sync: clean up OnceCell (#3945)",
+          "timestamp": "2021-07-12T11:19:14+02:00",
+          "tree_id": "0e2223cce68ae0eca304360c1d357a7bbe528fd7",
+          "url": "https://github.com/tokio-rs/tokio/commit/80d8d40a341e37f6c416cc46d30dd3e7d601c972"
+        },
+        "date": 1626081654599,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 229721,
+            "range": "± 101262",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 877082,
+            "range": "± 230423",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5286331,
+            "range": "± 1746945",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18661670,
+            "range": "± 2381301",
             "unit": "ns/iter"
           }
         ]
