@@ -2,6 +2,7 @@ use pin_project_lite::pin_project;
 use std::cell::RefCell;
 use std::error::Error;
 use std::future::Future;
+use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{fmt, thread};
@@ -123,6 +124,7 @@ impl<T: 'static> LocalKey<T> {
             local: &self,
             slot: Some(value),
             future: f,
+            _pinned: PhantomPinned,
         }
     }
 
@@ -147,12 +149,14 @@ impl<T: 'static> LocalKey<T> {
     where
         F: FnOnce() -> R,
     {
-        let mut scope = TaskLocalFuture {
+        let scope = TaskLocalFuture {
             local: &self,
             slot: Some(value),
             future: (),
+            _pinned: PhantomPinned,
         };
-        Pin::new(&mut scope).with_task(|_| f())
+        crate::pin!(scope);
+        scope.with_task(|_| f())
     }
 
     /// Accesses the current task-local and runs the provided closure.
@@ -234,6 +238,8 @@ pin_project! {
         slot: Option<T>,
         #[pin]
         future: F,
+        #[pin]
+        _pinned: PhantomPinned,
     }
 }
 
