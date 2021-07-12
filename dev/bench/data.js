@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626078821692,
+  "lastUpdate": 1626081636694,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19979,6 +19979,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 575,
             "range": "± 86",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "80d8d40a341e37f6c416cc46d30dd3e7d601c972",
+          "message": "sync: clean up OnceCell (#3945)",
+          "timestamp": "2021-07-12T11:19:14+02:00",
+          "tree_id": "0e2223cce68ae0eca304360c1d357a7bbe528fd7",
+          "url": "https://github.com/tokio-rs/tokio/commit/80d8d40a341e37f6c416cc46d30dd3e7d601c972"
+        },
+        "date": 1626081631931,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 742,
+            "range": "± 27",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 12841,
+            "range": "± 5495",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 766,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 12995,
+            "range": "± 3222",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 492,
+            "range": "± 15",
             "unit": "ns/iter"
           }
         ]
