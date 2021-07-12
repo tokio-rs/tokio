@@ -1,7 +1,6 @@
 //! Runs `!Send` futures on the current thread.
-use crate::runtime::task::{self, JoinHandle, Task};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Task};
 use crate::sync::AtomicWaker;
-use crate::util::linked_list::{Link, LinkedList};
 
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
@@ -233,7 +232,7 @@ struct Context {
 
 struct Tasks {
     /// Collection of all active tasks spawned onto this executor.
-    owned: LinkedList<Task<Arc<Shared>>, <Task<Arc<Shared>> as Link>::Target>,
+    owned: OwnedTasks<Arc<Shared>>,
 
     /// Local run queue sender and receiver.
     queue: VecDeque<task::Notified<Arc<Shared>>>,
@@ -334,7 +333,7 @@ impl LocalSet {
             tick: Cell::new(0),
             context: Context {
                 tasks: RefCell::new(Tasks {
-                    owned: LinkedList::new(),
+                    owned: OwnedTasks::new(),
                     queue: VecDeque::with_capacity(INITIAL_CAPACITY),
                 }),
                 shared: Arc::new(Shared {
@@ -682,17 +681,14 @@ impl task::Schedule for Arc<Shared> {
     }
 
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
-        use std::ptr::NonNull;
-
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
 
             assert!(cx.shared.ptr_eq(self));
 
-            let ptr = NonNull::from(task.header());
             // safety: task must be contained by list. It is inserted into the
             // list in `bind`.
-            unsafe { cx.tasks.borrow_mut().owned.remove(ptr) }
+            unsafe { cx.tasks.borrow_mut().owned.remove(&task) }
         })
     }
 

@@ -19,7 +19,7 @@ mod join;
 pub use self::join::JoinHandle;
 
 mod list;
-pub(super) use self::list::OwnedTasks;
+pub(crate) use self::list::OwnedTasks;
 
 mod raw;
 use self::raw::RawTask;
