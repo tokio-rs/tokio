@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626092364702,
+  "lastUpdate": 1626092399001,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -89699,6 +89699,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 755459,
             "range": "± 75273",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3fd88dac644728a9ae9ffa8bc518b090d90ed51b",
+          "message": "net: fix the uds_datagram tests with the latest nightly stdlib (#3952)",
+          "timestamp": "2021-07-12T11:36:50+02:00",
+          "tree_id": "2f9a7ed5bea20e065731650fec8549e89bfdec9c",
+          "url": "https://github.com/tokio-rs/tokio/commit/3fd88dac644728a9ae9ffa8bc518b090d90ed51b"
+        },
+        "date": 1626092393505,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7082976,
+            "range": "± 2455930",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6482914,
+            "range": "± 1738217",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 7041845,
+            "range": "± 2351827",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 299,
+            "range": "± 33",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 301,
+            "range": "± 15",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 301,
+            "range": "± 19",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 61690,
+            "range": "± 5408",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1038,
+            "range": "± 114",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1077132,
+            "range": "± 72293",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 778366,
+            "range": "± 55591",
             "unit": "ns/iter"
           }
         ]
