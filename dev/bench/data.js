@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626081789646,
+  "lastUpdate": 1626081793242,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -37945,6 +37945,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18661670,
             "range": "± 2381301",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ccd495647d04cd71e9e9bfe21ac61289ec35968e",
+          "message": "chore: update nightly version (#3953)",
+          "timestamp": "2021-07-12T11:21:10+02:00",
+          "tree_id": "b66487f206a06af17c2953b7e0a38789c5cb4d52",
+          "url": "https://github.com/tokio-rs/tokio/commit/ccd495647d04cd71e9e9bfe21ac61289ec35968e"
+        },
+        "date": 1626081786886,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 247704,
+            "range": "± 43318",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 977524,
+            "range": "± 185593",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5885724,
+            "range": "± 1577703",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18846036,
+            "range": "± 3233611",
             "unit": "ns/iter"
           }
         ]
