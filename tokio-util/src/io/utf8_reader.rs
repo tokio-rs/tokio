@@ -1,4 +1,5 @@
 use std::{
+    hint::unreachable_unchecked,
     io,
     // num::NonZeroU8,
     pin::Pin,
@@ -180,6 +181,25 @@ impl<R> Utf8Reader<R> {
     pub fn into_inner(self) -> R {
         self.inner
     }
+
+    fn handle_read_buf(
+        buf: &mut ReadBuf<'_>,
+        read_scrap: &mut Option<([u8; 3], usize)>,
+    ) -> Result<(), ()> {
+        match len_of_complete_or_invalid_utf8_bytes(buf.filled()) {
+            0 => {
+                debug_assert!(buf.filled().len() < 4, "it shouldn't be possible to not have valid UTF-8 to yield with at least 4 bytes available");
+                *read_scrap = make_read_scrap(buf.filled());
+                buf.set_filled(0);
+                Err(())
+            }
+            len_of_valid_utf8 => {
+                *read_scrap = make_read_scrap(&buf.filled()[len_of_valid_utf8..]);
+                buf.set_filled(len_of_valid_utf8);
+                Ok(())
+            }
+        }
+    }
 }
 
 impl<R> From<R> for Utf8Reader<R> {
@@ -195,45 +215,120 @@ impl<R: AsyncRead> AsyncRead for Utf8Reader<R> {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         let me = self.as_mut().project();
-        match me.scrap_state {
-            ScrapState::Scrap(scrap, len) => {
-                buf.put_slice(&scrap[..*len]);
-                *me.scrap_state = ScrapState::NoScrap;
-                self.poll_read(cx, buf)
+        let filled_before = buf.filled().len();
+        match me.read_scrap {
+            Some((scrap, len)) => {
+                let to_fill = std::cmp::min(*len, buf.remaining());
+                buf.put_slice(&scrap[..to_fill]);
+                if buf.remaining() == 0 {
+                    *me.read_scrap = make_read_scrap(&scrap[to_fill..*len]);
+                    return Poll::Ready(Ok(()));
+                }
+                match me.inner.poll_read(cx, buf) {
+                    Poll::Pending => {
+                        buf.set_filled(filled_before);
+                        Poll::Pending
+                    }
+                    Poll::Ready(res) => {
+                        if let err @ Err(_) = res {
+                            buf.set_filled(filled_before);
+                            return Poll::Ready(err);
+                        }
+
+                        // At this point, reading from the inner reader has
+                        // completed successfully. And since
+                        // `buf.remaining()` != 0, we know the entire scrap has
+                        // been used, so we can safely overrwrite it.
+
+                        match Self::handle_read_buf(buf, me.read_scrap) {
+                            Ok(()) => Poll::Ready(Ok(())),
+                            Err(()) => self.poll_read(cx, buf),
+                        }
+                    }
+                }
             }
-            ScrapState::NoScrap => {
+            None => {
                 ready!(me.inner.poll_read(cx, buf))?;
 
-                let filled = buf.filled();
-                let len_of_complete_utf8 = len_of_complete_or_invalid_utf8_bytes(filled);
-                if len_of_complete_utf8 != filled.len() {
-                    // should not be greater than 3, as
-                    // `len_of_complete_or_invalid_utf8_bytes` should only ever
-                    // return a length that's at most 3 less than the length of
-                    // the byte-string
-                    let scrap_len = filled.len() - len_of_complete_utf8;
-                    let mut scrap = [0; 3];
-                    scrap[..scrap_len].copy_from_slice(&filled[len_of_complete_utf8..]);
-                    *me.scrap_state = ScrapState::Scrap(scrap, scrap_len);
-                    // shouldn't panic, because `len_of_complete_utf8` will be less than or
-                    // equal to `filled.len()`, which is guarenteed to be less than the
-                    // initialized portion of `buf`
-                    buf.set_filled(len_of_complete_utf8);
+                match Self::handle_read_buf(buf, me.read_scrap) {
+                    Ok(()) => Poll::Ready(Ok(())),
+                    Err(()) => self.poll_read(cx, buf),
                 }
-
-                Poll::Ready(Ok(()))
             }
         }
     }
 }
 
 impl<R: AsyncBufRead> AsyncBufRead for Utf8Reader<R> {
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        let slice = ready!(self.project().inner.poll_fill_buf(cx))?;
-        Poll::Ready(Ok(&slice[..len_of_complete_or_invalid_utf8_bytes(slice)]))
+    fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        let me = self.as_mut().project();
+        match me.read_buf_scrap {
+            Some((scrap, len)) => match len_of_complete_or_invalid_utf8_bytes(scrap) {
+                0 => {
+                    let slice = ready!(me.inner.poll_fill_buf(cx))?;
+                    let to_fill = std::cmp::min(4 - *len, slice.len());
+                    scrap[*len..to_fill].copy_from_slice(&slice[..to_fill]);
+                    match len_of_complete_or_invalid_utf8_bytes(scrap) {
+                        0 => {
+                            self.as_mut().project().inner.consume(to_fill);
+                            self.poll_fill_buf(cx)
+                        }
+                        len_of_valid_utf8 => {
+                            let to_consume = len_of_valid_utf8 - *len;
+                            *len = len_of_valid_utf8;
+                            // We must re-project `self` because otherwise the borrow
+                            // checker would complain about us borrowing from the projection
+                            // created from a borrowed `self`. We must borrow `self` because
+                            // we want to be able to use `self` for recursion.
+                            let me = self.project();
+                            me.inner.consume(to_consume);
+                            Poll::Ready(Ok(&me
+                                .read_buf_scrap
+                                .as_ref()
+                                // SAFETY: the above match asserts that
+                                // `self.read_buf_scrap` is `Some`
+                                .unwrap_or_else(|| unsafe { unreachable_unchecked() })
+                                .0[..len_of_valid_utf8]))
+                        }
+                    }
+                }
+                // We must re-project `self` because otherwise the borrow
+                // checker would complain about us borrowing from the projection
+                // created from a borrowed `self`. We must borrow `self` because
+                // we want to be able to use `self` for recursion.
+                len_of_valid_utf8 => Poll::Ready(Ok(&self
+                    .project()
+                    .read_buf_scrap
+                    .as_ref()
+                    // SAFETY: the above match asserts that
+                    // `self.read_buf_scrap` is `Some`
+                    .unwrap_or_else(|| unsafe { unreachable_unchecked() })
+                    .0[..len_of_valid_utf8])),
+            },
+            None => {
+                let slice = ready!(me.inner.poll_fill_buf(cx))?;
+                match (
+                    len_of_complete_or_invalid_utf8_bytes(slice),
+                    slice.is_empty(),
+                ) {
+                    (0, false) => {
+                        *me.read_buf_scrap = make_read_buf_scrap(slice);
+                        let to_consume = slice.len();
+                        self.as_mut().project().inner.consume(to_consume);
+                        self.poll_fill_buf(cx)
+                    }
+                    // if `slice.is_empty()`, `len_of_valid_utf8` will be 0
+                    (len_of_valid_utf8, _) => Poll::Ready(Ok(&slice[..len_of_valid_utf8])),
+                }
+            }
+        }
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        self.project().inner.consume(amt)
+        let me = self.project();
+        match me.read_buf_scrap {
+            Some((scrap, len)) => *me.read_buf_scrap = make_read_buf_scrap(&scrap[amt..*len]),
+            None => me.inner.consume(amt),
+        }
     }
 }
