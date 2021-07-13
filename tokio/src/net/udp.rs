@@ -1170,14 +1170,14 @@ impl UdpSocket {
             .try_io(Interest::READABLE, || self.io.recv_from(buf))
     }
 
-    /// Try to perform IO operation from the socket using a user-provided IO operation.
+    /// Try to read or write from the socket using a user-provided IO operation.
     ///
-    /// If the socket is ready, the provided closure is called. The
-    /// closure should attempt to perform IO operation from the socket by manually calling the
-    /// appropriate syscall. If the operation fails because the socket is not
-    /// actually ready, then the closure should return a `WouldBlock` error and
-    /// the readiness flag is cleared. The return value of the closure is
-    /// then returned by `try_io`.
+    /// If the socket is ready, the provided closure is called. The closure
+    /// should attempt to perform IO operation from the socket by manually
+    /// calling the appropriate syscall. If the operation fails because the
+    /// socket is not actually ready, then the closure should return a
+    /// `WouldBlock` error and the readiness flag is cleared. The return value
+    /// of the closure is then returned by `try_io`.
     ///
     /// If the socket is not ready, then the closure is not called
     /// and a `WouldBlock` error is returned.
@@ -1188,9 +1188,9 @@ impl UdpSocket {
     /// incorrectly clear the readiness flag, which can cause the socket to
     /// behave incorrectly.
     ///
-    /// The closure should not perform the read operation using any of the
-    /// methods defined on the Tokio `UdpSocket` type, as this will mess with
-    /// the readiness flag and can cause the socket to behave incorrectly.
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `UdpSocket` type, as this will mess with the
+    /// readiness flag and can cause the socket to behave incorrectly.
     ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
