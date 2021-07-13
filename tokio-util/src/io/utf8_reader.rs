@@ -40,9 +40,7 @@ fn len_of_complete_or_invalid_utf8_bytes(slice: &[u8]) -> usize {
 pin_project! {
     /// An asynchronous UTF-8 text reader.
     ///
-    /// `Utf8Reader` wraps an
-    /// [`AsyncRead`](https://docs.rs/tokio/latest/tokio/io/trait.AsyncRead.html)
-    /// and/or
+    /// `Utf8Reader` wraps an [`AsyncRead`] and/or
     /// [`AsyncBufRead`](https://docs.rs/tokio/latest/tokio/io/trait.AsyncBufRead.html),
     /// withholding a partial UTF-8 sequence at the end if one is present. That
     /// is, with a multi-byte UTF-8 sequence, if the underlying reader has only
@@ -59,6 +57,14 @@ pin_project! {
     /// bytes or Unicode code points, one can use any of the `from_utf8_*`
     /// functions to determine how their program should respond to invalid
     /// bytes.
+    ///
+    /// # Full buffer
+    /// If the buffer supplied to the [`AsyncRead`] implementation runs out of
+    /// room, the above guarentees do not apply. As many bytes as possible will
+    /// be put into the supplied buffer, regardless of whether they are complete
+    /// UTF-8 or not.
+    ///
+    /// [`AsyncRead`]: https://docs.rs/tokio/latest/tokio/io/trait.AsyncRead.html
     ///
     /// # Examples
     /// ```
