@@ -19,7 +19,7 @@ pub struct PollSender<T> {
     /// is none if closed
     sender: Option<Arc<Sender<T>>>,
     is_sending: bool,
-    inner: ReusableBoxFuture<Result<(), SendError<T>>>,
+    inner: ReusableBoxFuture<'static, Result<(), SendError<T>>>,
 }
 
 // By reusing the same async fn for both Some and None, we make sure every
