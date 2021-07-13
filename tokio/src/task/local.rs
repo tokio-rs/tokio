@@ -309,11 +309,22 @@ cfg_rt! {
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
 
             let (task, handle) = task::joinable(future);
+
+            // We first bind the new task to the runtime, then submit a
+            // notification for the new task so it is executed.
+            //
+            // If `bind` fails, then the LocalSet is currently shutting down and
+            // this was called from the destructor of a task on the LocalSet.
+            // We cancel the task immediately in this case.
+            //
+            // If `bind` succeeds, then the LocalSet is responsible for cleaning
+            // up the task.
             let mut tasks = cx.tasks.borrow_mut();
             match tasks.owned.bind(task, cx.shared.clone()) {
-                Ok(task) => tasks.queue.push_back(task),
+                Ok(notified) => tasks.queue.push_back(notified),
                 Err(task) => drop(task),
             }
+
             handle
         })
     }
@@ -393,10 +404,22 @@ impl LocalSet {
         let (task, handle) = task::joinable(future);
         {
             let mut tasks = self.context.tasks.borrow_mut();
+
+            // We first bind the new task to the runtime, then submit a
+            // notification for the new task so it is executed.
+            //
+            // If `bind` fails, then the LocalSet is currently shutting down and
+            // this was called from the destructor of a task on the LocalSet.
+            // We cancel the task immediately in this case.
+            //
+            // If `bind` succeeds, then the LocalSet is responsible for cleaning
+            // up the task.
             match tasks.owned.bind(task, self.context.shared.clone()) {
-                Ok(task) => tasks.queue.push_back(task),
+                Ok(notified) => tasks.queue.push_back(notified),
                 Err(task) => drop(task),
             }
+
+            // Use a scope to release tasks borrow before waking.
         }
         self.context.shared.waker.wake();
         handle
@@ -602,8 +625,10 @@ impl Default for LocalSet {
 impl Drop for LocalSet {
     fn drop(&mut self) {
         self.with(|| {
-            // Close the LocalOwnedTasks to prevent spawning new tasks in the
-            // destructor of tasks being shut down in this destructor.
+            // Close the LocalOwnedTasks. This ensures that any calls to
+            // spawn_local in the destructor of a future on this LocalSet will
+            // immediately cancel the task, and prevents the task from being
+            // added to `owned`.
             self.context.tasks.borrow_mut().owned.close();
 
             // Loop required here to ensure borrow is dropped between iterations

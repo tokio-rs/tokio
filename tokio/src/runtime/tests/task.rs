@@ -65,10 +65,10 @@ fn create_drop2() {
         drop(ad);
         unreachable!()
     });
+    drop(join);
     handle.assert_not_dropped();
     drop(task);
     handle.assert_dropped();
-    drop(join);
 }
 
 // A Notified does not shut down on drop, but it is dropped once the ref-count
