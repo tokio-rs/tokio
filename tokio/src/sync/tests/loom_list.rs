@@ -39,6 +39,9 @@ fn smoke() {
                 Some(Closed) => {
                     panic!();
                 }
+                Some(NotReady) => {
+                    thread::yield_now();
+                }
                 None => {
                     thread::yield_now();
                 }
