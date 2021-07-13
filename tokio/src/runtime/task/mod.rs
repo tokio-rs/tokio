@@ -61,9 +61,7 @@ impl<T: 'static + Future, S: 'static + Schedule> UnboundTask<T, S> {
     /// Bind a scheduler to this task, then split it into two task references.
     fn bind_and_split(self, scheduler: S) -> (Notified<S>, Task<S>) {
         // safety: We know what the future type is.
-        let harness = unsafe {
-            Harness::<T, S>::from_raw(self.raw.header().into())
-        };
+        let harness = unsafe { Harness::<T, S>::from_raw(self.raw.header().into()) };
         harness.bind_scheduler(scheduler);
 
         let task1 = Task {

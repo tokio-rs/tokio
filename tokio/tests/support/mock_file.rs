@@ -211,7 +211,7 @@ impl Read for &'_ File {
                 assert!(dst.len() >= data.len());
                 assert!(dst.len() <= 16 * 1024, "actual = {}", dst.len()); // max buffer
 
-                &mut dst[..data.len()].copy_from_slice(&data);
+                dst[..data.len()].copy_from_slice(&data);
                 Ok(data.len())
             }
             Some(Read(Err(e))) => Err(e),

@@ -7,11 +7,11 @@
 //! the scheduler with the collection.
 
 use crate::loom::sync::Mutex;
-use crate::runtime::task::{Task, UnboundTask, Notified, Schedule};
+use crate::runtime::task::{Notified, Schedule, Task, UnboundTask};
 use crate::util::linked_list::{Link, LinkedList};
 
-use std::marker::PhantomData;
 use std::future::Future;
+use std::marker::PhantomData;
 
 pub(crate) struct OwnedTasks<S: 'static> {
     inner: Mutex<OwnedTasksInner<S>>,
@@ -42,7 +42,7 @@ impl<S: 'static> OwnedTasks<S> {
     pub(crate) fn bind<T>(
         &self,
         task: UnboundTask<T, S>,
-        scheduler: S
+        scheduler: S,
     ) -> Result<Notified<S>, UnboundTask<T, S>>
     where
         S: Schedule,
@@ -90,7 +90,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
     pub(crate) fn bind<T>(
         &mut self,
         task: UnboundTask<T, S>,
-        scheduler: S
+        scheduler: S,
     ) -> Result<Notified<S>, UnboundTask<T, S>>
     where
         S: Schedule,

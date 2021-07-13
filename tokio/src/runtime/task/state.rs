@@ -325,7 +325,7 @@ impl State {
 
     /// Returns `true` if the task should be released.
     pub(super) fn ref_dec_twice(&self) -> bool {
-        let prev = Snapshot(self.val.fetch_sub(2*REF_ONE, AcqRel));
+        let prev = Snapshot(self.val.fetch_sub(2 * REF_ONE, AcqRel));
         prev.ref_count() == 2
     }
 

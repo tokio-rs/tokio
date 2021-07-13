@@ -17,8 +17,8 @@ use crate::runtime::{queue, task};
 use crate::util::FastRand;
 
 use std::cell::RefCell;
-use std::time::Duration;
 use std::future::Future;
+use std::time::Duration;
 
 /// A scheduler worker
 pub(super) struct Worker {
