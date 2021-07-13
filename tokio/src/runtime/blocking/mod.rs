@@ -9,8 +9,8 @@ pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
 mod schedule;
 mod shutdown;
 mod task;
-pub(crate) use task::BlockingTask;
 pub(crate) use schedule::NoopSchedule;
+pub(crate) use task::BlockingTask;
 
 use crate::runtime::Builder;
 

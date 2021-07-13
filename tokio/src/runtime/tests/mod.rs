@@ -1,8 +1,8 @@
 use self::joinable_wrapper::joinable;
 
 mod joinable_wrapper {
-    use crate::runtime::task::{JoinHandle, Notified};
     use crate::runtime::blocking::NoopSchedule;
+    use crate::runtime::task::{JoinHandle, Notified};
 
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(crate) fn joinable<T>(task: T) -> (Notified<NoopSchedule>, JoinHandle<T::Output>)
