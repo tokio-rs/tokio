@@ -444,7 +444,7 @@ cfg_sync! {
     pub use mutex::{Mutex, MutexGuard, TryLockError, OwnedMutexGuard, MappedMutexGuard};
 
     pub(crate) mod notify;
-    pub use notify::Notify;
+    pub use notify::{Notify, Notified};
 
     pub mod oneshot;
 
