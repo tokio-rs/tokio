@@ -1,4 +1,5 @@
 use crate::runtime::task::{self, joinable, OwnedTasks, Schedule, Task, UnboundTask};
+use crate::runtime::blocking::NoopSchedule;
 use crate::util::TryLock;
 
 use std::collections::VecDeque;
@@ -75,11 +76,11 @@ fn create_drop2() {
 #[test]
 fn into_notified1() {
     let (ad, handle) = AssertDrop::new();
-    let (task, join) = joinable::<_, Runtime>(async {
+    let (task, join) = joinable(async {
         drop(ad);
         unreachable!()
     });
-    let notified = task.into_notified();
+    let notified = task.into_notified(NoopSchedule);
     drop(notified);
     handle.assert_not_dropped();
     drop(join);
@@ -89,11 +90,11 @@ fn into_notified1() {
 #[test]
 fn into_notified2() {
     let (ad, handle) = AssertDrop::new();
-    let (task, join) = joinable::<_, Runtime>(async {
+    let (task, join) = joinable(async {
         drop(ad);
         unreachable!()
     });
-    let notified = task.into_notified();
+    let notified = task.into_notified(NoopSchedule);
     drop(join);
     handle.assert_not_dropped();
     drop(notified);
@@ -104,11 +105,11 @@ fn into_notified2() {
 #[test]
 fn into_notified_shutdown1() {
     let (ad, handle) = AssertDrop::new();
-    let (task, join) = joinable::<_, Runtime>(async {
+    let (task, join) = joinable(async {
         drop(ad);
         unreachable!()
     });
-    let notified = task.into_notified();
+    let notified = task.into_notified(NoopSchedule);
     drop(join);
     handle.assert_not_dropped();
     notified.shutdown();
@@ -118,11 +119,11 @@ fn into_notified_shutdown1() {
 #[test]
 fn into_notified_shutdown2() {
     let (ad, handle) = AssertDrop::new();
-    let (task, join) = joinable::<_, Runtime>(async {
+    let (task, join) = joinable(async {
         drop(ad);
         unreachable!()
     });
-    let notified = task.into_notified();
+    let notified = task.into_notified(NoopSchedule);
     handle.assert_not_dropped();
     notified.shutdown();
     handle.assert_dropped();

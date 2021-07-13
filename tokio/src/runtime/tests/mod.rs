@@ -1,28 +1,27 @@
 use self::joinable_wrapper::joinable;
 
 mod joinable_wrapper {
-    use crate::runtime::task::{JoinHandle, Notified, Schedule};
+    use crate::runtime::task::{JoinHandle, Notified};
+    use crate::runtime::blocking::NoopSchedule;
 
     #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
+    pub(crate) fn joinable<T>(task: T) -> (Notified<NoopSchedule>, JoinHandle<T::Output>)
     where
         T: std::future::Future + Send + 'static,
-        S: Schedule,
     {
         use tracing::Instrument;
         let span = tracing::trace_span!("test_span");
         let (task, handle) = crate::runtime::task::joinable(task.instrument(span));
-        (task.into_notified(), handle)
+        (task.into_notified(NoopSchedule), handle)
     }
 
     #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-    pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
+    pub(crate) fn joinable<T>(task: T) -> (Notified<NoopSchedule>, JoinHandle<T::Output>)
     where
         T: std::future::Future + Send + 'static,
-        S: Schedule,
     {
         let (task, handle) = crate::runtime::task::joinable(task);
-        (task.into_notified(), handle)
+        (task.into_notified(NoopSchedule), handle)
     }
 }
 

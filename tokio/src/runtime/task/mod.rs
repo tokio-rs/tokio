@@ -81,13 +81,17 @@ impl<T: 'static + Future, S: 'static + Schedule> UnboundTask<T, S> {
     }
 
     // This method is used by the blocking spawner.
-    pub(crate) fn into_notified(self) -> Notified<S>
+    pub(crate) fn into_notified(self, scheduler: S) -> Notified<S>
     where
         T: Send,
     {
         // We need to drop a reference to do this conversion as UnboundTask has
         // two ref-counts.
         self.raw.header().state.ref_dec();
+
+        // We bind the task to the provided scheduler.
+        let harness = unsafe { Harness::<T, S>::from_raw(self.raw.header().into()) };
+        harness.bind_scheduler(scheduler);
 
         let task = Task {
             raw: self.raw,

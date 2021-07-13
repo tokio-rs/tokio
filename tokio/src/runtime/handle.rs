@@ -1,4 +1,4 @@
-use crate::runtime::blocking::task::BlockingTask;
+use crate::runtime::blocking::{BlockingTask, NoopSchedule};
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::CONTEXT_MISSING_ERROR;
@@ -214,7 +214,8 @@ impl Handle {
         let _ = name;
 
         let (task, handle) = task::joinable(fut);
-        let _ = self.blocking_spawner.spawn(task.into_notified(), &self);
+        let task = task.into_notified(NoopSchedule);
+        let _ = self.blocking_spawner.spawn(task, &self);
         handle
     }
 

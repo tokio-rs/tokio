@@ -197,20 +197,3 @@ fn chained_steal() {
         while inject.pop().is_some() {}
     });
 }
-
-struct Runtime;
-
-impl Schedule for Runtime {
-    fn bind(task: Task<Self>) -> Runtime {
-        std::mem::forget(task);
-        Runtime
-    }
-
-    fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
-        None
-    }
-
-    fn schedule(&self, _task: task::Notified<Self>) {
-        unreachable!();
-    }
-}
