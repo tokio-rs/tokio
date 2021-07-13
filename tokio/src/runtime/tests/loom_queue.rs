@@ -1,5 +1,6 @@
 use crate::runtime::queue;
 use crate::runtime::task::{self, Inject, Schedule, Task};
+use crate::runtime::blocking::NoopSchedule;
 
 use loom::thread;
 
@@ -30,7 +31,7 @@ fn basic() {
 
         for _ in 0..2 {
             for _ in 0..2 {
-                let (task, _) = super::joinable::<_, Runtime>(async {});
+                let (task, _) = super::joinable(async {});
                 local.push_back(task, &inject);
             }
 
@@ -39,7 +40,7 @@ fn basic() {
             }
 
             // Push another task
-            let (task, _) = super::joinable::<_, Runtime>(async {});
+            let (task, _) = super::joinable(async {});
             local.push_back(task, &inject);
 
             while local.pop().is_some() {
@@ -81,7 +82,7 @@ fn steal_overflow() {
         let mut n = 0;
 
         // push a task, pop a task
-        let (task, _) = super::joinable::<_, Runtime>(async {});
+        let (task, _) = super::joinable(async {});
         local.push_back(task, &inject);
 
         if local.pop().is_some() {
@@ -89,7 +90,7 @@ fn steal_overflow() {
         }
 
         for _ in 0..6 {
-            let (task, _) = super::joinable::<_, Runtime>(async {});
+            let (task, _) = super::joinable(async {});
             local.push_back(task, &inject);
         }
 
@@ -111,7 +112,7 @@ fn steal_overflow() {
 fn multi_stealer() {
     const NUM_TASKS: usize = 5;
 
-    fn steal_tasks(steal: queue::Steal<Runtime>) -> usize {
+    fn steal_tasks(steal: queue::Steal<NoopSchedule>) -> usize {
         let (_, mut local) = queue::local();
 
         if steal.steal_into(&mut local).is_none() {
@@ -133,7 +134,7 @@ fn multi_stealer() {
 
         // Push work
         for _ in 0..NUM_TASKS {
-            let (task, _) = super::joinable::<_, Runtime>(async {});
+            let (task, _) = super::joinable(async {});
             local.push_back(task, &inject);
         }
 
@@ -170,10 +171,10 @@ fn chained_steal() {
 
         // Load up some tasks
         for _ in 0..4 {
-            let (task, _) = super::joinable::<_, Runtime>(async {});
+            let (task, _) = super::joinable(async {});
             l1.push_back(task, &inject);
 
-            let (task, _) = super::joinable::<_, Runtime>(async {});
+            let (task, _) = super::joinable(async {});
             l2.push_back(task, &inject);
         }
 
