@@ -6,11 +6,11 @@
 //! The collections can be closed to prevent adding new tasks during shutdown of
 //! the scheduler with the collection.
 
+use crate::future::Future;
 use crate::loom::sync::Mutex;
 use crate::runtime::task::{Notified, Schedule, Task, UnboundTask};
 use crate::util::linked_list::{Link, LinkedList};
 
-use std::future::Future;
 use std::marker::PhantomData;
 
 pub(crate) struct OwnedTasks<S: 'static> {

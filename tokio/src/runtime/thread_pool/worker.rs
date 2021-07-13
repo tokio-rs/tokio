@@ -5,6 +5,7 @@
 //! make progress while the originating thread blocks.
 
 use crate::coop;
+use crate::future::Future;
 use crate::loom::rand::seed;
 use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
@@ -17,7 +18,6 @@ use crate::runtime::{queue, task};
 use crate::util::FastRand;
 
 use std::cell::RefCell;
-use std::future::Future;
 use std::time::Duration;
 
 /// A scheduler worker
