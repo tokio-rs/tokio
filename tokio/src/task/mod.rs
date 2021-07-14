@@ -300,6 +300,9 @@ cfg_rt! {
     mod unconstrained;
     pub use unconstrained::{unconstrained, Unconstrained};
 
+    mod task_set;
+    pub use task_set::TaskSet;
+
     cfg_trace! {
         mod builder;
         pub use builder::Builder;
