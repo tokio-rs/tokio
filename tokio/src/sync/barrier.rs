@@ -1,6 +1,5 @@
+use crate::loom::sync::Mutex;
 use crate::sync::watch;
-
-use std::sync::Mutex;
 
 /// A barrier enables multiple tasks to synchronize the beginning of some computation.
 ///
@@ -94,7 +93,7 @@ impl Barrier {
         // NOTE: the extra scope here is so that the compiler doesn't think `state` is held across
         // a yield point, and thus marks the returned future as !Send.
         let generation = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             let generation = state.generation;
             state.arrived += 1;
             if state.arrived == self.n {

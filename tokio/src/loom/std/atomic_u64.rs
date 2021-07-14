@@ -15,8 +15,8 @@ mod imp {
 
 #[cfg(any(target_arch = "arm", target_arch = "mips", target_arch = "powerpc"))]
 mod imp {
+    use crate::loom::sync::Mutex;
     use std::sync::atomic::Ordering;
-    use std::sync::Mutex;
 
     #[derive(Debug)]
     pub(crate) struct AtomicU64 {
@@ -31,15 +31,15 @@ mod imp {
         }
 
         pub(crate) fn load(&self, _: Ordering) -> u64 {
-            *self.inner.lock().unwrap()
+            *self.inner.lock()
         }
 
         pub(crate) fn store(&self, val: u64, _: Ordering) {
-            *self.inner.lock().unwrap() = val;
+            *self.inner.lock() = val;
         }
 
         pub(crate) fn fetch_or(&self, val: u64, _: Ordering) -> u64 {
-            let mut lock = self.inner.lock().unwrap();
+            let mut lock = self.inner.lock();
             let prev = *lock;
             *lock = prev | val;
             prev
@@ -52,7 +52,7 @@ mod imp {
             _success: Ordering,
             _failure: Ordering,
         ) -> Result<u64, u64> {
-            let mut lock = self.inner.lock().unwrap();
+            let mut lock = self.inner.lock();
 
             if *lock == current {
                 *lock = new;
