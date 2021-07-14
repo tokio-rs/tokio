@@ -573,6 +573,32 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
             marker: marker::PhantomData,
         })
     }
+
+    /// Returns a reference to the original `Mutex`.
+    ///
+    /// ```
+    /// use tokio::sync::{Mutex, MutexGuard};
+    ///
+    /// async fn unlock_and_relock<'l>(guard: MutexGuard<'l, u32>) -> MutexGuard<'l, u32> {
+    ///     println!("1. contains: {:?}", *guard);
+    ///     let mutex = MutexGuard::mutex(&guard);
+    ///     drop(guard);
+    ///     let guard = mutex.lock().await;
+    ///     println!("2. contains: {:?}", *guard);
+    ///     guard
+    /// }
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #     let mutex = Mutex::new(0u32);
+    /// #     let guard = mutex.lock().await;
+    /// #     unlock_and_relock(guard).await;
+    /// # }
+    /// ```
+    #[inline]
+    pub fn mutex(this: &Self) -> &'a Mutex<T> {
+        this.lock
+    }
 }
 
 impl<T: ?Sized> Drop for MutexGuard<'_, T> {
@@ -607,6 +633,35 @@ impl<T: ?Sized + fmt::Display> fmt::Display for MutexGuard<'_, T> {
 }
 
 // === impl OwnedMutexGuard ===
+
+impl<T: ?Sized> OwnedMutexGuard<T> {
+    /// Returns a reference to the original `Arc<Mutex>`.
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::{Mutex, OwnedMutexGuard};
+    ///
+    /// async fn unlock_and_relock(guard: OwnedMutexGuard<u32>) -> OwnedMutexGuard<u32> {
+    ///     println!("1. contains: {:?}", *guard);
+    ///     let mutex: Arc<Mutex<u32>> = OwnedMutexGuard::mutex(&guard).clone();
+    ///     drop(guard);
+    ///     let guard = mutex.lock_owned().await;
+    ///     println!("2. contains: {:?}", *guard);
+    ///     guard
+    /// }
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #     let mutex = Arc::new(Mutex::new(0u32));
+    /// #     let guard = mutex.lock_owned().await;
+    /// #     unlock_and_relock(guard).await;
+    /// # }
+    /// ```
+    #[inline]
+    pub fn mutex(this: &Self) -> &Arc<Mutex<T>> {
+        &this.lock
+    }
+}
 
 impl<T: ?Sized> Drop for OwnedMutexGuard<T> {
     fn drop(&mut self) {
