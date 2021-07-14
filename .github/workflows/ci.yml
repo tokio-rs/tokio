@@ -164,15 +164,27 @@ jobs:
 
   cross:
     name: cross
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        target:
-          - i686-unknown-linux-gnu
-          - powerpc-unknown-linux-gnu
-          - powerpc64-unknown-linux-gnu
-          - mips-unknown-linux-gnu
-          - arm-linux-androideabi
+        include:
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: i686-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: powerpc-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: powerpc64-unknown-linux-gnu
+            os: ubuntu-latest
+            subcmd: check # cross does not provide a Docker image for powerpc64-unknown-linux-gnu
+          - target: mips-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: arm-linux-androideabi
+            os: ubuntu-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            subcmd: build # cross does not provide a Docker image for aarch64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -180,11 +192,18 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: check
-          args: --workspace --target ${{ matrix.target }}
+      - name: cross --target ${{ matrix.target }}
+        run: |
+          cargo install cross
+          # tests-integration is excluded because it runs executable
+          cross ${{ matrix.subcmd || 'test' }} --workspace --all-features --target ${{ matrix.target }} --exclude tests-integration
+        if: startsWith(matrix.os, 'ubuntu')
+      - name: cargo --target ${{ matrix.target }}
+        run: |
+          rustup target add ${{ matrix.target }}
+          # tests-integration is excluded because it runs executable
+          cargo ${{ matrix.subcmd || 'test' }} --workspace --all-features --target ${{ matrix.target }} --exclude tests-integration
+        if: startsWith(matrix.os, 'windows')
 
   features:
     name: features
