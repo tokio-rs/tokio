@@ -216,6 +216,11 @@ cfg_rt_multi_thread! {
     use self::thread_pool::ThreadPool;
 }
 
+cfg_rt_test! {
+    pub(crate) mod test_scheduler;
+    use self::test_scheduler::TestScheduler;
+}
+
 cfg_rt! {
     use crate::task::JoinHandle;
 
@@ -281,6 +286,10 @@ cfg_rt! {
         /// Execute tasks across multiple threads.
         #[cfg(feature = "rt-multi-thread")]
         ThreadPool(ThreadPool),
+
+        /// Execute all tasks on the current-thread. Do not capture panics.
+        #[cfg(feature = "rt-test")]
+        TestScheduler(TestScheduler<driver::Driver>),
     }
 
     /// After thread starts / before thread stops
@@ -450,6 +459,8 @@ cfg_rt! {
                 Kind::CurrentThread(exec) => exec.block_on(future),
                 #[cfg(feature = "rt-multi-thread")]
                 Kind::ThreadPool(exec) => exec.block_on(future),
+                #[cfg(feature = "rt-test")]
+                Kind::TestScheduler(exec) => exec.block_on(future),
             }
         }
 
