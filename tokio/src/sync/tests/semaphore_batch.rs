@@ -248,3 +248,11 @@ fn cancel_acquire_releases_permits() {
     assert_eq!(6, s.available_permits());
     assert_ok!(s.try_acquire(6));
 }
+
+#[test]
+fn reduce_permits() {
+    let s = Semaphore::new(1);
+
+    s.reduce_permits(1);
+    assert_eq!(0, s.available_permits());
+}

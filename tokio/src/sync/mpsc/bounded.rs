@@ -1,14 +1,17 @@
-use crate::sync::batch_semaphore::{self as semaphore, TryAcquireError};
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{SendError, TrySendError};
+use crate::{
+    loom::sync::atomic::AtomicUsize,
+    sync::batch_semaphore::{self as semaphore, TryAcquireError},
+};
 
 cfg_time! {
     use crate::sync::mpsc::error::SendTimeoutError;
     use crate::time::Duration;
 }
 
-use std::fmt;
 use std::task::{Context, Poll};
+use std::{cmp::Ordering, fmt};
 
 /// Send values to the associated `Receiver`.
 ///
@@ -59,6 +62,9 @@ pub struct OwnedPermit<T> {
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
+
+    /// The number of permits that exceed the capacity of the channel
+    underflow: usize,
 }
 
 /// Creates a bounded mpsc channel for communicating between asynchronous tasks
@@ -107,7 +113,7 @@ pub struct Receiver<T> {
 /// ```
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
     assert!(buffer > 0, "mpsc bounded channel requires buffer > 0");
-    let semaphore = (semaphore::Semaphore::new(buffer), buffer);
+    let semaphore = (semaphore::Semaphore::new(buffer), AtomicUsize::new(buffer));
     let (tx, rx) = chan::channel(semaphore);
 
     let tx = Sender::new(tx);
@@ -118,11 +124,11 @@ pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
 
 /// Channel semaphore is a tuple of the semaphore implementation and a `usize`
 /// representing the channel bound.
-type Semaphore = (semaphore::Semaphore, usize);
+type Semaphore = (semaphore::Semaphore, AtomicUsize);
 
 impl<T> Receiver<T> {
     pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> Receiver<T> {
-        Receiver { chan }
+        Receiver { chan, underflow: 0 }
     }
 
     /// Receives the next value for this receiver.
@@ -184,7 +190,10 @@ impl<T> Receiver<T> {
     /// ```
     pub async fn recv(&mut self) -> Option<T> {
         use crate::future::poll_fn;
-        poll_fn(|cx| self.chan.recv(cx)).await
+        let res = poll_fn(|cx| self.chan.recv(cx, self.underflow == 0)).await;
+        self.underflow = self.underflow.saturating_sub(1);
+
+        res
     }
 
     /// Blocking receive to call outside of asynchronous contexts.
@@ -302,7 +311,65 @@ impl<T> Receiver<T> {
     /// `poll_recv`, only the `Waker` from the `Context` passed to the most
     /// recent call is scheduled to receive a wakeup.
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.chan.recv(cx)
+        let res = self.chan.recv(cx, self.underflow == 0);
+        self.underflow = self.underflow.saturating_sub(1);
+
+        res
+    }
+
+    /// Resizes the channel buffer to the provided size
+    ///
+    /// If the buffer is reduced to a smaller number of elements than it already
+    /// contains, it is no longer possible to send elements. It will be possible
+    /// to send new elements when the excess messages are consumed and there is
+    /// capacity available with respect to the new size.
+    ///
+    /// # Examples
+    ///
+    /// In the following example, a buffer of size 1 is resized to accommodate
+    /// a second value.
+    ///
+    /// ```rust
+    /// use tokio::sync::mpsc;
+    ///
+    /// fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     tx.try_send(()).unwrap();
+    ///     assert!(tx.try_send(()).is_err());
+    ///
+    ///     rx.resize(2);
+    ///     assert!(tx.try_send(()).is_ok());
+    /// }
+    /// ```
+    pub fn resize(&mut self, new_size: usize) {
+        use crate::sync::mpsc::chan::Semaphore;
+        assert!(new_size > 0, "mpsc bounded channel requires buffer > 0");
+
+        let semaphore = self.chan.semaphore();
+        let cap = semaphore.cap();
+
+        match new_size.cmp(&cap) {
+            Ordering::Less => {
+                let sub = cap - new_size;
+
+                // Reduce the number of available permits and increase the
+                // underflow if there's an excess of acquired permits.
+                semaphore.reduce_permits(sub);
+                self.underflow += sub.saturating_sub(semaphore.available_permits());
+            }
+            Ordering::Equal => {}
+            Ordering::Greater => {
+                let add = new_size - cap;
+
+                // Empty the underflow if any and add the remaining permits to
+                // the semaphore.
+                semaphore.add_permits(add.saturating_sub(self.underflow));
+                self.underflow = self.underflow.saturating_sub(add);
+            }
+        };
+
+        semaphore.set_cap(new_size);
     }
 }
 
@@ -1001,7 +1068,7 @@ impl<T> Drop for Permit<'_, T> {
         let semaphore = self.chan.semaphore();
 
         // Add the permit back to the semaphore
-        semaphore.add_permit();
+        semaphore.add_permits(1);
 
         // If this is the last sender for this channel, wake the receiver so
         // that it can be notified that the channel is closed.
@@ -1103,7 +1170,7 @@ impl<T> OwnedPermit<T> {
         });
 
         // Add the permit back to the semaphore
-        chan.semaphore().add_permit();
+        chan.semaphore().add_permits(1);
         Sender { chan }
     }
 }
@@ -1117,7 +1184,7 @@ impl<T> Drop for OwnedPermit<T> {
             let semaphore = chan.semaphore();
 
             // Add the permit back to the semaphore
-            semaphore.add_permit();
+            semaphore.add_permits(1);
 
             // If this `OwnedPermit` is holding the last sender for this
             // channel, wake the receiver so that it can be notified that the

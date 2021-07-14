@@ -36,11 +36,19 @@ impl<T, S: Semaphore + fmt::Debug> fmt::Debug for Rx<T, S> {
 pub(crate) trait Semaphore {
     fn is_idle(&self) -> bool;
 
-    fn add_permit(&self);
+    fn add_permits(&self, n: usize);
+
+    fn reduce_permits(&self, n: usize);
 
     fn close(&self);
 
     fn is_closed(&self) -> bool;
+
+    fn set_cap(&self, cap: usize);
+
+    fn cap(&self) -> usize;
+
+    fn available_permits(&self) -> usize;
 }
 
 struct Chan<T, S> {
@@ -213,7 +221,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     }
 
     /// Receive the next value
-    pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+    pub(crate) fn recv(&mut self, cx: &mut Context<'_>, release: bool) -> Poll<Option<T>> {
         use super::block::Read::*;
 
         // Keep track of task budget
@@ -226,7 +234,9 @@ impl<T, S: Semaphore> Rx<T, S> {
                 () => {
                     match rx_fields.list.pop(&self.inner.tx) {
                         Some(Value(value)) => {
-                            self.inner.semaphore.add_permit();
+                            if release {
+                                self.inner.semaphore.add_permits(1);
+                            }
                             coop.made_progress();
                             return Ready(Some(value));
                         }
@@ -263,6 +273,10 @@ impl<T, S: Semaphore> Rx<T, S> {
             }
         })
     }
+
+    pub(crate) fn semaphore(&self) -> &S {
+        &self.inner.semaphore
+    }
 }
 
 impl<T, S: Semaphore> Drop for Rx<T, S> {
@@ -275,7 +289,7 @@ impl<T, S: Semaphore> Drop for Rx<T, S> {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
 
             while let Some(Value(_)) = rx_fields.list.pop(&self.inner.tx) {
-                self.inner.semaphore.add_permit();
+                self.inner.semaphore.add_permits(1);
             }
         })
     }
@@ -310,13 +324,17 @@ impl<T, S> Drop for Chan<T, S> {
 
 // ===== impl Semaphore for (::Semaphore, capacity) =====
 
-impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
-    fn add_permit(&self) {
-        self.0.release(1)
+impl Semaphore for (crate::sync::batch_semaphore::Semaphore, AtomicUsize) {
+    fn add_permits(&self, n: usize) {
+        self.0.release(n)
+    }
+
+    fn reduce_permits(&self, reduction: usize) {
+        self.0.reduce_permits(reduction);
     }
 
     fn is_idle(&self) -> bool {
-        self.0.available_permits() == self.1
+        self.0.available_permits() == self.1.load(Acquire)
     }
 
     fn close(&self) {
@@ -326,6 +344,18 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
     fn is_closed(&self) -> bool {
         self.0.is_closed()
     }
+
+    fn set_cap(&self, cap: usize) {
+        self.1.store(cap, Release)
+    }
+
+    fn cap(&self) -> usize {
+        self.1.load(Acquire)
+    }
+
+    fn available_permits(&self) -> usize {
+        self.0.available_permits()
+    }
 }
 
 // ===== impl Semaphore for AtomicUsize =====
@@ -334,13 +364,18 @@ use std::sync::atomic::Ordering::{Acquire, Release};
 use std::usize;
 
 impl Semaphore for AtomicUsize {
-    fn add_permit(&self) {
-        let prev = self.fetch_sub(2, Release);
+    fn add_permits(&self, n: usize) {
+        let prev = self.fetch_sub(n << 1, Release);
 
         if prev >> 1 == 0 {
             // Something went wrong
             process::abort();
         }
+    }
+
+    fn reduce_permits(&self, reduction: usize) {
+        self.fetch_update(Acquire, Release, |v| Some(v.saturating_sub(reduction << 1)))
+            .expect("update failed");
     }
 
     fn is_idle(&self) -> bool {
@@ -353,5 +388,17 @@ impl Semaphore for AtomicUsize {
 
     fn is_closed(&self) -> bool {
         self.load(Acquire) & 1 == 1
+    }
+
+    fn set_cap(&self, cap: usize) {
+        self.store(cap << 1, Release)
+    }
+
+    fn cap(&self) -> usize {
+        self.load(Acquire) >> 1
+    }
+
+    fn available_permits(&self) -> usize {
+        self.load(Acquire) >> 1
     }
 }

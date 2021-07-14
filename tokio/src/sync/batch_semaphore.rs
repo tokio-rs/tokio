@@ -207,6 +207,7 @@ impl Semaphore {
             "a semaphore may not have more than MAX_PERMITS permits ({})",
             Self::MAX_PERMITS
         );
+
         let num_permits = (num_permits as usize) << Self::PERMIT_SHIFT;
         let mut curr = self.permits.load(Acquire);
         loop {
@@ -392,6 +393,18 @@ impl Semaphore {
         }
 
         Pending
+    }
+
+    /// Shrinks the number of available permits by the indicated reduction.
+    ///
+    /// This differs from `acquire` in that it does not block waiting for permits
+    /// to become available.
+    pub(crate) fn reduce_permits(&self, reduction: usize) {
+        self.permits
+            .fetch_update(Relaxed, Relaxed, |v| {
+                v.saturating_sub(reduction << Self::PERMIT_SHIFT).into()
+            })
+            .unwrap();
     }
 }
 
