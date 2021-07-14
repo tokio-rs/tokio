@@ -32,3 +32,42 @@ fn wake_without_register() {
 
     assert!(!waker.is_woken());
 }
+
+#[test]
+fn atomic_waker_panic_safe() {
+    use std::panic;
+    use std::ptr;
+    use std::task::{RawWaker, RawWakerVTable, Waker};
+
+    static PANICKING_VTABLE: RawWakerVTable = RawWakerVTable::new(
+        |_| panic!("clone"),
+        |_| unimplemented!("wake"),
+        |_| unimplemented!("wake_by_ref"),
+        |_| (),
+    );
+
+    static NONPANICKING_VTABLE: RawWakerVTable = RawWakerVTable::new(
+        |_| RawWaker::new(ptr::null(), &NONPANICKING_VTABLE),
+        |_| unimplemented!("wake"),
+        |_| unimplemented!("wake_by_ref"),
+        |_| (),
+    );
+
+    let panicking = unsafe { Waker::from_raw(RawWaker::new(ptr::null(), &PANICKING_VTABLE)) };
+    let nonpanicking = unsafe { Waker::from_raw(RawWaker::new(ptr::null(), &NONPANICKING_VTABLE)) };
+
+    let atomic_waker = AtomicWaker::new();
+
+    let panicking = panic::AssertUnwindSafe(&panicking);
+
+    let result = panic::catch_unwind(|| {
+        let panic::AssertUnwindSafe(panicking) = panicking;
+        atomic_waker.register_by_ref(panicking);
+    });
+
+    assert!(result.is_err());
+    assert!(atomic_waker.take_waker().is_none());
+
+    atomic_waker.register_by_ref(&nonpanicking);
+    assert!(atomic_waker.take_waker().is_some());
+}
