@@ -3,16 +3,16 @@ use crate::codec::{Decoder, Encoder};
 use futures_core::Stream;
 use tokio::{io::ReadBuf, net::UdpSocket};
 
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 use futures_core::ready;
 use futures_sink::Sink;
+use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{
     borrow::Borrow,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
 };
-use std::{io, mem::MaybeUninit};
 
 /// A unified [`Stream`] and [`Sink`] interface to an underlying `UdpSocket`, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
@@ -82,19 +82,10 @@ where
             }
 
             // We're out of data. Try and fetch more data to decode
-            let addr = unsafe {
-                // Convert `&mut [MaybeUnit<u8>]` to `&mut [u8]` because we will be
-                // writing to it via `poll_recv_from` and therefore initializing the memory.
-                let buf = &mut *(pin.rd.chunk_mut() as *mut _ as *mut [MaybeUninit<u8>]);
-                let mut read = ReadBuf::uninit(buf);
-                let ptr = read.filled().as_ptr();
-                let res = ready!(pin.socket.borrow().poll_recv_from(cx, &mut read));
-
-                assert_eq!(ptr, read.filled().as_ptr());
-                let addr = res?;
-                pin.rd.advance_mut(read.filled().len());
-                addr
-            };
+            let socket = &pin.socket;
+            let addr = ready!(ReadBuf::with_buf(&mut pin.rd, |read| socket
+                .borrow()
+                .poll_recv_from(cx, read)))?;
 
             pin.current_addr = Some(addr);
             pin.is_readable = true;

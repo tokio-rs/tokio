@@ -41,7 +41,6 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         use crate::io::ReadBuf;
-        use std::mem::MaybeUninit;
 
         let me = self.project();
 
@@ -49,24 +48,10 @@ where
             return Poll::Ready(Ok(0));
         }
 
-        let n = {
-            let dst = me.buf.chunk_mut();
-            let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
-            let mut buf = ReadBuf::uninit(dst);
-            let ptr = buf.filled().as_ptr();
-            ready!(Pin::new(me.reader).poll_read(cx, &mut buf)?);
-
-            // Ensure the pointer does not change from under us
-            assert_eq!(ptr, buf.filled().as_ptr());
-            buf.filled().len()
-        };
-
-        // Safety: This is guaranteed to be the number of initialized (and read)
-        // bytes due to the invariants provided by `ReadBuf::filled`.
-        unsafe {
-            me.buf.advance_mut(n);
-        }
-
-        Poll::Ready(Ok(n))
+        let reader = me.reader;
+        ReadBuf::with_buf(me.buf, |buf| {
+            ready!(Pin::new(reader).poll_read(cx, buf))?;
+            Poll::Ready(Ok(buf.filled().len()))
+        })
     }
 }
