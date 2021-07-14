@@ -43,6 +43,7 @@ cfg_io! {
 
 cfg_rt! {
     pub mod context;
+    pub mod task;
 }
 
 cfg_time! {
