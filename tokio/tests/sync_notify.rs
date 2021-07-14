@@ -151,3 +151,21 @@ fn notify_one_after_dropped_all() {
 
     assert_ready!(notified2.poll());
 }
+
+#[test]
+fn notify_many_waiters() {
+    let notify = Notify::new();
+    let mut notifieds = Vec::new();
+    for _ in 0..50 {
+        let mut notified = spawn(async { notify.notified().await });
+        assert_pending!(notified.poll());
+        notifieds.push(notified);
+    }
+
+    notify.notify_waiters();
+
+    for notified in notifieds.iter_mut() {
+        assert!(notified.is_woken());
+        assert_ready!(notified.poll());
+    }
+}
