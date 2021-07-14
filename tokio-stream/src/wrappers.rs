@@ -36,9 +36,9 @@ cfg_signal! {
     #[cfg(unix)]
     pub use signal_unix::SignalStream;
 
-    #[cfg(windows)]
+    #[cfg(any(windows, docsrs))]
     mod signal_windows;
-    #[cfg(windows)]
+    #[cfg(any(windows, docsrs))]
     pub use signal_windows::{CtrlCStream, CtrlBreakStream};
 }
 

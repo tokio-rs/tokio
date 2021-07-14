@@ -44,3 +44,8 @@ proptest = "1"
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+# Issue #3770
+#
+# This should allow `docsrs` to be read across projects, so that `tokio-stream`
+# can pick up stubbed types exported by `tokio`.
+rustc-args = ["--cfg", "docsrs"]
