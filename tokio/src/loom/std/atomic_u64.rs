@@ -15,8 +15,8 @@ mod imp {
 
 #[cfg(any(target_arch = "arm", target_arch = "mips", target_arch = "powerpc"))]
 mod imp {
-    use std::sync::atomic::Ordering;
     use crate::loom::sync::Mutex;
+    use std::sync::atomic::Ordering;
 
     #[derive(Debug)]
     pub(crate) struct AtomicU64 {

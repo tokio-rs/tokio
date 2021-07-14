@@ -1,5 +1,5 @@
-use crate::sync::watch;
 use crate::loom::sync::Mutex;
+use crate::sync::watch;
 
 /// A barrier enables multiple tasks to synchronize the beginning of some computation.
 ///

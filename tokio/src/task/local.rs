@@ -1,7 +1,7 @@
 //! Runs `!Send` futures on the current thread.
+use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Task};
 use crate::sync::AtomicWaker;
-use crate::loom::sync::{Arc, Mutex};
 
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;

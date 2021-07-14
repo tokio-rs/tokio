@@ -1,5 +1,5 @@
-use loom::sync::Notify;
 use crate::loom::sync::{Arc, Mutex};
+use loom::sync::Notify;
 
 pub(crate) fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let inner = Arc::new(Inner {
