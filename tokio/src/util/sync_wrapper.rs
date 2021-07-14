@@ -17,9 +17,7 @@ unsafe impl<T> Sync for SyncWrapper<T> {}
 
 impl<T> SyncWrapper<T> {
     pub(crate) fn new(value: T) -> Self {
-        Self {
-            value,
-        }
+        Self { value }
     }
 
     pub(crate) fn into_inner(self) -> T {
