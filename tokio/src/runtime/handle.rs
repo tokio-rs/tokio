@@ -213,8 +213,7 @@ impl Handle {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
 
-        let (task, handle) = task::joinable(fut);
-        let task = task.into_notified(NoopSchedule);
+        let (task, handle) = task::joinable(fut, NoopSchedule);
         let _ = self.blocking_spawner.spawn(task, &self);
         handle
     }

@@ -308,21 +308,10 @@ cfg_rt! {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
 
-            let (task, handle) = task::joinable(future);
+            let (handle, notified) = cx.tasks.borrow_mut().owned.bind(future, cx.shared.clone());
 
-            // We first bind the new task to the runtime, then submit a
-            // notification for the new task so it is executed.
-            //
-            // If `bind` fails, then the LocalSet is currently shutting down and
-            // this was called from the destructor of a task on the LocalSet.
-            // We cancel the task immediately in this case.
-            //
-            // If `bind` succeeds, then the LocalSet is responsible for cleaning
-            // up the task.
-            let mut tasks = cx.tasks.borrow_mut();
-            match tasks.owned.bind(task, cx.shared.clone()) {
-                Ok(notified) => tasks.queue.push_back(notified),
-                Err(task) => drop(task),
+            if let Some(notified) = notified {
+                cx.shared.schedule(notified);
             }
 
             handle
@@ -401,26 +390,13 @@ impl LocalSet {
         F::Output: 'static,
     {
         let future = crate::util::trace::task(future, "local", None);
-        let (task, handle) = task::joinable(future);
-        {
-            let mut tasks = self.context.tasks.borrow_mut();
 
-            // We first bind the new task to the runtime, then submit a
-            // notification for the new task so it is executed.
-            //
-            // If `bind` fails, then the LocalSet is currently shutting down and
-            // this was called from the destructor of a task on the LocalSet.
-            // We cancel the task immediately in this case.
-            //
-            // If `bind` succeeds, then the LocalSet is responsible for cleaning
-            // up the task.
-            match tasks.owned.bind(task, self.context.shared.clone()) {
-                Ok(notified) => tasks.queue.push_back(notified),
-                Err(task) => drop(task),
-            }
+        let (handle, notified) = self.context.tasks.borrow_mut().owned.bind(future, self.context.shared.clone());
 
-            // Use a scope to release tasks borrow before waking.
+        if let Some(notified) = notified {
+            self.context.shared.schedule(notified);
         }
+
         self.context.shared.waker.wake();
         handle
     }

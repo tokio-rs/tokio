@@ -363,17 +363,10 @@ impl Spawner {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (task, handle) = task::joinable(future);
+        let (handle, notified) = self.shared.owned.bind(future, self.shared.clone());
 
-        // We first bind the new task to the runtime, then submit a notification
-        // for the new task so it is executed.
-        //
-        // If `bind` fails, then the runtime has shut down (or is currently
-        // shutting down), and we cancel the task immediately. If `bind` succeeds,
-        // then the runtime is responsible for cleaning up the task.
-        match self.shared.owned.bind(task, self.shared.clone()) {
-            Ok(notified) => self.shared.schedule(notified),
-            Err(task) => drop(task),
+        if let Some(notified) = notified {
+            self.shared.schedule(notified);
         }
 
         handle

@@ -50,10 +50,6 @@ where
     T: Future,
     S: Schedule,
 {
-    pub(super) fn bind_scheduler(&self, scheduler: S) {
-        self.core().scheduler.bind_scheduler(scheduler);
-    }
-
     /// Polls the inner future.
     ///
     /// All necessary state checks and transitions are performed.

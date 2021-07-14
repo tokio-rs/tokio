@@ -11,8 +11,9 @@ mod joinable_wrapper {
     {
         use tracing::Instrument;
         let span = tracing::trace_span!("test_span");
-        let (task, handle) = crate::runtime::task::joinable(task.instrument(span));
-        (task.into_notified(NoopSchedule), handle)
+        let task = task.instrument(span);
+        let (task, handle) = crate::runtime::task::joinable(task, NoopSchedule);
+        (task, handle)
     }
 
     #[cfg(not(all(tokio_unstable, feature = "tracing")))]
@@ -20,8 +21,8 @@ mod joinable_wrapper {
     where
         T: std::future::Future + Send + 'static,
     {
-        let (task, handle) = crate::runtime::task::joinable(task);
-        (task.into_notified(NoopSchedule), handle)
+        let (task, handle) = crate::runtime::task::joinable(task, NoopSchedule);
+        (task, handle)
     }
 }
 

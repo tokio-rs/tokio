@@ -12,7 +12,7 @@ pub(crate) use worker::Launch;
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
-use crate::runtime::task::{self, JoinHandle};
+use crate::runtime::task::JoinHandle;
 use crate::runtime::Parker;
 
 use std::fmt;
@@ -93,11 +93,7 @@ impl Spawner {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (task, handle) = task::joinable(future);
-
-        worker::Shared::bind_new_task(&self.shared, task);
-
-        handle
+        worker::Shared::bind_new_task(&self.shared, future)
     }
 
     pub(crate) fn shutdown(&mut self) {

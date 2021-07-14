@@ -93,7 +93,7 @@ pub(super) enum Stage<T: Future> {
 impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
-    pub(super) fn new(future: T, state: State) -> Box<Cell<T, S>> {
+    pub(super) fn new(future: T, scheduler: S, state: State) -> Box<Cell<T, S>> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let id = future.id();
         Box::new(Cell {
@@ -107,7 +107,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
             },
             core: Core {
                 scheduler: Scheduler {
-                    scheduler: UnsafeCell::new(None),
+                    scheduler: UnsafeCell::new(Some(scheduler)),
                 },
                 stage: CoreStage {
                     stage: UnsafeCell::new(Stage::Running(future)),
@@ -123,24 +123,6 @@ impl<T: Future, S: Schedule> Cell<T, S> {
 impl<S: Schedule> Scheduler<S> {
     pub(super) fn with_mut<R>(&self, f: impl FnOnce(*mut Option<S>) -> R) -> R {
         self.scheduler.with_mut(f)
-    }
-
-    /// Bind a scheduler to the task.
-    ///
-    /// This happens as part of the conversion from UnboundTask to other kinds
-    /// of task reference.
-    ///
-    /// # Safety
-    ///
-    /// Binding must not be done concurrently since it will mutate the task
-    /// core through a shared reference.
-    pub(super) fn bind_scheduler(&self, scheduler: S) {
-        debug_assert!(!self.is_bound());
-
-        // Safety: The caller guarantees exclusive access to this field.
-        self.scheduler.with_mut(|ptr| unsafe {
-            *ptr = Some(scheduler);
-        });
     }
 
     /// Returns true if the task is bound to a scheduler.

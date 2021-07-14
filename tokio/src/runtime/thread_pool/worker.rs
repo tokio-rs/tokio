@@ -12,7 +12,7 @@ use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
-use crate::runtime::task::{Inject, OwnedTasks, UnboundTask};
+use crate::runtime::task::{Inject, OwnedTasks, JoinHandle};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
 use crate::runtime::{queue, task};
 use crate::util::FastRand;
@@ -588,20 +588,21 @@ impl task::Schedule for Arc<Shared> {
 }
 
 impl Shared {
-    pub(super) fn bind_new_task<T>(me: &Arc<Self>, task: UnboundTask<T, Arc<Shared>>)
+    pub(super) fn bind_new_task<T>(
+        me: &Arc<Self>,
+        future: T,
+    ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
+        T::Output: Send + 'static,
     {
-        // We first bind the new task to the runtime, then submit a notification
-        // for the new task so it is executed.
-        //
-        // If `bind` fails, then the runtime has shut down (or is currently
-        // shutting down), and we cancel the task immediately. If `bind` succeeds,
-        // then the runtime is responsible for cleaning up the task.
-        match me.owned.bind(task, me.clone()) {
-            Ok(notified) => me.schedule(notified, false),
-            Err(task) => drop(task),
+        let (handle, notified) = me.owned.bind(future, me.clone());
+
+        if let Some(notified) = notified {
+            me.schedule(notified, false);
         }
+
+        handle
     }
 
     pub(super) fn schedule(&self, task: Notified, is_yield: bool) {

@@ -8,7 +8,7 @@
 
 use crate::future::Future;
 use crate::loom::sync::Mutex;
-use crate::runtime::task::{Notified, Schedule, Task, UnboundTask};
+use crate::runtime::task::{Notified, Schedule, Task, JoinHandle, RawTask};
 use crate::util::linked_list::{Link, LinkedList};
 
 use std::marker::PhantomData;
@@ -41,20 +41,28 @@ impl<S: 'static> OwnedTasks<S> {
     /// OwnedTasks has been closed.
     pub(crate) fn bind<T>(
         &self,
-        task: UnboundTask<T, S>,
+        task: T,
         scheduler: S,
-    ) -> Result<Notified<S>, UnboundTask<T, S>>
+    ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + Send + 'static,
+        T::Output: Send + 'static,
     {
+        let raw = RawTask::new::<T, S>(task, scheduler);
+        let task = Task { raw, _p: PhantomData };
+        let notified = Notified(Task { raw, _p: PhantomData });
+        let join = JoinHandle::new(raw);
+
         let mut lock = self.inner.lock();
         if lock.closed {
-            Err(task)
+            drop(lock);
+            drop(task);
+            notified.shutdown();
+            (join, None)
         } else {
-            let (notified, task) = task.bind_and_split(scheduler);
             lock.list.push_front(task);
-            Ok(notified)
+            (join, Some(notified))
         }
     }
 
@@ -89,19 +97,26 @@ impl<S: 'static> LocalOwnedTasks<S> {
 
     pub(crate) fn bind<T>(
         &mut self,
-        task: UnboundTask<T, S>,
+        task: T,
         scheduler: S,
-    ) -> Result<Notified<S>, UnboundTask<T, S>>
+    ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
+        T::Output: 'static,
     {
+        let raw = RawTask::new::<T, S>(task, scheduler);
+        let task = Task { raw, _p: PhantomData };
+        let notified = Notified(Task { raw, _p: PhantomData });
+        let join = JoinHandle::new(raw);
+
         if self.closed {
-            Err(task)
+            drop(task);
+            notified.shutdown();
+            (join, None)
         } else {
-            let (notified, task) = task.bind_and_split(scheduler);
             self.list.push_front(task);
-            Ok(notified)
+            (join, Some(notified))
         }
     }
 
