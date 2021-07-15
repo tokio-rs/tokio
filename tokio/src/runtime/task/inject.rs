@@ -75,15 +75,13 @@ impl<T: 'static> Inject<T> {
 
     /// Pushes a value into the queue.
     ///
-    /// Returns `Err(task)` if pushing fails due to the queue being shutdown.
-    /// The caller is expected to call `shutdown()` on the task **if and only
-    /// if** it is a newly spawned task.
-    pub(crate) fn push(&self, task: task::Notified<T>) -> Result<(), task::Notified<T>> {
+    /// This does nothing if the queue is closed.
+    pub(crate) fn push(&self, task: task::Notified<T>) {
         // Acquire queue lock
         let mut p = self.pointers.lock();
 
         if p.is_closed {
-            return Err(task);
+            return;
         }
 
         // safety: only mutated with the lock held
@@ -102,7 +100,6 @@ impl<T: 'static> Inject<T> {
         p.tail = Some(task);
 
         self.len.store(len + 1, Release);
-        Ok(())
     }
 
     /// Pushes several values into the queue.

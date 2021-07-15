@@ -19,7 +19,7 @@ mod join;
 pub use self::join::JoinHandle;
 
 mod list;
-pub(crate) use self::list::OwnedTasks;
+pub(crate) use self::list::{LocalOwnedTasks, OwnedTasks};
 
 mod raw;
 use self::raw::RawTask;
@@ -57,13 +57,6 @@ unsafe impl<S: Schedule> Sync for Notified<S> {}
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
 pub(crate) trait Schedule: Sync + Sized + 'static {
-    /// Bind a task to the executor.
-    ///
-    /// Guaranteed to be called from the thread that called `poll` on the task.
-    /// The returned `Schedule` instance is associated with the task and is used
-    /// as `&self` in the other methods on this trait.
-    fn bind(task: Task<Self>) -> Self;
-
     /// The task has completed work and is ready to be released. The scheduler
     /// should release it immediately and return it. The task module will batch
     /// the ref-dec with setting other options.
@@ -82,33 +75,16 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
 }
 
 cfg_rt! {
-    /// Create a new task with an associated join handle
-    pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
+    /// Create a new task with an associated join handle. This method is used
+    /// only for blocking tasks and tests. Other spawned tasks use the bind
+    /// method on OwnedTasks.
+    pub(crate) fn joinable<T, S>(task: T, scheduler: S) -> (Notified<S>, JoinHandle<T::Output>)
     where
-        T: Future + Send + 'static,
+        T: Send + Future + 'static,
         S: Schedule,
     {
-        let raw = RawTask::new::<_, S>(task);
-
-        let task = Task {
-            raw,
-            _p: PhantomData,
-        };
-
-        let join = JoinHandle::new(raw);
-
-        (Notified(task), join)
-    }
-}
-
-cfg_rt! {
-    /// Create a new `!Send` task with an associated join handle
-    pub(crate) unsafe fn joinable_local<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
-    where
-        T: Future + 'static,
-        S: Schedule,
-    {
-        let raw = RawTask::new::<_, S>(task);
+        let raw = RawTask::new::<_, S>(task, scheduler);
+        raw.header().state.ref_dec();
 
         let task = Task {
             raw,

@@ -93,7 +93,7 @@ pub(super) enum Stage<T: Future> {
 impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
-    pub(super) fn new(future: T, state: State) -> Box<Cell<T, S>> {
+    pub(super) fn new(future: T, scheduler: S, state: State) -> Box<Cell<T, S>> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let id = future.id();
         Box::new(Cell {
@@ -107,7 +107,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
             },
             core: Core {
                 scheduler: Scheduler {
-                    scheduler: UnsafeCell::new(None),
+                    scheduler: UnsafeCell::new(Some(scheduler)),
                 },
                 stage: CoreStage {
                     stage: UnsafeCell::new(Stage::Running(future)),
@@ -123,34 +123,6 @@ impl<T: Future, S: Schedule> Cell<T, S> {
 impl<S: Schedule> Scheduler<S> {
     pub(super) fn with_mut<R>(&self, f: impl FnOnce(*mut Option<S>) -> R) -> R {
         self.scheduler.with_mut(f)
-    }
-
-    /// Bind a scheduler to the task.
-    ///
-    /// This only happens on the first poll and must be preceded by a call to
-    /// `is_bound` to determine if binding is appropriate or not.
-    ///
-    /// # Safety
-    ///
-    /// Binding must not be done concurrently since it will mutate the task
-    /// core through a shared reference.
-    pub(super) fn bind_scheduler(&self, task: Task<S>) {
-        // This function may be called concurrently, but the __first__ time it
-        // is called, the caller has unique access to this field. All subsequent
-        // concurrent calls will be via the `Waker`, which will "happens after"
-        // the first poll.
-        //
-        // In other words, it is always safe to read the field and it is safe to
-        // write to the field when it is `None`.
-        debug_assert!(!self.is_bound());
-
-        // Bind the task to the scheduler
-        let scheduler = S::bind(task);
-
-        // Safety: As `scheduler` is not set, this is the first poll
-        self.scheduler.with_mut(|ptr| unsafe {
-            *ptr = Some(scheduler);
-        });
     }
 
     /// Returns true if the task is bound to a scheduler.

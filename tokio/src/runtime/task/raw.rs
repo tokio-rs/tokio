@@ -42,12 +42,12 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
 }
 
 impl RawTask {
-    pub(super) fn new<T, S>(task: T) -> RawTask
+    pub(super) fn new<T, S>(task: T, scheduler: S) -> RawTask
     where
         T: Future,
         S: Schedule,
     {
-        let ptr = Box::into_raw(Cell::<_, S>::new(task, State::new()));
+        let ptr = Box::into_raw(Cell::<_, S>::new(task, scheduler, State::new()));
         let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
 
         RawTask { ptr }

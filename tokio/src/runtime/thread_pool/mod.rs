@@ -12,7 +12,7 @@ pub(crate) use worker::Launch;
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
-use crate::runtime::task::{self, JoinHandle};
+use crate::runtime::task::JoinHandle;
 use crate::runtime::Parker;
 
 use std::fmt;
@@ -93,15 +93,7 @@ impl Spawner {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (task, handle) = task::joinable(future);
-
-        if let Err(task) = self.shared.schedule(task, false) {
-            // The newly spawned task could not be scheduled because the runtime
-            // is shutting down. The task must be explicitly shutdown at this point.
-            task.shutdown();
-        }
-
-        handle
+        worker::Shared::bind_new_task(&self.shared, future)
     }
 
     pub(crate) fn shutdown(&mut self) {

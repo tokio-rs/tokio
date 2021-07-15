@@ -5,13 +5,14 @@
 //! make progress while the originating thread blocks.
 
 use crate::coop;
+use crate::future::Future;
 use crate::loom::rand::seed;
 use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
-use crate::runtime::task::{Inject, OwnedTasks};
+use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
 use crate::runtime::{queue, task};
 use crate::util::FastRand;
@@ -44,7 +45,7 @@ struct Core {
     lifo_slot: Option<Notified>,
 
     /// The worker-local run queue.
-    run_queue: queue::Local<Arc<Worker>>,
+    run_queue: queue::Local<Arc<Shared>>,
 
     /// True if the worker is currently searching for more work. Searching
     /// involves attempting to steal from other workers.
@@ -70,13 +71,13 @@ pub(super) struct Shared {
     remotes: Box<[Remote]>,
 
     /// Submit work to the scheduler while **not** currently on a worker thread.
-    inject: Inject<Arc<Worker>>,
+    inject: Inject<Arc<Shared>>,
 
     /// Coordinates idle workers
     idle: Idle,
 
     /// Collection of all active tasks spawned onto this executor.
-    owned: OwnedTasks<Arc<Worker>>,
+    owned: OwnedTasks<Arc<Shared>>,
 
     /// Cores that have observed the shutdown signal
     ///
@@ -89,7 +90,7 @@ pub(super) struct Shared {
 /// Used to communicate with a worker from other threads.
 struct Remote {
     /// Steal tasks from this worker.
-    steal: queue::Steal<Arc<Worker>>,
+    steal: queue::Steal<Arc<Shared>>,
 
     /// Unparks the associated worker thread
     unpark: Unparker,
@@ -113,10 +114,10 @@ pub(crate) struct Launch(Vec<Arc<Worker>>);
 type RunResult = Result<Box<Core>, ()>;
 
 /// A task handle
-type Task = task::Task<Arc<Worker>>;
+type Task = task::Task<Arc<Shared>>;
 
 /// A notified task handle
-type Notified = task::Notified<Arc<Worker>>;
+type Notified = task::Notified<Arc<Shared>>;
 
 // Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
@@ -543,6 +544,9 @@ impl Core {
     /// Signals all tasks to shut down, and waits for them to complete. Must run
     /// before we enter the single-threaded phase of shutdown processing.
     fn pre_shutdown(&mut self, worker: &Worker) {
+        // Close the OwnedTasks to prevent spawning new tasks during shutdown.
+        worker.shared.owned.close();
+
         // Signal to all tasks to shut down.
         while let Some(header) = worker.shared.owned.pop_back() {
             header.shutdown();
@@ -563,46 +567,42 @@ impl Core {
 
 impl Worker {
     /// Returns a reference to the scheduler's injection queue
-    fn inject(&self) -> &Inject<Arc<Worker>> {
+    fn inject(&self) -> &Inject<Arc<Shared>> {
         &self.shared.inject
     }
 }
 
-impl task::Schedule for Arc<Worker> {
-    fn bind(task: Task) -> Arc<Worker> {
-        CURRENT.with(|maybe_cx| {
-            let cx = maybe_cx.expect("scheduler context missing");
-
-            // Track the task
-            cx.worker.shared.owned.push_front(task);
-
-            // Return a clone of the worker
-            cx.worker.clone()
-        })
-    }
-
+impl task::Schedule for Arc<Shared> {
     fn release(&self, task: &Task) -> Option<Task> {
         // SAFETY: Inserted into owned in bind.
-        unsafe { self.shared.owned.remove(task) }
+        unsafe { self.owned.remove(task) }
     }
 
     fn schedule(&self, task: Notified) {
-        // Because this is not a newly spawned task, if scheduling fails due to
-        // the runtime shutting down, there is no special work that must happen
-        // here.
-        let _ = self.shared.schedule(task, false);
+        (**self).schedule(task, false);
     }
 
     fn yield_now(&self, task: Notified) {
-        // Because this is not a newly spawned task, if scheduling fails due to
-        // the runtime shutting down, there is no special work that must happen
-        // here.
-        let _ = self.shared.schedule(task, true);
+        (**self).schedule(task, true);
     }
 }
 
 impl Shared {
-    pub(super) fn schedule(&self, task: Notified, is_yield: bool) -> Result<(), Notified> {
+    pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T) -> JoinHandle<T::Output>
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
+        let (handle, notified) = me.owned.bind(future, me.clone());
+
+        if let Some(notified) = notified {
+            me.schedule(notified, false);
+        }
+
+        handle
+    }
+
+    pub(super) fn schedule(&self, task: Notified, is_yield: bool) {
         CURRENT.with(|maybe_cx| {
             if let Some(cx) = maybe_cx {
                 // Make sure the task is part of the **current** scheduler.
@@ -610,15 +610,14 @@ impl Shared {
                     // And the current thread still holds a core
                     if let Some(core) = cx.core.borrow_mut().as_mut() {
                         self.schedule_local(core, task, is_yield);
-                        return Ok(());
+                        return;
                     }
                 }
             }
 
-            // Otherwise, use the inject queue
-            self.inject.push(task)?;
+            // Otherwise, use the inject queue.
+            self.inject.push(task);
             self.notify_parked();
-            Ok(())
         })
     }
 

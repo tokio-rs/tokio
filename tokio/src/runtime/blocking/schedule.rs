@@ -9,11 +9,6 @@ use crate::runtime::task::{self, Task};
 pub(crate) struct NoopSchedule;
 
 impl task::Schedule for NoopSchedule {
-    fn bind(_task: Task<Self>) -> NoopSchedule {
-        // Do nothing w/ the task
-        NoopSchedule
-    }
-
     fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
         None
     }

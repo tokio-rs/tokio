@@ -106,13 +106,8 @@ impl<T> Local<T> {
                 break tail;
             } else if steal != real {
                 // Concurrently stealing, this will free up capacity, so only
-                // push the new task onto the inject queue
-                //
-                // If the task fails to be pushed on the injection queue, there
-                // is nothing to be done at this point as the task cannot be a
-                // newly spawned task. Shutting down this task is handled by the
-                // worker shutdown process.
-                let _ = inject.push(task);
+                // push the task onto the inject queue
+                inject.push(task);
                 return;
             } else {
                 // Push the current task and half of the queue into the
