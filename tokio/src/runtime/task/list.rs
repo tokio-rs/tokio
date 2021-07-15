@@ -8,7 +8,7 @@
 
 use crate::future::Future;
 use crate::loom::sync::Mutex;
-use crate::runtime::task::{Notified, Schedule, Task, JoinHandle, RawTask};
+use crate::runtime::task::{JoinHandle, Notified, RawTask, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
 
 use std::marker::PhantomData;
@@ -50,8 +50,14 @@ impl<S: 'static> OwnedTasks<S> {
         T::Output: Send + 'static,
     {
         let raw = RawTask::new::<T, S>(task, scheduler);
-        let task = Task { raw, _p: PhantomData };
-        let notified = Notified(Task { raw, _p: PhantomData });
+        let task = Task {
+            raw,
+            _p: PhantomData,
+        };
+        let notified = Notified(Task {
+            raw,
+            _p: PhantomData,
+        });
         let join = JoinHandle::new(raw);
 
         let mut lock = self.inner.lock();
@@ -106,8 +112,14 @@ impl<S: 'static> LocalOwnedTasks<S> {
         T::Output: 'static,
     {
         let raw = RawTask::new::<T, S>(task, scheduler);
-        let task = Task { raw, _p: PhantomData };
-        let notified = Notified(Task { raw, _p: PhantomData });
+        let task = Task {
+            raw,
+            _p: PhantomData,
+        };
+        let notified = Notified(Task {
+            raw,
+            _p: PhantomData,
+        });
         let join = JoinHandle::new(raw);
 
         if self.closed {

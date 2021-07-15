@@ -12,7 +12,7 @@ use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
-use crate::runtime::task::{Inject, OwnedTasks, JoinHandle};
+use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
 use crate::runtime::{queue, task};
 use crate::util::FastRand;
@@ -588,10 +588,7 @@ impl task::Schedule for Arc<Shared> {
 }
 
 impl Shared {
-    pub(super) fn bind_new_task<T>(
-        me: &Arc<Self>,
-        future: T,
-    ) -> JoinHandle<T::Output>
+    pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,

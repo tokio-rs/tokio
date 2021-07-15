@@ -1,5 +1,5 @@
 use crate::runtime::blocking::NoopSchedule;
-use crate::runtime::task::{self, joinable, OwnedTasks, Schedule, Task, JoinHandle};
+use crate::runtime::task::{self, joinable, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::util::TryLock;
 
 use std::collections::VecDeque;
@@ -49,10 +49,13 @@ impl Drop for AssertDrop {
 #[test]
 fn create_drop1() {
     let (ad, handle) = AssertDrop::new();
-    let (notified, join) = joinable(async {
-        drop(ad);
-        unreachable!()
-    }, NoopSchedule);
+    let (notified, join) = joinable(
+        async {
+            drop(ad);
+            unreachable!()
+        },
+        NoopSchedule,
+    );
     drop(notified);
     handle.assert_not_dropped();
     drop(join);
@@ -62,10 +65,13 @@ fn create_drop1() {
 #[test]
 fn create_drop2() {
     let (ad, handle) = AssertDrop::new();
-    let (notified, join) = joinable(async {
-        drop(ad);
-        unreachable!()
-    }, NoopSchedule);
+    let (notified, join) = joinable(
+        async {
+            drop(ad);
+            unreachable!()
+        },
+        NoopSchedule,
+    );
     drop(join);
     handle.assert_not_dropped();
     drop(notified);
@@ -76,10 +82,13 @@ fn create_drop2() {
 #[test]
 fn create_shutdown1() {
     let (ad, handle) = AssertDrop::new();
-    let (notified, join) = joinable(async {
-        drop(ad);
-        unreachable!()
-    }, NoopSchedule);
+    let (notified, join) = joinable(
+        async {
+            drop(ad);
+            unreachable!()
+        },
+        NoopSchedule,
+    );
     drop(join);
     handle.assert_not_dropped();
     notified.shutdown();
@@ -89,10 +98,13 @@ fn create_shutdown1() {
 #[test]
 fn create_shutdown2() {
     let (ad, handle) = AssertDrop::new();
-    let (notified, join) = joinable(async {
-        drop(ad);
-        unreachable!()
-    }, NoopSchedule);
+    let (notified, join) = joinable(
+        async {
+            drop(ad);
+            unreachable!()
+        },
+        NoopSchedule,
+    );
     handle.assert_not_dropped();
     notified.shutdown();
     handle.assert_dropped();

@@ -391,7 +391,12 @@ impl LocalSet {
     {
         let future = crate::util::trace::task(future, "local", None);
 
-        let (handle, notified) = self.context.tasks.borrow_mut().owned.bind(future, self.context.shared.clone());
+        let (handle, notified) = self
+            .context
+            .tasks
+            .borrow_mut()
+            .owned
+            .bind(future, self.context.shared.clone());
 
         if let Some(notified) = notified {
             self.context.shared.schedule(notified);
