@@ -1,5 +1,5 @@
 use crate::runtime::blocking::NoopSchedule;
-use crate::runtime::task::{self, joinable, OwnedTasks, Schedule, Task, UnboundTask};
+use crate::runtime::task::{self, joinable, OwnedTasks, Schedule, Task, JoinHandle};
 use crate::util::TryLock;
 
 use std::collections::VecDeque;
@@ -44,43 +44,15 @@ impl Drop for AssertDrop {
     }
 }
 
-// An UnboundTask shuts down on drop.
-#[test]
-fn create_drop1() {
-    let (ad, handle) = AssertDrop::new();
-    let (task, join) = joinable::<_, Runtime>(async {
-        drop(ad);
-        unreachable!()
-    });
-    handle.assert_not_dropped();
-    drop(task);
-    handle.assert_dropped();
-    drop(join);
-}
-
-#[test]
-fn create_drop2() {
-    let (ad, handle) = AssertDrop::new();
-    let (task, join) = joinable::<_, Runtime>(async {
-        drop(ad);
-        unreachable!()
-    });
-    drop(join);
-    handle.assert_not_dropped();
-    drop(task);
-    handle.assert_dropped();
-}
-
 // A Notified does not shut down on drop, but it is dropped once the ref-count
 // hits zero.
 #[test]
-fn into_notified1() {
+fn create_drop1() {
     let (ad, handle) = AssertDrop::new();
-    let (task, join) = joinable(async {
+    let (notified, join) = joinable(async {
         drop(ad);
         unreachable!()
-    });
-    let notified = task.into_notified(NoopSchedule);
+    }, NoopSchedule);
     drop(notified);
     handle.assert_not_dropped();
     drop(join);
@@ -88,13 +60,12 @@ fn into_notified1() {
 }
 
 #[test]
-fn into_notified2() {
+fn create_drop2() {
     let (ad, handle) = AssertDrop::new();
-    let (task, join) = joinable(async {
+    let (notified, join) = joinable(async {
         drop(ad);
         unreachable!()
-    });
-    let notified = task.into_notified(NoopSchedule);
+    }, NoopSchedule);
     drop(join);
     handle.assert_not_dropped();
     drop(notified);
@@ -103,13 +74,12 @@ fn into_notified2() {
 
 // Shutting down through Notified works
 #[test]
-fn into_notified_shutdown1() {
+fn create_shutdown1() {
     let (ad, handle) = AssertDrop::new();
-    let (task, join) = joinable(async {
+    let (notified, join) = joinable(async {
         drop(ad);
         unreachable!()
-    });
-    let notified = task.into_notified(NoopSchedule);
+    }, NoopSchedule);
     drop(join);
     handle.assert_not_dropped();
     notified.shutdown();
@@ -117,13 +87,12 @@ fn into_notified_shutdown1() {
 }
 
 #[test]
-fn into_notified_shutdown2() {
+fn create_shutdown2() {
     let (ad, handle) = AssertDrop::new();
-    let (task, join) = joinable(async {
+    let (notified, join) = joinable(async {
         drop(ad);
         unreachable!()
-    });
-    let notified = task.into_notified(NoopSchedule);
+    }, NoopSchedule);
     handle.assert_not_dropped();
     notified.shutdown();
     handle.assert_dropped();
@@ -133,11 +102,9 @@ fn into_notified_shutdown2() {
 #[test]
 fn schedule() {
     with(|rt| {
-        let (task, _) = joinable(async {
+        rt.spawn(async {
             crate::task::yield_now().await;
         });
-
-        rt.spawn(task);
 
         assert_eq!(2, rt.tick());
         rt.shutdown();
@@ -147,13 +114,12 @@ fn schedule() {
 #[test]
 fn shutdown() {
     with(|rt| {
-        let (task, _) = joinable(async {
+        rt.spawn(async {
             loop {
                 crate::task::yield_now().await;
             }
         });
 
-        rt.spawn(task);
         rt.tick_max(1);
 
         rt.shutdown();
@@ -163,13 +129,12 @@ fn shutdown() {
 #[test]
 fn shutdown_immediately() {
     with(|rt| {
-        let (task, _) = joinable(async {
+        rt.spawn(async {
             loop {
                 crate::task::yield_now().await;
             }
         });
 
-        rt.spawn(task);
         rt.shutdown();
     })
 }
@@ -182,13 +147,13 @@ fn spawn_during_shutdown() {
     impl Drop for SpawnOnDrop {
         fn drop(&mut self) {
             DID_SPAWN.store(true, Ordering::SeqCst);
-            self.0.spawn(joinable(async {}).0);
+            self.0.spawn(async {});
         }
     }
 
     with(|rt| {
         let rt2 = rt.clone();
-        let (task, _) = joinable(async move {
+        rt.spawn(async move {
             let _spawn_on_drop = SpawnOnDrop(rt2);
 
             loop {
@@ -196,7 +161,6 @@ fn spawn_during_shutdown() {
             }
         });
 
-        rt.spawn(task);
         rt.tick_max(1);
         rt.shutdown();
     });
@@ -241,11 +205,18 @@ struct Core {
 static CURRENT: TryLock<Option<Runtime>> = TryLock::new(None);
 
 impl Runtime {
-    fn spawn<T: 'static + Send + Future>(&self, task: UnboundTask<T, Runtime>) {
-        match self.0.owned.bind(task, self.clone()) {
-            Ok(notified) => self.schedule(notified),
-            Err(task) => drop(task),
+    fn spawn<T>(&self, future: T) -> JoinHandle<T::Output>
+    where
+        T: 'static + Send + Future,
+        T::Output: 'static + Send,
+    {
+        let (handle, notified) = self.0.owned.bind(future, self.clone());
+
+        if let Some(notified) = notified {
+            self.schedule(notified);
         }
+
+        handle
     }
 
     fn tick(&self) -> usize {
