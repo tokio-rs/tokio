@@ -1,3 +1,25 @@
+# 1.9.0 (July 16, 2021)
+
+### Added
+
+ - net: allow customized I/O operations for `TcpStream` ([#3888])
+ - task: expose nameable future for `TaskLocal::scope` ([#3273])
+
+### Changes
+
+ - runtime: reorganize parts of the runtime ([#3909], [#3939], [#3950])
+ - sync: clean up `OnceCell` ([#3945])
+ - task: remove mutex in `JoinError` ([#3959])
+
+[#3273]: https://github.com/tokio-rs/tokio/pull/3273
+[#3888]: https://github.com/tokio-rs/tokio/pull/3888
+[#3909]: https://github.com/tokio-rs/tokio/pull/3909
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
+[#3939]: https://github.com/tokio-rs/tokio/pull/3939
+[#3945]: https://github.com/tokio-rs/tokio/pull/3945
+[#3950]: https://github.com/tokio-rs/tokio/pull/3950
+[#3959]: https://github.com/tokio-rs/tokio/pull/3959
+
 # 1.8.1 (July 6, 2021)
 
 Forward ports 1.5.1 fixes.
