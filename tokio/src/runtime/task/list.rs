@@ -77,6 +77,7 @@ impl<S: 'static> OwnedTasks<S> {
         self.inner.lock().list.is_empty()
     }
 
+    #[cfg(feature = "rt-multi-thread")]
     pub(crate) fn is_closed(&self) -> bool {
         self.inner.lock().closed
     }
