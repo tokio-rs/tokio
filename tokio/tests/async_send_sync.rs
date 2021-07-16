@@ -452,6 +452,7 @@ assert_value!(tokio::task::LocalSet: !Send & !Sync & Unpin);
 assert_value!(tokio::task::JoinHandle<YY>: Send & Sync & Unpin);
 assert_value!(tokio::task::JoinHandle<YN>: Send & Sync & Unpin);
 assert_value!(tokio::task::JoinHandle<NN>: !Send & !Sync & Unpin);
+assert_value!(tokio::task::JoinError: Send & Sync & Unpin);
 
 assert_value!(tokio::runtime::Builder: Send & Sync & Unpin);
 assert_value!(tokio::runtime::EnterGuard<'_>: Send & Sync & Unpin);
