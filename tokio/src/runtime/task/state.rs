@@ -54,10 +54,14 @@ const REF_ONE: usize = 1 << REF_COUNT_SHIFT;
 
 /// State a task is initialized with
 ///
-/// A task is initialized with three references: two for the scheduler and one for
-/// the `JoinHandle`. As the task starts with a `JoinHandle`, `JOIN_INTEREST` is
-/// set. A new task is immediately pushed into the run queue for execution and
-/// starts with the `NOTIFIED` flag set.
+/// A task is initialized with three references:
+///
+///  * A reference that will be stored in an OwnedTasks or LocalOwnedTasks.
+///  * A reference that will be sent to the scheduler as an ordinary notification.
+///  * A reference for the JoinHandle.
+///
+/// As the task starts with a `JoinHandle`, `JOIN_INTEREST` is set.
+/// As the task starts with a `Notified`, `NOTIFIED` is set.
 const INITIAL_STATE: usize = (REF_ONE * 3) | JOIN_INTEREST | NOTIFIED;
 
 /// All transitions are performed via RMW operations. This establishes an
@@ -65,11 +69,8 @@ const INITIAL_STATE: usize = (REF_ONE * 3) | JOIN_INTEREST | NOTIFIED;
 impl State {
     /// Return a task's initial state
     pub(super) fn new() -> State {
-        // A task is initialized with three references: one for the scheduler,
-        // one for the `JoinHandle`, one for the task handle made available in
-        // release. As the task starts with a `JoinHandle`, `JOIN_INTEREST` is
-        // set. A new task is immediately pushed into the run queue for
-        // execution and starts with the `NOTIFIED` flag set.
+        // The raw task returned by this method has a ref-count of three. See
+        // the comment on INITIAL_STATE for more.
         State {
             val: AtomicUsize::new(INITIAL_STATE),
         }

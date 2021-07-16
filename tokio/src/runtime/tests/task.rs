@@ -1,5 +1,5 @@
 use crate::runtime::blocking::NoopSchedule;
-use crate::runtime::task::{self, joinable, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::task::{self, unowned, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::util::TryLock;
 
 use std::collections::VecDeque;
@@ -49,7 +49,7 @@ impl Drop for AssertDrop {
 #[test]
 fn create_drop1() {
     let (ad, handle) = AssertDrop::new();
-    let (notified, join) = joinable(
+    let (notified, join) = unowned(
         async {
             drop(ad);
             unreachable!()
@@ -65,7 +65,7 @@ fn create_drop1() {
 #[test]
 fn create_drop2() {
     let (ad, handle) = AssertDrop::new();
-    let (notified, join) = joinable(
+    let (notified, join) = unowned(
         async {
             drop(ad);
             unreachable!()
@@ -82,7 +82,7 @@ fn create_drop2() {
 #[test]
 fn create_shutdown1() {
     let (ad, handle) = AssertDrop::new();
-    let (notified, join) = joinable(
+    let (notified, join) = unowned(
         async {
             drop(ad);
             unreachable!()
@@ -98,7 +98,7 @@ fn create_shutdown1() {
 #[test]
 fn create_shutdown2() {
     let (ad, handle) = AssertDrop::new();
-    let (notified, join) = joinable(
+    let (notified, join) = unowned(
         async {
             drop(ad);
             unreachable!()

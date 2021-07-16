@@ -10,7 +10,7 @@ fn fits_256() {
     let inject = Inject::new();
 
     for _ in 0..256 {
-        let (task, _) = super::joinable(async {});
+        let (task, _) = super::unowned(async {});
         local.push_back(task, &inject);
     }
 
@@ -25,7 +25,7 @@ fn overflow() {
     let inject = Inject::new();
 
     for _ in 0..257 {
-        let (task, _) = super::joinable(async {});
+        let (task, _) = super::unowned(async {});
         local.push_back(task, &inject);
     }
 
@@ -49,7 +49,7 @@ fn steal_batch() {
     let inject = Inject::new();
 
     for _ in 0..4 {
-        let (task, _) = super::joinable(async {});
+        let (task, _) = super::unowned(async {});
         local1.push_back(task, &inject);
     }
 
@@ -103,7 +103,7 @@ fn stress1() {
 
         for _ in 0..NUM_LOCAL {
             for _ in 0..NUM_PUSH {
-                let (task, _) = super::joinable(async {});
+                let (task, _) = super::unowned(async {});
                 local.push_back(task, &inject);
             }
 
@@ -158,7 +158,7 @@ fn stress2() {
         let mut num_pop = 0;
 
         for i in 0..NUM_TASKS {
-            let (task, _) = super::joinable(async {});
+            let (task, _) = super::unowned(async {});
             local.push_back(task, &inject);
 
             if i % 128 == 0 && local.pop().is_some() {

@@ -30,7 +30,7 @@ pub(crate) struct ThreadPool {
 ///
 /// The `Spawner` handle is *only* used for spawning new futures. It does not
 /// impact the lifecycle of the thread pool in any way. The thread pool may
-/// shutdown while there are outstanding `Spawner` instances.
+/// shut down while there are outstanding `Spawner` instances.
 ///
 /// `Spawner` instances are obtained by calling [`ThreadPool::spawner`].
 ///

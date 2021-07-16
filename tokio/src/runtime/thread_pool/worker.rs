@@ -3,6 +3,58 @@
 //! run queue and other state. When `block_in_place` is called, the worker's
 //! "core" is handed off to a new thread allowing the scheduler to continue to
 //! make progress while the originating thread blocks.
+//!
+//! # Shutdown
+//!
+//! Shutting down the runtime involves the following steps:
+//!
+//!  1. The Shared::close method is called. This closes the inject queue and
+//!     OwnedTasks instance and wakes up all worker threads.
+//!
+//!  2. Each worker thread observes the close signal next time it runs
+//!     Core::maintenance by checking whether the inject queue is closed.
+//!     The Core::is_shutdown flag is set to true.
+//!
+//!  3. The worker thread calls `pre_shutdown` in parallel. Here, the worker
+//!     will keep removing tasks from OwnedTasks until it is empty. No new
+//!     tasks can be pushed to the OwnedTasks during or after this step as it
+//!     was closed in step 1.
+//!
+//!  5. The workers call Shared::shutdown to enter the single-threaded phase of
+//!     shutdown. These calls will push their core to Shared::shutdown_cores,
+//!     and the last thread to push its core will finish the shutdown procedure.
+//!
+//!  6. The local run queue of each core is emptied, then the inject queue is
+//!     emptied.
+//!
+//! At this point, shutdown has completed. It is not possible for any of the
+//! collections to contain any tasks at this point, as each collection was
+//! closed first, then emptied afterwards.
+//!
+//! ## Spawns during shutdown
+//!
+//! When spawning tasks during shutdown, there are two cases:
+//!
+//!  * The spawner observes the OwnedTasks being open, and the inject queue is
+//!    closed.
+//!  * The spawner observes the OwnedTasks being closed and doesn't check the
+//!    inject queue.
+//!
+//! The first case can only happen if the OwnedTasks::bind call happens before
+//! or during step 1 of shutdown. In this case, the runtime will clean up the
+//! task in step 3 of shutdown.
+//!
+//! In the latter case, the task was not spawned and the task is immediately
+//! cancelled by the spawner.
+//!
+//! The correctness of shutdown requires both the inject queue and OwnedTasks
+//! collection to have a closed bit. With a close bit on only the inject queue,
+//! spawning could run in to a situation where a task is successfully bound long
+//! after the runtime has shut down. With a close bit on only the OwnedTasks,
+//! the first spawning situation could result in the notification being pushed
+//! to the inject queue after step 6 of shutdown, which would leave a task in
+//! the inject queue indefinitely. This would be a ref-count cycle and a memory
+//! leak.
 
 use crate::coop;
 use crate::future::Future;
@@ -544,8 +596,8 @@ impl Core {
     /// Signals all tasks to shut down, and waits for them to complete. Must run
     /// before we enter the single-threaded phase of shutdown processing.
     fn pre_shutdown(&mut self, worker: &Worker) {
-        // Close the OwnedTasks to prevent spawning new tasks during shutdown.
-        worker.shared.owned.close();
+        // The OwnedTasks was closed in Shared::close.
+        debug_assert!(worker.shared.owned.is_closed());
 
         // Signal to all tasks to shut down.
         while let Some(header) = worker.shared.owned.pop_back() {
@@ -553,7 +605,7 @@ impl Core {
         }
     }
 
-    // Shutdown the core
+    /// Shutdown the core
     fn shutdown(&mut self) {
         // Take the core
         let mut park = self.park.take().expect("park missing");
@@ -653,6 +705,7 @@ impl Shared {
 
     pub(super) fn close(&self) {
         if self.inject.close() {
+            self.owned.close();
             self.notify_all();
         }
     }

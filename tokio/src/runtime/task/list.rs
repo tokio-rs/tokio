@@ -8,7 +8,7 @@
 
 use crate::future::Future;
 use crate::loom::sync::Mutex;
-use crate::runtime::task::{JoinHandle, Notified, RawTask, Schedule, Task};
+use crate::runtime::task::{JoinHandle, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
 
 use std::marker::PhantomData;
@@ -49,16 +49,7 @@ impl<S: 'static> OwnedTasks<S> {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let raw = RawTask::new::<T, S>(task, scheduler);
-        let task = Task {
-            raw,
-            _p: PhantomData,
-        };
-        let notified = Notified(Task {
-            raw,
-            _p: PhantomData,
-        });
-        let join = JoinHandle::new(raw);
+        let (task, notified, join) = super::new_task(task, scheduler);
 
         let mut lock = self.inner.lock();
         if lock.closed {
@@ -86,6 +77,10 @@ impl<S: 'static> OwnedTasks<S> {
         self.inner.lock().list.is_empty()
     }
 
+    pub(crate) fn is_closed(&self) -> bool {
+        self.inner.lock().closed
+    }
+
     /// Close the OwnedTasks. This prevents adding new tasks to the collection.
     pub(crate) fn close(&self) {
         self.inner.lock().closed = true;
@@ -111,16 +106,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
         T: Future + 'static,
         T::Output: 'static,
     {
-        let raw = RawTask::new::<T, S>(task, scheduler);
-        let task = Task {
-            raw,
-            _p: PhantomData,
-        };
-        let notified = Notified(Task {
-            raw,
-            _p: PhantomData,
-        });
-        let join = JoinHandle::new(raw);
+        let (task, notified, join) = super::new_task(task, scheduler);
 
         if self.closed {
             drop(task);

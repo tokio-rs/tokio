@@ -75,25 +75,46 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
 }
 
 cfg_rt! {
-    /// Create a new task with an associated join handle. This method is used
-    /// only for blocking tasks and tests. Other spawned tasks use the bind
-    /// method on OwnedTasks.
-    pub(crate) fn joinable<T, S>(task: T, scheduler: S) -> (Notified<S>, JoinHandle<T::Output>)
+    /// This is the constructor for a new task. Three references to the task are
+    /// created. The first task reference is usually put into an OwnedTasks
+    /// immediately. The Notified is sent to the scheduler as an ordinary
+    /// notification.
+    fn new_task<T, S>(
+        task: T,
+        scheduler: S
+    ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
-        T: Send + Future + 'static,
         S: Schedule,
+        T: Future + 'static,
+        T::Output: 'static,
     {
-        let raw = RawTask::new::<_, S>(task, scheduler);
-        raw.header().state.ref_dec();
-
+        let raw = RawTask::new::<T, S>(task, scheduler);
         let task = Task {
             raw,
             _p: PhantomData,
         };
-
+        let notified = Notified(Task {
+            raw,
+            _p: PhantomData,
+        });
         let join = JoinHandle::new(raw);
 
-        (Notified(task), join)
+        (task, notified, join)
+    }
+
+    /// Create a new task with an associated join handle. This method is used
+    /// only when the task is not going to be stored in an `OwnedTasks` list.
+    ///
+    /// Currently only blocking tasks and tests use this method.
+    pub(crate) fn unowned<T, S>(task: T, scheduler: S) -> (Notified<S>, JoinHandle<T::Output>)
+    where
+        S: Schedule,
+        T: Send + Future + 'static,
+        T::Output: Send + 'static,
+    {
+        let (task, notified, join) = new_task(task, scheduler);
+        drop(task);
+        (notified, join)
     }
 }
 
