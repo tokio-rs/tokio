@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626421932428,
+  "lastUpdate": 1626641291383,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -38707,6 +38707,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20557050,
             "range": "± 2539879",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "diggsey@googlemail.com",
+            "name": "Diggory Blake",
+            "username": "Diggsey"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7c4183a45d3548840104df87d9c8b81c1b19c006",
+          "message": "runtime: drop future when polling cancelled future (#3965)",
+          "timestamp": "2021-07-18T22:46:35+02:00",
+          "tree_id": "147b4ab7f221812cf21bbc614e3ee4fe5a5e4932",
+          "url": "https://github.com/tokio-rs/tokio/commit/7c4183a45d3548840104df87d9c8b81c1b19c006"
+        },
+        "date": 1626641285700,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 186774,
+            "range": "± 16099",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 872918,
+            "range": "± 146012",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5082488,
+            "range": "± 2312457",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18851753,
+            "range": "± 2230806",
             "unit": "ns/iter"
           }
         ]
