@@ -275,6 +275,9 @@ cfg_rt! {
     /// The runtime executor is either a thread-pool or a current-thread executor.
     #[derive(Debug)]
     enum Kind {
+        /// Runtime is shutting down
+        Gone,
+
         /// Execute all tasks on the current-thread.
         CurrentThread(BasicScheduler<driver::Driver>),
 
@@ -447,6 +450,7 @@ cfg_rt! {
             let _enter = self.enter();
 
             match &self.kind {
+                Kind::Gone => panic!("Runtime is shutting down"),
                 Kind::CurrentThread(exec) => exec.block_on(future),
                 #[cfg(feature = "rt-multi-thread")]
                 Kind::ThreadPool(exec) => exec.block_on(future),
@@ -558,6 +562,14 @@ cfg_rt! {
         /// ```
         pub fn shutdown_background(self) {
             self.shutdown_timeout(Duration::from_nanos(0))
+        }
+    }
+
+    impl Drop for Runtime {
+        fn drop(&mut self) {
+            let _guard = self.enter();
+            // Shutdown the runtime whilst it is still active
+            self.kind = Kind::Gone;
         }
     }
 }

@@ -301,7 +301,7 @@ impl Handle {
             .expect("failed to park thread")
     }
 
-    pub(crate) fn shutdown(mut self) {
+    pub(crate) fn shutdown(&mut self) {
         self.spawner.shutdown();
     }
 }
