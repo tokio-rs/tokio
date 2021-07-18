@@ -420,7 +420,7 @@ fn poll_future<T: Future>(
     cx: Context<'_>,
 ) -> PollFuture<T::Output> {
     if snapshot.is_cancelled() {
-        PollFuture::Complete(Err(JoinError::cancelled()), snapshot.is_join_interested())
+        PollFuture::Complete(Err(cancel_task(core)), snapshot.is_join_interested())
     } else {
         let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             struct Guard<'a, T: Future> {
