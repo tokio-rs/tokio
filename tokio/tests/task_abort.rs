@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -232,4 +232,45 @@ fn test_abort_task_that_panics_on_drop_returned() {
         handle.abort();
         assert!(handle.await.unwrap_err().is_panic());
     });
+}
+
+struct SpawnOnDrop(mpsc::Sender<bool>);
+
+impl Drop for SpawnOnDrop {
+    fn drop(&mut self) {
+        let res = std::panic::catch_unwind(|| {
+            tokio::spawn(async move {
+                println!("did something");
+            });
+        });
+        self.0.send(res.is_ok()).unwrap();
+    }
+}
+
+/// Checks that aborting a task whose destructor panics has the expected result.
+#[test]
+fn test_task_that_spawns_task_on_drop() {
+    let (tx, rx) = mpsc::channel();
+
+    {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+
+        rt.block_on(async move {
+            let _handle = tokio::spawn(async move {
+                // Make sure the Arc is moved into the task
+                let _spawn_dropped = SpawnOnDrop(tx);
+                println!("task started");
+                tokio::time::sleep(std::time::Duration::new(1, 0)).await
+            });
+
+            // wait for task to sleep.
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        });
+    }
+
+    // Check that spawning the task did not panic
+    assert!(rx.recv().unwrap());
 }
