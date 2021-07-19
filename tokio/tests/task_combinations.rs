@@ -128,7 +128,7 @@ fn test_combination(
         return;
     }
 
-    println!("Runtime {:?}, LocalSet {:?}, Task {:?}, Output {:?}, JoinInterest {:?} JoinHandle {:?}, Abort {:?}", rt, ls, task, output, ji, jh, abort);
+    println!("Runtime {:?}, LocalSet {:?}, Task {:?}, Output {:?}, JoinInterest {:?}, JoinHandle {:?}, Abort {:?}", rt, ls, task, output, ji, jh, abort);
 
     // A runtime optionally with a LocalSet
     struct Rt {
@@ -236,6 +236,10 @@ fn test_combination(
         // Wait for a signal, then complete the future
         let _ = signal.wait_complete.take().unwrap().await;
 
+        // If the task gets past wait_complete without yielding, then aborts
+        // may not be caught without this yield_now.
+        tokio::task::yield_now().await;
+
         if task == CombiTask::PanicOnRun || task == CombiTask::PanicOnRunAndDrop {
             panic!("Panicking");
         }
@@ -270,7 +274,7 @@ fn test_combination(
 
     // If we want to poll the JoinHandle, do it now
     if ji == CombiJoinInterest::Polled {
-        assert!(handle.as_mut().unwrap().now_or_never().is_none());
+        assert!(handle.as_mut().unwrap().now_or_never().is_none(), "Polling handle succeeded");
     }
 
     if abort == CombiAbort::AbortedImmediately {
@@ -285,7 +289,7 @@ fn test_combination(
     let got_polled = rt.block_on(wait_first_poll).is_ok();
     if !got_polled {
         // it's possible that we are aborted but still got polled
-        assert!(aborted);
+        assert!(aborted, "Task completed without ever being polled but was not aborted.");
     }
 
     if abort == CombiAbort::AbortedFirstPoll {
@@ -299,23 +303,26 @@ fn test_combination(
     // Signal the future that it can return now
     let _ = on_complete.send(());
     // === Wait for future to be dropped ===
-    assert!(rt.block_on(wait_future_drop).is_ok());
+    assert!(rt.block_on(wait_future_drop).is_ok(), "The future should always be dropped.");
 
     if abort == CombiAbort::AbortedAfterFinish {
         // Don't set aborted to true here as the task already finished
         handle.as_mut().unwrap().abort();
     }
     if jh == CombiJoinHandle::DropAfterNoConsume {
-        // Dropping the JoinHandle drops the output
+        // The runtime will usually have dropped every ref-count at this point,
+        // in which case dropping the JoinHandle drops the output.
+        //
+        // (But it might race and still hold a ref-count)
         let panic = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             drop(handle.take().unwrap());
         }));
-        assert_eq!(
-            panic.is_err(),
+        if panic.is_err() {
+            assert!(
             (output == CombiOutput::PanicOnDrop)
                 && (!matches!(task, CombiTask::PanicOnRun | CombiTask::PanicOnRunAndDrop))
-                && !aborted
-        );
+                && !aborted, "Dropping JoinHandle shouldn't panic here");
+        }
     }
 
     // Check whether we drop after consuming the output
@@ -327,15 +334,16 @@ fn test_combination(
             Ok(mut output) => {
                 // Don't panic here.
                 output.disarm();
-                assert!(!aborted);
+                assert!(!aborted, "Task was aborted but returned output");
             }
-            Err(err) if err.is_cancelled() => assert!(aborted),
+            Err(err) if err.is_cancelled() => assert!(aborted, "Cancelled output but not aborted"),
             Err(err) if err.is_panic() => {
                 assert!(
                     (task == CombiTask::PanicOnRun)
                         || (task == CombiTask::PanicOnDrop)
                         || (task == CombiTask::PanicOnRunAndDrop)
-                        || (output == CombiOutput::PanicOnDrop)
+                        || (output == CombiOutput::PanicOnDrop),
+                    "Panic but nothing should panic"
                 );
             }
             _ => unreachable!(),
@@ -353,6 +361,7 @@ fn test_combination(
     let output_created = rt.block_on(wait_output_drop).is_ok();
     assert_eq!(
         output_created,
-        (!matches!(task, CombiTask::PanicOnRun | CombiTask::PanicOnRunAndDrop)) && !aborted
+        (!matches!(task, CombiTask::PanicOnRun | CombiTask::PanicOnRunAndDrop)) && !aborted,
+        "Creation of output object"
     );
 }
