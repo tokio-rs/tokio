@@ -26,6 +26,7 @@ cfg_loom! {
     mod loom_pool;
     mod loom_queue;
     mod loom_shutdown_join;
+    mod loom_task;
 }
 
 cfg_not_loom! {
