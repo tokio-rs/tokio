@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626641310267,
+  "lastUpdate": 1626725339952,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -59385,6 +59385,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 824,
             "range": "± 118",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "distinct": false,
+          "id": "c8fc4927482a702c3a89bb8a2f158c430b402e78",
+          "message": "Merge remote-tracking branch 'origin/tokio-1.8.x' into merge-1.8",
+          "timestamp": "2021-07-19T12:13:21-07:00",
+          "tree_id": "a7378bca1e02617fb17efc54d41c99ff10a5c9eb",
+          "url": "https://github.com/tokio-rs/tokio/commit/c8fc4927482a702c3a89bb8a2f158c430b402e78"
+        },
+        "date": 1626725335057,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13634,
+            "range": "± 2469",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 859,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 540,
+            "range": "± 8",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13616,
+            "range": "± 9979",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 848,
+            "range": "± 3",
             "unit": "ns/iter"
           }
         ]
