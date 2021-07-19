@@ -193,6 +193,10 @@ where
 
             // Transition to `Complete`, notifying the `JoinHandle` if necessary.
             transition_to_complete(self.header(), stage, &self.trailer());
+        } else {
+            let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                drop(output);
+            }));
         }
 
         // The task has completed execution and will no longer be scheduled.
