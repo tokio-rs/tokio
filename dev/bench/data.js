@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626725352105,
+  "lastUpdate": 1626725362050,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -38863,6 +38863,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18851753,
             "range": "± 2230806",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "distinct": false,
+          "id": "c8fc4927482a702c3a89bb8a2f158c430b402e78",
+          "message": "Merge remote-tracking branch 'origin/tokio-1.8.x' into merge-1.8",
+          "timestamp": "2021-07-19T12:13:21-07:00",
+          "tree_id": "a7378bca1e02617fb17efc54d41c99ff10a5c9eb",
+          "url": "https://github.com/tokio-rs/tokio/commit/c8fc4927482a702c3a89bb8a2f158c430b402e78"
+        },
+        "date": 1626725356264,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 239157,
+            "range": "± 57353",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1059223,
+            "range": "± 366609",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6101388,
+            "range": "± 1922824",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21825442,
+            "range": "± 3886034",
             "unit": "ns/iter"
           }
         ]
