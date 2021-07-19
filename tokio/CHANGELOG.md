@@ -1,3 +1,11 @@
+# 1.7.3 (July 19, 2021)
+
+Fixes a missed edge case from 1.7.2.
+
+### Fixed
+
+- runtime: drop canceled future on next poll (#3965)
+
 # 1.7.2 (July 6, 2021)
 
 Forward ports 1.5.1 fixes.
