@@ -42,6 +42,7 @@ enum CombiJoinInterest {
     Polled,
     NotPolled,
 }
+#[allow(clippy::enum_variant_names)] // we aren't using glob imports
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum CombiJoinHandle {
     DropImmediately = 1,
