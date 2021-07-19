@@ -194,21 +194,25 @@ where
     // ====== internal ======
 
     fn complete(self, output: super::Result<T::Output>, is_join_interested: bool) {
-        if is_join_interested {
-            // Store the output. The future has already been dropped
-            //
-            // Safety: Mutual exclusion is obtained by having transitioned the task
-            // state -> Running
-            let stage = &self.core().stage;
-            stage.store_output(output);
+        // We catch panics here because dropping the output may panic.
+        //
+        // Dropping the output can also happen in the first branch inside
+        // transition_to_complete.
+        let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            if is_join_interested {
+                // Store the output. The future has already been dropped
+                //
+                // Safety: Mutual exclusion is obtained by having transitioned the task
+                // state -> Running
+                let stage = &self.core().stage;
+                stage.store_output(output);
 
-            // Transition to `Complete`, notifying the `JoinHandle` if necessary.
-            transition_to_complete(self.header(), stage, &self.trailer());
-        } else {
-            let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                // Transition to `Complete`, notifying the `JoinHandle` if necessary.
+                transition_to_complete(self.header(), stage, &self.trailer());
+            } else {
                 drop(output);
-            }));
-        }
+            }
+        }));
 
         // The task has completed execution and will no longer be scheduled.
         //
