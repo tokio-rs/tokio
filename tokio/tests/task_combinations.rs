@@ -274,7 +274,10 @@ fn test_combination(
 
     // If we want to poll the JoinHandle, do it now
     if ji == CombiJoinInterest::Polled {
-        assert!(handle.as_mut().unwrap().now_or_never().is_none(), "Polling handle succeeded");
+        assert!(
+            handle.as_mut().unwrap().now_or_never().is_none(),
+            "Polling handle succeeded"
+        );
     }
 
     if abort == CombiAbort::AbortedImmediately {
@@ -289,7 +292,10 @@ fn test_combination(
     let got_polled = rt.block_on(wait_first_poll).is_ok();
     if !got_polled {
         // it's possible that we are aborted but still got polled
-        assert!(aborted, "Task completed without ever being polled but was not aborted.");
+        assert!(
+            aborted,
+            "Task completed without ever being polled but was not aborted."
+        );
     }
 
     if abort == CombiAbort::AbortedFirstPoll {
@@ -303,7 +309,10 @@ fn test_combination(
     // Signal the future that it can return now
     let _ = on_complete.send(());
     // === Wait for future to be dropped ===
-    assert!(rt.block_on(wait_future_drop).is_ok(), "The future should always be dropped.");
+    assert!(
+        rt.block_on(wait_future_drop).is_ok(),
+        "The future should always be dropped."
+    );
 
     if abort == CombiAbort::AbortedAfterFinish {
         // Don't set aborted to true here as the task already finished
@@ -319,9 +328,11 @@ fn test_combination(
         }));
         if panic.is_err() {
             assert!(
-            (output == CombiOutput::PanicOnDrop)
-                && (!matches!(task, CombiTask::PanicOnRun | CombiTask::PanicOnRunAndDrop))
-                && !aborted, "Dropping JoinHandle shouldn't panic here");
+                (output == CombiOutput::PanicOnDrop)
+                    && (!matches!(task, CombiTask::PanicOnRun | CombiTask::PanicOnRunAndDrop))
+                    && !aborted,
+                "Dropping JoinHandle shouldn't panic here"
+            );
         }
     }
 
