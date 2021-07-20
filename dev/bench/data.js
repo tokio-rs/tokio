@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626776062407,
+  "lastUpdate": 1626776079757,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -38965,6 +38965,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21825442,
             "range": "± 3886034",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "549e89e9cd2073ffa70f1bd12022c5543343be78",
+          "message": "chore: use the loom mutex wrapper everywhere (#3958)",
+          "timestamp": "2021-07-20T12:12:30+02:00",
+          "tree_id": "fa41e7195a04f13f3a11c2068023a374a24c6c63",
+          "url": "https://github.com/tokio-rs/tokio/commit/549e89e9cd2073ffa70f1bd12022c5543343be78"
+        },
+        "date": 1626776072866,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 248007,
+            "range": "± 80237",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1017774,
+            "range": "± 230368",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5874224,
+            "range": "± 1757052",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21638165,
+            "range": "± 3853358",
             "unit": "ns/iter"
           }
         ]
