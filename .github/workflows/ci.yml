@@ -146,6 +146,9 @@ jobs:
       - name: miri
         run: cargo miri test --features rt,rt-multi-thread,sync task
         working-directory: tokio
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation
+
   san:
     name: san
     runs-on: ubuntu-latest

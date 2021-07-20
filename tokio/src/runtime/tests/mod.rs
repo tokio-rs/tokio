@@ -26,11 +26,13 @@ cfg_loom! {
     mod loom_pool;
     mod loom_queue;
     mod loom_shutdown_join;
-    mod loom_task;
 }
 
 cfg_not_loom! {
     mod queue;
+
+    // Runs both with and without miri
+    mod task_combinations;
 
     #[cfg(miri)]
     mod task;

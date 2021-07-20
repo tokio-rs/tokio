@@ -11,13 +11,13 @@ use futures::future::FutureExt;
 
 // Enums for each option in the combinations being tested
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum CombiRuntime {
     CurrentThread,
     Multi1,
     Multi2,
 }
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum CombiLocalSet {
     Yes,
     No,
@@ -58,11 +58,16 @@ enum CombiAbort {
 
 #[test]
 fn test_combinations() {
-    let rt = [
+    let mut rt = &[
         CombiRuntime::CurrentThread,
         CombiRuntime::Multi1,
         CombiRuntime::Multi2,
-    ];
+    ][..];
+
+    if cfg!(miri) {
+        rt = &[CombiRuntime::CurrentThread];
+    }
+
     let ls = [CombiLocalSet::Yes, CombiLocalSet::No];
     let task = [
         CombiTask::NoPanic,
@@ -94,9 +99,7 @@ fn test_combinations() {
                         for jh in jh.iter().copied() {
                             for abort in abort.iter().copied() {
                                 println!("Runtime {:?}, LocalSet {:?}, Task {:?}, Output {:?}, JoinInterest {:?}, JoinHandle {:?}, Abort {:?}", rt, ls, task, output, ji, jh, abort);
-                                loom::model(move || {
-                                    test_combination(rt, ls, task, output, ji, jh, abort);
-                                });
+                                test_combination(rt, ls, task, output, ji, jh, abort);
                             }
                         }
                     }
@@ -189,7 +192,7 @@ fn test_combination(
         fn drop(&mut self) {
             let _ = self.on_drop.take().unwrap().send(());
             if self.panic_on_drop {
-                panic!("Panicking");
+                panic!("Panicking in Output");
             }
         }
     }
@@ -212,9 +215,9 @@ fn test_combination(
     }
     impl<F> Drop for FutWrapper<F> {
         fn drop(&mut self) {
-            let _ = self.on_drop.take().unwrap().send(());
+            let _: Result<(), ()> = self.on_drop.take().unwrap().send(());
             if self.panic_on_drop {
-                panic!("Panicking");
+                panic!("Panicking in FutWrapper");
             }
         }
     }
@@ -239,7 +242,7 @@ fn test_combination(
         crate::task::yield_now().await;
 
         if task == CombiTask::PanicOnRun || task == CombiTask::PanicOnRunAndDrop {
-            panic!("Panicking");
+            panic!("Panicking in my_task on {:?}", std::thread::current().id());
         }
 
         Output {
@@ -373,4 +376,5 @@ fn test_combination(
         (!matches!(task, CombiTask::PanicOnRun | CombiTask::PanicOnRunAndDrop)) && !aborted,
         "Creation of output object"
     );
+
 }
