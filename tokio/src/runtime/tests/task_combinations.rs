@@ -376,5 +376,4 @@ fn test_combination(
         (!matches!(task, CombiTask::PanicOnRun | CombiTask::PanicOnRunAndDrop)) && !aborted,
         "Creation of output object"
     );
-
 }
