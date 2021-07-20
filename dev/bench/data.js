@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626788274634,
+  "lastUpdate": 1626791716221,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -39217,6 +39217,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18841411,
             "range": "± 2829169",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ijackson+github@slimy.greenend.org.uk",
+            "name": "Ian Jackson",
+            "username": "ijackson"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "252004811f39c092adb04fdb177738b57c46cbe4",
+          "message": "sync: add getter for the mutex from a guard (#3928)",
+          "timestamp": "2021-07-20T15:28:31+02:00",
+          "tree_id": "d63ca7cddc2da46b45cc8f2751905d651ed99a52",
+          "url": "https://github.com/tokio-rs/tokio/commit/252004811f39c092adb04fdb177738b57c46cbe4"
+        },
+        "date": 1626791711246,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 189805,
+            "range": "± 5156",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 922006,
+            "range": "± 261674",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5871893,
+            "range": "± 1940254",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18915123,
+            "range": "± 3410323",
             "unit": "ns/iter"
           }
         ]
