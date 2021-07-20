@@ -29,7 +29,7 @@ cfg_not_test_util! {
 
 cfg_test_util! {
     use crate::time::{Duration, Instant};
-    use std::sync::{Arc, Mutex};
+    use crate::loom::sync::{Arc, Mutex};
 
     cfg_rt! {
         fn clock() -> Option<Clock> {
@@ -102,7 +102,7 @@ cfg_test_util! {
     /// runtime.
     pub fn resume() {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
-        let mut inner = clock.inner.lock().unwrap();
+        let mut inner = clock.inner.lock();
 
         if inner.unfrozen.is_some() {
             panic!("time is not frozen");
@@ -164,7 +164,7 @@ cfg_test_util! {
         }
 
         pub(crate) fn pause(&self) {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
 
             if !inner.enable_pausing {
                 drop(inner); // avoid poisoning the lock
@@ -178,12 +178,12 @@ cfg_test_util! {
         }
 
         pub(crate) fn is_paused(&self) -> bool {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
             inner.unfrozen.is_none()
         }
 
         pub(crate) fn advance(&self, duration: Duration) {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
 
             if inner.unfrozen.is_some() {
                 panic!("time is not frozen");
@@ -193,7 +193,7 @@ cfg_test_util! {
         }
 
         pub(crate) fn now(&self) -> Instant {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
 
             let mut ret = inner.base;
 
