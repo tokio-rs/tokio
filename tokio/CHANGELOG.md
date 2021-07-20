@@ -1,3 +1,11 @@
+# 1.8.2 (July 19, 2021)
+
+Fixes a missed edge case from 1.8.1.
+
+### Fixed
+
+- runtime: drop canceled future on next poll (#3965)
+
 # 1.8.1 (July 6, 2021)
 
 Forward ports 1.5.1 fixes.

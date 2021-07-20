@@ -1,4 +1,5 @@
 //! Runs `!Send` futures on the current thread.
+use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
 use crate::sync::AtomicWaker;
 
@@ -8,7 +9,6 @@ use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
 use pin_project_lite::pin_project;
@@ -549,7 +549,6 @@ impl LocalSet {
                 .shared
                 .queue
                 .lock()
-                .unwrap()
                 .pop_front()
                 .or_else(|| self.context.tasks.borrow_mut().queue.pop_front())
         } else {
@@ -558,7 +557,7 @@ impl LocalSet {
                 .borrow_mut()
                 .queue
                 .pop_front()
-                .or_else(|| self.context.shared.queue.lock().unwrap().pop_front())
+                .or_else(|| self.context.shared.queue.lock().pop_front())
         }
     }
 
@@ -628,7 +627,7 @@ impl Drop for LocalSet {
                 task.shutdown();
             }
 
-            for task in self.context.shared.queue.lock().unwrap().drain(..) {
+            for task in self.context.shared.queue.lock().drain(..) {
                 task.shutdown();
             }
 
@@ -678,7 +677,7 @@ impl Shared {
                 cx.tasks.borrow_mut().queue.push_back(task);
             }
             _ => {
-                self.queue.lock().unwrap().push_back(task);
+                self.queue.lock().push_back(task);
                 self.waker.wake();
             }
         });
