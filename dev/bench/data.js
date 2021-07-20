@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626792302843,
+  "lastUpdate": 1626792318230,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -39373,6 +39373,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18915123,
             "range": "± 3410323",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2087f3e0ebb08d633d59c5f964b3901e68b3c038",
+          "message": "runtime: rework binding of new tasks (#3955)",
+          "timestamp": "2021-07-20T16:43:34+02:00",
+          "tree_id": "4473c6350bb3d41b55db56052bdc86428303bf2a",
+          "url": "https://github.com/tokio-rs/tokio/commit/2087f3e0ebb08d633d59c5f964b3901e68b3c038"
+        },
+        "date": 1626792313143,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 180404,
+            "range": "± 21209",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 962293,
+            "range": "± 99021",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5327668,
+            "range": "± 1240527",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18434052,
+            "range": "± 3367745",
             "unit": "ns/iter"
           }
         ]
