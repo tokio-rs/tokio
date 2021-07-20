@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626788204719,
+  "lastUpdate": 1626788224148,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -39169,6 +39169,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21269360,
             "range": "± 3381894",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5ae2855eaf29fc78687c6d17b0be35f8b4934788",
+          "message": "io: fix docs referring to clear_{read,write}_ready (#3957)",
+          "timestamp": "2021-07-20T15:35:18+02:00",
+          "tree_id": "a2b31d4fb2ae903d689637dd3ae8c99697b4dd3c",
+          "url": "https://github.com/tokio-rs/tokio/commit/5ae2855eaf29fc78687c6d17b0be35f8b4934788"
+        },
+        "date": 1626788218459,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 188255,
+            "range": "± 3959",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 898510,
+            "range": "± 219382",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5137527,
+            "range": "± 627372",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18841411,
+            "range": "± 2829169",
             "unit": "ns/iter"
           }
         ]
