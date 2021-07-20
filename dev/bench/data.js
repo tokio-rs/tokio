@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626791734836,
+  "lastUpdate": 1626791748059,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -92339,6 +92339,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 674202,
             "range": "± 1888",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ijackson+github@slimy.greenend.org.uk",
+            "name": "Ian Jackson",
+            "username": "ijackson"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "252004811f39c092adb04fdb177738b57c46cbe4",
+          "message": "sync: add getter for the mutex from a guard (#3928)",
+          "timestamp": "2021-07-20T15:28:31+02:00",
+          "tree_id": "d63ca7cddc2da46b45cc8f2751905d651ed99a52",
+          "url": "https://github.com/tokio-rs/tokio/commit/252004811f39c092adb04fdb177738b57c46cbe4"
+        },
+        "date": 1626791741795,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7225111,
+            "range": "± 4220319",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6616355,
+            "range": "± 1977307",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 7221473,
+            "range": "± 2347118",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 306,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 306,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 306,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 29702,
+            "range": "± 338",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1001,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1098047,
+            "range": "± 35794",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 786584,
+            "range": "± 32359",
             "unit": "ns/iter"
           }
         ]
