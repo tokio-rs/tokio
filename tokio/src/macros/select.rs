@@ -388,6 +388,25 @@
 ///     }
 /// }
 /// ```
+///
+/// # Conditional compilation
+///
+/// A single `#[cfg(...)]` attribute can be specified for each branch for
+/// conditional compilation (except else). The branch will be replaced by a
+/// dummy future (rather than being removed) that never gets polled.
+///
+/// ```
+/// #[tokio::main]
+/// async fn main() {
+///     let foo = tokio::select! {
+///         #[cfg(any())]
+///         _ = nani() => nani(),
+///         _ = async { 1 } => true,
+///     };
+///
+///     assert!(foo);
+/// }
+/// ```
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 macro_rules! select {
@@ -419,7 +438,7 @@ macro_rules! select {
         // generating a pattern to reference the future for the current branch.
         // $skip is also used as an argument to `count!`, returning the index of
         // the current select branch.
-        $( ( $($skip:tt)* ) $bind:pat = $fut:expr, if $c:expr => $handle:expr, )+
+        $( ( $($skip:tt)* ) #[cfg($meta:meta)] $bind:pat = $fut:expr, if $c:expr => $handle:expr, )+
 
         // Fallback expression used when all select branches have been disabled.
         ; $else:expr
@@ -430,7 +449,8 @@ macro_rules! select {
         // This module is defined within a scope and should not leak out of this
         // macro.
         mod util {
-            // Generate an enum with one variant per select branch
+            // Generate an enum with one variant per select branch, including
+            // the branches which cfg is false.
             $crate::select_priv_declare_output_enum!( ( $($count)* ) );
         }
 
@@ -458,7 +478,12 @@ macro_rules! select {
         let mut output = {
             // Safety: Nothing must be moved out of `futures`. This is to
             // satisfy the requirement of `Pin::new_unchecked` called below.
-            let mut futures = ( $( $fut , )+ );
+            let mut futures = ( $(
+                #[cfg($meta)] $fut ,
+                // Current integration cfg attribute is not zero-cost and will
+                // take up some space but at least it will not get polled.
+                #[cfg(not($meta))] $crate::macros::support::poll_fn(|_| unreachable!()) ,
+            )+ );
 
             $crate::macros::support::poll_fn(|cx| {
                 // Track if any branch returns pending. If no branch completes
@@ -482,6 +507,13 @@ macro_rules! select {
                         $(
                             #[allow(unreachable_code)]
                             $crate::count!( $($skip)* ) => {
+                                // Skip polling if cfg attribute is false but
+                                // keep the rest of the code for type elision.
+                                // Ideally this branch should not even be here
+                                // but Out requires type elided by this branch.
+                                #[cfg(not($meta))]
+                                continue;
+
                                 // First, if the future has previously been
                                 // disabled, do not poll it again. This is done
                                 // by checking the associated bit in the
@@ -543,6 +575,7 @@ macro_rules! select {
 
         match output {
             $(
+                #[cfg($meta)]
                 $crate::select_variant!(util::Out, ($($skip)*) ($bind)) => $handle,
             )*
             util::Out::Disabled => $else,
@@ -562,41 +595,65 @@ macro_rules! select {
     (@ { start=$start:expr; $($t:tt)* } else => $else:expr $(,)?) => {
         $crate::select!(@{ start=$start; $($t)*; $else })
     };
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($meta:meta)] $p:pat = $f:expr, if $c:expr => $h:block, $($r:tt)* ) => {
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg($meta)] $p = $f, if $c => $h, } $($r)*)
+    };
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($meta:meta)] $p:pat = $f:expr => $h:block, $($r:tt)* ) => {
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg($meta)] $p = $f, if true => $h, } $($r)*)
+    };
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($meta:meta)] $p:pat = $f:expr, if $c:expr => $h:block $($r:tt)* ) => {
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg($meta)] $p = $f, if $c => $h, } $($r)*)
+    };
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($meta:meta)] $p:pat = $f:expr => $h:block $($r:tt)* ) => {
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg($meta)] $p = $f, if true => $h, } $($r)*)
+    };
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($meta:meta)] $p:pat = $f:expr, if $c:expr => $h:expr ) => {
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg($meta)] $p = $f, if $c => $h, })
+    };
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($meta:meta)] $p:pat = $f:expr => $h:expr ) => {
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg($meta)] $p = $f, if true => $h, })
+    };
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($meta:meta)] $p:pat = $f:expr, if $c:expr => $h:expr, $($r:tt)* ) => {
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg($meta)] $p = $f, if $c => $h, } $($r)*)
+    };
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($meta:meta)] $p:pat = $f:expr => $h:expr, $($r:tt)* ) => {
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg($meta)] $p = $f, if true => $h, } $($r)*)
+    };
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr, if $c:expr => $h:block, $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, } $($r)*)
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg(all())] $p = $f, if $c => $h, } $($r)*)
     };
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr => $h:block, $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg(all())] $p = $f, if true => $h, } $($r)*)
     };
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr, if $c:expr => $h:block $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, } $($r)*)
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg(all())] $p = $f, if $c => $h, } $($r)*)
     };
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr => $h:block $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg(all())] $p = $f, if true => $h, } $($r)*)
     };
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr, if $c:expr => $h:expr ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, })
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg(all())] $p = $f, if $c => $h, })
     };
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr => $h:expr ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, })
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg(all())] $p = $f, if true => $h, })
     };
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr, if $c:expr => $h:expr, $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, } $($r)*)
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg(all())] $p = $f, if $c => $h, } $($r)*)
     };
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr => $h:expr, $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
+        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) #[cfg(all())] $p = $f, if true => $h, } $($r)*)
     };
 
     // ===== Entry point =====
 
-    (biased; $p:pat = $($t:tt)* ) => {
-        $crate::select!(@{ start=0; () } $p = $($t)*)
+    (biased; $( #[cfg($meta:meta)] )? $p:pat = $($t:tt)* ) => {
+        $crate::select!(@{ start=0; () } $( #[cfg($meta)] )? $p = $($t)*)
     };
 
-    ( $p:pat = $($t:tt)* ) => {
+    ( $( #[cfg($meta:meta)] )? $p:pat = $($t:tt)* ) => {
         // Randomly generate a starting point. This makes `select!` a bit more
         // fair and avoids always polling the first future.
-        $crate::select!(@{ start={ $crate::macros::support::thread_rng_n(BRANCHES) }; () } $p = $($t)*)
+        $crate::select!(@{ start={ $crate::macros::support::thread_rng_n(BRANCHES) }; () } $( #[cfg($meta)] )? $p = $($t)*)
     };
     () => {
         compile_error!("select! requires at least one branch.")
