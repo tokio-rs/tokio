@@ -189,7 +189,7 @@ that you use an LTS release.
 To use a fixed minor version, you can specify the version with a tilde. For
 example, to specify that you wish to use the newest `1.8.x` patch release, you
 can use the following dependency specification:
-```
+```text
 tokio = { version = "~1.8", features = [...] }
 ```
 
