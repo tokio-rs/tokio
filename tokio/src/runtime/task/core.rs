@@ -13,7 +13,7 @@ use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
-use crate::runtime::task::{Notified, Schedule, Task};
+use crate::runtime::task::Schedule;
 use crate::util::linked_list;
 
 use std::pin::Pin;
@@ -36,10 +36,6 @@ pub(super) struct Cell<T: Future, S> {
     pub(super) trailer: Trailer,
 }
 
-pub(super) struct Scheduler<S> {
-    scheduler: UnsafeCell<Option<S>>,
-}
-
 pub(super) struct CoreStage<T: Future> {
     stage: UnsafeCell<Stage<T>>,
 }
@@ -49,7 +45,7 @@ pub(super) struct CoreStage<T: Future> {
 /// Holds the future or output, depending on the stage of execution.
 pub(super) struct Core<T: Future, S> {
     /// Scheduler used to drive this future
-    pub(super) scheduler: Scheduler<S>,
+    pub(super) scheduler: S,
 
     /// Either the future or the output
     pub(super) stage: CoreStage<T>,
@@ -106,9 +102,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 id,
             },
             core: Core {
-                scheduler: Scheduler {
-                    scheduler: UnsafeCell::new(Some(scheduler)),
-                },
+                scheduler,
                 stage: CoreStage {
                     stage: UnsafeCell::new(Stage::Running(future)),
                 },
@@ -116,64 +110,6 @@ impl<T: Future, S: Schedule> Cell<T, S> {
             trailer: Trailer {
                 waker: UnsafeCell::new(None),
             },
-        })
-    }
-}
-
-impl<S: Schedule> Scheduler<S> {
-    pub(super) fn with_mut<R>(&self, f: impl FnOnce(*mut Option<S>) -> R) -> R {
-        self.scheduler.with_mut(f)
-    }
-
-    /// Returns true if the task is bound to a scheduler.
-    pub(super) fn is_bound(&self) -> bool {
-        // Safety: never called concurrently w/ a mutation.
-        self.scheduler.with(|ptr| unsafe { (*ptr).is_some() })
-    }
-
-    /// Schedule the future for execution
-    pub(super) fn schedule(&self, task: Notified<S>) {
-        self.scheduler.with(|ptr| {
-            // Safety: Can only be called after initial `poll`, which is the
-            // only time the field is mutated.
-            match unsafe { &*ptr } {
-                Some(scheduler) => scheduler.schedule(task),
-                None => panic!("no scheduler set"),
-            }
-        });
-    }
-
-    /// Schedule the future for execution in the near future, yielding the
-    /// thread to other tasks.
-    pub(super) fn yield_now(&self, task: Notified<S>) {
-        self.scheduler.with(|ptr| {
-            // Safety: Can only be called after initial `poll`, which is the
-            // only time the field is mutated.
-            match unsafe { &*ptr } {
-                Some(scheduler) => scheduler.yield_now(task),
-                None => panic!("no scheduler set"),
-            }
-        });
-    }
-
-    /// Release the task
-    ///
-    /// If the `Scheduler` implementation is able to, it returns the `Task`
-    /// handle immediately. The caller of this function will batch a ref-dec
-    /// with a state change.
-    pub(super) fn release(&self, task: Task<S>) -> Option<Task<S>> {
-        use std::mem::ManuallyDrop;
-
-        let task = ManuallyDrop::new(task);
-
-        self.scheduler.with(|ptr| {
-            // Safety: Can only be called after initial `poll`, which is the
-            // only time the field is mutated.
-            match unsafe { &*ptr } {
-                Some(scheduler) => scheduler.release(&*task),
-                // Task was never polled
-                None => None,
-            }
         })
     }
 }
