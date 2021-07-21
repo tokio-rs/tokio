@@ -40,7 +40,7 @@ cfg_loom! {
 cfg_not_loom! {
     mod queue;
 
-    // Runs both with and without miri
+    #[cfg(not(miri))]
     mod task_combinations;
 
     #[cfg(miri)]
