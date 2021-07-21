@@ -50,7 +50,15 @@ an asynchronous application.
 
 ## Example
 
-A basic TCP echo server with Tokio:
+A basic TCP echo server with Tokio.
+
+Make sure you activated the full features of the tokio crate on Cargo.toml:
+
+```toml
+[dependencies]
+tokio = { version = "1.8.0", features = ["full"] }
+```
+Then, on your main.rs:
 
 ```rust,no_run
 use tokio::net::TcpListener;
@@ -58,7 +66,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
 
     loop {
         let (mut socket, _) = listener.accept().await?;
@@ -132,7 +140,7 @@ several other libraries, including:
 
 * [`tower`]: A library of modular and reusable components for building robust networking clients and servers.
 
-* [`tracing`]: A framework for application-level tracing and async-aware diagnostics.
+* [`tracing`] (formerly `tokio-trace`): A framework for application-level tracing and async-aware diagnostics.
 
 * [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
 
@@ -177,6 +185,13 @@ releases are:
 Each LTS release will continue to receive backported fixes for at least half a
 year. If you wish to use a fixed minor release in your project, we recommend
 that you use an LTS release.
+
+To use a fixed minor version, you can specify the version with a tilde. For
+example, to specify that you wish to use the newest `1.8.x` patch release, you
+can use the following dependency specification:
+```
+tokio = { version = "~1.8", features = [...] }
+```
 
 ## License
 
