@@ -98,7 +98,6 @@ fn test_combinations() {
                     for ji in ji.iter().copied() {
                         for jh in jh.iter().copied() {
                             for abort in abort.iter().copied() {
-                                println!("Runtime {:?}, LocalSet {:?}, Task {:?}, Output {:?}, JoinInterest {:?}, JoinHandle {:?}, Abort {:?}", rt, ls, task, output, ji, jh, abort);
                                 test_combination(rt, ls, task, output, ji, jh, abort);
                             }
                         }
@@ -126,10 +125,12 @@ fn test_combination(
         // this causes double panic
         return;
     }
-    if (task == CombiTask::PanicOnRunAndDrop) && (abort != CombiAbort::AbortedImmediately) {
+    if task == CombiTask::PanicOnRunAndDrop {
         // this causes double panic
         return;
     }
+
+    println!("Runtime {:?}, LocalSet {:?}, Task {:?}, Output {:?}, JoinInterest {:?}, JoinHandle {:?}, Abort {:?}", rt, ls, task, output, ji, jh, abort);
 
     // A runtime optionally with a LocalSet
     struct Rt {
