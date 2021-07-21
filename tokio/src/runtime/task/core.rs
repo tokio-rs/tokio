@@ -288,7 +288,7 @@ impl Header {
     pub(super) fn get_owner_id(&self) -> u64 {
         // safety: If there are concurrent writes, then that write has violated
         // the safety requirements on `set_owner_id`.
-        unsafe { self.owner_id.with_mut(|ptr| *ptr) }
+        unsafe { self.owner_id.with(|ptr| *ptr) }
     }
 }
 
