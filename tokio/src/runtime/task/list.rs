@@ -93,6 +93,12 @@ impl<S: 'static> OwnedTasks<S> {
     {
         let (task, notified, join) = super::new_task(task, scheduler);
 
+        unsafe {
+            // safety: We just created the task, so we have exclusive access
+            // to the field.
+            task.header().set_owner_id(self.id);
+        }
+
         let mut lock = self.inner.lock();
         if lock.closed {
             drop(lock);
@@ -100,11 +106,6 @@ impl<S: 'static> OwnedTasks<S> {
             task.shutdown();
             (join, None)
         } else {
-            unsafe {
-                // safety: We just created the task, so we have exclusive access
-                // to the field.
-                task.header().set_owner_id(self.id);
-            }
             lock.list.push_front(task);
             (join, Some(notified))
         }
@@ -125,7 +126,7 @@ impl<S: 'static> OwnedTasks<S> {
     }
 
     pub(crate) fn pop_back(&self) -> Option<Task<S>> {
-        unset_owner_id(self.inner.lock().list.pop_back())
+        self.inner.lock().list.pop_back()
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
@@ -139,7 +140,7 @@ impl<S: 'static> OwnedTasks<S> {
 
         // safety: We just checked that the provided task is not in some other
         // linked list.
-        unsafe { unset_owner_id(self.inner.lock().list.remove(task.header().into())) }
+        unsafe { self.inner.lock().list.remove(task.header().into()) }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -179,23 +180,24 @@ impl<S: 'static> LocalOwnedTasks<S> {
     {
         let (task, notified, join) = super::new_task(task, scheduler);
 
+        unsafe {
+            // safety: We just created the task, so we have exclusive access
+            // to the field.
+            task.header().set_owner_id(self.id);
+        }
+
         if self.closed {
             drop(notified);
             task.shutdown();
             (join, None)
         } else {
-            unsafe {
-                // safety: We just created the task, so we have exclusive access
-                // to the field.
-                task.header().set_owner_id(self.id);
-            }
             self.list.push_front(task);
             (join, Some(notified))
         }
     }
 
     pub(crate) fn pop_back(&mut self) -> Option<Task<S>> {
-        unset_owner_id(self.list.pop_back())
+        self.list.pop_back()
     }
 
     pub(crate) fn remove(&mut self, task: &Task<S>) -> Option<Task<S>> {
@@ -209,7 +211,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
 
         // safety: We just checked that the provided task is not in some other
         // linked list.
-        unsafe { unset_owner_id(self.list.remove(task.header().into())) }
+        unsafe { self.list.remove(task.header().into()) }
     }
 
     /// Assert that the given task is owned by this LocalOwnedTasks and convert
@@ -236,18 +238,6 @@ impl<S: 'static> LocalOwnedTasks<S> {
     pub(crate) fn close(&mut self) {
         self.closed = true;
     }
-}
-
-fn unset_owner_id<S: 'static>(task: Option<Task<S>>) -> Option<Task<S>> {
-    if let Some(task) = &task {
-        unsafe {
-            // safety: Only the owning list will modify this field, so we have
-            // exclusive access.
-            task.header().set_owner_id(0);
-        }
-    }
-
-    task
 }
 
 #[cfg(all(test))]

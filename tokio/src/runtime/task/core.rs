@@ -69,7 +69,17 @@ pub(crate) struct Header {
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
 
-    /// Id of the OwnedTasks that owns this task, or zero if unowned.
+    /// This integer contains the id of the OwnedTasks or LocalOwnedTasks that
+    /// this task is stored in. If the task is not in any list, should be the
+    /// id of the list that it was previously in, or zero if it has never been
+    /// in any list.
+    ///
+    /// Once a task has been bound to a list, it can never be bound to another
+    /// list, even if removed from the first list.
+    ///
+    /// The id is not unset when removed from a list because we want to be able
+    /// to read the id without synchronization, even if it is concurrently being
+    /// removed from the list.
     pub(super) owner_id: UnsafeCell<u64>,
 
     /// The tracing ID for this instrumented task.
