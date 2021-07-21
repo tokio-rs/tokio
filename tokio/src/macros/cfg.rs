@@ -384,3 +384,29 @@ macro_rules! cfg_not_coop {
         )*
     }
 }
+
+macro_rules! cfg_has_atomic_u64 {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(any(
+                    target_arch = "arm",
+                    target_arch = "mips",
+                    target_arch = "powerpc"
+                    )))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_has_atomic_u64 {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(
+                    target_arch = "arm",
+                    target_arch = "mips",
+                    target_arch = "powerpc"
+                    ))]
+            $item
+        )*
+    }
+}

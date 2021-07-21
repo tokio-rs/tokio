@@ -14,22 +14,37 @@ use crate::util::linked_list::{Link, LinkedList};
 
 use std::marker::PhantomData;
 
-/// This id is used to verify whether a given task is stored in this OwnedTasks,
-/// or some other task. The counter starts at one so we can use zero for tasks
-/// not owned by any list.
-///
-/// The safety checks in this file can technically be violated if the u64 is
-/// overflown, but the checks are not supposed to ever fail unless there is a
-/// bug in Tokio, and overflowing an u64 by incrementing it is not possible in
-/// the real world, so we accept that the check would fail to catch bugs if two
-/// runtimes with the same id are mixed up.
-static NEXT_OWNED_TASKS_ID: AtomicU64 = AtomicU64::new(1);
+// The id from the module below is used to verify whether a given task is stored
+// in this OwnedTasks, or some other task. The counter starts at one so we can
+// use zero for tasks not owned by any list.
+//
+// The safety checks in this file can technically be violated if the counter is
+// overflown, but the checks are not supposed to ever fail unless there is a
+// bug in Tokio, so we accept that certain bugs would not be caught if the two
+// mixed up runtimes happen to have the same id.
 
-fn get_next_id() -> u64 {
-    loop {
-        let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
-        if id != 0 {
-            return id;
+cfg_has_atomic_u64! {
+    static NEXT_OWNED_TASKS_ID: AtomicU64 = AtomicU64::new(1);
+
+    fn get_next_id() -> u64 {
+        loop {
+            let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
+            if id != 0 {
+                return id;
+            }
+        }
+    }
+}
+
+cfg_not_has_atomic_u64! {
+    static NEXT_OWNED_TASKS_ID: AtomicU32 = AtomicU32::new(1);
+
+    fn get_next_id() -> u64 {
+        loop {
+            let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
+            if id != 0 {
+                return u64::from(id);
+            }
         }
     }
 }
