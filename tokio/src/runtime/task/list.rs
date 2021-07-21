@@ -65,7 +65,7 @@ pub(crate) struct LocalOwnedTasks<S: 'static> {
     list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
     closed: bool,
     id: u64,
-    _not_send: PhantomData<*const ()>,
+    _not_send_or_sync: PhantomData<*const ()>,
 }
 
 impl<S: 'static> OwnedTasks<S> {
@@ -164,7 +164,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
             list: LinkedList::new(),
             closed: false,
             id: get_next_id(),
-            _not_send: PhantomData,
+            _not_send_or_sync: PhantomData,
         }
     }
 
