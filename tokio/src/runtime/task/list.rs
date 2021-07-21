@@ -221,8 +221,8 @@ impl<S: 'static> LocalOwnedTasks<S> {
         assert_eq!(task.0.header().get_owner_id(), self.id);
 
         // safety: The task was bound to this LocalOwnedTasks, and the
-        // LocalOwnedTasks is not Send, so we are on the right thread for
-        // polling this task.
+        // LocalOwnedTasks is not Send or Sync, so we are on the right thread
+        // for polling this task.
         LocalNotified {
             task: task.0,
             _not_send: PhantomData,
