@@ -384,6 +384,8 @@ impl Context {
     }
 
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
+        let task = self.worker.shared.owned.assert_owner(task);
+
         // Make sure the worker is not in the **searching** state. This enables
         // another idle worker to try to steal work.
         core.transition_from_searching(&self.worker);
@@ -414,6 +416,7 @@ impl Context {
                 if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
                     *self.core.borrow_mut() = Some(core);
+                    let task = self.worker.shared.owned.assert_owner(task);
                     task.run();
                 } else {
                     // Not enough budget left to run the LIFO task, push it to
@@ -626,8 +629,7 @@ impl Worker {
 
 impl task::Schedule for Arc<Shared> {
     fn release(&self, task: &Task) -> Option<Task> {
-        // SAFETY: Inserted into owned in bind.
-        unsafe { self.owned.remove(task) }
+        self.owned.remove(task)
     }
 
     fn schedule(&self, task: Notified) {
@@ -762,8 +764,10 @@ impl Shared {
         }
 
         // Drain the injection queue
+        //
+        // We already shut down every task, so we can simply drop the tasks.
         while let Some(task) = self.inject.pop() {
-            task.shutdown();
+            drop(task);
         }
     }
 

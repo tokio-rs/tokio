@@ -8,13 +8,35 @@
 
 use crate::future::Future;
 use crate::loom::sync::Mutex;
-use crate::runtime::task::{JoinHandle, Notified, Schedule, Task};
+use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
 
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// This id is used to verify whether a given task is stored in this OwnedTasks,
+/// or some other task. The counter starts at one so we can use zero for tasks
+/// not owned by any list.
+///
+/// The safety checks in this file can technically be violated if the u64 is
+/// overflown, but the checks are not supposed to ever fail unless there is a
+/// bug in Tokio, and overflowing an u64 by incrementing it is not possible in
+/// the real world, so we accept that the check would fail to catch bugs if two
+/// runtimes with the same id are mixed up.
+static NEXT_OWNED_TASKS_ID: AtomicU64 = AtomicU64::new(1);
+
+fn get_next_id() -> u64 {
+    loop {
+        let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
+        if id != 0 {
+            return id;
+        }
+    }
+}
 
 pub(crate) struct OwnedTasks<S: 'static> {
     inner: Mutex<OwnedTasksInner<S>>,
+    id: u64,
 }
 struct OwnedTasksInner<S: 'static> {
     list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
@@ -24,6 +46,7 @@ struct OwnedTasksInner<S: 'static> {
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
     closed: bool,
+    id: u64,
     _not_send: PhantomData<*const ()>,
 }
 
@@ -34,6 +57,7 @@ impl<S: 'static> OwnedTasks<S> {
                 list: LinkedList::new(),
                 closed: false,
             }),
+            id: get_next_id(),
         }
     }
 
@@ -54,23 +78,50 @@ impl<S: 'static> OwnedTasks<S> {
         let mut lock = self.inner.lock();
         if lock.closed {
             drop(lock);
-            drop(task);
-            notified.shutdown();
+            drop(notified);
+            task.shutdown();
             (join, None)
         } else {
+            unsafe {
+                // safety: We just created the task, so we have exclusive access
+                // to the field.
+                task.header().set_owner_id(self.id);
+            }
             lock.list.push_front(task);
             (join, Some(notified))
         }
     }
 
-    pub(crate) fn pop_back(&self) -> Option<Task<S>> {
-        self.inner.lock().list.pop_back()
+    /// Assert that the given task is owned by this OwnedTasks and convert it to
+    /// a LocalNotified, giving the thread permission to poll this task.
+    #[inline]
+    pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
+        assert_eq!(task.0.header().get_owner_id(), self.id);
+
+        // safety: All tasks bound to this OwnedTasks are Send, so it is safe
+        // to poll it on this thread no matter what thread we are on.
+        LocalNotified {
+            task: task.0,
+            _not_send: PhantomData,
+        }
     }
 
-    /// The caller must ensure that if the provided task is stored in a
-    /// linked list, then it is in this linked list.
-    pub(crate) unsafe fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
-        self.inner.lock().list.remove(task.header().into())
+    pub(crate) fn pop_back(&self) -> Option<Task<S>> {
+        unset_owner_id(self.inner.lock().list.pop_back())
+    }
+
+    pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
+        let task_id = task.header().get_owner_id();
+        if task_id == 0 {
+            // The task is unowned.
+            return None;
+        }
+
+        assert_eq!(task_id, self.id);
+
+        // safety: We just checked that the provided task is not in some other
+        // linked list.
+        unsafe { unset_owner_id(self.inner.lock().list.remove(task.header().into())) }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -93,6 +144,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
         Self {
             list: LinkedList::new(),
             closed: false,
+            id: get_next_id(),
             _not_send: PhantomData,
         }
     }
@@ -110,23 +162,51 @@ impl<S: 'static> LocalOwnedTasks<S> {
         let (task, notified, join) = super::new_task(task, scheduler);
 
         if self.closed {
-            drop(task);
-            notified.shutdown();
+            drop(notified);
+            task.shutdown();
             (join, None)
         } else {
+            unsafe {
+                // safety: We just created the task, so we have exclusive access
+                // to the field.
+                task.header().set_owner_id(self.id);
+            }
             self.list.push_front(task);
             (join, Some(notified))
         }
     }
 
     pub(crate) fn pop_back(&mut self) -> Option<Task<S>> {
-        self.list.pop_back()
+        unset_owner_id(self.list.pop_back())
     }
 
-    /// The caller must ensure that if the provided task is stored in a
-    /// linked list, then it is in this linked list.
-    pub(crate) unsafe fn remove(&mut self, task: &Task<S>) -> Option<Task<S>> {
-        self.list.remove(task.header().into())
+    pub(crate) fn remove(&mut self, task: &Task<S>) -> Option<Task<S>> {
+        let task_id = task.header().get_owner_id();
+        if task_id == 0 {
+            // The task is unowned.
+            return None;
+        }
+
+        assert_eq!(task_id, self.id);
+
+        // safety: We just checked that the provided task is not in some other
+        // linked list.
+        unsafe { unset_owner_id(self.list.remove(task.header().into())) }
+    }
+
+    /// Assert that the given task is owned by this LocalOwnedTasks and convert
+    /// it to a LocalNotified, giving the thread permission to poll this task.
+    #[inline]
+    pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
+        assert_eq!(task.0.header().get_owner_id(), self.id);
+
+        // safety: The task was bound to this LocalOwnedTasks, and the
+        // LocalOwnedTasks is not Send, so we are on the right thread for
+        // polling this task.
+        LocalNotified {
+            task: task.0,
+            _not_send: PhantomData,
+        }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -137,5 +217,37 @@ impl<S: 'static> LocalOwnedTasks<S> {
     /// collection.
     pub(crate) fn close(&mut self) {
         self.closed = true;
+    }
+}
+
+fn unset_owner_id<S: 'static>(task: Option<Task<S>>) -> Option<Task<S>> {
+    if let Some(task) = &task {
+        unsafe {
+            // safety: Only the owning list will modify this field, so we have
+            // exclusive access.
+            task.header().set_owner_id(0);
+        }
+    }
+
+    task
+}
+
+#[cfg(all(test))]
+mod tests {
+    use super::*;
+
+    // This test may run in parallel with other tests, so we only test that ids
+    // come in increasing order.
+    #[test]
+    fn test_id_not_broken() {
+        let mut last_id = get_next_id();
+        assert_ne!(last_id, 0);
+
+        for _ in 0..1000 {
+            let next_id = get_next_id();
+            assert_ne!(next_id, 0);
+            assert!(last_id < next_id);
+            last_id = next_id;
+        }
     }
 }
