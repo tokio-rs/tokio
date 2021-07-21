@@ -7,12 +7,12 @@
 //! the scheduler with the collection.
 
 use crate::future::Future;
+use crate::loom::sync::atomic::{AtomicU64, Ordering};
 use crate::loom::sync::Mutex;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
 
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 /// This id is used to verify whether a given task is stored in this OwnedTasks,
 /// or some other task. The counter starts at one so we can use zero for tasks
