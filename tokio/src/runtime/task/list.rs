@@ -7,7 +7,6 @@
 //! the scheduler with the collection.
 
 use crate::future::Future;
-use crate::loom::sync::atomic::{AtomicU64, Ordering};
 use crate::loom::sync::Mutex;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
@@ -24,6 +23,8 @@ use std::marker::PhantomData;
 // mixed up runtimes happen to have the same id.
 
 cfg_has_atomic_u64! {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
     static NEXT_OWNED_TASKS_ID: AtomicU64 = AtomicU64::new(1);
 
     fn get_next_id() -> u64 {
@@ -37,6 +38,8 @@ cfg_has_atomic_u64! {
 }
 
 cfg_not_has_atomic_u64! {
+    use std::sync::atomic::{AtomicU32, Ordering};
+
     static NEXT_OWNED_TASKS_ID: AtomicU32 = AtomicU32::new(1);
 
     fn get_next_id() -> u64 {
