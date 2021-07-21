@@ -125,7 +125,7 @@ fn test_combination(
         // this causes double panic
         return;
     }
-    if task == CombiTask::PanicOnRunAndDrop {
+    if (task == CombiTask::PanicOnRunAndDrop) && (abort != CombiAbort::AbortedImmediately) {
         // this causes double panic
         return;
     }
