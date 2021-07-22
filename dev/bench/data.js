@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626948426757,
+  "lastUpdate": 1626948430967,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -93593,6 +93593,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 674892,
             "range": "± 1878",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "998dc5a2eb48bd0937b10bf0638b2f8346b5f9f5",
+          "message": "task: fix leak in LocalSet (#3978)",
+          "timestamp": "2021-07-22T12:05:02+02:00",
+          "tree_id": "4bf6d0236fc515452d169c9471c104f01fe1b6c3",
+          "url": "https://github.com/tokio-rs/tokio/commit/998dc5a2eb48bd0937b10bf0638b2f8346b5f9f5"
+        },
+        "date": 1626948423619,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7639630,
+            "range": "± 3905155",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6792490,
+            "range": "± 2149003",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 7864591,
+            "range": "± 5531618",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 305,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 305,
+            "range": "± 1",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 305,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 30157,
+            "range": "± 234",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 940,
+            "range": "± 36",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1096145,
+            "range": "± 45543",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 786763,
+            "range": "± 22287",
             "unit": "ns/iter"
           }
         ]
