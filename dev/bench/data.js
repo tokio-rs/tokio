@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626948414066,
+  "lastUpdate": 1626948418237,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -39781,6 +39781,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18782394,
             "range": "± 3024925",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "998dc5a2eb48bd0937b10bf0638b2f8346b5f9f5",
+          "message": "task: fix leak in LocalSet (#3978)",
+          "timestamp": "2021-07-22T12:05:02+02:00",
+          "tree_id": "4bf6d0236fc515452d169c9471c104f01fe1b6c3",
+          "url": "https://github.com/tokio-rs/tokio/commit/998dc5a2eb48bd0937b10bf0638b2f8346b5f9f5"
+        },
+        "date": 1626948409250,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 184752,
+            "range": "± 3204",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 981063,
+            "range": "± 135840",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6094273,
+            "range": "± 1396339",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19373459,
+            "range": "± 3594089",
             "unit": "ns/iter"
           }
         ]
