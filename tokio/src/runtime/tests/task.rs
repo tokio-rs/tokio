@@ -1,41 +1,183 @@
-use crate::runtime::task::{self, OwnedTasks, Schedule, Task};
+use crate::runtime::blocking::NoopSchedule;
+use crate::runtime::task::{self, unowned, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::util::TryLock;
 
 use std::collections::VecDeque;
+use std::future::Future;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+struct AssertDropHandle {
+    is_dropped: Arc<AtomicBool>,
+}
+impl AssertDropHandle {
+    #[track_caller]
+    fn assert_dropped(&self) {
+        assert!(self.is_dropped.load(Ordering::SeqCst));
+    }
+
+    #[track_caller]
+    fn assert_not_dropped(&self) {
+        assert!(!self.is_dropped.load(Ordering::SeqCst));
+    }
+}
+
+struct AssertDrop {
+    is_dropped: Arc<AtomicBool>,
+}
+impl AssertDrop {
+    fn new() -> (Self, AssertDropHandle) {
+        let shared = Arc::new(AtomicBool::new(false));
+        (
+            AssertDrop {
+                is_dropped: shared.clone(),
+            },
+            AssertDropHandle {
+                is_dropped: shared.clone(),
+            },
+        )
+    }
+}
+impl Drop for AssertDrop {
+    fn drop(&mut self) {
+        self.is_dropped.store(true, Ordering::SeqCst);
+    }
+}
+
+// A Notified does not shut down on drop, but it is dropped once the ref-count
+// hits zero.
 #[test]
-fn create_drop() {
-    let _ = super::joinable::<_, Runtime>(async { unreachable!() });
+fn create_drop1() {
+    let (ad, handle) = AssertDrop::new();
+    let (notified, join) = unowned(
+        async {
+            drop(ad);
+            unreachable!()
+        },
+        NoopSchedule,
+    );
+    drop(notified);
+    handle.assert_not_dropped();
+    drop(join);
+    handle.assert_dropped();
+}
+
+#[test]
+fn create_drop2() {
+    let (ad, handle) = AssertDrop::new();
+    let (notified, join) = unowned(
+        async {
+            drop(ad);
+            unreachable!()
+        },
+        NoopSchedule,
+    );
+    drop(join);
+    handle.assert_not_dropped();
+    drop(notified);
+    handle.assert_dropped();
+}
+
+// Shutting down through Notified works
+#[test]
+fn create_shutdown1() {
+    let (ad, handle) = AssertDrop::new();
+    let (notified, join) = unowned(
+        async {
+            drop(ad);
+            unreachable!()
+        },
+        NoopSchedule,
+    );
+    drop(join);
+    handle.assert_not_dropped();
+    notified.shutdown();
+    handle.assert_dropped();
+}
+
+#[test]
+fn create_shutdown2() {
+    let (ad, handle) = AssertDrop::new();
+    let (notified, join) = unowned(
+        async {
+            drop(ad);
+            unreachable!()
+        },
+        NoopSchedule,
+    );
+    handle.assert_not_dropped();
+    notified.shutdown();
+    handle.assert_dropped();
+    drop(join);
 }
 
 #[test]
 fn schedule() {
     with(|rt| {
-        let (task, _) = super::joinable(async {
+        rt.spawn(async {
             crate::task::yield_now().await;
         });
 
-        rt.schedule(task);
-
         assert_eq!(2, rt.tick());
+        rt.shutdown();
     })
 }
 
 #[test]
 fn shutdown() {
     with(|rt| {
-        let (task, _) = super::joinable(async {
+        rt.spawn(async {
             loop {
                 crate::task::yield_now().await;
             }
         });
 
-        rt.schedule(task);
         rt.tick_max(1);
 
         rt.shutdown();
     })
+}
+
+#[test]
+fn shutdown_immediately() {
+    with(|rt| {
+        rt.spawn(async {
+            loop {
+                crate::task::yield_now().await;
+            }
+        });
+
+        rt.shutdown();
+    })
+}
+
+#[test]
+fn spawn_during_shutdown() {
+    static DID_SPAWN: AtomicBool = AtomicBool::new(false);
+
+    struct SpawnOnDrop(Runtime);
+    impl Drop for SpawnOnDrop {
+        fn drop(&mut self) {
+            DID_SPAWN.store(true, Ordering::SeqCst);
+            self.0.spawn(async {});
+        }
+    }
+
+    with(|rt| {
+        let rt2 = rt.clone();
+        rt.spawn(async move {
+            let _spawn_on_drop = SpawnOnDrop(rt2);
+
+            loop {
+                crate::task::yield_now().await;
+            }
+        });
+
+        rt.tick_max(1);
+        rt.shutdown();
+    });
+
+    assert!(DID_SPAWN.load(Ordering::SeqCst));
 }
 
 fn with(f: impl FnOnce(Runtime)) {
@@ -75,6 +217,20 @@ struct Core {
 static CURRENT: TryLock<Option<Runtime>> = TryLock::new(None);
 
 impl Runtime {
+    fn spawn<T>(&self, future: T) -> JoinHandle<T::Output>
+    where
+        T: 'static + Send + Future,
+        T::Output: 'static + Send,
+    {
+        let (handle, notified) = self.0.owned.bind(future, self.clone());
+
+        if let Some(notified) = notified {
+            self.schedule(notified);
+        }
+
+        handle
+    }
+
     fn tick(&self) -> usize {
         self.tick_max(usize::MAX)
     }
@@ -102,6 +258,7 @@ impl Runtime {
     fn shutdown(&self) {
         let mut core = self.0.core.try_lock().unwrap();
 
+        self.0.owned.close();
         while let Some(task) = self.0.owned.pop_back() {
             task.shutdown();
         }
@@ -117,12 +274,6 @@ impl Runtime {
 }
 
 impl Schedule for Runtime {
-    fn bind(task: Task<Self>) -> Runtime {
-        let rt = CURRENT.try_lock().unwrap().as_ref().unwrap().clone();
-        rt.0.owned.push_front(task);
-        rt
-    }
-
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
         // safety: copying worker.rs
         unsafe { self.0.owned.remove(task) }

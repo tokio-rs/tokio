@@ -311,6 +311,9 @@ impl<P: Park> Drop for BasicScheduler<P> {
         };
 
         enter(&mut inner, |scheduler, context| {
+            // By closing the OwnedTasks, no new tasks can be spawned on it.
+            context.shared.owned.close();
+            // Drain the OwnedTasks collection.
             while let Some(task) = context.shared.owned.pop_back() {
                 task.shutdown();
             }
@@ -354,14 +357,18 @@ impl<P: Park> fmt::Debug for BasicScheduler<P> {
 // ===== impl Spawner =====
 
 impl Spawner {
-    /// Spawns a future onto the thread pool
+    /// Spawns a future onto the basic scheduler
     pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (task, handle) = task::joinable(future);
-        self.shared.schedule(task);
+        let (handle, notified) = self.shared.owned.bind(future, self.shared.clone());
+
+        if let Some(notified) = notified {
+            self.shared.schedule(notified);
+        }
+
         handle
     }
 
@@ -392,14 +399,6 @@ impl fmt::Debug for Spawner {
 // ===== impl Shared =====
 
 impl Schedule for Arc<Shared> {
-    fn bind(task: Task<Self>) -> Arc<Shared> {
-        CURRENT.with(|maybe_cx| {
-            let cx = maybe_cx.expect("scheduler context missing");
-            cx.shared.owned.push_front(task);
-            cx.shared.clone()
-        })
-    }
-
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
         // SAFETY: Inserted into the list in bind above.
         unsafe { self.owned.remove(task) }
@@ -411,16 +410,13 @@ impl Schedule for Arc<Shared> {
                 cx.tasks.borrow_mut().queue.push_back(task);
             }
             _ => {
+                // If the queue is None, then the runtime has shut down. We
+                // don't need to do anything with the notification in that case.
                 let mut guard = self.queue.lock();
                 if let Some(queue) = guard.as_mut() {
                     queue.push_back(RemoteMsg::Schedule(task));
                     drop(guard);
                     self.unpark.unpark();
-                } else {
-                    // The runtime has shut down. We drop the new task
-                    // immediately.
-                    drop(guard);
-                    task.shutdown();
                 }
             }
         });
