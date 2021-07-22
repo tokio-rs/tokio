@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626937706689,
+  "lastUpdate": 1626937712857,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -39679,6 +39679,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22973173,
             "range": "± 3780269",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ced7992f6555d884cac452d177b094eb44a58a29",
+          "message": "runtime: add large test and fix leak it found (#3967)",
+          "timestamp": "2021-07-22T09:06:38+02:00",
+          "tree_id": "1071d876764d02dca7bf6250179fee22939bf725",
+          "url": "https://github.com/tokio-rs/tokio/commit/ced7992f6555d884cac452d177b094eb44a58a29"
+        },
+        "date": 1626937706722,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 189805,
+            "range": "± 97860",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 904079,
+            "range": "± 151544",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5651962,
+            "range": "± 2988716",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18782394,
+            "range": "± 3024925",
             "unit": "ns/iter"
           }
         ]
