@@ -40,6 +40,9 @@ cfg_loom! {
 cfg_not_loom! {
     mod queue;
 
+    #[cfg(not(miri))]
+    mod task_combinations;
+
     #[cfg(miri)]
     mod task;
 }

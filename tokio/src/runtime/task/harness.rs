@@ -111,6 +111,8 @@ where
     }
 
     pub(super) fn drop_join_handle_slow(self) {
+        let mut maybe_panic = None;
+
         // Try to unset `JOIN_INTEREST`. This must be done as a first step in
         // case the task concurrently completed.
         if self.header().state.unset_join_interested().is_err() {
@@ -119,11 +121,20 @@ where
             // the scheduler or `JoinHandle`. i.e. if the output remains in the
             // task structure until the task is deallocated, it may be dropped
             // by a Waker on any arbitrary thread.
-            self.core().stage.drop_future_or_output();
+            let panic = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                self.core().stage.drop_future_or_output();
+            }));
+            if let Err(panic) = panic {
+                maybe_panic = Some(panic);
+            }
         }
 
         // Drop the `JoinHandle` reference, possibly deallocating the task
         self.drop_reference();
+
+        if let Some(panic) = maybe_panic {
+            panic::resume_unwind(panic);
+        }
     }
 
     // ===== waker behavior =====
@@ -182,17 +193,25 @@ where
     // ====== internal ======
 
     fn complete(self, output: super::Result<T::Output>, is_join_interested: bool) {
-        if is_join_interested {
-            // Store the output. The future has already been dropped
-            //
-            // Safety: Mutual exclusion is obtained by having transitioned the task
-            // state -> Running
-            let stage = &self.core().stage;
-            stage.store_output(output);
+        // We catch panics here because dropping the output may panic.
+        //
+        // Dropping the output can also happen in the first branch inside
+        // transition_to_complete.
+        let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            if is_join_interested {
+                // Store the output. The future has already been dropped
+                //
+                // Safety: Mutual exclusion is obtained by having transitioned the task
+                // state -> Running
+                let stage = &self.core().stage;
+                stage.store_output(output);
 
-            // Transition to `Complete`, notifying the `JoinHandle` if necessary.
-            transition_to_complete(self.header(), stage, &self.trailer());
-        }
+                // Transition to `Complete`, notifying the `JoinHandle` if necessary.
+                transition_to_complete(self.header(), stage, &self.trailer());
+            } else {
+                drop(output);
+            }
+        }));
 
         // The task has completed execution and will no longer be scheduled.
         //

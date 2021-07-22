@@ -5,11 +5,21 @@ use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
 
+use tokio::runtime::Builder;
+
+struct PanicOnDrop;
+
+impl Drop for PanicOnDrop {
+    fn drop(&mut self) {
+        panic!("Well what did you expect would happen...");
+    }
+}
+
 /// Checks that a suspended task can be aborted without panicking as reported in
 /// issue #3157: <https://github.com/tokio-rs/tokio/issues/3157>.
 #[test]
 fn test_abort_without_panic_3157() {
-    let rt = tokio::runtime::Builder::new_multi_thread()
+    let rt = Builder::new_multi_thread()
         .enable_time()
         .worker_threads(1)
         .build()
@@ -45,9 +55,7 @@ fn test_abort_without_panic_3662() {
         }
     }
 
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap();
+    let rt = Builder::new_current_thread().build().unwrap();
 
     rt.block_on(async move {
         let drop_flag = Arc::new(AtomicBool::new(false));
@@ -120,9 +128,7 @@ fn remote_abort_local_set_3929() {
         }
     }
 
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap();
+    let rt = Builder::new_current_thread().build().unwrap();
     let local = tokio::task::LocalSet::new();
 
     let check = DropCheck::new();
@@ -144,10 +150,7 @@ fn remote_abort_local_set_3929() {
 /// issue #3964: <https://github.com/tokio-rs/tokio/issues/3964>.
 #[test]
 fn test_abort_wakes_task_3964() {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .unwrap();
+    let rt = Builder::new_current_thread().enable_time().build().unwrap();
 
     rt.block_on(async move {
         let notify_dropped = Arc::new(());
@@ -174,22 +177,11 @@ fn test_abort_wakes_task_3964() {
     });
 }
 
-struct PanicOnDrop;
-
-impl Drop for PanicOnDrop {
-    fn drop(&mut self) {
-        panic!("Well what did you expect would happen...");
-    }
-}
-
 /// Checks that aborting a task whose destructor panics does not allow the
 /// panic to escape the task.
 #[test]
 fn test_abort_task_that_panics_on_drop_contained() {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .unwrap();
+    let rt = Builder::new_current_thread().enable_time().build().unwrap();
 
     rt.block_on(async move {
         let handle = tokio::spawn(async move {
@@ -213,10 +205,7 @@ fn test_abort_task_that_panics_on_drop_contained() {
 /// Checks that aborting a task whose destructor panics has the expected result.
 #[test]
 fn test_abort_task_that_panics_on_drop_returned() {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .unwrap();
+    let rt = Builder::new_current_thread().enable_time().build().unwrap();
 
     rt.block_on(async move {
         let handle = tokio::spawn(async move {
