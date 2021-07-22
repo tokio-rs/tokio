@@ -1,3 +1,37 @@
+# 1.9.0 (July 22, 2021)
+
+### Added
+
+ - net: allow customized I/O operations for `TcpStream` ([#3888])
+ - sync: add getter for the mutex from a guard ([#3928])
+ - task: expose nameable future for `TaskLocal::scope` ([#3273])
+
+### Fixed
+
+ - Fix leak if output of future panics on drop ([#3967])
+ - Fix leak in `LocalSet` ([#3978])
+
+### Changes
+
+ - runtime: reorganize parts of the runtime ([#3909], [#3939], [#3950], [#3955], [#3980])
+ - sync: clean up `OnceCell` ([#3945])
+ - task: remove mutex in `JoinError` ([#3959])
+
+[#3273]: https://github.com/tokio-rs/tokio/pull/3273
+[#3888]: https://github.com/tokio-rs/tokio/pull/3888
+[#3909]: https://github.com/tokio-rs/tokio/pull/3909
+[#3928]: https://github.com/tokio-rs/tokio/pull/3928
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
+[#3939]: https://github.com/tokio-rs/tokio/pull/3939
+[#3945]: https://github.com/tokio-rs/tokio/pull/3945
+[#3950]: https://github.com/tokio-rs/tokio/pull/3950
+[#3955]: https://github.com/tokio-rs/tokio/pull/3955
+[#3959]: https://github.com/tokio-rs/tokio/pull/3959
+[#3967]: https://github.com/tokio-rs/tokio/pull/3967
+[#3967]: https://github.com/tokio-rs/tokio/pull/3967
+[#3978]: https://github.com/tokio-rs/tokio/pull/3978
+[#3980]: https://github.com/tokio-rs/tokio/pull/3980
+
 # 1.8.2 (July 19, 2021)
 
 Fixes a missed edge case from 1.8.1.
