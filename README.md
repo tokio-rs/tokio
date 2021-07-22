@@ -140,8 +140,7 @@ several other libraries, including:
 
 * [`tower`]: A library of modular and reusable components for building robust networking clients and servers.
 
-* [`tracing`] (formerly `tokio-trace`): A framework for application-level
-  tracing and async-aware diagnostics.
+* [`tracing`] (formerly `tokio-trace`): A framework for application-level tracing and async-aware diagnostics.
 
 * [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
 
@@ -164,9 +163,35 @@ several other libraries, including:
 
 ## Supported Rust Versions
 
-Tokio is built against the latest stable release. The minimum supported version is 1.45.
-The current Tokio version is not guaranteed to build on Rust versions earlier than the
-minimum supported version.
+Tokio is built against the latest stable release. The minimum supported version
+is 1.45.  The current Tokio version is not guaranteed to build on Rust versions
+earlier than the minimum supported version.
+
+## Release schedule
+
+Tokio doesn't follow a fixed release schedule, but we typically make one to two
+new minor releases each month. We make patch releases for bugfixes as necessary.
+
+## Bug patching policy
+
+For the purposes of making patch releases with bugfixes, we have designated
+certain minor releases as LTS (long term support) releases. Whenever a bug
+warrants a patch release with a fix for the bug, it will be backported and
+released as a new patch release for each LTS minor version. Our current LTS
+releases are:
+
+ * `1.8.x` - LTS release until February 2022.
+
+Each LTS release will continue to receive backported fixes for at least half a
+year. If you wish to use a fixed minor release in your project, we recommend
+that you use an LTS release.
+
+To use a fixed minor version, you can specify the version with a tilde. For
+example, to specify that you wish to use the newest `1.8.x` patch release, you
+can use the following dependency specification:
+```text
+tokio = { version = "~1.8", features = [...] }
+```
 
 ## License
 
