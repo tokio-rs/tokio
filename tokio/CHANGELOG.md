@@ -29,6 +29,7 @@
 [#3959]: https://github.com/tokio-rs/tokio/pull/3959
 [#3967]: https://github.com/tokio-rs/tokio/pull/3967
 [#3967]: https://github.com/tokio-rs/tokio/pull/3967
+[#3978]: https://github.com/tokio-rs/tokio/pull/3978
 [#3980]: https://github.com/tokio-rs/tokio/pull/3980
 
 # 1.8.2 (July 19, 2021)
