@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626937728205,
+  "lastUpdate": 1626948400257,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21005,6 +21005,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 492,
             "range": "± 11",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "998dc5a2eb48bd0937b10bf0638b2f8346b5f9f5",
+          "message": "task: fix leak in LocalSet (#3978)",
+          "timestamp": "2021-07-22T12:05:02+02:00",
+          "tree_id": "4bf6d0236fc515452d169c9471c104f01fe1b6c3",
+          "url": "https://github.com/tokio-rs/tokio/commit/998dc5a2eb48bd0937b10bf0638b2f8346b5f9f5"
+        },
+        "date": 1626948395071,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 755,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13439,
+            "range": "± 4614",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 782,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 24629,
+            "range": "± 14080",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 493,
+            "range": "± 28",
             "unit": "ns/iter"
           }
         ]
