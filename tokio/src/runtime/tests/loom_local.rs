@@ -4,6 +4,14 @@ use crate::task::LocalSet;
 
 use std::task::Poll;
 
+/// Waking a runtime will attempt to push a task into a queue of notifications
+/// in the runtime, however the tasks in such a queue usually have a reference
+/// to the runtime itself. This means that if they are not properly removed at
+/// runtime shutdown, this will cause a memory leak.
+///
+/// This test verifies that waking something during shutdown of a LocalSet does
+/// not result in tasks lingering in the queue once shutdown is complete. This
+/// is verified using loom's leak finder.
 #[test]
 fn wake_during_shutdown() {
     loom::model(|| {
