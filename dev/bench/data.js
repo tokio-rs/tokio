@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1626954914302,
+  "lastUpdate": 1626954919369,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -39985,6 +39985,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19729589,
             "range": "± 4430141",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "df10b68d47631c3053342c7cf0b1fab8786565b2",
+          "message": "readme: add release schedule and bugfix policy (#3948)",
+          "timestamp": "2021-07-22T13:53:43+02:00",
+          "tree_id": "4e3fd61df727ca74eab4ec8b9fd7d135433d5403",
+          "url": "https://github.com/tokio-rs/tokio/commit/df10b68d47631c3053342c7cf0b1fab8786565b2"
+        },
+        "date": 1626954914213,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 182168,
+            "range": "± 28734",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 864446,
+            "range": "± 347255",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5519348,
+            "range": "± 1142226",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17904472,
+            "range": "± 2519126",
             "unit": "ns/iter"
           }
         ]
