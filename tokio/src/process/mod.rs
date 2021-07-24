@@ -573,6 +573,20 @@ impl Command {
         self
     }
 
+    /// Set executable argument
+    ///
+    /// Set the first process argument, `argv[0]`, to something other than the
+    /// default executable path.
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    pub fn arg0<S>(&mut self, arg: S) -> &mut Command
+    where
+        S: AsRef<OsStr>,
+    {
+        self.std.arg0(arg);
+        self
+    }
+
     /// Schedules a closure to be run just before the `exec` function is
     /// invoked.
     ///
