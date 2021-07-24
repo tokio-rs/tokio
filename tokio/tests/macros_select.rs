@@ -562,7 +562,7 @@ async fn select_cfg_true() {
 async fn select_cfg_false() {
     let foo = tokio::select! {
         #[cfg(any())]
-        _ = nani() => nani(),
+        _ = this_function_does_not_exist() => this_function_does_not_exist(),
         _ = one() => true,
     };
 
