@@ -1,9 +1,9 @@
 use super::*;
 use crate::{
     fs::mocks::*,
-    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt}
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
-use mockall::{Sequence, predicate::eq};
+use mockall::{predicate::eq, Sequence};
 use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
 
 const HELLO: &[u8] = b"hello world...";
@@ -12,12 +12,10 @@ const FOO: &[u8] = b"foo bar baz...";
 #[test]
 fn open_read() {
     let mut file = MockFile::default();
-    file.expect_inner_read()
-        .once()
-        .returning(|buf| {
-            buf[0..HELLO.len()].copy_from_slice(HELLO);
-            Ok(HELLO.len())
-        });
+    file.expect_inner_read().once().returning(|buf| {
+        buf[0..HELLO.len()].copy_from_slice(HELLO);
+        Ok(HELLO.len())
+    });
     let mut file = File::from_std(file);
 
     let mut buf = [0; 1024];
@@ -40,12 +38,10 @@ fn open_read() {
 #[test]
 fn read_twice_before_dispatch() {
     let mut file = MockFile::default();
-    file.expect_inner_read()
-        .once()
-        .returning(|buf| {
-            buf[0..HELLO.len()].copy_from_slice(HELLO);
-            Ok(HELLO.len())
-        });
+    file.expect_inner_read().once().returning(|buf| {
+        buf[0..HELLO.len()].copy_from_slice(HELLO);
+        Ok(HELLO.len())
+    });
     let mut file = File::from_std(file);
 
     let mut buf = [0; 1024];
@@ -66,12 +62,10 @@ fn read_twice_before_dispatch() {
 #[test]
 fn read_with_smaller_buf() {
     let mut file = MockFile::default();
-    file.expect_inner_read()
-        .once()
-        .returning(|buf| {
-            buf[0..HELLO.len()].copy_from_slice(HELLO);
-            Ok(HELLO.len())
-        });
+    file.expect_inner_read().once().returning(|buf| {
+        buf[0..HELLO.len()].copy_from_slice(HELLO);
+        Ok(HELLO.len())
+    });
 
     let mut file = File::from_std(file);
 
@@ -751,9 +745,7 @@ fn sync_all_ordered_after_write() {
         .in_sequence(&mut seq)
         .with(eq(HELLO))
         .returning(|_| Ok(HELLO.len()));
-    file.expect_sync_all()
-        .once()
-        .returning(|| Ok(()));
+    file.expect_sync_all().once().returning(|| Ok(()));
 
     let mut file = File::from_std(file);
     let mut t = task::spawn(file.write(HELLO));
@@ -817,9 +809,7 @@ fn sync_data_ordered_after_write() {
         .in_sequence(&mut seq)
         .with(eq(HELLO))
         .returning(|_| Ok(HELLO.len()));
-    file.expect_sync_data()
-        .once()
-        .returning(|| Ok(()));
+    file.expect_sync_data().once().returning(|| Ok(()));
 
     let mut file = File::from_std(file);
     let mut t = task::spawn(file.write(HELLO));
@@ -877,9 +867,7 @@ fn sync_data_err_ordered_after_write() {
 #[test]
 fn open_set_len_ok() {
     let mut file = MockFile::default();
-    file.expect_set_len()
-        .with(eq(123))
-        .returning(|_| Ok(()));
+    file.expect_set_len().with(eq(123)).returning(|_| Ok(()));
 
     let file = File::from_std(file);
     let mut t = task::spawn(file.set_len(123));

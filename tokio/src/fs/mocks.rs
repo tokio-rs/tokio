@@ -1,6 +1,7 @@
 //! Mock version of std::fs::File;
 use mockall::mock;
 
+use crate::sync::oneshot;
 use std::{
     cell::RefCell,
     collections::VecDeque,
@@ -9,9 +10,8 @@ use std::{
     io::{self, Read, Seek, SeekFrom, Write},
     path::PathBuf,
     pin::Pin,
-    task::{Context, Poll}
+    task::{Context, Poll},
 };
-use crate::sync::oneshot;
 
 mock! {
     #[derive(Debug)]

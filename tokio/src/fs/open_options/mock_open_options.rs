@@ -2,12 +2,9 @@
 use mockall::mock;
 
 use crate::fs::mocks::MockFile;
-use std::{
-    io,
-    path::Path
-};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
+use std::{io, path::Path};
 
 mock! {
     #[derive(Debug)]
