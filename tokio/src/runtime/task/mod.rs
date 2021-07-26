@@ -9,9 +9,17 @@ pub use self::error::JoinError;
 mod harness;
 use self::harness::Harness;
 
+cfg_rt_multi_thread! {
+    mod inject;
+    pub(super) use self::inject::Inject;
+}
+
 mod join;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
+
+mod list;
+pub(crate) use self::list::{LocalOwnedTasks, OwnedTasks};
 
 mod raw;
 use self::raw::RawTask;
@@ -20,11 +28,6 @@ mod state;
 use self::state::State;
 
 mod waker;
-
-cfg_rt_multi_thread! {
-    mod stack;
-    pub(crate) use self::stack::TransferStack;
-}
 
 use crate::future::Future;
 use crate::util::linked_list;
@@ -54,19 +57,11 @@ unsafe impl<S: Schedule> Sync for Notified<S> {}
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
 pub(crate) trait Schedule: Sync + Sized + 'static {
-    /// Bind a task to the executor.
-    ///
-    /// Guaranteed to be called from the thread that called `poll` on the task.
-    /// The returned `Schedule` instance is associated with the task and is used
-    /// as `&self` in the other methods on this trait.
-    fn bind(task: Task<Self>) -> Self;
-
     /// The task has completed work and is ready to be released. The scheduler
-    /// is free to drop it whenever.
+    /// should release it immediately and return it. The task module will batch
+    /// the ref-dec with setting other options.
     ///
-    /// If the scheduler can immediately release the task, it should return
-    /// it as part of the function. This enables the task module to batch
-    /// the ref-dec with other options.
+    /// If the scheduler has already released the task, then None is returned.
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>>;
 
     /// Schedule the task
@@ -80,42 +75,46 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
 }
 
 cfg_rt! {
-    /// Create a new task with an associated join handle
-    pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
+    /// This is the constructor for a new task. Three references to the task are
+    /// created. The first task reference is usually put into an OwnedTasks
+    /// immediately. The Notified is sent to the scheduler as an ordinary
+    /// notification.
+    fn new_task<T, S>(
+        task: T,
+        scheduler: S
+    ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
-        T: Future + Send + 'static,
         S: Schedule,
-    {
-        let raw = RawTask::new::<_, S>(task);
-
-        let task = Task {
-            raw,
-            _p: PhantomData,
-        };
-
-        let join = JoinHandle::new(raw);
-
-        (Notified(task), join)
-    }
-}
-
-cfg_rt! {
-    /// Create a new `!Send` task with an associated join handle
-    pub(crate) unsafe fn joinable_local<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
-    where
         T: Future + 'static,
-        S: Schedule,
+        T::Output: 'static,
     {
-        let raw = RawTask::new::<_, S>(task);
-
+        let raw = RawTask::new::<T, S>(task, scheduler);
         let task = Task {
             raw,
             _p: PhantomData,
         };
-
+        let notified = Notified(Task {
+            raw,
+            _p: PhantomData,
+        });
         let join = JoinHandle::new(raw);
 
-        (Notified(task), join)
+        (task, notified, join)
+    }
+
+    /// Create a new task with an associated join handle. This method is used
+    /// only when the task is not going to be stored in an `OwnedTasks` list.
+    ///
+    /// Currently only blocking tasks and tests use this method.
+    pub(crate) fn unowned<T, S>(task: T, scheduler: S) -> (Notified<S>, JoinHandle<T::Output>)
+    where
+        S: Schedule,
+        T: Send + Future + 'static,
+        T::Output: Send + 'static,
+    {
+        let (task, notified, join) = new_task(task, scheduler);
+        drop(task);
+        (notified, join)
     }
 }
 
@@ -136,10 +135,6 @@ cfg_rt_multi_thread! {
     impl<S: 'static> Notified<S> {
         pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
             Notified(Task::from_raw(ptr))
-        }
-
-        pub(crate) fn header(&self) -> &Header {
-            self.0.header()
         }
     }
 

@@ -13,7 +13,7 @@ use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
-use crate::runtime::task::{Notified, Schedule, Task};
+use crate::runtime::task::Schedule;
 use crate::util::linked_list;
 
 use std::pin::Pin;
@@ -36,10 +36,6 @@ pub(super) struct Cell<T: Future, S> {
     pub(super) trailer: Trailer,
 }
 
-pub(super) struct Scheduler<S> {
-    scheduler: UnsafeCell<Option<S>>,
-}
-
 pub(super) struct CoreStage<T: Future> {
     stage: UnsafeCell<Stage<T>>,
 }
@@ -49,7 +45,7 @@ pub(super) struct CoreStage<T: Future> {
 /// Holds the future or output, depending on the stage of execution.
 pub(super) struct Core<T: Future, S> {
     /// Scheduler used to drive this future
-    pub(super) scheduler: Scheduler<S>,
+    pub(super) scheduler: S,
 
     /// Either the future or the output
     pub(super) stage: CoreStage<T>,
@@ -65,9 +61,6 @@ pub(crate) struct Header {
 
     /// Pointer to next task, used with the injection queue
     pub(crate) queue_next: UnsafeCell<Option<NonNull<Header>>>,
-
-    /// Pointer to the next task in the transfer stack
-    pub(super) stack_next: UnsafeCell<Option<NonNull<Header>>>,
 
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
@@ -96,7 +89,7 @@ pub(super) enum Stage<T: Future> {
 impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
-    pub(super) fn new(future: T, state: State) -> Box<Cell<T, S>> {
+    pub(super) fn new(future: T, scheduler: S, state: State) -> Box<Cell<T, S>> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let id = future.id();
         Box::new(Cell {
@@ -104,15 +97,12 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 state,
                 owned: UnsafeCell::new(linked_list::Pointers::new()),
                 queue_next: UnsafeCell::new(None),
-                stack_next: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 id,
             },
             core: Core {
-                scheduler: Scheduler {
-                    scheduler: UnsafeCell::new(None),
-                },
+                scheduler,
                 stage: CoreStage {
                     stage: UnsafeCell::new(Stage::Running(future)),
                 },
@@ -120,92 +110,6 @@ impl<T: Future, S: Schedule> Cell<T, S> {
             trailer: Trailer {
                 waker: UnsafeCell::new(None),
             },
-        })
-    }
-}
-
-impl<S: Schedule> Scheduler<S> {
-    pub(super) fn with_mut<R>(&self, f: impl FnOnce(*mut Option<S>) -> R) -> R {
-        self.scheduler.with_mut(f)
-    }
-
-    /// Bind a scheduler to the task.
-    ///
-    /// This only happens on the first poll and must be preceded by a call to
-    /// `is_bound` to determine if binding is appropriate or not.
-    ///
-    /// # Safety
-    ///
-    /// Binding must not be done concurrently since it will mutate the task
-    /// core through a shared reference.
-    pub(super) fn bind_scheduler(&self, task: Task<S>) {
-        // This function may be called concurrently, but the __first__ time it
-        // is called, the caller has unique access to this field. All subsequent
-        // concurrent calls will be via the `Waker`, which will "happens after"
-        // the first poll.
-        //
-        // In other words, it is always safe to read the field and it is safe to
-        // write to the field when it is `None`.
-        debug_assert!(!self.is_bound());
-
-        // Bind the task to the scheduler
-        let scheduler = S::bind(task);
-
-        // Safety: As `scheduler` is not set, this is the first poll
-        self.scheduler.with_mut(|ptr| unsafe {
-            *ptr = Some(scheduler);
-        });
-    }
-
-    /// Returns true if the task is bound to a scheduler.
-    pub(super) fn is_bound(&self) -> bool {
-        // Safety: never called concurrently w/ a mutation.
-        self.scheduler.with(|ptr| unsafe { (*ptr).is_some() })
-    }
-
-    /// Schedule the future for execution
-    pub(super) fn schedule(&self, task: Notified<S>) {
-        self.scheduler.with(|ptr| {
-            // Safety: Can only be called after initial `poll`, which is the
-            // only time the field is mutated.
-            match unsafe { &*ptr } {
-                Some(scheduler) => scheduler.schedule(task),
-                None => panic!("no scheduler set"),
-            }
-        });
-    }
-
-    /// Schedule the future for execution in the near future, yielding the
-    /// thread to other tasks.
-    pub(super) fn yield_now(&self, task: Notified<S>) {
-        self.scheduler.with(|ptr| {
-            // Safety: Can only be called after initial `poll`, which is the
-            // only time the field is mutated.
-            match unsafe { &*ptr } {
-                Some(scheduler) => scheduler.yield_now(task),
-                None => panic!("no scheduler set"),
-            }
-        });
-    }
-
-    /// Release the task
-    ///
-    /// If the `Scheduler` implementation is able to, it returns the `Task`
-    /// handle immediately. The caller of this function will batch a ref-dec
-    /// with a state change.
-    pub(super) fn release(&self, task: Task<S>) -> Option<Task<S>> {
-        use std::mem::ManuallyDrop;
-
-        let task = ManuallyDrop::new(task);
-
-        self.scheduler.with(|ptr| {
-            // Safety: Can only be called after initial `poll`, which is the
-            // only time the field is mutated.
-            match unsafe { &*ptr } {
-                Some(scheduler) => scheduler.release(&*task),
-                // Task was never polled
-                None => None,
-            }
         })
     }
 }
@@ -299,13 +203,6 @@ impl<T: Future> CoreStage<T> {
 
 cfg_rt_multi_thread! {
     impl Header {
-        pub(crate) fn shutdown(&self) {
-            use crate::runtime::task::RawTask;
-
-            let task = unsafe { RawTask::from_raw(self.into()) };
-            task.shutdown();
-        }
-
         pub(crate) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
             self.queue_next.with_mut(|ptr| *ptr = next);
         }

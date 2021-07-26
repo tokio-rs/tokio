@@ -1,5 +1,5 @@
 use crate::future::Future;
-use crate::runtime::task::core::{Cell, Core, CoreStage, Header, Scheduler, Trailer};
+use crate::runtime::task::core::{Cell, Core, CoreStage, Header, Trailer};
 use crate::runtime::task::state::Snapshot;
 use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{JoinError, Notified, Schedule, Task};
@@ -95,7 +95,6 @@ where
 
         // Check causality
         self.core().stage.with_mut(drop);
-        self.core().scheduler.with_mut(drop);
 
         unsafe {
             drop(Box::from_raw(self.cell.as_ptr()));
@@ -238,7 +237,7 @@ enum TransitionToRunning {
 
 struct SchedulerView<'a, S> {
     header: &'a Header,
-    scheduler: &'a Scheduler<S>,
+    scheduler: &'a S,
 }
 
 impl<'a, S> SchedulerView<'a, S>
@@ -252,16 +251,16 @@ where
 
     /// Returns true if the task should be deallocated.
     fn transition_to_terminal(&self, is_join_interested: bool) -> bool {
-        let ref_dec = if self.scheduler.is_bound() {
-            if let Some(task) = self.scheduler.release(self.to_task()) {
-                mem::forget(task);
-                true
-            } else {
-                false
-            }
+        let me = self.to_task();
+
+        let ref_dec = if let Some(task) = self.scheduler.release(&me) {
+            mem::forget(task);
+            true
         } else {
             false
         };
+
+        mem::forget(me);
 
         // This might deallocate
         let snapshot = self
@@ -273,16 +272,11 @@ where
     }
 
     fn transition_to_running(&self) -> TransitionToRunning {
-        // If this is the first time the task is polled, the task will be bound
-        // to the scheduler, in which case the task ref count must be
-        // incremented.
-        let is_not_bound = !self.scheduler.is_bound();
-
         // Transition the task to the running state.
         //
         // A failure to transition here indicates the task has been cancelled
         // while in the run queue pending execution.
-        let snapshot = match self.header.state.transition_to_running(is_not_bound) {
+        let snapshot = match self.header.state.transition_to_running() {
             Ok(snapshot) => snapshot,
             Err(_) => {
                 // The task was shutdown while in the run queue. At this point,
@@ -292,20 +286,6 @@ where
             }
         };
 
-        if is_not_bound {
-            // Ensure the task is bound to a scheduler instance. Since this is
-            // the first time polling the task, a scheduler instance is pulled
-            // from the local context and assigned to the task.
-            //
-            // The scheduler maintains ownership of the task and responds to
-            // `wake` calls.
-            //
-            // The task reference count has been incremented.
-            //
-            // Safety: Since we have unique access to the task so that we can
-            // safely call `bind_scheduler`.
-            self.scheduler.bind_scheduler(self.to_task());
-        }
         TransitionToRunning::Ok(snapshot)
     }
 }

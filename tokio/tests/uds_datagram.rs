@@ -87,9 +87,12 @@ async fn try_send_recv_never_block() -> io::Result<()> {
         dgram1.writable().await.unwrap();
 
         match dgram1.try_send(payload) {
-            Err(err) => match err.kind() {
-                io::ErrorKind::WouldBlock | io::ErrorKind::Other => break,
-                _ => unreachable!("unexpected error {:?}", err),
+            Err(err) => match (err.kind(), err.raw_os_error()) {
+                (io::ErrorKind::WouldBlock, _) => break,
+                (_, Some(libc::ENOBUFS)) => break,
+                _ => {
+                    panic!("unexpected error {:?}", err);
+                }
             },
             Ok(len) => {
                 assert_eq!(len, payload.len());
@@ -291,9 +294,12 @@ async fn try_recv_buf_never_block() -> io::Result<()> {
         dgram1.writable().await.unwrap();
 
         match dgram1.try_send(payload) {
-            Err(err) => match err.kind() {
-                io::ErrorKind::WouldBlock | io::ErrorKind::Other => break,
-                _ => unreachable!("unexpected error {:?}", err),
+            Err(err) => match (err.kind(), err.raw_os_error()) {
+                (io::ErrorKind::WouldBlock, _) => break,
+                (_, Some(libc::ENOBUFS)) => break,
+                _ => {
+                    panic!("unexpected error {:?}", err);
+                }
             },
             Ok(len) => {
                 assert_eq!(len, payload.len());
