@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627295737197,
+  "lastUpdate": 1627306727461,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21275,6 +21275,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 593,
             "range": "± 108",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2b731c0e01756d695af4d2a77f372a7e6874761e",
+          "message": "task: elaborate on queue behavior of spawn_blocking (#3981)",
+          "timestamp": "2021-07-26T15:37:17+02:00",
+          "tree_id": "5cd83db50b6c8b519836acb3b0dda621184f8bca",
+          "url": "https://github.com/tokio-rs/tokio/commit/2b731c0e01756d695af4d2a77f372a7e6874761e"
+        },
+        "date": 1627306722195,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 767,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13298,
+            "range": "± 10593",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 775,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 12904,
+            "range": "± 3782",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 492,
+            "range": "± 6",
             "unit": "ns/iter"
           }
         ]
