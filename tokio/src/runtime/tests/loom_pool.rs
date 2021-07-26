@@ -11,7 +11,7 @@ use crate::{spawn, task};
 use tokio_test::assert_ok;
 
 use loom::sync::atomic::{AtomicBool, AtomicUsize};
-use loom::sync::{Arc, Mutex};
+use loom::sync::Arc;
 
 use pin_project_lite::pin_project;
 use std::future::Future;
