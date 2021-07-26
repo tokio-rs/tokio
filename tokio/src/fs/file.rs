@@ -8,7 +8,6 @@ use crate::io::blocking::Buf;
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
 
-use cfg_if::cfg_if;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
 use std::future::Future;
@@ -20,17 +19,18 @@ use std::task::Context;
 use std::task::Poll;
 use std::task::Poll::*;
 
-cfg_if! {
-    if #[cfg(test)] {
-        use super::mocks::MockFile as StdFile;
-        use super::mocks::JoinHandle;
-        use super::mocks::spawn_blocking;
-    } else {
-        use std::fs::File as StdFile;
-        use crate::blocking::spawn_blocking;
-        use crate::blocking::JoinHandle;
-    }
-}
+#[cfg(test)]
+use super::mocks::MockFile as StdFile;
+#[cfg(test)]
+use super::mocks::JoinHandle;
+#[cfg(test)]
+use super::mocks::spawn_blocking;
+#[cfg(not(test))]
+use std::fs::File as StdFile;
+#[cfg(not(test))]
+use crate::blocking::spawn_blocking;
+#[cfg(not(test))]
+use crate::blocking::JoinHandle;
 
 /// A reference to an open file on the filesystem.
 ///

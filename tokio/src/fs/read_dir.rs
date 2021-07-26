@@ -1,6 +1,5 @@
 use crate::fs::asyncify;
 
-use cfg_if::cfg_if;
 use std::ffi::OsString;
 use std::fs::{FileType, Metadata};
 use std::future::Future;
@@ -11,15 +10,14 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
-cfg_if! {
-    if #[cfg(test)] {
-        use super::mocks::JoinHandle;
-        use super::mocks::spawn_blocking;
-    } else {
-        use crate::blocking::spawn_blocking;
-        use crate::blocking::JoinHandle;
-    }
-}
+#[cfg(test)]
+use super::mocks::JoinHandle;
+#[cfg(test)]
+use super::mocks::spawn_blocking;
+#[cfg(not(test))]
+use crate::blocking::spawn_blocking;
+#[cfg(not(test))]
+use crate::blocking::JoinHandle;
 
 /// Returns a stream over the entries within a directory.
 ///

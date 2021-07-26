@@ -1,17 +1,14 @@
 use crate::fs::{asyncify, File};
 
-use cfg_if::cfg_if;
 use std::io;
 use std::path::Path;
 
-cfg_if! {
-    if #[cfg(test)] {
-        mod mock_open_options;
-        use mock_open_options::MockOpenOptions as StdOpenOptions;
-    } else {
-        use std::fs::OpenOptions as StdOpenOptions;
-    }
-}
+#[cfg(test)]
+mod mock_open_options;
+#[cfg(test)]
+use mock_open_options::MockOpenOptions as StdOpenOptions;
+#[cfg(not(test))]
+use std::fs::OpenOptions as StdOpenOptions;
 
 /// Options and flags which can be used to configure how a file is opened.
 ///

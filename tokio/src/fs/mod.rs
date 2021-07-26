@@ -24,8 +24,6 @@
 //!
 //! [`AsyncRead`]: trait@crate::io::AsyncRead
 
-use cfg_if::cfg_if;
-
 mod canonicalize;
 pub use self::canonicalize::canonicalize;
 
@@ -108,13 +106,10 @@ feature! {
 
 use std::io;
 
-cfg_if! {
-    if #[cfg(test)] {
-        use mocks::spawn_blocking;
-    } else {
-        use crate::blocking::spawn_blocking;
-    }
-}
+#[cfg(test)]
+use mocks::spawn_blocking;
+#[cfg(not(test))]
+use crate::blocking::spawn_blocking;
 
 pub(crate) async fn asyncify<F, T>(f: F) -> io::Result<T>
 where

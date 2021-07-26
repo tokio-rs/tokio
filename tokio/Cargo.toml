@@ -42,7 +42,7 @@ full = [
   "time",
 ]
 
-fs = ["cfg-if"]
+fs = []
 io-util = ["memchr", "bytes"]
 # stdin, stdout, stderr
 io-std = []
@@ -92,7 +92,6 @@ pin-project-lite = "0.2.0"
 
 # Everything else is optional...
 bytes = { version = "1.0.0", optional = true }
-cfg-if = { version = "1.0", optional = true }
 once_cell = { version = "1.5.2", optional = true }
 memchr = { version = "2.2", optional = true }
 mio = { version = "0.7.6", optional = true }
