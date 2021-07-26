@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627309593246,
+  "lastUpdate": 1627309597506,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -40393,6 +40393,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19267353,
             "range": "± 2903688",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2b731c0e01756d695af4d2a77f372a7e6874761e",
+          "message": "task: elaborate on queue behavior of spawn_blocking (#3981)",
+          "timestamp": "2021-07-26T15:37:17+02:00",
+          "tree_id": "5cd83db50b6c8b519836acb3b0dda621184f8bca",
+          "url": "https://github.com/tokio-rs/tokio/commit/2b731c0e01756d695af4d2a77f372a7e6874761e"
+        },
+        "date": 1627309587204,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 218831,
+            "range": "± 37334",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 960723,
+            "range": "± 125814",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6100791,
+            "range": "± 1980643",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20193272,
+            "range": "± 3683086",
             "unit": "ns/iter"
           }
         ]
