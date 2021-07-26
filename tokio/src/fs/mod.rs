@@ -106,10 +106,10 @@ feature! {
 
 use std::io;
 
-#[cfg(test)]
-use mocks::spawn_blocking;
 #[cfg(not(test))]
 use crate::blocking::spawn_blocking;
+#[cfg(test)]
+use mocks::spawn_blocking;
 
 pub(crate) async fn asyncify<F, T>(f: F) -> io::Result<T>
 where

@@ -11,9 +11,9 @@ use std::task::Context;
 use std::task::Poll;
 
 #[cfg(test)]
-use super::mocks::JoinHandle;
-#[cfg(test)]
 use super::mocks::spawn_blocking;
+#[cfg(test)]
+use super::mocks::JoinHandle;
 #[cfg(not(test))]
 use crate::blocking::spawn_blocking;
 #[cfg(not(test))]
