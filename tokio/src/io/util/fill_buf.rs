@@ -18,7 +18,7 @@ pin_project! {
     }
 }
 
-pub(crate) fn fill_buf<'a, R>(reader: &'a mut R) -> FillBuf<'a, R>
+pub(crate) fn fill_buf<R>(reader: &mut R) -> FillBuf<'_, R>
 where
     R: AsyncBufRead + ?Sized + Unpin,
 {

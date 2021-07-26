@@ -231,7 +231,7 @@ cfg_io_util! {
         /// read, but returned an error.
         ///
         /// [`consume`]: crate::io::AsyncBufReadExt::consume
-        fn fill_buf<'a>(&'a mut self) -> FillBuf<'a, Self>
+        fn fill_buf(&mut self) -> FillBuf<'_, Self>
         where
             Self: Unpin,
         {
