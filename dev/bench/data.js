@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627375480172,
+  "lastUpdate": 1627375484280,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -62139,6 +62139,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1045,
             "range": "± 72",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f2a06bff1be147a72d40cb01d8bb621fbdc242fc",
+          "message": "runtime: add owner id for tasks in OwnedTasks (#3979)",
+          "timestamp": "2021-07-27T10:41:35+02:00",
+          "tree_id": "545c22eb1cd68bfba00fd3ba5bdb763bee0f6484",
+          "url": "https://github.com/tokio-rs/tokio/commit/f2a06bff1be147a72d40cb01d8bb621fbdc242fc"
+        },
+        "date": 1627375469621,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 22973,
+            "range": "± 12495",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1084,
+            "range": "± 171",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 676,
+            "range": "± 267",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 21277,
+            "range": "± 13045",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1092,
+            "range": "± 148",
             "unit": "ns/iter"
           }
         ]
