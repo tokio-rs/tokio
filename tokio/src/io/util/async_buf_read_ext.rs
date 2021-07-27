@@ -36,6 +36,18 @@ cfg_io_util! {
         /// [`fill_buf`]: AsyncBufRead::poll_fill_buf
         /// [`ErrorKind::Interrupted`]: std::io::ErrorKind::Interrupted
         ///
+        /// # Cancel safety
+        ///
+        /// If the method is used as the event in a
+        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// completes first, then some data may have been partially read. Any
+        /// partially read bytes are appended to `buf`, and the method can be
+        /// called again to continue reading until `byte`.
+        ///
+        /// This method returns the total number of bytes read. If you cancel
+        /// the call to `read_until` and then call it again to continue reading,
+        /// the counter is reset.
+        ///
         /// # Examples
         ///
         /// [`std::io::Cursor`][`Cursor`] is a type that implements `BufRead`. In
@@ -113,6 +125,30 @@ cfg_io_util! {
         /// the event that all data read so far was valid UTF-8.
         ///
         /// [`read_until`]: AsyncBufReadExt::read_until
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is not cancellation safe. If the method is used as the
+        /// event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then some data may have been partially
+        /// read, and this data is lost. There are no guarantees regarding the
+        /// contents of `buf` when the call is cancelled. The current
+        /// implementation replaces `buf` with the empty string, but this may
+        /// change in the future.
+        ///
+        /// This function does not behave like [`read_until`] because of the
+        /// requirement that a string contains only valid utf-8. If you need a
+        /// cancellation safe `read_line`, there are three options:
+        ///
+        ///  * Call [`read_until`] with a newline character and manually perform the utf-8 check.
+        ///  * The stream returned by [`lines`] has a cancellation safe
+        ///    [`next_line`] method.
+        ///  * Use [`tokio_util::codec::LinesCodec`][LinesCodec].
+        ///
+        /// [LinesCodec]: https://docs.rs/tokio-util/0.6/tokio_util/codec/struct.LinesCodec.html
+        /// [`read_until`]: Self::read_until
+        /// [`lines`]: Self::lines
+        /// [`next_line`]: crate::io::Lines::next_line
         ///
         /// # Examples
         ///
