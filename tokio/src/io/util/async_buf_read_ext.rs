@@ -173,10 +173,11 @@ cfg_io_util! {
         /// [`BufRead::split`](std::io::BufRead::split).
         ///
         /// The stream returned from this function will yield instances of
-        /// [`io::Result`]`<`[`Vec<u8>`]`>`. Each vector returned will *not* have
+        /// [`io::Result`]`<`[`Option`]`<`[`Vec<u8>`]`>>`. Each vector returned will *not* have
         /// the delimiter byte at the end.
         ///
         /// [`io::Result`]: std::io::Result
+        /// [`Option`]: core::option::Option
         /// [`Vec<u8>`]: std::vec::Vec
         ///
         /// # Errors
@@ -210,10 +211,11 @@ cfg_io_util! {
         /// This method is the async equivalent to [`BufRead::lines`](std::io::BufRead::lines).
         ///
         /// The stream returned from this function will yield instances of
-        /// [`io::Result`]`<`[`String`]`>`. Each string returned will *not* have a newline
+        /// [`io::Result`]`<`[`Option`]`<`[`String`]`>>`. Each string returned will *not* have a newline
         /// byte (the 0xA byte) or CRLF (0xD, 0xA bytes) at the end.
         ///
         /// [`io::Result`]: std::io::Result
+        /// [`Option`]: core::option::Option
         /// [`String`]: String
         ///
         /// # Errors
