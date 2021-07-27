@@ -540,11 +540,11 @@ impl LocalSet {
         true
     }
 
-    fn next_task(&self) -> Option<task::Notified<Arc<Shared>>> {
+    fn next_task(&self) -> Option<task::LocalNotified<Arc<Shared>>> {
         let tick = self.tick.get();
         self.tick.set(tick.wrapping_add(1));
 
-        if tick % REMOTE_FIRST_INTERVAL == 0 {
+        let task = if tick % REMOTE_FIRST_INTERVAL == 0 {
             self.context
                 .shared
                 .queue
@@ -566,7 +566,9 @@ impl LocalSet {
                         .as_mut()
                         .and_then(|queue| queue.pop_front())
                 })
-        }
+        };
+
+        task.map(|task| self.context.tasks.borrow_mut().owned.assert_owner(task))
     }
 
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
@@ -631,15 +633,17 @@ impl Drop for LocalSet {
                 task.shutdown();
             }
 
+            // We already called shutdown on all tasks above, so there is no
+            // need to call shutdown.
             for task in self.context.tasks.borrow_mut().queue.drain(..) {
-                task.shutdown();
+                drop(task);
             }
 
             // Take the queue from the Shared object to prevent pushing
             // notifications to it in the future.
             let queue = self.context.shared.queue.lock().take().unwrap();
             for task in queue {
-                task.shutdown();
+                drop(task);
             }
 
             assert!(self.context.tasks.borrow().owned.is_empty());
@@ -711,12 +715,8 @@ impl task::Schedule for Arc<Shared> {
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
-
             assert!(cx.shared.ptr_eq(self));
-
-            // safety: task must be contained by list. It is inserted into the
-            // list when spawning.
-            unsafe { cx.tasks.borrow_mut().owned.remove(&task) }
+            cx.tasks.borrow_mut().owned.remove(&task)
         })
     }
 

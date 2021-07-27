@@ -71,7 +71,7 @@ struct Shared {
     worker_thread_index: usize,
 }
 
-type Task = task::Notified<NoopSchedule>;
+type Task = task::UnownedTask<NoopSchedule>;
 
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
