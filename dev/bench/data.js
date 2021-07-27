@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627375484280,
+  "lastUpdate": 1627394917664,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21491,6 +21491,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 493,
             "range": "± 23",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "erik@datenzone.de",
+            "name": "Erik Tews",
+            "username": "eriktews"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4d8cc28b76ca87a179e00402e6d8927cee3e51cf",
+          "message": "io: add missing Option to doc (#3999)",
+          "timestamp": "2021-07-27T16:06:47+02:00",
+          "tree_id": "f79fbcc1ff29b459c2769afb912ab0422a55c763",
+          "url": "https://github.com/tokio-rs/tokio/commit/4d8cc28b76ca87a179e00402e6d8927cee3e51cf"
+        },
+        "date": 1627394911145,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 923,
+            "range": "± 232",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16927,
+            "range": "± 20377",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 941,
+            "range": "± 7",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17129,
+            "range": "± 4463",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 593,
+            "range": "± 12",
             "unit": "ns/iter"
           }
         ]
