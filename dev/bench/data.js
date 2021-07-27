@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627401721615,
+  "lastUpdate": 1627402778690,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -62451,6 +62451,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1032,
             "range": "± 106",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8b447649bb3c9f8c5018d9818c60defc29908dfe",
+          "message": "io: document cancellation safety of AsyncBufReadExt (#3997)",
+          "timestamp": "2021-07-27T17:59:38+02:00",
+          "tree_id": "339696b3c4819bbce9aff6c76c5745480c037a91",
+          "url": "https://github.com/tokio-rs/tokio/commit/8b447649bb3c9f8c5018d9818c60defc29908dfe"
+        },
+        "date": 1627402772021,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 17310,
+            "range": "± 7316",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 990,
+            "range": "± 82",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 640,
+            "range": "± 53",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 17497,
+            "range": "± 7211",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 986,
+            "range": "± 88",
             "unit": "ns/iter"
           }
         ]
