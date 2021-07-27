@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627401716596,
+  "lastUpdate": 1627401721615,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -40747,6 +40747,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 16558818,
             "range": "± 3319480",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8b447649bb3c9f8c5018d9818c60defc29908dfe",
+          "message": "io: document cancellation safety of AsyncBufReadExt (#3997)",
+          "timestamp": "2021-07-27T17:59:38+02:00",
+          "tree_id": "339696b3c4819bbce9aff6c76c5745480c037a91",
+          "url": "https://github.com/tokio-rs/tokio/commit/8b447649bb3c9f8c5018d9818c60defc29908dfe"
+        },
+        "date": 1627401709420,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 248423,
+            "range": "± 64669",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1080121,
+            "range": "± 215495",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 7031924,
+            "range": "± 1572962",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 23143082,
+            "range": "± 3598580",
             "unit": "ns/iter"
           }
         ]
