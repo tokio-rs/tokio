@@ -199,6 +199,8 @@ use std::io;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 #[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, RawHandle};
+#[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::pin::Pin;
@@ -948,6 +950,16 @@ impl Child {
     pub fn id(&self) -> Option<u32> {
         match &self.child {
             FusedChild::Child(child) => Some(child.inner.id()),
+            FusedChild::Done(_) => None,
+        }
+    }
+
+    /// Extracts the raw handle of the process associated with this child while
+    /// it is still running. Returns `None` if the child has exited.
+    #[cfg(windows)]
+    pub fn raw_handle(&self) -> Option<RawHandle> {
+        match &self.child {
+            FusedChild::Child(c) => Some(c.inner.as_raw_handle()),
             FusedChild::Done(_) => None,
         }
     }

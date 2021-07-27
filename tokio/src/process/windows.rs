@@ -24,7 +24,7 @@ use mio::windows::NamedPipe;
 use std::fmt;
 use std::future::Future;
 use std::io;
-use std::os::windows::prelude::{AsRawHandle, FromRawHandle, IntoRawHandle};
+use std::os::windows::prelude::{AsRawHandle, FromRawHandle, IntoRawHandle, RawHandle};
 use std::pin::Pin;
 use std::process::Stdio;
 use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
@@ -141,6 +141,12 @@ impl Future for Child {
                 tx: ptr,
             });
         }
+    }
+}
+
+impl AsRawHandle for Child {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.child.as_raw_handle()
     }
 }
 
