@@ -47,7 +47,7 @@ where
 {
     /// Returns the next line in the stream.
     ///
-    /// # Cancellation safety
+    /// # Cancel safety
     ///
     /// This method is cancellation safe.
     ///
