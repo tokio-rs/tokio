@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use bytes::BytesMut;
-use tokio::io::{self, AsyncRead, ReadBuf, AsyncWrite, AsyncWriteExt};
+use tokio::io::{self, AsyncRead, ReadBuf, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 use tokio_test::assert_ok;
 use futures::ready;
 
@@ -39,33 +39,9 @@ async fn copy() {
 
 #[tokio::test]
 async fn proxy() {
-    struct LimitRd {
-        count: usize,
-        reader: io::DuplexStream
-    }
-
     struct BufferedWd {
         buf: BytesMut,
         writer: io::DuplexStream
-    }
-
-    impl AsyncRead for LimitRd {
-        fn poll_read(
-            self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-            buf: &mut ReadBuf<'_>,
-        ) -> Poll<io::Result<()>> {
-            let this = self.get_mut();
-
-            if this.count < 1024 {
-                let read_before = buf.filled().len();
-                ready!(Pin::new(&mut this.reader).poll_read(cx, buf))?;
-                let read_after = buf.filled().len();
-                this.count += read_after - read_before;
-            }
-
-            Poll::Ready(Ok(()))
-        }
     }
 
     impl AsyncWrite for BufferedWd {
@@ -95,10 +71,7 @@ async fn proxy() {
     }
 
     let (rd, wd) = io::duplex(1024);
-    let mut rd = LimitRd {
-        count: 0,
-        reader: rd
-    };
+    let mut rd = rd.take(1024);
     let mut wd = BufferedWd {
         buf: BytesMut::new(),
         writer: wd
