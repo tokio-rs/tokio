@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627487014664,
+  "lastUpdate": 1627487026917,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -40951,6 +40951,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22058775,
             "range": "± 4653291",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "felix@passcod.name",
+            "name": "Félix Saparelli",
+            "username": "passcod"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f957f7f9a7363db3a2640b55354c38958acc9c79",
+          "message": "process: add Child::raw_handle() on windows (#3998)\n\nFixes #3987",
+          "timestamp": "2021-07-28T15:42:03Z",
+          "tree_id": "82f47dcddfdbd17f19508d250d8abf6442cd82ff",
+          "url": "https://github.com/tokio-rs/tokio/commit/f957f7f9a7363db3a2640b55354c38958acc9c79"
+        },
+        "date": 1627487021237,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 188171,
+            "range": "± 4966",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1006414,
+            "range": "± 119826",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6120200,
+            "range": "± 3212770",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18296854,
+            "range": "± 4094932",
             "unit": "ns/iter"
           }
         ]
