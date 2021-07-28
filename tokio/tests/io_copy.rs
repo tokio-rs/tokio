@@ -2,9 +2,9 @@
 #![cfg(feature = "full")]
 
 use bytes::BytesMut;
-use tokio::io::{self, AsyncRead, ReadBuf, AsyncWrite, AsyncReadExt, AsyncWriteExt};
-use tokio_test::assert_ok;
 use futures::ready;
+use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
+use tokio_test::assert_ok;
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -41,7 +41,7 @@ async fn copy() {
 async fn proxy() {
     struct BufferedWd {
         buf: BytesMut,
-        writer: io::DuplexStream
+        writer: io::DuplexStream,
     }
 
     impl AsyncWrite for BufferedWd {
@@ -74,7 +74,7 @@ async fn proxy() {
     let mut rd = rd.take(1024);
     let mut wd = BufferedWd {
         buf: BytesMut::new(),
-        writer: wd
+        writer: wd,
     };
 
     // write start bytes

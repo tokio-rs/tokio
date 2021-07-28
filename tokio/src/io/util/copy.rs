@@ -58,8 +58,8 @@ impl CopyBuffer {
 
                 match reader.as_mut().poll_read(cx, &mut buf) {
                     Poll::Ready(Ok(_)) => (),
-                    Poll::Ready(Err(err)) => return Poll::Ready(Err(err.into())),
-                    Poll::Pending =>  {
+                    Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
+                    Poll::Pending => {
                         // Try flushing when the reader has no progress to avoid deadlock
                         // when the reader depends on buffered writer.
                         if let FlushState::Need = self.flush_state {
