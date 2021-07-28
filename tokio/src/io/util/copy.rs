@@ -8,16 +8,25 @@ use std::task::{Context, Poll};
 #[derive(Debug)]
 pub(super) struct CopyBuffer {
     read_done: bool,
+    flush_state: FlushState,
     pos: usize,
     cap: usize,
     amt: u64,
     buf: Box<[u8]>,
 }
 
+#[derive(Debug)]
+enum FlushState {
+    NoNeed,
+    Need,
+    Flushing,
+}
+
 impl CopyBuffer {
     pub(super) fn new() -> Self {
         Self {
             read_done: false,
+            flush_state: FlushState::NoNeed,
             pos: 0,
             cap: 0,
             amt: 0,
@@ -35,13 +44,34 @@ impl CopyBuffer {
         R: AsyncRead + ?Sized,
         W: AsyncWrite + ?Sized,
     {
+        if let FlushState::Flushing = self.flush_state {
+            ready!(writer.as_mut().poll_flush(cx))?;
+            self.flush_state = FlushState::NoNeed;
+        }
+
         loop {
             // If our buffer is empty, then we need to read some data to
             // continue.
             if self.pos == self.cap && !self.read_done {
                 let me = &mut *self;
                 let mut buf = ReadBuf::new(&mut me.buf);
-                ready!(reader.as_mut().poll_read(cx, &mut buf))?;
+
+                match reader.as_mut().poll_read(cx, &mut buf) {
+                    Poll::Ready(Ok(_)) => (),
+                    Poll::Ready(Err(err)) => return Poll::Ready(Err(err.into())),
+                    Poll::Pending =>  {
+                        // Try flushing when the reader has no progress to avoid deadlock
+                        // when the reader depends on buffered writer.
+                        if let FlushState::Need = self.flush_state {
+                            self.flush_state = FlushState::Flushing;
+                            ready!(writer.as_mut().poll_flush(cx))?;
+                            self.flush_state = FlushState::NoNeed;
+                        }
+
+                        return Poll::Pending;
+                    }
+                }
+
                 let n = buf.filled().len();
                 if n == 0 {
                     self.read_done = true;
@@ -63,6 +93,7 @@ impl CopyBuffer {
                 } else {
                     self.pos += i;
                     self.amt += i as u64;
+                    self.flush_state = FlushState::Need;
                 }
             }
 
