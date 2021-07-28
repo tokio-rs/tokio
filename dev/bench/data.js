@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627402804967,
+  "lastUpdate": 1627487014664,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21599,6 +21599,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 641,
             "range": "± 103",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "felix@passcod.name",
+            "name": "Félix Saparelli",
+            "username": "passcod"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f957f7f9a7363db3a2640b55354c38958acc9c79",
+          "message": "process: add Child::raw_handle() on windows (#3998)\n\nFixes #3987",
+          "timestamp": "2021-07-28T15:42:03Z",
+          "tree_id": "82f47dcddfdbd17f19508d250d8abf6442cd82ff",
+          "url": "https://github.com/tokio-rs/tokio/commit/f957f7f9a7363db3a2640b55354c38958acc9c79"
+        },
+        "date": 1627487008863,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 772,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14701,
+            "range": "± 5402",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 774,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13567,
+            "range": "± 5334",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 491,
+            "range": "± 14",
             "unit": "ns/iter"
           }
         ]
