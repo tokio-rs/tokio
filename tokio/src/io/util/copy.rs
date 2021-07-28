@@ -8,25 +8,18 @@ use std::task::{Context, Poll};
 #[derive(Debug)]
 pub(super) struct CopyBuffer {
     read_done: bool,
-    flush_state: FlushState,
+    need_flush: bool,
     pos: usize,
     cap: usize,
     amt: u64,
     buf: Box<[u8]>,
 }
 
-#[derive(Debug)]
-enum FlushState {
-    NoNeed,
-    Need,
-    Flushing,
-}
-
 impl CopyBuffer {
     pub(super) fn new() -> Self {
         Self {
             read_done: false,
-            flush_state: FlushState::NoNeed,
+            need_flush: false,
             pos: 0,
             cap: 0,
             amt: 0,
@@ -44,11 +37,6 @@ impl CopyBuffer {
         R: AsyncRead + ?Sized,
         W: AsyncWrite + ?Sized,
     {
-        if let FlushState::Flushing = self.flush_state {
-            ready!(writer.as_mut().poll_flush(cx))?;
-            self.flush_state = FlushState::NoNeed;
-        }
-
         loop {
             // If our buffer is empty, then we need to read some data to
             // continue.
@@ -62,10 +50,9 @@ impl CopyBuffer {
                     Poll::Pending => {
                         // Try flushing when the reader has no progress to avoid deadlock
                         // when the reader depends on buffered writer.
-                        if let FlushState::Need = self.flush_state {
-                            self.flush_state = FlushState::Flushing;
+                        if self.need_flush {
                             ready!(writer.as_mut().poll_flush(cx))?;
-                            self.flush_state = FlushState::NoNeed;
+                            self.need_flush = false;
                         }
 
                         return Poll::Pending;
@@ -93,7 +80,7 @@ impl CopyBuffer {
                 } else {
                     self.pos += i;
                     self.amt += i as u64;
-                    self.flush_state = FlushState::Need;
+                    self.need_flush = true;
                 }
             }
 
