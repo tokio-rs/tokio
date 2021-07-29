@@ -9,39 +9,44 @@ pub(super) struct State {
 }
 
 /// Current state value
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub(super) struct Snapshot(usize);
 
 type UpdateResult = Result<Snapshot, Snapshot>;
 
-/// The task is currently being run.
-const RUNNING: usize = 0b0001;
+// The bits described below are also documented in src/runtime/task/mod.rs
+
+/// The task is currently not being run.
+///
+/// Unused when COMPLETE is set, so it may take any value for completed tasks.
+const IDLE: usize = 0b0001;
 
 /// The task is complete.
 ///
 /// Once this bit is set, it is never unset
 const COMPLETE: usize = 0b0010;
 
-/// Extracts the task's lifecycle value from the state
-const LIFECYCLE_MASK: usize = 0b11;
+/// Flag tracking if a Notified currently exists for this task.
+const NOTIFIED: usize = 0b0100;
 
-/// Flag tracking if the task has been pushed into a run queue.
-const NOTIFIED: usize = 0b100;
+/// Flag tracking if a notification is sent while a task is being polled. May
+/// take any value if not currently being polled.
+///
+/// This is necessary because when a task is polled, the Notified still exists.
+const NOTIFIED_DURING_POLL: usize = 0b1000;
 
 /// The join handle is still around
-#[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
-const JOIN_INTEREST: usize = 0b1_000;
+const JOIN_INTEREST: usize = 0b1_0000;
 
 /// A join handle waker has been set
-#[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
-const JOIN_WAKER: usize = 0b10_000;
+const JOIN_WAKER: usize = 0b10_0000;
 
 /// The task has been forcibly cancelled.
-#[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
-const CANCELLED: usize = 0b100_000;
+const CANCELLED: usize = 0b100_0000;
 
 /// All bits
-const STATE_MASK: usize = LIFECYCLE_MASK | NOTIFIED | JOIN_INTEREST | JOIN_WAKER | CANCELLED;
+const STATE_MASK: usize =
+    IDLE | COMPLETE | NOTIFIED | NOTIFIED_DURING_POLL | JOIN_INTEREST | JOIN_WAKER | CANCELLED;
 
 /// Bits used by the ref count portion of the state.
 const REF_COUNT_MASK: usize = !STATE_MASK;
@@ -56,21 +61,28 @@ const REF_ONE: usize = 1 << REF_COUNT_SHIFT;
 ///
 /// A task is initialized with three references:
 ///
-///  * A reference that will be stored in an OwnedTasks or LocalOwnedTasks.
-///  * A reference that will be sent to the scheduler as an ordinary notification.
-///  * A reference for the JoinHandle.
+///  * A OwnedTask reference that will be stored in an OwnedTasks or LocalOwnedTasks.
+///  * A Notifed reference that will be sent to the scheduler as a notification.
+///  * A JoinHandle reference.
+///
+/// However it is only initialized with two ref-counts as the Notified does not
+/// hold a ref-count.
 ///
 /// As the task starts with a `JoinHandle`, `JOIN_INTEREST` is set.
 /// As the task starts with a `Notified`, `NOTIFIED` is set.
-const INITIAL_STATE: usize = (REF_ONE * 3) | JOIN_INTEREST | NOTIFIED;
+const INITIAL_STATE: usize = (REF_ONE * 2) | JOIN_INTEREST | NOTIFIED | IDLE;
+
+pub(super) enum IdleTransition {
+    Ok,
+    OkNotified,
+    Cancelled,
+}
 
 /// All transitions are performed via RMW operations. This establishes an
 /// unambiguous modification order.
 impl State {
     /// Return a task's initial state
     pub(super) fn new() -> State {
-        // The raw task returned by this method has a ref-count of three. See
-        // the comment on INITIAL_STATE for more.
         State {
             val: AtomicUsize::new(INITIAL_STATE),
         }
@@ -83,134 +95,122 @@ impl State {
 
     /// Attempt to transition the lifecycle to `Running`.
     ///
-    /// The `NOTIFIED` bit is always unset.
+    /// Returns an error if the task is already running or completed. The return
+    /// value contains a snapshot of the state **after** the transition.
     pub(super) fn transition_to_running(&self) -> UpdateResult {
-        self.fetch_update(|curr| {
-            assert!(curr.is_notified());
+        // unset IDLE and NOTIFIED_DURING_POLL
+        const MASK: usize = !(IDLE | NOTIFIED_DURING_POLL);
 
-            let mut next = curr;
+        let prev = Snapshot(self.val.fetch_and(MASK, AcqRel));
+        let next = Snapshot(prev.0 & MASK);
 
-            if !next.is_idle() {
-                return None;
-            }
-
-            next.set_running();
-            next.unset_notified();
-            Some(next)
-        })
+        if prev.is_idle_runnable() {
+            Ok(next)
+        } else {
+            Err(next)
+        }
     }
 
     /// Transitions the task from `Running` -> `Idle`.
     ///
-    /// Returns `Ok` if the transition to `Idle` is successful, `Err` otherwise.
-    /// In both cases, a snapshot of the state from **after** the transition is
-    /// returned.
+    /// This task assumes that the caller has ownership of a Notified and will
+    /// destroy it unless NOTIFIED_DURING_POLL is set.
     ///
-    /// The transition to `Idle` fails if the task has been flagged to be
-    /// cancelled.
-    pub(super) fn transition_to_idle(&self) -> UpdateResult {
-        self.fetch_update(|curr| {
-            assert!(curr.is_running());
+    /// If the task is cancelled, the transition fails and the caller should
+    /// cancel the task. The NOTIFIED bit is not unset in this case.
+    pub(super) fn transition_to_idle(&self) -> IdleTransition {
+        let mut prev = Snapshot(0);
+        let _ = self.fetch_update(|mut snapshot| {
+            prev = snapshot;
 
-            if curr.is_cancelled() {
+            if snapshot.is_cancelled() {
                 return None;
             }
 
-            let mut next = curr;
-            next.unset_running();
+            snapshot.set_idle();
 
-            if next.is_notified() {
-                // The caller needs to schedule the task. To do this, it needs a
-                // waker. The waker requires a ref count.
-                next.ref_inc();
+            // Conceptually the transition to idle always consumes the NOTIFIED
+            // bit that the caller owned, but if we were notified during poll,
+            // a new notification is immediately created and submitted to the
+            // runtime, hence we do not unset the bit in that case.
+            if !snapshot.is_notified_during_poll() {
+                snapshot.unset_notified();
             }
 
-            Some(next)
-        })
+            Some(snapshot)
+        });
+
+        if prev.is_cancelled() {
+            IdleTransition::Cancelled
+        } else if prev.is_notified_during_poll() {
+            IdleTransition::OkNotified
+        } else {
+            IdleTransition::Ok
+        }
     }
 
     /// Transitions the task from `Running` -> `Complete`.
     pub(super) fn transition_to_complete(&self) -> Snapshot {
-        const DELTA: usize = RUNNING | COMPLETE;
+        // set COMPLETE
+        let prev = Snapshot(self.val.fetch_or(COMPLETE, AcqRel));
+        let next = Snapshot(prev.0 | COMPLETE);
 
-        let prev = Snapshot(self.val.fetch_xor(DELTA, AcqRel));
-        assert!(prev.is_running());
-        assert!(!prev.is_complete());
+        #[cfg(any(test, debug_assertions))]
+        assert!(prev.is_running() && !prev.is_complete());
 
-        Snapshot(prev.0 ^ DELTA)
-    }
-
-    /// Transition from `Complete` -> `Terminal`, decrementing the reference
-    /// count by 1.
-    ///
-    /// When `ref_dec` is set, an additional ref count decrement is performed.
-    /// This is used to batch atomic ops when possible.
-    pub(super) fn transition_to_terminal(&self, complete: bool, ref_dec: bool) -> Snapshot {
-        self.fetch_update(|mut snapshot| {
-            if complete {
-                snapshot.set_complete();
-            } else {
-                assert!(snapshot.is_complete());
-            }
-
-            // Decrement the primary handle
-            snapshot.ref_dec();
-
-            if ref_dec {
-                // Decrement a second time
-                snapshot.ref_dec();
-            }
-
-            Some(snapshot)
-        })
-        .unwrap()
+        next
     }
 
     /// Transitions the state to `NOTIFIED`.
     ///
-    /// Returns `true` if the task needs to be submitted to the pool for
-    /// execution
+    /// Returns `true` if this operation obtained ownership of a Notified that
+    /// should be submitted to the pool for execution.
     pub(super) fn transition_to_notified(&self) -> bool {
-        let prev = Snapshot(self.val.fetch_or(NOTIFIED, AcqRel));
-        prev.will_need_queueing()
+        const MASK: usize = NOTIFIED | NOTIFIED_DURING_POLL;
+
+        let prev = Snapshot(self.val.fetch_or(MASK, AcqRel));
+
+        // We do not care whether the task is completed. The NOTIFIED bit acts
+        // as a ref-count, and we must create a Notified object or otherwise
+        // unset the bit again to not leak the task.
+        !prev.is_notified()
     }
 
     /// Set the cancelled bit and transition the state to `NOTIFIED`.
     ///
-    /// Returns `true` if the task needs to be submitted to the pool for
-    /// execution
+    /// Returns `true` if this operation obtained ownership of a Notified that
+    /// should be submitted to the pool for execution.
     pub(super) fn transition_to_notified_and_cancel(&self) -> bool {
-        let prev = Snapshot(self.val.fetch_or(NOTIFIED | CANCELLED, AcqRel));
-        prev.will_need_queueing()
+        const MASK: usize = CANCELLED | NOTIFIED | NOTIFIED_DURING_POLL;
+
+        let prev = Snapshot(self.val.fetch_or(MASK, AcqRel));
+
+        // We do not care whether the task is completed. The NOTIFIED bit acts
+        // as a ref-count, and we must create a Notified object or otherwise
+        // unset the bit again to not leak the task.
+        !prev.is_notified()
     }
 
     /// Set the `CANCELLED` bit and attempt to transition to `Running`.
     ///
-    /// Returns `true` if the transition to `Running` succeeded.
+    /// Returns `true` if the transition to `Running` succeeded. If the
+    /// transition fails, the provided closure can be used to decrement a
+    /// ref-count.
     pub(super) fn transition_to_shutdown(&self) -> bool {
         let mut prev = Snapshot(0);
 
         let _ = self.fetch_update(|mut snapshot| {
             prev = snapshot;
 
-            if snapshot.is_idle() {
-                snapshot.set_running();
-
-                if snapshot.is_notified() {
-                    // If the task is idle and notified, this indicates the task is
-                    // in the run queue and is considered owned by the scheduler.
-                    // The shutdown operation claims ownership of the task, which
-                    // means we need to assign an additional ref-count to the task
-                    // in the queue.
-                    snapshot.ref_inc();
-                }
+            if snapshot.is_idle_runnable() {
+                snapshot.unset_idle();
             }
 
             snapshot.set_cancelled();
             Some(snapshot)
         });
 
-        prev.is_idle()
+        prev.is_idle_runnable()
     }
 
     /// Optimistically tries to swap the state assuming the join handle is
@@ -321,13 +321,43 @@ impl State {
     /// Returns `true` if the task should be released.
     pub(super) fn ref_dec(&self) -> bool {
         let prev = Snapshot(self.val.fetch_sub(REF_ONE, AcqRel));
-        prev.ref_count() == 1
+        let next = Snapshot(prev.0 - REF_ONE);
+        next.should_dealloc()
     }
 
     /// Returns `true` if the task should be released.
-    pub(super) fn ref_dec_twice(&self) -> bool {
-        let prev = Snapshot(self.val.fetch_sub(2 * REF_ONE, AcqRel));
-        prev.ref_count() == 2
+    pub(super) fn ref_dec_several(&self, count: usize) -> bool {
+        let prev = Snapshot(self.val.fetch_sub(count * REF_ONE, AcqRel));
+        let next = Snapshot(prev.0 - count * REF_ONE);
+        next.should_dealloc()
+    }
+
+    /// Unset NOTIFIED and decrement the ref-count the specific number of times.
+    ///
+    /// Returns `true` if the task should be released.
+    pub(super) fn unset_notified(&self, ref_dec: usize) -> bool {
+        if ref_dec > 0 {
+            let diff = NOTIFIED | (ref_dec * REF_ONE);
+
+            let prev = Snapshot(self.val.fetch_sub(diff, AcqRel));
+            let next = Snapshot(prev.0.wrapping_sub(diff));
+
+            #[cfg(any(test, debug_assertions))]
+            assert!(prev.is_notified());
+
+            #[cfg(any(test, debug_assertions))]
+            assert!(prev.ref_count() >= ref_dec);
+
+            next.should_dealloc()
+        } else {
+            let prev = Snapshot(self.val.fetch_and(!NOTIFIED, AcqRel));
+            let next = Snapshot(prev.0 & !NOTIFIED);
+
+            #[cfg(any(test, debug_assertions))]
+            assert!(prev.is_notified());
+
+            next.should_dealloc()
+        }
     }
 
     fn fetch_update<F>(&self, mut f: F) -> Result<Snapshot, Snapshot>
@@ -355,9 +385,9 @@ impl State {
 // ===== impl Snapshot =====
 
 impl Snapshot {
-    /// Returns `true` if the task is in an idle state.
-    pub(super) fn is_idle(self) -> bool {
-        self.0 & (RUNNING | COMPLETE) == 0
+    /// Returns `true` if the task is idle and runnable.
+    pub(super) fn is_idle_runnable(self) -> bool {
+        self.0 & (IDLE | COMPLETE) == IDLE
     }
 
     /// Returns `true` if the task has been flagged as notified.
@@ -365,20 +395,25 @@ impl Snapshot {
         self.0 & NOTIFIED == NOTIFIED
     }
 
-    fn unset_notified(&mut self) {
-        self.0 &= !NOTIFIED
+    pub(super) fn unset_notified(&mut self) {
+        self.0 &= !NOTIFIED;
+    }
+
+    /// Returns `true` if the task has been flagged as notified during a poll.
+    pub(super) fn is_notified_during_poll(self) -> bool {
+        self.0 & NOTIFIED_DURING_POLL == NOTIFIED_DURING_POLL
     }
 
     pub(super) fn is_running(self) -> bool {
-        self.0 & RUNNING == RUNNING
+        self.0 & IDLE == 0
     }
 
-    fn set_running(&mut self) {
-        self.0 |= RUNNING;
+    fn set_idle(&mut self) {
+        self.0 |= IDLE;
     }
 
-    fn unset_running(&mut self) {
-        self.0 &= !RUNNING;
+    fn unset_idle(&mut self) {
+        self.0 &= !IDLE;
     }
 
     pub(super) fn is_cancelled(self) -> bool {
@@ -387,10 +422,6 @@ impl Snapshot {
 
     fn set_cancelled(&mut self) {
         self.0 |= CANCELLED;
-    }
-
-    fn set_complete(&mut self) {
-        self.0 |= COMPLETE;
     }
 
     /// Returns `true` if the task's future has completed execution.
@@ -418,22 +449,13 @@ impl Snapshot {
         self.0 &= !JOIN_WAKER
     }
 
-    pub(super) fn ref_count(self) -> usize {
+    pub(super) fn should_dealloc(self) -> bool {
+        // The Notified holds the task alive without a ref-count
+        self.0 & (REF_COUNT_MASK | NOTIFIED) == 0
+    }
+
+    fn ref_count(self) -> usize {
         (self.0 & REF_COUNT_MASK) >> REF_COUNT_SHIFT
-    }
-
-    fn ref_inc(&mut self) {
-        assert!(self.0 <= isize::MAX as usize);
-        self.0 += REF_ONE;
-    }
-
-    pub(super) fn ref_dec(&mut self) {
-        assert!(self.ref_count() > 0);
-        self.0 -= REF_ONE
-    }
-
-    fn will_need_queueing(self) -> bool {
-        !self.is_notified() && self.is_idle()
     }
 }
 

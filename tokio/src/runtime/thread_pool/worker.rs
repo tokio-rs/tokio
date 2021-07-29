@@ -603,9 +603,7 @@ impl Core {
         debug_assert!(worker.shared.owned.is_closed());
 
         // Signal to all tasks to shut down.
-        while let Some(header) = worker.shared.owned.pop_back() {
-            header.shutdown();
-        }
+        worker.shared.owned.drain_tasks();
     }
 
     /// Shutdown the core

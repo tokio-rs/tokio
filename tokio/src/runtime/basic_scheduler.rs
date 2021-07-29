@@ -317,9 +317,7 @@ impl<P: Park> Drop for BasicScheduler<P> {
             // By closing the OwnedTasks, no new tasks can be spawned on it.
             context.shared.owned.close();
             // Drain the OwnedTasks collection.
-            while let Some(task) = context.shared.owned.pop_back() {
-                task.shutdown();
-            }
+            context.shared.owned.drain_tasks();
 
             // Drain local queue
             // We already shut down every task, so we just need to drop the task.
