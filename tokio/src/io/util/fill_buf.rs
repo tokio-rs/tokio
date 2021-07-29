@@ -34,6 +34,9 @@ impl<'a, R: AsyncBufRead + ?Sized + Unpin> Future for FillBuf<'a, R> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let me = self.project();
 
+        // Due to a limitation in the borrow-checker, we cannot return the value
+        // directly on Ready. Once Rust starts using the polonius borrow checker,
+        // this can be simplified.
         let reader = me.reader.take().expect("Polled after completion.");
         match Pin::new(&mut *reader).poll_fill_buf(cx) {
             Poll::Ready(_) => match Pin::new(reader).poll_fill_buf(cx) {
