@@ -305,26 +305,23 @@ impl<S: 'static> Task<S> {
     }
 }
 
-cfg_rt_multi_thread! {
-    impl<S: 'static> Notified<S> {
-        unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
-            Notified {
-                raw: RawTask::from_raw(ptr),
-                _p: PhantomData,
-            }
+impl<S: 'static> Notified<S> {
+    unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
+        Notified {
+            raw: RawTask::from_raw(ptr),
+            _p: PhantomData,
         }
     }
 
-    impl<S: 'static> Notified<S> {
-        fn into_raw(self) -> NonNull<Header> {
-            let ret = self.raw.as_raw();
-            mem::forget(self);
-            ret
-        }
+    fn header(&self) -> &Header {
+        self.raw.header()
+    }
 
-        fn header(&self) -> &Header {
-            self.raw.header()
-        }
+    #[cfg(feature = "rt-multi-thread")]
+    fn into_raw(self) -> NonNull<Header> {
+        let ret = self.raw.as_raw();
+        mem::forget(self);
+        ret
     }
 }
 

@@ -65,6 +65,7 @@ impl RawTask {
     }
 
     /// Returns the raw pointer to the headers.
+    #[cfg(feature = "rt-multi-thread")]
     pub(super) fn as_raw(&self) -> NonNull<Header> {
         self.ptr
     }
