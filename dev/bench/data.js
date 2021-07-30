@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627637339286,
+  "lastUpdate": 1627637345923,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -41257,6 +41257,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20440058,
             "range": "± 4450836",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0d9430b99cc699824cc8545afbb01e0a7c520428",
+          "message": "tests: reduce sleep durations (#3994)",
+          "timestamp": "2021-07-30T11:27:04+02:00",
+          "tree_id": "5aeaf0292cddcac37575883be8e5afdb29fbee24",
+          "url": "https://github.com/tokio-rs/tokio/commit/0d9430b99cc699824cc8545afbb01e0a7c520428"
+        },
+        "date": 1627637339163,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 217528,
+            "range": "± 11939",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1136714,
+            "range": "± 150800",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6595178,
+            "range": "± 1343453",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20985603,
+            "range": "± 3748165",
             "unit": "ns/iter"
           }
         ]
