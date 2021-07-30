@@ -8,6 +8,7 @@ use std::task::{Context, Poll};
 #[derive(Debug)]
 pub(super) struct CopyBuffer {
     read_done: bool,
+    need_flush: bool,
     pos: usize,
     cap: usize,
     amt: u64,
@@ -18,6 +19,7 @@ impl CopyBuffer {
     pub(super) fn new() -> Self {
         Self {
             read_done: false,
+            need_flush: false,
             pos: 0,
             cap: 0,
             amt: 0,
@@ -41,7 +43,22 @@ impl CopyBuffer {
             if self.pos == self.cap && !self.read_done {
                 let me = &mut *self;
                 let mut buf = ReadBuf::new(&mut me.buf);
-                ready!(reader.as_mut().poll_read(cx, &mut buf))?;
+
+                match reader.as_mut().poll_read(cx, &mut buf) {
+                    Poll::Ready(Ok(_)) => (),
+                    Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
+                    Poll::Pending => {
+                        // Try flushing when the reader has no progress to avoid deadlock
+                        // when the reader depends on buffered writer.
+                        if self.need_flush {
+                            ready!(writer.as_mut().poll_flush(cx))?;
+                            self.need_flush = false;
+                        }
+
+                        return Poll::Pending;
+                    }
+                }
+
                 let n = buf.filled().len();
                 if n == 0 {
                     self.read_done = true;
@@ -63,6 +80,7 @@ impl CopyBuffer {
                 } else {
                     self.pos += i;
                     self.amt += i as u64;
+                    self.need_flush = true;
                 }
             }
 
