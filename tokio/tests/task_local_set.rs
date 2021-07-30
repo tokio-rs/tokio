@@ -67,11 +67,11 @@ async fn localset_future_timers() {
 
     let local = LocalSet::new();
     local.spawn_local(async move {
-        time::sleep(Duration::from_millis(10)).await;
+        time::sleep(Duration::from_millis(5)).await;
         RAN1.store(true, Ordering::SeqCst);
     });
     local.spawn_local(async move {
-        time::sleep(Duration::from_millis(20)).await;
+        time::sleep(Duration::from_millis(10)).await;
         RAN2.store(true, Ordering::SeqCst);
     });
     local.await;
@@ -299,9 +299,7 @@ fn drop_cancels_tasks() {
         let _rc2 = rc2;
 
         started_tx.send(()).unwrap();
-        loop {
-            time::sleep(Duration::from_secs(3600)).await;
-        }
+        futures::future::pending::<()>().await;
     });
 
     local.block_on(&rt, async {
@@ -416,7 +414,7 @@ async fn local_tasks_are_polled_after_tick() {
         .run_until(async {
             let task2 = task::spawn(async move {
                 // Wait a bit
-                time::sleep(Duration::from_millis(100)).await;
+                time::sleep(Duration::from_millis(10)).await;
 
                 let mut oneshots = Vec::with_capacity(EXPECTED);
 
@@ -427,13 +425,13 @@ async fn local_tasks_are_polled_after_tick() {
                     tx.send(oneshot_rx).unwrap();
                 }
 
-                time::sleep(Duration::from_millis(100)).await;
+                time::sleep(Duration::from_millis(10)).await;
 
                 for tx in oneshots.drain(..) {
                     tx.send(()).unwrap();
                 }
 
-                time::sleep(Duration::from_millis(300)).await;
+                time::sleep(Duration::from_millis(10)).await;
                 let rx1 = RX1.load(SeqCst);
                 let rx2 = RX2.load(SeqCst);
                 println!("EXPECT = {}; RX1 = {}; RX2 = {}", EXPECTED, rx1, rx2);

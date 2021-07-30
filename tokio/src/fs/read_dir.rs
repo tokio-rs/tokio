@@ -55,6 +55,10 @@ enum State {
 
 impl ReadDir {
     /// Returns the next entry in the directory stream.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancellation safe.
     pub async fn next_entry(&mut self) -> io::Result<Option<DirEntry>> {
         use crate::future::poll_fn;
         poll_fn(|cx| self.poll_next_entry(cx)).await

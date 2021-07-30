@@ -241,6 +241,7 @@ impl Runtime {
         while !self.is_empty() && n < max {
             let task = self.next_task();
             n += 1;
+            let task = self.0.owned.assert_owner(task);
             task.run();
         }
 
@@ -264,7 +265,7 @@ impl Runtime {
         }
 
         while let Some(task) = core.queue.pop_back() {
-            task.shutdown();
+            drop(task);
         }
 
         drop(core);
@@ -275,8 +276,7 @@ impl Runtime {
 
 impl Schedule for Runtime {
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
-        // safety: copying worker.rs
-        unsafe { self.0.owned.remove(task) }
+        self.0.owned.remove(task)
     }
 
     fn schedule(&self, task: task::Notified<Self>) {

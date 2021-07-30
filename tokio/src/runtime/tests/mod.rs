@@ -14,7 +14,7 @@ mod unowned_wrapper {
         let span = tracing::trace_span!("test_span");
         let task = task.instrument(span);
         let (task, handle) = crate::runtime::task::unowned(task, NoopSchedule);
-        (task, handle)
+        (task.into_notified(), handle)
     }
 
     #[cfg(not(all(tokio_unstable, feature = "tracing")))]
@@ -24,7 +24,7 @@ mod unowned_wrapper {
         T::Output: Send + 'static,
     {
         let (task, handle) = crate::runtime::task::unowned(task, NoopSchedule);
-        (task, handle)
+        (task.into_notified(), handle)
     }
 }
 

@@ -65,6 +65,19 @@ pub(crate) struct Header {
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
 
+    /// This integer contains the id of the OwnedTasks or LocalOwnedTasks that
+    /// this task is stored in. If the task is not in any list, should be the
+    /// id of the list that it was previously in, or zero if it has never been
+    /// in any list.
+    ///
+    /// Once a task has been bound to a list, it can never be bound to another
+    /// list, even if removed from the first list.
+    ///
+    /// The id is not unset when removed from a list because we want to be able
+    /// to read the id without synchronization, even if it is concurrently being
+    /// removed from the list.
+    pub(super) owner_id: UnsafeCell<u64>,
+
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) id: Option<tracing::Id>,
@@ -98,6 +111,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 owned: UnsafeCell::new(linked_list::Pointers::new()),
                 queue_next: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
+                owner_id: UnsafeCell::new(0),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 id,
             },
@@ -203,9 +217,24 @@ impl<T: Future> CoreStage<T> {
 
 cfg_rt_multi_thread! {
     impl Header {
-        pub(crate) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
+        pub(super) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
             self.queue_next.with_mut(|ptr| *ptr = next);
         }
+    }
+}
+
+impl Header {
+    // safety: The caller must guarantee exclusive access to this field, and
+    // must ensure that the id is either 0 or the id of the OwnedTasks
+    // containing this task.
+    pub(super) unsafe fn set_owner_id(&self, owner: u64) {
+        self.owner_id.with_mut(|ptr| *ptr = owner);
+    }
+
+    pub(super) fn get_owner_id(&self) -> u64 {
+        // safety: If there are concurrent writes, then that write has violated
+        // the safety requirements on `set_owner_id`.
+        unsafe { self.owner_id.with(|ptr| *ptr) }
     }
 }
 

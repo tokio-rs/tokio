@@ -24,7 +24,7 @@ async fn immediate_sleep() {
 async fn is_elapsed() {
     time::pause();
 
-    let sleep = time::sleep(Duration::from_millis(50));
+    let sleep = time::sleep(Duration::from_millis(10));
 
     tokio::pin!(sleep);
 

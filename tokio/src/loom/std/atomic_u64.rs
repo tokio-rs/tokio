@@ -2,19 +2,15 @@
 //! re-export of `AtomicU64`. On 32 bit platforms, this is implemented using a
 //! `Mutex`.
 
-pub(crate) use self::imp::AtomicU64;
-
 // `AtomicU64` can only be used on targets with `target_has_atomic` is 64 or greater.
 // Once `cfg_target_has_atomic` feature is stable, we can replace it with
 // `#[cfg(target_has_atomic = "64")]`.
 // Refs: https://github.com/rust-lang/rust/tree/master/src/librustc_target
-#[cfg(not(any(target_arch = "arm", target_arch = "mips", target_arch = "powerpc")))]
-mod imp {
+cfg_has_atomic_u64! {
     pub(crate) use std::sync::atomic::AtomicU64;
 }
 
-#[cfg(any(target_arch = "arm", target_arch = "mips", target_arch = "powerpc"))]
-mod imp {
+cfg_not_has_atomic_u64! {
     use crate::loom::sync::Mutex;
     use std::sync::atomic::Ordering;
 

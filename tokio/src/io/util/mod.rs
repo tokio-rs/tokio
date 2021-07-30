@@ -49,6 +49,7 @@ cfg_io_util! {
     mod read_exact;
     mod read_int;
     mod read_line;
+    mod fill_buf;
 
     mod read_to_end;
     mod vec_with_initialized;

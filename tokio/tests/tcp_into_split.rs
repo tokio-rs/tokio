@@ -116,7 +116,7 @@ async fn drop_write() -> Result<()> {
 
     // drop it while the read is in progress
     std::thread::spawn(move || {
-        thread::sleep(std::time::Duration::from_millis(50));
+        thread::sleep(std::time::Duration::from_millis(10));
         drop(write_half);
     });
 
