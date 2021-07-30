@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627637345923,
+  "lastUpdate": 1627641033664,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21815,6 +21815,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 483,
             "range": "± 20",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e60d7a474b9b7becd944ed510c4af3ab75a17c66",
+          "message": "chore: fix CI on master (#4008)",
+          "timestamp": "2021-07-30T12:28:46+02:00",
+          "tree_id": "45131557556163839e10452f9d16f46e7e7784de",
+          "url": "https://github.com/tokio-rs/tokio/commit/e60d7a474b9b7becd944ed510c4af3ab75a17c66"
+        },
+        "date": 1627641027276,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 870,
+            "range": "± 71",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 17924,
+            "range": "± 8223",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 919,
+            "range": "± 14",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16035,
+            "range": "± 6270",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 585,
+            "range": "± 38",
             "unit": "ns/iter"
           }
         ]
