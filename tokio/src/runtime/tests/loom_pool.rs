@@ -22,7 +22,7 @@ use std::task::{Context, Poll};
 mod atomic_take {
     use loom::sync::atomic::AtomicBool;
     use std::mem::MaybeUninit;
-    use std::sync::atomic::Ordering::Relaxed;
+    use std::sync::atomic::Ordering::SeqCst;
 
     pub(super) struct AtomicTake<T> {
         inner: MaybeUninit<T>,
