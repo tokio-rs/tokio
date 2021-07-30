@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627636931979,
+  "lastUpdate": 1627636943524,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -41155,6 +41155,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20983142,
             "range": "± 4150042",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "quininer@live.com",
+            "name": "quininer",
+            "username": "quininer"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f51676891f79151f596c9f919e3c74c78cbc07ed",
+          "message": "io: fix copy buffered write (#4001)",
+          "timestamp": "2021-07-30T11:20:16+02:00",
+          "tree_id": "056c14a2c9e87ccc417f4859522ca32a0b22135a",
+          "url": "https://github.com/tokio-rs/tokio/commit/f51676891f79151f596c9f919e3c74c78cbc07ed"
+        },
+        "date": 1627636937206,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 227132,
+            "range": "± 67164",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1009303,
+            "range": "± 201599",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5941549,
+            "range": "± 1584910",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20440058,
+            "range": "± 4450836",
             "unit": "ns/iter"
           }
         ]
