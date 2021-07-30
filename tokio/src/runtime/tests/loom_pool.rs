@@ -40,7 +40,7 @@ mod atomic_take {
         pub(super) fn take(&self) -> Option<T> {
             // safety: Only one thread will see the boolean change from false
             // to true, so that thread is able to take the value.
-            match self.taken.fetch_or(true, Relaxed) {
+            match self.taken.fetch_or(true, SeqCst) {
                 false => unsafe { Some(std::ptr::read(self.inner.as_ptr())) },
                 true => None,
             }
