@@ -1,3 +1,4 @@
+use crate::io::util::fill_buf::{fill_buf, FillBuf};
 use crate::io::util::lines::{lines, Lines};
 use crate::io::util::read_line::{read_line, ReadLine};
 use crate::io::util::read_until::{read_until, ReadUntil};
@@ -241,6 +242,59 @@ cfg_io_util! {
             Self: Sized + Unpin,
         {
             split(self, byte)
+        }
+
+        /// Returns the contents of the internal buffer, filling it with more
+        /// data from the inner reader if it is empty.
+        ///
+        /// This function is a lower-level call. It needs to be paired with the
+        /// [`consume`] method to function properly. When calling this method,
+        /// none of the contents will be "read" in the sense that later calling
+        /// `read` may return the same contents. As such, [`consume`] must be
+        /// called with the number of bytes that are consumed from this buffer
+        /// to ensure that the bytes are never returned twice.
+        ///
+        /// An empty buffer returned indicates that the stream has reached EOF.
+        ///
+        /// Equivalent to:
+        ///
+        /// ```ignore
+        /// async fn fill_buf(&mut self) -> io::Result<&[u8]>;
+        /// ```
+        ///
+        /// # Errors
+        ///
+        /// This function will return an I/O error if the underlying reader was
+        /// read, but returned an error.
+        ///
+        /// [`consume`]: crate::io::AsyncBufReadExt::consume
+        fn fill_buf(&mut self) -> FillBuf<'_, Self>
+        where
+            Self: Unpin,
+        {
+            fill_buf(self)
+        }
+
+        /// Tells this buffer that `amt` bytes have been consumed from the
+        /// buffer, so they should no longer be returned in calls to [`read`].
+        ///
+        /// This function is a lower-level call. It needs to be paired with the
+        /// [`fill_buf`] method to function properly. This function does not
+        /// perform any I/O, it simply informs this object that some amount of
+        /// its buffer, returned from [`fill_buf`], has been consumed and should
+        /// no longer be returned. As such, this function may do odd things if
+        /// [`fill_buf`] isn't called before calling it.
+        ///
+        /// The `amt` must be less than the number of bytes in the buffer
+        /// returned by [`fill_buf`].
+        ///
+        /// [`read`]: crate::io::AsyncReadExt::read
+        /// [`fill_buf`]: crate::io::AsyncBufReadExt::fill_buf
+        fn consume(&mut self, amt: usize)
+        where
+            Self: Unpin,
+        {
+            std::pin::Pin::new(self).consume(amt)
         }
 
         /// Returns a stream over the lines of this reader.
