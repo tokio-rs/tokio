@@ -26,7 +26,7 @@ async fn block_write(s: &mut TcpStream) -> usize {
             result = s.write(&BUF) => {
                 copied += result.expect("write error")
             },
-            _ = tokio::time::sleep(Duration::from_millis(100)) => {
+            _ = tokio::time::sleep(Duration::from_millis(10)) => {
                 break;
             }
         }

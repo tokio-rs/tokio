@@ -360,7 +360,21 @@ async fn use_future_in_if_condition() {
     use tokio::time::{self, Duration};
 
     tokio::select! {
-        _ = time::sleep(Duration::from_millis(50)), if false => {
+        _ = time::sleep(Duration::from_millis(10)), if false => {
+            panic!("if condition ignored")
+        }
+        _ = async { 1u32 } => {
+        }
+    }
+}
+
+#[tokio::test]
+async fn use_future_in_if_condition_biased() {
+    use tokio::time::{self, Duration};
+
+    tokio::select! {
+        biased;
+        _ = time::sleep(Duration::from_millis(10)), if false => {
             panic!("if condition ignored")
         }
         _ = async { 1u32 } => {
@@ -456,10 +470,7 @@ async fn require_mutable(_: &mut i32) {}
 async fn async_noop() {}
 
 async fn async_never() -> ! {
-    use tokio::time::Duration;
-    loop {
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    futures::future::pending().await
 }
 
 // From https://github.com/tokio-rs/tokio/issues/2857
