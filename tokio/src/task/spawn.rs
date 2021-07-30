@@ -127,7 +127,13 @@ cfg_rt! {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        spawn_inner(future, None)
+        // preventing stack overflows on debug mode, by quickly sending the
+        // task to the heap.
+        if cfg!(debug_assertions) {
+            spawn_inner(Box::pin(future), None)
+        } else {
+            spawn_inner(future, None)
+        }
     }
 
     #[cfg_attr(tokio_track_caller, track_caller)]
