@@ -3,7 +3,7 @@
 //! [`File`]: File
 
 use self::State::*;
-use crate::fs::{asyncify, sys};
+use crate::fs::asyncify;
 use crate::io::blocking::Buf;
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
@@ -18,6 +18,19 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 use std::task::Poll::*;
+
+#[cfg(test)]
+use super::mocks::spawn_blocking;
+#[cfg(test)]
+use super::mocks::JoinHandle;
+#[cfg(test)]
+use super::mocks::MockFile as StdFile;
+#[cfg(not(test))]
+use crate::blocking::spawn_blocking;
+#[cfg(not(test))]
+use crate::blocking::JoinHandle;
+#[cfg(not(test))]
+use std::fs::File as StdFile;
 
 /// A reference to an open file on the filesystem.
 ///
@@ -78,7 +91,7 @@ use std::task::Poll::*;
 /// # }
 /// ```
 pub struct File {
-    std: Arc<sys::File>,
+    std: Arc<StdFile>,
     inner: Mutex<Inner>,
 }
 
@@ -96,7 +109,7 @@ struct Inner {
 #[derive(Debug)]
 enum State {
     Idle(Option<Buf>),
-    Busy(sys::Blocking<(Operation, Buf)>),
+    Busy(JoinHandle<(Operation, Buf)>),
 }
 
 #[derive(Debug)]
@@ -142,7 +155,7 @@ impl File {
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn open(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
-        let std = asyncify(|| sys::File::open(path)).await?;
+        let std = asyncify(|| StdFile::open(path)).await?;
 
         Ok(File::from_std(std))
     }
@@ -182,7 +195,7 @@ impl File {
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn create(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
-        let std_file = asyncify(move || sys::File::create(path)).await?;
+        let std_file = asyncify(move || StdFile::create(path)).await?;
         Ok(File::from_std(std_file))
     }
 
@@ -199,7 +212,7 @@ impl File {
     /// let std_file = std::fs::File::open("foo.txt").unwrap();
     /// let file = tokio::fs::File::from_std(std_file);
     /// ```
-    pub fn from_std(std: sys::File) -> File {
+    pub fn from_std(std: StdFile) -> File {
         File {
             std: Arc::new(std),
             inner: Mutex::new(Inner {
@@ -323,7 +336,7 @@ impl File {
 
         let std = self.std.clone();
 
-        inner.state = Busy(sys::run(move || {
+        inner.state = Busy(spawn_blocking(move || {
             let res = if let Some(seek) = seek {
                 (&*std).seek(seek).and_then(|_| std.set_len(size))
             } else {
@@ -409,7 +422,7 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn into_std(mut self) -> sys::File {
+    pub async fn into_std(mut self) -> StdFile {
         self.inner.get_mut().complete_inflight().await;
         Arc::try_unwrap(self.std).expect("Arc::try_unwrap failed")
     }
@@ -434,7 +447,7 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn try_into_std(mut self) -> Result<sys::File, Self> {
+    pub fn try_into_std(mut self) -> Result<StdFile, Self> {
         match Arc::try_unwrap(self.std) {
             Ok(file) => Ok(file),
             Err(std_file_arc) => {
@@ -502,7 +515,7 @@ impl AsyncRead for File {
                     buf.ensure_capacity_for(dst);
                     let std = me.std.clone();
 
-                    inner.state = Busy(sys::run(move || {
+                    inner.state = Busy(spawn_blocking(move || {
                         let res = buf.read_from(&mut &*std);
                         (Operation::Read(res), buf)
                     }));
@@ -569,7 +582,7 @@ impl AsyncSeek for File {
 
                     let std = me.std.clone();
 
-                    inner.state = Busy(sys::run(move || {
+                    inner.state = Busy(spawn_blocking(move || {
                         let res = (&*std).seek(pos);
                         (Operation::Seek(res), buf)
                     }));
@@ -636,7 +649,7 @@ impl AsyncWrite for File {
                     let n = buf.copy_from(src);
                     let std = me.std.clone();
 
-                    inner.state = Busy(sys::run(move || {
+                    inner.state = Busy(spawn_blocking(move || {
                         let res = if let Some(seek) = seek {
                             (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
                         } else {
@@ -685,8 +698,8 @@ impl AsyncWrite for File {
     }
 }
 
-impl From<sys::File> for File {
-    fn from(std: sys::File) -> Self {
+impl From<StdFile> for File {
+    fn from(std: StdFile) -> Self {
         Self::from_std(std)
     }
 }
@@ -709,7 +722,7 @@ impl std::os::unix::io::AsRawFd for File {
 #[cfg(unix)]
 impl std::os::unix::io::FromRawFd for File {
     unsafe fn from_raw_fd(fd: std::os::unix::io::RawFd) -> Self {
-        sys::File::from_raw_fd(fd).into()
+        StdFile::from_raw_fd(fd).into()
     }
 }
 
@@ -723,7 +736,7 @@ impl std::os::windows::io::AsRawHandle for File {
 #[cfg(windows)]
 impl std::os::windows::io::FromRawHandle for File {
     unsafe fn from_raw_handle(handle: std::os::windows::io::RawHandle) -> Self {
-        sys::File::from_raw_handle(handle).into()
+        StdFile::from_raw_handle(handle).into()
     }
 }
 
@@ -756,3 +769,6 @@ impl Inner {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
