@@ -3,6 +3,13 @@ use crate::fs::{asyncify, File};
 use std::io;
 use std::path::Path;
 
+#[cfg(test)]
+mod mock_open_options;
+#[cfg(test)]
+use mock_open_options::MockOpenOptions as StdOpenOptions;
+#[cfg(not(test))]
+use std::fs::OpenOptions as StdOpenOptions;
+
 /// Options and flags which can be used to configure how a file is opened.
 ///
 /// This builder exposes the ability to configure how a [`File`] is opened and
@@ -69,7 +76,7 @@ use std::path::Path;
 /// }
 /// ```
 #[derive(Clone, Debug)]
-pub struct OpenOptions(std::fs::OpenOptions);
+pub struct OpenOptions(StdOpenOptions);
 
 impl OpenOptions {
     /// Creates a blank new set of options ready for configuration.
@@ -89,7 +96,7 @@ impl OpenOptions {
     /// let future = options.read(true).open("foo.txt");
     /// ```
     pub fn new() -> OpenOptions {
-        OpenOptions(std::fs::OpenOptions::new())
+        OpenOptions(StdOpenOptions::new())
     }
 
     /// Sets the option for read access.
@@ -384,7 +391,7 @@ impl OpenOptions {
     }
 
     /// Returns a mutable reference to the underlying `std::fs::OpenOptions`
-    pub(super) fn as_inner_mut(&mut self) -> &mut std::fs::OpenOptions {
+    pub(super) fn as_inner_mut(&mut self) -> &mut StdOpenOptions {
         &mut self.0
     }
 }
@@ -645,8 +652,8 @@ feature! {
     }
 }
 
-impl From<std::fs::OpenOptions> for OpenOptions {
-    fn from(options: std::fs::OpenOptions) -> OpenOptions {
+impl From<StdOpenOptions> for OpenOptions {
+    fn from(options: StdOpenOptions) -> OpenOptions {
         OpenOptions(options)
     }
 }
