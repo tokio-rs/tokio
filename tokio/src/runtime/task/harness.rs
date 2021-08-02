@@ -196,7 +196,7 @@ where
                         self.dealloc();
 
                         op.state = PollOperationState::Done;
-                    },
+                    }
                     IdleTransition::OkNotified => {
                         // The NOTIFIED bit was not unset, but we transfer
                         // ownership of the NOTIFIED to the notification below.
