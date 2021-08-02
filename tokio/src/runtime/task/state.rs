@@ -75,6 +75,7 @@ const INITIAL_STATE: usize = (REF_ONE * 2) | JOIN_INTEREST | NOTIFIED | IDLE;
 pub(super) enum IdleTransition {
     Ok,
     OkNotified,
+    OkDealloc,
     Cancelled,
 }
 
@@ -120,8 +121,10 @@ impl State {
     /// cancel the task. The NOTIFIED bit is not unset in this case.
     pub(super) fn transition_to_idle(&self) -> IdleTransition {
         let mut prev = Snapshot(0);
+        let mut should_dealloc = false;
         let _ = self.fetch_update(|mut snapshot| {
             prev = snapshot;
+            should_dealloc = false;
 
             if snapshot.is_cancelled() {
                 return None;
@@ -135,6 +138,9 @@ impl State {
             // runtime, hence we do not unset the bit in that case.
             if !snapshot.is_notified_during_poll() {
                 snapshot.unset_notified();
+                if snapshot.should_dealloc() {
+                    should_dealloc = true;
+                }
             }
 
             Some(snapshot)
@@ -144,6 +150,8 @@ impl State {
             IdleTransition::Cancelled
         } else if prev.is_notified_during_poll() {
             IdleTransition::OkNotified
+        } else if should_dealloc {
+            IdleTransition::OkDealloc
         } else {
             IdleTransition::Ok
         }

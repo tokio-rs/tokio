@@ -187,6 +187,16 @@ where
                         op.ownership_notified = false;
                         op.state = PollOperationState::ReleaseRefcount;
                     }
+                    IdleTransition::OkDealloc => {
+                        // The NOTIFIED bit was consumed by the transition to
+                        // idle. There was no ref-count holding on to the
+                        // task.
+                        op.ownership_notified = false;
+                        debug_assert_eq!(op.ownership_refcount, 0);
+                        self.dealloc();
+
+                        op.state = PollOperationState::Done;
+                    },
                     IdleTransition::OkNotified => {
                         // The NOTIFIED bit was not unset, but we transfer
                         // ownership of the NOTIFIED to the notification below.
