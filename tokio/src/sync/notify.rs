@@ -528,7 +528,7 @@ impl Notified<'_> {
             is_unpin::<AtomicUsize>();
 
             let me = self.get_unchecked_mut();
-            (&me.notify, &mut me.state, &me.waiter)
+            (me.notify, &mut me.state, &me.waiter)
         }
     }
 }
