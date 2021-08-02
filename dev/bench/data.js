@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627930625057,
+  "lastUpdate": 1627930629887,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -63903,6 +63903,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1001,
             "range": "± 125",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "69a6585429d17701a87aa914500d9c11e88c663f",
+          "message": "signal: make windows docs for signal module show up on unix builds (#3770)",
+          "timestamp": "2021-08-02T20:55:17+02:00",
+          "tree_id": "c398a1b44c560bd9a628581fdbb949a3a5e5bee2",
+          "url": "https://github.com/tokio-rs/tokio/commit/69a6585429d17701a87aa914500d9c11e88c663f"
+        },
+        "date": 1627930622257,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 17486,
+            "range": "± 5066",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1022,
+            "range": "± 8",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 751,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 17980,
+            "range": "± 6291",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1022,
+            "range": "± 7",
             "unit": "ns/iter"
           }
         ]
