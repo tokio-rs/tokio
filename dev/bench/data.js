@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627930634035,
+  "lastUpdate": 1627930651589,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -98285,6 +98285,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 770417,
             "range": "± 15629",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "69a6585429d17701a87aa914500d9c11e88c663f",
+          "message": "signal: make windows docs for signal module show up on unix builds (#3770)",
+          "timestamp": "2021-08-02T20:55:17+02:00",
+          "tree_id": "c398a1b44c560bd9a628581fdbb949a3a5e5bee2",
+          "url": "https://github.com/tokio-rs/tokio/commit/69a6585429d17701a87aa914500d9c11e88c663f"
+        },
+        "date": 1627930645012,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7261904,
+            "range": "± 3071078",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6851702,
+            "range": "± 2666530",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 7575602,
+            "range": "± 3958945",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 306,
+            "range": "± 8",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 307,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 305,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 30105,
+            "range": "± 322",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 960,
+            "range": "± 2729",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1118509,
+            "range": "± 57063",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 783365,
+            "range": "± 34217",
             "unit": "ns/iter"
           }
         ]
