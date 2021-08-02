@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627718269104,
+  "lastUpdate": 1627930625057,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -41713,6 +41713,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21686140,
             "range": "± 4647347",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "69a6585429d17701a87aa914500d9c11e88c663f",
+          "message": "signal: make windows docs for signal module show up on unix builds (#3770)",
+          "timestamp": "2021-08-02T20:55:17+02:00",
+          "tree_id": "c398a1b44c560bd9a628581fdbb949a3a5e5bee2",
+          "url": "https://github.com/tokio-rs/tokio/commit/69a6585429d17701a87aa914500d9c11e88c663f"
+        },
+        "date": 1627930619616,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 189236,
+            "range": "± 3656",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 991746,
+            "range": "± 140454",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5905034,
+            "range": "± 1413427",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18280808,
+            "range": "± 2040139",
             "unit": "ns/iter"
           }
         ]
