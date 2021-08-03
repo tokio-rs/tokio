@@ -119,7 +119,7 @@ impl<S: 'static> OwnedTasks<S> {
         // safety: All tasks bound to this OwnedTasks are Send, so it is safe
         // to poll it on this thread no matter what thread we are on.
         LocalNotified {
-            task,
+            task: task.0,
             _not_send: PhantomData,
         }
     }
@@ -243,7 +243,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
         // LocalOwnedTasks is not Send or Sync, so we are on the right thread
         // for polling this task.
         LocalNotified {
-            task,
+            task: task.0,
             _not_send: PhantomData,
         }
     }

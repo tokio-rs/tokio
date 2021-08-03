@@ -64,12 +64,6 @@ impl RawTask {
         unsafe { self.ptr.as_ref() }
     }
 
-    /// Returns the raw pointer to the headers.
-    #[cfg(feature = "rt-multi-thread")]
-    pub(super) fn as_raw(&self) -> NonNull<Header> {
-        self.ptr
-    }
-
     /// Safety: mutual exclusion is required to call this function.
     pub(super) fn poll(self) {
         let vtable = self.header().vtable;

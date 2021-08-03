@@ -147,18 +147,26 @@ impl<T: Future> CoreStage<T> {
     /// `self` must also be pinned. This is handled by storing the task on the
     /// heap.
     pub(super) fn poll(&self, mut cx: Context<'_>) -> Poll<T::Output> {
-        self.stage.with_mut(|ptr| {
-            // Safety: The caller ensures mutual exclusion to the field.
-            let future = match unsafe { &mut *ptr } {
-                Stage::Running(future) => future,
-                _ => unreachable!("unexpected stage"),
-            };
+        let res = {
+            self.stage.with_mut(|ptr| {
+                // Safety: The caller ensures mutual exclusion to the field.
+                let future = match unsafe { &mut *ptr } {
+                    Stage::Running(future) => future,
+                    _ => unreachable!("unexpected stage"),
+                };
 
-            // Safety: The caller ensures the future is pinned.
-            let future = unsafe { Pin::new_unchecked(future) };
+                // Safety: The caller ensures the future is pinned.
+                let future = unsafe { Pin::new_unchecked(future) };
 
-            future.poll(&mut cx)
-        })
+                future.poll(&mut cx)
+            })
+        };
+
+        if res.is_ready() {
+            self.drop_future_or_output();
+        }
+
+        res
     }
 
     /// Drop the future
