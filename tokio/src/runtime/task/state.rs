@@ -203,7 +203,12 @@ impl State {
     /// Returns true if the task should be deallocated.
     pub(super) fn transition_to_terminal(&self, count: usize) -> bool {
         let prev = Snapshot(self.val.fetch_sub(count * REF_ONE, AcqRel));
-        assert!(prev.ref_count() >= count, "current: {}, sub: {}", prev.ref_count(), count);
+        assert!(
+            prev.ref_count() >= count,
+            "current: {}, sub: {}",
+            prev.ref_count(),
+            count
+        );
         prev.ref_count() == count
     }
 

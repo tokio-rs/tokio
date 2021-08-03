@@ -5,9 +5,9 @@ use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{JoinError, Notified, Schedule, Task};
 
 use std::mem;
+use std::mem::ManuallyDrop;
 use std::panic;
 use std::ptr::NonNull;
-use std::mem::ManuallyDrop;
 use std::task::{Context, Poll, Waker};
 
 /// Typed raw task handle
@@ -60,7 +60,7 @@ where
             }
             PollFuture::Dealloc => {
                 self.dealloc();
-            },
+            }
             PollFuture::Done => (),
         }
     }
@@ -91,13 +91,13 @@ where
 
                         cancel_task(&self.core().stage);
                         PollFuture::Complete
-                    },
+                    }
                 }
-            },
+            }
             TransitionToRunning::Cancelled => {
                 cancel_task(&self.core().stage);
                 PollFuture::Complete
-            },
+            }
             TransitionToRunning::Failed => PollFuture::Done,
             TransitionToRunning::Dealloc => PollFuture::Dealloc,
         }
@@ -190,11 +190,11 @@ where
         match self.header().state.transition_to_notified_by_val() {
             TransitionToNotifiedByVal::Submit => {
                 self.core().scheduler.schedule(Notified(self.to_task()));
-            },
+            }
             TransitionToNotifiedByVal::Dealloc => {
                 self.dealloc();
-            },
-            TransitionToNotifiedByVal::DoNothing => {},
+            }
+            TransitionToNotifiedByVal::DoNothing => {}
         }
     }
 
@@ -204,8 +204,8 @@ where
         match self.header().state.transition_to_notified_by_ref() {
             TransitionToNotifiedByRef::Submit => {
                 self.core().scheduler.schedule(Notified(self.to_task()));
-            },
-            TransitionToNotifiedByRef::DoNothing => {},
+            }
+            TransitionToNotifiedByRef::DoNothing => {}
         }
     }
 
