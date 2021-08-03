@@ -422,6 +422,9 @@ impl<T> Drop for Receiver<T> {
 
 impl<T> Sender<T> {
     /// Sends a new value via the channel, notifying all receivers.
+    ///
+    /// This method fails if the channel has been closed, which happens when
+    /// every receiver has been dropped.
     pub fn send(&self, value: T) -> Result<(), error::SendError<T>> {
         // This is pretty much only useful as a hint anyway, so synchronization isn't critical.
         if 0 == self.shared.ref_count_rx.load(Relaxed) {

@@ -478,7 +478,7 @@ impl<'a> Acquire<'a> {
             let this = self.get_unchecked_mut();
             (
                 Pin::new_unchecked(&mut this.node),
-                &this.semaphore,
+                this.semaphore,
                 this.num_permits,
                 &mut this.queued,
             )

@@ -143,7 +143,7 @@ where
             ..
         } = *self;
 
-        let n = ready!(socket.borrow().poll_send_to(cx, &wr, *out_addr))?;
+        let n = ready!(socket.borrow().poll_send_to(cx, wr, *out_addr))?;
 
         let wrote_all = n == self.wr.len();
         self.wr.clear();

@@ -214,7 +214,7 @@ impl Handle {
         let _ = name;
 
         let (task, handle) = task::unowned(fut, NoopSchedule);
-        let _ = self.blocking_spawner.spawn(task, &self);
+        let _ = self.blocking_spawner.spawn(task, self);
         handle
     }
 

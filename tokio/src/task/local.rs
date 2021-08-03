@@ -691,7 +691,7 @@ impl task::Schedule for Arc<Shared> {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
             assert!(cx.shared.ptr_eq(self));
-            cx.owned.remove(&task)
+            cx.owned.remove(task)
         })
     }
 

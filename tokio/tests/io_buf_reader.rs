@@ -8,9 +8,11 @@ use std::cmp;
 use std::io::{self, Cursor};
 use std::pin::Pin;
 use tokio::io::{
-    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, BufReader,
-    ReadBuf, SeekFrom,
+    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWriteExt,
+    BufReader, ReadBuf, SeekFrom,
 };
+use tokio_test::task::spawn;
+use tokio_test::{assert_pending, assert_ready};
 
 macro_rules! run_fill_buf {
     ($reader:expr) => {{
@@ -347,4 +349,31 @@ async fn maybe_pending_seek() {
     assert_eq!(run_fill_buf!(reader).unwrap(), &[1, 2][..]);
     Pin::new(&mut reader).consume(1);
     assert_eq!(reader.seek(SeekFrom::Current(-2)).await.unwrap(), 3);
+}
+
+// This tests the AsyncBufReadExt::fill_buf wrapper.
+#[tokio::test]
+async fn test_fill_buf_wrapper() {
+    let (mut write, read) = tokio::io::duplex(16);
+
+    let mut read = BufReader::new(read);
+    write.write_all(b"hello world").await.unwrap();
+
+    assert_eq!(read.fill_buf().await.unwrap(), b"hello world");
+    read.consume(b"hello ".len());
+    assert_eq!(read.fill_buf().await.unwrap(), b"world");
+    assert_eq!(read.fill_buf().await.unwrap(), b"world");
+    read.consume(b"world".len());
+
+    let mut fill = spawn(read.fill_buf());
+    assert_pending!(fill.poll());
+
+    write.write_all(b"foo bar").await.unwrap();
+    assert_eq!(assert_ready!(fill.poll()).unwrap(), b"foo bar");
+    drop(fill);
+
+    drop(write);
+    assert_eq!(read.fill_buf().await.unwrap(), b"foo bar");
+    read.consume(b"foo bar".len());
+    assert_eq!(read.fill_buf().await.unwrap(), b"");
 }

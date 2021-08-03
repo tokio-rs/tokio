@@ -26,7 +26,7 @@ fn panics_when_no_reactor() {
 
 async fn timeout_value() {
     let (_tx, rx) = oneshot::channel::<()>();
-    let dur = Duration::from_millis(20);
+    let dur = Duration::from_millis(10);
     let _ = timeout(dur, rx).await;
 }
 

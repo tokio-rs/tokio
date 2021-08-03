@@ -63,7 +63,7 @@ impl<T> ReadHalf<T> {
     /// Checks if this `ReadHalf` and some `WriteHalf` were split from the same
     /// stream.
     pub fn is_pair_of(&self, other: &WriteHalf<T>) -> bool {
-        other.is_pair_of(&self)
+        other.is_pair_of(self)
     }
 
     /// Reunites with a previously split `WriteHalf`.

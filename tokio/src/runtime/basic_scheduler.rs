@@ -186,7 +186,7 @@ impl<P: Park> BasicScheduler<P> {
 
         Some(InnerGuard {
             inner: Some(inner),
-            basic_scheduler: &self,
+            basic_scheduler: self,
         })
     }
 }

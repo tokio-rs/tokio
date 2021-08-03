@@ -126,7 +126,7 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
                 }
 
                 // Wait for a named pipe to become available.
-                time::sleep(Duration::from_millis(50)).await;
+                time::sleep(Duration::from_millis(10)).await;
             };
 
             let mut client = BufReader::new(client);
@@ -255,7 +255,7 @@ async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
                 }
 
                 // Wait for a named pipe to become available.
-                time::sleep(Duration::from_millis(50)).await;
+                time::sleep(Duration::from_millis(10)).await;
             };
 
             let mut read_buf = [0u8; 5];

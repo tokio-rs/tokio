@@ -84,6 +84,9 @@ pub use self::write::write;
 mod copy;
 pub use self::copy::copy;
 
+#[cfg(test)]
+mod mocks;
+
 feature! {
     #![unix]
 
@@ -103,25 +106,21 @@ feature! {
 
 use std::io;
 
+#[cfg(not(test))]
+use crate::blocking::spawn_blocking;
+#[cfg(test)]
+use mocks::spawn_blocking;
+
 pub(crate) async fn asyncify<F, T>(f: F) -> io::Result<T>
 where
     F: FnOnce() -> io::Result<T> + Send + 'static,
     T: Send + 'static,
 {
-    match sys::run(f).await {
+    match spawn_blocking(f).await {
         Ok(res) => res,
         Err(_) => Err(io::Error::new(
             io::ErrorKind::Other,
             "background task failed",
         )),
     }
-}
-
-/// Types in this module can be mocked out in tests.
-mod sys {
-    pub(crate) use std::fs::File;
-
-    // TODO: don't rename
-    pub(crate) use crate::blocking::spawn_blocking as run;
-    pub(crate) use crate::blocking::JoinHandle as Blocking;
 }
