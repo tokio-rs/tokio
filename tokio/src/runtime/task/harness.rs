@@ -50,11 +50,9 @@ where
     ///
     /// Panics raised while polling the future are handled.
     pub(super) fn poll(self) {
-        println!("start poll");
         match self.poll_inner() {
             PollFuture::Notified => {
                 // Signal yield
-                println!("yield");
                 self.core().scheduler.yield_now(Notified(self.to_task()));
             }
             PollFuture::Complete => {
@@ -65,7 +63,6 @@ where
             },
             PollFuture::Done => (),
         }
-        println!("stop poll");
     }
 
     /// Poll the task and cancel it if necessary. This consumes the ref-count
@@ -92,14 +89,12 @@ where
                         // The transition to idle failed because the task was
                         // cancelled during the poll.
 
-                        println!("cancelled after");
                         cancel_task(&self.core().stage);
                         PollFuture::Complete
                     },
                 }
             },
             TransitionToRunning::Cancelled => {
-                println!("cancelled before");
                 cancel_task(&self.core().stage);
                 PollFuture::Complete
             },
@@ -192,7 +187,6 @@ where
     pub(super) fn wake_by_val(self) {
         use super::state::TransitionToNotifiedByVal;
 
-        println!("wake by val");
         match self.header().state.transition_to_notified_by_val() {
             TransitionToNotifiedByVal::Submit => {
                 self.core().scheduler.schedule(Notified(self.to_task()));
@@ -207,7 +201,6 @@ where
     pub(super) fn wake_by_ref(&self) {
         use super::state::TransitionToNotifiedByRef;
 
-        println!("wake by ref");
         match self.header().state.transition_to_notified_by_ref() {
             TransitionToNotifiedByRef::Submit => {
                 self.core().scheduler.schedule(Notified(self.to_task()));
