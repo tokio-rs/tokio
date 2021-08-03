@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1627974775045,
+  "lastUpdate": 1627974805486,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -41971,6 +41971,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20030142,
             "range": "± 3674028",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "175d84e2b14d152f4459869c6a8187bc7db63200",
+          "message": "chore: fix doc failure in CI on master (#4020)",
+          "timestamp": "2021-08-03T09:07:38+02:00",
+          "tree_id": "c0b71928d830eb323f6b66cf0d4ede4e14e092bf",
+          "url": "https://github.com/tokio-rs/tokio/commit/175d84e2b14d152f4459869c6a8187bc7db63200"
+        },
+        "date": 1627974798423,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 223835,
+            "range": "± 50719",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 909206,
+            "range": "± 210920",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6066845,
+            "range": "± 1996104",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18589319,
+            "range": "± 3462051",
             "unit": "ns/iter"
           }
         ]
