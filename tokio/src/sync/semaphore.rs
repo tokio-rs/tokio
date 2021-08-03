@@ -193,7 +193,7 @@ impl Semaphore {
     pub async fn acquire(&self) -> Result<SemaphorePermit<'_>, AcquireError> {
         self.ll_sem.acquire(1).await?;
         Ok(SemaphorePermit {
-            sem: &self,
+            sem: self,
             permits: 1,
         })
     }
@@ -229,7 +229,7 @@ impl Semaphore {
     pub async fn acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, AcquireError> {
         self.ll_sem.acquire(n).await?;
         Ok(SemaphorePermit {
-            sem: &self,
+            sem: self,
             permits: n,
         })
     }

@@ -207,7 +207,7 @@ where
                 stage.store_output(output);
 
                 // Transition to `Complete`, notifying the `JoinHandle` if necessary.
-                transition_to_complete(self.header(), stage, &self.trailer());
+                transition_to_complete(self.header(), stage, self.trailer());
             } else {
                 drop(output);
             }

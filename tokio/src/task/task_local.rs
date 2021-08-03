@@ -121,7 +121,7 @@ impl<T: 'static> LocalKey<T> {
         F: Future,
     {
         TaskLocalFuture {
-            local: &self,
+            local: self,
             slot: Some(value),
             future: f,
             _pinned: PhantomPinned,
@@ -150,7 +150,7 @@ impl<T: 'static> LocalKey<T> {
         F: FnOnce() -> R,
     {
         let scope = TaskLocalFuture {
-            local: &self,
+            local: self,
             slot: Some(value),
             future: (),
             _pinned: PhantomPinned,

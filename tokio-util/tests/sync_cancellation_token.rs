@@ -11,7 +11,7 @@ use futures_test::task::new_count_waker;
 fn cancel_token() {
     let (waker, wake_counter) = new_count_waker();
     let token = CancellationToken::new();
-    assert_eq!(false, token.is_cancelled());
+    assert!(!token.is_cancelled());
 
     let wait_fut = token.cancelled();
     pin!(wait_fut);
@@ -27,7 +27,7 @@ fn cancel_token() {
 
     token.cancel();
     assert_eq!(wake_counter, 1);
-    assert_eq!(true, token.is_cancelled());
+    assert!(token.is_cancelled());
 
     assert_eq!(
         Poll::Ready(()),
@@ -64,8 +64,8 @@ fn cancel_child_token_through_parent() {
 
     token.cancel();
     assert_eq!(wake_counter, 2);
-    assert_eq!(true, token.is_cancelled());
-    assert_eq!(true, child_token.is_cancelled());
+    assert!(token.is_cancelled());
+    assert!(child_token.is_cancelled());
 
     assert_eq!(
         Poll::Ready(()),
@@ -101,8 +101,8 @@ fn cancel_child_token_without_parent() {
 
     child_token_1.cancel();
     assert_eq!(wake_counter, 1);
-    assert_eq!(false, token.is_cancelled());
-    assert_eq!(true, child_token_1.is_cancelled());
+    assert!(!token.is_cancelled());
+    assert!(child_token_1.is_cancelled());
 
     assert_eq!(
         Poll::Ready(()),
@@ -128,8 +128,8 @@ fn cancel_child_token_without_parent() {
 
     token.cancel();
     assert_eq!(wake_counter, 3);
-    assert_eq!(true, token.is_cancelled());
-    assert_eq!(true, child_token_2.is_cancelled());
+    assert!(token.is_cancelled());
+    assert!(child_token_2.is_cancelled());
 
     assert_eq!(
         Poll::Ready(()),
