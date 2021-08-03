@@ -4,6 +4,7 @@ use crate::io::util::write::{write, Write};
 use crate::io::util::write_all::{write_all, WriteAll};
 use crate::io::util::write_all_buf::{write_all_buf, WriteAllBuf};
 use crate::io::util::write_buf::{write_buf, WriteBuf};
+use crate::io::util::write_int::{WriteF32, WriteF32Le, WriteF64, WriteF64Le};
 use crate::io::util::write_int::{
     WriteI128, WriteI128Le, WriteI16, WriteI16Le, WriteI32, WriteI32Le, WriteI64, WriteI64Le,
     WriteI8,
@@ -750,6 +751,81 @@ cfg_io_util! {
             /// ```
             fn write_i128(&mut self, n: i128) -> WriteI128;
 
+            /// Writes an 32-bit floating point type in big-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_f32(&mut self, n: f32) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write 32-bit floating point type to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_f32(f32::MIN).await?;
+            ///
+            ///     assert_eq!(writer, vec![0xff, 0x7f, 0xff, 0xff]);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_f32(&mut self, n: f32) -> WriteF32;
+
+            /// Writes an 64-bit floating point type in big-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_f64(&mut self, n: f64) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write 64-bit floating point type to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_f64(f64::MIN).await?;
+            ///
+            ///     assert_eq!(writer, vec![
+            ///         0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+            ///     ]);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_f64(&mut self, n: f64) -> WriteF64;
 
             /// Writes an unsigned 16-bit integer in little-endian order to the
             /// underlying writer.
@@ -1058,6 +1134,82 @@ cfg_io_util! {
             /// }
             /// ```
             fn write_i128_le(&mut self, n: i128) -> WriteI128Le;
+
+            /// Writes an 32-bit floating point type in little-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_f32_le(&mut self, n: f32) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write 32-bit floating point type to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_f32_le(f32::MIN).await?;
+            ///
+            ///     assert_eq!(writer, vec![0xff, 0xff, 0x7f, 0xff]);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_f32_le(&mut self, n: f32) -> WriteF32Le;
+
+            /// Writes an 64-bit floating point type in little-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_f64_le(&mut self, n: f64) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write 64-bit floating point type to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_f64_le(f64::MIN).await?;
+            ///
+            ///     assert_eq!(writer, vec![
+            ///         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0xff
+            ///     ]);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_f64_le(&mut self, n: f64) -> WriteF64Le;
         }
 
         /// Flushes this output stream, ensuring that all intermediately buffered
