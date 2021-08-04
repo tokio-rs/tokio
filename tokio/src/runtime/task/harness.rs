@@ -44,16 +44,25 @@ where
     T: Future,
     S: Schedule,
 {
-    /// Polls the inner future.
+    /// Polls the inner future. A ref-count is consumed.
     ///
     /// All necessary state checks and transitions are performed.
-    ///
     /// Panics raised while polling the future are handled.
     pub(super) fn poll(self) {
+        // We pass our ref-count to `poll_inner`.
         match self.poll_inner() {
             PollFuture::Notified => {
-                // Signal yield
-                self.core().scheduler.yield_now(Notified(self.to_task()));
+                // The `poll_inner` call has given us two ref-counts back.
+                // We give one of them to a new task and call `yield_now`.
+                self.core()
+                    .scheduler
+                    .yield_now(Notified(self.get_new_task()));
+
+                // The remaining ref-count is now dropped. We kept the extra
+                // ref-count until now to ensure that even if the `yield_now`
+                // call drops the provided task, the task isn't deallocated
+                // before after `yield_now` returns.
+                self.drop_reference();
             }
             PollFuture::Complete => {
                 self.complete();
@@ -65,8 +74,20 @@ where
         }
     }
 
-    /// Poll the task and cancel it if necessary. This consumes the ref-count
-    /// unless the return value is Complete.
+    /// Poll the task and cancel it if necessary. This takes ownership of a
+    /// ref-count.
+    ///
+    /// If the return value is Notified, the caller is given ownership of two
+    /// ref-counts.
+    ///
+    /// If the return value is Complete, the caller is given ownership of a
+    /// single ref-count, which should be passed on to `complete`.
+    ///
+    /// If the return value is Dealloc, then this call consumed the last
+    /// ref-count and the caller should call `dealloc`.
+    ///
+    /// Otherwise the ref-count is consumed and the caller should not access
+    /// `self` again.
     fn poll_inner(&self) -> PollFuture {
         use super::state::{TransitionToIdle, TransitionToRunning};
 
@@ -171,25 +192,53 @@ where
         }
     }
 
-    /// Remotely abort the task
+    /// Remotely abort the task.
+    ///
+    /// The caller should hold a ref-count, but we do not consume it.
     ///
     /// This is similar to `shutdown` except that it asks the runtime to perform
     /// the shutdown. This is necessary to avoid the shutdown happening in the
     /// wrong thread for non-Send tasks.
     pub(super) fn remote_abort(self) {
         if self.header().state.transition_to_notified_and_cancel() {
-            self.core().scheduler.schedule(Notified(self.to_task()));
+            // The transition has created a new ref-count, which we turn into
+            // a Notified and pass to the task.
+            //
+            // Since the caller holds a ref-count, the task cannot be destroyed
+            // before the call to `schedule` returns even if the call drops the
+            // `Notified` internally.
+            self.core()
+                .scheduler
+                .schedule(Notified(self.get_new_task()));
         }
     }
 
     // ===== waker behavior =====
 
+    /// This call consumes a ref-count and notifies the task. This will create a
+    /// new Notified and submit it if necessary.
+    ///
+    /// The caller does not need to hold a ref-count besides the one that was
+    /// passed to this call.
     pub(super) fn wake_by_val(self) {
         use super::state::TransitionToNotifiedByVal;
 
         match self.header().state.transition_to_notified_by_val() {
             TransitionToNotifiedByVal::Submit => {
-                self.core().scheduler.schedule(Notified(self.to_task()));
+                // The caller has given us a ref-count, and the transition has
+                // created a new ref-count, so we now hold two. We turn the new
+                // ref-count Notified and pass it to the call to `schedule`.
+                //
+                // The old ref-count is retained for now to ensure that the task
+                // is not dropped during the call to `schedule` if the call
+                // drops the task it was given.
+                self.core()
+                    .scheduler
+                    .schedule(Notified(self.get_new_task()));
+
+                // Now that we have completed the call to schedule, we can
+                // release our ref-count.
+                self.drop_reference();
             }
             TransitionToNotifiedByVal::Dealloc => {
                 self.dealloc();
@@ -198,12 +247,21 @@ where
         }
     }
 
+    /// This call notifies the task. It will not consume any ref-counts, but the
+    /// caller should hold a ref-count.  This will create a new Notified and
+    /// submit it if necessary.
     pub(super) fn wake_by_ref(&self) {
         use super::state::TransitionToNotifiedByRef;
 
         match self.header().state.transition_to_notified_by_ref() {
             TransitionToNotifiedByRef::Submit => {
-                self.core().scheduler.schedule(Notified(self.to_task()));
+                // The transition above incremented the ref-count for a new task
+                // and the caller also holds a ref-count. The caller's ref-count
+                // ensures that the task is not destroyed even if the new task
+                // is dropped before `schedule` returns.
+                self.core()
+                    .scheduler
+                    .schedule(Notified(self.get_new_task()));
             }
             TransitionToNotifiedByRef::DoNothing => {}
         }
@@ -255,7 +313,9 @@ where
     /// Release the task from the scheduler. Returns the number of ref-counts
     /// that should be decremented.
     fn release(&self) -> usize {
-        let me = ManuallyDrop::new(self.to_task());
+        // We don't actually increment the ref-count here, but the new task is
+        // never destroyed, so that's ok.
+        let me = ManuallyDrop::new(self.get_new_task());
 
         if let Some(task) = self.core().scheduler.release(&me) {
             mem::forget(task);
@@ -265,7 +325,15 @@ where
         }
     }
 
-    fn to_task(&self) -> Task<S> {
+    /// Create a new task that holds its own ref-count.
+    ///
+    /// # Safety
+    ///
+    /// Any use of `self` after this call must ensure that a ref-count to the
+    /// task holds the task alive until after the use of `self`. Passing the
+    /// returned Task to any method on `self` is unsound if dropping the Task
+    /// could drop `self` before the call on `self` returned.
+    fn get_new_task(&self) -> Task<S> {
         // safety: The header is at the beginning of the cell, so this cast is
         // safe.
         unsafe { Task::from_raw(self.cell.cast()) }

@@ -113,14 +113,11 @@ impl State {
     /// Attempt to transition the lifecycle to `Running`. This sets the
     /// notified bit to false so notifications during the poll can be detected.
     pub(super) fn transition_to_running(&self) -> TransitionToRunning {
-        let mut action = TransitionToRunning::Success;
+        self.fetch_update_action(|mut next| {
+            let action;
+            assert!(next.is_notified());
 
-        let _ = self.fetch_update(|curr| {
-            assert!(curr.is_notified());
-
-            let mut next = curr;
-
-            if !curr.is_idle() {
+            if !next.is_idle() {
                 // This happens if the task is either currently running or if it
                 // has already completed, e.g. if it was cancelled during
                 // shutdown. Consume the ref-count and return.
@@ -141,10 +138,8 @@ impl State {
                     action = TransitionToRunning::Success;
                 }
             }
-            Some(next)
-        });
-
-        action
+            (action, Some(next))
+        })
     }
 
     /// Transitions the task from `Running` -> `Idle`.
@@ -153,17 +148,15 @@ impl State {
     /// The transition to `Idle` fails if the task has been flagged to be
     /// cancelled.
     pub(super) fn transition_to_idle(&self) -> TransitionToIdle {
-        let mut action = TransitionToIdle::Ok;
-
-        let _ = self.fetch_update(|curr| {
+        self.fetch_update_action(|curr| {
             assert!(curr.is_running());
 
             if curr.is_cancelled() {
-                action = TransitionToIdle::Cancelled;
-                return None;
+                return (TransitionToIdle::Cancelled, None);
             }
 
             let mut next = curr;
+            let action;
             next.unset_running();
 
             if !next.is_notified() {
@@ -175,15 +168,15 @@ impl State {
                     action = TransitionToIdle::Ok;
                 }
             } else {
-                // The caller will schedule a new notification, so our ref-count
-                // is transferred to that new notification.
+                // The caller will schedule a new notification, so we create a
+                // new ref-count for the notification. Our own ref-count is kept
+                // for now, and the caller will drop it shortly.
+                next.ref_inc();
                 action = TransitionToIdle::OkNotified;
             }
 
-            Some(next)
-        });
-
-        action
+            (action, Some(next))
+        })
     }
 
     /// Transitions the task from `Running` -> `Complete`.
@@ -212,12 +205,15 @@ impl State {
         prev.ref_count() == count
     }
 
-    /// Transitions the state to `NOTIFIED` and consume a ref-count.
+    /// Transitions the state to `NOTIFIED`.
+    ///
+    /// If no task needs to be submitted, a ref-count is consumed.
+    ///
+    /// If a task needs to be submitted, the ref-count is incremented for the
+    /// new Notified.
     pub(super) fn transition_to_notified_by_val(&self) -> TransitionToNotifiedByVal {
-        let mut action = TransitionToNotifiedByVal::DoNothing;
-
-        let _ = self.fetch_update(|mut snapshot| {
-            action = TransitionToNotifiedByVal::DoNothing;
+        self.fetch_update_action(|mut snapshot| {
+            let action;
 
             if snapshot.is_running() {
                 // If the task is running, we mark it as notified, but we should
@@ -228,57 +224,51 @@ impl State {
 
                 if snapshot.ref_count() == 0 {
                     action = TransitionToNotifiedByVal::Dealloc;
+                } else {
+                    action = TransitionToNotifiedByVal::DoNothing;
                 }
             } else if snapshot.is_complete() || snapshot.is_notified() {
-                // We do not need to submit any notification.
+                // We do not need to submit any notifications, but we have to
+                // decrement the ref-count.
                 snapshot.ref_dec();
 
                 if snapshot.ref_count() == 0 {
                     action = TransitionToNotifiedByVal::Dealloc;
+                } else {
+                    action = TransitionToNotifiedByVal::DoNothing;
                 }
             } else {
-                // We do not decrement the ref-count as it is transferred to the
-                // new notification.
+                // We create a new notified that we can submit. The caller
+                // retains ownership of the ref-count they passed in.
                 snapshot.set_notified();
+                snapshot.ref_inc();
                 action = TransitionToNotifiedByVal::Submit;
             }
 
-            Some(snapshot)
-        });
-
-        action
+            (action, Some(snapshot))
+        })
     }
 
     /// Transitions the state to `NOTIFIED`.
     pub(super) fn transition_to_notified_by_ref(&self) -> TransitionToNotifiedByRef {
-        let mut action = TransitionToNotifiedByRef::DoNothing;
-
-        let _ = self.fetch_update(|mut snapshot| {
-            action = TransitionToNotifiedByRef::DoNothing;
-
-            if snapshot.is_running() {
+        self.fetch_update_action(|mut snapshot| {
+            if snapshot.is_complete() || snapshot.is_notified() {
+                // There is nothing to do in this case.
+                (TransitionToNotifiedByRef::DoNothing, None)
+            } else if snapshot.is_running() {
                 // If the task is running, we mark it as notified, but we should
                 // not submit as the thread currently running the future is
                 // responsible for that.
                 snapshot.set_notified();
-                Some(snapshot)
-            } else if snapshot.is_complete() {
-                // Notifications to completed tasks are no-ops.
-                None
-            } else if !snapshot.is_notified() {
+                (TransitionToNotifiedByRef::DoNothing, Some(snapshot))
+            } else {
                 // The task is idle and not notified. We should submit a
                 // notification.
                 snapshot.set_notified();
                 snapshot.ref_inc();
-                action = TransitionToNotifiedByRef::Submit;
-                Some(snapshot)
-            } else {
-                // The task is idle but already notified. Do nothing.
-                None
+                (TransitionToNotifiedByRef::Submit, Some(snapshot))
             }
-        });
-
-        action
+        })
     }
 
     /// Set the cancelled bit and transition the state to `NOTIFIED` if idle.
@@ -286,40 +276,35 @@ impl State {
     /// Returns `true` if the task needs to be submitted to the pool for
     /// execution
     pub(super) fn transition_to_notified_and_cancel(&self) -> bool {
-        let mut should_submit = false;
-
-        let _ = self.fetch_update(|mut snapshot| {
-            should_submit = false;
-
+        self.fetch_update_action(|mut snapshot| {
             if snapshot.is_cancelled() || snapshot.is_complete() {
                 // Aborts to completed or cancelled tasks are no-ops.
-                None
+                (false, None)
             } else if snapshot.is_running() {
                 // If the task is running, we mark it as cancelled. The thread
                 // running the task will notice the cancelled bit when it
                 // stops polling and it will kill the task.
                 //
-                // The set_notified() call is not strictly necessary but tells
-                // future notifications also submitted during the poll to not
-                // do anything.
+                // The set_notified() call is not strictly necessary but it will
+                // in some cases let a wake_by_ref call return without having
+                // to perform a compare_exchange.
                 snapshot.set_notified();
                 snapshot.set_cancelled();
-                Some(snapshot)
+                (false, Some(snapshot))
             } else {
                 // The task is idle. We set the cancelled and notified bits and
                 // submit a notification if the notified bit was not already
                 // set.
+                snapshot.set_cancelled();
                 if !snapshot.is_notified() {
                     snapshot.set_notified();
                     snapshot.ref_inc();
-                    should_submit = true;
+                    (true, Some(snapshot))
+                } else {
+                    (false, Some(snapshot))
                 }
-                snapshot.set_cancelled();
-                Some(snapshot)
             }
-        });
-
-        should_submit
+        })
     }
 
     /// Set the `CANCELLED` bit and attempt to transition to `Running`.
@@ -462,6 +447,28 @@ impl State {
         let prev = Snapshot(self.val.fetch_sub(2 * REF_ONE, AcqRel));
         assert!(prev.ref_count() >= 2);
         prev.ref_count() == 2
+    }
+
+    fn fetch_update_action<F, T>(&self, mut f: F) -> T
+    where
+        F: FnMut(Snapshot) -> (T, Option<Snapshot>),
+    {
+        let mut curr = self.load();
+
+        loop {
+            let (output, next) = f(curr);
+            let next = match next {
+                Some(next) => next,
+                None => return output,
+            };
+
+            let res = self.val.compare_exchange(curr.0, next.0, AcqRel, Acquire);
+
+            match res {
+                Ok(_) => return output,
+                Err(actual) => curr = Snapshot(actual),
+            }
+        }
     }
 
     fn fetch_update<F>(&self, mut f: F) -> Result<Snapshot, Snapshot>
