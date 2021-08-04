@@ -398,8 +398,23 @@ fn local_tasks_wake_join_all() {
     });
 }
 
+fn local_tasks_are_polled_after_tick() {
+    // This test depends on timing, so we run it up to five times.
+    for _ in 0..4 {
+        let res = std::panic::catch_unwind(local_tasks_are_polled_after_tick_inner);
+        if res.is_ok() {
+            // success
+            return;
+        }
+    }
+
+    // Test failed 4 times. Try one more time without catching panics. If it
+    // fails again, the test fails.
+    local_tasks_are_polled_after_tick_inner();
+}
+
 #[tokio::test]
-async fn local_tasks_are_polled_after_tick() {
+async fn local_tasks_are_polled_after_tick_inner() {
     // Reproduces issues #1899 and #1900
 
     static RX1: AtomicUsize = AtomicUsize::new(0);
@@ -431,7 +446,7 @@ async fn local_tasks_are_polled_after_tick() {
                     tx.send(()).unwrap();
                 }
 
-                time::sleep(Duration::from_millis(10)).await;
+                time::sleep(Duration::from_millis(20)).await;
                 let rx1 = RX1.load(SeqCst);
                 let rx2 = RX2.load(SeqCst);
                 println!("EXPECT = {}; RX1 = {}; RX2 = {}", EXPECTED, rx1, rx2);
