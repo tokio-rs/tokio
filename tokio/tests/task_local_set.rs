@@ -398,6 +398,7 @@ fn local_tasks_wake_join_all() {
     });
 }
 
+#[test]
 fn local_tasks_are_polled_after_tick() {
     // This test depends on timing, so we run it up to five times.
     for _ in 0..4 {
@@ -413,7 +414,7 @@ fn local_tasks_are_polled_after_tick() {
     local_tasks_are_polled_after_tick_inner();
 }
 
-#[tokio::test]
+#[tokio::main(flavor = "current_thread")]
 async fn local_tasks_are_polled_after_tick_inner() {
     // Reproduces issues #1899 and #1900
 
