@@ -325,6 +325,7 @@ fn parse_knobs(
     let brace_token = input.block.brace_token;
     input.block = syn::parse2(quote_spanned! {last_stmt_end_span=>
         {
+            #[allow(clippy::expect_used)]
             #rt
                 .enable_all()
                 .build()
