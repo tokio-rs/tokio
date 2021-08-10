@@ -222,11 +222,10 @@ impl State {
                 snapshot.set_notified();
                 snapshot.ref_dec();
 
-                if snapshot.ref_count() == 0 {
-                    action = TransitionToNotifiedByVal::Dealloc;
-                } else {
-                    action = TransitionToNotifiedByVal::DoNothing;
-                }
+                // The thread that set the running bit also holds a ref-count.
+                assert!(snapshot.ref_count() > 0);
+
+                action = TransitionToNotifiedByVal::DoNothing;
             } else if snapshot.is_complete() || snapshot.is_notified() {
                 // We do not need to submit any notifications, but we have to
                 // decrement the ref-count.
