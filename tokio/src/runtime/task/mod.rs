@@ -369,10 +369,10 @@ impl<S: Schedule> UnownedTask<S> {
         let raw = self.raw;
         mem::forget(self);
 
-        // Decrement the ref-count
-        raw.header().state.ref_dec();
         // Poll the task
         raw.poll();
+        // Decrement our extra ref-count
+        raw.header().state.ref_dec();
     }
 
     pub(crate) fn shutdown(self) {
