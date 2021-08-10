@@ -32,7 +32,7 @@ impl<T> VecDequeCell<T> {
         // not called recursively. Finally, this is the only place that can
         // create mutable references to the inner VecDeque. This ensures that
         // any mutable references created here are exclusive.
-        self.inner.with_mut(|ptr| unsafe { f(&mut *ptr) })
+        self.inner.with_mut(|ptr| f(&mut *ptr))
     }
 
     pub(crate) fn pop_front(&self) -> Option<T> {
