@@ -156,11 +156,6 @@ impl<S: 'static> OwnedTasks<S> {
         self.inner.lock().list.is_empty()
     }
 
-    #[cfg(feature = "rt-multi-thread")]
-    pub(crate) fn is_closed(&self) -> bool {
-        self.inner.lock().closed
-    }
-
     /// Close the OwnedTasks. This prevents adding new tasks to the collection.
     pub(crate) fn close(&self) {
         self.inner.lock().closed = true;
