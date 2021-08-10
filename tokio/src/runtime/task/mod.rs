@@ -98,7 +98,7 @@
 //!
 //! If a future is not Send, then it is bound to a LocalOwnedTasks.  The future
 //! will only ever be polled or dropped given a LocalNotified or inside a call
-//! to LocalOwnedTasks::drain_tasks. In either case, it is guaranteed that the
+//! to LocalOwnedTasks::shutdown_all. In either case, it is guaranteed that the
 //! future is on the right thread.
 //!
 //! If the task is never removed from the LocalOwnedTasks, then it is leaked, so

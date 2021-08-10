@@ -606,7 +606,7 @@ impl Drop for LocalSet {
             self.context.owned.close();
 
             // Shut down all tasks in the LocalOwnedTasks.
-            self.context.owned.drain_tasks();
+            self.context.owned.shutdown_all();
 
             // We already called shutdown on all tasks above, so there is no
             // need to call shutdown.

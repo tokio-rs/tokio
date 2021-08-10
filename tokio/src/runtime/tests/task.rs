@@ -260,7 +260,7 @@ impl Runtime {
         let mut core = self.0.core.try_lock().unwrap();
 
         self.0.owned.close();
-        self.0.owned.drain_tasks();
+        self.0.owned.shutdown_all();
 
         while let Some(task) = core.queue.pop_back() {
             drop(task);

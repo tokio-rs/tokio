@@ -124,7 +124,7 @@ impl<S: 'static> OwnedTasks<S> {
         }
     }
 
-    pub(crate) fn drain_tasks(&self)
+    pub(crate) fn shutdown_all(&self)
     where
         S: Schedule,
     {
@@ -209,7 +209,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
         }
     }
 
-    pub(crate) fn drain_tasks(&self)
+    pub(crate) fn shutdown_all(&self)
     where
         S: Schedule,
     {
