@@ -325,12 +325,13 @@ fn parse_knobs(
     let brace_token = input.block.brace_token;
     input.block = syn::parse2(quote_spanned! {last_stmt_end_span=>
         {
+            let body_closure = || async #body;
             #[allow(clippy::expect_used)]
             #rt
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
-                .block_on(async #body)
+                .block_on(body_closure())
         }
     })
     .expect("Parsing failure");
