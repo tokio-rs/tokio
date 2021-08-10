@@ -21,28 +21,33 @@ impl<T> VecDequeCell<T> {
         }
     }
 
+    /// Safety: This method may not be called recursively.
     #[inline]
-    fn with_inner<F, R>(&self, f: F) -> R
+    unsafe fn with_inner<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut VecDeque<T>) -> R,
     {
         // safety: This type is not Sync, so concurrent calls of this method
-        // can't happen.  Furthermore, all uses of this method in this file make
-        // sure that they don't call `with_inner` recursively.
+        // cannot happen. Furthermore, the caller guarantees that the method is
+        // not called recursively. Finally, this is the only place that can
+        // create mutable references to the inner VecDeque. This ensures that
+        // any mutable references created here are exclusive.
         self.inner.with_mut(|ptr| unsafe { f(&mut *ptr) })
     }
 
     pub(crate) fn pop_front(&self) -> Option<T> {
-        self.with_inner(VecDeque::pop_front)
+        unsafe { self.with_inner(VecDeque::pop_front) }
     }
 
     pub(crate) fn push_back(&self, item: T) {
-        self.with_inner(|inner| inner.push_back(item));
+        unsafe {
+            self.with_inner(|inner| inner.push_back(item));
+        }
     }
 
     /// Replace the inner VecDeque with an empty VecDeque and return the current
     /// contents.
     pub(crate) fn take(&self) -> VecDeque<T> {
-        self.with_inner(|inner| std::mem::take(inner))
+        unsafe { self.with_inner(|inner| std::mem::take(inner)) }
     }
 }
