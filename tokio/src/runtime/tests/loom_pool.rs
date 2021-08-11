@@ -210,23 +210,6 @@ mod group_b {
     }
 
     #[test]
-    fn pool_shutdown() {
-        loom::model(|| {
-            let pool = mk_pool(2);
-
-            pool.spawn(track(async move {
-                gated2(true).await;
-            }));
-
-            pool.spawn(track(async move {
-                gated2(false).await;
-            }));
-
-            drop(pool);
-        });
-    }
-
-    #[test]
     fn join_output() {
         loom::model(|| {
             let rt = mk_pool(1);
@@ -342,6 +325,27 @@ mod group_d {
             }));
 
             done_rx.recv();
+        });
+    }
+}
+
+mod group_e {
+    use super::*;
+
+    #[test]
+    fn pool_shutdown() {
+        loom::model(|| {
+            let pool = mk_pool(2);
+
+            pool.spawn(track(async move {
+                gated2(true).await;
+            }));
+
+            pool.spawn(track(async move {
+                gated2(false).await;
+            }));
+
+            drop(pool);
         });
     }
 }
