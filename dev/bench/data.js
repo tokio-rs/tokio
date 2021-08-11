@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1628096436055,
+  "lastUpdate": 1628673478934,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -42427,6 +42427,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20490632,
             "range": "± 2981650",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "katerina.churanova@gmail.com",
+            "name": "Kateřina Churanová",
+            "username": "kate-shine"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e95d6994a78d880df79d9e2ed207c908e89ac1a",
+          "message": "chore: explicitly relaxed clippy lint for runtime entry macro (#4030)",
+          "timestamp": "2021-08-11T18:16:00+09:00",
+          "tree_id": "f2bad789c19e3fb5a3f98bde3e1fd77db01100b5",
+          "url": "https://github.com/tokio-rs/tokio/commit/1e95d6994a78d880df79d9e2ed207c908e89ac1a"
+        },
+        "date": 1628673472168,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 227354,
+            "range": "± 14985",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1129553,
+            "range": "± 141435",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 7017341,
+            "range": "± 1554040",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21111117,
+            "range": "± 3037686",
             "unit": "ns/iter"
           }
         ]
