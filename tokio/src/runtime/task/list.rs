@@ -124,10 +124,24 @@ impl<S: 'static> OwnedTasks<S> {
         }
     }
 
-    pub(crate) fn shutdown_all(&self)
+    /// Shut down all tasks in the collection. This call also closes the
+    /// collection, preventing new items from being added.
+    pub(crate) fn close_and_shutdown_all(&self)
     where
         S: Schedule,
     {
+        // The first iteration of the loop was unrolled so it can set the
+        // closed bool.
+        let first_task = {
+            let mut lock = self.inner.lock();
+            lock.closed = true;
+            lock.list.pop_back()
+        };
+        match first_task {
+            Some(task) => task.shutdown(),
+            None => return,
+        }
+
         loop {
             let task = match self.inner.lock().list.pop_back() {
                 Some(task) => task,
@@ -154,11 +168,6 @@ impl<S: 'static> OwnedTasks<S> {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.inner.lock().list.is_empty()
-    }
-
-    /// Close the OwnedTasks. This prevents adding new tasks to the collection.
-    pub(crate) fn close(&self) {
-        self.inner.lock().closed = true;
     }
 }
 
@@ -204,10 +213,14 @@ impl<S: 'static> LocalOwnedTasks<S> {
         }
     }
 
-    pub(crate) fn shutdown_all(&self)
+    /// Shut down all tasks in the collection. This call also closes the
+    /// collection, preventing new items from being added.
+    pub(crate) fn close_and_shutdown_all(&self)
     where
         S: Schedule,
     {
+        self.with_inner(|inner| inner.closed = true);
+
         while let Some(task) = self.with_inner(|inner| inner.list.pop_back()) {
             task.shutdown();
         }
@@ -260,12 +273,6 @@ impl<S: 'static> LocalOwnedTasks<S> {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.with_inner(|inner| inner.list.is_empty())
-    }
-
-    /// Close the LocalOwnedTasks. This prevents adding new tasks to the
-    /// collection.
-    pub(crate) fn close(&self) {
-        self.with_inner(|inner| inner.closed = true);
     }
 }
 

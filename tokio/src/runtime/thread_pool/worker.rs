@@ -599,13 +599,8 @@ impl Core {
     /// Signals all tasks to shut down, and waits for them to complete. Must run
     /// before we enter the single-threaded phase of shutdown processing.
     fn pre_shutdown(&mut self, worker: &Worker) {
-        // The OwnedTasks is also closed in Shared::close, but since the inject
-        // queue is closed before closing the OwnedTasks, it is possible for one
-        // thread to get here before the OwnedTasks gets closed.
-        worker.shared.owned.close();
-
         // Signal to all tasks to shut down.
-        worker.shared.owned.shutdown_all();
+        worker.shared.owned.close_and_shutdown_all();
     }
 
     /// Shutdown the core
@@ -707,7 +702,6 @@ impl Shared {
 
     pub(super) fn close(&self) {
         if self.inject.close() {
-            self.owned.close();
             self.notify_all();
         }
     }

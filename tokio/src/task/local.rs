@@ -599,14 +599,9 @@ impl Default for LocalSet {
 impl Drop for LocalSet {
     fn drop(&mut self) {
         self.with(|| {
-            // Close the LocalOwnedTasks. This ensures that any calls to
-            // spawn_local in the destructor of a future on this LocalSet will
-            // immediately cancel the task, and prevents the task from being
-            // added to `owned`.
-            self.context.owned.close();
-
-            // Shut down all tasks in the LocalOwnedTasks.
-            self.context.owned.shutdown_all();
+            // Shut down all tasks in the LocalOwnedTasks and close it to
+            // prevent new tasks from ever being added.
+            self.context.owned.close_and_shutdown_all();
 
             // We already called shutdown on all tasks above, so there is no
             // need to call shutdown.

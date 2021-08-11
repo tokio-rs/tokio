@@ -314,10 +314,10 @@ impl<P: Park> Drop for BasicScheduler<P> {
         };
 
         enter(&mut inner, |scheduler, context| {
-            // By closing the OwnedTasks, no new tasks can be spawned on it.
-            context.shared.owned.close();
-            // Drain the OwnedTasks collection.
-            context.shared.owned.shutdown_all();
+            // Drain the OwnedTasks collection. This call also closes the
+            // collection, ensuring that no tasks are ever pushed after this
+            // call returns.
+            context.shared.owned.close_and_shutdown_all();
 
             // Drain local queue
             // We already shut down every task, so we just need to drop the task.
