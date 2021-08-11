@@ -257,10 +257,6 @@ mod group_b {
             });
         });
     }
-}
-
-mod group_c {
-    use super::*;
 
     #[test]
     fn shutdown_with_notification() {
@@ -285,6 +281,27 @@ mod group_c {
 
                 let _ = done_tx.send(());
             }));
+        });
+    }
+}
+
+mod group_c {
+    use super::*;
+
+    #[test]
+    fn pool_shutdown() {
+        loom::model(|| {
+            let pool = mk_pool(2);
+
+            pool.spawn(track(async move {
+                gated2(true).await;
+            }));
+
+            pool.spawn(track(async move {
+                gated2(false).await;
+            }));
+
+            drop(pool);
         });
     }
 }
@@ -325,27 +342,6 @@ mod group_d {
             }));
 
             done_rx.recv();
-        });
-    }
-}
-
-mod group_e {
-    use super::*;
-
-    #[test]
-    fn pool_shutdown() {
-        loom::model(|| {
-            let pool = mk_pool(2);
-
-            pool.spawn(track(async move {
-                gated2(true).await;
-            }));
-
-            pool.spawn(track(async move {
-                gated2(false).await;
-            }));
-
-            drop(pool);
         });
     }
 }
