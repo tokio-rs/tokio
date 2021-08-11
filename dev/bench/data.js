@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1628673484643,
+  "lastUpdate": 1628673502899,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -22409,6 +22409,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 584,
             "range": "± 121",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "katerina.churanova@gmail.com",
+            "name": "Kateřina Churanová",
+            "username": "kate-shine"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e95d6994a78d880df79d9e2ed207c908e89ac1a",
+          "message": "chore: explicitly relaxed clippy lint for runtime entry macro (#4030)",
+          "timestamp": "2021-08-11T18:16:00+09:00",
+          "tree_id": "f2bad789c19e3fb5a3f98bde3e1fd77db01100b5",
+          "url": "https://github.com/tokio-rs/tokio/commit/1e95d6994a78d880df79d9e2ed207c908e89ac1a"
+        },
+        "date": 1628673495902,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 949,
+            "range": "± 111",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 18839,
+            "range": "± 6868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 960,
+            "range": "± 140",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 19074,
+            "range": "± 6176",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 613,
+            "range": "± 71",
             "unit": "ns/iter"
           }
         ]
