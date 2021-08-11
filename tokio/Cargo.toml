@@ -82,7 +82,7 @@ signal = [
   "winapi/consoleapi",
 ]
 sync = []
-test-util = []
+test-util = ["rt", "sync", "time"]
 time = []
 
 [dependencies]
