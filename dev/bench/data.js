@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1628673502899,
+  "lastUpdate": 1628673530910,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -99965,6 +99965,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 675281,
             "range": "± 1573",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "katerina.churanova@gmail.com",
+            "name": "Kateřina Churanová",
+            "username": "kate-shine"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e95d6994a78d880df79d9e2ed207c908e89ac1a",
+          "message": "chore: explicitly relaxed clippy lint for runtime entry macro (#4030)",
+          "timestamp": "2021-08-11T18:16:00+09:00",
+          "tree_id": "f2bad789c19e3fb5a3f98bde3e1fd77db01100b5",
+          "url": "https://github.com/tokio-rs/tokio/commit/1e95d6994a78d880df79d9e2ed207c908e89ac1a"
+        },
+        "date": 1628673523574,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7497807,
+            "range": "± 3145726",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6678219,
+            "range": "± 1632890",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 7240253,
+            "range": "± 1875606",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 304,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 304,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 304,
+            "range": "± 1",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 29891,
+            "range": "± 293",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 958,
+            "range": "± 351",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1082783,
+            "range": "± 2335",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 789544,
+            "range": "± 3692",
             "unit": "ns/iter"
           }
         ]
