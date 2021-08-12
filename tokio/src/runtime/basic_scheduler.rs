@@ -3,6 +3,7 @@ use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::metrics::{RuntimeMetrics, WorkerMetricsBatcher};
 use crate::sync::notify::Notify;
 use crate::util::{waker_ref, Wake, WakerRef};
 
@@ -47,6 +48,9 @@ struct Inner<P: Park> {
 
     /// Thread park handle
     park: P,
+
+    /// Metrics batcher
+    metrics: WorkerMetricsBatcher,
 }
 
 #[derive(Clone)]
@@ -87,6 +91,9 @@ struct Shared {
 
     /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
+
+    /// Keeps track of various runtime metrics.
+    metrics: RuntimeMetrics,
 }
 
 /// Thread-local context.
@@ -123,6 +130,7 @@ impl<P: Park> BasicScheduler<P> {
                 owned: OwnedTasks::new(),
                 unpark: unpark as Box<dyn Unpark>,
                 woken: AtomicBool::new(false),
+                metrics: RuntimeMetrics::new(1),
             }),
         };
 
@@ -133,6 +141,7 @@ impl<P: Park> BasicScheduler<P> {
             spawner: spawner.clone(),
             tick: 0,
             park,
+            metrics: WorkerMetricsBatcher::new(0),
         }));
 
         BasicScheduler {
@@ -205,6 +214,7 @@ impl<P: Park> Inner<P> {
             'outer: loop {
                 if scheduler.spawner.was_woken() || !polled {
                     polled = true;
+                    scheduler.metrics.incr_poll_count();
                     if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
                         return v;
                     }
@@ -238,6 +248,8 @@ impl<P: Park> Inner<P> {
                         Some(entry) => entry,
                         None => {
                             // Park until the thread is signaled
+                            scheduler.metrics.incr_park_count();
+                            scheduler.metrics.submit(&scheduler.spawner.shared.metrics);
                             scheduler.park.park().expect("failed to park");
 
                             // Try polling the `block_on` future next
@@ -247,6 +259,7 @@ impl<P: Park> Inner<P> {
 
                     match entry {
                         RemoteMsg::Schedule(task) => {
+                            scheduler.metrics.incr_poll_count();
                             let task = context.shared.owned.assert_owner(task);
                             crate::coop::budget(|| task.run())
                         }
@@ -255,6 +268,7 @@ impl<P: Park> Inner<P> {
 
                 // Yield to the park, this drives the timer and pulls any pending
                 // I/O events.
+                scheduler.metrics.submit(&scheduler.spawner.shared.metrics);
                 scheduler
                     .park
                     .park_timeout(Duration::from_millis(0))
@@ -367,6 +381,10 @@ impl Spawner {
         }
 
         handle
+    }
+
+    pub(crate) fn metrics(&self) -> &RuntimeMetrics {
+        &self.shared.metrics
     }
 
     fn pop(&self) -> Option<RemoteMsg> {

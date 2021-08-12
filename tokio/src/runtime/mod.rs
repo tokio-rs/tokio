@@ -181,6 +181,8 @@ pub(crate) mod enter;
 
 pub(crate) mod task;
 
+pub(crate) mod metrics;
+
 cfg_rt! {
     mod basic_scheduler;
     use basic_scheduler::BasicScheduler;
