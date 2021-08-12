@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1628792196585,
+  "lastUpdate": 1628792203054,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -65991,6 +65991,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 848,
             "range": "± 113",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b67534a20bf5b6ac0de152f42cc5fc0af20316ea",
+          "message": "tests: fix flaky test (#4024)",
+          "timestamp": "2021-08-12T20:15:06+02:00",
+          "tree_id": "919233baea2a525a6a8f8a9b0df5644898f00a7a",
+          "url": "https://github.com/tokio-rs/tokio/commit/b67534a20bf5b6ac0de152f42cc5fc0af20316ea"
+        },
+        "date": 1628792196762,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13526,
+            "range": "± 4597",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 818,
+            "range": "± 13",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 535,
+            "range": "± 23",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13047,
+            "range": "± 4041",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 820,
+            "range": "± 2",
             "unit": "ns/iter"
           }
         ]
