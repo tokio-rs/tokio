@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1628792203054,
+  "lastUpdate": 1628792210743,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -43093,6 +43093,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 16748890,
             "range": "± 1644499",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b67534a20bf5b6ac0de152f42cc5fc0af20316ea",
+          "message": "tests: fix flaky test (#4024)",
+          "timestamp": "2021-08-12T20:15:06+02:00",
+          "tree_id": "919233baea2a525a6a8f8a9b0df5644898f00a7a",
+          "url": "https://github.com/tokio-rs/tokio/commit/b67534a20bf5b6ac0de152f42cc5fc0af20316ea"
+        },
+        "date": 1628792200849,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 183047,
+            "range": "± 3176",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 987743,
+            "range": "± 78049",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6345251,
+            "range": "± 1061312",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 16722470,
+            "range": "± 1332547",
             "unit": "ns/iter"
           }
         ]
