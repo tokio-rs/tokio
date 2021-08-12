@@ -320,6 +320,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify that both READMEs are identical
+        working-directory: .
         run: diff README.md tokio/README.md
 
       - name: Verify that Tokio version is up to date in README
