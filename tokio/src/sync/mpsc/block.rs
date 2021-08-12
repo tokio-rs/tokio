@@ -1,6 +1,5 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicPtr, AtomicUsize};
-use crate::loom::thread;
 
 use std::mem::MaybeUninit;
 use std::ops;
@@ -345,7 +344,7 @@ impl<T> Block<T> {
             };
 
             #[cfg(all(test, loom))]
-            thread::yield_now();
+            crate::loom::thread::yield_now();
 
             // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
             #[cfg(not(all(test, loom)))]
