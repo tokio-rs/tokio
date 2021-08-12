@@ -24,6 +24,9 @@ cfg_rt! {
 
     mod sync_wrapper;
     pub(crate) use sync_wrapper::SyncWrapper;
+
+    mod vec_deque_cell;
+    pub(crate) use vec_deque_cell::VecDequeCell;
 }
 
 cfg_rt_multi_thread! {

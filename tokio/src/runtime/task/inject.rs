@@ -92,6 +92,8 @@ impl<T: 'static> Inject<T> {
         debug_assert!(get_next(task).is_none());
 
         if let Some(tail) = p.tail {
+            // safety: Holding the Notified for a task guarantees exclusive
+            // access to the `queue_next` field.
             set_next(tail, Some(task));
         } else {
             p.head = Some(task);
@@ -103,9 +105,6 @@ impl<T: 'static> Inject<T> {
     }
 
     /// Pushes several values into the queue.
-    ///
-    /// SAFETY: The caller should ensure that we have exclusive access to the
-    /// `queue_next` field in the provided tasks.
     #[inline]
     pub(crate) fn push_batch<I>(&self, mut iter: I)
     where
@@ -123,8 +122,11 @@ impl<T: 'static> Inject<T> {
         // We are going to be called with an `std::iter::Chain`, and that
         // iterator overrides `for_each` to something that is easier for the
         // compiler to optimize than a loop.
-        iter.map(|next| next.into_raw()).for_each(|next| {
-            // safety: The caller guarantees exclusive access to this field.
+        iter.for_each(|next| {
+            let next = next.into_raw();
+
+            // safety: Holding the Notified for a task guarantees exclusive
+            // access to the `queue_next` field.
             set_next(prev, Some(next));
             prev = next;
             counter += 1;

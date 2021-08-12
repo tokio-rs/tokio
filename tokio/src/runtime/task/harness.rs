@@ -5,6 +5,7 @@ use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{JoinError, Notified, Schedule, Task};
 
 use std::mem;
+use std::mem::ManuallyDrop;
 use std::panic;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
@@ -36,13 +37,6 @@ where
     fn core(&self) -> &Core<T, S> {
         unsafe { &self.cell.as_ref().core }
     }
-
-    fn scheduler_view(&self) -> SchedulerView<'_, S> {
-        SchedulerView {
-            header: self.header(),
-            scheduler: &self.core().scheduler,
-        }
-    }
 }
 
 impl<T, S> Harness<T, S>
@@ -50,43 +44,103 @@ where
     T: Future,
     S: Schedule,
 {
-    /// Polls the inner future.
+    /// Polls the inner future. A ref-count is consumed.
     ///
     /// All necessary state checks and transitions are performed.
-    ///
     /// Panics raised while polling the future are handled.
     pub(super) fn poll(self) {
+        // We pass our ref-count to `poll_inner`.
         match self.poll_inner() {
             PollFuture::Notified => {
-                // Signal yield
-                self.core().scheduler.yield_now(Notified(self.to_task()));
-                // The ref-count was incremented as part of
-                // `transition_to_idle`.
+                // The `poll_inner` call has given us two ref-counts back.
+                // We give one of them to a new task and call `yield_now`.
+                self.core()
+                    .scheduler
+                    .yield_now(Notified(self.get_new_task()));
+
+                // The remaining ref-count is now dropped. We kept the extra
+                // ref-count until now to ensure that even if the `yield_now`
+                // call drops the provided task, the task isn't deallocated
+                // before after `yield_now` returns.
                 self.drop_reference();
             }
-            PollFuture::DropReference => {
-                self.drop_reference();
+            PollFuture::Complete => {
+                self.complete();
             }
-            PollFuture::Complete(out, is_join_interested) => {
-                self.complete(out, is_join_interested);
+            PollFuture::Dealloc => {
+                self.dealloc();
             }
-            PollFuture::None => (),
+            PollFuture::Done => (),
         }
     }
 
-    fn poll_inner(&self) -> PollFuture<T::Output> {
-        let snapshot = match self.scheduler_view().transition_to_running() {
-            TransitionToRunning::Ok(snapshot) => snapshot,
-            TransitionToRunning::DropReference => return PollFuture::DropReference,
-        };
+    /// Poll the task and cancel it if necessary. This takes ownership of a
+    /// ref-count.
+    ///
+    /// If the return value is Notified, the caller is given ownership of two
+    /// ref-counts.
+    ///
+    /// If the return value is Complete, the caller is given ownership of a
+    /// single ref-count, which should be passed on to `complete`.
+    ///
+    /// If the return value is Dealloc, then this call consumed the last
+    /// ref-count and the caller should call `dealloc`.
+    ///
+    /// Otherwise the ref-count is consumed and the caller should not access
+    /// `self` again.
+    fn poll_inner(&self) -> PollFuture {
+        use super::state::{TransitionToIdle, TransitionToRunning};
 
-        // The transition to `Running` done above ensures that a lock on the
-        // future has been obtained. This also ensures the `*mut T` pointer
-        // contains the future (as opposed to the output) and is initialized.
+        match self.header().state.transition_to_running() {
+            TransitionToRunning::Success => {
+                let waker_ref = waker_ref::<T, S>(self.header());
+                let cx = Context::from_waker(&*waker_ref);
+                let res = poll_future(&self.core().stage, cx);
 
-        let waker_ref = waker_ref::<T, S>(self.header());
-        let cx = Context::from_waker(&*waker_ref);
-        poll_future(self.header(), &self.core().stage, snapshot, cx)
+                if res == Poll::Ready(()) {
+                    // The future completed. Move on to complete the task.
+                    return PollFuture::Complete;
+                }
+
+                match self.header().state.transition_to_idle() {
+                    TransitionToIdle::Ok => PollFuture::Done,
+                    TransitionToIdle::OkNotified => PollFuture::Notified,
+                    TransitionToIdle::OkDealloc => PollFuture::Dealloc,
+                    TransitionToIdle::Cancelled => {
+                        // The transition to idle failed because the task was
+                        // cancelled during the poll.
+
+                        cancel_task(&self.core().stage);
+                        PollFuture::Complete
+                    }
+                }
+            }
+            TransitionToRunning::Cancelled => {
+                cancel_task(&self.core().stage);
+                PollFuture::Complete
+            }
+            TransitionToRunning::Failed => PollFuture::Done,
+            TransitionToRunning::Dealloc => PollFuture::Dealloc,
+        }
+    }
+
+    /// Forcibly shutdown the task
+    ///
+    /// Attempt to transition to `Running` in order to forcibly shutdown the
+    /// task. If the task is currently running or in a state of completion, then
+    /// there is nothing further to do. When the task completes running, it will
+    /// notice the `CANCELLED` bit and finalize the task.
+    pub(super) fn shutdown(self) {
+        if !self.header().state.transition_to_shutdown() {
+            // The task is concurrently running. No further work needed.
+            self.drop_reference();
+            return;
+        }
+
+        // By transitioning the lifecycle to `Running`, we have permission to
+        // drop the future.
+        cancel_task(&self.core().stage);
+        self.complete();
     }
 
     pub(super) fn dealloc(self) {
@@ -124,6 +178,7 @@ where
             let panic = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 self.core().stage.drop_future_or_output();
             }));
+
             if let Err(panic) = panic {
                 maybe_panic = Some(panic);
             }
@@ -137,16 +192,78 @@ where
         }
     }
 
-    // ===== waker behavior =====
-
-    pub(super) fn wake_by_val(self) {
-        self.wake_by_ref();
-        self.drop_reference();
+    /// Remotely abort the task.
+    ///
+    /// The caller should hold a ref-count, but we do not consume it.
+    ///
+    /// This is similar to `shutdown` except that it asks the runtime to perform
+    /// the shutdown. This is necessary to avoid the shutdown happening in the
+    /// wrong thread for non-Send tasks.
+    pub(super) fn remote_abort(self) {
+        if self.header().state.transition_to_notified_and_cancel() {
+            // The transition has created a new ref-count, which we turn into
+            // a Notified and pass to the task.
+            //
+            // Since the caller holds a ref-count, the task cannot be destroyed
+            // before the call to `schedule` returns even if the call drops the
+            // `Notified` internally.
+            self.core()
+                .scheduler
+                .schedule(Notified(self.get_new_task()));
+        }
     }
 
+    // ===== waker behavior =====
+
+    /// This call consumes a ref-count and notifies the task. This will create a
+    /// new Notified and submit it if necessary.
+    ///
+    /// The caller does not need to hold a ref-count besides the one that was
+    /// passed to this call.
+    pub(super) fn wake_by_val(self) {
+        use super::state::TransitionToNotifiedByVal;
+
+        match self.header().state.transition_to_notified_by_val() {
+            TransitionToNotifiedByVal::Submit => {
+                // The caller has given us a ref-count, and the transition has
+                // created a new ref-count, so we now hold two. We turn the new
+                // ref-count Notified and pass it to the call to `schedule`.
+                //
+                // The old ref-count is retained for now to ensure that the task
+                // is not dropped during the call to `schedule` if the call
+                // drops the task it was given.
+                self.core()
+                    .scheduler
+                    .schedule(Notified(self.get_new_task()));
+
+                // Now that we have completed the call to schedule, we can
+                // release our ref-count.
+                self.drop_reference();
+            }
+            TransitionToNotifiedByVal::Dealloc => {
+                self.dealloc();
+            }
+            TransitionToNotifiedByVal::DoNothing => {}
+        }
+    }
+
+    /// This call notifies the task. It will not consume any ref-counts, but the
+    /// caller should hold a ref-count.  This will create a new Notified and
+    /// submit it if necessary.
     pub(super) fn wake_by_ref(&self) {
-        if self.header().state.transition_to_notified() {
-            self.core().scheduler.schedule(Notified(self.to_task()));
+        use super::state::TransitionToNotifiedByRef;
+
+        match self.header().state.transition_to_notified_by_ref() {
+            TransitionToNotifiedByRef::Submit => {
+                // The transition above incremented the ref-count for a new task
+                // and the caller also holds a ref-count. The caller's ref-count
+                // ensures that the task is not destroyed even if the new task
+                // is dropped before `schedule` returns.
+                self.core()
+                    .scheduler
+                    .schedule(Notified(self.get_new_task()));
+            }
+            TransitionToNotifiedByRef::DoNothing => {}
         }
     }
 
@@ -161,153 +278,65 @@ where
         self.header().id.as_ref()
     }
 
-    /// Forcibly shutdown the task
-    ///
-    /// Attempt to transition to `Running` in order to forcibly shutdown the
-    /// task. If the task is currently running or in a state of completion, then
-    /// there is nothing further to do. When the task completes running, it will
-    /// notice the `CANCELLED` bit and finalize the task.
-    pub(super) fn shutdown(self) {
-        if !self.header().state.transition_to_shutdown() {
-            // The task is concurrently running. No further work needed.
-            return;
-        }
-
-        // By transitioning the lifecycle to `Running`, we have permission to
-        // drop the future.
-        let err = cancel_task(&self.core().stage);
-        self.complete(Err(err), true)
-    }
-
-    /// Remotely abort the task
-    ///
-    /// This is similar to `shutdown` except that it asks the runtime to perform
-    /// the shutdown. This is necessary to avoid the shutdown happening in the
-    /// wrong thread for non-Send tasks.
-    pub(super) fn remote_abort(self) {
-        if self.header().state.transition_to_notified_and_cancel() {
-            self.core().scheduler.schedule(Notified(self.to_task()));
-        }
-    }
-
     // ====== internal ======
 
-    fn complete(self, output: super::Result<T::Output>, is_join_interested: bool) {
-        // We catch panics here because dropping the output may panic.
-        //
-        // Dropping the output can also happen in the first branch inside
-        // transition_to_complete.
-        let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            if is_join_interested {
-                // Store the output. The future has already been dropped
-                //
-                // Safety: Mutual exclusion is obtained by having transitioned the task
-                // state -> Running
-                let stage = &self.core().stage;
-                stage.store_output(output);
+    /// Complete the task. This method assumes that the state is RUNNING.
+    fn complete(self) {
+        // The future has completed and its output has been written to the task
+        // stage. We transition from running to complete.
 
-                // Transition to `Complete`, notifying the `JoinHandle` if necessary.
-                transition_to_complete(self.header(), stage, self.trailer());
-            } else {
-                drop(output);
+        let snapshot = self.header().state.transition_to_complete();
+
+        // We catch panics here in case dropping the future or waking the
+        // JoinHandle panics.
+        let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            if !snapshot.is_join_interested() {
+                // The `JoinHandle` is not interested in the output of
+                // this task. It is our responsibility to drop the
+                // output.
+                self.core().stage.drop_future_or_output();
+            } else if snapshot.has_join_waker() {
+                // Notify the join handle. The previous transition obtains the
+                // lock on the waker cell.
+                self.trailer().wake_join();
             }
         }));
 
         // The task has completed execution and will no longer be scheduled.
-        //
-        // Attempts to batch a ref-dec with the state transition below.
+        let num_release = self.release();
 
-        if self
-            .scheduler_view()
-            .transition_to_terminal(is_join_interested)
-        {
-            self.dealloc()
+        if self.header().state.transition_to_terminal(num_release) {
+            self.dealloc();
         }
     }
 
-    fn to_task(&self) -> Task<S> {
-        self.scheduler_view().to_task()
-    }
-}
+    /// Release the task from the scheduler. Returns the number of ref-counts
+    /// that should be decremented.
+    fn release(&self) -> usize {
+        // We don't actually increment the ref-count here, but the new task is
+        // never destroyed, so that's ok.
+        let me = ManuallyDrop::new(self.get_new_task());
 
-enum TransitionToRunning {
-    Ok(Snapshot),
-    DropReference,
-}
-
-struct SchedulerView<'a, S> {
-    header: &'a Header,
-    scheduler: &'a S,
-}
-
-impl<'a, S> SchedulerView<'a, S>
-where
-    S: Schedule,
-{
-    fn to_task(&self) -> Task<S> {
-        // SAFETY The header is from the same struct containing the scheduler `S` so  the cast is safe
-        unsafe { Task::from_raw(self.header.into()) }
-    }
-
-    /// Returns true if the task should be deallocated.
-    fn transition_to_terminal(&self, is_join_interested: bool) -> bool {
-        let me = self.to_task();
-
-        let ref_dec = if let Some(task) = self.scheduler.release(&me) {
+        if let Some(task) = self.core().scheduler.release(&me) {
             mem::forget(task);
-            true
+            2
         } else {
-            false
-        };
-
-        mem::forget(me);
-
-        // This might deallocate
-        let snapshot = self
-            .header
-            .state
-            .transition_to_terminal(!is_join_interested, ref_dec);
-
-        snapshot.ref_count() == 0
+            1
+        }
     }
 
-    fn transition_to_running(&self) -> TransitionToRunning {
-        // Transition the task to the running state.
-        //
-        // A failure to transition here indicates the task has been cancelled
-        // while in the run queue pending execution.
-        let snapshot = match self.header.state.transition_to_running() {
-            Ok(snapshot) => snapshot,
-            Err(_) => {
-                // The task was shutdown while in the run queue. At this point,
-                // we just hold a ref counted reference. Since we do not have access to it here
-                // return `DropReference` so the caller drops it.
-                return TransitionToRunning::DropReference;
-            }
-        };
-
-        TransitionToRunning::Ok(snapshot)
-    }
-}
-
-/// Transitions the task's lifecycle to `Complete`. Notifies the
-/// `JoinHandle` if it still has interest in the completion.
-fn transition_to_complete<T>(header: &Header, stage: &CoreStage<T>, trailer: &Trailer)
-where
-    T: Future,
-{
-    // Transition the task's lifecycle to `Complete` and get a snapshot of
-    // the task's sate.
-    let snapshot = header.state.transition_to_complete();
-
-    if !snapshot.is_join_interested() {
-        // The `JoinHandle` is not interested in the output of this task. It
-        // is our responsibility to drop the output.
-        stage.drop_future_or_output();
-    } else if snapshot.has_join_waker() {
-        // Notify the join handle. The previous transition obtains the
-        // lock on the waker cell.
-        trailer.wake_join();
+    /// Create a new task that holds its own ref-count.
+    ///
+    /// # Safety
+    ///
+    /// Any use of `self` after this call must ensure that a ref-count to the
+    /// task holds the task alive until after the use of `self`. Passing the
+    /// returned Task to any method on `self` is unsound if dropping the Task
+    /// could drop `self` before the call on `self` returned.
+    fn get_new_task(&self) -> Task<S> {
+        // safety: The header is at the beginning of the cell, so this cast is
+        // safe.
+        unsafe { Task::from_raw(self.cell.cast()) }
     }
 }
 
@@ -389,73 +418,62 @@ fn set_join_waker(
     res
 }
 
-enum PollFuture<T> {
-    Complete(Result<T, JoinError>, bool),
-    DropReference,
+enum PollFuture {
+    Complete,
     Notified,
-    None,
+    Done,
+    Dealloc,
 }
 
-fn cancel_task<T: Future>(stage: &CoreStage<T>) -> JoinError {
+/// Cancel the task and store the appropriate error in the stage field.
+fn cancel_task<T: Future>(stage: &CoreStage<T>) {
     // Drop the future from a panic guard.
     let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         stage.drop_future_or_output();
     }));
 
-    if let Err(err) = res {
-        // Dropping the future panicked, complete the join
-        // handle with the panic to avoid dropping the panic
-        // on the ground.
-        JoinError::panic(err)
-    } else {
-        JoinError::cancelled()
+    match res {
+        Ok(()) => {
+            stage.store_output(Err(JoinError::cancelled()));
+        }
+        Err(panic) => {
+            stage.store_output(Err(JoinError::panic(panic)));
+        }
     }
 }
 
-fn poll_future<T: Future>(
-    header: &Header,
-    core: &CoreStage<T>,
-    snapshot: Snapshot,
-    cx: Context<'_>,
-) -> PollFuture<T::Output> {
-    if snapshot.is_cancelled() {
-        PollFuture::Complete(Err(cancel_task(core)), snapshot.is_join_interested())
-    } else {
-        let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            struct Guard<'a, T: Future> {
-                core: &'a CoreStage<T>,
-            }
-
-            impl<T: Future> Drop for Guard<'_, T> {
-                fn drop(&mut self) {
-                    self.core.drop_future_or_output();
-                }
-            }
-
-            let guard = Guard { core };
-
-            let res = guard.core.poll(cx);
-
-            // prevent the guard from dropping the future
-            mem::forget(guard);
-
-            res
-        }));
-        match res {
-            Ok(Poll::Pending) => match header.state.transition_to_idle() {
-                Ok(snapshot) => {
-                    if snapshot.is_notified() {
-                        PollFuture::Notified
-                    } else {
-                        PollFuture::None
-                    }
-                }
-                Err(_) => PollFuture::Complete(Err(cancel_task(core)), true),
-            },
-            Ok(Poll::Ready(ok)) => PollFuture::Complete(Ok(ok), snapshot.is_join_interested()),
-            Err(err) => {
-                PollFuture::Complete(Err(JoinError::panic(err)), snapshot.is_join_interested())
+/// Poll the future. If the future completes, the output is written to the
+/// stage field.
+fn poll_future<T: Future>(core: &CoreStage<T>, cx: Context<'_>) -> Poll<()> {
+    // Poll the future.
+    let output = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        struct Guard<'a, T: Future> {
+            core: &'a CoreStage<T>,
+        }
+        impl<'a, T: Future> Drop for Guard<'a, T> {
+            fn drop(&mut self) {
+                // If the future panics on poll, we drop it inside the panic
+                // guard.
+                self.core.drop_future_or_output();
             }
         }
-    }
+        let guard = Guard { core };
+        let res = guard.core.poll(cx);
+        mem::forget(guard);
+        res
+    }));
+
+    // Prepare output for being placed in the core stage.
+    let output = match output {
+        Ok(Poll::Pending) => return Poll::Pending,
+        Ok(Poll::Ready(output)) => Ok(output),
+        Err(panic) => Err(JoinError::panic(panic)),
+    };
+
+    // Catch and ignore panics if the future panics on drop.
+    let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        core.store_output(output);
+    }));
+
+    Poll::Ready(())
 }

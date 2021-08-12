@@ -2,8 +2,9 @@
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
 use crate::sync::AtomicWaker;
+use crate::util::VecDequeCell;
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
@@ -223,19 +224,14 @@ cfg_rt! {
 
 /// State available from the thread-local
 struct Context {
-    /// Owned task set and local run queue
-    tasks: RefCell<Tasks>,
-
-    /// State shared between threads.
-    shared: Arc<Shared>,
-}
-
-struct Tasks {
     /// Collection of all active tasks spawned onto this executor.
     owned: LocalOwnedTasks<Arc<Shared>>,
 
     /// Local run queue sender and receiver.
-    queue: VecDeque<task::Notified<Arc<Shared>>>,
+    queue: VecDequeCell<task::Notified<Arc<Shared>>>,
+
+    /// State shared between threads.
+    shared: Arc<Shared>,
 }
 
 /// LocalSet state shared between threads.
@@ -308,7 +304,7 @@ cfg_rt! {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
 
-            let (handle, notified) = cx.tasks.borrow_mut().owned.bind(future, cx.shared.clone());
+            let (handle, notified) = cx.owned.bind(future, cx.shared.clone());
 
             if let Some(notified) = notified {
                 cx.shared.schedule(notified);
@@ -334,10 +330,8 @@ impl LocalSet {
         LocalSet {
             tick: Cell::new(0),
             context: Context {
-                tasks: RefCell::new(Tasks {
-                    owned: LocalOwnedTasks::new(),
-                    queue: VecDeque::with_capacity(INITIAL_CAPACITY),
-                }),
+                owned: LocalOwnedTasks::new(),
+                queue: VecDequeCell::with_capacity(INITIAL_CAPACITY),
                 shared: Arc::new(Shared {
                     queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
                     waker: AtomicWaker::new(),
@@ -391,12 +385,7 @@ impl LocalSet {
     {
         let future = crate::util::trace::task(future, "local", None);
 
-        let (handle, notified) = self
-            .context
-            .tasks
-            .borrow_mut()
-            .owned
-            .bind(future, self.context.shared.clone());
+        let (handle, notified) = self.context.owned.bind(future, self.context.shared.clone());
 
         if let Some(notified) = notified {
             self.context.shared.schedule(notified);
@@ -551,24 +540,19 @@ impl LocalSet {
                 .lock()
                 .as_mut()
                 .and_then(|queue| queue.pop_front())
-                .or_else(|| self.context.tasks.borrow_mut().queue.pop_front())
+                .or_else(|| self.context.queue.pop_front())
         } else {
-            self.context
-                .tasks
-                .borrow_mut()
-                .queue
-                .pop_front()
-                .or_else(|| {
-                    self.context
-                        .shared
-                        .queue
-                        .lock()
-                        .as_mut()
-                        .and_then(|queue| queue.pop_front())
-                })
+            self.context.queue.pop_front().or_else(|| {
+                self.context
+                    .shared
+                    .queue
+                    .lock()
+                    .as_mut()
+                    .and_then(|queue| queue.pop_front())
+            })
         };
 
-        task.map(|task| self.context.tasks.borrow_mut().owned.assert_owner(task))
+        task.map(|task| self.context.owned.assert_owner(task))
     }
 
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
@@ -594,7 +578,7 @@ impl Future for LocalSet {
             // there are still tasks remaining in the run queue.
             cx.waker().wake_by_ref();
             Poll::Pending
-        } else if self.context.tasks.borrow().owned.is_empty() {
+        } else if self.context.owned.is_empty() {
             // If the scheduler has no remaining futures, we're done!
             Poll::Ready(())
         } else {
@@ -615,27 +599,13 @@ impl Default for LocalSet {
 impl Drop for LocalSet {
     fn drop(&mut self) {
         self.with(|| {
-            // Close the LocalOwnedTasks. This ensures that any calls to
-            // spawn_local in the destructor of a future on this LocalSet will
-            // immediately cancel the task, and prevents the task from being
-            // added to `owned`.
-            self.context.tasks.borrow_mut().owned.close();
-
-            // Loop required here to ensure borrow is dropped between iterations
-            #[allow(clippy::while_let_loop)]
-            loop {
-                let task = match self.context.tasks.borrow_mut().owned.pop_back() {
-                    Some(task) => task,
-                    None => break,
-                };
-
-                // Safety: same as `run_unchecked`.
-                task.shutdown();
-            }
+            // Shut down all tasks in the LocalOwnedTasks and close it to
+            // prevent new tasks from ever being added.
+            self.context.owned.close_and_shutdown_all();
 
             // We already called shutdown on all tasks above, so there is no
             // need to call shutdown.
-            for task in self.context.tasks.borrow_mut().queue.drain(..) {
+            for task in self.context.queue.take() {
                 drop(task);
             }
 
@@ -646,7 +616,7 @@ impl Drop for LocalSet {
                 drop(task);
             }
 
-            assert!(self.context.tasks.borrow().owned.is_empty());
+            assert!(self.context.owned.is_empty());
         });
     }
 }
@@ -689,7 +659,7 @@ impl Shared {
     fn schedule(&self, task: task::Notified<Arc<Self>>) {
         CURRENT.with(|maybe_cx| match maybe_cx {
             Some(cx) if cx.shared.ptr_eq(self) => {
-                cx.tasks.borrow_mut().queue.push_back(task);
+                cx.queue.push_back(task);
             }
             _ => {
                 // First check whether the queue is still there (if not, the
@@ -716,7 +686,7 @@ impl task::Schedule for Arc<Shared> {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
             assert!(cx.shared.ptr_eq(self));
-            cx.tasks.borrow_mut().owned.remove(task)
+            cx.owned.remove(task)
         })
     }
 

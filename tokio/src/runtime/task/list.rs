@@ -7,6 +7,7 @@
 //! the scheduler with the collection.
 
 use crate::future::Future;
+use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::Mutex;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
@@ -56,16 +57,14 @@ pub(crate) struct OwnedTasks<S: 'static> {
     inner: Mutex<OwnedTasksInner<S>>,
     id: u64,
 }
+pub(crate) struct LocalOwnedTasks<S: 'static> {
+    inner: UnsafeCell<OwnedTasksInner<S>>,
+    id: u64,
+    _not_send_or_sync: PhantomData<*const ()>,
+}
 struct OwnedTasksInner<S: 'static> {
     list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
     closed: bool,
-}
-
-pub(crate) struct LocalOwnedTasks<S: 'static> {
-    list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
-    closed: bool,
-    id: u64,
-    _not_send_or_sync: PhantomData<*const ()>,
 }
 
 impl<S: 'static> OwnedTasks<S> {
@@ -115,7 +114,7 @@ impl<S: 'static> OwnedTasks<S> {
     /// a LocalNotified, giving the thread permission to poll this task.
     #[inline]
     pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
-        assert_eq!(task.0.header().get_owner_id(), self.id);
+        assert_eq!(task.header().get_owner_id(), self.id);
 
         // safety: All tasks bound to this OwnedTasks are Send, so it is safe
         // to poll it on this thread no matter what thread we are on.
@@ -125,8 +124,32 @@ impl<S: 'static> OwnedTasks<S> {
         }
     }
 
-    pub(crate) fn pop_back(&self) -> Option<Task<S>> {
-        self.inner.lock().list.pop_back()
+    /// Shut down all tasks in the collection. This call also closes the
+    /// collection, preventing new items from being added.
+    pub(crate) fn close_and_shutdown_all(&self)
+    where
+        S: Schedule,
+    {
+        // The first iteration of the loop was unrolled so it can set the
+        // closed bool.
+        let first_task = {
+            let mut lock = self.inner.lock();
+            lock.closed = true;
+            lock.list.pop_back()
+        };
+        match first_task {
+            Some(task) => task.shutdown(),
+            None => return,
+        }
+
+        loop {
+            let task = match self.inner.lock().list.pop_back() {
+                Some(task) => task,
+                None => return,
+            };
+
+            task.shutdown();
+        }
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
@@ -146,30 +169,22 @@ impl<S: 'static> OwnedTasks<S> {
     pub(crate) fn is_empty(&self) -> bool {
         self.inner.lock().list.is_empty()
     }
-
-    #[cfg(feature = "rt-multi-thread")]
-    pub(crate) fn is_closed(&self) -> bool {
-        self.inner.lock().closed
-    }
-
-    /// Close the OwnedTasks. This prevents adding new tasks to the collection.
-    pub(crate) fn close(&self) {
-        self.inner.lock().closed = true;
-    }
 }
 
 impl<S: 'static> LocalOwnedTasks<S> {
     pub(crate) fn new() -> Self {
         Self {
-            list: LinkedList::new(),
-            closed: false,
+            inner: UnsafeCell::new(OwnedTasksInner {
+                list: LinkedList::new(),
+                closed: false,
+            }),
             id: get_next_id(),
             _not_send_or_sync: PhantomData,
         }
     }
 
     pub(crate) fn bind<T>(
-        &mut self,
+        &self,
         task: T,
         scheduler: S,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
@@ -186,21 +201,32 @@ impl<S: 'static> LocalOwnedTasks<S> {
             task.header().set_owner_id(self.id);
         }
 
-        if self.closed {
+        if self.is_closed() {
             drop(notified);
             task.shutdown();
             (join, None)
         } else {
-            self.list.push_front(task);
+            self.with_inner(|inner| {
+                inner.list.push_front(task);
+            });
             (join, Some(notified))
         }
     }
 
-    pub(crate) fn pop_back(&mut self) -> Option<Task<S>> {
-        self.list.pop_back()
+    /// Shut down all tasks in the collection. This call also closes the
+    /// collection, preventing new items from being added.
+    pub(crate) fn close_and_shutdown_all(&self)
+    where
+        S: Schedule,
+    {
+        self.with_inner(|inner| inner.closed = true);
+
+        while let Some(task) = self.with_inner(|inner| inner.list.pop_back()) {
+            task.shutdown();
+        }
     }
 
-    pub(crate) fn remove(&mut self, task: &Task<S>) -> Option<Task<S>> {
+    pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
         let task_id = task.header().get_owner_id();
         if task_id == 0 {
             // The task is unowned.
@@ -209,16 +235,17 @@ impl<S: 'static> LocalOwnedTasks<S> {
 
         assert_eq!(task_id, self.id);
 
-        // safety: We just checked that the provided task is not in some other
-        // linked list.
-        unsafe { self.list.remove(task.header().into()) }
+        self.with_inner(|inner|
+            // safety: We just checked that the provided task is not in some
+            // other linked list.
+            unsafe { inner.list.remove(task.header().into()) })
     }
 
     /// Assert that the given task is owned by this LocalOwnedTasks and convert
     /// it to a LocalNotified, giving the thread permission to poll this task.
     #[inline]
     pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
-        assert_eq!(task.0.header().get_owner_id(), self.id);
+        assert_eq!(task.header().get_owner_id(), self.id);
 
         // safety: The task was bound to this LocalOwnedTasks, and the
         // LocalOwnedTasks is not Send or Sync, so we are on the right thread
@@ -229,14 +256,23 @@ impl<S: 'static> LocalOwnedTasks<S> {
         }
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.list.is_empty()
+    #[inline]
+    fn with_inner<F, T>(&self, f: F) -> T
+    where
+        F: FnOnce(&mut OwnedTasksInner<S>) -> T,
+    {
+        // safety: This type is not Sync, so concurrent calls of this method
+        // can't happen.  Furthermore, all uses of this method in this file make
+        // sure that they don't call `with_inner` recursively.
+        self.inner.with_mut(|ptr| unsafe { f(&mut *ptr) })
     }
 
-    /// Close the LocalOwnedTasks. This prevents adding new tasks to the
-    /// collection.
-    pub(crate) fn close(&mut self) {
-        self.closed = true;
+    pub(crate) fn is_closed(&self) -> bool {
+        self.with_inner(|inner| inner.closed)
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.with_inner(|inner| inner.list.is_empty())
     }
 }
 

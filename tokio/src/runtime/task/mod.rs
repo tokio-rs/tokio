@@ -1,3 +1,140 @@
+//! The task module.
+//!
+//! The task module contains the code that manages spawned tasks and provides a
+//! safe API for the rest of the runtime to use. Each task in a runtime is
+//! stored in an OwnedTasks or LocalOwnedTasks object.
+//!
+//! # Task reference types
+//!
+//! A task is usually referenced by multiple handles, and there are several
+//! types of handles.
+//!
+//!  * OwnedTask - tasks stored in an OwnedTasks or LocalOwnedTasks are of this
+//!    reference type.
+//!
+//!  * JoinHandle - each task has a JoinHandle that allows access to the output
+//!    of the task.
+//!
+//!  * Waker - every waker for a task has this reference type. There can be any
+//!    number of waker references.
+//!
+//!  * Notified - tracks whether the task is notified.
+//!
+//!  * Unowned - this task reference type is used for tasks not stored in any
+//!    runtime. Mainly used for blocking tasks, but also in tests.
+//!
+//! The task uses a reference count to keep track of how many active references
+//! exist. The Unowned reference type takes up two ref-counts. All other
+//! reference types take pu a single ref-count.
+//!
+//! Besides the waker type, each task has at most one of each reference type.
+//!
+//! # State
+//!
+//! The task stores its state in an atomic usize with various bitfields for the
+//! necessary information. The state has the following bitfields:
+//!
+//!  * RUNNING - Tracks whether the task is currently being polled or cancelled.
+//!    This bit functions as a lock around the task.
+//!
+//!  * COMPLETE - Is one once the future has fully completed and has been
+//!    dropped. Never unset once set. Never set together with RUNNING.
+//!
+//!  * NOTIFIED - Tracks whether a Notified object currently exists.
+//!
+//!  * CANCELLED - Is set to one for tasks that should be cancelled as soon as
+//!    possible. May take any value for completed tasks.
+//!
+//!  * JOIN_INTEREST - Is set to one if there exists a JoinHandle.
+//!
+//!  * JOIN_WAKER - Is set to one if the JoinHandle has set a waker.
+//!
+//! The rest of the bits are used for the ref-count.
+//!
+//! # Fields in the task
+//!
+//! The task has various fields. This section describes how and when it is safe
+//! to access a field.
+//!
+//!  * The state field is accessed with atomic instructions.
+//!
+//!  * The OwnedTask reference has exclusive access to the `owned` field.
+//!
+//!  * The Notified reference has exclusive access to the `queue_next` field.
+//!
+//!  * The `owner_id` field can be set as part of construction of the task, but
+//!    is otherwise immutable and anyone can access the field immutably without
+//!    synchronization.
+//!
+//!  * If COMPLETE is one, then the JoinHandle has exclusive access to the
+//!    stage field. If COMPLETE is zero, then the RUNNING bitfield functions as
+//!    a lock for the stage field, and it can be accessed only by the thread
+//!    that set RUNNING to one.
+//!
+//!  * If JOIN_WAKER is zero, then the JoinHandle has exclusive access to the
+//!    join handle waker. If JOIN_WAKER and COMPLETE are both one, then the
+//!    thread that set COMPLETE to one has exclusive access to the join handle
+//!    waker.
+//!
+//! All other fields are immutable and can be accessed immutably without
+//! synchronization by anyone.
+//!
+//! # Safety
+//!
+//! This section goes through various situations and explains why the API is
+//! safe in that situation.
+//!
+//! ## Polling or dropping the future
+//!
+//! Any mutable access to the future happens after obtaining a lock by modifying
+//! the RUNNING field, so exclusive access is ensured.
+//!
+//! When the task completes, exclusive access to the output is transferred to
+//! the JoinHandle. If the JoinHandle is already dropped when the transition to
+//! complete happens, the thread performing that transition retains exclusive
+//! access to the output and should immediately drop it.
+//!
+//! ## Non-Send futures
+//!
+//! If a future is not Send, then it is bound to a LocalOwnedTasks.  The future
+//! will only ever be polled or dropped given a LocalNotified or inside a call
+//! to LocalOwnedTasks::shutdown_all. In either case, it is guaranteed that the
+//! future is on the right thread.
+//!
+//! If the task is never removed from the LocalOwnedTasks, then it is leaked, so
+//! there is no risk that the task is dropped on some other thread when the last
+//! ref-count drops.
+//!
+//! ## Non-Send output
+//!
+//! When a task completes, the output is placed in the stage of the task. Then,
+//! a transition that sets COMPLETE to true is performed, and the value of
+//! JOIN_INTEREST when this transition happens is read.
+//!
+//! If JOIN_INTEREST is zero when the transition to COMPLETE happens, then the
+//! output is immediately dropped.
+//!
+//! If JOIN_INTEREST is one when the transition to COMPLETE happens, then the
+//! JoinHandle is responsible for cleaning up the output. If the output is not
+//! Send, then this happens:
+//!
+//!  1. The output is created on the thread that the future was polled on. Since
+//!     only non-Send futures can have non-Send output, the future was polled on
+//!     the thread that the future was spawned from.
+//!  2. Since JoinHandle<Output> is not Send if Output is not Send, the
+//!     JoinHandle is also on the thread that the future was spawned from.
+//!  3. Thus, the JoinHandle will not move the output across threads when it
+//!     takes or drops the output.
+//!
+//! ## Recursive poll/shutdown
+//!
+//! Calling poll from inside a shutdown call or vice-versa is not prevented by
+//! the API exposed by the task module, so this has to be safe. In either case,
+//! the lock in the RUNNING bitfield makes the inner call return immediately. If
+//! the inner call is a `shutdown` call, then the CANCELLED bit is set, and the
+//! poll call will notice it when the poll finishes, and the task is cancelled
+//! at that point.
+
 mod core;
 use self::core::Cell;
 use self::core::Header;
@@ -161,6 +298,12 @@ impl<S: 'static> Task<S> {
     }
 }
 
+impl<S: 'static> Notified<S> {
+    fn header(&self) -> &Header {
+        self.0.header()
+    }
+}
+
 cfg_rt_multi_thread! {
     impl<S: 'static> Notified<S> {
         unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
@@ -185,16 +328,19 @@ cfg_rt_multi_thread! {
 
 impl<S: Schedule> Task<S> {
     /// Pre-emptively cancel the task as part of the shutdown process.
-    pub(crate) fn shutdown(&self) {
-        self.raw.shutdown();
+    pub(crate) fn shutdown(self) {
+        let raw = self.raw;
+        mem::forget(self);
+        raw.shutdown();
     }
 }
 
 impl<S: Schedule> LocalNotified<S> {
     /// Run the task
     pub(crate) fn run(self) {
-        self.task.raw.poll();
+        let raw = self.task.raw;
         mem::forget(self);
+        raw.poll();
     }
 }
 
@@ -220,11 +366,13 @@ impl<S: Schedule> UnownedTask<S> {
     }
 
     pub(crate) fn run(self) {
-        // Decrement the ref-count
-        self.raw.header().state.ref_dec();
-        // Poll the task
-        self.raw.poll();
+        let raw = self.raw;
         mem::forget(self);
+
+        // Poll the task
+        raw.poll();
+        // Decrement our extra ref-count
+        raw.header().state.ref_dec();
     }
 
     pub(crate) fn shutdown(self) {

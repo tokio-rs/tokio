@@ -57,10 +57,10 @@ pub(crate) struct Header {
     /// Task state
     pub(super) state: State,
 
-    pub(crate) owned: UnsafeCell<linked_list::Pointers<Header>>,
+    pub(super) owned: UnsafeCell<linked_list::Pointers<Header>>,
 
     /// Pointer to next task, used with the injection queue
-    pub(crate) queue_next: UnsafeCell<Option<NonNull<Header>>>,
+    pub(super) queue_next: UnsafeCell<Option<NonNull<Header>>>,
 
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
@@ -239,18 +239,18 @@ impl Header {
 }
 
 impl Trailer {
-    pub(crate) unsafe fn set_waker(&self, waker: Option<Waker>) {
+    pub(super) unsafe fn set_waker(&self, waker: Option<Waker>) {
         self.waker.with_mut(|ptr| {
             *ptr = waker;
         });
     }
 
-    pub(crate) unsafe fn will_wake(&self, waker: &Waker) -> bool {
+    pub(super) unsafe fn will_wake(&self, waker: &Waker) -> bool {
         self.waker
             .with(|ptr| (*ptr).as_ref().unwrap().will_wake(waker))
     }
 
-    pub(crate) fn wake_join(&self) {
+    pub(super) fn wake_join(&self) {
         self.waker.with(|ptr| match unsafe { &*ptr } {
             Some(waker) => waker.wake_by_ref(),
             None => panic!("waker missing"),
