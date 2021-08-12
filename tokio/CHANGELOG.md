@@ -1,3 +1,44 @@
+# 1.10.0 (August 12, 2021)
+
+### Added
+
+ - io: add `(read|write)_f(32|64)[_le]` methods ([#4022])
+ - io: add `fill_buf` and `consume` to `AsyncBufReadExt` ([#3991])
+ - process: add `Child::raw_handle()` on windows ([#3998])
+
+### Fixed
+
+ - doc: fix non-doc builds with `--cfg docsrs` ([#4020])
+ - io: flush eagerly in `io::copy` ([#4001])
+ - runtime: a debug assert was sometimes triggered during shutdown ([#4005])
+ - sync: use `spin_loop_hint` instead of `yield_now` in mpsc ([#4037])
+ - tokio: the test-util feature depends on rt, sync, and time ([#4036])
+
+### Changes
+
+ - runtime: reorganize parts of the runtime ([#3979], [#4005])
+ - signal: make windows docs for signal module show up on unix builds ([#3770])
+ - task: quickly send task to heap on debug mode ([#4009])
+
+### Documented
+
+ - io: document cancellation safety of `AsyncBufReadExt` ([#3997])
+ - sync: document when `watch::send` fails ([#4021])
+
+[#3770]: https://github.com/tokio-rs/tokio/pull/3770
+[#3979]: https://github.com/tokio-rs/tokio/pull/3979
+[#3991]: https://github.com/tokio-rs/tokio/pull/3991
+[#3997]: https://github.com/tokio-rs/tokio/pull/3997
+[#3998]: https://github.com/tokio-rs/tokio/pull/3998
+[#4001]: https://github.com/tokio-rs/tokio/pull/4001
+[#4005]: https://github.com/tokio-rs/tokio/pull/4005
+[#4009]: https://github.com/tokio-rs/tokio/pull/4009
+[#4020]: https://github.com/tokio-rs/tokio/pull/4020
+[#4021]: https://github.com/tokio-rs/tokio/pull/4021
+[#4022]: https://github.com/tokio-rs/tokio/pull/4022
+[#4036]: https://github.com/tokio-rs/tokio/pull/4036
+[#4037]: https://github.com/tokio-rs/tokio/pull/4037
+
 # 1.9.0 (July 22, 2021)
 
 ### Added
