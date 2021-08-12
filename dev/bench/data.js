@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1628775763177,
+  "lastUpdate": 1628777092353,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -22679,6 +22679,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 528,
             "range": "± 124",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c4e56232ff844533320a5de4900d72d6c58ef220",
+          "message": "sync: use spin_loop_hint instead of yield_now in mpsc (#4037)",
+          "timestamp": "2021-08-12T16:03:10+02:00",
+          "tree_id": "d0722eeea796d4759ea6f2d4d7907cc0706d7655",
+          "url": "https://github.com/tokio-rs/tokio/commit/c4e56232ff844533320a5de4900d72d6c58ef220"
+        },
+        "date": 1628777087101,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 671,
+            "range": "± 8",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14209,
+            "range": "± 4377",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 761,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 12971,
+            "range": "± 9858",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 427,
+            "range": "± 17",
             "unit": "ns/iter"
           }
         ]
