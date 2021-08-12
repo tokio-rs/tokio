@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1628775466789,
+  "lastUpdate": 1628775472172,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -42787,6 +42787,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 15736160,
             "range": "± 1962686",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "032c55e77f281e5e010ce1c0e4888f1d23cbd5f5",
+          "message": "tokio: the test-util feature depends on rt, sync, and time (#4036)\n\nFixes #4035",
+          "timestamp": "2021-08-12T10:04:09+02:00",
+          "tree_id": "f84b628ce5d74233cc7c759aca136272f7369f34",
+          "url": "https://github.com/tokio-rs/tokio/commit/032c55e77f281e5e010ce1c0e4888f1d23cbd5f5"
+        },
+        "date": 1628775464975,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 236464,
+            "range": "± 24573",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1152041,
+            "range": "± 92405",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6818717,
+            "range": "± 1522454",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19964844,
+            "range": "± 4534380",
             "unit": "ns/iter"
           }
         ]
