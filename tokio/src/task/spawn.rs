@@ -129,7 +129,7 @@ cfg_rt! {
     {
         // preventing stack overflows on debug mode, by quickly sending the
         // task to the heap.
-        if cfg!(debug_assertions) {
+        if cfg!(debug_assertions) && std::mem::size_of::<T>() > 2048 {
             spawn_inner(Box::pin(future), None)
         } else {
             spawn_inner(future, None)
