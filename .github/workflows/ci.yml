@@ -319,8 +319,8 @@ jobs:
     name: Check README
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - name: Verify that both READMEs are identical
-        working-directory: .
         run: diff README.md tokio/README.md
 
       - name: Verify that Tokio version is up to date in README
