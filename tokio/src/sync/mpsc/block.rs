@@ -344,8 +344,13 @@ impl<T> Block<T> {
                 Err(curr) => curr,
             };
 
-            // When running outside of loom, this calls `spin_loop_hint`.
+            #[cfg(all(test, loom))]
             thread::yield_now();
+
+            // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
+            #[cfg(not(all(test, loom)))]
+            #[allow(deprecated)]
+            std::sync::atomic::spin_loop_hint();
         }
     }
 }
