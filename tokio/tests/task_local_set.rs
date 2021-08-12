@@ -420,7 +420,10 @@ async fn local_tasks_are_polled_after_tick_inner() {
 
     static RX1: AtomicUsize = AtomicUsize::new(0);
     static RX2: AtomicUsize = AtomicUsize::new(0);
-    static EXPECTED: usize = 500;
+    const EXPECTED: usize = 500;
+
+    RX1.store(0, SeqCst);
+    RX2.store(0, SeqCst);
 
     let (tx, mut rx) = mpsc::unbounded_channel();
 
