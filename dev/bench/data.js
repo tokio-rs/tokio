@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1628775711479,
+  "lastUpdate": 1628775716102,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -42835,6 +42835,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19964844,
             "range": "± 4534380",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "84c4a6d89fe4988e630e18d592908d12bdd017cb",
+          "message": "task: quickly send task to heap on debug mode (#4009)",
+          "timestamp": "2021-08-12T15:37:26+02:00",
+          "tree_id": "f5c3962a59f415be31acb05435466a781d572031",
+          "url": "https://github.com/tokio-rs/tokio/commit/84c4a6d89fe4988e630e18d592908d12bdd017cb"
+        },
+        "date": 1628775709449,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 196751,
+            "range": "± 35498",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1042582,
+            "range": "± 145726",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6847678,
+            "range": "± 1454694",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18314621,
+            "range": "± 3343489",
             "unit": "ns/iter"
           }
         ]
