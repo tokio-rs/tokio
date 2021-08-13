@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1628859999039,
+  "lastUpdate": 1628860011175,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -43243,6 +43243,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17156363,
             "range": "± 1532452",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f478647a8e39b125b9b7f27b70649ec73bbee68a",
+          "message": "ci: add readme check to CI (#4039)",
+          "timestamp": "2021-08-13T15:05:09+02:00",
+          "tree_id": "734b5e6ca6f2bc3b013c22095f323688d97978a3",
+          "url": "https://github.com/tokio-rs/tokio/commit/f478647a8e39b125b9b7f27b70649ec73bbee68a"
+        },
+        "date": 1628860005466,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 184397,
+            "range": "± 2556",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1009479,
+            "range": "± 82994",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5980857,
+            "range": "± 988901",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17000639,
+            "range": "± 1994551",
             "unit": "ns/iter"
           }
         ]
