@@ -29,6 +29,7 @@ jobs:
       - docs
       - loom
       - valgrind
+      - check-readme
     steps:
       - run: exit 0
 
@@ -313,3 +314,15 @@ jobs:
           RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
           LOOM_MAX_PREEMPTIONS: 2
           SCOPE: ${{ matrix.scope }}
+
+  check-readme:
+    name: Check README
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Verify that both READMEs are identical
+        run: diff README.md tokio/README.md
+
+      - name: Verify that Tokio version is up to date in README
+        working-directory: tokio
+        run: grep -q "$(sed '/^version = /!d' Cargo.toml | head -n1)" README.md
