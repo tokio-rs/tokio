@@ -24,7 +24,7 @@ use std::task::{self, Poll};
 /// Wait 100ms and print "100 ms have elapsed".
 ///
 /// ```
-/// use tokio::time::{sleep, Instant, Duration};
+/// use tokio::time::{sleep_until, Instant, Duration};
 ///
 /// #[tokio::main]
 /// async fn main() {
