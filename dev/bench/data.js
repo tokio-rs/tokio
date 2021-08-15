@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1628860067938,
+  "lastUpdate": 1629048341236,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -66404,6 +66404,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "uncontended_concurrent_single",
             "value": 841,
+            "range": "± 3",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5c19b5a162b37eeb5b713549e06dc78399bfc9ae",
+          "message": "time: make Sleep examples easier to find (#4040)",
+          "timestamp": "2021-08-15T19:24:04+02:00",
+          "tree_id": "9b109b86d6ccc49497dc77bfd1e224c941c5e7e8",
+          "url": "https://github.com/tokio-rs/tokio/commit/5c19b5a162b37eeb5b713549e06dc78399bfc9ae"
+        },
+        "date": 1629048335386,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 12868,
+            "range": "± 5008",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 830,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 535,
+            "range": "± 10",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13422,
+            "range": "± 3232",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 842,
             "range": "± 3",
             "unit": "ns/iter"
           }
