@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1629048366385,
+  "lastUpdate": 1629048374229,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -102179,6 +102179,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 801683,
             "range": "± 82886",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5c19b5a162b37eeb5b713549e06dc78399bfc9ae",
+          "message": "time: make Sleep examples easier to find (#4040)",
+          "timestamp": "2021-08-15T19:24:04+02:00",
+          "tree_id": "9b109b86d6ccc49497dc77bfd1e224c941c5e7e8",
+          "url": "https://github.com/tokio-rs/tokio/commit/5c19b5a162b37eeb5b713549e06dc78399bfc9ae"
+        },
+        "date": 1629048366897,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6885125,
+            "range": "± 3039639",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6397245,
+            "range": "± 2118621",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 7103643,
+            "range": "± 2044469",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 304,
+            "range": "± 9",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 304,
+            "range": "± 15",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 303,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 29641,
+            "range": "± 1204",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 982,
+            "range": "± 121",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1110953,
+            "range": "± 128588",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 790243,
+            "range": "± 112635",
             "unit": "ns/iter"
           }
         ]
