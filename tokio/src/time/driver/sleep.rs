@@ -12,10 +12,31 @@ use std::task::{self, Poll};
 /// operates at millisecond granularity and should not be used for tasks that
 /// require high-resolution timers.
 ///
+/// To run something regularly on a schedule, see [`interval`].
+///
 /// # Cancellation
 ///
 /// Canceling a sleep instance is done by dropping the returned future. No additional
 /// cleanup work is required.
+///
+/// # Examples
+///
+/// Wait 100ms and print "100 ms have elapsed".
+///
+/// ```
+/// use tokio::time::{sleep_until, Instant, Duration};
+///
+/// #[tokio::main]
+/// async fn main() {
+///     sleep_until(Instant::now() + Duration::from_millis(100)).await;
+///     println!("100 ms have elapsed");
+/// }
+/// ```
+///
+/// See the documentation for the [`Sleep`] type for more examples.
+///
+/// [`Sleep`]: struct@crate::time::Sleep
+/// [`interval`]: crate::time::interval()
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_until"))]
 pub fn sleep_until(deadline: Instant) -> Sleep {
@@ -54,6 +75,9 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 /// }
 /// ```
 ///
+/// See the documentation for the [`Sleep`] type for more examples.
+///
+/// [`Sleep`]: struct@crate::time::Sleep
 /// [`interval`]: crate::time::interval()
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_for"))]
@@ -215,6 +239,8 @@ impl Sleep {
     /// sleep.as_mut().reset(Instant::now() + Duration::from_millis(20));
     /// # }
     /// ```
+    ///
+    /// See also the top-level examples.
     ///
     /// [`Pin::as_mut`]: fn@std::pin::Pin::as_mut
     pub fn reset(self: Pin<&mut Self>, deadline: Instant) {
