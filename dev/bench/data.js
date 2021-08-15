@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1629048351600,
+  "lastUpdate": 1629048366385,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -43399,6 +43399,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17000639,
             "range": "± 1994551",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5c19b5a162b37eeb5b713549e06dc78399bfc9ae",
+          "message": "time: make Sleep examples easier to find (#4040)",
+          "timestamp": "2021-08-15T19:24:04+02:00",
+          "tree_id": "9b109b86d6ccc49497dc77bfd1e224c941c5e7e8",
+          "url": "https://github.com/tokio-rs/tokio/commit/5c19b5a162b37eeb5b713549e06dc78399bfc9ae"
+        },
+        "date": 1629048359407,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 246229,
+            "range": "± 88524",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1029420,
+            "range": "± 190550",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6348141,
+            "range": "± 1881776",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19303843,
+            "range": "± 2410521",
             "unit": "ns/iter"
           }
         ]
