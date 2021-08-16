@@ -11,17 +11,17 @@ cfg_trace! {
             #[cfg(tokio_track_caller)]
             let span = tracing::trace_span!(
                 target: "tokio::task",
-                "task",
+                "runtime.spawn",
                 %kind,
+                task.name = %name.unwrap_or_default(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
-                task.name = %name.unwrap_or_default()
             );
             #[cfg(not(tokio_track_caller))]
             let span = tracing::trace_span!(
                 target: "tokio::task",
-                "task",
+                "runtime.spawn",
                 %kind,
-                task.name = %name.unwrap_or_default()
+                task.name = %name.unwrap_or_default(),
             );
             task.instrument(span)
         }
