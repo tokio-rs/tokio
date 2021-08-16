@@ -192,20 +192,20 @@ impl Handle {
             let location = std::panic::Location::caller();
             #[cfg(tokio_track_caller)]
             let span = tracing::trace_span!(
-                target: "tokio::task",
-                "task",
+                target: "tokio::task::blocking",
+                "runtime.spawn",
                 kind = %"blocking",
-                function = %std::any::type_name::<F>(),
                 task.name = %name.unwrap_or_default(),
+                "fn" = %std::any::type_name::<F>(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
             );
             #[cfg(not(tokio_track_caller))]
             let span = tracing::trace_span!(
-                target: "tokio::task",
-                "task",
+                target: "tokio::task::blocking",
+                "runtime.spawn",
                 kind = %"blocking",
                 task.name = %name.unwrap_or_default(),
-                function = %std::any::type_name::<F>(),
+                "fn" = %std::any::type_name::<F>(),
             );
             fut.instrument(span)
         };
