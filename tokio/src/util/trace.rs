@@ -13,7 +13,7 @@ cfg_trace! {
                 target: "tokio::task",
                 "runtime.spawn",
                 %kind,
-                task.name = %name.unwrap_or_default()
+                task.name = %name.unwrap_or_default(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
             );
             #[cfg(not(tokio_track_caller))]
@@ -21,7 +21,7 @@ cfg_trace! {
                 target: "tokio::task",
                 "runtime.spawn",
                 %kind,
-                task.name = %name.unwrap_or_default()
+                task.name = %name.unwrap_or_default(),
             );
             task.instrument(span)
         }
