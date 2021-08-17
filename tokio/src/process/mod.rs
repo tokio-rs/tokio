@@ -225,9 +225,9 @@ pub struct Command {
 
 pub(crate) struct SpawnedChild {
     child: imp::Child,
-    stdin: Option<imp::ChildStdin>,
-    stdout: Option<imp::ChildStdout>,
-    stderr: Option<imp::ChildStderr>,
+    stdin: Option<imp::ChildStdio>,
+    stdout: Option<imp::ChildStdio>,
+    stderr: Option<imp::ChildStdio>,
 }
 
 impl Command {
@@ -1151,7 +1151,7 @@ impl Child {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStdin {
-    inner: imp::ChildStdin,
+    inner: imp::ChildStdio,
 }
 
 /// The standard output stream for spawned children.
@@ -1160,7 +1160,7 @@ pub struct ChildStdin {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStdout {
-    inner: imp::ChildStdout,
+    inner: imp::ChildStdio,
 }
 
 /// The standard error stream for spawned children.
@@ -1169,7 +1169,52 @@ pub struct ChildStdout {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStderr {
-    inner: imp::ChildStderr,
+    inner: imp::ChildStdio,
+}
+
+impl ChildStdin {
+    /// Create an asynchronous `ChildStdin` from a synchronous one.
+    ///
+    /// # Errors
+    ///
+    /// This method may fail if an error is encountered when setting the pipe to
+    /// non-blocking mode, or when registering the pipe with the runtime's IO
+    /// driver.
+    pub fn from_std(inner: std::process::ChildStdin) -> io::Result<Self> {
+        Ok(Self {
+            inner: imp::stdio(inner)?,
+        })
+    }
+}
+
+impl ChildStdout {
+    /// Create an asynchronous `ChildStderr` from a synchronous one.
+    ///
+    /// # Errors
+    ///
+    /// This method may fail if an error is encountered when setting the pipe to
+    /// non-blocking mode, or when registering the pipe with the runtime's IO
+    /// driver.
+    pub fn from_std(inner: std::process::ChildStdout) -> io::Result<Self> {
+        Ok(Self {
+            inner: imp::stdio(inner)?,
+        })
+    }
+}
+
+impl ChildStderr {
+    /// Create an asynchronous `ChildStderr` from a synchronous one.
+    ///
+    /// # Errors
+    ///
+    /// This method may fail if an error is encountered when setting the pipe to
+    /// non-blocking mode, or when registering the pipe with the runtime's IO
+    /// driver.
+    pub fn from_std(inner: std::process::ChildStderr) -> io::Result<Self> {
+        Ok(Self {
+            inner: imp::stdio(inner)?,
+        })
+    }
 }
 
 impl AsyncWrite for ChildStdin {
