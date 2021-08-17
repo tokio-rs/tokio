@@ -409,10 +409,16 @@ impl<T> Sender<T> {
         debug_assert_eq!(0, self.shared.ref_count_rx.load(Relaxed));
     }
 
-    /// Creates a new [`Receiver`] handle that will receive values sent **after**
-    /// this call to `subscribe`.
+    /// Creates a new [`Receiver`] connected to this `Sender`.
+    ///
+    /// All messages sent before this call to `subscribe` are initially marked
+    /// as seen by the new `Receiver`.
+    ///
+    /// This method can be called even if there are no other receivers.
     ///
     /// # Examples
+    ///
+    /// The new channel will receive messages sent on this `Sender`.
     ///
     /// ```
     /// use tokio::sync::watch;
@@ -423,11 +429,35 @@ impl<T> Sender<T> {
     ///
     ///     tx.send(5).unwrap();
     ///
-    ///     let mut rx = tx.subscribe();
-    ///     // A new Receiver will immediately see the latest value.
+    ///     let rx = tx.subscribe();
     ///     assert_eq!(5, *rx.borrow());
     ///
-    ///     tx.send(100).unwrap();
+    ///     tx.send(10).unwrap();
+    ///     assert_eq!(10, *rx.borrow());
+    /// }
+    /// ```
+    ///
+    /// The most recent message is considered seen by the channel, so this test
+    /// is guaranteed to pass.
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    /// use tokio::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, _rx) = watch::channel(0u64);
+    ///     tx.send(5).unwrap();
+    ///     let mut rx = tx.subscribe();
+    ///
+    ///     tokio::spawn(async move {
+    ///         // by spawning and sleeping, the message is sent after `main`
+    ///         // hits the call to `changed`.
+    ///         # if false {
+    ///         tokio::time::sleep(Duration::from_millis(10)).await;
+    ///         # }
+    ///         tx.send(100).unwrap();
+    ///     });
     ///
     ///     rx.changed().await.unwrap();
     ///     assert_eq!(100, *rx.borrow());
