@@ -246,5 +246,5 @@ where
     let mut pipe = Pipe::from(io);
     set_nonblocking(&mut pipe, true)?;
 
-    Ok(PollEvented::new(pipe)?)
+    PollEvented::new(pipe)
 }

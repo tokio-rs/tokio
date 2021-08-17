@@ -169,7 +169,7 @@ unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
 
 pub(crate) type ChildStdio = PollEvented<NamedPipe>;
 
-pub(super) fn stdio<T>(option: T) -> io::Result<PollEvented<NamedPipe>>
+pub(super) fn stdio<T>(io: T) -> io::Result<PollEvented<NamedPipe>>
 where
     T: IntoRawHandle,
 {
