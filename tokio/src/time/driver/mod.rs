@@ -205,7 +205,15 @@ where
     fn park_internal(&mut self, limit: Option<Duration>) -> Result<(), P::Error> {
         let mut lock = self.handle.get().state.lock();
 
-        assert!(!self.handle.is_shutdown());
+        if now < lock.elapsed {
+            // Time went backwards! This normally shouldn't happen as the Rust language
+            // guarantees that an Instant is monotonic, but can happen when running
+            // Linux in a VM on a Windows host due to std incorrectly trusting the
+            // hardware clock to be monotonic.
+            //
+            // See <https://github.com/tokio-rs/tokio/issues/3619> for more information.
+            now = lock.elapsed;
+        }
 
         let next_wake = lock.wheel.next_expiration_time();
         lock.next_wake =
