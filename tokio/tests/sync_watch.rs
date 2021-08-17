@@ -186,3 +186,18 @@ fn borrow_and_update() {
     assert_eq!(*rx.borrow_and_update(), "three");
     assert_ready!(spawn(rx.changed()).poll()).unwrap_err();
 }
+
+#[test]
+fn reopened_after_subscribe() {
+    let (tx, rx) = watch::channel("one");
+    assert!(!tx.is_closed());
+
+    drop(rx);
+    assert!(tx.is_closed());
+
+    let rx = tx.subscribe();
+    assert!(!tx.is_closed());
+
+    drop(rx);
+    assert!(tx.is_closed());
+}
