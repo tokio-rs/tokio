@@ -56,7 +56,7 @@
 use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering::{Relaxed, SeqCst};
+use crate::loom::sync::atomic::Ordering::Relaxed;
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::ops;
 
@@ -74,7 +74,7 @@ pub struct Receiver<T> {
     shared: Arc<Shared<T>>,
 
     /// Last observed version
-    version: usize,
+    version: Version,
 }
 
 /// Sends values to the associated [`Receiver`](struct@Receiver).
@@ -104,7 +104,7 @@ struct Shared<T> {
     ///
     /// The lowest bit represents a "closed" state. The rest of the bits
     /// represent the current version.
-    version: AtomicUsize,
+    state: AtomicState,
 
     /// Tracks the number of `Receiver` instances
     ref_count_rx: AtomicUsize,
@@ -152,7 +152,69 @@ pub mod error {
     impl std::error::Error for RecvError {}
 }
 
-const CLOSED: usize = 1;
+use self::state::{AtomicState, Version};
+mod state {
+    use crate::loom::sync::atomic::AtomicUsize;
+    use crate::loom::sync::atomic::Ordering::SeqCst;
+
+    const CLOSED: usize = 1;
+
+    /// The version part of the state. The lowest bit is always zero.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    pub(super) struct Version(usize);
+
+    /// Snapshot of the state. The first bit is used as the CLOSED bit.
+    /// The remaining bits are used as the version.
+    #[derive(Copy, Clone, Debug)]
+    pub(super) struct StateSnapshot(usize);
+
+    /// The state stored in an atomic integer.
+    #[derive(Debug)]
+    pub(super) struct AtomicState(AtomicUsize);
+
+    impl Version {
+        /// Get the initial version when creating the channel.
+        pub(super) fn initial() -> Self {
+            Version(0)
+        }
+    }
+
+    impl StateSnapshot {
+        /// Extract the version from the state.
+        pub(super) fn version(self) -> Version {
+            Version(self.0 & !CLOSED)
+        }
+
+        /// Is the closed bit set?
+        pub(super) fn is_closed(self) -> bool {
+            (self.0 & CLOSED) == CLOSED
+        }
+    }
+
+    impl AtomicState {
+        /// Create a new `AtomicState` that is not closed and which has the
+        /// version set to `Version::initial()`.
+        pub(super) fn new() -> Self {
+            AtomicState(AtomicUsize::new(0))
+        }
+
+        /// Load the current value of the state.
+        pub(super) fn load(&self) -> StateSnapshot {
+            StateSnapshot(self.0.load(SeqCst))
+        }
+
+        /// Increment the version counter.
+        pub(super) fn increment_version(&self) {
+            // Increment by two to avoid touching the CLOSED bit.
+            self.0.fetch_add(2, SeqCst);
+        }
+
+        /// Set the closed bit in the state.
+        pub(super) fn set_closed(&self) {
+            self.0.fetch_or(CLOSED, SeqCst);
+        }
+    }
+}
 
 /// Creates a new watch channel, returning the "send" and "receive" handles.
 ///
@@ -184,7 +246,7 @@ const CLOSED: usize = 1;
 pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
     let shared = Arc::new(Shared {
         value: RwLock::new(init),
-        version: AtomicUsize::new(0),
+        state: AtomicState::new(),
         ref_count_rx: AtomicUsize::new(1),
         notify_rx: Notify::new(),
         notify_tx: Notify::new(),
@@ -194,13 +256,16 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
         shared: shared.clone(),
     };
 
-    let rx = Receiver { shared, version: 0 };
+    let rx = Receiver {
+        shared,
+        version: Version::initial(),
+    };
 
     (tx, rx)
 }
 
 impl<T> Receiver<T> {
-    fn from_shared(version: usize, shared: Arc<Shared<T>>) -> Self {
+    fn from_shared(version: Version, shared: Arc<Shared<T>>) -> Self {
         // No synchronization necessary as this is only used as a counter and
         // not memory access.
         shared.ref_count_rx.fetch_add(1, Relaxed);
@@ -208,11 +273,17 @@ impl<T> Receiver<T> {
         Self { shared, version }
     }
 
-    /// Returns a reference to the most recently sent value
+    /// Returns a reference to the most recently sent value.
+    ///
+    /// This method does not mark the returned value as seen, so future calls to
+    /// [`changed`] may return immediately even if you have already seen the
+    /// value with a call to `borrow`.
     ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
     /// could cause the send half to block. It is recommended to keep the borrow
     /// as short lived as possible.
+    ///
+    /// [`changed`]: Receiver::changed
     ///
     /// # Examples
     ///
@@ -227,11 +298,40 @@ impl<T> Receiver<T> {
         Ref { inner }
     }
 
-    /// Wait for a change notification
+    /// Returns a reference to the most recently sent value and mark that value
+    /// as seen.
     ///
-    /// Returns when a new value has been sent by the [`Sender`] since the last
-    /// time `changed()` was called. When the `Sender` half is dropped, `Err` is
-    /// returned.
+    /// This method marks the value as seen, so [`changed`] will not return
+    /// immediately if the newest value is one previously returned by
+    /// `borrow_and_update`.
+    ///
+    /// Outstanding borrows hold a read lock. This means that long lived borrows
+    /// could cause the send half to block. It is recommended to keep the borrow
+    /// as short lived as possible.
+    ///
+    /// [`changed`]: Receiver::changed
+    pub fn borrow_and_update(&mut self) -> Ref<'_, T> {
+        let inner = self.shared.value.read().unwrap();
+        self.version = self.shared.state.load().version();
+        Ref { inner }
+    }
+
+    /// Wait for a change notification, then mark the newest value as seen.
+    ///
+    /// If the newest value in the channel has not yet been marked seen when
+    /// this method is called, the method marks that value seen and returns
+    /// immediately. If the newest value has already been marked seen, then the
+    /// method sleeps until a new message is sent by the [`Sender`] connected to
+    /// this `Receiver`, or until the [`Sender`] is dropped.
+    ///
+    /// This method returns an error if and only if the [`Sender`] is dropped.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If you use it as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that no values have been marked
+    /// seen by this call to `changed`.
     ///
     /// [`Sender`]: struct@Sender
     ///
@@ -280,11 +380,11 @@ impl<T> Receiver<T> {
 
 fn maybe_changed<T>(
     shared: &Shared<T>,
-    version: &mut usize,
+    version: &mut Version,
 ) -> Option<Result<(), error::RecvError>> {
     // Load the version from the state
-    let state = shared.version.load(SeqCst);
-    let new_version = state & !CLOSED;
+    let state = shared.state.load();
+    let new_version = state.version();
 
     if *version != new_version {
         // Observe the new version and return
@@ -292,7 +392,7 @@ fn maybe_changed<T>(
         return Some(Ok(()));
     }
 
-    if CLOSED == state & CLOSED {
+    if state.is_closed() {
         // All receivers have dropped.
         return Some(Err(error::RecvError(())));
     }
@@ -322,16 +422,29 @@ impl<T> Drop for Receiver<T> {
 
 impl<T> Sender<T> {
     /// Sends a new value via the channel, notifying all receivers.
+    ///
+    /// This method fails if the channel has been closed, which happens when
+    /// every receiver has been dropped.
     pub fn send(&self, value: T) -> Result<(), error::SendError<T>> {
         // This is pretty much only useful as a hint anyway, so synchronization isn't critical.
         if 0 == self.shared.ref_count_rx.load(Relaxed) {
             return Err(error::SendError { inner: value });
         }
 
-        *self.shared.value.write().unwrap() = value;
+        {
+            // Acquire the write lock and update the value.
+            let mut lock = self.shared.value.write().unwrap();
+            *lock = value;
 
-        // Update the version. 2 is used so that the CLOSED bit is not set.
-        self.shared.version.fetch_add(2, SeqCst);
+            self.shared.state.increment_version();
+
+            // Release the write lock.
+            //
+            // Incrementing the version counter while holding the lock ensures
+            // that receivers are able to figure out the version number of the
+            // value they are currently looking at.
+            drop(lock);
+        }
 
         // Notify all watchers
         self.shared.notify_rx.notify_waiters();
@@ -378,6 +491,11 @@ impl<T> Sender<T> {
     ///
     /// This allows the producer to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once the channel is closed, it stays closed
+    /// forever and all future calls to `closed` will return immediately.
     ///
     /// # Examples
     ///
@@ -465,7 +583,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
-        let version = shared.version.load(SeqCst);
+        let version = shared.state.load().version();
 
         Receiver::from_shared(version, shared)
     }
@@ -495,7 +613,7 @@ impl<T> Sender<T> {
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.shared.version.fetch_or(CLOSED, SeqCst);
+        self.shared.state.set_closed();
         self.shared.notify_rx.notify_waiters();
     }
 }

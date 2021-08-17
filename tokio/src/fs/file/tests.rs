@@ -1,80 +1,21 @@
-#![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
-
-macro_rules! ready {
-    ($e:expr $(,)?) => {
-        match $e {
-            std::task::Poll::Ready(t) => t,
-            std::task::Poll::Pending => return std::task::Poll::Pending,
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! cfg_fs {
-    ($($item:item)*) => { $($item)* }
-}
-
-#[macro_export]
-macro_rules! cfg_io_std {
-    ($($item:item)*) => { $($item)* }
-}
-
-use futures::future;
-
-// Load source
-#[allow(warnings)]
-#[path = "../src/fs/file.rs"]
-mod file;
-use file::File;
-
-#[allow(warnings)]
-#[path = "../src/io/blocking.rs"]
-mod blocking;
-
-// Load mocked types
-mod support {
-    pub(crate) mod mock_file;
-    pub(crate) mod mock_pool;
-}
-pub(crate) use support::mock_pool as pool;
-
-// Place them where the source expects them
-pub(crate) mod io {
-    pub(crate) use tokio::io::*;
-
-    pub(crate) use crate::blocking;
-
-    pub(crate) mod sys {
-        pub(crate) use crate::support::mock_pool::{run, Blocking};
-    }
-}
-pub(crate) mod fs {
-    pub(crate) mod sys {
-        pub(crate) use crate::support::mock_file::File;
-        pub(crate) use crate::support::mock_pool::{run, Blocking};
-    }
-
-    pub(crate) use crate::support::mock_pool::asyncify;
-}
-pub(crate) mod sync {
-    pub(crate) use tokio::sync::Mutex;
-}
-use fs::sys;
-
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
-use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task};
-
-use std::io::SeekFrom;
+use super::*;
+use crate::{
+    fs::mocks::*,
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
+};
+use mockall::{predicate::eq, Sequence};
+use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
 
 const HELLO: &[u8] = b"hello world...";
 const FOO: &[u8] = b"foo bar baz...";
 
 #[test]
 fn open_read() {
-    let (mock, file) = sys::File::mock();
-    mock.read(HELLO);
-
+    let mut file = MockFile::default();
+    file.expect_inner_read().once().returning(|buf| {
+        buf[0..HELLO.len()].copy_from_slice(HELLO);
+        Ok(HELLO.len())
+    });
     let mut file = File::from_std(file);
 
     let mut buf = [0; 1024];
@@ -83,12 +24,10 @@ fn open_read() {
     assert_eq!(0, pool::len());
     assert_pending!(t.poll());
 
-    assert_eq!(1, mock.remaining());
     assert_eq!(1, pool::len());
 
     pool::run_one();
 
-    assert_eq!(0, mock.remaining());
     assert!(t.is_woken());
 
     let n = assert_ready_ok!(t.poll());
@@ -98,9 +37,11 @@ fn open_read() {
 
 #[test]
 fn read_twice_before_dispatch() {
-    let (mock, file) = sys::File::mock();
-    mock.read(HELLO);
-
+    let mut file = MockFile::default();
+    file.expect_inner_read().once().returning(|buf| {
+        buf[0..HELLO.len()].copy_from_slice(HELLO);
+        Ok(HELLO.len())
+    });
     let mut file = File::from_std(file);
 
     let mut buf = [0; 1024];
@@ -120,8 +61,11 @@ fn read_twice_before_dispatch() {
 
 #[test]
 fn read_with_smaller_buf() {
-    let (mock, file) = sys::File::mock();
-    mock.read(HELLO);
+    let mut file = MockFile::default();
+    file.expect_inner_read().once().returning(|buf| {
+        buf[0..HELLO.len()].copy_from_slice(HELLO);
+        Ok(HELLO.len())
+    });
 
     let mut file = File::from_std(file);
 
@@ -153,8 +97,22 @@ fn read_with_smaller_buf() {
 
 #[test]
 fn read_with_bigger_buf() {
-    let (mock, file) = sys::File::mock();
-    mock.read(&HELLO[..4]).read(&HELLO[4..]);
+    let mut seq = Sequence::new();
+    let mut file = MockFile::default();
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..4].copy_from_slice(&HELLO[..4]);
+            Ok(4)
+        });
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..HELLO.len() - 4].copy_from_slice(&HELLO[4..]);
+            Ok(HELLO.len() - 4)
+        });
 
     let mut file = File::from_std(file);
 
@@ -194,8 +152,19 @@ fn read_with_bigger_buf() {
 
 #[test]
 fn read_err_then_read_success() {
-    let (mock, file) = sys::File::mock();
-    mock.read_err().read(&HELLO);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..HELLO.len()].copy_from_slice(HELLO);
+            Ok(HELLO.len())
+        });
 
     let mut file = File::from_std(file);
 
@@ -225,8 +194,11 @@ fn read_err_then_read_success() {
 
 #[test]
 fn open_write() {
-    let (mock, file) = sys::File::mock();
-    mock.write(HELLO);
+    let mut file = MockFile::default();
+    file.expect_inner_write()
+        .once()
+        .with(eq(HELLO))
+        .returning(|buf| Ok(buf.len()));
 
     let mut file = File::from_std(file);
 
@@ -235,12 +207,10 @@ fn open_write() {
     assert_eq!(0, pool::len());
     assert_ready_ok!(t.poll());
 
-    assert_eq!(1, mock.remaining());
     assert_eq!(1, pool::len());
 
     pool::run_one();
 
-    assert_eq!(0, mock.remaining());
     assert!(!t.is_woken());
 
     let mut t = task::spawn(file.flush());
@@ -249,7 +219,7 @@ fn open_write() {
 
 #[test]
 fn flush_while_idle() {
-    let (_mock, file) = sys::File::mock();
+    let file = MockFile::default();
 
     let mut file = File::from_std(file);
 
@@ -271,13 +241,42 @@ fn read_with_buffer_larger_than_max() {
     for i in 0..(chunk_d - 1) {
         data.push((i % 151) as u8);
     }
+    let data = Arc::new(data);
+    let d0 = data.clone();
+    let d1 = data.clone();
+    let d2 = data.clone();
+    let d3 = data.clone();
 
-    let (mock, file) = sys::File::mock();
-    mock.read(&data[0..chunk_a])
-        .read(&data[chunk_a..chunk_b])
-        .read(&data[chunk_b..chunk_c])
-        .read(&data[chunk_c..]);
-
+    let mut seq = Sequence::new();
+    let mut file = MockFile::default();
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(move |buf| {
+            buf[0..chunk_a].copy_from_slice(&d0[0..chunk_a]);
+            Ok(chunk_a)
+        });
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(move |buf| {
+            buf[..chunk_a].copy_from_slice(&d1[chunk_a..chunk_b]);
+            Ok(chunk_b - chunk_a)
+        });
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(move |buf| {
+            buf[..chunk_a].copy_from_slice(&d2[chunk_b..chunk_c]);
+            Ok(chunk_c - chunk_b)
+        });
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(move |buf| {
+            buf[..chunk_a - 1].copy_from_slice(&d3[chunk_c..]);
+            Ok(chunk_a - 1)
+        });
     let mut file = File::from_std(file);
 
     let mut actual = vec![0; chunk_d];
@@ -296,8 +295,7 @@ fn read_with_buffer_larger_than_max() {
         pos += n;
     }
 
-    assert_eq!(mock.remaining(), 0);
-    assert_eq!(data, &actual[..data.len()]);
+    assert_eq!(&data[..], &actual[..data.len()]);
 }
 
 #[test]
@@ -314,12 +312,34 @@ fn write_with_buffer_larger_than_max() {
     for i in 0..(chunk_d - 1) {
         data.push((i % 151) as u8);
     }
+    let data = Arc::new(data);
+    let d0 = data.clone();
+    let d1 = data.clone();
+    let d2 = data.clone();
+    let d3 = data.clone();
 
-    let (mock, file) = sys::File::mock();
-    mock.write(&data[0..chunk_a])
-        .write(&data[chunk_a..chunk_b])
-        .write(&data[chunk_b..chunk_c])
-        .write(&data[chunk_c..]);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .withf(move |buf| buf == &d0[0..chunk_a])
+        .returning(|buf| Ok(buf.len()));
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .withf(move |buf| buf == &d1[chunk_a..chunk_b])
+        .returning(|buf| Ok(buf.len()));
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .withf(move |buf| buf == &d2[chunk_b..chunk_c])
+        .returning(|buf| Ok(buf.len()));
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .withf(move |buf| buf == &d3[chunk_c..chunk_d - 1])
+        .returning(|buf| Ok(buf.len()));
 
     let mut file = File::from_std(file);
 
@@ -344,14 +364,22 @@ fn write_with_buffer_larger_than_max() {
     }
 
     pool::run_one();
-
-    assert_eq!(mock.remaining(), 0);
 }
 
 #[test]
 fn write_twice_before_dispatch() {
-    let (mock, file) = sys::File::mock();
-    mock.write(HELLO).write(FOO);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(HELLO))
+        .returning(|buf| Ok(buf.len()));
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(FOO))
+        .returning(|buf| Ok(buf.len()));
 
     let mut file = File::from_std(file);
 
@@ -380,10 +408,24 @@ fn write_twice_before_dispatch() {
 
 #[test]
 fn incomplete_read_followed_by_write() {
-    let (mock, file) = sys::File::mock();
-    mock.read(HELLO)
-        .seek_current_ok(-(HELLO.len() as i64), 0)
-        .write(FOO);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..HELLO.len()].copy_from_slice(HELLO);
+            Ok(HELLO.len())
+        });
+    file.expect_inner_seek()
+        .once()
+        .with(eq(SeekFrom::Current(-(HELLO.len() as i64))))
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(0));
+    file.expect_inner_write()
+        .once()
+        .with(eq(FOO))
+        .returning(|_| Ok(FOO.len()));
 
     let mut file = File::from_std(file);
 
@@ -406,8 +448,25 @@ fn incomplete_read_followed_by_write() {
 
 #[test]
 fn incomplete_partial_read_followed_by_write() {
-    let (mock, file) = sys::File::mock();
-    mock.read(HELLO).seek_current_ok(-10, 0).write(FOO);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..HELLO.len()].copy_from_slice(HELLO);
+            Ok(HELLO.len())
+        });
+    file.expect_inner_seek()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(SeekFrom::Current(-10)))
+        .returning(|_| Ok(0));
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(FOO))
+        .returning(|_| Ok(FOO.len()));
 
     let mut file = File::from_std(file);
 
@@ -433,10 +492,25 @@ fn incomplete_partial_read_followed_by_write() {
 
 #[test]
 fn incomplete_read_followed_by_flush() {
-    let (mock, file) = sys::File::mock();
-    mock.read(HELLO)
-        .seek_current_ok(-(HELLO.len() as i64), 0)
-        .write(FOO);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..HELLO.len()].copy_from_slice(HELLO);
+            Ok(HELLO.len())
+        });
+    file.expect_inner_seek()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(SeekFrom::Current(-(HELLO.len() as i64))))
+        .returning(|_| Ok(0));
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(FOO))
+        .returning(|_| Ok(FOO.len()));
 
     let mut file = File::from_std(file);
 
@@ -458,8 +532,18 @@ fn incomplete_read_followed_by_flush() {
 
 #[test]
 fn incomplete_flush_followed_by_write() {
-    let (mock, file) = sys::File::mock();
-    mock.write(HELLO).write(FOO);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(HELLO))
+        .returning(|_| Ok(HELLO.len()));
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(FOO))
+        .returning(|_| Ok(FOO.len()));
 
     let mut file = File::from_std(file);
 
@@ -484,8 +568,10 @@ fn incomplete_flush_followed_by_write() {
 
 #[test]
 fn read_err() {
-    let (mock, file) = sys::File::mock();
-    mock.read_err();
+    let mut file = MockFile::default();
+    file.expect_inner_read()
+        .once()
+        .returning(|_| Err(io::ErrorKind::Other.into()));
 
     let mut file = File::from_std(file);
 
@@ -502,8 +588,10 @@ fn read_err() {
 
 #[test]
 fn write_write_err() {
-    let (mock, file) = sys::File::mock();
-    mock.write_err();
+    let mut file = MockFile::default();
+    file.expect_inner_write()
+        .once()
+        .returning(|_| Err(io::ErrorKind::Other.into()));
 
     let mut file = File::from_std(file);
 
@@ -518,8 +606,19 @@ fn write_write_err() {
 
 #[test]
 fn write_read_write_err() {
-    let (mock, file) = sys::File::mock();
-    mock.write_err().read(HELLO);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..HELLO.len()].copy_from_slice(HELLO);
+            Ok(HELLO.len())
+        });
 
     let mut file = File::from_std(file);
 
@@ -541,8 +640,19 @@ fn write_read_write_err() {
 
 #[test]
 fn write_read_flush_err() {
-    let (mock, file) = sys::File::mock();
-    mock.write_err().read(HELLO);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..HELLO.len()].copy_from_slice(HELLO);
+            Ok(HELLO.len())
+        });
 
     let mut file = File::from_std(file);
 
@@ -564,8 +674,17 @@ fn write_read_flush_err() {
 
 #[test]
 fn write_seek_write_err() {
-    let (mock, file) = sys::File::mock();
-    mock.write_err().seek_start_ok(0);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    file.expect_inner_seek()
+        .once()
+        .with(eq(SeekFrom::Start(0)))
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(0));
 
     let mut file = File::from_std(file);
 
@@ -587,8 +706,17 @@ fn write_seek_write_err() {
 
 #[test]
 fn write_seek_flush_err() {
-    let (mock, file) = sys::File::mock();
-    mock.write_err().seek_start_ok(0);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    file.expect_inner_seek()
+        .once()
+        .with(eq(SeekFrom::Start(0)))
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(0));
 
     let mut file = File::from_std(file);
 
@@ -610,8 +738,14 @@ fn write_seek_flush_err() {
 
 #[test]
 fn sync_all_ordered_after_write() {
-    let (mock, file) = sys::File::mock();
-    mock.write(HELLO).sync_all();
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(HELLO))
+        .returning(|_| Ok(HELLO.len()));
+    file.expect_sync_all().once().returning(|| Ok(()));
 
     let mut file = File::from_std(file);
     let mut t = task::spawn(file.write(HELLO));
@@ -635,8 +769,16 @@ fn sync_all_ordered_after_write() {
 
 #[test]
 fn sync_all_err_ordered_after_write() {
-    let (mock, file) = sys::File::mock();
-    mock.write(HELLO).sync_all_err();
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(HELLO))
+        .returning(|_| Ok(HELLO.len()));
+    file.expect_sync_all()
+        .once()
+        .returning(|| Err(io::ErrorKind::Other.into()));
 
     let mut file = File::from_std(file);
     let mut t = task::spawn(file.write(HELLO));
@@ -660,8 +802,14 @@ fn sync_all_err_ordered_after_write() {
 
 #[test]
 fn sync_data_ordered_after_write() {
-    let (mock, file) = sys::File::mock();
-    mock.write(HELLO).sync_data();
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(HELLO))
+        .returning(|_| Ok(HELLO.len()));
+    file.expect_sync_data().once().returning(|| Ok(()));
 
     let mut file = File::from_std(file);
     let mut t = task::spawn(file.write(HELLO));
@@ -685,8 +833,16 @@ fn sync_data_ordered_after_write() {
 
 #[test]
 fn sync_data_err_ordered_after_write() {
-    let (mock, file) = sys::File::mock();
-    mock.write(HELLO).sync_data_err();
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(HELLO))
+        .returning(|_| Ok(HELLO.len()));
+    file.expect_sync_data()
+        .once()
+        .returning(|| Err(io::ErrorKind::Other.into()));
 
     let mut file = File::from_std(file);
     let mut t = task::spawn(file.write(HELLO));
@@ -710,17 +866,15 @@ fn sync_data_err_ordered_after_write() {
 
 #[test]
 fn open_set_len_ok() {
-    let (mock, file) = sys::File::mock();
-    mock.set_len(123);
+    let mut file = MockFile::default();
+    file.expect_set_len().with(eq(123)).returning(|_| Ok(()));
 
     let file = File::from_std(file);
     let mut t = task::spawn(file.set_len(123));
 
     assert_pending!(t.poll());
-    assert_eq!(1, mock.remaining());
 
     pool::run_one();
-    assert_eq!(0, mock.remaining());
 
     assert!(t.is_woken());
     assert_ready_ok!(t.poll());
@@ -728,17 +882,17 @@ fn open_set_len_ok() {
 
 #[test]
 fn open_set_len_err() {
-    let (mock, file) = sys::File::mock();
-    mock.set_len_err(123);
+    let mut file = MockFile::default();
+    file.expect_set_len()
+        .with(eq(123))
+        .returning(|_| Err(io::ErrorKind::Other.into()));
 
     let file = File::from_std(file);
     let mut t = task::spawn(file.set_len(123));
 
     assert_pending!(t.poll());
-    assert_eq!(1, mock.remaining());
 
     pool::run_one();
-    assert_eq!(0, mock.remaining());
 
     assert!(t.is_woken());
     assert_ready_err!(t.poll());
@@ -746,11 +900,32 @@ fn open_set_len_err() {
 
 #[test]
 fn partial_read_set_len_ok() {
-    let (mock, file) = sys::File::mock();
-    mock.read(HELLO)
-        .seek_current_ok(-14, 0)
-        .set_len(123)
-        .read(FOO);
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..HELLO.len()].copy_from_slice(HELLO);
+            Ok(HELLO.len())
+        });
+    file.expect_inner_seek()
+        .once()
+        .with(eq(SeekFrom::Current(-(HELLO.len() as i64))))
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(0));
+    file.expect_set_len()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(123))
+        .returning(|_| Ok(()));
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..FOO.len()].copy_from_slice(FOO);
+            Ok(FOO.len())
+        });
 
     let mut buf = [0; 32];
     let mut file = File::from_std(file);

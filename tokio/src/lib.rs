@@ -9,7 +9,8 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![cfg_attr(docsrs, deny(broken_intra_doc_links))]
+#![deny(unused_must_use)]
+#![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
@@ -441,6 +442,28 @@ mod util;
 /// };
 /// ```
 pub mod stream {}
+
+// local re-exports of platform specific things, allowing for decent
+// documentation to be shimmed in on docs.rs
+
+#[cfg(docsrs)]
+pub mod doc;
+
+#[cfg(docsrs)]
+#[allow(unused)]
+pub(crate) use self::doc::os;
+
+#[cfg(not(docsrs))]
+#[allow(unused)]
+pub(crate) use std::os;
+
+#[cfg(docsrs)]
+#[allow(unused)]
+pub(crate) use self::doc::winapi;
+
+#[cfg(all(not(docsrs), windows, feature = "net"))]
+#[allow(unused)]
+pub(crate) use ::winapi;
 
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**

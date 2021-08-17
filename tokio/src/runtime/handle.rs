@@ -1,4 +1,4 @@
-use crate::runtime::blocking::task::BlockingTask;
+use crate::runtime::blocking::{BlockingTask, NoopSchedule};
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::CONTEXT_MISSING_ERROR;
@@ -145,7 +145,7 @@ impl Handle {
         F::Output: Send + 'static,
     {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task");
+        let future = crate::util::trace::task(future, "task", None);
         self.spawner.spawn(future)
     }
 
@@ -174,32 +174,47 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        self.spawn_blocking_inner(func, None)
+    }
+
+    #[cfg_attr(tokio_track_caller, track_caller)]
+    pub(crate) fn spawn_blocking_inner<F, R>(&self, func: F, name: Option<&str>) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let fut = BlockingTask::new(func);
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let func = {
+        let fut = {
+            use tracing::Instrument;
             #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
             #[cfg(tokio_track_caller)]
             let span = tracing::trace_span!(
-                target: "tokio::task",
-                "task",
+                target: "tokio::task::blocking",
+                "runtime.spawn",
                 kind = %"blocking",
-                function = %std::any::type_name::<F>(),
+                task.name = %name.unwrap_or_default(),
+                "fn" = %std::any::type_name::<F>(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
             );
             #[cfg(not(tokio_track_caller))]
             let span = tracing::trace_span!(
-                target: "tokio::task",
-                "task",
+                target: "tokio::task::blocking",
+                "runtime.spawn",
                 kind = %"blocking",
-                function = %std::any::type_name::<F>(),
+                task.name = %name.unwrap_or_default(),
+                "fn" = %std::any::type_name::<F>(),
             );
-            move || {
-                let _g = span.enter();
-                func()
-            }
+            fut.instrument(span)
         };
-        let (task, handle) = task::joinable(BlockingTask::new(func));
-        let _ = self.blocking_spawner.spawn(task, &self);
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let _ = name;
+
+        let (task, handle) = task::unowned(fut, NoopSchedule);
+        let _ = self.blocking_spawner.spawn(task, self);
         handle
     }
 

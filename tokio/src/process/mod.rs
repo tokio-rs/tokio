@@ -199,6 +199,8 @@ use std::io;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 #[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, RawHandle};
+#[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::pin::Pin;
@@ -551,6 +553,7 @@ impl Command {
     ///
     /// [1]: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863(v=vs.85).aspx
     #[cfg(windows)]
+    #[cfg_attr(docsrs, doc(cfg(windows)))]
     pub fn creation_flags(&mut self, flags: u32) -> &mut Command {
         self.std.creation_flags(flags);
         self
@@ -560,6 +563,7 @@ impl Command {
     /// `setuid` call in the child process. Failure in the `setuid`
     /// call will cause the spawn to fail.
     #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn uid(&mut self, id: u32) -> &mut Command {
         self.std.uid(id);
         self
@@ -568,8 +572,23 @@ impl Command {
     /// Similar to `uid` but sets the group ID of the child process. This has
     /// the same semantics as the `uid` field.
     #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn gid(&mut self, id: u32) -> &mut Command {
         self.std.gid(id);
+        self
+    }
+
+    /// Set executable argument
+    ///
+    /// Set the first process argument, `argv[0]`, to something other than the
+    /// default executable path.
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    pub fn arg0<S>(&mut self, arg: S) -> &mut Command
+    where
+        S: AsRef<OsStr>,
+    {
+        self.std.arg0(arg);
         self
     }
 
@@ -603,6 +622,7 @@ impl Command {
     /// working directory have successfully been changed, so output to these
     /// locations may not appear where intended.
     #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub unsafe fn pre_exec<F>(&mut self, f: F) -> &mut Command
     where
         F: FnMut() -> io::Result<()> + Send + Sync + 'static,
@@ -930,6 +950,16 @@ impl Child {
     pub fn id(&self) -> Option<u32> {
         match &self.child {
             FusedChild::Child(child) => Some(child.inner.id()),
+            FusedChild::Done(_) => None,
+        }
+    }
+
+    /// Extracts the raw handle of the process associated with this child while
+    /// it is still running. Returns `None` if the child has exited.
+    #[cfg(windows)]
+    pub fn raw_handle(&self) -> Option<RawHandle> {
+        match &self.child {
+            FusedChild::Child(c) => Some(c.inner.as_raw_handle()),
             FusedChild::Done(_) => None,
         }
     }

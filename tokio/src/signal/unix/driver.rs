@@ -47,7 +47,7 @@ impl Driver {
         use std::mem::ManuallyDrop;
         use std::os::unix::io::{AsRawFd, FromRawFd};
 
-        // NB: We give each driver a "fresh" reciever file descriptor to avoid
+        // NB: We give each driver a "fresh" receiver file descriptor to avoid
         // the issues described in alexcrichton/tokio-process#42.
         //
         // In the past we would reuse the actual receiver file descriptor and

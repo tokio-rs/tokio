@@ -52,7 +52,7 @@ async fn write_all_buf() {
     assert_eq!(wr.buf, b"helloworld"[..]);
     // expect 4 writes, [hell],[o],[worl],[d]
     assert_eq!(wr.cnt, 4);
-    assert_eq!(buf.has_remaining(), false);
+    assert!(!buf.has_remaining());
 }
 
 #[tokio::test]

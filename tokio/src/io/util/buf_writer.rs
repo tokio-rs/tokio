@@ -3,7 +3,7 @@ use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
 use std::fmt;
-use std::io::{self, SeekFrom, Write};
+use std::io::{self, IoSlice, SeekFrom, Write};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -131,6 +131,72 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
         } else {
             Poll::Ready(me.buf.write(buf))
         }
+    }
+
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        mut bufs: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        if self.inner.is_write_vectored() {
+            let total_len = bufs
+                .iter()
+                .fold(0usize, |acc, b| acc.saturating_add(b.len()));
+            if total_len > self.buf.capacity() - self.buf.len() {
+                ready!(self.as_mut().flush_buf(cx))?;
+            }
+            let me = self.as_mut().project();
+            if total_len >= me.buf.capacity() {
+                // It's more efficient to pass the slices directly to the
+                // underlying writer than to buffer them.
+                // The case when the total_len calculation saturates at
+                // usize::MAX is also handled here.
+                me.inner.poll_write_vectored(cx, bufs)
+            } else {
+                bufs.iter().for_each(|b| me.buf.extend_from_slice(b));
+                Poll::Ready(Ok(total_len))
+            }
+        } else {
+            // Remove empty buffers at the beginning of bufs.
+            while bufs.first().map(|buf| buf.len()) == Some(0) {
+                bufs = &bufs[1..];
+            }
+            if bufs.is_empty() {
+                return Poll::Ready(Ok(0));
+            }
+            // Flush if the first buffer doesn't fit.
+            let first_len = bufs[0].len();
+            if first_len > self.buf.capacity() - self.buf.len() {
+                ready!(self.as_mut().flush_buf(cx))?;
+                debug_assert!(self.buf.is_empty());
+            }
+            let me = self.as_mut().project();
+            if first_len >= me.buf.capacity() {
+                // The slice is at least as large as the buffering capacity,
+                // so it's better to write it directly, bypassing the buffer.
+                debug_assert!(me.buf.is_empty());
+                return me.inner.poll_write(cx, &bufs[0]);
+            } else {
+                me.buf.extend_from_slice(&bufs[0]);
+                bufs = &bufs[1..];
+            }
+            let mut total_written = first_len;
+            debug_assert!(total_written != 0);
+            // Append the buffers that fit in the internal buffer.
+            for buf in bufs {
+                if buf.len() > me.buf.capacity() - me.buf.len() {
+                    break;
+                } else {
+                    me.buf.extend_from_slice(buf);
+                    total_written += buf.len();
+                }
+            }
+            Poll::Ready(Ok(total_written))
+        }
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {

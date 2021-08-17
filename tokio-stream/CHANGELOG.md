@@ -1,3 +1,13 @@
+# 0.1.7 (July 7, 2021)
+
+### Fixed
+
+- sync: fix watch wrapper ([#3914])
+- time: fix `Timeout::size_hint` ([#3902])
+
+[#3902]: https://github.com/tokio-rs/tokio/pull/3902
+[#3914]: https://github.com/tokio-rs/tokio/pull/3914
+
 # 0.1.6 (May 14, 2021)
 
 ### Added

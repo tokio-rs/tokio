@@ -140,7 +140,7 @@ struct Waiter {
     _p: PhantomPinned,
 }
 
-/// Future returned from `notified()`
+/// Future returned from [`Notify::notified()`]
 #[derive(Debug)]
 pub struct Notified<'a> {
     /// The `Notify` being received on.
@@ -245,6 +245,12 @@ impl Notify {
     /// for a permit to be made available by the next call to `notify_one()`.
     ///
     /// [`notify_one()`]: Notify::notify_one
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute notifications in the order
+    /// they were requested. Cancelling a call to `notified` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///
@@ -522,7 +528,7 @@ impl Notified<'_> {
             is_unpin::<AtomicUsize>();
 
             let me = self.get_unchecked_mut();
-            (&me.notify, &mut me.state, &me.waiter)
+            (me.notify, &mut me.state, &me.waiter)
         }
     }
 }

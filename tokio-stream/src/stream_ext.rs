@@ -515,7 +515,7 @@ pub trait StreamExt: Stream {
     /// Skip elements from the underlying stream while the provided predicate
     /// resolves to `true`.
     ///
-    /// This function, like [`Iterator::skip_while`], will ignore elemets from the
+    /// This function, like [`Iterator::skip_while`], will ignore elements from the
     /// stream until the predicate `f` resolves to `false`. Once one element
     /// returns false, the rest of the elements will be yielded.
     ///

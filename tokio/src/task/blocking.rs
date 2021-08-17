@@ -89,13 +89,14 @@ cfg_rt! {
     ///
     /// Tokio will spawn more blocking threads when they are requested through this
     /// function until the upper limit configured on the [`Builder`] is reached.
-    /// This limit is very large by default, because `spawn_blocking` is often used
-    /// for various kinds of IO operations that cannot be performed asynchronously.
-    /// When you run CPU-bound code using `spawn_blocking`, you should keep this
-    /// large upper limit in mind. When running many CPU-bound computations, a
-    /// semaphore or some other synchronization primitive should be used to limit
-    /// the number of computation executed in parallel. Specialized CPU-bound
-    /// executors, such as [rayon], may also be a good fit.
+    /// After reaching the upper limit, the tasks are put in a queue.
+    /// The thread limit is very large by default, because `spawn_blocking` is often
+    /// used for various kinds of IO operations that cannot be performed
+    /// asynchronously.  When you run CPU-bound code using `spawn_blocking`, you
+    /// should keep this large upper limit in mind. When running many CPU-bound
+    /// computations, a semaphore or some other synchronization primitive should be
+    /// used to limit the number of computation executed in parallel. Specialized
+    /// CPU-bound executors, such as [rayon], may also be a good fit.
     ///
     /// This function is intended for non-async operations that eventually finish on
     /// their own. If you want to spawn an ordinary thread, you should use

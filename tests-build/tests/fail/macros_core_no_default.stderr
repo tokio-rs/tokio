@@ -4,4 +4,4 @@ error: The default runtime flavor is `multi_thread`, but the `rt-multi-thread` f
 3 | #[tokio::main]
   | ^^^^^^^^^^^^^^
   |
-  = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+  = note: this error originates in the attribute macro `tokio::main` (in Nightly builds, run with -Z macro-backtrace for more info)

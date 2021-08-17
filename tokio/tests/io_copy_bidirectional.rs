@@ -26,7 +26,7 @@ async fn block_write(s: &mut TcpStream) -> usize {
             result = s.write(&BUF) => {
                 copied += result.expect("write error")
             },
-            _ = tokio::time::sleep(Duration::from_millis(100)) => {
+            _ = tokio::time::sleep(Duration::from_millis(10)) => {
                 break;
             }
         }
@@ -42,7 +42,7 @@ where
 {
     // We run the test twice, with streams passed to copy_bidirectional in
     // different orders, in order to ensure that the two arguments are
-    // interchangable.
+    // interchangeable.
 
     let (a, mut a1) = make_socketpair().await;
     let (b, mut b1) = make_socketpair().await;

@@ -65,7 +65,7 @@ pub struct Receiver<T> {
 /// with backpressure.
 ///
 /// The channel will buffer up to the provided number of messages.  Once the
-/// buffer is full, attempts to `send` new messages will wait until a message is
+/// buffer is full, attempts to send new messages will wait until a message is
 /// received from the channel. The provided buffer capacity must be at least 1.
 ///
 /// All data sent on `Sender` will become available on `Receiver` in the same
@@ -76,7 +76,7 @@ pub struct Receiver<T> {
 ///
 /// If the `Receiver` is disconnected while trying to `send`, the `send` method
 /// will return a `SendError`. Similarly, if `Sender` is disconnected while
-/// trying to `recv`, the `recv` method will return a `RecvError`.
+/// trying to `recv`, the `recv` method will return `None`.
 ///
 /// # Panics
 ///
@@ -134,11 +134,16 @@ impl<T> Receiver<T> {
     ///
     /// If there are no messages in the channel's buffer, but the channel has
     /// not yet been closed, this method will sleep until a message is sent or
-    /// the channel is closed.
+    /// the channel is closed.  Note that if [`close`] is called, but there are
+    /// still outstanding [`Permits`] from before it was closed, the channel is
+    /// not considered closed by `recv` until the permits are released.
     ///
-    /// Note that if [`close`] is called, but there are still outstanding
-    /// [`Permits`] from before it was closed, the channel is not considered
-    /// closed by `recv` until the permits are released.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
     ///
     /// [`close`]: Self::close
     /// [`Permits`]: struct@crate::sync::mpsc::Permit
@@ -335,6 +340,16 @@ impl<T> Sender<T> {
     /// [`close`]: Receiver::close
     /// [`Receiver`]: Receiver
     ///
+    /// # Cancel safety
+    ///
+    /// If `send` is used as the event in a [`tokio::select!`](crate::select)
+    /// statement and some other branch completes first, then it is guaranteed
+    /// that the message was not sent.
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// complete in the order they were requested.  Cancelling a call to
+    /// `send` makes you lose your place in the queue.
+    ///
     /// # Examples
     ///
     /// In the following example, each call to `send` will block until the
@@ -375,6 +390,11 @@ impl<T> Sender<T> {
     ///
     /// This allows the producers to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once the channel is closed, it stays closed
+    /// forever and all future calls to `closed` will return immediately.
     ///
     /// # Examples
     ///
@@ -617,6 +637,12 @@ impl<T> Sender<T> {
     /// [`Permit`]: Permit
     /// [`send`]: Permit::send
     ///
+    /// # Cancel safety
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// complete in the order they were requested.  Cancelling a call to
+    /// `reserve` makes you lose your place in the queue.
+    ///
     /// # Examples
     ///
     /// ```
@@ -665,6 +691,12 @@ impl<T> Sender<T> {
     ///
     /// Dropping the [`OwnedPermit`] without sending a message releases the
     /// capacity back to the channel.
+    ///
+    /// # Cancel safety
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// complete in the order they were requested.  Cancelling a call to
+    /// `reserve_owned` makes you lose your place in the queue.
     ///
     /// # Examples
     /// Sending a message using an [`OwnedPermit`]:
@@ -887,7 +919,7 @@ impl<T> Sender<T> {
     ///     let permit = tx.reserve().await.unwrap();
     ///     assert_eq!(tx.capacity(), 4);
     ///
-    ///     // Sending and receiving a value increases the caapcity by one.
+    ///     // Sending and receiving a value increases the capacity by one.
     ///     permit.send(());
     ///     rx.recv().await.unwrap();
     ///     assert_eq!(tx.capacity(), 5);

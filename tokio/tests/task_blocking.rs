@@ -132,7 +132,7 @@ fn useful_panic_message_when_dropping_rt_in_rt() {
     let err: &'static str = err.downcast_ref::<&'static str>().unwrap();
 
     assert!(
-        err.find("Cannot drop a runtime").is_some(),
+        err.contains("Cannot drop a runtime"),
         "Wrong panic message: {:?}",
         err
     );

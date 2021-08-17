@@ -87,7 +87,7 @@ impl<T> OrphanQueueImpl<T> {
                         // means that the signal driver isn't running, in
                         // which case there isn't anything we can
                         // register/initialize here, so we can try again later
-                        if let Ok(sigchild) = signal_with_handle(SignalKind::child(), &handle) {
+                        if let Ok(sigchild) = signal_with_handle(SignalKind::child(), handle) {
                             *sigchild_guard = Some(sigchild);
                             drain_orphan_queue(queue);
                         }

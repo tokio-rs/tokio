@@ -1,13 +1,4 @@
 //! Wrappers for Tokio types that implement `Stream`.
-//!
-#![cfg_attr(
-    unix,
-    doc = "You are viewing documentation built under unix. To view windows-specific wrappers, change to the `x86_64-pc-windows-msvc` platform."
-)]
-#![cfg_attr(
-    windows,
-    doc = "You are viewing documentation built under windows. To view unix-specific wrappers, change to the `x86_64-unknown-linux-gnu` platform."
-)]
 
 /// Error types for the wrappers.
 pub mod errors {
@@ -36,9 +27,9 @@ cfg_signal! {
     #[cfg(unix)]
     pub use signal_unix::SignalStream;
 
-    #[cfg(windows)]
+    #[cfg(any(windows, docsrs))]
     mod signal_windows;
-    #[cfg(windows)]
+    #[cfg(any(windows, docsrs))]
     pub use signal_windows::{CtrlCStream, CtrlBreakStream};
 }
 

@@ -228,7 +228,7 @@ It is only possible to implement `AsyncRead` and `AsyncWrite` for resource types
 themselves and not for `&Resource`. Implementing the traits for `&Resource`
 would permit concurrent operations to the resource. Because only a single waker
 is stored per direction, any concurrent usage would result in deadlocks. An
-alterate implementation would call for a `Vec<Waker>` but this would result in
+alternate implementation would call for a `Vec<Waker>` but this would result in
 memory leaks.
 
 ## Enabling reads and writes for `&TcpStream`
@@ -268,7 +268,7 @@ select! {
 }
 ```
 
-It is also possible to sotre a `TcpStream` in an `Arc`.
+It is also possible to store a `TcpStream` in an `Arc`.
 
 ```rust
 let arc_stream = Arc::new(my_tcp_stream);
