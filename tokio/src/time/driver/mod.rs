@@ -288,13 +288,21 @@ impl Handle {
         self.process_at_time(now)
     }
 
-    pub(self) fn process_at_time(&self, now: u64) {
+    pub(self) fn process_at_time(&self, mut now: u64) {
         let mut waker_list: [Option<Waker>; 32] = Default::default();
         let mut waker_idx = 0;
 
         let mut lock = self.get().lock();
 
-        assert!(now >= lock.elapsed);
+        if now < lock.elapsed {
+            // Time went backwards! This normally shouldn't happen as the Rust language
+            // guarantees that an Instant is monotonic, but can happen when running
+            // Linux in a VM on a Windows host due to std incorrectly trusting the
+            // hardware clock to be monotonic.
+            //
+            // See <https://github.com/tokio-rs/tokio/issues/3619> for more information.
+            now = lock.elapsed;
+        }
 
         while let Some(entry) = lock.wheel.poll(now) {
             debug_assert!(unsafe { entry.is_pending() });
