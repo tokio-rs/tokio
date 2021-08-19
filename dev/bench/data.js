@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1629359163504,
+  "lastUpdate": 1629359179836,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -102899,6 +102899,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 792280,
             "range": "± 62652",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "a.github@omega-id.com",
+            "name": "Christoph Herzog",
+            "username": "theduke"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8aa2bfe23e739b19a0787ab141d2965d9e891997",
+          "message": "watch: make `watch::Sender::subscribe` public (#3800)\n\nCo-authored-by: Alice Ryhl <aliceryhl@google.com>",
+          "timestamp": "2021-08-19T09:43:59+02:00",
+          "tree_id": "8154b7ac56723b9eb3762cbeafeff04219444b5c",
+          "url": "https://github.com/tokio-rs/tokio/commit/8aa2bfe23e739b19a0787ab141d2965d9e891997"
+        },
+        "date": 1629359172540,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6540579,
+            "range": "± 2233849",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5860305,
+            "range": "± 1772016",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6440379,
+            "range": "± 2423168",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 254,
+            "range": "± 40",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 258,
+            "range": "± 39",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 265,
+            "range": "± 61",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 54516,
+            "range": "± 6521",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 847,
+            "range": "± 104",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1024482,
+            "range": "± 132563",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 711771,
+            "range": "± 66345",
             "unit": "ns/iter"
           }
         ]
