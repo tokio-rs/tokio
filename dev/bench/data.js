@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1629359143733,
+  "lastUpdate": 1629359151682,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -66920,6 +66920,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "uncontended_concurrent_single",
             "value": 817,
+            "range": "± 3",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "a.github@omega-id.com",
+            "name": "Christoph Herzog",
+            "username": "theduke"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8aa2bfe23e739b19a0787ab141d2965d9e891997",
+          "message": "watch: make `watch::Sender::subscribe` public (#3800)\n\nCo-authored-by: Alice Ryhl <aliceryhl@google.com>",
+          "timestamp": "2021-08-19T09:43:59+02:00",
+          "tree_id": "8154b7ac56723b9eb3762cbeafeff04219444b5c",
+          "url": "https://github.com/tokio-rs/tokio/commit/8aa2bfe23e739b19a0787ab141d2965d9e891997"
+        },
+        "date": 1629359143936,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16211,
+            "range": "± 6303",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 963,
+            "range": "± 196",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 649,
+            "range": "± 281",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 18018,
+            "range": "± 7080",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 986,
             "range": "± 3",
             "unit": "ns/iter"
           }
