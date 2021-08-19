@@ -4,7 +4,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{self, AtomicUsize};
 
 use std::fmt;
-use std::panic::{catch_unwind, resume_unwind, RefUnwindSafe, UnwindSafe};
+use std::panic::{resume_unwind, RefUnwindSafe, UnwindSafe, AssertUnwindSafe};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Waker;
 
@@ -175,6 +175,10 @@ impl AtomicWaker {
     where
         W: WakerRef,
     {
+        fn catch_unwind<F: FnOnce() -> R, R>(f: F) -> std::thread::Result<R> {
+            std::panic::catch_unwind(AssertUnwindSafe(f))
+        }
+
         match self
             .state
             .compare_exchange(WAITING, REGISTERING, Acquire, Acquire)
@@ -187,9 +191,7 @@ impl AtomicWaker {
                     // unwind to restore the waker to a WAITING state. Otherwise
                     // any future calls to register will incorrectly be stuck
                     // believing it's being updated by someone else.
-                    let new_waker_or_panic = catch_unwind(move || {
-                        waker.into_waker()
-                    });
+                    let new_waker_or_panic = catch_unwind(move || waker.into_waker());
 
                     // Set the field to contain the new waker, or if
                     // `into_waker` panicked, leave the old value.
@@ -199,7 +201,7 @@ impl AtomicWaker {
                         Ok(new_waker) => {
                             old_waker = self.waker.with_mut(|t| (*t).take());
                             self.waker.with_mut(|t| *t = Some(new_waker));
-                        },
+                        }
                         Err(panic) => maybe_panic = Some(panic),
                     }
 
@@ -231,7 +233,7 @@ impl AtomicWaker {
 
                             // Take the waker to wake once the atomic operation has
                             // completed.
-                            let waker = self.waker.with_mut(|t| (*t).take());
+                            let mut waker = self.waker.with_mut(|t| (*t).take());
 
                             // Just swap, because no one could change state
                             // while state == `Registering | `Waking`
