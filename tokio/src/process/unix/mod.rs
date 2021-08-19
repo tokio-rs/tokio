@@ -101,9 +101,9 @@ impl fmt::Debug for Child {
 
 pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<SpawnedChild> {
     let mut child = cmd.spawn()?;
-    let stdin = stdio(child.stdin.take())?;
-    let stdout = stdio(child.stdout.take())?;
-    let stderr = stdio(child.stderr.take())?;
+    let stdin = child.stdin.take().map(stdio).transpose()?;
+    let stdout = child.stdout.take().map(stdio).transpose()?;
+    let stderr = child.stderr.take().map(stdio).transpose()?;
 
     let signal = signal(SignalKind::child())?;
 
@@ -213,9 +213,7 @@ impl Source for Pipe {
     }
 }
 
-pub(crate) type ChildStdin = PollEvented<Pipe>;
-pub(crate) type ChildStdout = PollEvented<Pipe>;
-pub(crate) type ChildStderr = PollEvented<Pipe>;
+pub(crate) type ChildStdio = PollEvented<Pipe>;
 
 fn set_nonblocking<T: AsRawFd>(fd: &mut T, nonblocking: bool) -> io::Result<()> {
     unsafe {
@@ -240,18 +238,13 @@ fn set_nonblocking<T: AsRawFd>(fd: &mut T, nonblocking: bool) -> io::Result<()> 
     Ok(())
 }
 
-fn stdio<T>(option: Option<T>) -> io::Result<Option<PollEvented<Pipe>>>
+pub(super) fn stdio<T>(io: T) -> io::Result<PollEvented<Pipe>>
 where
     T: IntoRawFd,
 {
-    let io = match option {
-        Some(io) => io,
-        None => return Ok(None),
-    };
-
     // Set the fd to nonblocking before we pass it to the event loop
     let mut pipe = Pipe::from(io);
     set_nonblocking(&mut pipe, true)?;
 
-    Ok(Some(PollEvented::new(pipe)?))
+    PollEvented::new(pipe)
 }

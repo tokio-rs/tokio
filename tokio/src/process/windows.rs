@@ -67,9 +67,9 @@ unsafe impl Send for Waiting {}
 
 pub(crate) fn spawn_child(cmd: &mut StdCommand) -> io::Result<SpawnedChild> {
     let mut child = cmd.spawn()?;
-    let stdin = stdio(child.stdin.take());
-    let stdout = stdio(child.stdout.take());
-    let stderr = stdio(child.stderr.take());
+    let stdin = child.stdin.take().map(stdio).transpose()?;
+    let stdout = child.stdout.take().map(stdio).transpose()?;
+    let stderr = child.stderr.take().map(stdio).transpose()?;
 
     Ok(SpawnedChild {
         child: Child {
@@ -167,20 +167,14 @@ unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
     let _ = complete.take().unwrap().send(());
 }
 
-pub(crate) type ChildStdin = PollEvented<NamedPipe>;
-pub(crate) type ChildStdout = PollEvented<NamedPipe>;
-pub(crate) type ChildStderr = PollEvented<NamedPipe>;
+pub(crate) type ChildStdio = PollEvented<NamedPipe>;
 
-fn stdio<T>(option: Option<T>) -> Option<PollEvented<NamedPipe>>
+pub(super) fn stdio<T>(io: T) -> io::Result<PollEvented<NamedPipe>>
 where
     T: IntoRawHandle,
 {
-    let io = match option {
-        Some(io) => io,
-        None => return None,
-    };
     let pipe = unsafe { NamedPipe::from_raw_handle(io.into_raw_handle()) };
-    PollEvented::new(pipe).ok()
+    PollEvented::new(pipe)
 }
 
 pub(crate) fn convert_to_stdio(io: PollEvented<NamedPipe>) -> io::Result<Stdio> {
