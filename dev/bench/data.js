@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1629359066978,
+  "lastUpdate": 1629359143733,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -43651,6 +43651,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17902497,
             "range": "± 2219011",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "a.github@omega-id.com",
+            "name": "Christoph Herzog",
+            "username": "theduke"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8aa2bfe23e739b19a0787ab141d2965d9e891997",
+          "message": "watch: make `watch::Sender::subscribe` public (#3800)\n\nCo-authored-by: Alice Ryhl <aliceryhl@google.com>",
+          "timestamp": "2021-08-19T09:43:59+02:00",
+          "tree_id": "8154b7ac56723b9eb3762cbeafeff04219444b5c",
+          "url": "https://github.com/tokio-rs/tokio/commit/8aa2bfe23e739b19a0787ab141d2965d9e891997"
+        },
+        "date": 1629359137189,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 182000,
+            "range": "± 4818",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1015210,
+            "range": "± 69863",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5608847,
+            "range": "± 626395",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17592767,
+            "range": "± 1177426",
             "unit": "ns/iter"
           }
         ]
