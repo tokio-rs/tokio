@@ -55,14 +55,18 @@ impl<T> From<SendError<T>> for TrySendError<T> {
 
 /// Error returned by `Receiver`.
 #[derive(Debug)]
+#[doc(hidden)]
+#[deprecated(note = "This type is unused because recv returns an Option.")]
 pub struct RecvError(());
 
+#[allow(deprecated)]
 impl fmt::Display for RecvError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "channel closed")
     }
 }
 
+#[allow(deprecated)]
 impl Error for RecvError {}
 
 cfg_time! {

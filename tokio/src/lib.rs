@@ -9,7 +9,8 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![cfg_attr(docsrs, deny(broken_intra_doc_links))]
+#![deny(unused_must_use)]
+#![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
@@ -442,6 +443,28 @@ mod util;
 /// ```
 pub mod stream {}
 
+// local re-exports of platform specific things, allowing for decent
+// documentation to be shimmed in on docs.rs
+
+#[cfg(docsrs)]
+pub mod doc;
+
+#[cfg(docsrs)]
+#[allow(unused)]
+pub(crate) use self::doc::os;
+
+#[cfg(not(docsrs))]
+#[allow(unused)]
+pub(crate) use std::os;
+
+#[cfg(docsrs)]
+#[allow(unused)]
+pub(crate) use self::doc::winapi;
+
+#[cfg(all(not(docsrs), windows, feature = "net"))]
+#[allow(unused)]
+pub(crate) use ::winapi;
+
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**
     /// intended to be used as part of the public API and is permitted to
@@ -453,15 +476,20 @@ cfg_macros! {
         #[cfg(feature = "rt-multi-thread")]
         #[cfg(not(test))] // Work around for rust-lang/rust#62127
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[doc(inline)]
         pub use tokio_macros::main;
 
         #[cfg(feature = "rt-multi-thread")]
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[doc(inline)]
         pub use tokio_macros::test;
 
         cfg_not_rt_multi_thread! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
+            #[doc(inline)]
             pub use tokio_macros::main_rt as main;
+
+            #[doc(inline)]
             pub use tokio_macros::test_rt as test;
         }
     }
@@ -469,7 +497,10 @@ cfg_macros! {
     // Always fail if rt is not enabled.
     cfg_not_rt! {
         #[cfg(not(test))]
+        #[doc(inline)]
         pub use tokio_macros::main_fail as main;
+
+        #[doc(inline)]
         pub use tokio_macros::test_fail as test;
     }
 }

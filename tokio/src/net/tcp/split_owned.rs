@@ -112,7 +112,7 @@ impl OwnedReadHalf {
     /// `Waker` from the `Context` passed to the most recent call is scheduled
     /// to receive a wakeup.
     ///
-    /// See the [`TcpStream::poll_peek`] level documenation for more details.
+    /// See the [`TcpStream::poll_peek`] level documentation for more details.
     ///
     /// # Examples
     ///
@@ -150,7 +150,7 @@ impl OwnedReadHalf {
     /// connected, without removing that data from the queue. On success,
     /// returns the number of bytes peeked.
     ///
-    /// See the [`TcpStream::peek`] level documenation for more details.
+    /// See the [`TcpStream::peek`] level documentation for more details.
     ///
     /// [`TcpStream::peek`]: TcpStream::peek
     ///

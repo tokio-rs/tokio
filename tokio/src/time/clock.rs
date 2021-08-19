@@ -7,7 +7,7 @@
 //! configurable.
 
 cfg_not_test_util! {
-    use crate::time::{Duration, Instant};
+    use crate::time::{Instant};
 
     #[derive(Debug, Clone)]
     pub(crate) struct Clock {}
@@ -24,20 +24,12 @@ cfg_not_test_util! {
         pub(crate) fn now(&self) -> Instant {
             now()
         }
-
-        pub(crate) fn is_paused(&self) -> bool {
-            false
-        }
-
-        pub(crate) fn advance(&self, _dur: Duration) {
-            unreachable!();
-        }
     }
 }
 
 cfg_test_util! {
     use crate::time::{Duration, Instant};
-    use std::sync::{Arc, Mutex};
+    use crate::loom::sync::{Arc, Mutex};
 
     cfg_rt! {
         fn clock() -> Option<Clock> {
@@ -85,6 +77,15 @@ cfg_test_util! {
     ///
     /// Panics if time is already frozen or if called from outside of a
     /// `current_thread` Tokio runtime.
+    ///
+    /// # Auto-advance
+    ///
+    /// If time is paused and the runtime has no work to do, the clock is
+    /// auto-advanced to the next pending timer. This means that [`Sleep`] or
+    /// other timer-backed primitives can cause the runtime to advance the
+    /// current time when awaited.
+    ///
+    /// [`Sleep`]: crate::time::Sleep
     pub fn pause() {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.pause();
@@ -101,7 +102,7 @@ cfg_test_util! {
     /// runtime.
     pub fn resume() {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
-        let mut inner = clock.inner.lock().unwrap();
+        let mut inner = clock.inner.lock();
 
         if inner.unfrozen.is_some() {
             panic!("time is not frozen");
@@ -119,23 +120,17 @@ cfg_test_util! {
     ///
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
+    ///
+    /// # Auto-advance
+    ///
+    /// If the time is paused and there is no work to do, the runtime advances
+    /// time to the next timer. See [`pause`](pause#auto-advance) for more
+    /// details.
     pub async fn advance(duration: Duration) {
-        use crate::future::poll_fn;
-        use std::task::Poll;
-
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.advance(duration);
 
-        let mut yielded = false;
-        poll_fn(|cx| {
-            if yielded {
-                Poll::Ready(())
-            } else {
-                yielded = true;
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        }).await;
+        crate::task::yield_now().await;
     }
 
     /// Return the current instant, factoring in frozen time.
@@ -169,7 +164,7 @@ cfg_test_util! {
         }
 
         pub(crate) fn pause(&self) {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
 
             if !inner.enable_pausing {
                 drop(inner); // avoid poisoning the lock
@@ -183,12 +178,12 @@ cfg_test_util! {
         }
 
         pub(crate) fn is_paused(&self) -> bool {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
             inner.unfrozen.is_none()
         }
 
         pub(crate) fn advance(&self, duration: Duration) {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
 
             if inner.unfrozen.is_some() {
                 panic!("time is not frozen");
@@ -198,7 +193,7 @@ cfg_test_util! {
         }
 
         pub(crate) fn now(&self) -> Instant {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
 
             let mut ret = inner.base;
 

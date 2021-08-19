@@ -140,7 +140,7 @@ struct Waiter {
     _p: PhantomPinned,
 }
 
-/// Future returned from `notified()`
+/// Future returned from [`Notify::notified()`]
 #[derive(Debug)]
 pub struct Notified<'a> {
     /// The `Notify` being received on.
@@ -192,6 +192,10 @@ fn inc_num_notify_waiters_calls(data: usize) -> usize {
     data + (1 << NOTIFY_WAITERS_SHIFT)
 }
 
+fn atomic_inc_num_notify_waiters_calls(data: &AtomicUsize) {
+    data.fetch_add(1 << NOTIFY_WAITERS_SHIFT, SeqCst);
+}
+
 impl Notify {
     /// Create a new `Notify`, initialized without a permit.
     ///
@@ -241,6 +245,12 @@ impl Notify {
     /// for a permit to be made available by the next call to `notify_one()`.
     ///
     /// [`notify_one()`]: Notify::notify_one
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute notifications in the order
+    /// they were requested. Cancelling a call to `notified` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///
@@ -394,11 +404,9 @@ impl Notify {
         let curr = self.state.load(SeqCst);
 
         if let EMPTY | NOTIFIED = get_state(curr) {
-            // There are no waiting tasks. In this case, no synchronization is
-            // established between `notify` and `notified().await`.
-            // All we need to do is increment the number of times this
-            // method was called.
-            self.state.store(inc_num_notify_waiters_calls(curr), SeqCst);
+            // There are no waiting tasks. All we need to do is increment the
+            // number of times this method was called.
+            atomic_inc_num_notify_waiters_calls(&self.state);
             return;
         }
 
@@ -520,7 +528,7 @@ impl Notified<'_> {
             is_unpin::<AtomicUsize>();
 
             let me = self.get_unchecked_mut();
-            (&me.notify, &mut me.state, &me.waiter)
+            (me.notify, &mut me.state, &me.waiter)
         }
     }
 }

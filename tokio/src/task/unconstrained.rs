@@ -5,6 +5,7 @@ use std::task::{Context, Poll};
 
 pin_project! {
     /// Future for the [`unconstrained`](unconstrained) method.
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
     #[must_use = "Unconstrained does nothing unless polled"]
     pub struct Unconstrained<F> {
         #[pin]
@@ -38,6 +39,7 @@ where
 /// otherwise.
 ///
 /// See also the usage example in the [task module](index.html#unconstrained).
+#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub fn unconstrained<F>(inner: F) -> Unconstrained<F> {
     Unconstrained { inner }
 }

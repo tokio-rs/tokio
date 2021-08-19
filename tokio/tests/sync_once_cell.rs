@@ -266,3 +266,9 @@ fn drop_into_inner_new_with() {
     let count = NUM_DROPS.load(Ordering::Acquire);
     assert!(count == 1);
 }
+
+#[test]
+fn from() {
+    let cell = OnceCell::from(2);
+    assert_eq!(*cell.get().unwrap(), 2);
+}

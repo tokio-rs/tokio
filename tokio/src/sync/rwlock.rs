@@ -216,13 +216,13 @@ impl<T: ?Sized> RwLock<T> {
     /// ```
     /// use tokio::sync::RwLock;
     ///
-    /// let lock = RwLock::new_with_max_reads(5, 1024);
+    /// let lock = RwLock::with_max_readers(5, 1024);
     /// ```
     ///
     /// # Panics
     ///
     /// Panics if `max_reads` is more than `u32::MAX >> 3`.
-    pub fn new_with_max_reads(value: T, max_reads: u32) -> RwLock<T>
+    pub fn with_max_readers(value: T, max_reads: u32) -> RwLock<T>
     where
         T: Sized,
     {
@@ -268,11 +268,11 @@ impl<T: ?Sized> RwLock<T> {
     /// ```
     /// use tokio::sync::RwLock;
     ///
-    /// static LOCK: RwLock<i32> = RwLock::const_new_with_max_reads(5, 1024);
+    /// static LOCK: RwLock<i32> = RwLock::const_with_max_readers(5, 1024);
     /// ```
     #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
     #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
-    pub const fn const_new_with_max_reads(value: T, mut max_reads: u32) -> RwLock<T>
+    pub const fn const_with_max_readers(value: T, mut max_reads: u32) -> RwLock<T>
     where
         T: Sized,
     {
@@ -298,6 +298,12 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// Returns an RAII guard which will drop this read access of the `RwLock`
     /// when dropped.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `read` makes you lose your place in
+    /// the queue.
     ///
     /// # Examples
     ///
@@ -356,6 +362,12 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// Returns an RAII guard which will drop this read access of the `RwLock`
     /// when dropped.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `read_owned` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///
@@ -501,6 +513,12 @@ impl<T: ?Sized> RwLock<T> {
     /// Returns an RAII guard which will drop the write access of this `RwLock`
     /// when dropped.
     ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `write` makes you lose your place
+    /// in the queue.
+    ///
     /// # Examples
     ///
     /// ```
@@ -542,6 +560,12 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// Returns an RAII guard which will drop the write access of this `RwLock`
     /// when dropped.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `write_owned` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///

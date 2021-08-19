@@ -42,11 +42,11 @@ impl Idle {
     /// worker currently sleeping.
     pub(super) fn worker_to_notify(&self) -> Option<usize> {
         // If at least one worker is spinning, work being notified will
-        // eventully be found. A searching thread will find **some** work and
+        // eventually be found. A searching thread will find **some** work and
         // notify another worker, eventually leading to our work being found.
         //
         // For this to happen, this load must happen before the thread
-        // transitioning `num_searching` to zero. Acquire / Relese does not
+        // transitioning `num_searching` to zero. Acquire / Release does not
         // provide sufficient guarantees, so this load is done with `SeqCst` and
         // will pair with the `fetch_sub(1)` when transitioning out of
         // searching.

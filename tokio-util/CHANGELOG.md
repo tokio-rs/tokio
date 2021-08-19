@@ -1,3 +1,28 @@
+# 0.6.7 (May 14, 2021)
+
+### Added
+
+- udp: make `UdpFramed` take `Borrow<UdpSocket>` ([#3451])
+- compat: implement `AsRawFd`/`AsRawHandle` for `Compat<T>` ([#3765])
+
+[#3451]: https://github.com/tokio-rs/tokio/pull/3451
+[#3765]: https://github.com/tokio-rs/tokio/pull/3765
+
+# 0.6.6 (April 12, 2021)
+
+### Added
+
+- util: makes `Framed` and `FramedStream` resumable after eof ([#3272])
+- util: add `PollSemaphore::{add_permits, available_permits}` ([#3683])
+
+### Fixed
+
+- chore: avoid allocation if `PollSemaphore` is unused ([#3634])
+
+[#3272]: https://github.com/tokio-rs/tokio/pull/3272
+[#3634]: https://github.com/tokio-rs/tokio/pull/3634
+[#3683]: https://github.com/tokio-rs/tokio/pull/3683
+
 # 0.6.5 (March 20, 2021)
 
 ### Fixed

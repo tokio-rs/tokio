@@ -364,11 +364,11 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::HashMap;
+    /// use tokio_stream::{StreamMap, pending};
     ///
-    /// let mut a = HashMap::new();
+    /// let mut a = StreamMap::new();
     /// assert!(a.is_empty());
-    /// a.insert(1, "a");
+    /// a.insert(1, pending::<i32>());
     /// assert!(!a.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
@@ -605,10 +605,10 @@ mod rand {
     /// Fast random number generate
     ///
     /// Implement xorshift64+: 2 32-bit xorshift sequences added together.
-    /// Shift triplet [17,7,16] was calculated as indicated in Marsaglia's
-    /// Xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf
+    /// Shift triplet `[17,7,16]` was calculated as indicated in Marsaglia's
+    /// Xorshift paper: <https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf>
     /// This generator passes the SmallCrush suite, part of TestU01 framework:
-    /// http://simul.iro.umontreal.ca/testu01/tu01.html
+    /// <http://simul.iro.umontreal.ca/testu01/tu01.html>
     #[derive(Debug)]
     pub(crate) struct FastRand {
         one: Cell<u32>,

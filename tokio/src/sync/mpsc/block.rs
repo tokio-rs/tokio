@@ -1,6 +1,5 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicPtr, AtomicUsize};
-use crate::loom::thread;
 
 use std::mem::MaybeUninit;
 use std::ops;
@@ -344,8 +343,13 @@ impl<T> Block<T> {
                 Err(curr) => curr,
             };
 
-            // When running outside of loom, this calls `spin_loop_hint`.
-            thread::yield_now();
+            #[cfg(all(test, loom))]
+            crate::loom::thread::yield_now();
+
+            // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
+            #[cfg(not(all(test, loom)))]
+            #[allow(deprecated)]
+            std::sync::atomic::spin_loop_hint();
         }
     }
 }

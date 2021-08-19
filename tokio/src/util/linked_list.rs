@@ -50,6 +50,7 @@ pub(crate) unsafe trait Link {
     type Target;
 
     /// Convert the handle to a raw pointer without consuming the handle
+    #[allow(clippy::wrong_self_convention)]
     fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target>;
 
     /// Convert the raw pointer to a handle
@@ -77,7 +78,7 @@ pub(crate) struct Pointers<T> {
 /// #[repr(C)].
 ///
 /// See this link for more information:
-/// https://github.com/rust-lang/rust/pull/82834
+/// <https://github.com/rust-lang/rust/pull/82834>
 #[repr(C)]
 struct PointersInner<T> {
     /// The previous node in the list. null if there is no previous node.
@@ -93,7 +94,7 @@ struct PointersInner<T> {
     next: Option<NonNull<T>>,
 
     /// This type is !Unpin due to the heuristic from:
-    /// https://github.com/rust-lang/rust/pull/82834
+    /// <https://github.com/rust-lang/rust/pull/82834>
     _pin: PhantomPinned,
 }
 
@@ -232,37 +233,6 @@ impl<L: Link> LinkedList<L, L::Target> {
 impl<L: Link> Default for LinkedList<L, L::Target> {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-// ===== impl Iter =====
-
-cfg_rt_multi_thread! {
-    pub(crate) struct Iter<'a, T: Link> {
-        curr: Option<NonNull<T::Target>>,
-        _p: core::marker::PhantomData<&'a T>,
-    }
-
-    impl<L: Link> LinkedList<L, L::Target> {
-        pub(crate) fn iter(&self) -> Iter<'_, L> {
-            Iter {
-                curr: self.head,
-                _p: core::marker::PhantomData,
-            }
-        }
-    }
-
-    impl<'a, T: Link> Iterator for Iter<'a, T> {
-        type Item = &'a T::Target;
-
-        fn next(&mut self) -> Option<&'a T::Target> {
-            let curr = self.curr?;
-            // safety: the pointer references data contained by the list
-            self.curr = unsafe { T::pointers(curr).as_ref() }.get_next();
-
-            // safety: the value is still owned by the linked list.
-            Some(unsafe { &*curr.as_ptr() })
-        }
     }
 }
 
@@ -642,24 +612,6 @@ mod tests {
 
             assert!(list.remove(ptr(&c)).is_none());
         }
-    }
-
-    #[test]
-    fn iter() {
-        let a = entry(5);
-        let b = entry(7);
-
-        let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
-
-        assert_eq!(0, list.iter().count());
-
-        list.push_front(a.as_ref());
-        list.push_front(b.as_ref());
-
-        let mut i = list.iter();
-        assert_eq!(7, i.next().unwrap().val);
-        assert_eq!(5, i.next().unwrap().val);
-        assert!(i.next().is_none());
     }
 
     proptest::proptest! {

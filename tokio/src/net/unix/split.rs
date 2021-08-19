@@ -29,7 +29,7 @@ pub struct ReadHalf<'a>(&'a UnixStream);
 
 /// Borrowed write half of a [`UnixStream`], created by [`split`].
 ///
-/// Note that in the [`AsyncWrite`] implemenation of this type, [`poll_shutdown`] will
+/// Note that in the [`AsyncWrite`] implementation of this type, [`poll_shutdown`] will
 /// shut down the UnixStream stream in the write direction.
 ///
 /// Writing to an `WriteHalf` is usually done using the convenience methods found

@@ -96,7 +96,7 @@ const ADDRESS: bit::Pack = bit::Pack::least_significant(24);
 //
 // The generation prevents a race condition where a slab slot is reused for a
 // new socket while the I/O driver is about to apply a readiness event. The
-// generaton value is checked when setting new readiness. If the generation do
+// generation value is checked when setting new readiness. If the generation do
 // not match, then the readiness event is discarded.
 const GENERATION: bit::Pack = ADDRESS.then(7);
 
@@ -273,7 +273,7 @@ cfg_not_rt! {
         /// This function panics if there is no current reactor set, or if the `rt`
         /// feature flag is not enabled.
         pub(super) fn current() -> Self {
-            panic!(crate::util::error::CONTEXT_MISSING_ERROR)
+            panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
         }
     }
 }

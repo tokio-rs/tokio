@@ -1,3 +1,19 @@
+# 1.3.0 (July 7, 2021)
+
+- macros: don't trigger `clippy::unwrap_used` ([#3926])
+
+[#3926]: https://github.com/tokio-rs/tokio/pull/3926
+
+# 1.2.0 (May 14, 2021)
+
+- macros: forward input arguments in `#[tokio::test]` ([#3691])
+- macros: improve diagnostics on type mismatch ([#3766])
+- macros: various error message improvements ([#3677])
+
+[#3677]: https://github.com/tokio-rs/tokio/pull/3677
+[#3691]: https://github.com/tokio-rs/tokio/pull/3691
+[#3766]: https://github.com/tokio-rs/tokio/pull/3766
+
 # 1.1.0 (February 5, 2021)
 
 - add `start_paused` option to macros ([#3492])

@@ -6,9 +6,9 @@ use tokio_util::sync::PollSemaphore;
 
 type SemRet = Option<OwnedSemaphorePermit>;
 
-fn semaphore_poll<'a>(
-    sem: &'a mut PollSemaphore,
-) -> tokio_test::task::Spawn<impl Future<Output = SemRet> + 'a> {
+fn semaphore_poll(
+    sem: &mut PollSemaphore,
+) -> tokio_test::task::Spawn<impl Future<Output = SemRet> + '_> {
     let fut = futures::future::poll_fn(move |cx| sem.poll_acquire(cx));
     tokio_test::task::spawn(fut)
 }

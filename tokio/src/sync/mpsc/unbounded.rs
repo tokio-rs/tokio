@@ -82,6 +82,13 @@ impl<T> UnboundedReceiver<T> {
     /// `None` is returned when all `Sender` halves have dropped, indicating
     /// that no further values can be sent on the channel.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
+    ///
     /// # Examples
     ///
     /// ```
@@ -241,6 +248,11 @@ impl<T> UnboundedSender<T> {
     /// This allows the producers to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once the channel is closed, it stays closed
+    /// forever and all future calls to `closed` will return immediately.
+    ///
     /// # Examples
     ///
     /// ```
@@ -270,6 +282,7 @@ impl<T> UnboundedSender<T> {
     pub async fn closed(&self) {
         self.chan.closed().await
     }
+
     /// Checks if the channel has been closed. This happens when the
     /// [`UnboundedReceiver`] is dropped, or when the
     /// [`UnboundedReceiver::close`] method is called.

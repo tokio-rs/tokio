@@ -428,6 +428,11 @@
 //!   bounding of any kind.
 
 cfg_sync! {
+    /// Named future types.
+    pub mod futures {
+        pub use super::notify::Notified;
+    }
+
     mod barrier;
     pub use barrier::{Barrier, BarrierWaitResult};
 
@@ -436,7 +441,7 @@ cfg_sync! {
     pub mod mpsc;
 
     mod mutex;
-    pub use mutex::{Mutex, MutexGuard, TryLockError, OwnedMutexGuard};
+    pub use mutex::{Mutex, MutexGuard, TryLockError, OwnedMutexGuard, MappedMutexGuard};
 
     pub(crate) mod notify;
     pub use notify::Notify;

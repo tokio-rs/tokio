@@ -45,7 +45,7 @@ impl<'a> ReadBuf<'a> {
 
     /// Creates a new `ReadBuf` from a fully uninitialized buffer.
     ///
-    /// Use `assume_init` if part of the buffer is known to be already inintialized.
+    /// Use `assume_init` if part of the buffer is known to be already initialized.
     #[inline]
     pub fn uninit(buf: &'a mut [MaybeUninit<u8>]) -> ReadBuf<'a> {
         ReadBuf {
@@ -85,7 +85,7 @@ impl<'a> ReadBuf<'a> {
     #[inline]
     pub fn take(&mut self, n: usize) -> ReadBuf<'_> {
         let max = std::cmp::min(self.remaining(), n);
-        // Saftey: We don't set any of the `unfilled_mut` with `MaybeUninit::uninit`.
+        // Safety: We don't set any of the `unfilled_mut` with `MaybeUninit::uninit`.
         unsafe { ReadBuf::uninit(&mut self.unfilled_mut()[..max]) }
     }
 
@@ -217,7 +217,7 @@ impl<'a> ReadBuf<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if the filled region of the buffer would become larger than the intialized region.
+    /// Panics if the filled region of the buffer would become larger than the initialized region.
     #[inline]
     pub fn set_filled(&mut self, n: usize) {
         assert!(

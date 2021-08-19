@@ -222,7 +222,7 @@ impl<T> LinkedList<T> {
         }
     }
 
-    /// Returns whether the linked list doesn not contain any node
+    /// Returns whether the linked list does not contain any node
     pub fn is_empty(&self) -> bool {
         if self.head.is_some() {
             return false;
