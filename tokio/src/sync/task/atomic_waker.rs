@@ -247,9 +247,11 @@ impl AtomicWaker {
 
                             // We don't want to give the caller the panic if it
                             // was someone else who put in that waker.
-                            let _ = catch_unwind(move || {
-                                drop(old_waker);
-                            });
+                            if let Some(old_waker) = old_waker {
+                                let _ = catch_unwind(move || {
+                                    old_waker.wake();
+                                });
+                            }
 
                             // The atomic swap was complete, now wake the waker
                             // and return.
@@ -319,7 +321,7 @@ impl AtomicWaker {
                 let waker = unsafe { self.waker.with_mut(|t| (*t).take()) };
 
                 // Release the lock
-                self.state.store(WAITING, Release);
+                self.state.fetch_and(!WAKING, Release);
 
                 waker
             }
