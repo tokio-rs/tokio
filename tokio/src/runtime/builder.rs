@@ -263,7 +263,6 @@ impl Builder {
         self
     }
 
-
     /// Specifies the limit for additional threads spawned by the Runtime.
     ///
     /// These threads are used for blocking operations like tasks spawned
@@ -624,6 +623,7 @@ impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Builder")
             .field("worker_threads", &self.worker_threads)
+            .field("lifo_slot_optimization", &self.lifo_slot_optimization)
             .field("max_blocking_threads", &self.max_blocking_threads)
             .field(
                 "thread_name",
