@@ -3,7 +3,7 @@
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::runtime::{self, Runtime, Builder};
+use tokio::runtime::{self, Builder, Runtime};
 use tokio::sync::oneshot;
 use tokio_test::{assert_err, assert_ok};
 
@@ -60,11 +60,13 @@ fn no_lifo_slot_complex() {
     // used for notifying the main thread
     const NUM: usize = 1_000;
 
-
     for _ in 0..5 {
         let (tx, rx) = mpsc::channel();
 
-        let rt = Builder::new_multi_thread().lifo_slot_optimization(false).build().unwrap();
+        let rt = Builder::new_multi_thread()
+            .lifo_slot_optimization(false)
+            .build()
+            .unwrap();
         let cnt = Arc::new(AtomicUsize::new(0));
 
         for _ in 0..NUM {
