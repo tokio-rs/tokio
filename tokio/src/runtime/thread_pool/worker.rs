@@ -94,7 +94,9 @@ struct Core {
     /// queue. This effectively results in the **last** scheduled task to be run
     /// next (LIFO). This is an optimization for message passing patterns and
     /// helps to reduce latency.
-    lifo_slot: Option<Notified>,
+    ///
+    /// The first layer of `Option` is whether or not the slot is configured for use or not
+    lifo_slot: Option<Option<Notified>>,
 
     /// The worker-local run queue.
     run_queue: queue::Local<Arc<Shared>>,
@@ -174,7 +176,11 @@ type Notified = task::Notified<Arc<Shared>>;
 // Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
 
-pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
+pub(super) fn create(
+    size: usize,
+    lifo_slot_optimization: bool,
+    park: Parker,
+) -> (Arc<Shared>, Launch) {
     let mut cores = vec![];
     let mut remotes = vec![];
 
@@ -187,7 +193,11 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
 
         cores.push(Box::new(Core {
             tick: 0,
-            lifo_slot: None,
+            lifo_slot: if lifo_slot_optimization {
+                Some(None)
+            } else {
+                None
+            },
             run_queue,
             is_searching: false,
             is_shutdown: false,
@@ -408,8 +418,11 @@ impl Context {
                 };
 
                 // Check for a task in the LIFO slot
-                let task = match core.lifo_slot.take() {
-                    Some(task) => task,
+                let task = match &mut core.lifo_slot {
+                    Some(lifo_slot) => match lifo_slot.take() {
+                        Some(task) => task,
+                        None => return Ok(core),
+                    },
                     None => return Ok(core),
                 };
 
@@ -503,7 +516,10 @@ impl Core {
     }
 
     fn next_local_task(&mut self) -> Option<Notified> {
-        self.lifo_slot.take().or_else(|| self.run_queue.pop())
+        self.lifo_slot
+            .as_mut()
+            .and_then(|lifo_slot| lifo_slot.take())
+            .or_else(|| self.run_queue.pop())
     }
 
     fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
@@ -573,7 +589,7 @@ impl Core {
     fn transition_from_parked(&mut self, worker: &Worker) -> bool {
         // If a task is in the lifo slot, then we must unpark regardless of
         // being notified
-        if self.lifo_slot.is_some() {
+        if matches!(self.lifo_slot, Some(Some(_))) {
             worker.shared.idle.unpark_worker_by_id(worker.index);
             self.is_searching = true;
             return true;
@@ -675,19 +691,21 @@ impl Shared {
         // task must always be pushed to the back of the queue, enabling other
         // tasks to be executed. If **not** a yield, then there is more
         // flexibility and the task may go to the front of the queue.
-        let should_notify = if is_yield {
+        let should_notify = if is_yield || core.lifo_slot.is_none() {
             core.run_queue.push_back(task, &self.inject);
             true
         } else {
             // Push to the LIFO slot
-            let prev = core.lifo_slot.take();
+
+            // We checked `is_none` above
+            let prev = core.lifo_slot.as_mut().unwrap().take();
             let ret = prev.is_some();
 
             if let Some(prev) = prev {
                 core.run_queue.push_back(prev, &self.inject);
             }
 
-            core.lifo_slot = Some(task);
+            core.lifo_slot = Some(Some(task));
 
             ret
         };

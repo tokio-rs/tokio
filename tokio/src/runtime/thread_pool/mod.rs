@@ -43,8 +43,12 @@ pub(crate) struct Spawner {
 // ===== impl ThreadPool =====
 
 impl ThreadPool {
-    pub(crate) fn new(size: usize, parker: Parker) -> (ThreadPool, Launch) {
-        let (shared, launch) = worker::create(size, parker);
+    pub(crate) fn new(
+        size: usize,
+        lifo_slot_optimization: bool,
+        parker: Parker,
+    ) -> (ThreadPool, Launch) {
+        let (shared, launch) = worker::create(size, lifo_slot_optimization, parker);
         let spawner = Spawner { shared };
         let thread_pool = ThreadPool { spawner };
 

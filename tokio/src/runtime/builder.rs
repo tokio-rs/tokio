@@ -55,6 +55,9 @@ pub struct Builder {
     /// Only used when not using the current-thread executor.
     worker_threads: Option<usize>,
 
+    /// Whether or not to enable to the lifo_slot optimization
+    lifo_slot_optimization: bool,
+
     /// Cap on thread usage.
     max_blocking_threads: usize,
 
@@ -125,6 +128,9 @@ impl Builder {
             worker_threads: None,
 
             max_blocking_threads: 512,
+
+            // Default to using the optimization
+            lifo_slot_optimization: true,
 
             // Default thread name
             thread_name: std::sync::Arc::new(|| "tokio-runtime-worker".into()),
@@ -219,6 +225,44 @@ impl Builder {
         self.worker_threads = Some(val);
         self
     }
+
+    /// Configures whether or not the `Runtime` will use an optimization that
+    /// causes recently spawned tasks to be scheduled first. This defaults to `true`,
+    /// as this optimization improves latencies in many patterns, but may be undesired
+    /// behavior
+    ///
+    /// # Default
+    ///
+    /// The default value is `true`
+    ///
+    /// # Panic
+    ///
+    /// When using the `current_thread` runtime this method will panic, since
+    /// those variants do not allow setting worker thread counts.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ## Multi threaded runtime with 4 threads
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// // This will spawn a work-stealing runtime with the optimization turned off
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .lifo_slot_optimization(true)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// rt.spawn(async move {});
+    /// ```
+    pub fn lifo_slot_optimization(&mut self, yes: bool) -> &mut Self {
+        // Doesn't actually panic as described in the docs, to match the current
+        // behavior of `worker_threads`
+        self.lifo_slot_optimization = yes;
+        self
+    }
+
 
     /// Specifies the limit for additional threads spawned by the Runtime.
     ///
@@ -546,7 +590,7 @@ cfg_rt_multi_thread! {
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
-            let (scheduler, launch) = ThreadPool::new(core_threads, Parker::new(driver));
+            let (scheduler, launch) = ThreadPool::new(core_threads, self.lifo_slot_optimization, Parker::new(driver));
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
