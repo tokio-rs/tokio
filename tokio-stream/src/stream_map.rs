@@ -568,6 +568,43 @@ where
     }
 }
 
+impl<K, V> std::iter::FromIterator<(K, V)> for StreamMap<K, V>
+where
+    K: Hash + Eq,
+{
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        let iterator = iter.into_iter();
+        let (lower_bound, _) = iterator.size_hint();
+        let mut stream_map = Self::with_capacity(lower_bound);
+
+        for (key, value) in iterator {
+            stream_map.insert(key, value);
+        }
+
+        stream_map
+    }
+}
+
+impl<K, V> IntoIterator for StreamMap<K, V> {
+    type Item = (K, V);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.entries.into_iter()
+    }
+}
+
+impl<K, V> Extend<(K, V)> for StreamMap<K, V>
+where
+    K: Hash + Eq,
+{
+    fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
+        for (key, value) in iter {
+            self.insert(key, value);
+        }
+    }
+}
+
 mod rand {
     use std::cell::Cell;
 
