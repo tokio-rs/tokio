@@ -585,26 +585,6 @@ where
     }
 }
 
-impl<K, V> IntoIterator for StreamMap<K, V> {
-    type Item = (K, V);
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.entries.into_iter()
-    }
-}
-
-impl<K, V> Extend<(K, V)> for StreamMap<K, V>
-where
-    K: Hash + Eq,
-{
-    fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
-        for (key, value) in iter {
-            self.insert(key, value);
-        }
-    }
-}
-
 mod rand {
     use std::cell::Cell;
 
