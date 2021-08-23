@@ -3,7 +3,7 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::bit;
 use crate::util::slab::Entry;
-use core::mem::MaybeUninit;
+use core::mem::{self, MaybeUninit};
 
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::{Context, Poll, Waker};
@@ -215,7 +215,7 @@ impl ScheduledIo {
     fn wake0(&self, ready: Ready, shutdown: bool) {
         const NUM_WAKERS: usize = 32;
 
-        let mut wakers: [MaybeUninit<Option<Waker>>; NUM_WAKERS] = unsafe {
+        let mut wakers: [MaybeUninit<Waker>; NUM_WAKERS] = unsafe {
           core::mem::MaybeUninit::uninit().assume_init()
         };
 
@@ -228,7 +228,7 @@ impl ScheduledIo {
         // check for AsyncRead slot
         if ready.is_readable() {
             if let Some(waker) = waiters.reader.take() {
-                wakers[curr] = MaybeUninit::new(Some(waker));
+                wakers[curr] = MaybeUninit::new(waker);
                 curr += 1;
             }
         }
@@ -236,7 +236,7 @@ impl ScheduledIo {
         // check for AsyncWrite slot
         if ready.is_writable() {
             if let Some(waker) = waiters.writer.take() {
-                wakers[curr] = MaybeUninit::new(Some(waker));
+                wakers[curr] = MaybeUninit::new(waker);
                 curr += 1;
             }
         }
@@ -252,7 +252,7 @@ impl ScheduledIo {
 
                         if let Some(waker) = waiter.waker.take() {
                             waiter.is_ready = true;
-                            wakers[curr] = MaybeUninit::new(Some(waker));
+                            wakers[curr] = MaybeUninit::new(waker);
                             curr += 1;
                         }
                     }
@@ -265,7 +265,10 @@ impl ScheduledIo {
             drop(waiters);
 
             for waker in &mut wakers[..curr] {
-              unsafe { &mut *waker.as_mut_ptr() }.take().unwrap().wake();
+                unsafe {
+                    mem::replace(waker, MaybeUninit::uninit())
+                        .assume_init()
+                }.wake()
             }
 
             curr = 0;
@@ -278,7 +281,11 @@ impl ScheduledIo {
         drop(waiters);
 
         for waker in &mut wakers[..curr] {
-            unsafe { &mut *waker.as_mut_ptr() }.take().unwrap().wake();
+            unsafe {
+                mem::replace(waker, MaybeUninit::uninit())
+                    .assume_init()
+            }.wake()
+
         }
     }
 
