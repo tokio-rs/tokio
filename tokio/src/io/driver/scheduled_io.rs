@@ -215,9 +215,8 @@ impl ScheduledIo {
     fn wake0(&self, ready: Ready, shutdown: bool) {
         const NUM_WAKERS: usize = 32;
 
-        let mut wakers: [MaybeUninit<Waker>; NUM_WAKERS] = unsafe {
-          core::mem::MaybeUninit::uninit().assume_init()
-        };
+        let mut wakers: [MaybeUninit<Waker>; NUM_WAKERS] =
+            unsafe { core::mem::MaybeUninit::uninit().assume_init() };
 
         let mut curr = 0;
 
@@ -265,10 +264,7 @@ impl ScheduledIo {
             drop(waiters);
 
             for waker in &mut wakers[..curr] {
-                unsafe {
-                    mem::replace(waker, MaybeUninit::uninit())
-                        .assume_init()
-                }.wake()
+                unsafe { mem::replace(waker, MaybeUninit::uninit()).assume_init() }.wake()
             }
 
             curr = 0;
@@ -281,11 +277,7 @@ impl ScheduledIo {
         drop(waiters);
 
         for waker in &mut wakers[..curr] {
-            unsafe {
-                mem::replace(waker, MaybeUninit::uninit())
-                    .assume_init()
-            }.wake()
-
+            unsafe { mem::replace(waker, MaybeUninit::uninit()).assume_init() }.wake()
         }
     }
 
