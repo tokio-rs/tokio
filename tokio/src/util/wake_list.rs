@@ -16,8 +16,9 @@ impl WakeList {
         }
     }
 
+    #[inline]
     pub(crate) fn can_push(&self) -> bool {
-        self.curr < NUM_WAKERS - 1
+        self.curr <= NUM_WAKERS - 1
     }
 
     pub(crate) fn push(&mut self, val: Waker) {
