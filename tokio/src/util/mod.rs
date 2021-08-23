@@ -27,6 +27,9 @@ cfg_rt! {
 
     mod vec_deque_cell;
     pub(crate) use vec_deque_cell::VecDequeCell;
+
+    mod wake_list;
+    pub(crate) use wake_list::WakeList;
 }
 
 cfg_rt_multi_thread! {

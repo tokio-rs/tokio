@@ -3,7 +3,7 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::bit;
 use crate::util::slab::Entry;
-use core::mem::{self, MaybeUninit};
+use crate::util::WakeList;
 
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::{Context, Poll, Waker};
@@ -213,12 +213,7 @@ impl ScheduledIo {
     }
 
     fn wake0(&self, ready: Ready, shutdown: bool) {
-        const NUM_WAKERS: usize = 32;
-
-        let mut wakers: [MaybeUninit<Waker>; NUM_WAKERS] =
-            unsafe { core::mem::MaybeUninit::uninit().assume_init() };
-
-        let mut curr = 0;
+        let mut wakers = WakeList::new();
 
         let mut waiters = self.waiters.lock();
 
@@ -227,16 +222,14 @@ impl ScheduledIo {
         // check for AsyncRead slot
         if ready.is_readable() {
             if let Some(waker) = waiters.reader.take() {
-                wakers[curr] = MaybeUninit::new(waker);
-                curr += 1;
+                wakers.push(waker);
             }
         }
 
         // check for AsyncWrite slot
         if ready.is_writable() {
             if let Some(waker) = waiters.writer.take() {
-                wakers[curr] = MaybeUninit::new(waker);
-                curr += 1;
+                wakers.push(waker);
             }
         }
 
@@ -244,15 +237,14 @@ impl ScheduledIo {
         'outer: loop {
             let mut iter = waiters.list.drain_filter(|w| ready.satisfies(w.interest));
 
-            while curr < NUM_WAKERS {
+            while wakers.can_push() {
                 match iter.next() {
                     Some(waiter) => {
                         let waiter = unsafe { &mut *waiter.as_ptr() };
 
                         if let Some(waker) = waiter.waker.take() {
                             waiter.is_ready = true;
-                            wakers[curr] = MaybeUninit::new(waker);
-                            curr += 1;
+                            wakers.push(waker);
                         }
                     }
                     None => {
@@ -263,11 +255,7 @@ impl ScheduledIo {
 
             drop(waiters);
 
-            for waker in &mut wakers[..curr] {
-                unsafe { mem::replace(waker, MaybeUninit::uninit()).assume_init() }.wake()
-            }
-
-            curr = 0;
+            wakers.wake_all();
 
             // Acquire the lock again.
             waiters = self.waiters.lock();
@@ -276,9 +264,7 @@ impl ScheduledIo {
         // Release the lock before notifying
         drop(waiters);
 
-        for waker in &mut wakers[..curr] {
-            unsafe { mem::replace(waker, MaybeUninit::uninit()).assume_init() }.wake()
-        }
+        wakers.wake_all();
     }
 
     pub(super) fn ready_event(&self, interest: Interest) -> ReadyEvent {
