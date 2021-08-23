@@ -30,8 +30,8 @@ impl<T: AioSource> Source for MioSource<T> {
         &mut self,
         registry: &Registry,
         token: Token,
-        interests: mio::Interest) -> io::Result<()>
-    {
+        interests: mio::Interest,
+    ) -> io::Result<()> {
         assert!(interests.is_aio() || interests.is_lio());
         self.0.register(registry.as_raw_fd(), usize::from(token));
         Ok(())

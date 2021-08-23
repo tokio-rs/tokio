@@ -99,8 +99,13 @@ mod lio {
         let mut rbuf = Vec::new();
 
         let mut builder = mio_aio::LioCbBuilder::with_capacity(1);
-        builder = builder.emplace_slice(f.as_raw_fd(), 0, &wbuf[..], 0,
-                            mio_aio::LioOpcode::LIO_WRITE);
+        builder = builder.emplace_slice(
+            f.as_raw_fd(),
+            0,
+            &wbuf[..],
+            0,
+            mio_aio::LioOpcode::LIO_WRITE,
+        );
         let liocb = builder.finish();
         let source = WrappedLioCb(liocb);
         let rt = rt();
