@@ -40,7 +40,8 @@ impl WakeList {
 
 impl Drop for WakeList {
     fn drop(&mut self) {
-        let slice = std::ptr::slice_from_raw_parts_mut(self.inner.as_mut_ptr() as *mut Waker, self.curr);
+        let slice =
+            std::ptr::slice_from_raw_parts_mut(self.inner.as_mut_ptr() as *mut Waker, self.curr);
         unsafe { std::ptr::drop_in_place(slice) };
     }
 }
