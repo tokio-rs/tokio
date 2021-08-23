@@ -28,10 +28,12 @@ impl WakeList {
     }
 
     pub(crate) fn wake_all(&mut self) {
-        for waker in &mut self.inner[..self.curr] {
-            unsafe { mem::replace(waker, MaybeUninit::uninit()).assume_init() }.wake()
+        assert!(self.curr <= NUM_WAKERS);
+        while self.curr > 0 {
+            self.curr -= 1;
+            let waker = unsafe { std::ptr::read(self.inner[self.curr].as_mut_ptr()) };
+            waker.wake();
         }
-        self.curr = 0;
     }
 }
 
