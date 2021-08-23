@@ -1,13 +1,62 @@
 use crate::io::driver::{Handle, Interest, ReadyEvent, Registration};
 use mio::event::Source;
+use mio::Registry;
+use mio::Token;
 use std::fmt;
 use std::io;
 use std::ops::{Deref, DerefMut};
+use std::os::unix::io::AsRawFd;
+use std::os::unix::prelude::RawFd;
 use std::task::{Context, Poll};
+
+/// Like [`mio::event::Source`], but for POSIX AIO only.
+///
+/// Tokio's consumer must pass an implementor of this trait to create a
+/// [`PollAio`] object.
+pub trait AioSource {
+    /// Register this AIO event source with Tokio's reactor
+    fn register(&mut self, kq: RawFd, token: usize);
+
+    /// Deregister this AIO event source with Tokio's reactor
+    fn deregister(&mut self);
+}
+
+/// Wrap the user's AioSource in order to implement mio::event::Source, which
+/// is what the rest of the crate wants.
+struct MioSource<T>(T);
+
+impl<T: AioSource> Source for MioSource<T> {
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: mio::Interest) -> io::Result<()>
+    {
+        assert!(interests.is_aio() || interests.is_lio());
+        self.0.register(registry.as_raw_fd(), usize::from(token));
+        Ok(())
+    }
+
+    fn deregister(&mut self, _registry: &Registry) -> io::Result<()> {
+        self.0.deregister();
+        Ok(())
+    }
+
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: mio::Interest,
+    ) -> io::Result<()> {
+        assert!(interests.is_aio() || interests.is_lio());
+        self.0.register(registry.as_raw_fd(), usize::from(token));
+        Ok(())
+    }
+}
 
 /// Associates a POSIX AIO control block with the reactor that drives it.
 ///
-/// `PollAio`'s wrapped type must implement [`mio::event::Source`] to be driven
+/// `PollAio`'s wrapped type must implement [`AioSource`] to be driven
 /// by the reactor.
 ///
 /// The wrapped source may be accessed through the `PollAio` via the `Deref` and
@@ -34,14 +83,14 @@ use std::task::{Context, Poll};
 //
 // Note that PollAio doesn't implement Drop.  There's no need.  Unlike other
 // kqueue sources, there is nothing to deregister.
-pub struct PollAio<E: Source> {
-    io: E,
+pub struct PollAio<E: AioSource> {
+    io: MioSource<E>,
     registration: Registration,
 }
 
 // ===== impl PollAio =====
 
-impl<E: Source> PollAio<E> {
+impl<E: AioSource> PollAio<E> {
     /// Indicates to Tokio that the source is no longer ready.  The internal
     /// readiness flag will be cleared, and tokio will wait for the next
     /// edge-triggered readiness notification from the OS.
@@ -56,7 +105,7 @@ impl<E: Source> PollAio<E> {
 
     /// Destroy the [`PollAio`] and return its inner Source
     pub fn into_inner(self) -> E {
-        self.io
+        self.io.0
     }
 
     /// Creates a new `PollAio` suitable for use with POSIX AIO functions.
@@ -81,7 +130,8 @@ impl<E: Source> PollAio<E> {
         Self::new_with_interest(io, Interest::LIO)
     }
 
-    fn new_with_interest(mut io: E, interest: Interest) -> io::Result<Self> {
+    fn new_with_interest(io: E, interest: Interest) -> io::Result<Self> {
+        let mut io = MioSource(io);
         let handle = Handle::current();
         let registration = Registration::new_with_interest_and_handle(&mut io, interest, handle)?;
         Ok(Self { io, registration })
@@ -94,23 +144,23 @@ impl<E: Source> PollAio<E> {
     }
 }
 
-impl<E: Source> Deref for PollAio<E> {
+impl<E: AioSource> Deref for PollAio<E> {
     type Target = E;
 
     fn deref(&self) -> &E {
-        &self.io
+        &self.io.0
     }
 }
 
-impl<E: Source> DerefMut for PollAio<E> {
+impl<E: AioSource> DerefMut for PollAio<E> {
     fn deref_mut(&mut self) -> &mut E {
-        &mut self.io
+        &mut self.io.0
     }
 }
 
-impl<E: Source + fmt::Debug> fmt::Debug for PollAio<E> {
+impl<E: AioSource + fmt::Debug> fmt::Debug for PollAio<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PollAio").field("io", &self.io).finish()
+        f.debug_struct("PollAio").field("io", &self.io.0).finish()
     }
 }
 

@@ -213,7 +213,7 @@ cfg_io_driver_impl! {
 
     cfg_aio! {
         mod poll_aio;
-        pub use poll_aio::{PollAio, PollAioEvent};
+        pub use poll_aio::{AioSource, PollAio, PollAioEvent};
     }
 
     mod poll_evented;
