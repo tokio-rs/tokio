@@ -30,13 +30,12 @@ impl WakeList {
     }
 
     pub(crate) fn wake_all(&mut self) {
-        debug_assert!(self.curr <= NUM_WAKERS);
-
-        for waker in self.inner[..self.curr].iter_mut().rev() {
-            let waker = unsafe { std::ptr::read(waker.as_mut_ptr()) };
+        assert!(self.curr <= NUM_WAKERS);
+        while self.curr > 0 {
+            self.curr -= 1;
+            let waker = unsafe { ptr::read(self.inner[self.curr].as_mut_ptr()) };
             waker.wake();
         }
-        self.curr = 0;
     }
 }
 
