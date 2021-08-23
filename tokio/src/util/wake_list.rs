@@ -20,13 +20,11 @@ impl WakeList {
         self.curr < NUM_WAKERS - 1
     }
 
-    pub(crate) fn push(&mut self, val: Waker) -> bool {
-        if self.curr == NUM_WAKERS - 1 {
-            return false;
-        }
+    pub(crate) fn push(&mut self, val: Waker) {
+        debug_assert!(self.can_push());
+
         self.inner[self.curr] = MaybeUninit::new(val);
         self.curr += 1;
-        true
     }
 
     pub(crate) fn wake_all(&mut self) {
