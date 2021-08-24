@@ -15,7 +15,7 @@ use std::{
 
 use nix::unistd::{close, read, write};
 
-use futures::{poll, FutureExt};
+use futures::poll;
 
 use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
 use tokio_test::{assert_err, assert_pending};
@@ -163,10 +163,11 @@ async fn initially_writable() {
     afd_a.writable().await.unwrap().clear_ready();
     afd_b.writable().await.unwrap().clear_ready();
 
-    futures::select_biased! {
-        _ = tokio::time::sleep(Duration::from_millis(10)).fuse() => {},
-        _ = afd_a.readable().fuse() => panic!("Unexpected readable state"),
-        _ = afd_b.readable().fuse() => panic!("Unexpected readable state"),
+    tokio::select! {
+        biased;
+        _ = tokio::time::sleep(Duration::from_millis(10)) => {},
+        _ = afd_a.readable() => panic!("Unexpected readable state"),
+        _ = afd_b.readable() => panic!("Unexpected readable state"),
     }
 }
 
@@ -353,12 +354,13 @@ async fn multiple_waiters() {
                 futures::future::pending::<()>().await;
             };
 
-            futures::select_biased! {
-                guard = afd_a.readable().fuse() => {
+            tokio::select! {
+                biased;
+                guard = afd_a.readable() => {
                     tokio::task::yield_now().await;
                     guard.unwrap().clear_ready()
                 },
-                _ = notify_barrier.fuse() => unreachable!(),
+                _ = notify_barrier => unreachable!(),
             }
 
             std::mem::drop(afd_a);
