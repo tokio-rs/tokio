@@ -369,10 +369,16 @@ impl<S: Schedule> UnownedTask<S> {
         let raw = self.raw;
         mem::forget(self);
 
-        // Poll the task
+        // Transfer one ref-count to a Task object.
+        let task = Task::<S> {
+            raw,
+            _p: PhantomData,
+        };
+
+        // Use the other ref-count to poll the task.
         raw.poll();
         // Decrement our extra ref-count
-        raw.header().state.ref_dec();
+        drop(task);
     }
 
     pub(crate) fn shutdown(self) {

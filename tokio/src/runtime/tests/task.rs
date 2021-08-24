@@ -112,6 +112,12 @@ fn create_shutdown2() {
 }
 
 #[test]
+fn unowned_poll() {
+    let (task, _) = unowned(async {}, NoopSchedule);
+    task.run();
+}
+
+#[test]
 fn schedule() {
     with(|rt| {
         rt.spawn(async {
