@@ -96,7 +96,7 @@ jobs:
 
       # Run with valgrind
       - name: Run valgrind test-mem
-        run: valgrind  --leak-check=full --show-leak-kinds=all ./target/debug/test-mem
+        run: valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all ./target/debug/test-mem
 
       # Compile tests
       - name: cargo build test-process-signal
@@ -105,7 +105,7 @@ jobs:
 
       # Run with valgrind
       - name: Run valgrind test-process-signal
-        run: valgrind --leak-check=full --show-leak-kinds=all ./target/debug/test-process-signal
+        run: valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all ./target/debug/test-process-signal
 
   test-unstable:
     name: test tokio full --unstable
