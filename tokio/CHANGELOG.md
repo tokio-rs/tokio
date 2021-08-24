@@ -1,3 +1,11 @@
+# 1.10.1 (August 24, 2021)
+
+### Fixed
+
+ - runtime: fix leak in UnownedTask ([#4063])
+
+[#4063]: https://github.com/tokio-rs/tokio/pull/4063
+
 # 1.10.0 (August 12, 2021)
 
 ### Added
