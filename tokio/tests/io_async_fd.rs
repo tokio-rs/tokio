@@ -15,7 +15,7 @@ use std::{
 
 use nix::unistd::{close, read, write};
 
-use futures::{poll, FutureExt};
+use futures::poll;
 
 use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
 use tokio_test::{assert_err, assert_pending};
