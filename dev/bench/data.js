@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1629804202203,
+  "lastUpdate": 1629809950755,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -67341,6 +67341,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 922,
             "range": "± 364",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7e474640dd803fd057e26b1aea302382711120af",
+          "message": "chore: fix chores (#4060)",
+          "timestamp": "2021-08-24T14:57:23+02:00",
+          "tree_id": "696e12483e4359ac2dbc8ff28c3db8d90c547412",
+          "url": "https://github.com/tokio-rs/tokio/commit/7e474640dd803fd057e26b1aea302382711120af"
+        },
+        "date": 1629809944853,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13015,
+            "range": "± 2967",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 721,
+            "range": "± 17",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 534,
+            "range": "± 9",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12591,
+            "range": "± 3815",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 816,
+            "range": "± 5",
             "unit": "ns/iter"
           }
         ]
