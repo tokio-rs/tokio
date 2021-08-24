@@ -202,6 +202,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        crate::is_unpin::<BufStream<()>>();
+        super::is_unpin::<BufStream<()>>();
     }
 }

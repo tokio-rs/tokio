@@ -82,6 +82,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        crate::is_unpin::<Sink>();
+        super::is_unpin::<Sink>();
     }
 }

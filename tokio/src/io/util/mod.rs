@@ -1,6 +1,9 @@
 #![allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 
 cfg_io_util! {
+    #[cfg(test)]
+    fn is_unpin<T: Unpin>() {}
+
     mod async_buf_read_ext;
     pub use async_buf_read_ext::AsyncBufReadExt;
 

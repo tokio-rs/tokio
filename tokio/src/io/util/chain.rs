@@ -139,6 +139,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        crate::is_unpin::<Chain<(), ()>>();
+        super::is_unpin::<Chain<(), ()>>();
     }
 }

@@ -79,6 +79,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        crate::is_unpin::<Empty>();
+        super::is_unpin::<Empty>();
     }
 }
