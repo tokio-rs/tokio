@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1629804182695,
+  "lastUpdate": 1629804185634,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -43909,6 +43909,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19259176,
             "range": "± 2237095",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50183564+nylonicious@users.noreply.github.com",
+            "name": "Nylonicious",
+            "username": "nylonicious"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "84f6845bf2238bd05eda9afd556f4a6fed42b60d",
+          "message": "stream: impl FromIterator for StreamMap (#4052)",
+          "timestamp": "2021-08-24T13:21:02+02:00",
+          "tree_id": "49c41accb497c48ab6a79b81436ccfe2ed4274f3",
+          "url": "https://github.com/tokio-rs/tokio/commit/84f6845bf2238bd05eda9afd556f4a6fed42b60d"
+        },
+        "date": 1629804175836,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 225250,
+            "range": "± 42396",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 992570,
+            "range": "± 274760",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6161798,
+            "range": "± 2942367",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19187486,
+            "range": "± 3750481",
             "unit": "ns/iter"
           }
         ]
