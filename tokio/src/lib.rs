@@ -505,3 +505,8 @@ cfg_macros! {
         pub use tokio_macros::test_fail as test;
     }
 }
+
+// TODO: rm
+#[cfg(feature = "io-util")]
+#[cfg(test)]
+fn is_unpin<T: Unpin>() {}

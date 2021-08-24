@@ -140,6 +140,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        super::is_unpin::<Lines<()>>();
+        crate::is_unpin::<Lines<()>>();
     }
 }

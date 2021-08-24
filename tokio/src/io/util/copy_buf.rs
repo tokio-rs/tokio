@@ -97,6 +97,6 @@ mod tests {
     #[test]
     fn assert_unpin() {
         use std::marker::PhantomPinned;
-        super::is_unpin::<CopyBuf<'_, PhantomPinned, PhantomPinned>>();
+        crate::is_unpin::<CopyBuf<'_, PhantomPinned, PhantomPinned>>();
     }
 }

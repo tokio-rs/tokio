@@ -67,6 +67,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        super::is_unpin::<Repeat>();
+        crate::is_unpin::<Repeat>();
     }
 }

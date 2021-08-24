@@ -307,6 +307,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        super::is_unpin::<BufReader<()>>();
+        crate::is_unpin::<BufReader<()>>();
     }
 }

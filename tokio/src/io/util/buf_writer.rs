@@ -305,6 +305,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        super::is_unpin::<BufWriter<()>>();
+        crate::is_unpin::<BufWriter<()>>();
     }
 }

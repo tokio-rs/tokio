@@ -128,6 +128,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        super::is_unpin::<Take<()>>();
+        crate::is_unpin::<Take<()>>();
     }
 }

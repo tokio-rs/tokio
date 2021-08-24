@@ -116,6 +116,6 @@ mod tests {
 
     #[test]
     fn assert_unpin() {
-        super::is_unpin::<Split<()>>();
+        crate::is_unpin::<Split<()>>();
     }
 }
