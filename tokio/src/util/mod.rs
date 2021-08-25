@@ -1,6 +1,9 @@
 cfg_io_driver! {
     pub(crate) mod bit;
     pub(crate) mod slab;
+
+    mod wake_list;
+    pub(crate) use wake_list::WakeList;
 }
 
 #[cfg(any(
