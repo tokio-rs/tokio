@@ -9,9 +9,6 @@ use std::fmt;
 use std::time::Duration;
 
 const MAX_NANOS: u64 = (1u64 << 48) - 1;
-const NANOS_MASK: u64 = MAX_NANOS;
-const COUNTER_MASK: u64 = !NANOS_MASK;
-const COUNTER_ONE: u64 = 1u64 << 48;
 
 #[derive(Copy, Clone, Default)]
 pub(crate) struct CounterDuration {
