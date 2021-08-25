@@ -39,8 +39,8 @@ impl CounterDuration {
     /// duration.
     pub(crate) fn set_next_duration(&mut self, dur: Duration) {
         let nanos = std::cmp::min(dur.as_nanos(), u128::from(MAX_NANOS)) as u64;
-        let counter_bits = (self.value & COUNTER_MASK).wrapping_add(COUNTER_ONE);
-        self.value = counter_bits | nanos;
+        let counter = self.counter().wrapping_add(1);
+        self.value = (u64::from(counter) << 48) | nanos;
     }
 
     pub(crate) fn into_pair(self) -> (u16, Duration) {
