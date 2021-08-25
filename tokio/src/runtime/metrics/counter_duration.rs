@@ -19,6 +19,14 @@ pub(crate) struct CounterDuration {
 }
 
 impl CounterDuration {
+    #[cfg(test)]
+    pub(crate) fn new(counter: u16, duration: Duration) -> Self {
+        let nanos = std::cmp::min(duration.as_nanos(), u128::from(MAX_NANOS)) as u64;
+        Self {
+            value: (u64::from(counter) << 48) | nanos,
+        }
+    }
+
     pub(crate) fn counter(self) -> u16 {
         (self.value >> 48) as u16
     }
