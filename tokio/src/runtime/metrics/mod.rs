@@ -1,5 +1,6 @@
 //! This module contains information need to view information about how the
 //! runtime is performing.
+#![allow(clippy::module_inception)]
 
 cfg_metrics! {
     mod metrics;

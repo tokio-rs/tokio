@@ -102,7 +102,7 @@ impl Spawner {
     }
 
     pub(crate) fn metrics(&self) -> &RuntimeMetrics {
-        &self.shared.metrics()
+        self.shared.metrics()
     }
 }
 
