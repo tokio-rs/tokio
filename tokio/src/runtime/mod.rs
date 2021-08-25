@@ -181,7 +181,12 @@ pub(crate) mod enter;
 
 pub(crate) mod task;
 
-pub(crate) mod metrics;
+cfg_metrics! {
+    pub mod metrics;
+}
+cfg_not_metrics! {
+    pub(crate) mod metrics;
+}
 
 cfg_rt! {
     mod basic_scheduler;

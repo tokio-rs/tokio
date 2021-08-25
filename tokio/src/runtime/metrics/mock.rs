@@ -10,8 +10,6 @@ impl RuntimeMetrics {
     }
 }
 
-
-
 pub(crate) struct WorkerMetricsBatcher {
 }
 
