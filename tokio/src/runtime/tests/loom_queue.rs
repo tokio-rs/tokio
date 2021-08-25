@@ -1,5 +1,5 @@
-use crate::runtime::metrics::WorkerMetricsBatcher;
 use crate::runtime::blocking::NoopSchedule;
+use crate::runtime::metrics::WorkerMetricsBatcher;
 use crate::runtime::queue;
 use crate::runtime::task::Inject;
 
