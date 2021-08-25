@@ -36,6 +36,7 @@ impl Spawner {
         }
     }
 
+    #[cfg_attr(not(all(tokio_unstable, feature = "metrics")), allow(dead_code))]
     pub(crate) fn metrics(&self) -> &RuntimeMetrics {
         match self {
             Spawner::Basic(spawner) => spawner.metrics(),
