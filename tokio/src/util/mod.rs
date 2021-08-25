@@ -3,9 +3,23 @@ cfg_io_driver! {
     pub(crate) mod slab;
 }
 
-#[cfg(any(feature = "io-driver", feature = "sync"))]
+#[cfg(any(
+    // io driver
+    feature = "net",
+    feature = "process",
+    all(unix, feature = "signal"),
+    // sync
+    feature = "sync"
+))]
 mod wake_list;
-#[cfg(any(feature = "io-driver", feature = "sync"))]
+#[cfg(any(
+    // io driver
+    feature = "net",
+    feature = "process",
+    all(unix, feature = "signal"),
+    // sync
+    feature = "sync"
+))]
 pub(crate) use wake_list::WakeList;
 
 #[cfg(any(
