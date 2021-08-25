@@ -1,10 +1,12 @@
 cfg_io_driver! {
     pub(crate) mod bit;
     pub(crate) mod slab;
-
-    mod wake_list;
-    pub(crate) use wake_list::WakeList;
 }
+
+#[cfg(any(feature = "io-driver", feature = "sync"))]
+mod wake_list;
+#[cfg(any(feature = "io-driver", feature = "sync"))]
+pub(crate) use wake_list::WakeList;
 
 #[cfg(any(
     feature = "fs",
