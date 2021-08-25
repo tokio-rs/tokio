@@ -473,7 +473,7 @@ impl Context {
         // Take the parker out of core
         let mut park = core.park.take().expect("park missing");
 
-        core.metrics.incr_park_count();
+        core.metrics.about_to_park();
 
         // Store `core` in context
         *self.core.borrow_mut() = Some(core);
@@ -495,6 +495,8 @@ impl Context {
         if core.run_queue.is_stealable() {
             self.worker.shared.notify_parked();
         }
+
+        core.metrics.returned_from_park();
 
         core
     }

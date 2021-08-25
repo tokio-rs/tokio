@@ -248,9 +248,10 @@ impl<P: Park> Inner<P> {
                         Some(entry) => entry,
                         None => {
                             // Park until the thread is signaled
-                            scheduler.metrics.incr_park_count();
+                            scheduler.metrics.about_to_park();
                             scheduler.metrics.submit(&scheduler.spawner.shared.metrics);
                             scheduler.park.park().expect("failed to park");
+                            scheduler.metrics.returned_from_park();
 
                             // Try polling the `block_on` future next
                             continue 'outer;

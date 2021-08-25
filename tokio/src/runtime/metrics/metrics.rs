@@ -102,9 +102,13 @@ impl WorkerMetricsBatcher {
             .store(self.park_to_park, Ordering::Relaxed);
     }
 
-    pub(crate) fn incr_park_count(&mut self) {
+    pub(crate) fn about_to_park(&mut self) {
         self.park_count += 1;
         self.update_park_to_park();
+    }
+
+    pub(crate) fn returned_from_park(&mut self) {
+        self.last_park = Instant::now();
     }
 
     pub(crate) fn incr_steal_count(&mut self, by: u16) {
@@ -119,6 +123,5 @@ impl WorkerMetricsBatcher {
         let now = Instant::now();
         let diff = now - self.last_park;
         self.park_to_park.set_next_duration(diff);
-        self.last_park = now;
     }
 }

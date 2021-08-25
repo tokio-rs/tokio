@@ -17,7 +17,8 @@ impl WorkerMetricsBatcher {
 
     pub(crate) fn submit(&mut self, _to: &RuntimeMetrics) {}
 
-    pub(crate) fn incr_park_count(&mut self) {}
+    pub(crate) fn about_to_park(&mut self) {}
+    pub(crate) fn returned_from_park(&mut self) {}
 
     pub(crate) fn incr_steal_count(&mut self, _by: u16) {}
 
