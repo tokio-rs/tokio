@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1629901786487,
+  "lastUpdate": 1629901790675,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -44623,6 +44623,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19644476,
             "range": "± 5484617",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gleb@pomykalov.ru",
+            "name": "Gleb Pomykalov",
+            "username": "glebpom"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "51f4f0594c81fe24919055e0c08be374ee54a14b",
+          "message": "io: speed-up waking by using uninitialized array (#4055)",
+          "timestamp": "2021-08-25T16:18:19+02:00",
+          "tree_id": "12cb73b3846cc6ee1a8d53d59b2710d47db3dc22",
+          "url": "https://github.com/tokio-rs/tokio/commit/51f4f0594c81fe24919055e0c08be374ee54a14b"
+        },
+        "date": 1629901782745,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 225968,
+            "range": "± 15011",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1125746,
+            "range": "± 353438",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6919902,
+            "range": "± 1277407",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21310900,
+            "range": "± 4530987",
             "unit": "ns/iter"
           }
         ]
