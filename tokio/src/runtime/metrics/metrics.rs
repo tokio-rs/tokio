@@ -107,7 +107,7 @@ impl WorkerMetricsBatcher {
         self.last_park = Instant::now();
     }
 
-    #[cfg(features = "rt-multi-thread")]
+    #[cfg(feature = "rt-multi-thread")]
     pub(crate) fn incr_steal_count(&mut self, by: u16) {
         self.steal_count += u64::from(by);
     }

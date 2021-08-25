@@ -20,7 +20,7 @@ impl WorkerMetricsBatcher {
     pub(crate) fn about_to_park(&mut self) {}
     pub(crate) fn returned_from_park(&mut self) {}
 
-    #[cfg(features = "rt-multi-thread")]
+    #[cfg(feature = "rt-multi-thread")]
     pub(crate) fn incr_steal_count(&mut self, _by: u16) {}
 
     pub(crate) fn incr_poll_count(&mut self) {}
