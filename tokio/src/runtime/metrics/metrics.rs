@@ -1,5 +1,5 @@
 //! This file contains the types necessary to collect various types of metrics.
-use crate::loom::sync::atomic::{AtomicU64, Ordering};
+use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use crate::runtime::metrics::counter_duration::{AtomicCounterDuration, CounterDuration};
 
 use std::time::{Duration, Instant};
@@ -45,18 +45,18 @@ impl RuntimeMetrics {
 impl WorkerMetrics {
     /// Returns the total number of times this worker thread has parked.
     pub fn park_count(&self) -> u64 {
-        self.park_count.load(Ordering::Relaxed)
+        self.park_count.load(Relaxed)
     }
 
     /// Returns the number of tasks this worker has stolen from other worker
     /// threads.
     pub fn steal_count(&self) -> u64 {
-        self.steal_count.load(Ordering::Relaxed)
+        self.steal_count.load(Relaxed)
     }
 
     /// Returns the number of times this worker has polled a task.
     pub fn poll_count(&self) -> u64 {
-        self.poll_count.load(Ordering::Relaxed)
+        self.poll_count.load(Relaxed)
     }
 
     /// Returns the amount of time the runtime spent working between the last
@@ -65,7 +65,7 @@ impl WorkerMetrics {
     /// The `u16` is a counter that is incremented by one each time the duration
     /// is changed. The counter will wrap around when it reaches `u16::MAX`.
     pub fn park_to_park(&self) -> (u16, Duration) {
-        self.park_to_park.load(Ordering::Relaxed).into_pair()
+        self.park_to_park.load(Relaxed).into_pair()
     }
 }
 
@@ -92,14 +92,10 @@ impl WorkerMetricsBatcher {
     pub(crate) fn submit(&mut self, to: &RuntimeMetrics) {
         let worker = &to.workers[self.my_index];
 
-        worker.park_count.store(self.park_count, Ordering::Relaxed);
-        worker
-            .steal_count
-            .store(self.steal_count, Ordering::Relaxed);
-        worker.poll_count.store(self.poll_count, Ordering::Relaxed);
-        worker
-            .park_to_park
-            .store(self.park_to_park, Ordering::Relaxed);
+        worker.park_count.store(self.park_count, Relaxed);
+        worker.steal_count.store(self.steal_count, Relaxed);
+        worker.poll_count.store(self.poll_count, Relaxed);
+        worker.park_to_park.store(self.park_to_park, Relaxed);
     }
 
     pub(crate) fn about_to_park(&mut self) {
