@@ -66,7 +66,7 @@ use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
-use crate::runtime::{queue, task};
+use crate::runtime::{queue, task, Callback};
 use crate::util::FastRand;
 
 use std::cell::RefCell;
@@ -137,6 +137,11 @@ pub(super) struct Shared {
     /// stolen by a thread that was spawned as part of `block_in_place`.
     #[allow(clippy::vec_box)] // we're moving an already-boxed value
     shutdown_cores: Mutex<Vec<Box<Core>>>,
+
+    /// Callback for a worker parking itself
+    before_park: Option<Callback>,
+    /// Callback for a worker unparking itself
+    after_unpark: Option<Callback>,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -174,7 +179,12 @@ type Notified = task::Notified<Arc<Shared>>;
 // Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
 
-pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
+pub(super) fn create(
+    size: usize,
+    park: Parker,
+    before_park: Option<Callback>,
+    after_unpark: Option<Callback>,
+) -> (Arc<Shared>, Launch) {
     let mut cores = vec![];
     let mut remotes = vec![];
 
@@ -204,6 +214,8 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
         idle: Idle::new(size),
         owned: OwnedTasks::new(),
         shutdown_cores: Mutex::new(vec![]),
+        before_park,
+        after_unpark,
     });
 
     let mut launch = Launch(vec![]);
@@ -466,10 +478,16 @@ impl Context {
         *self.core.borrow_mut() = Some(core);
 
         // Park thread
+        if let Some(f) = &self.worker.shared.before_park {
+            f()
+        }
         if let Some(timeout) = duration {
             park.park_timeout(timeout).expect("park failed");
         } else {
             park.park().expect("park failed");
+        }
+        if let Some(f) = &self.worker.shared.after_unpark {
+            f()
         }
 
         // Remove `core` from context
