@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1629901496257,
+  "lastUpdate": 1629901772794,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -68223,6 +68223,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 944,
             "range": "± 40",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gleb@pomykalov.ru",
+            "name": "Gleb Pomykalov",
+            "username": "glebpom"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "51f4f0594c81fe24919055e0c08be374ee54a14b",
+          "message": "io: speed-up waking by using uninitialized array (#4055)",
+          "timestamp": "2021-08-25T16:18:19+02:00",
+          "tree_id": "12cb73b3846cc6ee1a8d53d59b2710d47db3dc22",
+          "url": "https://github.com/tokio-rs/tokio/commit/51f4f0594c81fe24919055e0c08be374ee54a14b"
+        },
+        "date": 1629901766340,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13034,
+            "range": "± 3306",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 703,
+            "range": "± 26",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 474,
+            "range": "± 18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12519,
+            "range": "± 5855",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 719,
+            "range": "± 16",
             "unit": "ns/iter"
           }
         ]
