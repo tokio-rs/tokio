@@ -2,8 +2,8 @@ use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
-use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::metrics::{RuntimeMetrics, WorkerMetricsBatcher};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::sync::notify::Notify;
 use crate::util::{waker_ref, Wake, WakerRef};
 

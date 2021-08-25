@@ -119,7 +119,6 @@ impl Handle {
         }
     }
 
-
     /// Spawn a future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a

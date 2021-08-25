@@ -12,9 +12,9 @@ pub(crate) use worker::Launch;
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
+use crate::runtime::metrics::RuntimeMetrics;
 use crate::runtime::task::JoinHandle;
 use crate::runtime::Parker;
-use crate::runtime::metrics::RuntimeMetrics;
 
 use std::fmt;
 use std::future::Future;

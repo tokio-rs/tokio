@@ -1,8 +1,8 @@
 //! This file contains the types necessary to collect various types of metrics.
 use crate::loom::sync::atomic::{AtomicU64, Ordering};
-use crate::runtime::metrics::counter_duration::{CounterDuration, AtomicCounterDuration};
+use crate::runtime::metrics::counter_duration::{AtomicCounterDuration, CounterDuration};
 
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 /// This type contains methods to retrieve metrics from a Tokio runtime.
 #[derive(Debug)]
@@ -18,7 +18,6 @@ pub struct WorkerMetrics {
     poll_count: AtomicU64,
     park_to_park: AtomicCounterDuration,
 }
-
 
 impl RuntimeMetrics {
     pub(crate) fn new(worker_threads: usize) -> Self {
@@ -94,9 +93,13 @@ impl WorkerMetricsBatcher {
         let worker = &to.workers[self.my_index];
 
         worker.park_count.store(self.park_count, Ordering::Relaxed);
-        worker.steal_count.store(self.steal_count, Ordering::Relaxed);
+        worker
+            .steal_count
+            .store(self.steal_count, Ordering::Relaxed);
         worker.poll_count.store(self.poll_count, Ordering::Relaxed);
-        worker.park_to_park.store(self.park_to_park, Ordering::Relaxed);
+        worker
+            .park_to_park
+            .store(self.park_to_park, Ordering::Relaxed);
     }
 
     pub(crate) fn incr_park_count(&mut self) {

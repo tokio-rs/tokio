@@ -1,6 +1,6 @@
+use crate::runtime::metrics::WorkerMetricsBatcher;
 use crate::runtime::queue;
 use crate::runtime::task::{self, Inject, Schedule, Task};
-use crate::runtime::metrics::WorkerMetricsBatcher;
 
 use std::thread;
 use std::time::Duration;

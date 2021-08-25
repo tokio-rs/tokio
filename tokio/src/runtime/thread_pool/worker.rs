@@ -63,10 +63,10 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
+use crate::runtime::metrics::{RuntimeMetrics, WorkerMetricsBatcher};
 use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
-use crate::runtime::metrics::{RuntimeMetrics, WorkerMetricsBatcher};
 use crate::runtime::{queue, task};
 use crate::util::FastRand;
 
@@ -537,7 +537,10 @@ impl Core {
             }
 
             let target = &worker.shared.remotes[i];
-            if let Some(task) = target.steal.steal_into(&mut self.run_queue, &mut self.metrics) {
+            if let Some(task) = target
+                .steal
+                .steal_into(&mut self.run_queue, &mut self.metrics)
+            {
                 return Some(task);
             }
         }

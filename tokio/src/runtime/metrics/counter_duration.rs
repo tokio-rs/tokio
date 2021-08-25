@@ -4,9 +4,9 @@
 //!
 //! The u16 counter can be used to determine if the duration has changed since
 //! last time you look at it.
-use std::time::Duration;
-use std::fmt;
 use crate::loom::sync::atomic::{AtomicU64, Ordering};
+use std::fmt;
+use std::time::Duration;
 
 const MAX_NANOS: u64 = (1u64 << 48) - 1;
 const NANOS_MASK: u64 = MAX_NANOS;
