@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1629914502934,
+  "lastUpdate": 1629914518312,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -44725,6 +44725,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21310900,
             "range": "± 4530987",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "job@fedorenko-d.ru",
+            "name": "Fedorenko Dmitrij",
+            "username": "c0va23"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "80bda3bf5f27778edff5e5b0d762932af2a0896b",
+          "message": "macros: fix wrong error messages (#4067)",
+          "timestamp": "2021-08-25T19:59:41+02:00",
+          "tree_id": "3ef91dc5f45b59b2658c063d5239145ae4e8854b",
+          "url": "https://github.com/tokio-rs/tokio/commit/80bda3bf5f27778edff5e5b0d762932af2a0896b"
+        },
+        "date": 1629914510283,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 239290,
+            "range": "± 59812",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1067630,
+            "range": "± 306119",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6267320,
+            "range": "± 952839",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21248437,
+            "range": "± 6098452",
             "unit": "ns/iter"
           }
         ]
