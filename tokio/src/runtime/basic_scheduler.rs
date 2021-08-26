@@ -3,6 +3,7 @@ use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::Callback;
 use crate::sync::notify::Notify;
 use crate::util::{waker_ref, Wake, WakerRef};
 
@@ -47,6 +48,11 @@ struct Inner<P: Park> {
 
     /// Thread park handle
     park: P,
+
+    /// Callback for a worker parking itself
+    before_park: Option<Callback>,
+    /// Callback for a worker unparking itself
+    after_unpark: Option<Callback>,
 }
 
 #[derive(Clone)]
@@ -114,7 +120,11 @@ const REMOTE_FIRST_INTERVAL: u8 = 31;
 scoped_thread_local!(static CURRENT: Context);
 
 impl<P: Park> BasicScheduler<P> {
-    pub(crate) fn new(park: P) -> BasicScheduler<P> {
+    pub(crate) fn new(
+        park: P,
+        before_park: Option<Callback>,
+        after_unpark: Option<Callback>,
+    ) -> BasicScheduler<P> {
         let unpark = Box::new(park.unpark());
 
         let spawner = Spawner {
@@ -133,6 +143,8 @@ impl<P: Park> BasicScheduler<P> {
             spawner: spawner.clone(),
             tick: 0,
             park,
+            before_park,
+            after_unpark,
         }));
 
         BasicScheduler {
@@ -237,8 +249,14 @@ impl<P: Park> Inner<P> {
                     let entry = match entry {
                         Some(entry) => entry,
                         None => {
+                            if let Some(f) = &scheduler.before_park {
+                                f();
+                            }
                             // Park until the thread is signaled
                             scheduler.park.park().expect("failed to park");
+                            if let Some(f) = &scheduler.after_unpark {
+                                f();
+                            }
 
                             // Try polling the `block_on` future next
                             continue 'outer;

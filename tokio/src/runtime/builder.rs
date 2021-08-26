@@ -522,7 +522,8 @@ impl Builder {
         // there are no futures ready to do something, it'll let the timer or
         // the reactor to generate some new stimuli for the futures to continue
         // in their life.
-        let scheduler = BasicScheduler::new(driver);
+        let scheduler =
+            BasicScheduler::new(driver, self.before_park.clone(), self.after_unpark.clone());
         let spawner = Spawner::Basic(scheduler.spawner().clone());
 
         // Blocking pool
