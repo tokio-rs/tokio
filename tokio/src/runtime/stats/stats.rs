@@ -1,29 +1,29 @@
-//! This file contains the types necessary to collect various types of metrics.
+//! This file contains the types necessary to collect various types of stats.
 use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
-use crate::runtime::metrics::counter_duration::{AtomicCounterDuration, CounterDuration};
+use crate::runtime::stats::counter_duration::{AtomicCounterDuration, CounterDuration};
 
 use std::time::{Duration, Instant};
 
-/// This type contains methods to retrieve metrics from a Tokio runtime.
+/// This type contains methods to retrieve stats from a Tokio runtime.
 #[derive(Debug)]
-pub struct RuntimeMetrics {
-    workers: Box<[WorkerMetrics]>,
+pub struct RuntimeStats {
+    workers: Box<[WorkerStats]>,
 }
 
-/// This type contains methods to retrieve metrics from a worker thread on a Tokio runtime.
+/// This type contains methods to retrieve stats from a worker thread on a Tokio runtime.
 #[derive(Debug)]
-pub struct WorkerMetrics {
+pub struct WorkerStats {
     park_count: AtomicU64,
     steal_count: AtomicU64,
     poll_count: AtomicU64,
     park_to_park: AtomicCounterDuration,
 }
 
-impl RuntimeMetrics {
+impl RuntimeStats {
     pub(crate) fn new(worker_threads: usize) -> Self {
         let mut workers = Vec::with_capacity(worker_threads);
         for _ in 0..worker_threads {
-            workers.push(WorkerMetrics {
+            workers.push(WorkerStats {
                 park_count: AtomicU64::new(0),
                 steal_count: AtomicU64::new(0),
                 poll_count: AtomicU64::new(0),
@@ -36,13 +36,13 @@ impl RuntimeMetrics {
         }
     }
 
-    /// Returns a slice containing the worker metrics for each worker thread.
-    pub fn workers(&self) -> impl Iterator<Item = &WorkerMetrics> {
+    /// Returns a slice containing the worker stats for each worker thread.
+    pub fn workers(&self) -> impl Iterator<Item = &WorkerStats> {
         self.workers.iter()
     }
 }
 
-impl WorkerMetrics {
+impl WorkerStats {
     /// Returns the total number of times this worker thread has parked.
     pub fn park_count(&self) -> u64 {
         self.park_count.load(Relaxed)
@@ -69,7 +69,7 @@ impl WorkerMetrics {
     }
 }
 
-pub(crate) struct WorkerMetricsBatcher {
+pub(crate) struct WorkerStatsBatcher {
     my_index: usize,
     park_count: u64,
     steal_count: u64,
@@ -78,7 +78,7 @@ pub(crate) struct WorkerMetricsBatcher {
     park_to_park: CounterDuration,
 }
 
-impl WorkerMetricsBatcher {
+impl WorkerStatsBatcher {
     pub(crate) fn new(my_index: usize) -> Self {
         Self {
             my_index,
@@ -89,7 +89,7 @@ impl WorkerMetricsBatcher {
             park_to_park: CounterDuration::default(),
         }
     }
-    pub(crate) fn submit(&mut self, to: &RuntimeMetrics) {
+    pub(crate) fn submit(&mut self, to: &RuntimeStats) {
         let worker = &to.workers[self.my_index];
 
         worker.park_count.store(self.park_count, Relaxed);

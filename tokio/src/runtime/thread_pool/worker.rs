@@ -63,7 +63,7 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
-use crate::runtime::metrics::{RuntimeMetrics, WorkerMetricsBatcher};
+use crate::runtime::stats::{RuntimeStats, WorkerStatsBatcher};
 use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
@@ -113,8 +113,8 @@ struct Core {
     /// borrow checker happy.
     park: Option<Parker>,
 
-    /// Batching metrics so they can be submitted to RuntimeMetrics.
-    metrics: WorkerMetricsBatcher,
+    /// Batching stats so they can be submitted to RuntimeStats.
+    stats: WorkerStatsBatcher,
 
     /// Fast random number generator.
     rand: FastRand,
@@ -142,8 +142,8 @@ pub(super) struct Shared {
     #[allow(clippy::vec_box)] // we're moving an already-boxed value
     shutdown_cores: Mutex<Vec<Box<Core>>>,
 
-    /// Collect metrics from the runtime.
-    metrics: RuntimeMetrics,
+    /// Collect stats from the runtime.
+    stats: RuntimeStats,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -199,7 +199,7 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
             is_searching: false,
             is_shutdown: false,
             park: Some(park),
-            metrics: WorkerMetricsBatcher::new(i),
+            stats: WorkerStatsBatcher::new(i),
             rand: FastRand::new(seed()),
         }));
 
@@ -212,7 +212,7 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
         idle: Idle::new(size),
         owned: OwnedTasks::new(),
         shutdown_cores: Mutex::new(vec![]),
-        metrics: RuntimeMetrics::new(size),
+        stats: RuntimeStats::new(size),
     });
 
     let mut launch = Launch(vec![]);
@@ -400,7 +400,7 @@ impl Context {
         core.transition_from_searching(&self.worker);
 
         // Make the core available to the runtime context
-        core.metrics.incr_poll_count();
+        core.stats.incr_poll_count();
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
@@ -425,7 +425,7 @@ impl Context {
 
                 if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
-                    core.metrics.incr_poll_count();
+                    core.stats.incr_poll_count();
                     *self.core.borrow_mut() = Some(core);
                     let task = self.worker.shared.owned.assert_owner(task);
                     task.run();
@@ -473,7 +473,7 @@ impl Context {
         // Take the parker out of core
         let mut park = core.park.take().expect("park missing");
 
-        core.metrics.about_to_park();
+        core.stats.about_to_park();
 
         // Store `core` in context
         *self.core.borrow_mut() = Some(core);
@@ -496,7 +496,7 @@ impl Context {
             self.worker.shared.notify_parked();
         }
 
-        core.metrics.returned_from_park();
+        core.stats.returned_from_park();
 
         core
     }
@@ -541,7 +541,7 @@ impl Core {
             let target = &worker.shared.remotes[i];
             if let Some(task) = target
                 .steal
-                .steal_into(&mut self.run_queue, &mut self.metrics)
+                .steal_into(&mut self.run_queue, &mut self.stats)
             {
                 return Some(task);
             }
@@ -608,7 +608,7 @@ impl Core {
 
     /// Runs maintenance work such as checking the pool's state.
     fn maintenance(&mut self, worker: &Worker) {
-        self.metrics.submit(&worker.shared.metrics);
+        self.stats.submit(&worker.shared.stats);
 
         if !self.is_shutdown {
             // Check if the scheduler has been shutdown
@@ -622,7 +622,7 @@ impl Core {
         // Signal to all tasks to shut down.
         worker.shared.owned.close_and_shutdown_all();
 
-        self.metrics.submit(&worker.shared.metrics);
+        self.stats.submit(&worker.shared.stats);
     }
 
     /// Shutdown the core
@@ -673,8 +673,8 @@ impl Shared {
         handle
     }
 
-    pub(crate) fn metrics(&self) -> &RuntimeMetrics {
-        &self.metrics
+    pub(crate) fn stats(&self) -> &RuntimeStats {
+        &self.stats
     }
 
     pub(super) fn schedule(&self, task: Notified, is_yield: bool) {

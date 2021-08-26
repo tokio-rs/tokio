@@ -3,7 +3,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicU16, AtomicU32};
 use crate::loom::sync::Arc;
-use crate::runtime::metrics::WorkerMetricsBatcher;
+use crate::runtime::stats::WorkerStatsBatcher;
 use crate::runtime::task::{self, Inject};
 
 use std::mem::MaybeUninit;
@@ -292,7 +292,7 @@ impl<T> Steal<T> {
     pub(super) fn steal_into(
         &self,
         dst: &mut Local<T>,
-        metrics: &mut WorkerMetricsBatcher,
+        stats: &mut WorkerStatsBatcher,
     ) -> Option<task::Notified<T>> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
@@ -312,7 +312,7 @@ impl<T> Steal<T> {
         // Steal the tasks into `dst`'s buffer. This does not yet expose the
         // tasks in `dst`.
         let mut n = self.steal_into2(dst, dst_tail);
-        metrics.incr_steal_count(n);
+        stats.incr_steal_count(n);
 
         if n == 0 {
             // No tasks were stolen

@@ -111,11 +111,11 @@ impl Handle {
         context::current().ok_or(TryCurrentError(()))
     }
 
-    cfg_metrics! {
+    cfg_stats! {
         /// Returns a view that lets you get information about how the runtime
         /// is performing.
-        pub fn metrics(&self) -> &crate::runtime::metrics::RuntimeMetrics {
-            self.spawner.metrics()
+        pub fn stats(&self) -> &crate::runtime::stats::RuntimeStats {
+            self.spawner.stats()
         }
     }
 

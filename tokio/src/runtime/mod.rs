@@ -181,11 +181,11 @@ pub(crate) mod enter;
 
 pub(crate) mod task;
 
-cfg_metrics! {
-    pub mod metrics;
+cfg_stats! {
+    pub mod stats;
 }
-cfg_not_metrics! {
-    pub(crate) mod metrics;
+cfg_not_stats! {
+    pub(crate) mod stats;
 }
 
 cfg_rt! {

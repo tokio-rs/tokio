@@ -1,21 +1,21 @@
-//! This file contains mocks of the types in src/runtime/metrics/metrics.rs
+//! This file contains mocks of the types in src/runtime/stats/stats.rs
 
-pub(crate) struct RuntimeMetrics {}
+pub(crate) struct RuntimeStats {}
 
-impl RuntimeMetrics {
+impl RuntimeStats {
     pub(crate) fn new(_worker_threads: usize) -> Self {
         Self {}
     }
 }
 
-pub(crate) struct WorkerMetricsBatcher {}
+pub(crate) struct WorkerStatsBatcher {}
 
-impl WorkerMetricsBatcher {
+impl WorkerStatsBatcher {
     pub(crate) fn new(_my_index: usize) -> Self {
         Self {}
     }
 
-    pub(crate) fn submit(&mut self, _to: &RuntimeMetrics) {}
+    pub(crate) fn submit(&mut self, _to: &RuntimeStats) {}
 
     pub(crate) fn about_to_park(&mut self) {}
     pub(crate) fn returned_from_park(&mut self) {}
