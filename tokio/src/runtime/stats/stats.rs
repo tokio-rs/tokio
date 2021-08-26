@@ -9,6 +9,7 @@ pub struct RuntimeStats {
 
 /// This type contains methods to retrieve stats from a worker thread on a Tokio runtime.
 #[derive(Debug)]
+#[repr(align(128))]
 pub struct WorkerStats {
     park_count: AtomicU64,
     steal_count: AtomicU64,
