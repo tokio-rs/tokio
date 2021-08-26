@@ -395,7 +395,7 @@ impl Future for Sleep {
     // Both cases are extremely rare, and pretty accurately fit into
     // "logic errors", so we just panic in this case. A user couldn't
     // really do much better if we passed the error onwards.
-    cfg_not_trace!{
+    cfg_not_trace! {
         fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
             match ready!(self.as_mut().poll_elapsed(cx)) {
                 Ok(()) => Poll::Ready(()),
@@ -404,7 +404,7 @@ impl Future for Sleep {
         }
     }
 
-    cfg_trace!{
+    cfg_trace! {
         fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
             let _span = self.inner.async_op_span.clone().entered();
             match ready!(self.as_mut().poll_elapsed(cx)) {
