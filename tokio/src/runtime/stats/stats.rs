@@ -1,6 +1,5 @@
 //! This file contains the types necessary to collect various types of stats.
 use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
-use crate::runtime::stats::counter_duration::{AtomicCounterDuration, CounterDuration};
 
 use std::time::{Duration, Instant};
 

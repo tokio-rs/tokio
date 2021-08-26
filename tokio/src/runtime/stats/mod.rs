@@ -5,8 +5,6 @@
 cfg_stats! {
     mod stats;
 
-    mod counter_duration;
-
     pub use self::stats::{RuntimeStats, WorkerStats};
     pub(crate) use self::stats::WorkerStatsBatcher;
 }
