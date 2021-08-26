@@ -478,16 +478,16 @@ impl Context {
         *self.core.borrow_mut() = Some(core);
 
         // Park thread
-        if let Some(f) = &self.worker.shared.before_park {
-            f()
-        }
         if let Some(timeout) = duration {
             park.park_timeout(timeout).expect("park failed");
         } else {
+            if let Some(f) = &self.worker.shared.before_park {
+                f()
+            }
             park.park().expect("park failed");
-        }
-        if let Some(f) = &self.worker.shared.after_unpark {
-            f()
+            if let Some(f) = &self.worker.shared.after_unpark {
+                f()
+            }
         }
 
         // Remove `core` from context
