@@ -1,24 +1,17 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(target_os = "freebsd", feature = "aio"))]
 
-use futures_test::task::noop_context;
 use mio_aio::{AioCb, AioFsyncMode, LioCb};
 use std::{
-    io::{Read, Seek, SeekFrom},
+    future::Future,
     os::unix::io::{AsRawFd, RawFd},
-    task::Poll,
-    time::{Duration, Instant},
+    pin::Pin,
+    task::{Context, Poll},
 };
-use tempfile::tempdir;
-use tokio::io::{AioSource, PollAio};
-use tokio_test::{assert_pending, assert_ready_ok};
-
-fn rt() -> tokio::runtime::Runtime {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_io()
-        .build()
-        .unwrap()
-}
+use tempfile::tempfile;
+use tokio::{
+    io::{AioSource, PollAio},
+};
 
 struct WrappedAioCb<'a>(AioCb<'a>);
 impl<'a> AioSource for WrappedAioCb<'a> {
@@ -43,105 +36,98 @@ impl<'a> AioSource for WrappedLioCb<'a> {
 mod aio {
     use super::*;
 
-    /// aio_fsync is the simplest AIO operation.  This test ensures that Tokio
-    /// can register an aiocb, and set its readiness.
-    #[test]
-    fn fsync() {
-        let dir = tempdir().unwrap();
-        let path = dir.path().join("testfile");
-        let f = std::fs::File::create(&path).unwrap();
+    /// A very crude implementation of an AIO-based future
+    struct FsyncFut(PollAio<WrappedAioCb<'static>>);
+
+    impl Future for FsyncFut {
+        type Output = Result<(), std::io::Error>;
+
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>)
+            -> Poll<Self::Output>
+        {
+            let poll_result = self.0.poll(cx);
+            match poll_result {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+                Poll::Ready(Ok(_ev)) => {
+                    // At this point, we could clear readiness.  But there's no
+                    // point, since we're about to drop the PollAio.
+                    let result = (*self.0).0.aio_return();
+                    match result {
+                        Ok(_) => Poll::Ready(Ok(())),
+                        Err(e) => Poll::Ready(Err(e.into()))
+                    }
+                },
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn fsync() {
+        let f = tempfile().unwrap();
         let fd = f.as_raw_fd();
         let aiocb = AioCb::from_fd(fd, 0);
         let source = WrappedAioCb(aiocb);
-        let rt = rt();
-        let mut poll_aio = {
-            let _enter = rt.enter();
-            PollAio::new_for_aio(source).unwrap()
-        };
-        let mut ctx = noop_context();
-        // Should be not ready after initialization
-        assert_pending!(poll_aio.poll(&mut ctx));
-
-        // Send the operation to the kernel
+        let mut poll_aio = PollAio::new_for_aio(source).unwrap();
         (*poll_aio).0.fsync(AioFsyncMode::O_SYNC).unwrap();
-
-        // Wait for completeness
-        let start = Instant::now();
-        while Instant::now() - start < Duration::new(5, 0) {
-            if let Poll::Ready(_ev) = poll_aio.poll(&mut ctx) {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
-        assert_ready_ok!(poll_aio.poll(&mut ctx));
-
-        // Free its in-kernel state, so Nix doesn't panic.
-        let mut aiocb = poll_aio.into_inner().0;
-        aiocb.aio_return().unwrap();
+        let fut = FsyncFut(poll_aio);
+        fut.await.unwrap();
     }
 }
 
 mod lio {
     use super::*;
 
+    /// A very crude lio_listio-based Future
+    struct LioFut(Option<PollAio<WrappedLioCb<'static>>>);
+
+    impl Future for LioFut {
+        type Output = Result<Vec<isize>, std::io::Error>;
+
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>)
+            -> Poll<Self::Output>
+        {
+            let poll_result = self.0.as_mut().unwrap().poll(cx);
+            match poll_result {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+                Poll::Ready(Ok(_ev)) => {
+                    // At this point, we could clear readiness.  But there's no
+                    // point, since we're about to drop the PollAio.
+                    let r = self.0.take().unwrap().into_inner().0
+                        .into_results(|iter| {
+                            iter.map(|lr| lr.result.unwrap())
+                            .collect::<Vec<isize>>()
+                        });
+                    Poll::Ready(Ok(r))
+                }
+            }
+        }
+    }
+
     /// An lio_listio operation with one write element
-    #[test]
-    fn onewrite() {
-        let wbuf = b"abcdef";
-        let dir = tempdir().unwrap();
-        let path = dir.path().join("testfile");
-        let mut f = std::fs::OpenOptions::new()
-            .create_new(true)
-            .read(true)
-            .write(true)
-            .open(path)
-            .unwrap();
-        let mut rbuf = Vec::new();
+    #[tokio::test]
+    async fn onewrite() {
+        const WBUF: &[u8] = b"abcdef";
+        let f = tempfile().unwrap();
 
         let mut builder = mio_aio::LioCbBuilder::with_capacity(1);
         builder = builder.emplace_slice(
             f.as_raw_fd(),
             0,
-            &wbuf[..],
+            &WBUF[..],
             0,
             mio_aio::LioOpcode::LIO_WRITE,
         );
         let liocb = builder.finish();
         let source = WrappedLioCb(liocb);
-        let rt = rt();
-        let mut poll_aio = {
-            let _enter = rt.enter();
-            PollAio::new_for_lio(source).unwrap()
-        };
-        let mut ctx = noop_context();
-        // Should be not ready after initialization
-        assert_pending!(poll_aio.poll(&mut ctx));
+        let mut poll_aio = PollAio::new_for_lio(source).unwrap();
 
         // Send the operation to the kernel
         (*poll_aio).0.submit().unwrap();
-
-        // Wait for completeness
-        let start = Instant::now();
-        while Instant::now() - start < Duration::new(5, 0) {
-            if let Poll::Ready(_ev) = poll_aio.poll(&mut ctx) {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
-        assert_ready_ok!(poll_aio.poll(&mut ctx));
-        let liocb = poll_aio.into_inner().0;
-
-        // Check results
-        liocb.into_results(|mut iter| {
-            let lr = iter.next().unwrap();
-            assert_eq!(lr.result.unwrap(), wbuf.len() as isize);
-            assert!(iter.next().is_none());
-        });
-
-        // Verify that it actually wrote to the file
-        f.seek(SeekFrom::Start(0)).unwrap();
-        let len = f.read_to_end(&mut rbuf).unwrap();
-        assert_eq!(len, wbuf.len());
-        assert_eq!(&wbuf[..], &rbuf[..]);
+        let fut = LioFut(Some(poll_aio));
+        let v = fut.await.unwrap();
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0] as usize, WBUF.len());
     }
 }
