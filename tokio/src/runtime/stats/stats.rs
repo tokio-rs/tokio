@@ -87,8 +87,7 @@ impl WorkerStatsBatcher {
         self.park_count += 1;
     }
 
-    pub(crate) fn returned_from_park(&mut self) {
-    }
+    pub(crate) fn returned_from_park(&mut self) {}
 
     #[cfg(feature = "rt-multi-thread")]
     pub(crate) fn incr_steal_count(&mut self, by: u16) {

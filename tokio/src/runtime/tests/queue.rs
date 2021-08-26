@@ -1,5 +1,5 @@
-use crate::runtime::stats::WorkerStatsBatcher;
 use crate::runtime::queue;
+use crate::runtime::stats::WorkerStatsBatcher;
 use crate::runtime::task::{self, Inject, Schedule, Task};
 
 use std::thread;

@@ -1,6 +1,6 @@
 use crate::runtime::blocking::NoopSchedule;
-use crate::runtime::stats::WorkerStatsBatcher;
 use crate::runtime::queue;
+use crate::runtime::stats::WorkerStatsBatcher;
 use crate::runtime::task::Inject;
 
 use loom::thread;
