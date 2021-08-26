@@ -5,6 +5,7 @@ use mio_aio::{AioCb, AioFsyncMode, LioCb};
 use std::{
     future::Future,
     os::unix::io::{AsRawFd, RawFd},
+    mem,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -40,7 +41,7 @@ mod aio {
     struct FsyncFut(PollAio<WrappedAioCb<'static>>);
 
     impl Future for FsyncFut {
-        type Output = Result<(), std::io::Error>;
+        type Output = std::io::Result<()>;
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>)
             -> Poll<Self::Output>
@@ -62,6 +63,57 @@ mod aio {
         }
     }
 
+    /// Low-level AIO Source
+    ///
+    /// Neither Nix nor mio-aio permit an aiocb to be reused, because the C
+    /// library discourages that and in fact the OS prohibits this unless you
+    /// bzero the contents in between uses.  So to demonstrate proper use of
+    /// clear_ready, we must access libc directly
+    struct LlSource(Pin<Box<libc::aiocb>>);
+
+    impl AioSource for LlSource {
+        fn register(&mut self, kq: RawFd, token: usize) {
+            let mut sev: libc::sigevent = unsafe {
+                mem::MaybeUninit::zeroed().assume_init()
+            };
+            sev.sigev_notify = libc::SIGEV_KEVENT;
+            sev.sigev_signo = kq;
+            sev.sigev_value = libc::sigval{
+                sival_ptr: token as *mut libc::c_void
+            };
+            self.0.aio_sigevent = sev;
+        }
+
+        fn deregister(&mut self) {
+            unsafe {
+                self.0.aio_sigevent = mem::zeroed();
+            }
+        }
+    }
+
+    struct LlFut(PollAio<LlSource>);
+
+    impl Future for LlFut {
+        type Output = std::io::Result<()>;
+
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>)
+            -> Poll<Self::Output>
+        {
+            let poll_result = self.0.poll(cx);
+            match poll_result {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+                Poll::Ready(Ok(_ev)) => {
+                    let r = unsafe {
+                        libc::aio_return(self.0.0.as_mut().get_unchecked_mut())
+                    };
+                    assert_eq!(0, r);
+                    Poll::Ready(Ok(()))
+                }
+            }
+        }
+    }
+
     #[tokio::test]
     async fn fsync() {
         let f = tempfile().unwrap();
@@ -73,6 +125,45 @@ mod aio {
         let fut = FsyncFut(poll_aio);
         fut.await.unwrap();
     }
+
+    #[tokio::test]
+    async fn ll_fsync() {
+        let f = tempfile().unwrap();
+        let fd = f.as_raw_fd();
+        let mut aiocb: libc::aiocb = unsafe {
+            mem::MaybeUninit::zeroed().assume_init()
+        };
+        aiocb.aio_fildes = fd;
+        let source = LlSource(Box::pin(aiocb));
+        let mut poll_aio = PollAio::new_for_aio(source).unwrap();
+        let r = unsafe {
+            let p = (*poll_aio).0.as_mut().get_unchecked_mut();
+            libc::aio_fsync(libc::O_SYNC, p)
+        };
+        assert_eq!(0, r);
+        let fut = LlFut(poll_aio);
+        fut.await.unwrap();
+    }
+
+    /// To reuse a PollAio object requires using `clear_ready`.
+    #[tokio::test]
+    async fn clear_ready() {
+        let f = tempfile().unwrap();
+        let fd = f.as_raw_fd();
+        let mut aiocb: libc::aiocb = unsafe {
+            mem::MaybeUninit::zeroed().assume_init()
+        };
+        aiocb.aio_fildes = fd;
+        let source = LlSource(Box::pin(aiocb));
+        let mut poll_aio = PollAio::new_for_aio(source).unwrap();
+        let r = unsafe {
+            let p = (*poll_aio).0.as_mut().get_unchecked_mut();
+            libc::aio_fsync(libc::O_SYNC, p)
+        };
+        assert_eq!(0, r);
+        let fut = LlFut(poll_aio);
+        fut.await.unwrap();
+    }
 }
 
 mod lio {
@@ -82,7 +173,7 @@ mod lio {
     struct LioFut(Option<PollAio<WrappedLioCb<'static>>>);
 
     impl Future for LioFut {
-        type Output = Result<Vec<isize>, std::io::Error>;
+        type Output = std::io::Result<Vec<isize>>;
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>)
             -> Poll<Self::Output>
