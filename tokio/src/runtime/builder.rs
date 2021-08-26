@@ -389,6 +389,9 @@ impl Builder {
     /// This can be used to start work only when the executor is idle, or for bookkeeping
     /// and monitoring purposes.
     ///
+    /// Note: There can only be one park callback for a runtime; calling this function
+    /// more than once replaces the last callback defined, rather than adding to it.
+    ///
     /// # Examples
     ///
     /// ```
@@ -427,6 +430,9 @@ impl Builder {
     /// This is intended for bookkeeping and monitoring use cases; note that work
     /// in this callback will increase latencies when the application has allowed one or
     /// more runtime threads to go idle.
+    ///
+    /// Note: There can only be one unpark callback for a runtime; calling this function
+    /// more than once replaces the last callback defined, rather than adding to it.
     ///
     /// # Examples
     ///
