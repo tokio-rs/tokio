@@ -1,8 +1,6 @@
 //! This file contains the types necessary to collect various types of stats.
 use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
-use std::time::{Duration, Instant};
-
 /// This type contains methods to retrieve stats from a Tokio runtime.
 #[derive(Debug)]
 pub struct RuntimeStats {
@@ -71,7 +69,6 @@ impl WorkerStatsBatcher {
             park_count: 0,
             steal_count: 0,
             poll_count: 0,
-            last_park: Instant::now(),
         }
     }
     pub(crate) fn submit(&mut self, to: &RuntimeStats) {
