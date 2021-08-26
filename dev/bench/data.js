@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1630002920479,
+  "lastUpdate": 1630002927726,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -44929,6 +44929,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17711272,
             "range": "± 2435163",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eliza@buoyant.io",
+            "name": "Eliza Weisman",
+            "username": "hawkw"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e2e38b7cdf4c9f51a0034469c8553d995af1383",
+          "message": "sync: use `WakeList` in `Notify` and `batch_semaphore` (#4071)\n\n## Motivation\r\n\r\nPR #4055 added a new `WakeList` type, to manage a potentially\r\nuninitialized array when waking batches of wakers. This has the\r\nadvantage of not initializing a bunch of empty `Option`s when only a\r\nsmall number of tasks are being woken, potentially improving performance\r\nin these cases.\r\n\r\nCurrently, `WakeList` is used only in the IO driver. However,\r\n`tokio::sync` contains some code that's almost identical to the code in\r\nthe IO driver that was replaced with `WakeList`, so we can apply the\r\nsame optimizations there.\r\n\r\n## Solution\r\n\r\nThis branch changes `tokio::sync::Notify` and\r\n`tokio::sync::batch_semaphore::Semaphore` to use `WakeList` when waking\r\nbatches of wakers. This was a pretty straightforward drop-in\r\nreplacement.\r\n\r\nSigned-off-by: Eliza Weisman <eliza@buoyant.io>",
+          "timestamp": "2021-08-26T11:33:22-07:00",
+          "tree_id": "d74ef96d6251eefbbe6d2eff7f92b3dc494e2900",
+          "url": "https://github.com/tokio-rs/tokio/commit/1e2e38b7cdf4c9f51a0034469c8553d995af1383"
+        },
+        "date": 1630002918970,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 198412,
+            "range": "± 49988",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 828045,
+            "range": "± 177911",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5322301,
+            "range": "± 1105720",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19213465,
+            "range": "± 3449467",
             "unit": "ns/iter"
           }
         ]
