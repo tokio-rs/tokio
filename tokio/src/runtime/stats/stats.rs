@@ -16,7 +16,6 @@ pub struct WorkerStats {
     park_count: AtomicU64,
     steal_count: AtomicU64,
     poll_count: AtomicU64,
-    park_to_park: AtomicCounterDuration,
 }
 
 impl RuntimeStats {
@@ -27,7 +26,6 @@ impl RuntimeStats {
                 park_count: AtomicU64::new(0),
                 steal_count: AtomicU64::new(0),
                 poll_count: AtomicU64::new(0),
-                park_to_park: AtomicCounterDuration::default(),
             });
         }
 
@@ -58,15 +56,6 @@ impl WorkerStats {
     pub fn poll_count(&self) -> u64 {
         self.poll_count.load(Relaxed)
     }
-
-    /// Returns the amount of time the runtime spent working between the last
-    /// two times it parked.
-    ///
-    /// The `u16` is a counter that is incremented by one each time the duration
-    /// is changed. The counter will wrap around when it reaches `u16::MAX`.
-    pub fn park_to_park(&self) -> (u16, Duration) {
-        self.park_to_park.load(Relaxed).into_pair()
-    }
 }
 
 pub(crate) struct WorkerStatsBatcher {
@@ -74,8 +63,6 @@ pub(crate) struct WorkerStatsBatcher {
     park_count: u64,
     steal_count: u64,
     poll_count: u64,
-    last_park: Instant,
-    park_to_park: CounterDuration,
 }
 
 impl WorkerStatsBatcher {
@@ -86,7 +73,6 @@ impl WorkerStatsBatcher {
             steal_count: 0,
             poll_count: 0,
             last_park: Instant::now(),
-            park_to_park: CounterDuration::default(),
         }
     }
     pub(crate) fn submit(&mut self, to: &RuntimeStats) {
@@ -95,16 +81,13 @@ impl WorkerStatsBatcher {
         worker.park_count.store(self.park_count, Relaxed);
         worker.steal_count.store(self.steal_count, Relaxed);
         worker.poll_count.store(self.poll_count, Relaxed);
-        worker.park_to_park.store(self.park_to_park, Relaxed);
     }
 
     pub(crate) fn about_to_park(&mut self) {
         self.park_count += 1;
-        self.update_park_to_park();
     }
 
     pub(crate) fn returned_from_park(&mut self) {
-        self.last_park = Instant::now();
     }
 
     #[cfg(feature = "rt-multi-thread")]
@@ -114,11 +97,5 @@ impl WorkerStatsBatcher {
 
     pub(crate) fn incr_poll_count(&mut self) {
         self.poll_count += 1;
-    }
-
-    pub(crate) fn update_park_to_park(&mut self) {
-        let now = Instant::now();
-        let diff = now - self.last_park;
-        self.park_to_park.set_next_duration(diff);
     }
 }
