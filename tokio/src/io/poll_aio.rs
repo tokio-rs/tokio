@@ -82,7 +82,7 @@ impl<T: AioSource> Source for MioSource<T> {
 // AsyncFd can't be used for POSIX AIO.
 //
 // Note that PollAio doesn't implement Drop.  There's no need.  Unlike other
-// kqueue sources, there is nothing to deregister.
+// kqueue sources, simply dropping the object effectively deregisters it.
 pub struct PollAio<E: AioSource> {
     io: MioSource<E>,
     registration: Registration,
@@ -95,10 +95,19 @@ impl<E: AioSource> PollAio<E> {
     /// readiness flag will be cleared, and tokio will wait for the next
     /// edge-triggered readiness notification from the OS.
     ///
-    /// It is critical that this function not be called unless your code
+    /// It is critical that this method not be called unless your code
     /// _actually observes_ that the source is _not_ ready.  The OS must
     /// deliver a subsequent notification, or this source will block
-    /// forever.
+    /// forever.  It is equally critical that you `do` call this method if you
+    /// resubmit the same structure to the kernel and poll it again.
+    ///
+    /// This method is not very useful with AIO readiness, since each `aiocb`
+    /// structure is typically only used once.  It's main use with
+    /// [`lio_listio`], which will sometimes send notification when only a
+    /// portion of its elements are complete.  In that case, the caller must
+    /// call `clear_ready` before resubmitting it.
+    ///
+    /// [`lio_listio`]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/lio_listio.html
     pub fn clear_ready(&self, ev: PollAioEvent) {
         self.registration.clear_readiness(ev.0)
     }
