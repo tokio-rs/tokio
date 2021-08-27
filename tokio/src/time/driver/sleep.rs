@@ -240,7 +240,7 @@ impl Sleep {
 
             let span_guard = resource_span.enter();
             tracing::trace!(
-                target: "tokio::resource::state_update",
+                target: "runtime::resource::state_update",
                 duration = duration,
                 duration.unit = "ms",
                 duration.op = "override",
@@ -308,7 +308,7 @@ impl Sleep {
             let duration = me.inner.time_source.deadline_to_tick(deadline) - now;
             let _span_guard = me.inner.resource_span.enter();
             tracing::trace!(
-                target: "tokio::resource::state_update",
+                target: "runtime::resource::state_update",
                 duration = duration,
                 duration.unit = "ms",
                 duration.op = "override",
@@ -345,7 +345,7 @@ impl Sleep {
             macro_rules! trace_op {
                 ($readiness:literal) => {
                     tracing::trace!(
-                        target: "tokio::resource::poll_op",
+                        target: "runtime::resource::poll_op",
                         op_name = "poll_elapsed",
                         readiness = $readiness
                     );
