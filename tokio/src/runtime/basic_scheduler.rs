@@ -2,6 +2,7 @@ use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
+use crate::runtime::stats::{RuntimeStats, WorkerStatsBatcher};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::sync::notify::Notify;
 use crate::util::{waker_ref, Wake, WakerRef};
@@ -47,6 +48,9 @@ struct Inner<P: Park> {
 
     /// Thread park handle
     park: P,
+
+    /// Stats batcher
+    stats: WorkerStatsBatcher,
 }
 
 #[derive(Clone)]
@@ -87,6 +91,9 @@ struct Shared {
 
     /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
+
+    /// Keeps track of various runtime stats.
+    stats: RuntimeStats,
 }
 
 /// Thread-local context.
@@ -123,6 +130,7 @@ impl<P: Park> BasicScheduler<P> {
                 owned: OwnedTasks::new(),
                 unpark: unpark as Box<dyn Unpark>,
                 woken: AtomicBool::new(false),
+                stats: RuntimeStats::new(1),
             }),
         };
 
@@ -133,6 +141,7 @@ impl<P: Park> BasicScheduler<P> {
             spawner: spawner.clone(),
             tick: 0,
             park,
+            stats: WorkerStatsBatcher::new(0),
         }));
 
         BasicScheduler {
@@ -205,6 +214,7 @@ impl<P: Park> Inner<P> {
             'outer: loop {
                 if scheduler.spawner.was_woken() || !polled {
                     polled = true;
+                    scheduler.stats.incr_poll_count();
                     if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
                         return v;
                     }
@@ -238,7 +248,10 @@ impl<P: Park> Inner<P> {
                         Some(entry) => entry,
                         None => {
                             // Park until the thread is signaled
+                            scheduler.stats.about_to_park();
+                            scheduler.stats.submit(&scheduler.spawner.shared.stats);
                             scheduler.park.park().expect("failed to park");
+                            scheduler.stats.returned_from_park();
 
                             // Try polling the `block_on` future next
                             continue 'outer;
@@ -247,6 +260,7 @@ impl<P: Park> Inner<P> {
 
                     match entry {
                         RemoteMsg::Schedule(task) => {
+                            scheduler.stats.incr_poll_count();
                             let task = context.shared.owned.assert_owner(task);
                             crate::coop::budget(|| task.run())
                         }
@@ -255,6 +269,7 @@ impl<P: Park> Inner<P> {
 
                 // Yield to the park, this drives the timer and pulls any pending
                 // I/O events.
+                scheduler.stats.submit(&scheduler.spawner.shared.stats);
                 scheduler
                     .park
                     .park_timeout(Duration::from_millis(0))
@@ -367,6 +382,10 @@ impl Spawner {
         }
 
         handle
+    }
+
+    pub(crate) fn stats(&self) -> &RuntimeStats {
+        &self.shared.stats
     }
 
     fn pop(&self) -> Option<RemoteMsg> {

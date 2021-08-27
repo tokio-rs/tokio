@@ -47,6 +47,7 @@ io-util = ["memchr", "bytes"]
 # stdin, stdout, stderr
 io-std = []
 macros = ["tokio-macros"]
+stats = []
 net = [
   "libc",
   "mio/os-poll",

@@ -111,6 +111,14 @@ impl Handle {
         context::current().ok_or(TryCurrentError(()))
     }
 
+    cfg_stats! {
+        /// Returns a view that lets you get information about how the runtime
+        /// is performing.
+        pub fn stats(&self) -> &crate::runtime::stats::RuntimeStats {
+            self.spawner.stats()
+        }
+    }
+
     /// Spawn a future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
