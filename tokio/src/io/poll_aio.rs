@@ -147,6 +147,14 @@ impl<E: AioSource> PollAio<E> {
     }
 
     /// Polls for readiness.  Either AIO or LIO counts.
+    ///
+    /// This method returns:
+    ///  * `Poll::Pending` if the underlying operation is not complete, whether
+    ///     or not it completed successfully.  This will be true if the OS is
+    ///     still processing it, or if it has not yet been submitted to the OS.
+    ///  * `Poll::Ready(Ok(_))` if the underlying operation is complete.
+    ///  * `Poll::Ready(Err(_))` if the reactor has been shutdown.  This does
+    ///     _not_ indicate that the underlying operation encountered an error.
     pub fn poll<'a>(&'a self, cx: &mut Context<'_>) -> Poll<io::Result<PollAioEvent>> {
         let ev = ready!(self.registration.poll_read_ready(cx))?;
         Poll::Ready(Ok(PollAioEvent(ev)))
