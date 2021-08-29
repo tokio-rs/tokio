@@ -94,3 +94,9 @@ impl<T> fmt::Debug for WatchStream<T> {
         f.debug_struct("WatchStream").finish()
     }
 }
+
+impl<T: 'static + Clone + Unpin + Send + Sync> From<Receiver<T>> for WatchStream<T> {
+    fn from(recv: Receiver<T>) -> Self {
+        Self::new(recv)
+    }
+}

@@ -51,3 +51,9 @@ impl<T> AsMut<UnboundedReceiver<T>> for UnboundedReceiverStream<T> {
         &mut self.inner
     }
 }
+
+impl<T> From<UnboundedReceiver<T>> for UnboundedReceiverStream<T> {
+    fn from(recv: UnboundedReceiver<T>) -> Self {
+        Self::new(recv)
+    }
+}
