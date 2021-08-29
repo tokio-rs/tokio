@@ -155,6 +155,11 @@ impl<E: AioSource> PollAio<E> {
     ///  * `Poll::Ready(Ok(_))` if the underlying operation is complete.
     ///  * `Poll::Ready(Err(_))` if the reactor has been shutdown.  This does
     ///     _not_ indicate that the underlying operation encountered an error.
+    ///
+    /// When the method returns Poll::Pending, the Waker in the provided Context
+    /// is scheduled to receive a wakeup when the underlying operation
+    /// completes. Note that on multiple calls to poll, only the Waker from the
+    /// Context passed to the most recent call is scheduled to receive a wakeup.
     pub fn poll<'a>(&'a self, cx: &mut Context<'_>) -> Poll<io::Result<PollAioEvent>> {
         let ev = ready!(self.registration.poll_read_ready(cx))?;
         Poll::Ready(Ok(PollAioEvent(ev)))
