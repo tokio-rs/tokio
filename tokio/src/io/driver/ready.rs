@@ -38,7 +38,7 @@ impl Ready {
     pub(crate) fn from_mio(event: &mio::event::Event) -> Ready {
         let mut ready = Ready::EMPTY;
 
-        #[cfg(all(target_os = "freebsd", feature = "aio"))]
+        #[cfg(all(target_os = "freebsd", feature = "net"))]
         {
             if event.is_aio() {
                 ready |= Ready::READABLE;

@@ -28,7 +28,6 @@ default = []
 
 # enable everything
 full = [
-  "aio",
   "fs",
   "io-util",
   "io-std",
@@ -41,10 +40,6 @@ full = [
   "signal",
   "sync",
   "time",
-]
-
-aio = [
-  "mio/os-poll"
 ]
 
 fs = []

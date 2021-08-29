@@ -48,9 +48,9 @@ macro_rules! cfg_atomic_waker_impl {
 macro_rules! cfg_aio {
     ($($item:item)*) => {
         $(
-            #[cfg(all(target_os = "freebsd", feature = "aio"))]
+            #[cfg(all(target_os = "freebsd", feature = "net"))]
             #[cfg_attr(docsrs,
-                doc(cfg(all(target_os = "freebsd", feature = "aio")))
+                doc(cfg(all(target_os = "freebsd", feature = "net")))
             )]
             $item
         )*
@@ -77,7 +77,6 @@ macro_rules! cfg_io_driver {
     ($($item:item)*) => {
         $(
             #[cfg(any(
-                all(target_os = "freebsd", feature = "aio"),
                 feature = "net",
                 feature = "process",
                 all(unix, feature = "signal"),
@@ -96,7 +95,6 @@ macro_rules! cfg_io_driver_impl {
     ( $( $item:item )* ) => {
         $(
             #[cfg(any(
-                all(target_os = "freebsd", feature = "aio"),
                 feature = "net",
                 feature = "process",
                 all(unix, feature = "signal"),
@@ -110,7 +108,6 @@ macro_rules! cfg_not_io_driver {
     ($($item:item)*) => {
         $(
             #[cfg(not(any(
-                all(target_os = "freebsd", feature = "aio"),
                 feature = "net",
                 feature = "process",
                 all(unix, feature = "signal"),

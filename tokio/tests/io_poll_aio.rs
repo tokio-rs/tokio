@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(target_os = "freebsd", feature = "aio"))]
+#![cfg(all(target_os = "freebsd", feature = "net"))]
 
 use mio_aio::{AioCb, AioFsyncMode, LioCb};
 use std::{
