@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1630230112601,
+  "lastUpdate": 1630247525622,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -23975,6 +23975,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 544,
             "range": "± 40",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "francis.murillo@protonmail.com",
+            "name": "Francis Murillo",
+            "username": "FrancisMurillo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "909d3ec0ff205cc5be1e31b8c3c22a4f0916bb47",
+          "message": "stream: add `From<Receiver<T>>` impl for receiver streams (#4080)",
+          "timestamp": "2021-08-29T16:30:13+02:00",
+          "tree_id": "f1bd6fd5780ed386a1a5c662436275be2a87f70a",
+          "url": "https://github.com/tokio-rs/tokio/commit/909d3ec0ff205cc5be1e31b8c3c22a4f0916bb47"
+        },
+        "date": 1630247519600,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 660,
+            "range": "± 50",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14955,
+            "range": "± 10480",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 687,
+            "range": "± 60",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14617,
+            "range": "± 4154",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 424,
+            "range": "± 52",
             "unit": "ns/iter"
           }
         ]
