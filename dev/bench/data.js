@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1630230072022,
+  "lastUpdate": 1630230079255,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -45337,6 +45337,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20594598,
             "range": "± 3154931",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b67d46403fd7d1df364ff5319231630f6bbc8779",
+          "message": "process: skip the process_kill_on_drop test if bash is not installed. (#4079)",
+          "timestamp": "2021-08-29T10:59:58+02:00",
+          "tree_id": "7e9500c015ee78c02dd639b1621aa3fc5d3a6df4",
+          "url": "https://github.com/tokio-rs/tokio/commit/b67d46403fd7d1df364ff5319231630f6bbc8779"
+        },
+        "date": 1630230071466,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 203854,
+            "range": "± 64289",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 849419,
+            "range": "± 119931",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5957587,
+            "range": "± 819197",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17415311,
+            "range": "± 4157432",
             "unit": "ns/iter"
           }
         ]
