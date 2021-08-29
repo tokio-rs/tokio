@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1630247545928,
+  "lastUpdate": 1630247547954,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -45439,6 +45439,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17415311,
             "range": "± 4157432",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "francis.murillo@protonmail.com",
+            "name": "Francis Murillo",
+            "username": "FrancisMurillo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "909d3ec0ff205cc5be1e31b8c3c22a4f0916bb47",
+          "message": "stream: add `From<Receiver<T>>` impl for receiver streams (#4080)",
+          "timestamp": "2021-08-29T16:30:13+02:00",
+          "tree_id": "f1bd6fd5780ed386a1a5c662436275be2a87f70a",
+          "url": "https://github.com/tokio-rs/tokio/commit/909d3ec0ff205cc5be1e31b8c3c22a4f0916bb47"
+        },
+        "date": 1630247535981,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 221447,
+            "range": "± 44938",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 1016514,
+            "range": "± 219999",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6227554,
+            "range": "± 2142359",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20977290,
+            "range": "± 4719126",
             "unit": "ns/iter"
           }
         ]
