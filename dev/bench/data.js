@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1630227691190,
+  "lastUpdate": 1630227717378,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -23867,6 +23867,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 450,
             "range": "± 20",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b67d46403fd7d1df364ff5319231630f6bbc8779",
+          "message": "process: skip the process_kill_on_drop test if bash is not installed. (#4079)",
+          "timestamp": "2021-08-29T10:59:58+02:00",
+          "tree_id": "7e9500c015ee78c02dd639b1621aa3fc5d3a6df4",
+          "url": "https://github.com/tokio-rs/tokio/commit/b67d46403fd7d1df364ff5319231630f6bbc8779"
+        },
+        "date": 1630227709135,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 786,
+            "range": "± 195",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 19742,
+            "range": "± 14609",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 842,
+            "range": "± 128",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15684,
+            "range": "± 7219",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 466,
+            "range": "± 186",
             "unit": "ns/iter"
           }
         ]
