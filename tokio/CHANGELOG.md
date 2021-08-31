@@ -1,3 +1,36 @@
+# 1.11.0 (August 31, 2021)
+
+### Fixed
+
+ - time: don't panic when Instant is not monotonic ([#4044])
+ - io: fix panic in `fill_buf` by not calling `poll_fill_buf` twice ([#4084])
+
+### Added
+
+ - watch: add `watch::Sender::subscribe` ([#3800])
+ - process: add `from_std` to `ChildStd*` ([#4045])
+ - stats: initial work on runtime stats ([#4043])
+
+### Changed
+
+ - tracing: change span naming to new console convention ([#4042])
+ - io: speed-up waking by using uninitialized array ([#4055], [#4071], [#4075])
+
+### Documented
+
+ - time: make Sleep examples easier to find ([#4040])
+
+[#3800]: https://github.com/tokio-rs/tokio/pull/3800
+[#4040]: https://github.com/tokio-rs/tokio/pull/4040
+[#4042]: https://github.com/tokio-rs/tokio/pull/4042
+[#4043]: https://github.com/tokio-rs/tokio/pull/4043
+[#4044]: https://github.com/tokio-rs/tokio/pull/4044
+[#4045]: https://github.com/tokio-rs/tokio/pull/4045
+[#4055]: https://github.com/tokio-rs/tokio/pull/4055
+[#4071]: https://github.com/tokio-rs/tokio/pull/4071
+[#4075]: https://github.com/tokio-rs/tokio/pull/4075
+[#4084]: https://github.com/tokio-rs/tokio/pull/4084
+
 # 1.10.1 (August 24, 2021)
 
 ### Fixed
