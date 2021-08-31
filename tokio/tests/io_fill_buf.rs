@@ -1,10 +1,10 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::{BufReader, AsyncBufReadExt};
-use tokio::fs::File;
-use tokio_test::assert_ok;
 use tempfile::NamedTempFile;
+use tokio::fs::File;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio_test::assert_ok;
 
 #[tokio::test]
 async fn fill_buf_file() {
@@ -20,7 +20,9 @@ async fn fill_buf_file() {
     loop {
         let consumed = {
             let buffer = assert_ok!(file.fill_buf().await);
-            if buffer.is_empty() { break; }
+            if buffer.is_empty() {
+                break;
+            }
             contents.extend_from_slice(buffer);
             buffer.len()
         };
