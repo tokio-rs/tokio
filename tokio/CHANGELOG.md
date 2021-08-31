@@ -3,6 +3,7 @@
 ### Fixed
 
  - time: don't panic when Instant is not monotonic ([#4044])
+ - io: fix panic in `fill_buf` by not calling `poll_fill_buf` twice ([#4084])
 
 ### Added
 
@@ -28,6 +29,7 @@
 [#4055]: https://github.com/tokio-rs/tokio/pull/4055
 [#4071]: https://github.com/tokio-rs/tokio/pull/4071
 [#4075]: https://github.com/tokio-rs/tokio/pull/4075
+[#4084]: https://github.com/tokio-rs/tokio/pull/4084
 
 # 1.10.1 (August 24, 2021)
 
