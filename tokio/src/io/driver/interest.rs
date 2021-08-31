@@ -16,12 +16,20 @@ pub struct Interest(mio::Interest);
 impl Interest {
     cfg_aio! {
         /// Interest for POSIX AIO
+        #[cfg(target_os = "freebsd")]
         pub const AIO: Interest = Interest(mio::Interest::AIO);
-    }
 
-    cfg_aio! {
+        /// Interest for POSIX AIO
+        #[cfg(not(target_os = "freebsd"))]
+        pub const AIO: Interest = Interest(mio::Interest::READABLE);
+
         /// Interest for POSIX AIO lio_listio events
+        #[cfg(target_os = "freebsd")]
         pub const LIO: Interest = Interest(mio::Interest::LIO);
+
+        /// Interest for POSIX AIO lio_listio events
+        #[cfg(not(target_os = "freebsd"))]
+        pub const LIO: Interest = Interest(mio::Interest::READABLE);
     }
 
     /// Interest in all readable events.
