@@ -93,23 +93,6 @@ pub fn sleep(duration: Duration) -> Sleep {
     }
 }
 
-cfg_trace! {
-    #[derive(Debug)]
-    struct Inner {
-        deadline: Instant,
-        resource_span: tracing::Span,
-        async_op_span: tracing::Span,
-        time_source: ClockTime,
-    }
-}
-
-cfg_not_trace! {
-    #[derive(Debug)]
-    struct Inner {
-        deadline: Instant,
-    }
-}
-
 pin_project! {
     /// Future returned by [`sleep`](sleep) and [`sleep_until`](sleep_until).
     ///
@@ -211,32 +194,37 @@ pin_project! {
     }
 }
 
-impl Sleep {
-    cfg_not_trace! {
-        pub(crate) fn new_timeout(deadline: Instant) -> Sleep {
-            let handle = Handle::current();
-            let entry = TimerEntry::new(&handle, deadline);
-            Sleep { inner: Inner {deadline}, entry }
-        }
+cfg_trace! {
+    #[derive(Debug)]
+    struct Inner {
+        deadline: Instant,
+        resource_span: tracing::Span,
+        async_op_span: tracing::Span,
+        time_source: ClockTime,
     }
+}
 
-    cfg_trace! {
-        pub(crate) fn new_timeout(deadline: Instant) -> Sleep {
-            let handle = Handle::current();
-            let entry = TimerEntry::new(&handle, deadline);
+cfg_not_trace! {
+    #[derive(Debug)]
+    struct Inner {
+        deadline: Instant,
+    }
+}
 
-            let time_source =  handle.time_source().clone();
+impl Sleep {
+    pub(crate) fn new_timeout(deadline: Instant) -> Sleep {
+        let handle = Handle::current();
+        let entry = TimerEntry::new(&handle, deadline);
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let inner = {
+            let time_source = handle.time_source().clone();
             let duration = time_source.deadline_to_tick(deadline) - time_source.now();
-            let resource_span = tracing::trace_span!(
-                "runtime.resource",
-                concrete_type = "Sleep",
-                kind = "timer");
+            let resource_span =
+                tracing::trace_span!("runtime.resource", concrete_type = "Sleep", kind = "timer",);
 
-            let async_op_span = tracing::trace_span!(
-                "runtime.resource.async_op",
-                source = "Sleep::new_timeout"
-                );
-
+            let async_op_span =
+                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout",);
 
             let span_guard = resource_span.enter();
             tracing::trace!(
@@ -247,8 +235,18 @@ impl Sleep {
             );
             drop(span_guard);
 
-            Sleep { inner: Inner {deadline, resource_span, async_op_span, time_source }, entry }
-        }
+            Inner {
+                deadline,
+                resource_span,
+                async_op_span,
+                time_source,
+            }
+        };
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let inner = Inner { deadline };
+
+        Sleep { inner, entry }
     }
 
     pub(crate) fn far_future() -> Sleep {
@@ -273,7 +271,7 @@ impl Sleep {
     /// future completes without having to create new associated state.
     ///
     /// This function can be called both before and after the future has
-    /// completed.Event
+    /// completed.
     ///
     /// To call this method, you will usually combine the call with
     /// [`Pin::as_mut`], which lets you call the method without consuming the
@@ -300,10 +298,13 @@ impl Sleep {
         self.reset_inner(deadline)
     }
 
-    cfg_trace! {
-        fn reset_inner(self: Pin<&mut Self>, deadline: Instant) {
-            let me = self.project();
+    fn reset_inner(self: Pin<&mut Self>, deadline: Instant) {
+        let me = self.project();
+        me.entry.reset(deadline);
+        (*me.inner).deadline = deadline;
 
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        {
             let now = me.inner.time_source.now();
             let duration = me.inner.time_source.deadline_to_tick(deadline) - now;
             let _span_guard = me.inner.resource_span.enter();
@@ -313,16 +314,6 @@ impl Sleep {
                 duration.unit = "ms",
                 duration.op = "override",
             );
-            me.entry.reset(deadline);
-            (*me.inner).deadline = deadline;
-        }
-    }
-
-    cfg_not_trace! {
-        fn reset_inner(self: Pin<&mut Self>, deadline: Instant) {
-            let me = self.project();
-            me.entry.reset(deadline);
-            (*me.inner).deadline = deadline;
         }
     }
 
@@ -342,43 +333,21 @@ impl Sleep {
 
     cfg_trace! {
         fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
-            macro_rules! trace_op {
-                ($readiness:literal) => {
-                    tracing::trace!(
-                        target: "runtime::resource::poll_op",
-                        op_name = "poll_elapsed",
-                        readiness = $readiness
-                    );
-                }
-            }
-
             let me = self.project();
             let _span_guard = me.inner.resource_span.enter();
 
             // Keep track of task budget
-            let coop = match crate::coop::poll_proceed(cx) {
-                Poll::Pending => {
-                    trace_op!("pending");
-                    return Poll::Pending;
-                },
-                Poll::Ready(coop) => coop
-            };
-
+            let coop = ready!(trace_poll_op!(
+                "poll_elapsed",
+                crate::coop::poll_proceed(cx)
+            ));
 
             let result =  me.entry.poll_elapsed(cx).map(move |r| {
                 coop.made_progress();
                 r
             });
-            match result {
-                Poll::Ready(result) => {
-                    trace_op!("ready");
-                    Poll::Ready(result)
-                },
-                Poll::Pending => {
-                    trace_op!("pending");
-                    Poll::Pending
-                }
-            }
+
+            trace_poll_op!("poll_elapsed", result)
         }
     }
 }
@@ -395,22 +364,13 @@ impl Future for Sleep {
     // Both cases are extremely rare, and pretty accurately fit into
     // "logic errors", so we just panic in this case. A user couldn't
     // really do much better if we passed the error onwards.
-    cfg_not_trace! {
-        fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-            match ready!(self.as_mut().poll_elapsed(cx)) {
-                Ok(()) => Poll::Ready(()),
-                Err(e) => panic!("timer error: {}", e),
-            }
-        }
-    }
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _span = self.inner.async_op_span.clone().entered();
 
-    cfg_trace! {
-        fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-            let _span = self.inner.async_op_span.clone().entered();
-            match ready!(self.as_mut().poll_elapsed(cx)) {
-                Ok(()) => Poll::Ready(()),
-                Err(e) => panic!("timer error: {}", e),
-            }
+        match ready!(self.as_mut().poll_elapsed(cx)) {
+            Ok(()) => Poll::Ready(()),
+            Err(e) => panic!("timer error: {}", e),
         }
     }
 }
