@@ -48,7 +48,7 @@ macro_rules! cfg_atomic_waker_impl {
 macro_rules! cfg_aio {
     ($($item:item)*) => {
         $(
-            #[cfg(all(target_os = "freebsd", feature = "net"))]
+            #[cfg(all(any(docsrs, target_os = "freebsd"), feature = "net"))]
             #[cfg_attr(docsrs,
                 doc(cfg(all(target_os = "freebsd", feature = "net")))
             )]
