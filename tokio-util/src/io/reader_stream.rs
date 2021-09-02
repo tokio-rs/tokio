@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
-const CAPACITY: usize = 4096;
+const DEFAULT_CAPACITY: usize = 4096;
 
 pin_project! {
     /// Convert an [`AsyncRead`] into a [`Stream`] of byte chunks.
@@ -50,6 +50,7 @@ pin_project! {
         reader: Option<R>,
         // Working buffer, used to optimize allocations.
         buf: BytesMut,
+        capacity: usize,
     }
 }
 
@@ -63,6 +64,21 @@ impl<R: AsyncRead> ReaderStream<R> {
         ReaderStream {
             reader: Some(reader),
             buf: BytesMut::new(),
+            capacity: DEFAULT_CAPACITY,
+        }
+    }
+
+    /// Convert an [`AsyncRead`] into a [`Stream`] with item type
+    /// `Result<Bytes, std::io::Error>`,
+    /// with a specific read buffer initial capacity.
+    ///
+    /// [`AsyncRead`]: tokio::io::AsyncRead
+    /// [`Stream`]: futures_core::Stream
+    pub fn with_capacity(reader: R, capacity: usize) -> Self {
+        ReaderStream {
+            reader: Some(reader),
+            buf: BytesMut::with_capacity(capacity),
+            capacity,
         }
     }
 }
@@ -80,7 +96,7 @@ impl<R: AsyncRead> Stream for ReaderStream<R> {
         };
 
         if this.buf.capacity() == 0 {
-            this.buf.reserve(CAPACITY);
+            this.buf.reserve(*this.capacity);
         }
 
         match poll_read_buf(reader, cx, &mut this.buf) {
