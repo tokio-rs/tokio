@@ -64,14 +64,23 @@ cfg_test_util! {
     /// Pause time
     ///
     /// The current value of `Instant::now()` is saved and all subsequent calls
-    /// to `Instant::now()` until the timer wheel is checked again will return
-    /// the saved value. Once the timer wheel is checked, time will immediately
-    /// advance to the next registered `Sleep`. This is useful for running tests
-    /// that depend on time.
+    /// to `Instant::now()` will return the saved value. The saved value can be
+    /// changed by [`advance`] or by the time auto-advancing once the runtime
+    /// has no work to do. This only affects the `Instant` type in Tokio, and
+    /// the `Instant` in std continues to work as normal.
     ///
     /// Pausing time requires the `current_thread` Tokio runtime. This is the
     /// default runtime used by `#[tokio::test]`. The runtime can be initialized
     /// with time in a paused state using the `Builder::start_paused` method.
+    ///
+    /// For cases where time is immediately paused, it is better to pause
+    /// the time using the `main` or `test` macro:
+    /// ```
+    /// #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// async fn main() {
+    ///    println!("Hello world");
+    /// }
+    /// ```
     ///
     /// # Panics
     ///
@@ -86,6 +95,7 @@ cfg_test_util! {
     /// current time when awaited.
     ///
     /// [`Sleep`]: crate::time::Sleep
+    /// [`advance`]: crate::time::advance
     pub fn pause() {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.pause();
@@ -116,6 +126,11 @@ cfg_test_util! {
     /// Increments the saved `Instant::now()` value by `duration`. Subsequent
     /// calls to `Instant::now()` will return the result of the increment.
     ///
+    /// Although this function is async, it does not wait for timers with a
+    /// deadline less than the given duration to complete. If you wish to wait
+    /// for those, you should use the [`sleep`] method instead and rely on the
+    /// auto-advance feature.
+    ///
     /// # Panics
     ///
     /// Panics if time is not frozen or if called from outside of the Tokio
@@ -126,6 +141,8 @@ cfg_test_util! {
     /// If the time is paused and there is no work to do, the runtime advances
     /// time to the next timer. See [`pause`](pause#auto-advance) for more
     /// details.
+    ///
+    /// [`sleep`]: fn@crate::time::sleep
     pub async fn advance(duration: Duration) {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.advance(duration);

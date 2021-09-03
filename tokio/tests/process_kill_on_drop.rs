@@ -1,6 +1,7 @@
 #![cfg(all(unix, feature = "process"))]
 #![warn(rust_2018_idioms)]
 
+use std::io::ErrorKind;
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::AsyncReadExt;
@@ -24,11 +25,12 @@ async fn kill_on_drop() {
     ",
     ]);
 
-    let mut child = cmd
-        .kill_on_drop(true)
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
+    let e = cmd.kill_on_drop(true).stdout(Stdio::piped()).spawn();
+    if e.is_err() && e.as_ref().unwrap_err().kind() == ErrorKind::NotFound {
+        println!("bash not available; skipping test");
+        return;
+    }
+    let mut child = e.unwrap();
 
     sleep(Duration::from_secs(2)).await;
 

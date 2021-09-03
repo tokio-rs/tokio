@@ -12,7 +12,13 @@ pub(crate) struct WakeList {
 impl WakeList {
     pub(crate) fn new() -> Self {
         Self {
-            inner: unsafe { MaybeUninit::uninit().assume_init() },
+            inner: unsafe {
+                // safety: Create an uninitialized array of `MaybeUninit`. The
+                // `assume_init` is safe because the type we are claiming to
+                // have initialized here is a bunch of `MaybeUninit`s, which do
+                // not require initialization.
+                MaybeUninit::uninit().assume_init()
+            },
             curr: 0,
         }
     }

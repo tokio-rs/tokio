@@ -12,6 +12,7 @@ pub(crate) use worker::Launch;
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
+use crate::runtime::stats::RuntimeStats;
 use crate::runtime::task::JoinHandle;
 use crate::runtime::Parker;
 
@@ -98,6 +99,10 @@ impl Spawner {
 
     pub(crate) fn shutdown(&mut self) {
         self.shared.close();
+    }
+
+    pub(crate) fn stats(&self) -> &RuntimeStats {
+        self.shared.stats()
     }
 }
 

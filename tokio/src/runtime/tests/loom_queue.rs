@@ -1,5 +1,6 @@
 use crate::runtime::blocking::NoopSchedule;
 use crate::runtime::queue;
+use crate::runtime::stats::WorkerStatsBatcher;
 use crate::runtime::task::Inject;
 
 use loom::thread;
@@ -11,11 +12,12 @@ fn basic() {
         let inject = Inject::new();
 
         let th = thread::spawn(move || {
+            let mut stats = WorkerStatsBatcher::new(0);
             let (_, mut local) = queue::local();
             let mut n = 0;
 
             for _ in 0..3 {
-                if steal.steal_into(&mut local).is_some() {
+                if steal.steal_into(&mut local, &mut stats).is_some() {
                     n += 1;
                 }
 
@@ -65,10 +67,11 @@ fn steal_overflow() {
         let inject = Inject::new();
 
         let th = thread::spawn(move || {
+            let mut stats = WorkerStatsBatcher::new(0);
             let (_, mut local) = queue::local();
             let mut n = 0;
 
-            if steal.steal_into(&mut local).is_some() {
+            if steal.steal_into(&mut local, &mut stats).is_some() {
                 n += 1;
             }
 
@@ -113,9 +116,10 @@ fn multi_stealer() {
     const NUM_TASKS: usize = 5;
 
     fn steal_tasks(steal: queue::Steal<NoopSchedule>) -> usize {
+        let mut stats = WorkerStatsBatcher::new(0);
         let (_, mut local) = queue::local();
 
-        if steal.steal_into(&mut local).is_none() {
+        if steal.steal_into(&mut local, &mut stats).is_none() {
             return 0;
         }
 
@@ -165,6 +169,7 @@ fn multi_stealer() {
 #[test]
 fn chained_steal() {
     loom::model(|| {
+        let mut stats = WorkerStatsBatcher::new(0);
         let (s1, mut l1) = queue::local();
         let (s2, mut l2) = queue::local();
         let inject = Inject::new();
@@ -180,8 +185,9 @@ fn chained_steal() {
 
         // Spawn a task to steal from **our** queue
         let th = thread::spawn(move || {
+            let mut stats = WorkerStatsBatcher::new(0);
             let (_, mut local) = queue::local();
-            s1.steal_into(&mut local);
+            s1.steal_into(&mut local, &mut stats);
 
             while local.pop().is_some() {}
         });
@@ -189,7 +195,7 @@ fn chained_steal() {
         // Drain our tasks, then attempt to steal
         while l1.pop().is_some() {}
 
-        s2.steal_into(&mut l1);
+        s2.steal_into(&mut l1, &mut stats);
 
         th.join().unwrap();
 

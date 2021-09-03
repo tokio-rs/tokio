@@ -57,3 +57,9 @@ impl<T> AsMut<Receiver<T>> for ReceiverStream<T> {
         &mut self.inner
     }
 }
+
+impl<T> From<Receiver<T>> for ReceiverStream<T> {
+    fn from(recv: Receiver<T>) -> Self {
+        Self::new(recv)
+    }
+}
