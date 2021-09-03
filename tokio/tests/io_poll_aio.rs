@@ -10,7 +10,7 @@ use std::{
     task::{Context, Poll},
 };
 use tempfile::tempfile;
-use tokio::io::bsd::poll_aio::{AioSource, Aio};
+use tokio::io::bsd::poll_aio::{Aio, AioSource};
 use tokio_test::assert_pending;
 
 mod aio {
