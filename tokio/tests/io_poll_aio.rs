@@ -10,7 +10,7 @@ use std::{
     task::{Context, Poll},
 };
 use tempfile::tempfile;
-use tokio::io::poll_aio::{AioSource, PollAio};
+use tokio::io::bsd::poll_aio::{AioSource, Aio};
 use tokio_test::assert_pending;
 
 mod aio {
@@ -28,7 +28,7 @@ mod aio {
     }
 
     /// A very crude implementation of an AIO-based future
-    struct FsyncFut(PollAio<WrappedAioCb<'static>>);
+    struct FsyncFut(Aio<WrappedAioCb<'static>>);
 
     impl Future for FsyncFut {
         type Output = std::io::Result<()>;
@@ -40,7 +40,7 @@ mod aio {
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
                 Poll::Ready(Ok(_ev)) => {
                     // At this point, we could clear readiness.  But there's no
-                    // point, since we're about to drop the PollAio.
+                    // point, since we're about to drop the Aio.
                     let result = (*self.0).0.aio_return();
                     match result {
                         Ok(_) => Poll::Ready(Ok(())),
@@ -75,7 +75,7 @@ mod aio {
         }
     }
 
-    struct LlFut(PollAio<LlSource>);
+    struct LlFut(Aio<LlSource>);
 
     impl Future for LlFut {
         type Output = std::io::Result<()>;
@@ -97,7 +97,7 @@ mod aio {
     /// A very simple object that can implement AioSource and can be reused.
     ///
     /// mio_aio normally assumes that each AioCb will be consumed on completion.
-    /// This somewhat contrived example shows how a PollAio object can be reused
+    /// This somewhat contrived example shows how an Aio object can be reused
     /// anyway.
     struct ReusableFsyncSource {
         aiocb: Pin<Box<AioCb<'static>>>,
@@ -130,7 +130,7 @@ mod aio {
         }
     }
 
-    struct ReusableFsyncFut<'a>(&'a mut PollAio<ReusableFsyncSource>);
+    struct ReusableFsyncFut<'a>(&'a mut Aio<ReusableFsyncSource>);
     impl<'a> Future for ReusableFsyncFut<'a> {
         type Output = std::io::Result<()>;
 
@@ -140,7 +140,7 @@ mod aio {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
                 Poll::Ready(Ok(ev)) => {
-                    // Since this future uses a reusable PollAio, we must clear
+                    // Since this future uses a reusable Aio, we must clear
                     // its readiness here.  That makes the future
                     // non-idempotent; the caller can't poll it repeatedly after
                     // it has already returned Ready.  But that's ok; most
@@ -162,7 +162,7 @@ mod aio {
         let fd = f.as_raw_fd();
         let aiocb = AioCb::from_fd(fd, 0);
         let source = WrappedAioCb(aiocb);
-        let mut poll_aio = PollAio::new_for_aio(source).unwrap();
+        let mut poll_aio = Aio::new_for_aio(source).unwrap();
         (*poll_aio).0.fsync(AioFsyncMode::O_SYNC).unwrap();
         let fut = FsyncFut(poll_aio);
         fut.await.unwrap();
@@ -175,7 +175,7 @@ mod aio {
         let mut aiocb: libc::aiocb = unsafe { mem::MaybeUninit::zeroed().assume_init() };
         aiocb.aio_fildes = fd;
         let source = LlSource(Box::pin(aiocb));
-        let mut poll_aio = PollAio::new_for_aio(source).unwrap();
+        let mut poll_aio = Aio::new_for_aio(source).unwrap();
         let r = unsafe {
             let p = (*poll_aio).0.as_mut().get_unchecked_mut();
             libc::aio_fsync(libc::O_SYNC, p)
@@ -185,14 +185,14 @@ mod aio {
         fut.await.unwrap();
     }
 
-    /// A suitably crafted future type can reuse a PollAio object
+    /// A suitably crafted future type can reuse an Aio object
     #[tokio::test]
     async fn reuse() {
         let f = tempfile().unwrap();
         let fd = f.as_raw_fd();
         let aiocb0 = AioCb::from_fd(fd, 0);
         let source = ReusableFsyncSource::new(aiocb0);
-        let mut poll_aio = PollAio::new_for_aio(source).unwrap();
+        let mut poll_aio = Aio::new_for_aio(source).unwrap();
         poll_aio.fsync();
         let fut0 = ReusableFsyncFut(&mut poll_aio);
         fut0.await.unwrap();
@@ -221,7 +221,7 @@ mod lio {
     }
 
     /// A very crude lio_listio-based Future
-    struct LioFut(Option<PollAio<WrappedLioCb<'static>>>);
+    struct LioFut(Option<Aio<WrappedLioCb<'static>>>);
 
     impl Future for LioFut {
         type Output = std::io::Result<Vec<isize>>;
@@ -233,7 +233,7 @@ mod lio {
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
                 Poll::Ready(Ok(_ev)) => {
                     // At this point, we could clear readiness.  But there's no
-                    // point, since we're about to drop the PollAio.
+                    // point, since we're about to drop the Aio.
                     let r = self.0.take().unwrap().into_inner().0.into_results(|iter| {
                         iter.map(|lr| lr.result.unwrap()).collect::<Vec<isize>>()
                     });
@@ -243,7 +243,7 @@ mod lio {
         }
     }
 
-    /// Minimal example demonstrating reuse of a PollAio object with lio
+    /// Minimal example demonstrating reuse of an Aio object with lio
     /// readiness.  mio_aio::LioCb actually does something similar under the
     /// hood.
     struct ReusableLioSource {
@@ -279,7 +279,7 @@ mod lio {
             self.fd = 0;
         }
     }
-    struct ReusableLioFut<'a>(&'a mut PollAio<ReusableLioSource>);
+    struct ReusableLioFut<'a>(&'a mut Aio<ReusableLioSource>);
     impl<'a> Future for ReusableLioFut<'a> {
         type Output = std::io::Result<Vec<isize>>;
 
@@ -289,7 +289,7 @@ mod lio {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
                 Poll::Ready(Ok(ev)) => {
-                    // Since this future uses a reusable PollAio, we must clear
+                    // Since this future uses a reusable Aio, we must clear
                     // its readiness here.  That makes the future
                     // non-idempotent; the caller can't poll it repeatedly after
                     // it has already returned Ready.  But that's ok; most
@@ -320,7 +320,7 @@ mod lio {
         );
         let liocb = builder.finish();
         let source = WrappedLioCb(liocb);
-        let mut poll_aio = PollAio::new_for_lio(source).unwrap();
+        let mut poll_aio = Aio::new_for_lio(source).unwrap();
 
         // Send the operation to the kernel
         (*poll_aio).0.submit().unwrap();
@@ -330,7 +330,7 @@ mod lio {
         assert_eq!(v[0] as usize, WBUF.len());
     }
 
-    /// A suitably crafted future type can reuse a PollAio object
+    /// A suitably crafted future type can reuse an Aio object
     #[tokio::test]
     async fn reuse() {
         const WBUF: &[u8] = b"abcdef";
@@ -346,14 +346,14 @@ mod lio {
         );
         let liocb0 = builder0.finish();
         let source = ReusableLioSource::new(liocb0);
-        let mut poll_aio = PollAio::new_for_aio(source).unwrap();
+        let mut poll_aio = Aio::new_for_aio(source).unwrap();
         poll_aio.submit();
         let fut0 = ReusableLioFut(&mut poll_aio);
         let v = fut0.await.unwrap();
         assert_eq!(v.len(), 1);
         assert_eq!(v[0] as usize, WBUF.len());
 
-        // Now reuse the same PollAio
+        // Now reuse the same Aio
         let mut builder1 = mio_aio::LioCbBuilder::with_capacity(1);
         builder1 = builder1.emplace_slice(
             f.as_raw_fd(),

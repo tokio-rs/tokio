@@ -14,7 +14,7 @@ use std::task::{Context, Poll};
 /// Like [`mio::event::Source`], but for POSIX AIO only.
 ///
 /// Tokio's consumer must pass an implementor of this trait to create a
-/// [`PollAio`] object.
+/// [`Aio`] object.
 pub trait AioSource {
     /// Register this AIO event source with Tokio's reactor
     fn register(&mut self, kq: RawFd, token: usize);
@@ -58,24 +58,24 @@ impl<T: AioSource> Source for MioSource<T> {
 
 /// Associates a POSIX AIO control block with the reactor that drives it.
 ///
-/// `PollAio`'s wrapped type must implement [`AioSource`] to be driven
+/// `Aio`'s wrapped type must implement [`AioSource`] to be driven
 /// by the reactor.
 ///
-/// The wrapped source may be accessed through the `PollAio` via the `Deref` and
+/// The wrapped source may be accessed through the `Aio` via the `Deref` and
 /// `DerefMut` traits.
 ///
 /// ## Clearing readiness
 ///
-/// If [`PollAio::poll`] returns ready, but the consumer determines that the
+/// If [`Aio::poll`] returns ready, but the consumer determines that the
 /// Source is not completely ready and must return to the Pending state,
-/// [`PollAio::clear_ready`] may be used.  This can be useful with
+/// [`Aio::clear_ready`] may be used.  This can be useful with
 /// [`lio_listio`], which may generate a kevent when only a portion of the
 /// operations have completed.
 ///
 /// ## Platforms
 ///
 /// Only FreeBSD implements POSIX AIO with kqueue notification, so
-/// `PollAio` is only available for that operating system.
+/// `Aio` is only available for that operating system.
 ///
 /// [`lio_listio`]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/lio_listio.html
 // Note: Unlike every other kqueue event source, POSIX AIO registers events not
@@ -83,16 +83,16 @@ impl<T: AioSource> Source for MioSource<T> {
 // aio_write, etc.  It needs the kqueue's file descriptor to do that.  So
 // AsyncFd can't be used for POSIX AIO.
 //
-// Note that PollAio doesn't implement Drop.  There's no need.  Unlike other
+// Note that Aio doesn't implement Drop.  There's no need.  Unlike other
 // kqueue sources, simply dropping the object effectively deregisters it.
-pub struct PollAio<E: AioSource> {
+pub struct Aio<E: AioSource> {
     io: MioSource<E>,
     registration: Registration,
 }
 
-// ===== impl PollAio =====
+// ===== impl Aio =====
 
-impl<E: AioSource> PollAio<E> {
+impl<E: AioSource> Aio<E> {
     /// Indicates to Tokio that the source is no longer ready.  The internal
     /// readiness flag will be cleared, and tokio will wait for the next
     /// edge-triggered readiness notification from the OS.
@@ -110,16 +110,16 @@ impl<E: AioSource> PollAio<E> {
     /// call `clear_ready` before resubmitting it.
     ///
     /// [`lio_listio`]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/lio_listio.html
-    pub fn clear_ready(&self, ev: PollAioEvent) {
+    pub fn clear_ready(&self, ev: AioEvent) {
         self.registration.clear_readiness(ev.0)
     }
 
-    /// Destroy the [`PollAio`] and return its inner Source
+    /// Destroy the [`Aio`] and return its inner Source
     pub fn into_inner(self) -> E {
         self.io.0
     }
 
-    /// Creates a new `PollAio` suitable for use with POSIX AIO functions.
+    /// Creates a new `Aio` suitable for use with POSIX AIO functions.
     ///
     /// It will be associated with the default reactor.  The runtime is usually
     /// set implicitly when this function is called from a future driven by a
@@ -129,7 +129,7 @@ impl<E: AioSource> PollAio<E> {
         Self::new_with_interest(io, Interest::AIO)
     }
 
-    /// Creates a new `PollAio` suitable for use with [`lio_listio`].
+    /// Creates a new `Aio` suitable for use with [`lio_listio`].
     ///
     /// It will be associated with the default reactor.  The runtime is usually
     /// set implicitly when this function is called from a future driven by a
@@ -162,13 +162,13 @@ impl<E: AioSource> PollAio<E> {
     /// is scheduled to receive a wakeup when the underlying operation
     /// completes. Note that on multiple calls to poll, only the Waker from the
     /// Context passed to the most recent call is scheduled to receive a wakeup.
-    pub fn poll<'a>(&'a self, cx: &mut Context<'_>) -> Poll<io::Result<PollAioEvent>> {
+    pub fn poll<'a>(&'a self, cx: &mut Context<'_>) -> Poll<io::Result<AioEvent>> {
         let ev = ready!(self.registration.poll_read_ready(cx))?;
-        Poll::Ready(Ok(PollAioEvent(ev)))
+        Poll::Ready(Ok(AioEvent(ev)))
     }
 }
 
-impl<E: AioSource> Deref for PollAio<E> {
+impl<E: AioSource> Deref for Aio<E> {
     type Target = E;
 
     fn deref(&self) -> &E {
@@ -176,20 +176,20 @@ impl<E: AioSource> Deref for PollAio<E> {
     }
 }
 
-impl<E: AioSource> DerefMut for PollAio<E> {
+impl<E: AioSource> DerefMut for Aio<E> {
     fn deref_mut(&mut self) -> &mut E {
         &mut self.io.0
     }
 }
 
-impl<E: AioSource + fmt::Debug> fmt::Debug for PollAio<E> {
+impl<E: AioSource + fmt::Debug> fmt::Debug for Aio<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PollAio").field("io", &self.io.0).finish()
+        f.debug_struct("Aio").field("io", &self.io.0).finish()
     }
 }
 
-/// Opaque data returned by [`PollAio::poll`].
+/// Opaque data returned by [`Aio::poll`].
 ///
-/// It can be fed back to [`PollAio::clear_ready`].
+/// It can be fed back to [`Aio::clear_ready`].
 #[derive(Debug)]
-pub struct PollAioEvent(ReadyEvent);
+pub struct AioEvent(ReadyEvent);
