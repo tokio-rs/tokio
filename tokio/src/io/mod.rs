@@ -220,7 +220,9 @@ cfg_io_driver_impl! {
 cfg_aio! {
     /// BSD-specific I/O types
     pub mod bsd {
-        pub mod poll_aio;
+        mod poll_aio;
+
+        pub use poll_aio::{Aio, AioEvent, AioSource};
     }
 }
 
