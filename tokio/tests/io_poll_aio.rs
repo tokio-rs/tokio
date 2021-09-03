@@ -34,7 +34,7 @@ mod aio {
         type Output = std::io::Result<()>;
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let poll_result = self.0.poll(cx);
+            let poll_result = self.0.poll_ready(cx);
             match poll_result {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
@@ -81,7 +81,7 @@ mod aio {
         type Output = std::io::Result<()>;
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let poll_result = self.0.poll(cx);
+            let poll_result = self.0.poll_ready(cx);
             match poll_result {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
@@ -135,7 +135,7 @@ mod aio {
         type Output = std::io::Result<()>;
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let poll_result = self.0.poll(cx);
+            let poll_result = self.0.poll_ready(cx);
             match poll_result {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
@@ -200,7 +200,7 @@ mod aio {
         let aiocb1 = AioCb::from_fd(fd, 0);
         poll_aio.reset(aiocb1);
         let mut ctx = Context::from_waker(futures::task::noop_waker_ref());
-        assert_pending!(poll_aio.poll(&mut ctx));
+        assert_pending!(poll_aio.poll_ready(&mut ctx));
         poll_aio.fsync();
         let fut1 = ReusableFsyncFut(&mut poll_aio);
         fut1.await.unwrap();
@@ -227,7 +227,7 @@ mod lio {
         type Output = std::io::Result<Vec<isize>>;
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let poll_result = self.0.as_mut().unwrap().poll(cx);
+            let poll_result = self.0.as_mut().unwrap().poll_ready(cx);
             match poll_result {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
@@ -284,7 +284,7 @@ mod lio {
         type Output = std::io::Result<Vec<isize>>;
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let poll_result = self.0.poll(cx);
+            let poll_result = self.0.poll_ready(cx);
             match poll_result {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
@@ -365,7 +365,7 @@ mod lio {
         let liocb1 = builder1.finish();
         poll_aio.reset(liocb1);
         let mut ctx = Context::from_waker(futures::task::noop_waker_ref());
-        assert_pending!(poll_aio.poll(&mut ctx));
+        assert_pending!(poll_aio.poll_ready(&mut ctx));
         poll_aio.submit();
         let fut1 = ReusableLioFut(&mut poll_aio);
         let v = fut1.await.unwrap();
