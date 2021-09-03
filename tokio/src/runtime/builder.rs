@@ -395,24 +395,32 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::runtime;
+    /// # use std::sync::Arc;
     /// # use std::sync::atomic::{AtomicBool, Ordering};
+    /// # use tokio::runtime;
+    /// # use tokio::sync::Barrier;
     ///
     /// # pub fn main() {
     ///
     /// let once = AtomicBool::new(true);
+    /// let barrier = Arc::new(Barrier::new(2));
     ///
     /// let runtime = runtime::Builder::new_multi_thread()
-    ///     .on_thread_park(move || {
-    ///         if once.swap(false, Ordering::Relaxed) {
-    ///             tokio::spawn(async { println!("thread went idle"); });
+    ///     .worker_threads(1)
+    ///     .on_thread_park({
+    ///         let barrier = barrier.clone();
+    ///         move || {
+    ///             let barrier = barrier.clone();
+    ///             if once.swap(false, Ordering::Relaxed) {
+    ///                 tokio::spawn(async move { barrier.wait().await; });
+    ///            }
     ///         }
     ///     })
-    ///     .build();
+    ///     .build()
+    ///     .unwrap();
     ///
-    /// runtime.unwrap().block_on(async {
-    ///    tokio::task::yield_now().await;
-    ///    println!("Hello from Tokio!");
+    /// runtime.block_on(async {
+    ///    barrier.wait().await;
     /// })
     /// # }
     /// ```

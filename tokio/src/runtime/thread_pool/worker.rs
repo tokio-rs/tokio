@@ -454,6 +454,18 @@ impl Context {
     }
 
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
+        if let Some(f) = &self.worker.shared.before_park {
+            f();
+            // If `f` scheduled any tasks on the local queue, don't park - the extra
+            // work should be done now.
+            if core.lifo_slot.is_some() || !core.run_queue.has_tasks() {
+                if let Some(f) = &self.worker.shared.after_unpark {
+                    f();
+                }
+                return core;
+            }
+        }
+
         core.transition_to_parked(&self.worker);
 
         while !core.is_shutdown {
@@ -463,10 +475,13 @@ impl Context {
             core.maintenance(&self.worker);
 
             if core.transition_from_parked(&self.worker) {
-                return core;
+                break;
             }
         }
 
+        if let Some(f) = &self.worker.shared.after_unpark {
+            f();
+        }
         core
     }
 
@@ -481,13 +496,7 @@ impl Context {
         if let Some(timeout) = duration {
             park.park_timeout(timeout).expect("park failed");
         } else {
-            if let Some(f) = &self.worker.shared.before_park {
-                f()
-            }
             park.park().expect("park failed");
-            if let Some(f) = &self.worker.shared.after_unpark {
-                f()
-            }
         }
 
         // Remove `core` from context
