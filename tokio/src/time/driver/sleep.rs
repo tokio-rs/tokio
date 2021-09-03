@@ -219,21 +219,22 @@ impl Sleep {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
             let time_source = handle.time_source().clone();
-            let duration = time_source.deadline_to_tick(deadline) - time_source.now();
+            let deadline_tick = time_source.deadline_to_tick(deadline);
+            let duration = deadline_tick.checked_sub(time_source.now()).unwrap_or(0);
+
             let resource_span =
                 tracing::trace_span!("runtime.resource", concrete_type = "Sleep", kind = "timer",);
 
             let async_op_span =
                 tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout",);
 
-            let span_guard = resource_span.enter();
             tracing::trace!(
                 target: "runtime::resource::state_update",
+                parent: resource_span.id(),
                 duration = duration,
                 duration.unit = "ms",
                 duration.op = "override",
             );
-            drop(span_guard);
 
             Inner {
                 deadline,
@@ -305,12 +306,14 @@ impl Sleep {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
-            let now = me.inner.time_source.now();
-            let duration = me.inner.time_source.deadline_to_tick(deadline) - now;
-            let _span_guard = me.inner.resource_span.enter();
             tracing::trace!(
                 target: "runtime::resource::state_update",
-                duration = duration,
+                parent: me.inner.resource_span.id(),
+                duration = {
+                    let now = me.inner.time_source.now();
+                    let deadline_tick = me.inner.time_source.deadline_to_tick(deadline);
+                    deadline_tick.checked_sub(now).unwrap_or(0)
+                },
                 duration.unit = "ms",
                 duration.op = "override",
             );
@@ -334,12 +337,11 @@ impl Sleep {
     cfg_trace! {
         fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
             let me = self.project();
-            let _span_guard = me.inner.resource_span.enter();
-
             // Keep track of task budget
             let coop = ready!(trace_poll_op!(
                 "poll_elapsed",
-                crate::coop::poll_proceed(cx)
+                crate::coop::poll_proceed(cx),
+                me.inner.resource_span.id(),
             ));
 
             let result =  me.entry.poll_elapsed(cx).map(move |r| {
@@ -347,7 +349,7 @@ impl Sleep {
                 r
             });
 
-            trace_poll_op!("poll_elapsed", result)
+            trace_poll_op!("poll_elapsed", result, me.inner.resource_span.id())
         }
     }
 }

@@ -15,8 +15,10 @@ mod ready;
 #[macro_use]
 mod thread_local;
 
-#[macro_use]
-mod trace;
+cfg_trace! {
+    #[macro_use]
+    mod trace;
+}
 
 #[macro_use]
 #[cfg(feature = "rt")]
