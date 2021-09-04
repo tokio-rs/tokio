@@ -66,7 +66,7 @@ impl<T: AioSource> Source for MioSource<T> {
 ///
 /// ## Clearing readiness
 ///
-/// If [`Aio::poll`] returns ready, but the consumer determines that the
+/// If [`Aio::poll_ready`] returns ready, but the consumer determines that the
 /// Source is not completely ready and must return to the Pending state,
 /// [`Aio::clear_ready`] may be used.  This can be useful with
 /// [`lio_listio`], which may generate a kevent when only a portion of the
@@ -188,7 +188,7 @@ impl<E: AioSource + fmt::Debug> fmt::Debug for Aio<E> {
     }
 }
 
-/// Opaque data returned by [`Aio::poll`].
+/// Opaque data returned by [`Aio::poll_ready`].
 ///
 /// It can be fed back to [`Aio::clear_ready`].
 #[derive(Debug)]
