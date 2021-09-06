@@ -394,6 +394,7 @@ impl Builder {
     ///
     /// # Examples
     ///
+    /// ## Multithreaded executor
     /// ```
     /// # use std::sync::Arc;
     /// # use std::sync::atomic::{AtomicBool, Ordering};
@@ -407,6 +408,36 @@ impl Builder {
     ///
     /// let runtime = runtime::Builder::new_multi_thread()
     ///     .worker_threads(1)
+    ///     .on_thread_park({
+    ///         let barrier = barrier.clone();
+    ///         move || {
+    ///             let barrier = barrier.clone();
+    ///             if once.swap(false, Ordering::Relaxed) {
+    ///                 tokio::spawn(async move { barrier.wait().await; });
+    ///            }
+    ///         }
+    ///     })
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// runtime.block_on(async {
+    ///    barrier.wait().await;
+    /// })
+    /// # }
+    /// ```
+    /// ## Current thread executor
+    /// ```
+    /// # use std::sync::Arc;
+    /// # use std::sync::atomic::{AtomicBool, Ordering};
+    /// # use tokio::runtime;
+    /// # use tokio::sync::Barrier;
+    ///
+    /// # pub fn main() {
+    ///
+    /// let once = AtomicBool::new(true);
+    /// let barrier = Arc::new(Barrier::new(2));
+    ///
+    /// let runtime = runtime::Builder::new_current_thread()
     ///     .on_thread_park({
     ///         let barrier = barrier.clone();
     ///         move || {

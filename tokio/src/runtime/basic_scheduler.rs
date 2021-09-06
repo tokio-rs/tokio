@@ -252,8 +252,10 @@ impl<P: Park> Inner<P> {
                             if let Some(f) = &scheduler.before_park {
                                 f();
                             }
-                            // Park until the thread is signaled
-                            scheduler.park.park().expect("failed to park");
+                            if context.tasks.borrow_mut().queue.is_empty() {
+                                // Park until the thread is signaled
+                                scheduler.park.park().expect("failed to park");
+                            }
                             if let Some(f) = &scheduler.after_unpark {
                                 f();
                             }
