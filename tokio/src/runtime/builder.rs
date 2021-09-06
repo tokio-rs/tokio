@@ -400,9 +400,7 @@ impl Builder {
     /// # use std::sync::atomic::{AtomicBool, Ordering};
     /// # use tokio::runtime;
     /// # use tokio::sync::Barrier;
-    ///
     /// # pub fn main() {
-    ///
     /// let once = AtomicBool::new(true);
     /// let barrier = Arc::new(Barrier::new(2));
     ///
@@ -431,9 +429,7 @@ impl Builder {
     /// # use std::sync::atomic::{AtomicBool, Ordering};
     /// # use tokio::runtime;
     /// # use tokio::sync::Barrier;
-    ///
     /// # pub fn main() {
-    ///
     /// let once = AtomicBool::new(true);
     /// let barrier = Arc::new(Barrier::new(2));
     ///
