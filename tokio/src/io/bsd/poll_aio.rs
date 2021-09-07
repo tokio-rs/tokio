@@ -93,32 +93,6 @@ pub struct Aio<E> {
 // ===== impl Aio =====
 
 impl<E: AioSource> Aio<E> {
-    /// Indicates to Tokio that the source is no longer ready.  The internal
-    /// readiness flag will be cleared, and tokio will wait for the next
-    /// edge-triggered readiness notification from the OS.
-    ///
-    /// It is critical that this method not be called unless your code
-    /// _actually observes_ that the source is _not_ ready.  The OS must
-    /// deliver a subsequent notification, or this source will block
-    /// forever.  It is equally critical that you `do` call this method if you
-    /// resubmit the same structure to the kernel and poll it again.
-    ///
-    /// This method is not very useful with AIO readiness, since each `aiocb`
-    /// structure is typically only used once.  It's main use with
-    /// [`lio_listio`], which will sometimes send notification when only a
-    /// portion of its elements are complete.  In that case, the caller must
-    /// call `clear_ready` before resubmitting it.
-    ///
-    /// [`lio_listio`]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/lio_listio.html
-    pub fn clear_ready(&self, ev: AioEvent) {
-        self.registration.clear_readiness(ev.0)
-    }
-
-    /// Destroy the [`Aio`] and return its inner source.
-    pub fn into_inner(self) -> E {
-        self.io.0
-    }
-
     /// Creates a new `Aio` suitable for use with POSIX AIO functions.
     ///
     /// It will be associated with the default reactor.  The runtime is usually
@@ -146,6 +120,32 @@ impl<E: AioSource> Aio<E> {
         let handle = Handle::current();
         let registration = Registration::new_with_interest_and_handle(&mut io, interest, handle)?;
         Ok(Self { io, registration })
+    }
+
+    /// Indicates to Tokio that the source is no longer ready.  The internal
+    /// readiness flag will be cleared, and tokio will wait for the next
+    /// edge-triggered readiness notification from the OS.
+    ///
+    /// It is critical that this method not be called unless your code
+    /// _actually observes_ that the source is _not_ ready.  The OS must
+    /// deliver a subsequent notification, or this source will block
+    /// forever.  It is equally critical that you `do` call this method if you
+    /// resubmit the same structure to the kernel and poll it again.
+    ///
+    /// This method is not very useful with AIO readiness, since each `aiocb`
+    /// structure is typically only used once.  It's main use with
+    /// [`lio_listio`], which will sometimes send notification when only a
+    /// portion of its elements are complete.  In that case, the caller must
+    /// call `clear_ready` before resubmitting it.
+    ///
+    /// [`lio_listio`]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/lio_listio.html
+    pub fn clear_ready(&self, ev: AioEvent) {
+        self.registration.clear_readiness(ev.0)
+    }
+
+    /// Destroy the [`Aio`] and return its inner source.
+    pub fn into_inner(self) -> E {
+        self.io.0
     }
 
     /// Polls for readiness.  Either AIO or LIO counts.
