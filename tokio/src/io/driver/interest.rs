@@ -14,6 +14,8 @@ use std::ops;
 pub struct Interest(mio::Interest);
 
 impl Interest {
+    // The non-FreeBSD definitions in this block are active only when
+    // building documentation.
     cfg_aio! {
         /// Interest for POSIX AIO
         #[cfg(target_os = "freebsd")]

@@ -85,7 +85,7 @@ impl<T: AioSource> Source for MioSource<T> {
 //
 // Note that Aio doesn't implement Drop.  There's no need.  Unlike other
 // kqueue sources, simply dropping the object effectively deregisters it.
-pub struct Aio<E: AioSource> {
+pub struct Aio<E> {
     io: MioSource<E>,
     registration: Registration,
 }
@@ -114,7 +114,7 @@ impl<E: AioSource> Aio<E> {
         self.registration.clear_readiness(ev.0)
     }
 
-    /// Destroy the [`Aio`] and return its inner Source
+    /// Destroy the [`Aio`] and return its inner source.
     pub fn into_inner(self) -> E {
         self.io.0
     }
@@ -123,7 +123,7 @@ impl<E: AioSource> Aio<E> {
     ///
     /// It will be associated with the default reactor.  The runtime is usually
     /// set implicitly when this function is called from a future driven by a
-    /// tokio runtime, otherwise runtime can be set explicitly with
+    /// Tokio runtime, otherwise runtime can be set explicitly with
     /// [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn new_for_aio(io: E) -> io::Result<Self> {
         Self::new_with_interest(io, Interest::AIO)
@@ -133,7 +133,7 @@ impl<E: AioSource> Aio<E> {
     ///
     /// It will be associated with the default reactor.  The runtime is usually
     /// set implicitly when this function is called from a future driven by a
-    /// tokio runtime, otherwise runtime can be set explicitly with
+    /// Tokio runtime, otherwise runtime can be set explicitly with
     /// [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     ///
     /// [`lio_listio`]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/lio_listio.html
@@ -158,10 +158,10 @@ impl<E: AioSource> Aio<E> {
     ///  * `Poll::Ready(Err(_))` if the reactor has been shutdown.  This does
     ///     _not_ indicate that the underlying operation encountered an error.
     ///
-    /// When the method returns Poll::Pending, the Waker in the provided Context
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided `Context`
     /// is scheduled to receive a wakeup when the underlying operation
-    /// completes. Note that on multiple calls to poll, only the Waker from the
-    /// Context passed to the most recent call is scheduled to receive a wakeup.
+    /// completes. Note that on multiple calls to `poll_ready`, only the `Waker` from the
+    /// `Context` passed to the most recent call is scheduled to receive a wakeup.
     pub fn poll_ready<'a>(&'a self, cx: &mut Context<'_>) -> Poll<io::Result<AioEvent>> {
         let ev = ready!(self.registration.poll_read_ready(cx))?;
         Poll::Ready(Ok(AioEvent(ev)))
