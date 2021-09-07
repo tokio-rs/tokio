@@ -421,7 +421,7 @@ pub struct LengthDelimitedCodecError {
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LengthDelimitedCodec {
     // Configuration values
     builder: Builder,
