@@ -223,10 +223,10 @@ impl Sleep {
             let duration = deadline_tick.checked_sub(time_source.now()).unwrap_or(0);
 
             let resource_span =
-                tracing::trace_span!("runtime.resource", concrete_type = "Sleep", kind = "timer",);
+                tracing::trace_span!("runtime.resource", concrete_type = "Sleep", kind = "timer");
 
             let async_op_span =
-                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout",);
+                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout");
 
             tracing::trace!(
                 target: "runtime::resource::state_update",
@@ -306,6 +306,9 @@ impl Sleep {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
+            me.inner.async_op_span =
+                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout");
+
             tracing::trace!(
                 target: "runtime::resource::state_update",
                 parent: me.inner.resource_span.id(),
