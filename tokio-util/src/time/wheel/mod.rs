@@ -6,6 +6,8 @@ mod stack;
 pub(crate) use self::stack::Stack;
 
 use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::fmt::Debug;
 use std::usize;
 
 /// Timing wheel implementation.
@@ -244,6 +246,25 @@ where
 
     fn level_for(&self, when: u64) -> usize {
         level_for(self.elapsed, when)
+    }
+
+    // Change all indices that are used in `self.levels` according to `remapping`.
+    pub(crate) fn adjust_indices(
+        &mut self,
+        remapping: &HashMap<T::Borrowed, T::Borrowed>,
+        store: &mut T::Store,
+    ) where
+        T::Borrowed: Copy,
+    {
+        for level in self.levels.iter_mut() {
+            level.modify_items(store, |old_key| {
+                if let Some(new_key) = remapping.get(&old_key) {
+                    *new_key
+                } else {
+                    old_key
+                }
+            });
+        }
     }
 }
 

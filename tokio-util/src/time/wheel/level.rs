@@ -206,6 +206,16 @@ impl<T: Stack> Level<T> {
 
         ret
     }
+
+    pub(crate) fn modify_items<F>(&mut self, store: &mut T::Store, f: F)
+    where
+        F: (Fn(T::Borrowed) -> T::Borrowed) + Copy,
+        T::Borrowed: Copy,
+    {
+        for slot in self.slot.iter_mut() {
+            slot.modify_items(store, f);
+        }
+    }
 }
 
 impl<T> fmt::Debug for Level<T> {

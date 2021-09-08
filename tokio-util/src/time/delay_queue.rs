@@ -11,10 +11,15 @@ use tokio::time::{error::Error, sleep_until, Duration, Instant, Sleep};
 
 use slab::Slab;
 use std::cmp;
+use std::collections::{HashMap, LinkedList};
+use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{self, Poll, Waker};
+
+// Size of list that is used to store keys that can be used by `create_new_key`.
+const AVAILABLE_KEYS_LIST_SIZE: usize = 200;
 
 /// A queue of delayed elements.
 ///
@@ -150,6 +155,17 @@ pub struct DelayQueue<T> {
     /// Because we lazily create the timer when the first entry is created, we
     /// need to awaken any poller that polled us before that point.
     waker: Option<Waker>,
+
+    /// A `compact` call requires a re-mapping of the `Key`s that were changed
+    /// during the `compact` call of the `slab`. Since the keys that were given out
+    /// cannot be changed retroactively we need to keep track of these re-mappings.
+    /// The keys of `key_map` correspond to the old keys that were given out and
+    /// the values to the `Key`s that were re-mapped by the `compact` call.
+    key_map: HashMap<Key, Key>,
+
+    /// List of keys that we can use to create new keys. See the comment for
+    /// `create_available_keys` for why this is necessary.
+    available_keys: LinkedList<usize>,
 }
 
 /// An entry in `DelayQueue` that has expired and been removed.
@@ -176,7 +192,7 @@ pub struct Expired<T> {
 ///
 /// [`DelayQueue`]: struct@DelayQueue
 /// [`DelayQueue::insert`]: method@DelayQueue::insert
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Key {
     index: usize,
 }
@@ -259,6 +275,8 @@ impl<T> DelayQueue<T> {
             wheel_now: 0,
             start: Instant::now(),
             waker: None,
+            key_map: HashMap::new(),
+            available_keys: LinkedList::new(),
         }
     }
 
@@ -317,15 +335,30 @@ impl<T> DelayQueue<T> {
         let when = self.normalize_deadline(when);
 
         // Insert the value in the store
-        let key = self.slab.insert(Data {
+        let mut key = self.slab.insert(Data {
             inner: value,
             when,
             expired: false,
             next: None,
             prev: None,
         });
+        let old_key = key;
 
-        self.insert_idx(when, key);
+        if self.key_map.contains_key(&Key::new(key)) {
+            // It's possible that a `compact` call creates capacitiy in `self.slab` in
+            // such a way that a `self.slab.insert` call creates a `key` which was
+            // previously given out during an `insert` call prior to the `compact` call.
+            // If `key` is contained in `self.key_map`, we have encountered this exact situation,
+            // We need to create a new key `key_to_give_out` and include the relation
+            // `key_to_give_out` -> `key` in `self.key_map`.
+            let key_to_give_out = self.create_new_key();
+            self.key_map
+                .insert(Key::new(key_to_give_out), Key::new(key));
+            key = key_to_give_out
+        }
+
+        // `old_key` is the actual index the slab uses internally
+        self.insert_idx(when, old_key);
 
         // Set a new delay if the current's deadline is later than the one of the new item
         let should_set_delay = if let Some(ref delay) = self.delay {
@@ -349,6 +382,34 @@ impl<T> DelayQueue<T> {
         }
 
         Key::new(key)
+    }
+
+    // We use a linked list of available keys that we can use to create
+    // new keys. The creation of new keys is necessary if the `slab.insert` call
+    // in `self.insert` gives back a key that was previously given out.
+    // This scenario of a duplicate key can only happen after `compact` was called.
+    // We maintain a list of available keys for efficiency reasons, so as not to calculate
+    // the smallest available key each time `slab.insert` outputs a duplicate key.
+    fn create_available_keys(&mut self) {
+        assert!(self.available_keys.is_empty());
+
+        let mut i = 0;
+        let mut num_created_keys = 0;
+        while num_created_keys < AVAILABLE_KEYS_LIST_SIZE {
+            if !self.key_map.contains_key(&Key::new(i)) {
+                self.available_keys.push_back(i);
+                num_created_keys += 1;
+            }
+            i += 1;
+        }
+    }
+
+    fn create_new_key(&mut self) -> usize {
+        if self.available_keys.is_empty() {
+            self.create_available_keys();
+        }
+
+        self.available_keys.pop_front().unwrap()
     }
 
     /// Attempts to pull out the next value of the delay queue, registering the
@@ -500,8 +561,9 @@ impl<T> DelayQueue<T> {
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
         let prev_deadline = self.next_deadline();
 
-        self.remove_key(key);
-        let data = self.slab.remove(key.index);
+        let remapped_key = self.key_map.remove(key).unwrap_or(*key);
+        self.remove_key(&remapped_key);
+        let data = self.slab.remove(remapped_key.index);
 
         let next_deadline = self.next_deadline();
         if prev_deadline != next_deadline {
@@ -554,21 +616,105 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
-        self.remove_key(key);
+        let key_map = &self.key_map;
+        let remapped_key = *key_map.get(&*key).unwrap_or(key);
+
+        self.remove_key(&remapped_key);
 
         // Normalize the deadline. Values cannot be set to expire in the past.
         let when = self.normalize_deadline(when);
 
-        self.slab[key.index].when = when;
-        self.slab[key.index].expired = false;
+        self.slab[remapped_key.index].when = when;
+        self.slab[remapped_key.index].expired = false;
 
-        self.insert_idx(when, key.index);
+        self.insert_idx(when, remapped_key.index);
 
         let next_deadline = self.next_deadline();
         if let (Some(ref mut delay), Some(deadline)) = (&mut self.delay, next_deadline) {
             // This should awaken us if necessary (ie, if already expired)
             delay.as_mut().reset(deadline);
         }
+    }
+
+    /// Shrink the capacity of the slab, which `DelayQueue` uses internally for storage allocation.
+    /// This function is not guaranteed to, and in most cases, won't decrease the capacity of the slab
+    /// to the number of elements still contained in it. To decrease the capacity to the size of
+    /// the slab use [`compact`]
+    /// This function can take O(n) time even when the capacity cannot be reduced or the allocation is
+    /// shrunk in place. Repeated calls run in O(1) though.
+    ///
+    /// [`poll_expired`]: method@Self::compact
+    pub fn shrink_to_fit(&mut self) {
+        self.slab.shrink_to_fit()
+    }
+
+    /// Shrink the capacity of the slab, which `DelayQueue` uses internally for storage allocation,
+    /// to the number of elements that are contained in it.
+    ///
+    /// This methods runs in O(n).
+    ///
+    /// # Examples
+    ///
+    /// Basic usage
+    ///
+    /// ```rust
+    /// use tokio_util::time::DelayQueue;
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut delay_queue = DelayQueue::with_capacity(10);
+    ///
+    /// let key1 = delay_queue.insert(5, Duration::from_secs(5));
+    /// let key2 = delay_queue.insert(10, Duration::from_secs(10));
+    /// let key3 = delay_queue.insert(15, Duration::from_secs(15));
+    ///
+    /// delay_queue.remove(&key3);
+    ///
+    /// delay_queue.compact();
+    /// assert_eq!(delay_queue.capacity(), 2);
+    /// # }
+    /// ```
+    pub fn compact(&mut self) {
+        // We need to invert `key_map` since during a `slab.compact` call
+        // previously re-mapped keys (the values in `key_map`) might be re-mapped.
+        let key_map = &mut self.key_map;
+        let slab = &mut self.slab;
+        let wheel = &mut self.wheel;
+
+        let mut remapped_keys = HashMap::new();
+
+        let mut inverse_key_map: HashMap<Key, Key> = HashMap::new();
+        for (old_key, remapped_key) in key_map.iter() {
+            inverse_key_map.insert(*remapped_key, *old_key);
+        }
+
+        slab.compact(|_, from, to| {
+            remapped_keys.insert(from, to);
+
+            let from_key = Key::new(from);
+            let to_key = Key::new(to);
+
+            if inverse_key_map.contains_key(&from_key) {
+                // `from_key` is a `Key` that was previously re-mapped, get the key
+                // that was previously given out for its item.
+                let old_key = inverse_key_map.get(&from_key).unwrap();
+
+                *key_map.get_mut(&old_key).unwrap() = to_key;
+            } else if key_map.contains_key(&from_key) {
+                // `from_key` is a `Key` that was given out during insertion
+                // into `self`.
+                *key_map.get_mut(&from_key).unwrap() = to_key;
+            } else {
+                key_map.insert(from_key, to_key);
+            }
+
+            true
+        });
+
+        // The wheel internally uses the `Key` indices in the slots of its levels,
+        // these `Key`s also need to be re-mapped.
+        wheel.adjust_indices(&remapped_keys, slab);
     }
 
     /// Returns the next time to poll as determined by the wheel
@@ -837,7 +983,7 @@ impl<T> wheel::Stack for Stack<T> {
         }
 
         store[item].next = old;
-        self.head = Some(item)
+        self.head = Some(item);
     }
 
     fn pop(&mut self, store: &mut Self::Store) -> Option<Self::Owned> {
@@ -894,6 +1040,27 @@ impl<T> wheel::Stack for Stack<T> {
 
     fn when(item: &Self::Borrowed, store: &Self::Store) -> u64 {
         store[*item].when
+    }
+
+    fn modify_items<F>(&mut self, store: &mut Self::Store, f: F)
+    where
+        F: Fn(Self::Borrowed) -> Self::Borrowed,
+    {
+        if !self.is_empty() {
+            self.head = self.head.map(|h| f(h));
+
+            let mut current_index = self.head.unwrap();
+            let mut prev_index;
+            let mut current_elem = &mut store[current_index];
+
+            while let Some(next_index) = current_elem.next {
+                prev_index = current_index;
+                current_index = f(next_index);
+                current_elem.next = Some(current_index);
+                current_elem = &mut store[current_index];
+                current_elem.prev = Some(prev_index);
+            }
+        }
     }
 }
 

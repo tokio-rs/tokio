@@ -640,6 +640,211 @@ async fn delay_queue_poll_expired_when_empty() {
     assert!(assert_ready!(poll!(delay_queue)).is_none());
 }
 
+#[tokio::test]
+async fn compact_expire_empty() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    queue.insert_at("foo1", now + ms(10));
+    queue.insert_at("foo2", now + ms(10));
+
+    sleep(ms(10)).await;
+
+    let mut res = vec![];
+    while res.len() < 2 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    queue.compact();
+
+    assert_eq!(queue.len(), 0);
+    assert_eq!(queue.capacity(), 0);
+}
+
+#[tokio::test]
+async fn compact_remove_empty() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    let key1 = queue.insert_at("foo1", now + ms(10));
+    let key2 = queue.insert_at("foo2", now + ms(10));
+
+    queue.remove(&key1);
+    queue.remove(&key2);
+
+    queue.compact();
+
+    assert_eq!(queue.len(), 0);
+    assert_eq!(queue.capacity(), 0);
+}
+
+#[tokio::test]
+// Trigger a re-mapping of keys in the slab due to a `compact` call and
+// test removal of re-mapped keys
+async fn compact_remove_remapped_keys() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    queue.insert_at("foo1", now + ms(10));
+    queue.insert_at("foo2", now + ms(10));
+
+    // should be assigned indices 3 and 4
+    let key3 = queue.insert_at("foo3", now + ms(20));
+    let key4 = queue.insert_at("foo4", now + ms(20));
+
+    sleep(ms(10)).await;
+
+    let mut res = vec![];
+    while res.len() < 2 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    // items corresponding to `foo3` and `foo4` will be assigned
+    // new indices here
+    queue.compact();
+
+    queue.insert_at("foo5", now + ms(10));
+
+    // test removal of re-mapped keys
+    let expired3 = queue.remove(&key3);
+    let expired4 = queue.remove(&key4);
+
+    assert_eq!(expired3.into_inner(), "foo3");
+    assert_eq!(expired4.into_inner(), "foo4");
+
+    queue.compact();
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue.capacity(), 1);
+    /*
+    sleep(ms(10)).await;
+
+    while res.len() < 4 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    let entry = assert_ready!(poll!(queue));
+    assert!(entry.is_none());
+    */
+}
+
+#[tokio::test]
+async fn compact_change_deadline() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let mut now = Instant::now();
+
+    queue.insert_at("foo1", now + ms(10));
+    queue.insert_at("foo2", now + ms(10));
+
+    // should be assigned indices 3 and 4
+    queue.insert_at("foo3", now + ms(20));
+    let key4 = queue.insert_at("foo4", now + ms(20));
+
+    sleep(ms(10)).await;
+
+    let mut res = vec![];
+    while res.len() < 2 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    // items corresponding to `foo3` and `foo4` should be assigned
+    // new indices
+    queue.compact();
+
+    now = Instant::now();
+
+    queue.insert_at("foo5", now + ms(10));
+    let key6 = queue.insert_at("foo6", now + ms(10));
+
+    queue.reset_at(&key4, now + ms(20));
+    queue.reset_at(&key6, now + ms(20));
+
+    // foo3 and foo5 will expire
+    sleep(ms(10)).await;
+
+    while res.len() < 4 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    sleep(ms(10)).await;
+
+    while res.len() < 6 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    let entry = assert_ready!(poll!(queue));
+    assert!(entry.is_none());
+}
+
+#[tokio::test]
+async fn compact_new_available_keys() {
+    // Tests `available_keys` functionality of `DelayQueue`.
+    // We first insert 2*`AVAILABLE_KEYS_LIST_SIZE` (call this `insert1`)
+    // many elements into `queue` and let the first half of those expire (this will
+    // cause all keys in the second half to be remapped). Then we will insert
+    // `AVAILABLE_KEYS_LIST_SIZE + 1` many elements into delay queue (insert2). Since the first
+    // half of the keys in the delay_queue have all been re-mapped `delay_queue` will have
+    // to create new keys using `create_available_keys`. Here we want to trigger the creation
+    // of that list of available keys twice. Once for the first `AVAILABLE_KEYS_LIST_SIZE`
+    // many elements in `insert2` and again for the last key of the second insertion.
+
+    // FIXME somehow coordinate this with the actual const `DelayQueue` uses
+    const AVAILABLE_KEYS_LIST_SIZE: usize = 200;
+
+    time::pause();
+    let now = Instant::now();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    // insert1
+    for i in 0..(2 * AVAILABLE_KEYS_LIST_SIZE) {
+        if i < AVAILABLE_KEYS_LIST_SIZE {
+            queue.insert_at(format!("foo{}", i), now + ms(10));
+        } else {
+            queue.insert_at(format!("foo{}", i), now + ms(20));
+        }
+    }
+
+    sleep(ms(10)).await;
+
+    let mut res = vec![];
+    while res.len() < 2 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    // First half of elements in `queue` expired. Calling `compact` will now
+    // re-map all remaining keys
+    queue.compact();
+
+    // insert2
+    for i in 0..(AVAILABLE_KEYS_LIST_SIZE) {
+        queue.insert_at(format!("foo{}", AVAILABLE_KEYS_LIST_SIZE + i), now + ms(10));
+    }
+    let key_last_elem = queue.insert_at("foo_last".to_string(), now + ms(10));
+
+    // remove last inserted element
+    assert_eq!(queue.remove(&key_last_elem).into_inner(), "foo_last")
+>>>>>>> 0289df7c (add shrink_to_fit and compact methods to DelayQueue)
+}
+
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
