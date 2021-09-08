@@ -456,26 +456,18 @@ impl Context {
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
         if let Some(f) = &self.worker.shared.before_park {
             f();
-            // If `f` scheduled any tasks on the local queue, don't park - the extra
-            // work should be done now.
-            if core.lifo_slot.is_some() || !core.run_queue.has_tasks() {
-                if let Some(f) = &self.worker.shared.after_unpark {
-                    f();
-                }
-                return core;
-            }
         }
 
-        core.transition_to_parked(&self.worker);
+        if core.transition_to_parked(&self.worker) {
+            while !core.is_shutdown {
+                core = self.park_timeout(core, None);
 
-        while !core.is_shutdown {
-            core = self.park_timeout(core, None);
+                // Run regularly scheduled maintenance
+                core.maintenance(&self.worker);
 
-            // Run regularly scheduled maintenance
-            core.maintenance(&self.worker);
-
-            if core.transition_from_parked(&self.worker) {
-                break;
+                if core.transition_from_parked(&self.worker) {
+                    break;
+                }
             }
         }
 
@@ -578,7 +570,13 @@ impl Core {
     }
 
     /// Prepare the worker state for parking
-    fn transition_to_parked(&mut self, worker: &Worker) {
+    /// Returns true if the transition happend, false if there is work to do first
+    fn transition_to_parked(&mut self, worker: &Worker) -> bool {
+        // Workers should not park if they have work to do
+        if self.lifo_slot.is_some() || self.run_queue.has_tasks() {
+            return false;
+        }
+
         // When the final worker transitions **out** of searching to parked, it
         // must check all the queues one last time in case work materialized
         // between the last work scan and transitioning out of searching.
@@ -594,6 +592,8 @@ impl Core {
         if is_last_searcher {
             worker.shared.notify_if_work_pending();
         }
+
+        true
     }
 
     /// Returns `true` if the transition happened.
