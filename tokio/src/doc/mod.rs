@@ -17,6 +17,7 @@
 /// will ever accidentally use it.
 ///
 /// [`never` type]: https://doc.rust-lang.org/std/primitive.never.html
+#[derive(Debug)]
 pub enum NotDefinedHere {}
 
 pub mod os;

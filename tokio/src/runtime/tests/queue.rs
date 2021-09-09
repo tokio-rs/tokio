@@ -1,4 +1,5 @@
 use crate::runtime::queue;
+use crate::runtime::stats::WorkerStatsBatcher;
 use crate::runtime::task::{self, Inject, Schedule, Task};
 
 use std::thread;
@@ -44,6 +45,8 @@ fn overflow() {
 
 #[test]
 fn steal_batch() {
+    let mut stats = WorkerStatsBatcher::new(0);
+
     let (steal1, mut local1) = queue::local();
     let (_, mut local2) = queue::local();
     let inject = Inject::new();
@@ -53,7 +56,7 @@ fn steal_batch() {
         local1.push_back(task, &inject);
     }
 
-    assert!(steal1.steal_into(&mut local2).is_some());
+    assert!(steal1.steal_into(&mut local2, &mut stats).is_some());
 
     for _ in 0..1 {
         assert!(local2.pop().is_some());
@@ -81,11 +84,12 @@ fn stress1() {
         let inject = Inject::new();
 
         let th = thread::spawn(move || {
+            let mut stats = WorkerStatsBatcher::new(0);
             let (_, mut local) = queue::local();
             let mut n = 0;
 
             for _ in 0..NUM_STEAL {
-                if steal.steal_into(&mut local).is_some() {
+                if steal.steal_into(&mut local, &mut stats).is_some() {
                     n += 1;
                 }
 
@@ -137,11 +141,12 @@ fn stress2() {
         let inject = Inject::new();
 
         let th = thread::spawn(move || {
+            let mut stats = WorkerStatsBatcher::new(0);
             let (_, mut local) = queue::local();
             let mut n = 0;
 
             for _ in 0..NUM_STEAL {
-                if steal.steal_into(&mut local).is_some() {
+                if steal.steal_into(&mut local, &mut stats).is_some() {
                     n += 1;
                 }
 

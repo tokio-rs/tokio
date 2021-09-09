@@ -59,7 +59,7 @@ async fn make_future<T: Clone + Send + Sync>(
     (result, rx)
 }
 
-impl<T: 'static + Clone + Unpin + Send + Sync> WatchStream<T> {
+impl<T: 'static + Clone + Send + Sync> WatchStream<T> {
     /// Create a new `WatchStream`.
     pub fn new(rx: Receiver<T>) -> Self {
         Self {
@@ -92,5 +92,11 @@ impl<T> Unpin for WatchStream<T> {}
 impl<T> fmt::Debug for WatchStream<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("WatchStream").finish()
+    }
+}
+
+impl<T: 'static + Clone + Send + Sync> From<Receiver<T>> for WatchStream<T> {
+    fn from(recv: Receiver<T>) -> Self {
+        Self::new(recv)
     }
 }

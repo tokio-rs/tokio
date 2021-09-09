@@ -1,3 +1,22 @@
+# 0.6.8 (September 3, 2021)
+
+### Added
+
+- sync: add drop guard for `CancellationToken` ([#3839])
+- compact: added `AsyncSeek` compat ([#4078])
+- time: expose `Key` used in `DelayQueue`'s `Expired` ([#4081])
+- io: add `with_capacity` to `ReaderStream` ([#4086])
+
+### Fixed
+
+- codec: remove unnecessary `doc(cfg(...))` ([#3989])
+
+[#3839]: https://github.com/tokio-rs/tokio/pull/3839
+[#4078]: https://github.com/tokio-rs/tokio/pull/4078
+[#4081]: https://github.com/tokio-rs/tokio/pull/4081
+[#4086]: https://github.com/tokio-rs/tokio/pull/4086
+[#3989]: https://github.com/tokio-rs/tokio/pull/3989
+
 # 0.6.7 (May 14, 2021)
 
 ### Added

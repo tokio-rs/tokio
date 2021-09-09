@@ -162,6 +162,25 @@ macro_rules! cfg_macros {
     }
 }
 
+macro_rules! cfg_stats {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(tokio_unstable, feature = "stats"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "stats")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_stats {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(tokio_unstable, feature = "stats")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_net {
     ($($item:item)*) => {
         $(

@@ -4,6 +4,29 @@ cfg_io_driver! {
 }
 
 #[cfg(any(
+    // io driver uses `WakeList` directly
+    feature = "net",
+    feature = "process",
+    // `sync` enables `Notify` and `batch_semaphore`, which require `WakeList`.
+    feature = "sync",
+    // `fs` uses `batch_semaphore`, which requires `WakeList`.
+    feature = "fs",
+    // rt and signal use `Notify`, which requires `WakeList`.
+    feature = "rt",
+    feature = "signal",
+))]
+mod wake_list;
+#[cfg(any(
+    feature = "net",
+    feature = "process",
+    feature = "sync",
+    feature = "fs",
+    feature = "rt",
+    feature = "signal",
+))]
+pub(crate) use wake_list::WakeList;
+
+#[cfg(any(
     feature = "fs",
     feature = "net",
     feature = "process",

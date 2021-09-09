@@ -323,15 +323,27 @@ fn parse_knobs(
 
     let body = &input.block;
     let brace_token = input.block.brace_token;
+    let (tail_return, tail_semicolon) = match body.stmts.last() {
+        Some(syn::Stmt::Semi(expr, _)) => (
+            match expr {
+                syn::Expr::Return(_) => quote! { return },
+                _ => quote! {},
+            },
+            quote! {
+                ;
+            },
+        ),
+        _ => (quote! {}, quote! {}),
+    };
     input.block = syn::parse2(quote_spanned! {last_stmt_end_span=>
         {
             let body = async #body;
             #[allow(clippy::expect_used)]
-            #rt
+            #tail_return #rt
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
-                .block_on(body)
+                .block_on(body)#tail_semicolon
         }
     })
     .expect("Parsing failure");

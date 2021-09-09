@@ -71,3 +71,9 @@ impl<T> fmt::Debug for BroadcastStream<T> {
         f.debug_struct("BroadcastStream").finish()
     }
 }
+
+impl<T: 'static + Clone + Send> From<Receiver<T>> for BroadcastStream<T> {
+    fn from(recv: Receiver<T>) -> Self {
+        Self::new(recv)
+    }
+}
