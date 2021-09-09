@@ -123,9 +123,7 @@ pub mod error {
 
     /// Error produced when sending a value fails.
     #[derive(Debug)]
-    pub struct SendError<T> {
-        pub(crate) inner: T,
-    }
+    pub struct SendError<T>(pub T);
 
     // ===== impl SendError =====
 
@@ -431,7 +429,7 @@ impl<T> Sender<T> {
     pub fn send(&self, value: T) -> Result<(), error::SendError<T>> {
         // This is pretty much only useful as a hint anyway, so synchronization isn't critical.
         if 0 == self.receiver_count() {
-            return Err(error::SendError { inner: value });
+            return Err(error::SendError(value));
         }
 
         {
