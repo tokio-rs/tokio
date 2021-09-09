@@ -296,7 +296,11 @@ impl Handle {
     /// [`tokio::fs`]: crate::fs
     /// [`tokio::net`]: crate::net
     /// [`tokio::time`]: crate::time
+    #[cfg_attr(tokio_track_caller, track_caller)]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let future = crate::util::trace::task(future, "block_on", None);
+
         // Enter the **runtime** context. This configures spawning, the current I/O driver, ...
         let _rt_enter = self.enter();
 
