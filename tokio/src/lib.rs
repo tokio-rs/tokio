@@ -209,10 +209,10 @@
 //! and *NOT* the same [`Runtime`] used to handle latency sensitive IO tasks.
 //!
 //! For example, you might consider using the [rayon] library or an
-//! additional tokio [`Runtime`] instance than the one used to handle
+//! additional tokio [`Runtime`] instance other than the one used to handle
 //! IO.
 //!
-//! Hint: If using rayon, you can use an [`oneshot`] channel to send the result back
+//! Hint: If using rayon, you can use a [`oneshot`] channel to send the result back
 //! to Tokio when the rayon task finishes.
 //!
 //! [rayon]: https://docs.rs/rayon
