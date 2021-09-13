@@ -1,11 +1,11 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::fs::File;
-use tokio_test::task;
 use std::io::prelude::*;
 use tempfile::NamedTempFile;
+use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio_test::task;
 
 const HELLO: &[u8] = b"hello world...";
 
