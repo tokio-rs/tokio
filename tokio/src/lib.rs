@@ -205,9 +205,10 @@
 //! ```
 //!
 //! If your code is CPU-bound and you wish to limit the number of threads used
-//! to run it, you should run it on another thread pool such as [rayon]. You
-//! can use an [`oneshot`] channel to send the result back to Tokio when the
-//! rayon task finishes.
+//! to run it, you should use a separate thread pool such as provided by [rayon] or
+//! a different [`Runtime`] than the one used to handle IO tasks.
+//! If using rayon, you can use an [`oneshot`] channel to send the result back
+//! to Tokio when the rayon task finishes.
 //!
 //! [rayon]: https://docs.rs/rayon
 //! [`oneshot`]: crate::sync::oneshot
