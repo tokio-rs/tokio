@@ -1,12 +1,11 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
-use tokio_test::task;
-
 use std::io::prelude::*;
 use tempfile::NamedTempFile;
+use tokio::fs::File;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio_test::task;
 
 const HELLO: &[u8] = b"hello world...";
 
@@ -48,6 +47,19 @@ async fn basic_write_and_shutdown() {
 
     let file = std::fs::read(tempfile.path()).unwrap();
     assert_eq!(file, HELLO);
+}
+
+#[tokio::test]
+async fn rewind_seek_position() {
+    let tempfile = tempfile();
+
+    let mut file = File::create(tempfile.path()).await.unwrap();
+
+    file.seek(SeekFrom::Current(10)).await.unwrap();
+
+    file.rewind().await.unwrap();
+
+    assert_eq!(file.stream_position().await.unwrap(), 0);
 }
 
 #[tokio::test]
