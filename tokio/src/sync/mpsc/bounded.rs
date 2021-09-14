@@ -14,8 +14,8 @@ use std::task::{Context, Poll};
 ///
 /// Instances are created by the [`channel`](channel) function.
 ///
-/// To use the `Sender` in a poll function, you can use the [`PollSender`]
-/// utility.
+/// To convert the `Sender` into a `Sink` or use it in a poll function, you can
+/// use the [`PollSender`] utility.
 ///
 /// [`PollSender`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSender.html
 pub struct Sender<T> {
