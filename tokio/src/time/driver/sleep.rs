@@ -3,6 +3,7 @@ use crate::time::{error::Error, Duration, Instant};
 
 use pin_project_lite::pin_project;
 use std::future::Future;
+use std::panic::Location;
 use std::pin::Pin;
 use std::task::{self, Poll};
 
@@ -43,8 +44,15 @@ cfg_trace! {
 /// [`interval`]: crate::time::interval()
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_until"))]
+#[cfg_attr(tokio_track_caller, track_caller)]
 pub fn sleep_until(deadline: Instant) -> Sleep {
-    Sleep::new_timeout(deadline)
+    #[cfg(tokio_track_caller)]
+    let location = std::panic::Location::caller();
+    #[cfg(tokio_track_caller)]
+    return Sleep::new_timeout(deadline, Some(location));
+
+    #[cfg(not(tokio_track_caller))]
+    Sleep::new_timeout(deadline, None)
 }
 
 /// Waits until `duration` has elapsed.
@@ -86,10 +94,16 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_for"))]
 #[cfg_attr(docsrs, doc(alias = "wait"))]
+#[cfg_attr(tokio_track_caller, track_caller)]
 pub fn sleep(duration: Duration) -> Sleep {
+    #[cfg(tokio_track_caller)]
+    let location = Some(std::panic::Location::caller());
+    #[cfg(not(tokio_track_caller))]
+    let location = None;
+
     match Instant::now().checked_add(duration) {
-        Some(deadline) => sleep_until(deadline),
-        None => sleep_until(Instant::far_future()),
+        Some(deadline) => Sleep::new_timeout(deadline, location),
+        None => Sleep::new_timeout(Instant::far_future(), location),
     }
 }
 
@@ -212,7 +226,11 @@ cfg_not_trace! {
 }
 
 impl Sleep {
-    pub(crate) fn new_timeout(deadline: Instant) -> Sleep {
+    #[allow(unused_variables)]
+    pub(crate) fn new_timeout(
+        deadline: Instant,
+        location: Option<&'static Location<'static>>,
+    ) -> Sleep {
         let handle = Handle::current();
         let entry = TimerEntry::new(&handle, deadline);
 
@@ -222,6 +240,20 @@ impl Sleep {
             let deadline_tick = time_source.deadline_to_tick(deadline);
             let duration = deadline_tick.checked_sub(time_source.now()).unwrap_or(0);
 
+            #[cfg(tokio_track_caller)]
+            let location = location.expect("should have location if tracking caller");
+
+            #[cfg(tokio_track_caller)]
+            let resource_span = tracing::trace_span!(
+                "runtime.resource",
+                concrete_type = "Sleep",
+                kind = "timer",
+                location.file = location.file(),
+                location.line = location.line(),
+                location.column = location.column(),
+            );
+
+            #[cfg(not(tokio_track_caller))]
             let resource_span =
                 tracing::trace_span!("runtime.resource", concrete_type = "Sleep", kind = "timer");
 
@@ -250,8 +282,8 @@ impl Sleep {
         Sleep { inner, entry }
     }
 
-    pub(crate) fn far_future() -> Sleep {
-        Self::new_timeout(Instant::far_future())
+    pub(crate) fn far_future(location: Option<&'static Location<'static>>) -> Sleep {
+        Self::new_timeout(Instant::far_future(), location)
     }
 
     /// Returns the instant at which the future will complete.

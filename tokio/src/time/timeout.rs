@@ -11,6 +11,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
 
+#[cfg(all(tokio_track_caller, tokio_unstable, feature = "tracing"))]
+use std::panic::Location;
+
 /// Require a `Future` to complete before the specified duration has elapsed.
 ///
 /// If the future completes before the duration has elapsed, then the completed
@@ -45,14 +48,20 @@ use std::task::{self, Poll};
 /// }
 /// # }
 /// ```
+#[cfg_attr(tokio_track_caller, track_caller)]
 pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
 where
     T: Future,
 {
+    #[cfg(all(tokio_track_caller, tokio_unstable, feature = "tracing"))]
+    let location = Some(Location::caller());
+    #[cfg(not(all(tokio_track_caller, tokio_unstable, feature = "tracing")))]
+    let location = None;
+
     let deadline = Instant::now().checked_add(duration);
     let delay = match deadline {
-        Some(deadline) => Sleep::new_timeout(deadline),
-        None => Sleep::far_future(),
+        Some(deadline) => Sleep::new_timeout(deadline, location),
+        None => Sleep::far_future(location),
     };
     Timeout::new_with_delay(future, delay)
 }
