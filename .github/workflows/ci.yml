@@ -46,6 +46,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install Rust
         run: rustup update stable
+      - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
         run: cargo install cargo-hack
 
@@ -83,6 +84,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install Rust
         run: rustup update stable
+      - uses: Swatinem/rust-cache@v1
 
       - name: Install Valgrind
         run: |
@@ -120,6 +122,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install Rust
         run: rustup update stable
+      - uses: Swatinem/rust-cache@v1
 
       # Run `tokio` with "unstable" cfg flag.
       - name: test tokio full --cfg unstable
@@ -137,6 +140,7 @@ jobs:
         with:
           toolchain: ${{ env.nightly }}
           override: true
+      - uses: Swatinem/rust-cache@v1
       - name: Install Miri
         run: |
           set -e
@@ -156,6 +160,7 @@ jobs:
         with:
           toolchain: ${{ env.nightly }}
           override: true
+      - uses: Swatinem/rust-cache@v1
       - name: asan
         run: cargo test --all-features --target x86_64-unknown-linux-gnu --lib -- --test-threads 1
         working-directory: tokio
@@ -181,6 +186,7 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
+      - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
@@ -196,6 +202,7 @@ jobs:
         with:
           toolchain: ${{ env.nightly }}
           override: true
+      - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
         run: cargo install cargo-hack
 
@@ -217,7 +224,7 @@ jobs:
         with:
           toolchain: ${{ env.minrust }}
           override: true
-
+      - uses: Swatinem/rust-cache@v1
       - name: "test --workspace --all-features"
         run: cargo check --workspace --all-features
 
@@ -230,6 +237,7 @@ jobs:
         with:
           toolchain: ${{ env.nightly }}
           override: true
+      - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
         run: cargo install cargo-hack
       - name: "check --all-features -Z minimal-versions"
@@ -248,6 +256,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install Rust
         run: rustup update stable
+      - uses: Swatinem/rust-cache@v1
       - name: Install rustfmt
         run: rustup component add rustfmt
 
@@ -267,6 +276,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install Rust
         run: rustup update 1.52.1 && rustup default 1.52.1
+      - uses: Swatinem/rust-cache@v1
       - name: Install clippy
         run: rustup component add clippy
 
@@ -283,7 +293,7 @@ jobs:
         with:
           toolchain: ${{ env.nightly }}
           override: true
-
+      - uses: Swatinem/rust-cache@v1
       - name: "doc --lib --all-features"
         run: cargo doc --lib --no-deps --all-features --document-private-items
         env:
@@ -306,7 +316,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install Rust
         run: rustup update stable
-
+      - uses: Swatinem/rust-cache@v1
       - name: loom ${{ matrix.scope }}
         run: cargo test --lib --release --features full -- --nocapture $SCOPE
         working-directory: tokio
