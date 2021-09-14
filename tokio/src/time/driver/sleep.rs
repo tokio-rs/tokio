@@ -1,5 +1,6 @@
 use crate::time::driver::{Handle, TimerEntry};
 use crate::time::{error::Error, Duration, Instant};
+use crate::util::trace;
 
 use pin_project_lite::pin_project;
 use std::future::Future;
@@ -46,13 +47,7 @@ cfg_trace! {
 #[cfg_attr(docsrs, doc(alias = "delay_until"))]
 #[cfg_attr(tokio_track_caller, track_caller)]
 pub fn sleep_until(deadline: Instant) -> Sleep {
-    #[cfg(tokio_track_caller)]
-    let location = std::panic::Location::caller();
-    #[cfg(tokio_track_caller)]
-    return Sleep::new_timeout(deadline, Some(location));
-
-    #[cfg(not(tokio_track_caller))]
-    Sleep::new_timeout(deadline, None)
+    return Sleep::new_timeout(deadline, trace::caller_location());
 }
 
 /// Waits until `duration` has elapsed.
@@ -96,10 +91,7 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 #[cfg_attr(docsrs, doc(alias = "wait"))]
 #[cfg_attr(tokio_track_caller, track_caller)]
 pub fn sleep(duration: Duration) -> Sleep {
-    #[cfg(tokio_track_caller)]
-    let location = Some(std::panic::Location::caller());
-    #[cfg(not(tokio_track_caller))]
-    let location = None;
+    let location = trace::caller_location();
 
     match Instant::now().checked_add(duration) {
         Some(deadline) => Sleep::new_timeout(deadline, location),
@@ -226,7 +218,7 @@ cfg_not_trace! {
 }
 
 impl Sleep {
-    #[allow(unused_variables)]
+    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
     pub(crate) fn new_timeout(
         deadline: Instant,
         location: Option<&'static Location<'static>>,

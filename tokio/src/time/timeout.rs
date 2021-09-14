@@ -4,15 +4,15 @@
 //!
 //! [`Timeout`]: struct@Timeout
 
-use crate::time::{error::Elapsed, sleep_until, Duration, Instant, Sleep};
+use crate::{
+    time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
+    util::trace,
+};
 
 use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
-
-#[cfg(all(tokio_track_caller, tokio_unstable, feature = "tracing"))]
-use std::panic::Location;
 
 /// Require a `Future` to complete before the specified duration has elapsed.
 ///
@@ -53,10 +53,7 @@ pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
 where
     T: Future,
 {
-    #[cfg(all(tokio_track_caller, tokio_unstable, feature = "tracing"))]
-    let location = Some(Location::caller());
-    #[cfg(not(all(tokio_track_caller, tokio_unstable, feature = "tracing")))]
-    let location = None;
+    let location = trace::caller_location();
 
     let deadline = Instant::now().checked_add(duration);
     let delay = match deadline {
