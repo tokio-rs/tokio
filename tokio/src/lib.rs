@@ -205,12 +205,12 @@
 //! ```
 //!
 //! If your code is CPU-bound and you wish to limit the number of threads used
-//! to run it, you should use a separate thread pool dedicated to CPU bound tasks
-//! and *NOT* the same [`Runtime`] used to handle latency sensitive IO tasks.
-//!
-//! For example, you might consider using the [rayon] library or an
-//! additional tokio [`Runtime`] instance other than the one used to handle
-//! IO.
+//! to run it, you should use a separate thread pool dedicated to CPU bound tasks.
+//! For example, you could consider using the [rayon] library for CPU-bound
+//! tasks. It is also possible to create an extra Tokio runtime dedicated to
+//! CPU-bound tasks, but if you do this, you should be careful that the extra
+//! runtime runs _only_ CPU-bound tasks, as IO-bound tasks on that runtime
+//! will behave poorly.
 //!
 //! Hint: If using rayon, you can use a [`oneshot`] channel to send the result back
 //! to Tokio when the rayon task finishes.
