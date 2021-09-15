@@ -1,11 +1,11 @@
 on:
-  label:
   push:
     branches: ["master", "tokio-*.x"]
   pull_request:
+    types: [labeled, opened, synchronize, reopened]
     branches: ["master", "tokio-*.x"]
 
-name: Loom CI
+name: Loom
 
 env:
   RUSTFLAGS: -Dwarnings
