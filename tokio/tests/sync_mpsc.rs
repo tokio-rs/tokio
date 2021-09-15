@@ -5,7 +5,7 @@
 use std::thread;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::{TrySendError, TryRecvError};
+use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
 use tokio_test::task;
 use tokio_test::{
     assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,

@@ -1,9 +1,9 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
-use crate::loom::sync::Arc;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::park::Park;
+use crate::loom::sync::Arc;
 use crate::park::thread::CachedParkThread;
+use crate::park::Park;
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
@@ -280,7 +280,7 @@ impl<T, S: Semaphore> Rx<T, S> {
                         TryPopResult::Ok(value) => {
                             self.inner.semaphore.add_permit();
                             return Ok(value);
-                        },
+                        }
                         TryPopResult::Closed => return Err(TryRecvError::Disconnected),
                         TryPopResult::Empty => return Err(TryRecvError::Empty),
                         TryPopResult::Busy => {} // fall through
