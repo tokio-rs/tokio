@@ -262,6 +262,8 @@ impl<P: Park> Inner<P> {
                             if let Some(f) = &scheduler.before_park {
                                 f();
                             }
+                            // This check will fail if `before_park` spawns a task for us to run
+                            // instead of parking the thread
                             if context.tasks.borrow_mut().queue.is_empty() {
                                 // Park until the thread is signaled
                                 scheduler.stats.about_to_park();
