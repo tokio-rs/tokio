@@ -240,9 +240,9 @@ impl Sleep {
                 "runtime.resource",
                 concrete_type = "Sleep",
                 kind = "timer",
-                location.file = location.file(),
-                location.line = location.line(),
-                location.column = location.column(),
+                loc.file = location.file(),
+                loc.line = location.line(),
+                loc.col = location.column(),
             );
 
             #[cfg(not(tokio_track_caller))]
