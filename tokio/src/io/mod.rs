@@ -217,6 +217,15 @@ cfg_io_driver_impl! {
     pub(crate) use poll_evented::PollEvented;
 }
 
+cfg_aio! {
+    /// BSD-specific I/O types
+    pub mod bsd {
+        mod poll_aio;
+
+        pub use poll_aio::{Aio, AioEvent, AioSource};
+    }
+}
+
 cfg_net_unix! {
     mod async_fd;
 

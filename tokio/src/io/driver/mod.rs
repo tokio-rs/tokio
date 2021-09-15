@@ -51,6 +51,7 @@ pub(crate) struct Handle {
     inner: Weak<Inner>,
 }
 
+#[derive(Debug)]
 pub(crate) struct ReadyEvent {
     tick: u8,
     pub(crate) ready: Ready,

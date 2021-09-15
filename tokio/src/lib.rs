@@ -314,8 +314,9 @@
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
-//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`,
-//!          as well as (on Unix-like systems) `AsyncFd`
+//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and
+//!          `UdpSocket`, as well as (on Unix-like systems) `AsyncFd` and (on
+//!          FreeBSD) `PollAio`.
 //! - `time`: Enables `tokio::time` types and allows the schedulers to enable
 //!           the built in timer.
 //! - `process`: Enables `tokio::process` types.
