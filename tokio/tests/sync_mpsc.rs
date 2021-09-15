@@ -5,7 +5,7 @@
 use std::thread;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::TrySendError;
+use tokio::sync::mpsc::error::{TrySendError, TryRecvError};
 use tokio_test::task;
 use tokio_test::{
     assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
@@ -328,6 +328,27 @@ async fn try_send_fail() {
 }
 
 #[tokio::test]
+async fn try_send_fail_with_try_recv() {
+    let (tx, mut rx) = mpsc::channel(1);
+
+    tx.try_send("hello").unwrap();
+
+    // This should fail
+    match assert_err!(tx.try_send("fail")) {
+        TrySendError::Full(..) => {}
+        _ => panic!(),
+    }
+
+    assert_eq!(rx.try_recv(), Ok("hello"));
+
+    assert_ok!(tx.try_send("goodbye"));
+    drop(tx);
+
+    assert_eq!(rx.try_recv(), Ok("goodbye"));
+    assert_eq!(rx.try_recv(), Err(TryRecvError::Disconnected));
+}
+
+#[tokio::test]
 async fn try_reserve_fails() {
     let (tx, mut rx) = mpsc::channel(1);
 
@@ -493,4 +514,68 @@ async fn permit_available_not_acquired_close() {
 
     drop(permit2);
     assert!(rx.recv().await.is_none());
+}
+
+#[test]
+fn try_recv_bounded() {
+    let (tx, mut rx) = mpsc::channel(5);
+
+    tx.try_send("hello").unwrap();
+    tx.try_send("hello").unwrap();
+    tx.try_send("hello").unwrap();
+    tx.try_send("hello").unwrap();
+    tx.try_send("hello").unwrap();
+    assert!(tx.try_send("hello").is_err());
+
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+
+    tx.try_send("hello").unwrap();
+    tx.try_send("hello").unwrap();
+    tx.try_send("hello").unwrap();
+    tx.try_send("hello").unwrap();
+    assert_eq!(Ok("hello"), rx.try_recv());
+    tx.try_send("hello").unwrap();
+    tx.try_send("hello").unwrap();
+    assert!(tx.try_send("hello").is_err());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+
+    tx.try_send("hello").unwrap();
+    tx.try_send("hello").unwrap();
+    tx.try_send("hello").unwrap();
+    drop(tx);
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Ok("hello"), rx.try_recv());
+    assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+}
+
+#[test]
+fn try_recv_unbounded() {
+    let nums = vec![1, 4, 7, 8, 50, 100];
+
+    for num in nums {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+
+        for i in 0..num {
+            tx.send(i);
+        }
+
+        for i in 0..num {
+            assert_eq!(rx.try_recv(), Ok(i));
+        }
+
+        assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
+        drop(tx);
+        assert_eq!(rx.try_recv(), Err(TryRecvError::Disconnected));
+    }
 }
