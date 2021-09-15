@@ -567,7 +567,7 @@ fn try_recv_unbounded() {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         for i in 0..num {
-            tx.send(i);
+            tx.send(i).unwrap();
         }
 
         for i in 0..num {
