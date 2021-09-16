@@ -152,12 +152,12 @@ impl<T> UnboundedReceiver<T> {
     /// async fn main() {
     ///     let (tx, mut rx) = mpsc::unbounded_channel();
     ///
-    ///     tx.send("hello").await.unwrap();
+    ///     tx.send("hello").unwrap();
     ///
     ///     assert_eq!(Ok("hello"), rx.try_recv());
     ///     assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
     ///
-    ///     tx.send("hello").await.unwrap();
+    ///     tx.send("hello").unwrap();
     ///     // Drop the last sender, closing the channel.
     ///     drop(tx);
     ///
