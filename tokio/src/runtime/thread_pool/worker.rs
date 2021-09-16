@@ -67,7 +67,7 @@ use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::stats::{RuntimeStats, WorkerStatsBatcher};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
-use crate::runtime::{queue, task};
+use crate::runtime::{queue, task, Callback};
 use crate::util::FastRand;
 
 use std::cell::RefCell;
@@ -142,6 +142,11 @@ pub(super) struct Shared {
     #[allow(clippy::vec_box)] // we're moving an already-boxed value
     shutdown_cores: Mutex<Vec<Box<Core>>>,
 
+    /// Callback for a worker parking itself
+    before_park: Option<Callback>,
+    /// Callback for a worker unparking itself
+    after_unpark: Option<Callback>,
+
     /// Collect stats from the runtime.
     stats: RuntimeStats,
 }
@@ -181,7 +186,12 @@ type Notified = task::Notified<Arc<Shared>>;
 // Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
 
-pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
+pub(super) fn create(
+    size: usize,
+    park: Parker,
+    before_park: Option<Callback>,
+    after_unpark: Option<Callback>,
+) -> (Arc<Shared>, Launch) {
     let mut cores = vec![];
     let mut remotes = vec![];
 
@@ -212,6 +222,8 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
         idle: Idle::new(size),
         owned: OwnedTasks::new(),
         shutdown_cores: Mutex::new(vec![]),
+        before_park,
+        after_unpark,
         stats: RuntimeStats::new(size),
     });
 
@@ -453,19 +465,26 @@ impl Context {
     }
 
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
-        core.transition_to_parked(&self.worker);
+        if let Some(f) = &self.worker.shared.before_park {
+            f();
+        }
 
-        while !core.is_shutdown {
-            core = self.park_timeout(core, None);
+        if core.transition_to_parked(&self.worker) {
+            while !core.is_shutdown {
+                core = self.park_timeout(core, None);
 
-            // Run regularly scheduled maintenance
-            core.maintenance(&self.worker);
+                // Run regularly scheduled maintenance
+                core.maintenance(&self.worker);
 
-            if core.transition_from_parked(&self.worker) {
-                return core;
+                if core.transition_from_parked(&self.worker) {
+                    break;
+                }
             }
         }
 
+        if let Some(f) = &self.worker.shared.after_unpark {
+            f();
+        }
         core
     }
 
@@ -569,7 +588,14 @@ impl Core {
     }
 
     /// Prepare the worker state for parking
-    fn transition_to_parked(&mut self, worker: &Worker) {
+    ///
+    /// Returns true if the transition happend, false if there is work to do first
+    fn transition_to_parked(&mut self, worker: &Worker) -> bool {
+        // Workers should not park if they have work to do
+        if self.lifo_slot.is_some() || self.run_queue.has_tasks() {
+            return false;
+        }
+
         // When the final worker transitions **out** of searching to parked, it
         // must check all the queues one last time in case work materialized
         // between the last work scan and transitioning out of searching.
@@ -585,6 +611,8 @@ impl Core {
         if is_last_searcher {
             worker.shared.notify_if_work_pending();
         }
+
+        true
     }
 
     /// Returns `true` if the transition happened.
