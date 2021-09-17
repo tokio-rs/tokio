@@ -331,7 +331,7 @@ impl Sleep {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
             me.inner.async_op_span =
-                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout");
+                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::reset");
 
             tracing::trace!(
                 target: "runtime::resource::state_update",
