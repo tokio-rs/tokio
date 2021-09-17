@@ -561,9 +561,7 @@ fn try_recv_bounded() {
 
 #[test]
 fn try_recv_unbounded() {
-    let nums = vec![1, 4, 7, 8, 50, 100];
-
-    for num in nums {
+    for num in 0..100 {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         for i in 0..num {
@@ -578,4 +576,22 @@ fn try_recv_unbounded() {
         drop(tx);
         assert_eq!(rx.try_recv(), Err(TryRecvError::Disconnected));
     }
+}
+
+#[test]
+fn try_recv_close_while_empty_bounded() {
+    let (tx, mut rx) = mpsc::channel::<()>(5);
+
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    drop(tx);
+    assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+}
+
+#[test]
+fn try_recv_close_while_empty_unbounded() {
+    let (tx, mut rx) = mpsc::unbounded_channel::<()>();
+
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    drop(tx);
+    assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
 }
