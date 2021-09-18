@@ -1,6 +1,6 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::sync::mpsc::chan;
-use crate::sync::mpsc::error::SendError;
+use crate::sync::mpsc::error::{SendError, TryRecvError};
 
 use std::fmt;
 use std::task::{Context, Poll};
@@ -127,6 +127,46 @@ impl<T> UnboundedReceiver<T> {
         use crate::future::poll_fn;
 
         poll_fn(|cx| self.poll_recv(cx)).await
+    }
+
+    /// Try to receive the next value for this receiver.
+    ///
+    /// This method returns the [`Empty`] error if the channel is currently
+    /// empty, but there are still outstanding [senders] or [permits].
+    ///
+    /// This method returns the [`Disconnected`] error if the channel is
+    /// currently empty, and there are no outstanding [senders] or [permits].
+    ///
+    /// [`Empty`]: crate::sync::mpsc::error::TryRecvError::Empty
+    /// [`Disconnected`]: crate::sync::mpsc::error::TryRecvError::Disconnected
+    /// [senders]: crate::sync::mpsc::Sender
+    /// [permits]: crate::sync::mpsc::Permit
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    /// use tokio::sync::mpsc::error::TryRecvError;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::unbounded_channel();
+    ///
+    ///     tx.send("hello").unwrap();
+    ///
+    ///     assert_eq!(Ok("hello"), rx.try_recv());
+    ///     assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    ///
+    ///     tx.send("hello").unwrap();
+    ///     // Drop the last sender, closing the channel.
+    ///     drop(tx);
+    ///
+    ///     assert_eq!(Ok("hello"), rx.try_recv());
+    ///     assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+    /// }
+    /// ```
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        self.chan.try_recv()
     }
 
     /// Blocking receive to call outside of asynchronous contexts.
