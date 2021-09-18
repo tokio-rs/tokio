@@ -137,8 +137,12 @@ impl<T> UnboundedReceiver<T> {
     /// This method returns the [`Disconnected`] error if the channel is
     /// currently empty, and there are no outstanding [senders] or [permits].
     ///
+    /// Unlike the [`poll_recv`] method, this method will never return an
+    /// [`Empty`] error spuriously.
+    ///
     /// [`Empty`]: crate::sync::mpsc::error::TryRecvError::Empty
     /// [`Disconnected`]: crate::sync::mpsc::error::TryRecvError::Disconnected
+    /// [`poll_recv`]: Self::poll_recv
     /// [senders]: crate::sync::mpsc::Sender
     /// [permits]: crate::sync::mpsc::Permit
     ///
@@ -212,7 +216,7 @@ impl<T> UnboundedReceiver<T> {
     /// This method returns:
     ///
     ///  * `Poll::Pending` if no messages are available but the channel is not
-    ///    closed.
+    ///    closed, or if a spurious failure happens.
     ///  * `Poll::Ready(Some(message))` if a message is available.
     ///  * `Poll::Ready(None)` if the channel has been closed and all messages
     ///    sent before it was closed have been received.
@@ -222,6 +226,12 @@ impl<T> UnboundedReceiver<T> {
     /// receiver, or when the channel is closed.  Note that on multiple calls to
     /// `poll_recv`, only the `Waker` from the `Context` passed to the most
     /// recent call is scheduled to receive a wakeup.
+    ///
+    /// If this method returns `Poll::Pending` due to a spurious failure, then
+    /// the `Waker` will be notified when the situation causing the spurious
+    /// failure has been resolved. Note that receiving such a wakeup does not
+    /// guarantee that the next call will succeed — it could fail with another
+    /// spurious failure.
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
