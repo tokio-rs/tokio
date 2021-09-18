@@ -343,13 +343,7 @@ impl<T> Block<T> {
                 Err(curr) => curr,
             };
 
-            #[cfg(all(test, loom))]
             crate::loom::thread::yield_now();
-
-            // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
-            #[cfg(not(all(test, loom)))]
-            #[allow(deprecated)]
-            std::sync::atomic::spin_loop_hint();
         }
     }
 }
