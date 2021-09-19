@@ -410,13 +410,15 @@ fn dropping_rx_closes_channel_for_try() {
 
     drop(rx);
 
-    {
-        let err = assert_err!(tx.try_send(msg.clone()));
-        match err {
-            TrySendError::Closed(..) => {}
-            _ => panic!(),
-        }
-    }
+    assert!(matches!(
+        tx.try_send(msg.clone()),
+        Err(TrySendError::Closed(_))
+    ));
+    assert!(matches!(tx.try_reserve(), Err(TrySendError::Closed(_))));
+    assert!(matches!(
+        tx.try_reserve_owned(),
+        Err(TrySendError::Closed(_))
+    ));
 
     assert_eq!(1, Arc::strong_count(&msg));
 }

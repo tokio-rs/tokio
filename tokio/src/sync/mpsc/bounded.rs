@@ -851,7 +851,8 @@ impl<T> Sender<T> {
     pub fn try_reserve(&self) -> Result<Permit<'_, T>, TrySendError<()>> {
         match self.chan.semaphore().0.try_acquire(1) {
             Ok(_) => {}
-            Err(_) => return Err(TrySendError::Full(())),
+            Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
+            Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),
         }
 
         Ok(Permit { chan: &self.chan })
@@ -915,7 +916,8 @@ impl<T> Sender<T> {
     pub fn try_reserve_owned(self) -> Result<OwnedPermit<T>, TrySendError<Self>> {
         match self.chan.semaphore().0.try_acquire(1) {
             Ok(_) => {}
-            Err(_) => return Err(TrySendError::Full(self)),
+            Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(self)),
+            Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(self)),
         }
 
         Ok(OwnedPermit {
