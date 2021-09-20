@@ -300,7 +300,7 @@ jobs:
           RUSTDOCFLAGS: --cfg docsrs -Dwarnings
 
   loom-compile:
-    name: Loom tests compiles
+    name: build loom tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -308,7 +308,7 @@ jobs:
         run: rustup update stable
       - uses: Swatinem/rust-cache@v1
       - name: build --cfg loom
-        run: cargo build --tests --features full
+        run: cargo test --no-run --lib --release --features full
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
