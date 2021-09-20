@@ -496,6 +496,25 @@ impl ReadHalf<'_> {
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.0.peer_addr()
     }
+
+    /// Returns the local address that this stream is bound to.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
+    /// let (read_half, _write_half) = stream.split();
+    ///
+    /// println!("{:?}", read_half.local_addr()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.0.local_addr()
+    }
 }
 
 impl WriteHalf<'_> {
@@ -756,6 +775,25 @@ impl WriteHalf<'_> {
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.0.peer_addr()
+    }
+
+    /// Returns the local address that this stream is bound to.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
+    /// let (_read_half, write_half) = stream.split();
+    ///
+    /// println!("{:?}", write_half.local_addr()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.0.local_addr()
     }
 }
 

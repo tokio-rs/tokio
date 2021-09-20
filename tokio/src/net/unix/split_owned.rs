@@ -474,6 +474,27 @@ impl OwnedReadHalf {
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
     }
+
+    /// Returns the socket address of the local half of this connection.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let bind_path = dir.path().join("bind_path");
+    /// let stream = UnixStream::connect(bind_path).await?;
+    /// let (read_half, _write_half) = stream.into_split();
+    ///
+    /// println!("{:?}", read_half.local_addr()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.local_addr()
+    }
 }
 
 impl AsyncRead for OwnedReadHalf {
@@ -771,6 +792,27 @@ impl OwnedWriteHalf {
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
+    }
+
+    /// Returns the socket address of the local half of this connection.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let bind_path = dir.path().join("bind_path");
+    /// let stream = UnixStream::connect(bind_path).await?;
+    /// let (_read_half, write_half) = stream.into_split();
+    ///
+    /// println!("{:?}", write_half.local_addr()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.local_addr()
     }
 }
 
