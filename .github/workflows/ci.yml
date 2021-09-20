@@ -299,6 +299,20 @@ jobs:
           RUSTFLAGS: --cfg docsrs
           RUSTDOCFLAGS: --cfg docsrs -Dwarnings
 
+  loom-compile:
+    name: Loom tests compiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+      - uses: Swatinem/rust-cache@v1
+      - name: build --cfg loom
+        run: cargo build --tests --features full
+        working-directory: tokio
+        env:
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
+
   check-readme:
     name: Check README
     runs-on: ubuntu-latest
