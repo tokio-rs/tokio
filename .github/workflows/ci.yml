@@ -27,8 +27,8 @@ jobs:
       - fmt
       - clippy
       - docs
-      - loom
       - valgrind
+      - loom-compile
       - check-readme
     steps:
       - run: exit 0
@@ -300,30 +300,19 @@ jobs:
           RUSTFLAGS: --cfg docsrs
           RUSTDOCFLAGS: --cfg docsrs -Dwarnings
 
-  loom:
-    name: loom
+  loom-compile:
+    name: build loom tests
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        scope:
-          - --skip loom_pool
-          - loom_pool::group_a
-          - loom_pool::group_b
-          - loom_pool::group_c
-          - loom_pool::group_d
-          - time::driver
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
         run: rustup update stable
       - uses: Swatinem/rust-cache@v1
-      - name: loom ${{ matrix.scope }}
-        run: cargo test --lib --release --features full -- --nocapture $SCOPE
+      - name: build --cfg loom
+        run: cargo test --no-run --lib --features full
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
-          LOOM_MAX_PREEMPTIONS: 2
-          SCOPE: ${{ matrix.scope }}
 
   check-readme:
     name: Check README
