@@ -162,8 +162,7 @@ impl<T> JoinHandle<T> {
     ///
     /// Awaiting a cancelled task might complete as usual if the task was
     /// already completed at the time it was cancelled, but most likely it
-    /// will complete with an `Err(JoinError)` and can be checked that
-    /// it was cancelled via [`JoinError::is_cancelled`].
+    /// will fail with a [cancelled] `JoinError`.
     ///
     /// ```rust
     /// use tokio::time;
@@ -191,7 +190,7 @@ impl<T> JoinHandle<T> {
     ///    }
     /// }
     /// ```
-    /// [`JoinError::is_cancelled`]: method@super::error::JoinError::is_cancelled
+    /// [cancelled]: method@super::error::JoinError::is_cancelled
     pub fn abort(&self) {
         if let Some(raw) = self.raw {
             raw.remote_abort();
