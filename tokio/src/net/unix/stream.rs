@@ -773,6 +773,7 @@ impl UnixStream {
     }
 
     /// Returns the socket address of the local half of this connection.
+    ///
     /// # Examples
     ///
     /// ```no_run
