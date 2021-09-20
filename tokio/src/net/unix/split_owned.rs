@@ -120,65 +120,6 @@ impl OwnedReadHalf {
     /// will continue to return immediately until the readiness event is
     /// consumed by an attempt to read or write that fails with `WouldBlock` or
     /// `Poll::Pending`.
-    ///
-    /// # Examples
-    ///
-    /// Concurrently read and write to the stream on the same task without
-    /// splitting.
-    ///
-    /// ```no_run
-    /// use tokio::io::Interest;
-    /// use tokio::net::UnixStream;
-    /// use std::error::Error;
-    /// use std::io;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let dir = tempfile::tempdir().unwrap();
-    ///     let bind_path = dir.path().join("bind_path");
-    ///     let stream = UnixStream::connect(bind_path).await?;
-    ///
-    ///     let (read_half, write_half) = stream.into_split();
-    ///
-    ///     loop {
-    ///         let ready = read_half.ready(Interest::READABLE | Interest::WRITABLE).await?;
-    ///
-    ///         if ready.is_readable() {
-    ///             let mut data = vec![0; 1024];
-    ///             // Try to read data, this may still fail with `WouldBlock`
-    ///             // if the readiness event is a false positive.
-    ///             match read_half.try_read(&mut data) {
-    ///                 Ok(n) => {
-    ///                     println!("read {} bytes", n);
-    ///                 }
-    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                     continue;
-    ///                 }
-    ///                 Err(e) => {
-    ///                     return Err(e.into());
-    ///                 }
-    ///             }
-    ///
-    ///         }
-    ///
-    ///         if ready.is_writable() {
-    ///             // Try to write data, this may still fail with `WouldBlock`
-    ///             // if the readiness event is a false positive.
-    ///             match write_half.try_write(b"hello world") {
-    ///                 Ok(n) => {
-    ///                     println!("write {} bytes", n);
-    ///                 }
-    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                     continue;
-    ///                 }
-    ///                 Err(e) => {
-    ///                     return Err(e.into());
-    ///                 }
-    ///             }
-    ///         }
-    ///     }
-    /// }
-    /// ```
     pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
         self.inner.ready(interest).await
     }
@@ -194,49 +135,6 @@ impl OwnedReadHalf {
     /// will continue to return immediately until the readiness event is
     /// consumed by an attempt to read that fails with `WouldBlock` or
     /// `Poll::Pending`.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::UnixStream;
-    /// use std::error::Error;
-    /// use std::io;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let dir = tempfile::tempdir().unwrap();
-    ///     let bind_path = dir.path().join("bind_path");
-    ///     let stream = UnixStream::connect(bind_path).await?;
-    ///
-    ///     let (read_half, _write_half) = stream.into_split();
-    ///
-    ///     let mut msg = vec![0; 1024];
-    ///
-    ///     loop {
-    ///         // Wait for the socket to be readable
-    ///         read_half.readable().await?;
-    ///
-    ///         // Try to read data, this may still fail with `WouldBlock`
-    ///         // if the readiness event is a false positive.
-    ///         match read_half.try_read(&mut msg) {
-    ///             Ok(n) => {
-    ///                 msg.truncate(n);
-    ///                 break;
-    ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                 continue;
-    ///             }
-    ///             Err(e) => {
-    ///                 return Err(e.into());
-    ///             }
-    ///         }
-    ///     }
-    ///
-    ///     println!("GOT = {:?}", msg);
-    ///     Ok(())
-    /// }
-    /// ```
     pub async fn readable(&self) -> io::Result<()> {
         self.inner.readable().await
     }
@@ -260,50 +158,6 @@ impl OwnedReadHalf {
     /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
     /// and will no longer yield data. If the stream is not ready to read data
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::UnixStream;
-    /// use std::error::Error;
-    /// use std::io;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let dir = tempfile::tempdir().unwrap();
-    ///     let bind_path = dir.path().join("bind_path");
-    ///     let stream = UnixStream::connect(bind_path).await?;
-    ///
-    ///     let (read_half, _write_half) = stream.into_split();
-    ///
-    ///     loop {
-    ///         // Wait for the socket to be readable
-    ///         read_half.readable().await?;
-    ///
-    ///         // Creating the buffer **after** the `await` prevents it from
-    ///         // being stored in the async task.
-    ///         let mut buf = [0; 4096];
-    ///
-    ///         // Try to read data, this may still fail with `WouldBlock`
-    ///         // if the readiness event is a false positive.
-    ///         match read_half.try_read(&mut buf) {
-    ///             Ok(0) => break,
-    ///             Ok(n) => {
-    ///                 println!("read {} bytes", n);
-    ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                 continue;
-    ///             }
-    ///             Err(e) => {
-    ///                 return Err(e.into());
-    ///             }
-    ///         }
-    ///     }
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn try_read(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.try_read(buf)
     }
@@ -328,48 +182,6 @@ impl OwnedReadHalf {
         /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
         /// and will no longer yield data. If the stream is not ready to read data
         /// `Err(io::ErrorKind::WouldBlock)` is returned.
-        ///
-        /// # Examples
-        ///
-        /// ```no_run
-        /// use tokio::net::UnixStream;
-        /// use std::error::Error;
-        /// use std::io;
-        ///
-        /// #[tokio::main]
-        /// async fn main() -> Result<(), Box<dyn Error>> {
-        ///     // Connect to a peer
-        ///     let dir = tempfile::tempdir().unwrap();
-        ///     let bind_path = dir.path().join("bind_path");
-        ///     let stream = UnixStream::connect(bind_path).await?;
-        ///
-        ///     let (read_half, _write_half) = stream.into_split();
-        ///
-        ///     loop {
-        ///         // Wait for the socket to be readable
-        ///         read_half.readable().await?;
-        ///
-        ///         let mut buf = Vec::with_capacity(4096);
-        ///
-        ///         // Try to read data, this may still fail with `WouldBlock`
-        ///         // if the readiness event is a false positive.
-        ///         match read_half.try_read_buf(&mut buf) {
-        ///             Ok(0) => break,
-        ///             Ok(n) => {
-        ///                 println!("read {} bytes", n);
-        ///             }
-        ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-        ///                 continue;
-        ///             }
-        ///             Err(e) => {
-        ///                 return Err(e.into());
-        ///             }
-        ///         }
-        ///     }
-        ///
-        ///     Ok(())
-        /// }
-        /// ```
         pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
             self.inner.try_read_buf(buf)
         }
@@ -400,98 +212,16 @@ impl OwnedReadHalf {
     /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
     /// and will no longer yield data. If the stream is not ready to read data
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::UnixStream;
-    /// use std::error::Error;
-    /// use std::io::{self, IoSliceMut};
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let dir = tempfile::tempdir().unwrap();
-    ///     let bind_path = dir.path().join("bind_path");
-    ///     let stream = UnixStream::connect(bind_path).await?;
-    ///
-    ///     let (read_half, _write_half) = stream.into_split();
-    ///
-    ///     loop {
-    ///         // Wait for the socket to be readable
-    ///         read_half.readable().await?;
-    ///
-    ///         // Creating the buffer **after** the `await` prevents it from
-    ///         // being stored in the async task.
-    ///         let mut buf_a = [0; 512];
-    ///         let mut buf_b = [0; 1024];
-    ///         let mut bufs = [
-    ///             IoSliceMut::new(&mut buf_a),
-    ///             IoSliceMut::new(&mut buf_b),
-    ///         ];
-    ///
-    ///         // Try to read data, this may still fail with `WouldBlock`
-    ///         // if the readiness event is a false positive.
-    ///         match read_half.try_read_vectored(&mut bufs) {
-    ///             Ok(0) => break,
-    ///             Ok(n) => {
-    ///                 println!("read {} bytes", n);
-    ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                 continue;
-    ///             }
-    ///             Err(e) => {
-    ///                 return Err(e.into());
-    ///             }
-    ///         }
-    ///     }
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn try_read_vectored(&self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
         self.inner.try_read_vectored(bufs)
     }
 
     /// Returns the socket address of the remote half of this connection.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::UnixStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let dir = tempfile::tempdir().unwrap();
-    /// let bind_path = dir.path().join("bind_path");
-    /// let stream = UnixStream::connect(bind_path).await?;
-    ///
-    /// let (read_half, _write_half) = stream.into_split();
-    ///
-    /// println!("{:?}", read_half.peer_addr()?);
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
     }
 
     /// Returns the socket address of the local half of this connection.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::UnixStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let dir = tempfile::tempdir().unwrap();
-    /// let bind_path = dir.path().join("bind_path");
-    /// let stream = UnixStream::connect(bind_path).await?;
-    /// let (read_half, _write_half) = stream.into_split();
-    ///
-    /// println!("{:?}", read_half.local_addr()?);
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.inner.local_addr()
     }
@@ -537,65 +267,6 @@ impl OwnedWriteHalf {
     /// will continue to return immediately until the readiness event is
     /// consumed by an attempt to read or write that fails with `WouldBlock` or
     /// `Poll::Pending`.
-    ///
-    /// # Examples
-    ///
-    /// Concurrently read and write to the stream on the same task without
-    /// splitting.
-    ///
-    /// ```no_run
-    /// use tokio::io::Interest;
-    /// use tokio::net::UnixStream;
-    /// use std::error::Error;
-    /// use std::io;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let dir = tempfile::tempdir().unwrap();
-    ///     let bind_path = dir.path().join("bind_path");
-    ///     let stream = UnixStream::connect(bind_path).await?;
-    ///
-    ///     let (read_half, write_half) = stream.into_split();
-    ///
-    ///     loop {
-    ///         let ready = write_half.ready(Interest::READABLE | Interest::WRITABLE).await?;
-    ///
-    ///         if ready.is_readable() {
-    ///             let mut data = vec![0; 1024];
-    ///             // Try to read data, this may still fail with `WouldBlock`
-    ///             // if the readiness event is a false positive.
-    ///             match read_half.try_read(&mut data) {
-    ///                 Ok(n) => {
-    ///                     println!("read {} bytes", n);
-    ///                 }
-    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                     continue;
-    ///                 }
-    ///                 Err(e) => {
-    ///                     return Err(e.into());
-    ///                 }
-    ///             }
-    ///
-    ///         }
-    ///
-    ///         if ready.is_writable() {
-    ///             // Try to write data, this may still fail with `WouldBlock`
-    ///             // if the readiness event is a false positive.
-    ///             match write_half.try_write(b"hello world") {
-    ///                 Ok(n) => {
-    ///                     println!("write {} bytes", n);
-    ///                 }
-    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                     continue;
-    ///                 }
-    ///                 Err(e) => {
-    ///                     return Err(e.into());
-    ///                 }
-    ///             }
-    ///         }
-    ///     }
-    /// }
-    /// ```
     pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
         self.inner.ready(interest).await
     }
@@ -611,45 +282,6 @@ impl OwnedWriteHalf {
     /// will continue to return immediately until the readiness event is
     /// consumed by an attempt to write that fails with `WouldBlock` or
     /// `Poll::Pending`.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::UnixStream;
-    /// use std::error::Error;
-    /// use std::io;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let dir = tempfile::tempdir().unwrap();
-    ///     let bind_path = dir.path().join("bind_path");
-    ///     let stream = UnixStream::connect(bind_path).await?;
-    ///
-    ///     let (_read_half, write_half) = stream.into_split();
-    ///
-    ///     loop {
-    ///         // Wait for the socket to be writable
-    ///         write_half.writable().await?;
-    ///
-    ///         // Try to write data, this may still fail with `WouldBlock`
-    ///         // if the readiness event is a false positive.
-    ///         match write_half.try_write(b"hello world") {
-    ///             Ok(n) => {
-    ///                 break;
-    ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                 continue;
-    ///             }
-    ///             Err(e) => {
-    ///                 return Err(e.into());
-    ///             }
-    ///         }
-    ///     }
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
     pub async fn writable(&self) -> io::Result<()> {
         self.inner.writable().await
     }
@@ -667,45 +299,6 @@ impl OwnedWriteHalf {
     /// If data is successfully written, `Ok(n)` is returned, where `n` is the
     /// number of bytes written. If the stream is not ready to write data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::UnixStream;
-    /// use std::error::Error;
-    /// use std::io;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let dir = tempfile::tempdir().unwrap();
-    ///     let bind_path = dir.path().join("bind_path");
-    ///     let stream = UnixStream::connect(bind_path).await?;
-    ///
-    ///     let (_read_half, write_half) = stream.into_split();
-    ///
-    ///     loop {
-    ///         // Wait for the socket to be writable
-    ///         write_half.writable().await?;
-    ///
-    ///         // Try to write data, this may still fail with `WouldBlock`
-    ///         // if the readiness event is a false positive.
-    ///         match write_half.try_write(b"hello world") {
-    ///             Ok(n) => {
-    ///                 break;
-    ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                 continue;
-    ///             }
-    ///             Err(e) => {
-    ///                 return Err(e.into());
-    ///             }
-    ///         }
-    ///     }
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn try_write(&self, buf: &[u8]) -> io::Result<usize> {
         self.inner.try_write(buf)
     }
@@ -727,90 +320,16 @@ impl OwnedWriteHalf {
     /// If data is successfully written, `Ok(n)` is returned, where `n` is the
     /// number of bytes written. If the stream is not ready to write data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::UnixStream;
-    /// use std::error::Error;
-    /// use std::io;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let dir = tempfile::tempdir().unwrap();
-    ///     let bind_path = dir.path().join("bind_path");
-    ///     let stream = UnixStream::connect(bind_path).await?;
-    ///
-    ///     let (_read_half, write_half) = stream.into_split();
-    ///
-    ///     let bufs = [io::IoSlice::new(b"hello "), io::IoSlice::new(b"world")];
-    ///
-    ///     loop {
-    ///         // Wait for the socket to be writable
-    ///         write_half.writable().await?;
-    ///
-    ///         // Try to write data, this may still fail with `WouldBlock`
-    ///         // if the readiness event is a false positive.
-    ///         match write_half.try_write_vectored(&bufs) {
-    ///             Ok(n) => {
-    ///                 break;
-    ///             }
-    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                 continue;
-    ///             }
-    ///             Err(e) => {
-    ///                 return Err(e.into());
-    ///             }
-    ///         }
-    ///     }
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn try_write_vectored(&self, buf: &[io::IoSlice<'_>]) -> io::Result<usize> {
         self.inner.try_write_vectored(buf)
     }
 
     /// Returns the socket address of the remote half of this connection.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::UnixStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let dir = tempfile::tempdir().unwrap();
-    /// let bind_path = dir.path().join("bind_path");
-    /// let stream = UnixStream::connect(bind_path).await?;
-    ///
-    /// let (_read_half, write_half) = stream.into_split();
-    ///
-    /// println!("{:?}", write_half.peer_addr()?);
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
     }
 
     /// Returns the socket address of the local half of this connection.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::UnixStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let dir = tempfile::tempdir().unwrap();
-    /// let bind_path = dir.path().join("bind_path");
-    /// let stream = UnixStream::connect(bind_path).await?;
-    /// let (_read_half, write_half) = stream.into_split();
-    ///
-    /// println!("{:?}", write_half.local_addr()?);
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.inner.local_addr()
     }
