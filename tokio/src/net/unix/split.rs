@@ -408,9 +408,9 @@ impl ReadHalf<'_> {
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
     /// let dir = tempfile::tempdir().unwrap();
     /// let bind_path = dir.path().join("bind_path");
-    /// let stream = UnixStream::connect(bind_path).await?;
+    /// let mut stream = UnixStream::connect(bind_path).await?;
     ///
-    /// let (read_half, _write_half) = stream.into_split();
+    /// let (read_half, _write_half) = stream.split();
     ///
     /// println!("{:?}", read_half.peer_addr()?);
     /// # Ok(())
