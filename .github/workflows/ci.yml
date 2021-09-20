@@ -28,6 +28,7 @@ jobs:
       - clippy
       - docs
       - valgrind
+      - loom-compile
       - check-readme
     steps:
       - run: exit 0
