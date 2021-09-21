@@ -7,12 +7,12 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.0.x" git tag.
-version = "1.11.0"
+version = "1.12.0"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/1.11.0/tokio/"
+documentation = "https://docs.rs/tokio/1.12.0/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
