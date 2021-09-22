@@ -4,7 +4,10 @@
 //!
 //! [`Timeout`]: struct@Timeout
 
-use crate::time::{error::Elapsed, sleep_until, Duration, Instant, Sleep};
+use crate::{
+    time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
+    util::trace,
+};
 
 use pin_project_lite::pin_project;
 use std::future::Future;
@@ -45,14 +48,17 @@ use std::task::{self, Poll};
 /// }
 /// # }
 /// ```
+#[cfg_attr(tokio_track_caller, track_caller)]
 pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
 where
     T: Future,
 {
+    let location = trace::caller_location();
+
     let deadline = Instant::now().checked_add(duration);
     let delay = match deadline {
-        Some(deadline) => Sleep::new_timeout(deadline),
-        None => Sleep::far_future(),
+        Some(deadline) => Sleep::new_timeout(deadline, location),
+        None => Sleep::far_future(location),
     };
     Timeout::new_with_delay(future, delay)
 }
