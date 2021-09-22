@@ -551,6 +551,10 @@ impl Future for Notified<'_> {
                         return Poll::Ready(());
                     }
 
+                    // Clone the waker before locking, a waker clone can be
+                    // triggering arbitrary code.
+                    let waker = cx.waker().clone();
+
                     // Acquire the lock and attempt to transition to the waiting
                     // state.
                     let mut waiters = notify.waiters.lock();
@@ -612,7 +616,7 @@ impl Future for Notified<'_> {
 
                     // Safety: called while locked.
                     unsafe {
-                        (*waiter.get()).waker = Some(cx.waker().clone());
+                        (*waiter.get()).waker = Some(waker);
                     }
 
                     // Insert the waiter into the linked list
