@@ -84,6 +84,14 @@ impl CopyBuffer {
                 }
             }
 
+            // If pos larger than cap, this loop will never stop.
+            // In particular, user's wrong poll_write implementation returning
+            // incorrect written length may lead to thread blocking.
+            debug_assert!(
+                self.pos <= self.cap,
+                "writer returned length larger than input slice"
+            );
+
             // If we've written all the data and we've seen EOF, flush out the
             // data and finish the transfer.
             if self.pos == self.cap && self.read_done {
