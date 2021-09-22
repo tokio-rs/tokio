@@ -93,6 +93,14 @@ impl<T> Local<T> {
         !self.inner.is_empty()
     }
 
+    /// Returns false if there are any entries in the queue
+    ///
+    /// Separate to is_stealable so that refactors of is_stealable to "protect"
+    /// some tasks from stealing won't affect this
+    pub(super) fn has_tasks(&self) -> bool {
+        !self.inner.is_empty()
+    }
+
     /// Pushes a task to the back of the local queue, skipping the LIFO slot.
     pub(super) fn push_back(&mut self, mut task: task::Notified<T>, inject: &Inject<T>) {
         let tail = loop {

@@ -2,6 +2,9 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
+use crate::park::thread::CachedParkThread;
+use crate::park::Park;
+use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
 
@@ -260,6 +263,51 @@ impl<T, S: Semaphore> Rx<T, S> {
                 Ready(None)
             } else {
                 Pending
+            }
+        })
+    }
+
+    /// Try to receive the next value.
+    pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        use super::list::TryPopResult;
+
+        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
+            let rx_fields = unsafe { &mut *rx_fields_ptr };
+
+            macro_rules! try_recv {
+                () => {
+                    match rx_fields.list.try_pop(&self.inner.tx) {
+                        TryPopResult::Ok(value) => {
+                            self.inner.semaphore.add_permit();
+                            return Ok(value);
+                        }
+                        TryPopResult::Closed => return Err(TryRecvError::Disconnected),
+                        TryPopResult::Empty => return Err(TryRecvError::Empty),
+                        TryPopResult::Busy => {} // fall through
+                    }
+                };
+            }
+
+            try_recv!();
+
+            // If a previous `poll_recv` call has set a waker, we wake it here.
+            // This allows us to put our own CachedParkThread waker in the
+            // AtomicWaker slot instead.
+            //
+            // This is not a spurious wakeup to `poll_recv` since we just got a
+            // Busy from `try_pop`, which only happens if there are messages in
+            // the queue.
+            self.inner.rx_waker.wake();
+
+            // Park the thread until the problematic send has completed.
+            let mut park = CachedParkThread::new();
+            let waker = park.unpark().into_waker();
+            loop {
+                self.inner.rx_waker.register_by_ref(&waker);
+                // It is possible that the problematic send has now completed,
+                // so we have to check for messages again.
+                try_recv!();
+                park.park().expect("park failed");
             }
         })
     }

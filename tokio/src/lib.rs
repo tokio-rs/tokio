@@ -205,9 +205,15 @@
 //! ```
 //!
 //! If your code is CPU-bound and you wish to limit the number of threads used
-//! to run it, you should run it on another thread pool such as [rayon]. You
-//! can use an [`oneshot`] channel to send the result back to Tokio when the
-//! rayon task finishes.
+//! to run it, you should use a separate thread pool dedicated to CPU bound tasks.
+//! For example, you could consider using the [rayon] library for CPU-bound
+//! tasks. It is also possible to create an extra Tokio runtime dedicated to
+//! CPU-bound tasks, but if you do this, you should be careful that the extra
+//! runtime runs _only_ CPU-bound tasks, as IO-bound tasks on that runtime
+//! will behave poorly.
+//!
+//! Hint: If using rayon, you can use a [`oneshot`] channel to send the result back
+//! to Tokio when the rayon task finishes.
 //!
 //! [rayon]: https://docs.rs/rayon
 //! [`oneshot`]: crate::sync::oneshot
@@ -308,8 +314,9 @@
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
-//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`,
-//!          as well as (on Unix-like systems) `AsyncFd`
+//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and
+//!          `UdpSocket`, as well as (on Unix-like systems) `AsyncFd` and (on
+//!          FreeBSD) `PollAio`.
 //! - `time`: Enables `tokio::time` types and allows the schedulers to enable
 //!           the built in timer.
 //! - `process`: Enables `tokio::process` types.

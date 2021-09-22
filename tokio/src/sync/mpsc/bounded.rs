@@ -1,6 +1,6 @@
 use crate::sync::batch_semaphore::{self as semaphore, TryAcquireError};
 use crate::sync::mpsc::chan;
-use crate::sync::mpsc::error::{SendError, TrySendError};
+use crate::sync::mpsc::error::{SendError, TryRecvError, TrySendError};
 
 cfg_time! {
     use crate::sync::mpsc::error::SendTimeoutError;
@@ -14,8 +14,8 @@ use std::task::{Context, Poll};
 ///
 /// Instances are created by the [`channel`](channel) function.
 ///
-/// To use the `Sender` in a poll function, you can use the [`PollSender`]
-/// utility.
+/// To convert the `Sender` into a `Sink` or use it in a poll function, you can
+/// use the [`PollSender`] utility.
 ///
 /// [`PollSender`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSender.html
 pub struct Sender<T> {
@@ -187,6 +187,50 @@ impl<T> Receiver<T> {
         poll_fn(|cx| self.chan.recv(cx)).await
     }
 
+    /// Try to receive the next value for this receiver.
+    ///
+    /// This method returns the [`Empty`] error if the channel is currently
+    /// empty, but there are still outstanding [senders] or [permits].
+    ///
+    /// This method returns the [`Disconnected`] error if the channel is
+    /// currently empty, and there are no outstanding [senders] or [permits].
+    ///
+    /// Unlike the [`poll_recv`] method, this method will never return an
+    /// [`Empty`] error spuriously.
+    ///
+    /// [`Empty`]: crate::sync::mpsc::error::TryRecvError::Empty
+    /// [`Disconnected`]: crate::sync::mpsc::error::TryRecvError::Disconnected
+    /// [`poll_recv`]: Self::poll_recv
+    /// [senders]: crate::sync::mpsc::Sender
+    /// [permits]: crate::sync::mpsc::Permit
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    /// use tokio::sync::mpsc::error::TryRecvError;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(100);
+    ///
+    ///     tx.send("hello").await.unwrap();
+    ///
+    ///     assert_eq!(Ok("hello"), rx.try_recv());
+    ///     assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    ///
+    ///     tx.send("hello").await.unwrap();
+    ///     // Drop the last sender, closing the channel.
+    ///     drop(tx);
+    ///
+    ///     assert_eq!(Ok("hello"), rx.try_recv());
+    ///     assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+    /// }
+    /// ```
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        self.chan.try_recv()
+    }
+
     /// Blocking receive to call outside of asynchronous contexts.
     ///
     /// This method returns `None` if the channel has been closed and there are
@@ -291,7 +335,7 @@ impl<T> Receiver<T> {
     /// This method returns:
     ///
     ///  * `Poll::Pending` if no messages are available but the channel is not
-    ///    closed.
+    ///    closed, or if a spurious failure happens.
     ///  * `Poll::Ready(Some(message))` if a message is available.
     ///  * `Poll::Ready(None)` if the channel has been closed and all messages
     ///    sent before it was closed have been received.
@@ -301,6 +345,12 @@ impl<T> Receiver<T> {
     /// receiver, or when the channel is closed.  Note that on multiple calls to
     /// `poll_recv`, only the `Waker` from the `Context` passed to the most
     /// recent call is scheduled to receive a wakeup.
+    ///
+    /// If this method returns `Poll::Pending` due to a spurious failure, then
+    /// the `Waker` will be notified when the situation causing the spurious
+    /// failure has been resolved. Note that receiving such a wakeup does not
+    /// guarantee that the next call will succeed — it could fail with another
+    /// spurious failure.
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
@@ -811,7 +861,8 @@ impl<T> Sender<T> {
     pub fn try_reserve(&self) -> Result<Permit<'_, T>, TrySendError<()>> {
         match self.chan.semaphore().0.try_acquire(1) {
             Ok(_) => {}
-            Err(_) => return Err(TrySendError::Full(())),
+            Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
+            Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),
         }
 
         Ok(Permit { chan: &self.chan })
@@ -875,7 +926,8 @@ impl<T> Sender<T> {
     pub fn try_reserve_owned(self) -> Result<OwnedPermit<T>, TrySendError<Self>> {
         match self.chan.semaphore().0.try_acquire(1) {
             Ok(_) => {}
-            Err(_) => return Err(TrySendError::Full(self)),
+            Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(self)),
+            Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(self)),
         }
 
         Ok(OwnedPermit {

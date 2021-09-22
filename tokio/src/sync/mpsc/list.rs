@@ -13,21 +13,33 @@ pub(crate) struct Tx<T> {
     /// Tail in the `Block` mpmc list.
     block_tail: AtomicPtr<Block<T>>,
 
-    /// Position to push the next message. This reference a block and offset
+    /// Position to push the next message. This references a block and offset
     /// into the block.
     tail_position: AtomicUsize,
 }
 
 /// List queue receive handle
 pub(crate) struct Rx<T> {
-    /// Pointer to the block being processed
+    /// Pointer to the block being processed.
     head: NonNull<Block<T>>,
 
-    /// Next slot index to process
+    /// Next slot index to process.
     index: usize,
 
-    /// Pointer to the next block pending release
+    /// Pointer to the next block pending release.
     free_head: NonNull<Block<T>>,
+}
+
+/// Return value of `Rx::try_pop`.
+pub(crate) enum TryPopResult<T> {
+    /// Successfully popped a value.
+    Ok(T),
+    /// The channel is empty.
+    Empty,
+    /// The channel is empty and closed.
+    Closed,
+    /// The channel is not empty, but the first value is being written.
+    Busy,
 }
 
 pub(crate) fn channel<T>() -> (Tx<T>, Rx<T>) {
@@ -218,7 +230,7 @@ impl<T> fmt::Debug for Tx<T> {
 }
 
 impl<T> Rx<T> {
-    /// Pops the next value off the queue
+    /// Pops the next value off the queue.
     pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
         // Advance `head`, if needed
         if !self.try_advancing_head() {
@@ -237,6 +249,26 @@ impl<T> Rx<T> {
             }
 
             ret
+        }
+    }
+
+    /// Pops the next value off the queue, detecting whether the block
+    /// is busy or empty on failure.
+    ///
+    /// This function exists because `Rx::pop` can return `None` even if the
+    /// channel's queue contains a message that has been completely written.
+    /// This can happen if the fully delivered message is behind another message
+    /// that is in the middle of being written to the block, since the channel
+    /// can't return the messages out of order.
+    pub(crate) fn try_pop(&mut self, tx: &Tx<T>) -> TryPopResult<T> {
+        let tail_position = tx.tail_position.load(Acquire);
+        let result = self.pop(tx);
+
+        match result {
+            Some(block::Read::Value(t)) => TryPopResult::Ok(t),
+            Some(block::Read::Closed) => TryPopResult::Closed,
+            None if tail_position == self.index => TryPopResult::Empty,
+            None => TryPopResult::Busy,
         }
     }
 

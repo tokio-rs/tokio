@@ -27,6 +27,9 @@ use proc_macro::TokenStream;
 /// helps set up a `Runtime` without requiring the user to use
 /// [Runtime](../tokio/runtime/struct.Runtime.html) or
 /// [Builder](../tokio/runtime/struct.Builder.html) directly.
+/// The function executes in the context of a
+/// [LocalSet](../tokio/task/struct.LocalSet.html), allowing calls to
+/// [spawn_local](../tokio/task/fn.spawn_local.html) without further setup.
 ///
 /// Note: This macro is designed to be simplistic and targets applications that
 /// do not require a complex setup. If the provided functionality is not
@@ -84,13 +87,14 @@ use proc_macro::TokenStream;
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new_multi_thread()
+///     let ls = tokio::task::LocalSet::new();
+///     let rt = tokio::runtime::Builder::new_multi_thread()
 ///         .enable_all()
 ///         .build()
-///         .unwrap()
-///         .block_on(async {
-///             println!("Hello world");
-///         })
+///         .unwrap();
+///     ls.block_on(&rt, async {
+///         println!("Hello world");
+///     })
 /// }
 /// ```
 ///
@@ -109,13 +113,14 @@ use proc_macro::TokenStream;
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new_current_thread()
+///     let ls = tokio::task::LocalSet::new();
+///     let rt = tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
 ///         .build()
-///         .unwrap()
-///         .block_on(async {
-///             println!("Hello world");
-///         })
+///         .unwrap();
+///     ls.block_on(&rt, async {
+///         println!("Hello world");
+///     })
 /// }
 /// ```
 ///
@@ -132,14 +137,15 @@ use proc_macro::TokenStream;
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new_multi_thread()
+///     let ls = tokio::task::LocalSet::new();
+///     let rt = tokio::runtime::Builder::new_multi_thread()
 ///         .worker_threads(2)
 ///         .enable_all()
 ///         .build()
-///         .unwrap()
-///         .block_on(async {
-///             println!("Hello world");
-///         })
+///         .unwrap();
+///     ls.block_on(&rt, async {
+///         println!("Hello world");
+///     })
 /// }
 /// ```
 ///
@@ -156,14 +162,15 @@ use proc_macro::TokenStream;
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new_current_thread()
+///     let ls = tokio::task::LocalSet::new();
+///     let rt = tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
 ///         .start_paused(true)
 ///         .build()
-///         .unwrap()
-///         .block_on(async {
-///             println!("Hello world");
-///         })
+///         .unwrap();
+///     ls.block_on(&rt, async {
+///         println!("Hello world");
+///     })
 /// }
 /// ```
 ///
@@ -204,13 +211,14 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new_current_thread()
+///     let ls = tokio::task::LocalSet::new();
+///     let rt = tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
 ///         .build()
-///         .unwrap()
-///         .block_on(async {
-///             println!("Hello world");
-///         })
+///         .unwrap();
+///     ls.block_on(&rt, async {
+///         println!("Hello world");
+///     })
 /// }
 /// ```
 ///

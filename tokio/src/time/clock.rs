@@ -121,15 +121,24 @@ cfg_test_util! {
         inner.unfrozen = Some(std::time::Instant::now());
     }
 
-    /// Advance time
+    /// Advance time.
     ///
     /// Increments the saved `Instant::now()` value by `duration`. Subsequent
     /// calls to `Instant::now()` will return the result of the increment.
     ///
-    /// Although this function is async, it does not wait for timers with a
-    /// deadline less than the given duration to complete. If you wish to wait
-    /// for those, you should use the [`sleep`] method instead and rely on the
-    /// auto-advance feature.
+    /// This function will make the current time jump forward by the given
+    /// duration in one jump. This means that all `sleep` calls with a deadline
+    /// before the new time will immediately complete "at the same time", and
+    /// the runtime is free to poll them in any order.  Additionally, this
+    /// method will not wait for the `sleep` calls it advanced past to complete.
+    /// If you want to do that, you should instead call [`sleep`] and rely on
+    /// the runtime's auto-advance feature.
+    ///
+    /// Note that calls to `sleep` are not guaranteed to complete the first time
+    /// they are polled after a call to `advance`. For example, this can happen
+    /// if the runtime has not yet touched the timer driver after the call to
+    /// `advance`. However if they don't, the runtime will poll the task again
+    /// shortly.
     ///
     /// # Panics
     ///
