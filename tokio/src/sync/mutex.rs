@@ -301,6 +301,40 @@ impl<T: ?Sized> Mutex<T> {
         MutexGuard { lock: self }
     }
 
+    /// Blocking lock this mutex. When the lock has been acquired, function returns a
+    /// [`MutexGuard`].
+    ///
+    /// This method is intended for use cases where you
+    /// need to use this mutex in asynchronous code as well as in synchronous code.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Mutex;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mutex =  Arc::new(Mutex::new(1));
+    ///
+    ///     let mutex1 = Arc::clone(&mutex);
+    ///     let sync_code = tokio::task::spawn_blocking(move || {
+    ///         let mut n = mutex1.blocking_lock();
+    ///         *n = 2;
+    ///     });
+    ///
+    ///     sync_code.await.unwrap();
+    ///
+    ///     let n = mutex.lock().await;
+    ///     assert_eq!(*n, 2);
+    /// }
+    ///
+    /// ```
+    #[cfg(feature = "sync")]
+    pub fn blocking_lock(&self) -> MutexGuard<'_, T> {
+        crate::future::block_on(self.lock())
+    }
+
     /// Locks this mutex, causing the current task to yield until the lock has
     /// been acquired. When the lock has been acquired, this returns an
     /// [`OwnedMutexGuard`].
