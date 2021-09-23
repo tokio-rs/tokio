@@ -443,6 +443,39 @@ impl UdpSocket {
         Ok(())
     }
 
+    /// Polls for write/send readiness.
+    ///
+    /// If the udp stream is not currently ready for sending, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the udp
+    /// stream becomes ready for sending, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_send_ready` or `poll_send`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_recv_ready` retains a
+    /// second, independent waker.)
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`writable`] is not feasible. Where possible, using [`writable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the udp stream is not ready for writing.
+    /// * `Poll::Ready(Ok(()))` if the udp stream is ready for writing.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`writable`]: method@Self::writable
+    pub fn poll_send_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.io.registration().poll_write_ready(cx).map_ok(|_| ())
+    }
+
     /// Sends data on the socket to the remote address that the socket is
     /// connected to.
     ///
@@ -628,6 +661,39 @@ impl UdpSocket {
     pub async fn readable(&self) -> io::Result<()> {
         self.ready(Interest::READABLE).await?;
         Ok(())
+    }
+
+    /// Polls for read/receive readiness.
+    ///
+    /// If the udp stream is not currently ready for receiving, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the udp
+    /// socket becomes ready for reading, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_recv_ready`, `poll_recv` or
+    /// `poll_peek`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup. (However,
+    /// `poll_send_ready` retains a second, independent waker.)
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`readable`] is not feasible. Where possible, using [`readable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the udp stream is not ready for reading.
+    /// * `Poll::Ready(Ok(()))` if the udp stream is ready for reading.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`readable`]: method@Self::readable
+    pub fn poll_recv_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.io.registration().poll_read_ready(cx).map_ok(|_| ())
     }
 
     /// Receives a single datagram message on the socket from the remote address
