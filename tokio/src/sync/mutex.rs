@@ -310,7 +310,6 @@ impl<T: ?Sized> Mutex<T> {
     /// # Examples
     ///
     /// ```
-    /// use std::thread;
     /// use std::sync::Arc;
     /// use tokio::sync::Mutex;
     ///
@@ -319,12 +318,12 @@ impl<T: ?Sized> Mutex<T> {
     ///     let mutex =  Arc::new(Mutex::new(1));
     ///
     ///     let mutex1 = Arc::clone(&mutex);
-    ///     let sync_code = thread::spawn(move || {
+    ///     let sync_code = tokio::task::spawn_blocking(move || {
     ///         let mut n = mutex1.blocking_lock();
     ///         *n = 2;
     ///     });
     ///
-    ///     sync_code.join().unwrap();
+    ///     sync_code.await.unwrap();
     ///
     ///     let n = mutex.lock().await;
     ///     assert_eq!(*n, 2);
