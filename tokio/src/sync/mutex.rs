@@ -331,6 +331,7 @@ impl<T: ?Sized> Mutex<T> {
     /// }
     ///
     /// ```
+    #[cfg(feature = "sync")]
     pub fn blocking_lock(&self) -> MutexGuard<'_, T> {
         crate::future::block_on(self.lock())
     }
