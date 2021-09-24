@@ -161,8 +161,8 @@
 //! [`tokio::runtime`]: crate::runtime
 //! [`Builder`]: crate::runtime::Builder
 //! [`Runtime`]: crate::runtime::Runtime
-//! [rt]: runtime/index.html#basic-scheduler
-//! [rt-multi-thread]: runtime/index.html#threaded-scheduler
+//! [rt]: runtime/index.html#current-thread-scheduler
+//! [rt-multi-thread]: runtime/index.html#multi-thread-scheduler
 //! [rt-features]: runtime/index.html#runtime-scheduler
 //!
 //! ## CPU-bound tasks and blocking code
