@@ -328,3 +328,50 @@ async fn try_recv_buf_never_block() -> io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn poll_ready() -> io::Result<()> {
+    let dir = tempfile::tempdir().unwrap();
+    let server_path = dir.path().join("server.sock");
+    let client_path = dir.path().join("client.sock");
+
+    // Create listener
+    let server = UnixDatagram::bind(&server_path)?;
+
+    // Create socket pair
+    let client = UnixDatagram::bind(&client_path)?;
+
+    for _ in 0..5 {
+        loop {
+            poll_fn(|cx| client.poll_send_ready(cx)).await?;
+
+            match client.try_send_to(b"hello world", &server_path) {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+
+        loop {
+            poll_fn(|cx| server.poll_recv_ready(cx)).await?;
+
+            let mut buf = Vec::with_capacity(512);
+
+            match server.try_recv_buf_from(&mut buf) {
+                Ok((n, addr)) => {
+                    assert_eq!(n, 11);
+                    assert_eq!(addr.as_pathname(), Some(client_path.as_ref()));
+                    assert_eq!(&buf[0..11], &b"hello world"[..]);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+    }
+
+    Ok(())
+}
