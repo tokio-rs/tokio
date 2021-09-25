@@ -162,7 +162,7 @@ impl ReadHalf<'_> {
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
     ///
-    /// This function is also equivalent to [TcpStream::ready].
+    /// This function is also equivalent to [`TcpStream::ready`].
     ///
     /// # Cancel safety
     ///
