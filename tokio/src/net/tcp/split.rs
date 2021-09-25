@@ -145,7 +145,7 @@ impl ReadHalf<'_> {
     /// can be used to concurrently read / write to the same socket on a single
     /// task without splitting the socket.
     ///
-    /// This function is equivalent to [TcpStream::ready].
+    /// This function is equivalent to [`TcpStream::ready`].
     ///
     /// # Cancel safety
     ///
