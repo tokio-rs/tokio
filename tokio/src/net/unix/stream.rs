@@ -773,11 +773,41 @@ impl UnixStream {
     }
 
     /// Returns the socket address of the local half of this connection.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let bind_path = dir.path().join("bind_path");
+    /// let stream = UnixStream::connect(bind_path).await?;
+    ///
+    /// println!("{:?}", stream.local_addr()?);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.local_addr().map(SocketAddr)
     }
 
     /// Returns the socket address of the remote half of this connection.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let bind_path = dir.path().join("bind_path");
+    /// let stream = UnixStream::connect(bind_path).await?;
+    ///
+    /// println!("{:?}", stream.peer_addr()?);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.io.peer_addr().map(SocketAddr)
     }
