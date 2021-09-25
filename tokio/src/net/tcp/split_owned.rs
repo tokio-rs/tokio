@@ -200,7 +200,7 @@ impl OwnedReadHalf {
     /// can be used to concurrently read / write to the same socket on a single
     /// task without splitting the socket.
     ///
-    /// This function is equivalent to [TcpStream::ready].
+    /// This function is equivalent to [`TcpStream::ready`].
     ///
     /// # Cancel safety
     ///
@@ -217,7 +217,7 @@ impl OwnedReadHalf {
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
     ///
-    /// This function is also equivalent to [TcpStream::ready].
+    /// This function is also equivalent to [`TcpStream::ready`].
     ///
     /// # Cancel safety
     ///
@@ -351,7 +351,7 @@ impl OwnedWriteHalf {
     /// can be used to concurrently read / write to the same socket on a single
     /// task without splitting the socket.
     ///
-    /// This function is equivalent to [TcpStream::ready].
+    /// This function is equivalent to [`TcpStream::ready`].
     ///
     /// # Cancel safety
     ///
