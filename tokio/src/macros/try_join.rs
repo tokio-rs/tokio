@@ -91,8 +91,9 @@
 ///         Ok(val) => {
 ///             // do something with the values
 ///         }
-///         Err(val) => {
-///             assert_eq!(val, "failed");
+///         Err(err) => {
+///             println!("Failed with {}.", err);
+///             # assert_eq!(err, "failed");
 ///         }
 ///     }
 /// }
