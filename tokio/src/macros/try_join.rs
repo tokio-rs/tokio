@@ -92,7 +92,7 @@
 ///             // do something with the values
 ///         }
 ///         Err(val) => {
-///             assert_eq!(val, "failed1");
+///             assert_eq!(val, "failed");
 ///         }
 ///     }
 /// }
