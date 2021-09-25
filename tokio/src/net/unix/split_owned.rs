@@ -149,8 +149,8 @@ impl OwnedReadHalf {
     ///
     /// Usually, [`readable()`] or [`ready()`] is used with this function.
     ///
-    /// [`readable()`]: UnixStream::readable()
-    /// [`ready()`]: UnixStream::ready()
+    /// [`readable()`]: Self::readable()
+    /// [`ready()`]: Self::ready()
     ///
     /// # Return
     ///
@@ -173,8 +173,8 @@ impl OwnedReadHalf {
         ///
         /// Usually, [`readable()`] or [`ready()`] is used with this function.
         ///
-        /// [`readable()`]: UnixStream::readable()
-        /// [`ready()`]: UnixStream::ready()
+        /// [`readable()`]: Self::readable()
+        /// [`ready()`]: Self::ready()
         ///
         /// # Return
         ///
@@ -202,9 +202,9 @@ impl OwnedReadHalf {
     ///
     /// Usually, [`readable()`] or [`ready()`] is used with this function.
     ///
-    /// [`try_read()`]: UnixStream::try_read()
-    /// [`readable()`]: UnixStream::readable()
-    /// [`ready()`]: UnixStream::ready()
+    /// [`try_read()`]: Self::try_read()
+    /// [`readable()`]: Self::readable()
+    /// [`ready()`]: Self::ready()
     ///
     /// # Return
     ///
@@ -313,7 +313,7 @@ impl OwnedWriteHalf {
     ///
     /// This function is usually paired with `writable()`.
     ///
-    /// [`try_write()`]: UnixStream::try_write()
+    /// [`try_write()`]: Self::try_write()
     ///
     /// # Return
     ///

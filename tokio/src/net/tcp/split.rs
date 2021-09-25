@@ -161,6 +161,7 @@ impl ReadHalf<'_> {
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
+    ///
     /// This function is also equivalent to [TcpStream::ready].
     ///
     /// # Cancel safety
@@ -183,8 +184,8 @@ impl ReadHalf<'_> {
     ///
     /// Usually, [`readable()`] or [`ready()`] is used with this function.
     ///
-    /// [`readable()`]: TcpStream::readable()
-    /// [`ready()`]: TcpStream::ready()
+    /// [`readable()`]: Self::readable()
+    /// [`ready()`]: Self::ready()
     ///
     /// # Return
     ///
@@ -211,9 +212,9 @@ impl ReadHalf<'_> {
     ///
     /// Usually, [`readable()`] or [`ready()`] is used with this function.
     ///
-    /// [`try_read()`]: TcpStream::try_read()
-    /// [`readable()`]: TcpStream::readable()
-    /// [`ready()`]: TcpStream::ready()
+    /// [`try_read()`]: Self::try_read()
+    /// [`readable()`]: Self::readable()
+    /// [`ready()`]: Self::ready()
     ///
     /// # Return
     ///
@@ -236,8 +237,8 @@ impl ReadHalf<'_> {
         ///
         /// Usually, [`readable()`] or [`ready()`] is used with this function.
         ///
-        /// [`readable()`]: TcpStream::readable()
-        /// [`ready()`]: TcpStream::ready()
+        /// [`readable()`]: Self::readable()
+        /// [`ready()`]: Self::ready()
         ///
         /// # Return
         ///
@@ -322,7 +323,7 @@ impl WriteHalf<'_> {
     ///
     /// This function is usually paired with `writable()`.
     ///
-    /// [`try_write()`]: TcpStream::try_write()
+    /// [`try_write()`]: Self::try_write()
     ///
     /// # Return
     ///
