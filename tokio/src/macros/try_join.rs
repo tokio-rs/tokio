@@ -60,7 +60,7 @@
 /// }
 /// ```
 ///
-/// Returning on the first error.
+/// Using `try_join!` with spawned tasks.
 ///
 /// ```
 /// use tokio::task::JoinHandle;
@@ -92,7 +92,7 @@
 ///             // do something with the values
 ///         }
 ///         Err(val) => {
-///             assert_eq!(val, "failed");
+///             assert_eq!(val, "failed1");
 ///         }
 ///     }
 /// }
