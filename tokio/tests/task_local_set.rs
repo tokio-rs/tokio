@@ -1,6 +1,11 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use futures::{
+    future::{pending, ready},
+    FutureExt,
+};
+
 use tokio::runtime::{self, Runtime};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{self, LocalSet};
@@ -10,6 +15,16 @@ use std::cell::Cell;
 use std::sync::atomic::Ordering::{self, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::time::Duration;
+
+#[tokio::test(flavor = "current_thread")]
+async fn localset_implicit_current_thread() {
+    task::spawn_local(async {}).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn localset_implicit_multi_thread() {
+    task::spawn_local(async {}).await.unwrap();
+}
 
 #[tokio::test(flavor = "current_thread")]
 async fn local_basic_scheduler() {
@@ -62,11 +77,11 @@ async fn localset_future_timers() {
 
     let local = LocalSet::new();
     local.spawn_local(async move {
-        time::sleep(Duration::from_millis(10)).await;
+        time::sleep(Duration::from_millis(5)).await;
         RAN1.store(true, Ordering::SeqCst);
     });
     local.spawn_local(async move {
-        time::sleep(Duration::from_millis(20)).await;
+        time::sleep(Duration::from_millis(10)).await;
         RAN2.store(true, Ordering::SeqCst);
     });
     local.await;
@@ -294,9 +309,7 @@ fn drop_cancels_tasks() {
         let _rc2 = rc2;
 
         started_tx.send(()).unwrap();
-        loop {
-            time::sleep(Duration::from_secs(3600)).await;
-        }
+        futures::future::pending::<()>().await;
     });
 
     local.block_on(&rt, async {
@@ -329,7 +342,7 @@ fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
     // something we can easily make assertions about, we'll run it in a
     // thread. When the test thread finishes, it will send a message on a
     // channel to this thread. We'll wait for that message with a fairly
-    // generous timeout, and if we don't recieve it, we assume the test
+    // generous timeout, and if we don't receive it, we assume the test
     // thread has hung.
     //
     // Note that it should definitely complete in under a minute, but just
@@ -395,13 +408,32 @@ fn local_tasks_wake_join_all() {
     });
 }
 
-#[tokio::test]
-async fn local_tasks_are_polled_after_tick() {
+#[test]
+fn local_tasks_are_polled_after_tick() {
+    // This test depends on timing, so we run it up to five times.
+    for _ in 0..4 {
+        let res = std::panic::catch_unwind(local_tasks_are_polled_after_tick_inner);
+        if res.is_ok() {
+            // success
+            return;
+        }
+    }
+
+    // Test failed 4 times. Try one more time without catching panics. If it
+    // fails again, the test fails.
+    local_tasks_are_polled_after_tick_inner();
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn local_tasks_are_polled_after_tick_inner() {
     // Reproduces issues #1899 and #1900
 
     static RX1: AtomicUsize = AtomicUsize::new(0);
     static RX2: AtomicUsize = AtomicUsize::new(0);
-    static EXPECTED: usize = 500;
+    const EXPECTED: usize = 500;
+
+    RX1.store(0, SeqCst);
+    RX2.store(0, SeqCst);
 
     let (tx, mut rx) = mpsc::unbounded_channel();
 
@@ -411,7 +443,7 @@ async fn local_tasks_are_polled_after_tick() {
         .run_until(async {
             let task2 = task::spawn(async move {
                 // Wait a bit
-                time::sleep(Duration::from_millis(100)).await;
+                time::sleep(Duration::from_millis(10)).await;
 
                 let mut oneshots = Vec::with_capacity(EXPECTED);
 
@@ -422,13 +454,13 @@ async fn local_tasks_are_polled_after_tick() {
                     tx.send(oneshot_rx).unwrap();
                 }
 
-                time::sleep(Duration::from_millis(100)).await;
+                time::sleep(Duration::from_millis(10)).await;
 
                 for tx in oneshots.drain(..) {
                     tx.send(()).unwrap();
                 }
 
-                time::sleep(Duration::from_millis(300)).await;
+                time::sleep(Duration::from_millis(20)).await;
                 let rx1 = RX1.load(SeqCst);
                 let rx2 = RX2.load(SeqCst);
                 println!("EXPECT = {}; RX1 = {}; RX2 = {}", EXPECTED, rx1, rx2);
@@ -484,6 +516,15 @@ async fn acquire_mutex_in_drop() {
 
     // Drop the LocalSet
     drop(local);
+}
+
+#[tokio::test]
+async fn spawn_wakes_localset() {
+    let local = LocalSet::new();
+    futures::select! {
+        _ = local.run_until(pending::<()>()).fuse() => unreachable!(),
+        ret = async { local.spawn_local(ready(())).await.unwrap()}.fuse() => ret
+    }
 }
 
 fn rt() -> Runtime {

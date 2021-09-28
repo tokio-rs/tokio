@@ -10,7 +10,7 @@
 //!
 //! Tokio's [`Runtime`] bundles all of these services as a single type, allowing
 //! them to be started, shut down, and configured together. However, often it is
-//! not required to configure a [`Runtime`] manually, and user may just use the
+//! not required to configure a [`Runtime`] manually, and a user may just use the
 //! [`tokio::main`] attribute macro, which creates a [`Runtime`] under the hood.
 //!
 //! # Usage
@@ -114,7 +114,7 @@
 //!
 //! The multi-thread scheduler executes futures on a _thread pool_, using a
 //! work-stealing strategy. By default, it will start a worker thread for each
-//! CPU core available on the system. This tends to be the ideal configurations
+//! CPU core available on the system. This tends to be the ideal configuration
 //! for most applications. The multi-thread scheduler requires the `rt-multi-thread`
 //! feature flag, and is selected by default:
 //! ```
@@ -180,6 +180,13 @@ mod tests;
 pub(crate) mod enter;
 
 pub(crate) mod task;
+
+cfg_stats! {
+    pub mod stats;
+}
+cfg_not_stats! {
+    pub(crate) mod stats;
+}
 
 cfg_rt! {
     mod basic_scheduler;
@@ -250,7 +257,7 @@ cfg_rt! {
     ///
     /// The Tokio runtime implements `Sync` and `Send` to allow you to wrap it
     /// in a `Arc`. Most fn take `&self` to allow you to call them concurrently
-    /// accross multiple threads.
+    /// across multiple threads.
     ///
     /// Calls to `shutdown` and `shutdown_timeout` require exclusive ownership of
     /// the runtime type and this can be achieved via `Arc::try_unwrap` when only
@@ -405,7 +412,7 @@ cfg_rt! {
         /// Run a future to completion on the Tokio runtime. This is the
         /// runtime's entry point.
         ///
-        /// This runs the given future on the runtime, blocking until it is
+        /// This runs the given future on the current thread, blocking until it is
         /// complete, and yielding its resolved result. Any tasks or timers
         /// which the future spawns internally will be executed on the runtime.
         ///
@@ -443,7 +450,11 @@ cfg_rt! {
         /// ```
         ///
         /// [handle]: fn@Handle::block_on
+        #[cfg_attr(tokio_track_caller, track_caller)]
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            let future = crate::util::trace::task(future, "block_on", None);
+
             let _enter = self.enter();
 
             match &self.kind {
@@ -526,7 +537,7 @@ cfg_rt! {
         /// ```
         pub fn shutdown_timeout(mut self, duration: Duration) {
             // Wakeup and shutdown all the worker threads
-            self.handle.spawner.shutdown();
+            self.handle.shutdown();
             self.blocking_pool.shutdown(Some(duration));
         }
 

@@ -13,6 +13,7 @@ pin_project! {
     pub struct Compat<T> {
         #[pin]
         inner: T,
+        seek_pos: Option<io::SeekFrom>,
     }
 }
 
@@ -80,7 +81,10 @@ impl<T: tokio::io::AsyncWrite> TokioAsyncWriteCompatExt for T {}
 
 impl<T> Compat<T> {
     fn new(inner: T) -> Self {
-        Self { inner }
+        Self {
+            inner,
+            seek_pos: None,
+        }
     }
 
     /// Get a reference to the `Future`, `Stream`, `AsyncRead`, or `AsyncWrite` object
@@ -213,5 +217,58 @@ where
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         tokio::io::AsyncWrite::poll_shutdown(self.project().inner, cx)
+    }
+}
+
+impl<T: tokio::io::AsyncSeek> futures_io::AsyncSeek for Compat<T> {
+    fn poll_seek(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        pos: io::SeekFrom,
+    ) -> Poll<io::Result<u64>> {
+        if self.seek_pos != Some(pos) {
+            self.as_mut().project().inner.start_seek(pos)?;
+            *self.as_mut().project().seek_pos = Some(pos);
+        }
+        let res = ready!(self.as_mut().project().inner.poll_complete(cx));
+        *self.as_mut().project().seek_pos = None;
+        Poll::Ready(res.map(|p| p as u64))
+    }
+}
+
+impl<T: futures_io::AsyncSeek> tokio::io::AsyncSeek for Compat<T> {
+    fn start_seek(mut self: Pin<&mut Self>, pos: io::SeekFrom) -> io::Result<()> {
+        *self.as_mut().project().seek_pos = Some(pos);
+        Ok(())
+    }
+
+    fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        let pos = match self.seek_pos {
+            None => {
+                // tokio 1.x AsyncSeek recommends calling poll_complete before start_seek.
+                // We don't have to guarantee that the value returned by
+                // poll_complete called without start_seek is correct,
+                // so we'll return 0.
+                return Poll::Ready(Ok(0));
+            }
+            Some(pos) => pos,
+        };
+        let res = ready!(self.as_mut().project().inner.poll_seek(cx, pos));
+        *self.as_mut().project().seek_pos = None;
+        Poll::Ready(res.map(|p| p as u64))
+    }
+}
+
+#[cfg(unix)]
+impl<T: std::os::unix::io::AsRawFd> std::os::unix::io::AsRawFd for Compat<T> {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        self.inner.as_raw_fd()
+    }
+}
+
+#[cfg(windows)]
+impl<T: std::os::windows::io::AsRawHandle> std::os::windows::io::AsRawHandle for Compat<T> {
+    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
+        self.inner.as_raw_handle()
     }
 }

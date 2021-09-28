@@ -364,11 +364,11 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use std::collections::HashMap;
+    /// use tokio_stream::{StreamMap, pending};
     ///
-    /// let mut a = HashMap::new();
+    /// let mut a = StreamMap::new();
     /// assert!(a.is_empty());
-    /// a.insert(1, "a");
+    /// a.insert(1, pending::<i32>());
     /// assert!(!a.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
@@ -568,6 +568,23 @@ where
     }
 }
 
+impl<K, V> std::iter::FromIterator<(K, V)> for StreamMap<K, V>
+where
+    K: Hash + Eq,
+{
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        let iterator = iter.into_iter();
+        let (lower_bound, _) = iterator.size_hint();
+        let mut stream_map = Self::with_capacity(lower_bound);
+
+        for (key, value) in iterator {
+            stream_map.insert(key, value);
+        }
+
+        stream_map
+    }
+}
+
 mod rand {
     use std::cell::Cell;
 
@@ -605,10 +622,10 @@ mod rand {
     /// Fast random number generate
     ///
     /// Implement xorshift64+: 2 32-bit xorshift sequences added together.
-    /// Shift triplet [17,7,16] was calculated as indicated in Marsaglia's
-    /// Xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf
+    /// Shift triplet `[17,7,16]` was calculated as indicated in Marsaglia's
+    /// Xorshift paper: <https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf>
     /// This generator passes the SmallCrush suite, part of TestU01 framework:
-    /// http://simul.iro.umontreal.ca/testu01/tu01.html
+    /// <http://simul.iro.umontreal.ca/testu01/tu01.html>
     #[derive(Debug)]
     pub(crate) struct FastRand {
         one: Cell<u32>,

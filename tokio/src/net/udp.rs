@@ -22,8 +22,15 @@ cfg_net! {
     /// * one to one: [`connect`](`UdpSocket::connect`) and associate with a single address, using [`send`](`UdpSocket::send`)
     ///   and [`recv`](`UdpSocket::recv`) to communicate only with that remote address
     ///
-    /// `UdpSocket` can also be used concurrently to `send_to` and `recv_from` in different tasks,
-    /// all that's required is that you `Arc<UdpSocket>` and clone a reference for each task.
+    /// This type does not provide a `split` method, because this functionality
+    /// can be achieved by instead wrapping the socket in an [`Arc`]. Note that
+    /// you do not need a `Mutex` to share the `UdpSocket` — an `Arc<UdpSocket>`
+    /// is enough. This is because all of the methods take `&self` instead of
+    /// `&mut self`. Once you have wrapped it in an `Arc`, you can call
+    /// `.clone()` on the `Arc<UdpSocket>` to get multiple shared handles to the
+    /// same socket. An example of such usage can be found further down.
+    ///
+    /// [`Arc`]: std::sync::Arc
     ///
     /// # Streams
     ///
@@ -78,11 +85,12 @@ cfg_net! {
     /// }
     /// ```
     ///
-    /// # Example: Sending/Receiving concurrently
+    /// # Example: Splitting with `Arc`
     ///
-    /// Because `send_to` and `recv_from` take `&self`. It's perfectly alright to `Arc<UdpSocket>`
-    /// and share the references to multiple tasks, in order to send/receive concurrently. Here is
-    /// a similar "echo" example but that supports concurrent sending/receiving:
+    /// Because `send_to` and `recv_from` take `&self`. It's perfectly alright
+    /// to use an `Arc<UdpSocket>` and share the references to multiple tasks.
+    /// Here is a similar "echo" example that supports concurrent
+    /// sending/receiving:
     ///
     /// ```no_run
     /// use tokio::{net::UdpSocket, sync::mpsc};
@@ -203,6 +211,48 @@ impl UdpSocket {
         UdpSocket::new(io)
     }
 
+    /// Turn a [`tokio::net::UdpSocket`] into a [`std::net::UdpSocket`].
+    ///
+    /// The returned [`std::net::UdpSocket`] will have nonblocking mode set as
+    /// `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use std::error::Error;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let tokio_socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await?;
+    ///     let std_socket = tokio_socket.into_std()?;
+    ///     std_socket.set_nonblocking(false)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`tokio::net::UdpSocket`]: UdpSocket
+    /// [`std::net::UdpSocket`]: std::net::UdpSocket
+    /// [`set_nonblocking`]: fn@std::net::UdpSocket::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::net::UdpSocket> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_fd())
+                .map(|raw_fd| unsafe { std::net::UdpSocket::from_raw_fd(raw_fd) })
+        }
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_socket())
+                .map(|raw_socket| unsafe { std::net::UdpSocket::from_raw_socket(raw_socket) })
+        }
+    }
+
     /// Returns the local address that this socket is bound to.
     ///
     /// # Example
@@ -277,6 +327,13 @@ impl UdpSocket {
     /// false-positive and attempting an operation will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// Concurrently receive from and send to the socket on the same task
@@ -340,6 +397,13 @@ impl UdpSocket {
     /// false-positive and attempting a `try_send()` will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -379,6 +443,39 @@ impl UdpSocket {
         Ok(())
     }
 
+    /// Polls for write/send readiness.
+    ///
+    /// If the udp stream is not currently ready for sending, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the udp
+    /// stream becomes ready for sending, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_send_ready` or `poll_send`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_recv_ready` retains a
+    /// second, independent waker.)
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`writable`] is not feasible. Where possible, using [`writable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the udp stream is not ready for writing.
+    /// * `Poll::Ready(Ok(()))` if the udp stream is ready for writing.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`writable`]: method@Self::writable
+    pub fn poll_send_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.io.registration().poll_write_ready(cx).map_ok(|_| ())
+    }
+
     /// Sends data on the socket to the remote address that the socket is
     /// connected to.
     ///
@@ -391,6 +488,12 @@ impl UdpSocket {
     ///
     /// On success, the number of bytes sent is returned, otherwise, the
     /// encountered error is returned.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `send` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that the message was not sent.
     ///
     /// # Examples
     ///
@@ -509,6 +612,13 @@ impl UdpSocket {
     /// false-positive and attempting a `try_recv()` will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -553,6 +663,39 @@ impl UdpSocket {
         Ok(())
     }
 
+    /// Polls for read/receive readiness.
+    ///
+    /// If the udp stream is not currently ready for receiving, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the udp
+    /// socket becomes ready for reading, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_recv_ready`, `poll_recv` or
+    /// `poll_peek`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup. (However,
+    /// `poll_send_ready` retains a second, independent waker.)
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`readable`] is not feasible. Where possible, using [`readable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the udp stream is not ready for reading.
+    /// * `Poll::Ready(Ok(()))` if the udp stream is ready for reading.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`readable`]: method@Self::readable
+    pub fn poll_recv_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.io.registration().poll_read_ready(cx).map_ok(|_| ())
+    }
+
     /// Receives a single datagram message on the socket from the remote address
     /// to which it is connected. On success, returns the number of bytes read.
     ///
@@ -562,6 +705,13 @@ impl UdpSocket {
     ///
     /// The [`connect`] method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv_from` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// socket.
     ///
     /// [`connect`]: method@Self::connect
     ///
@@ -615,7 +765,7 @@ impl UdpSocket {
     /// [`connect`]: method@Self::connect
     pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         let n = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uinitialized bytes.
+            // Safety: will not read the maybe uninitialized bytes.
             let b = unsafe {
                 &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
             };
@@ -832,6 +982,12 @@ impl UdpSocket {
     ///
     /// [`ToSocketAddrs`]: crate::net::ToSocketAddrs
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `send_to` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that the message was not sent.
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -895,7 +1051,7 @@ impl UdpSocket {
     ///
     /// # Returns
     ///
-    /// If successfull, returns the number of bytes sent
+    /// If successful, returns the number of bytes sent
     ///
     /// Users should ensure that when the remote cannot receive, the
     /// [`ErrorKind::WouldBlock`] is properly handled. An error can also occur
@@ -955,6 +1111,13 @@ impl UdpSocket {
     /// size to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv_from` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// socket.
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -1003,7 +1166,7 @@ impl UdpSocket {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<SocketAddr>> {
         let (n, addr) = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uinitialized bytes.
+            // Safety: will not read the maybe uninitialized bytes.
             let b = unsafe {
                 &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
             };
@@ -1071,6 +1234,41 @@ impl UdpSocket {
         self.io
             .registration()
             .try_io(Interest::READABLE, || self.io.recv_from(buf))
+    }
+
+    /// Try to read or write from the socket using a user-provided IO operation.
+    ///
+    /// If the socket is ready, the provided closure is called. The closure
+    /// should attempt to perform IO operation from the socket by manually
+    /// calling the appropriate syscall. If the operation fails because the
+    /// socket is not actually ready, then the closure should return a
+    /// `WouldBlock` error and the readiness flag is cleared. The return value
+    /// of the closure is then returned by `try_io`.
+    ///
+    /// If the socket is not ready, then the closure is not called
+    /// and a `WouldBlock` error is returned.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `UdpSocket` type, as this will mess with the
+    /// readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`readable()`]: UdpSocket::readable()
+    /// [`writable()`]: UdpSocket::writable()
+    /// [`ready()`]: UdpSocket::ready()
+    pub fn try_io<R>(
+        &self,
+        interest: Interest,
+        f: impl FnOnce() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.io.registration().try_io(interest, f)
     }
 
     /// Receives data from the socket, without removing it from the input queue.
@@ -1142,7 +1340,7 @@ impl UdpSocket {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<SocketAddr>> {
         let (n, addr) = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uinitialized bytes.
+            // Safety: will not read the maybe uninitialized bytes.
             let b = unsafe {
                 &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
             };

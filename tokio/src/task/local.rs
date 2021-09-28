@@ -1,15 +1,15 @@
 //! Runs `!Send` futures on the current thread.
-use crate::runtime::task::{self, JoinHandle, Task};
+use crate::loom::sync::{Arc, Mutex};
+use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
 use crate::sync::AtomicWaker;
-use crate::util::linked_list::{Link, LinkedList};
+use crate::util::VecDequeCell;
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
 use pin_project_lite::pin_project;
@@ -43,10 +43,13 @@ cfg_rt! {
     ///     }).await.unwrap();
     /// }
     /// ```
-    /// In order to spawn `!Send` futures, we can use a local task set to
-    /// schedule them on the thread calling [`Runtime::block_on`]. When running
-    /// inside of the local task set, we can use [`task::spawn_local`], which can
-    /// spawn `!Send` futures. For example:
+    ///
+    /// # Use with `run_until`
+    ///
+    /// To spawn `!Send` futures, we can use a local task set to schedule them
+    /// on the thread calling [`Runtime::block_on`]. When running inside of the
+    /// local task set, we can use [`task::spawn_local`], which can spawn
+    /// `!Send` futures. For example:
     ///
     /// ```rust
     /// use std::rc::Rc;
@@ -71,6 +74,9 @@ cfg_rt! {
     ///     }).await;
     /// }
     /// ```
+    /// **Note:** The `run_until` method can only be used in `#[tokio::main]`,
+    /// `#[tokio::test]` or directly inside a call to [`Runtime::block_on`]. It
+    /// cannot be used inside a task spawned with `tokio::spawn`.
     ///
     /// ## Awaiting a `LocalSet`
     ///
@@ -104,11 +110,106 @@ cfg_rt! {
     ///     local.await;
     /// }
     /// ```
+    /// **Note:** Awaiting a `LocalSet` can only be done inside
+    /// `#[tokio::main]`, `#[tokio::test]` or directly inside a call to
+    /// [`Runtime::block_on`]. It cannot be used inside a task spawned with
+    /// `tokio::spawn`.
+    ///
+    /// ## Use inside `tokio::spawn`
+    ///
+    /// The two methods mentioned above cannot be used inside `tokio::spawn`, so
+    /// to spawn `!Send` futures from inside `tokio::spawn`, we need to do
+    /// something else. The solution is to create the `LocalSet` somewhere else,
+    /// and communicate with it using an [`mpsc`] channel.
+    ///
+    /// The following example puts the `LocalSet` inside a new thread.
+    /// ```
+    /// use tokio::runtime::Builder;
+    /// use tokio::sync::{mpsc, oneshot};
+    /// use tokio::task::LocalSet;
+    ///
+    /// // This struct describes the task you want to spawn. Here we include
+    /// // some simple examples. The oneshot channel allows sending a response
+    /// // to the spawner.
+    /// #[derive(Debug)]
+    /// enum Task {
+    ///     PrintNumber(u32),
+    ///     AddOne(u32, oneshot::Sender<u32>),
+    /// }
+    ///
+    /// #[derive(Clone)]
+    /// struct LocalSpawner {
+    ///    send: mpsc::UnboundedSender<Task>,
+    /// }
+    ///
+    /// impl LocalSpawner {
+    ///     pub fn new() -> Self {
+    ///         let (send, mut recv) = mpsc::unbounded_channel();
+    ///
+    ///         let rt = Builder::new_current_thread()
+    ///             .enable_all()
+    ///             .build()
+    ///             .unwrap();
+    ///
+    ///         std::thread::spawn(move || {
+    ///             let local = LocalSet::new();
+    ///
+    ///             local.spawn_local(async move {
+    ///                 while let Some(new_task) = recv.recv().await {
+    ///                     tokio::task::spawn_local(run_task(new_task));
+    ///                 }
+    ///                 // If the while loop returns, then all the LocalSpawner
+    ///                 // objects have have been dropped.
+    ///             });
+    ///
+    ///             // This will return once all senders are dropped and all
+    ///             // spawned tasks have returned.
+    ///             rt.block_on(local);
+    ///         });
+    ///
+    ///         Self {
+    ///             send,
+    ///         }
+    ///     }
+    ///
+    ///     pub fn spawn(&self, task: Task) {
+    ///         self.send.send(task).expect("Thread with LocalSet has shut down.");
+    ///     }
+    /// }
+    ///
+    /// // This task may do !Send stuff. We use printing a number as an example,
+    /// // but it could be anything.
+    /// //
+    /// // The Task struct is an enum to support spawning many different kinds
+    /// // of operations.
+    /// async fn run_task(task: Task) {
+    ///     match task {
+    ///         Task::PrintNumber(n) => {
+    ///             println!("{}", n);
+    ///         },
+    ///         Task::AddOne(n, response) => {
+    ///             // We ignore failures to send the response.
+    ///             let _ = response.send(n + 1);
+    ///         },
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let spawner = LocalSpawner::new();
+    ///
+    ///     let (send, response) = oneshot::channel();
+    ///     spawner.spawn(Task::AddOne(10, send));
+    ///     let eleven = response.await.unwrap();
+    ///     assert_eq!(eleven, 11);
+    /// }
+    /// ```
     ///
     /// [`Send`]: trait@std::marker::Send
     /// [local task set]: struct@LocalSet
     /// [`Runtime::block_on`]: method@crate::runtime::Runtime::block_on
     /// [`task::spawn_local`]: fn@spawn_local
+    /// [`mpsc`]: mod@crate::sync::mpsc
     pub struct LocalSet {
         /// Current scheduler tick
         tick: Cell<u8>,
@@ -123,25 +224,20 @@ cfg_rt! {
 
 /// State available from the thread-local
 struct Context {
-    /// Owned task set and local run queue
-    tasks: RefCell<Tasks>,
+    /// Collection of all active tasks spawned onto this executor.
+    owned: LocalOwnedTasks<Arc<Shared>>,
+
+    /// Local run queue sender and receiver.
+    queue: VecDequeCell<task::Notified<Arc<Shared>>>,
 
     /// State shared between threads.
     shared: Arc<Shared>,
 }
 
-struct Tasks {
-    /// Collection of all active tasks spawned onto this executor.
-    owned: LinkedList<Task<Arc<Shared>>, <Task<Arc<Shared>> as Link>::Target>,
-
-    /// Local run queue sender and receiver.
-    queue: VecDeque<task::Notified<Arc<Shared>>>,
-}
-
 /// LocalSet state shared between threads.
 struct Shared {
     /// Remote run queue sender
-    queue: Mutex<VecDeque<task::Notified<Arc<Shared>>>>,
+    queue: Mutex<Option<VecDeque<task::Notified<Arc<Shared>>>>>,
 
     /// Wake the `LocalSet` task
     waker: AtomicWaker,
@@ -196,15 +292,24 @@ cfg_rt! {
         F: Future + 'static,
         F::Output: 'static,
     {
-        let future = crate::util::trace::task(future, "local");
+        spawn_local_inner(future, None)
+    }
+
+    pub(super) fn spawn_local_inner<F>(future: F, name: Option<&str>) -> JoinHandle<F::Output>
+    where F: Future + 'static,
+          F::Output: 'static
+    {
+        let future = crate::util::trace::task(future, "local", name);
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
 
-            // Safety: Tasks are only polled and dropped from the thread that
-            // spawns them.
-            let (task, handle) = unsafe { task::joinable_local(future) };
-            cx.tasks.borrow_mut().queue.push_back(task);
+            let (handle, notified) = cx.owned.bind(future, cx.shared.clone());
+
+            if let Some(notified) = notified {
+                cx.shared.schedule(notified);
+            }
+
             handle
         })
     }
@@ -225,12 +330,10 @@ impl LocalSet {
         LocalSet {
             tick: Cell::new(0),
             context: Context {
-                tasks: RefCell::new(Tasks {
-                    owned: LinkedList::new(),
-                    queue: VecDeque::with_capacity(INITIAL_CAPACITY),
-                }),
+                owned: LocalOwnedTasks::new(),
+                queue: VecDequeCell::with_capacity(INITIAL_CAPACITY),
                 shared: Arc::new(Shared {
-                    queue: Mutex::new(VecDeque::with_capacity(INITIAL_CAPACITY)),
+                    queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
                     waker: AtomicWaker::new(),
                 }),
             },
@@ -280,9 +383,15 @@ impl LocalSet {
         F: Future + 'static,
         F::Output: 'static,
     {
-        let future = crate::util::trace::task(future, "local");
-        let (task, handle) = unsafe { task::joinable_local(future) };
-        self.context.tasks.borrow_mut().queue.push_back(task);
+        let future = crate::util::trace::task(future, "local", None);
+
+        let (handle, notified) = self.context.owned.bind(future, self.context.shared.clone());
+
+        if let Some(notified) = notified {
+            self.context.shared.schedule(notified);
+        }
+
+        self.context.shared.waker.wake();
         handle
     }
 
@@ -420,26 +529,30 @@ impl LocalSet {
         true
     }
 
-    fn next_task(&self) -> Option<task::Notified<Arc<Shared>>> {
+    fn next_task(&self) -> Option<task::LocalNotified<Arc<Shared>>> {
         let tick = self.tick.get();
         self.tick.set(tick.wrapping_add(1));
 
-        if tick % REMOTE_FIRST_INTERVAL == 0 {
+        let task = if tick % REMOTE_FIRST_INTERVAL == 0 {
             self.context
                 .shared
                 .queue
                 .lock()
-                .unwrap()
-                .pop_front()
-                .or_else(|| self.context.tasks.borrow_mut().queue.pop_front())
+                .as_mut()
+                .and_then(|queue| queue.pop_front())
+                .or_else(|| self.context.queue.pop_front())
         } else {
-            self.context
-                .tasks
-                .borrow_mut()
-                .queue
-                .pop_front()
-                .or_else(|| self.context.shared.queue.lock().unwrap().pop_front())
-        }
+            self.context.queue.pop_front().or_else(|| {
+                self.context
+                    .shared
+                    .queue
+                    .lock()
+                    .as_mut()
+                    .and_then(|queue| queue.pop_front())
+            })
+        };
+
+        task.map(|task| self.context.owned.assert_owner(task))
     }
 
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
@@ -465,7 +578,7 @@ impl Future for LocalSet {
             // there are still tasks remaining in the run queue.
             cx.waker().wake_by_ref();
             Poll::Pending
-        } else if self.context.tasks.borrow().owned.is_empty() {
+        } else if self.context.owned.is_empty() {
             // If the scheduler has no remaining futures, we're done!
             Poll::Ready(())
         } else {
@@ -486,27 +599,24 @@ impl Default for LocalSet {
 impl Drop for LocalSet {
     fn drop(&mut self) {
         self.with(|| {
-            // Loop required here to ensure borrow is dropped between iterations
-            #[allow(clippy::while_let_loop)]
-            loop {
-                let task = match self.context.tasks.borrow_mut().owned.pop_back() {
-                    Some(task) => task,
-                    None => break,
-                };
+            // Shut down all tasks in the LocalOwnedTasks and close it to
+            // prevent new tasks from ever being added.
+            self.context.owned.close_and_shutdown_all();
 
-                // Safety: same as `run_unchecked`.
-                task.shutdown();
+            // We already called shutdown on all tasks above, so there is no
+            // need to call shutdown.
+            for task in self.context.queue.take() {
+                drop(task);
             }
 
-            for task in self.context.tasks.borrow_mut().queue.drain(..) {
-                task.shutdown();
+            // Take the queue from the Shared object to prevent pushing
+            // notifications to it in the future.
+            let queue = self.context.shared.queue.lock().take().unwrap();
+            for task in queue {
+                drop(task);
             }
 
-            for task in self.context.shared.queue.lock().unwrap().drain(..) {
-                task.shutdown();
-            }
-
-            assert!(self.context.tasks.borrow().owned.is_empty());
+            assert!(self.context.owned.is_empty());
         });
     }
 }
@@ -549,41 +659,34 @@ impl Shared {
     fn schedule(&self, task: task::Notified<Arc<Self>>) {
         CURRENT.with(|maybe_cx| match maybe_cx {
             Some(cx) if cx.shared.ptr_eq(self) => {
-                cx.tasks.borrow_mut().queue.push_back(task);
+                cx.queue.push_back(task);
             }
             _ => {
-                self.queue.lock().unwrap().push_back(task);
-                self.waker.wake();
+                // First check whether the queue is still there (if not, the
+                // LocalSet is dropped). Then push to it if so, and if not,
+                // do nothing.
+                let mut lock = self.queue.lock();
+
+                if let Some(queue) = lock.as_mut() {
+                    queue.push_back(task);
+                    drop(lock);
+                    self.waker.wake();
+                }
             }
         });
     }
 
     fn ptr_eq(&self, other: &Shared) -> bool {
-        self as *const _ == other as *const _
+        std::ptr::eq(self, other)
     }
 }
 
 impl task::Schedule for Arc<Shared> {
-    fn bind(task: Task<Self>) -> Arc<Shared> {
-        CURRENT.with(|maybe_cx| {
-            let cx = maybe_cx.expect("scheduler context missing");
-            cx.tasks.borrow_mut().owned.push_front(task);
-            cx.shared.clone()
-        })
-    }
-
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
-        use std::ptr::NonNull;
-
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
-
             assert!(cx.shared.ptr_eq(self));
-
-            let ptr = NonNull::from(task.header());
-            // safety: task must be contained by list. It is inserted into the
-            // list in `bind`.
-            unsafe { cx.tasks.borrow_mut().owned.remove(ptr) }
+            cx.owned.remove(task)
         })
     }
 

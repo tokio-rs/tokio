@@ -8,7 +8,11 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Stream for the [`split`](crate::io::AsyncBufReadExt::split) method.
+    /// Splitter for the [`split`](crate::io::AsyncBufReadExt::split) method.
+    ///
+    /// A `Split` can be turned into a `Stream` with [`SplitStream`].
+    ///
+    /// [`SplitStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.SplitStream.html
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
@@ -91,7 +95,7 @@ where
         let n = ready!(read_until_internal(
             me.reader, cx, *me.delim, me.buf, me.read,
         ))?;
-        // read_until_internal resets me.read to zero once it finds the delimeter
+        // read_until_internal resets me.read to zero once it finds the delimiter
         debug_assert_eq!(*me.read, 0);
 
         if n == 0 && me.buf.is_empty() {
@@ -102,7 +106,7 @@ where
             me.buf.pop();
         }
 
-        Poll::Ready(Ok(Some(mem::replace(me.buf, Vec::new()))))
+        Poll::Ready(Ok(Some(mem::take(me.buf))))
     }
 }
 

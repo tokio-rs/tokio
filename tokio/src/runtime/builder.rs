@@ -47,6 +47,9 @@ pub struct Builder {
     /// Whether or not to enable the time driver
     enable_time: bool,
 
+    /// Whether or not the clock should start paused.
+    start_paused: bool,
+
     /// The number of worker threads, used by Runtime.
     ///
     /// Only used when not using the current-thread executor.
@@ -67,6 +70,12 @@ pub struct Builder {
     /// To run before each worker thread stops
     pub(super) before_stop: Option<Callback>,
 
+    /// To run before each worker thread is parked.
+    pub(super) before_park: Option<Callback>,
+
+    /// To run after each thread is unparked.
+    pub(super) after_unpark: Option<Callback>,
+
     /// Customizable keep alive timeout for BlockingPool
     pub(super) keep_alive: Option<Duration>,
 }
@@ -83,6 +92,11 @@ impl Builder {
     /// Returns a new builder with the current thread scheduler selected.
     ///
     /// Configuration methods can be chained on the return value.
+    ///
+    /// To spawn non-`Send` tasks on the resulting runtime, combine it with a
+    /// [`LocalSet`].
+    ///
+    /// [`LocalSet`]: crate::task::LocalSet
     pub fn new_current_thread() -> Builder {
         Builder::new(Kind::CurrentThread)
     }
@@ -110,6 +124,9 @@ impl Builder {
             // Time defaults to "off"
             enable_time: false,
 
+            // The clock starts not-paused
+            start_paused: false,
+
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
 
@@ -124,6 +141,8 @@ impl Builder {
             // No worker thread callbacks
             after_start: None,
             before_stop: None,
+            before_park: None,
+            after_unpark: None,
 
             keep_alive: None,
         }
@@ -156,8 +175,8 @@ impl Builder {
 
     /// Sets the number of worker threads the `Runtime` will use.
     ///
-    /// This should be a number between 0 and 32,768 though it is advised to
-    /// keep this value on the smaller side.
+    /// This can be any number above 0 though it is advised to keep this value
+    /// on the smaller side.
     ///
     /// # Default
     ///
@@ -209,19 +228,28 @@ impl Builder {
         self
     }
 
-    /// Specifies limit for threads spawned by the Runtime used for blocking operations.
+    /// Specifies the limit for additional threads spawned by the Runtime.
     ///
-    ///
-    /// Similarly to the `worker_threads`, this number should be between 1 and 32,768.
+    /// These threads are used for blocking operations like tasks spawned
+    /// through [`spawn_blocking`]. Unlike the [`worker_threads`], they are not
+    /// always active and will exit if left idle for too long. You can change
+    /// this timeout duration with [`thread_keep_alive`].
     ///
     /// The default value is 512.
-    ///
-    /// Otherwise as `worker_threads` are always active, it limits additional threads (e.g. for
-    /// blocking annotations).
     ///
     /// # Panic
     ///
     /// This will panic if `val` is not larger than `0`.
+    ///
+    /// # Upgrading from 0.x
+    ///
+    /// In old versions `max_threads` limited both blocking and worker threads, but the
+    /// current `max_blocking_threads` does not include async worker threads in the count.
+    ///
+    /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
+    /// [`worker_threads`]: Self::worker_threads
+    /// [`thread_keep_alive`]: Self::thread_keep_alive
+    #[cfg_attr(docsrs, doc(alias = "max_threads"))]
     pub fn max_blocking_threads(&mut self, val: usize) -> &mut Self {
         assert!(val > 0, "Max blocking threads cannot be set to 0");
         self.max_blocking_threads = val;
@@ -354,6 +382,120 @@ impl Builder {
         self
     }
 
+    /// Executes function `f` just before a thread is parked (goes idle).
+    /// `f` is called within the Tokio context, so functions like [`tokio::spawn`](crate::spawn)
+    /// can be called, and may result in this thread being unparked immediately.
+    ///
+    /// This can be used to start work only when the executor is idle, or for bookkeeping
+    /// and monitoring purposes.
+    ///
+    /// Note: There can only be one park callback for a runtime; calling this function
+    /// more than once replaces the last callback defined, rather than adding to it.
+    ///
+    /// # Examples
+    ///
+    /// ## Multithreaded executor
+    /// ```
+    /// # use std::sync::Arc;
+    /// # use std::sync::atomic::{AtomicBool, Ordering};
+    /// # use tokio::runtime;
+    /// # use tokio::sync::Barrier;
+    /// # pub fn main() {
+    /// let once = AtomicBool::new(true);
+    /// let barrier = Arc::new(Barrier::new(2));
+    ///
+    /// let runtime = runtime::Builder::new_multi_thread()
+    ///     .worker_threads(1)
+    ///     .on_thread_park({
+    ///         let barrier = barrier.clone();
+    ///         move || {
+    ///             let barrier = barrier.clone();
+    ///             if once.swap(false, Ordering::Relaxed) {
+    ///                 tokio::spawn(async move { barrier.wait().await; });
+    ///            }
+    ///         }
+    ///     })
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// runtime.block_on(async {
+    ///    barrier.wait().await;
+    /// })
+    /// # }
+    /// ```
+    /// ## Current thread executor
+    /// ```
+    /// # use std::sync::Arc;
+    /// # use std::sync::atomic::{AtomicBool, Ordering};
+    /// # use tokio::runtime;
+    /// # use tokio::sync::Barrier;
+    /// # pub fn main() {
+    /// let once = AtomicBool::new(true);
+    /// let barrier = Arc::new(Barrier::new(2));
+    ///
+    /// let runtime = runtime::Builder::new_current_thread()
+    ///     .on_thread_park({
+    ///         let barrier = barrier.clone();
+    ///         move || {
+    ///             let barrier = barrier.clone();
+    ///             if once.swap(false, Ordering::Relaxed) {
+    ///                 tokio::spawn(async move { barrier.wait().await; });
+    ///            }
+    ///         }
+    ///     })
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// runtime.block_on(async {
+    ///    barrier.wait().await;
+    /// })
+    /// # }
+    /// ```
+    #[cfg(not(loom))]
+    pub fn on_thread_park<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.before_park = Some(std::sync::Arc::new(f));
+        self
+    }
+
+    /// Executes function `f` just after a thread unparks (starts executing tasks).
+    ///
+    /// This is intended for bookkeeping and monitoring use cases; note that work
+    /// in this callback will increase latencies when the application has allowed one or
+    /// more runtime threads to go idle.
+    ///
+    /// Note: There can only be one unpark callback for a runtime; calling this function
+    /// more than once replaces the last callback defined, rather than adding to it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let runtime = runtime::Builder::new_multi_thread()
+    ///     .on_thread_unpark(|| {
+    ///         println!("thread unparking");
+    ///     })
+    ///     .build();
+    ///
+    /// runtime.unwrap().block_on(async {
+    ///    tokio::task::yield_now().await;
+    ///    println!("Hello from Tokio!");
+    /// })
+    /// # }
+    /// ```
+    #[cfg(not(loom))]
+    pub fn on_thread_unpark<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.after_unpark = Some(std::sync::Arc::new(f));
+        self
+    }
+
     /// Creates the configured `Runtime`.
     ///
     /// The returned `Runtime` instance is ready to spawn tasks.
@@ -386,13 +528,14 @@ impl Builder {
             },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
+            start_paused: self.start_paused,
         }
     }
 
     /// Sets a custom timeout for a thread in the blocking pool.
     ///
     /// By default, the timeout for a thread is set to 10 seconds. This can
-    /// be overriden using .thread_keep_alive().
+    /// be overridden using .thread_keep_alive().
     ///
     /// # Example
     ///
@@ -420,7 +563,8 @@ impl Builder {
         // there are no futures ready to do something, it'll let the timer or
         // the reactor to generate some new stimuli for the futures to continue
         // in their life.
-        let scheduler = BasicScheduler::new(driver);
+        let scheduler =
+            BasicScheduler::new(driver, self.before_park.clone(), self.after_unpark.clone());
         let spawner = Spawner::Basic(scheduler.spawner().clone());
 
         // Blocking pool
@@ -489,6 +633,31 @@ cfg_time! {
     }
 }
 
+cfg_test_util! {
+    impl Builder {
+        /// Controls if the runtime's clock starts paused or advancing.
+        ///
+        /// Pausing time requires the current-thread runtime; construction of
+        /// the runtime will panic otherwise.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .enable_time()
+        ///     .start_paused(true)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn start_paused(&mut self, start_paused: bool) -> &mut Self {
+            self.start_paused = start_paused;
+            self
+        }
+    }
+}
+
 cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
@@ -500,7 +669,7 @@ cfg_rt_multi_thread! {
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
-            let (scheduler, launch) = ThreadPool::new(core_threads, Parker::new(driver));
+            let (scheduler, launch) = ThreadPool::new(core_threads, Parker::new(driver), self.before_park.clone(), self.after_unpark.clone());
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
@@ -541,7 +710,9 @@ impl fmt::Debug for Builder {
             )
             .field("thread_stack_size", &self.thread_stack_size)
             .field("after_start", &self.after_start.as_ref().map(|_| "..."))
-            .field("before_stop", &self.after_start.as_ref().map(|_| "..."))
+            .field("before_stop", &self.before_stop.as_ref().map(|_| "..."))
+            .field("before_park", &self.before_park.as_ref().map(|_| "..."))
+            .field("after_unpark", &self.after_unpark.as_ref().map(|_| "..."))
             .finish()
     }
 }

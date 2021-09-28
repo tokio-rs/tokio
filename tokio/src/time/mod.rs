@@ -3,31 +3,29 @@
 //! This module provides a number of types for executing code after a set period
 //! of time.
 //!
-//! * `Sleep` is a future that does no work and completes at a specific `Instant`
+//! * [`Sleep`] is a future that does no work and completes at a specific [`Instant`]
 //!   in time.
 //!
-//! * `Interval` is a stream yielding a value at a fixed period. It is
-//!   initialized with a `Duration` and repeatedly yields each time the duration
+//! * [`Interval`] is a stream yielding a value at a fixed period. It is
+//!   initialized with a [`Duration`] and repeatedly yields each time the duration
 //!   elapses.
 //!
-//! * `Timeout`: Wraps a future or stream, setting an upper bound to the amount
+//! * [`Timeout`]: Wraps a future or stream, setting an upper bound to the amount
 //!   of time it is allowed to execute. If the future or stream does not
 //!   complete in time, then it is canceled and an error is returned.
 //!
 //! These types are sufficient for handling a large number of scenarios
 //! involving time.
 //!
-//! These types must be used from within the context of the `Runtime`.
+//! These types must be used from within the context of the [`Runtime`](crate::runtime::Runtime).
 //!
 //! # Examples
 //!
 //! Wait 100ms and print "100 ms have elapsed"
 //!
 //! ```
-//! use tokio::time::sleep;
-//!
 //! use std::time::Duration;
-//!
+//! use tokio::time::sleep;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -36,7 +34,7 @@
 //! }
 //! ```
 //!
-//! Require that an operation takes no more than 300ms.
+//! Require that an operation takes no more than 1s.
 //!
 //! ```
 //! use tokio::time::{timeout, Duration};
@@ -56,10 +54,10 @@
 //!
 //! A simple example using [`interval`] to execute a task every two seconds.
 //!
-//! The difference between [`interval`] and [`sleep`] is that an
-//! [`interval`] measures the time since the last tick, which means that
-//! `.tick().await` may wait for a shorter time than the duration specified
-//! for the interval if some time has passed between calls to `.tick().await`.
+//! The difference between [`interval`] and [`sleep`] is that an [`interval`]
+//! measures the time since the last tick, which means that `.tick().await` may
+//! wait for a shorter time than the duration specified for the interval
+//! if some time has passed between calls to `.tick().await`.
 //!
 //! If the tick in the example below was replaced with [`sleep`], the task
 //! would only be executed once every three seconds, and not every two
@@ -75,17 +73,14 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let interval = time::interval(time::Duration::from_secs(2));
-//!     tokio::pin!(interval);
-//!
+//!     let mut interval = time::interval(time::Duration::from_secs(2));
 //!     for _i in 0..5 {
-//!         interval.as_mut().tick().await;
+//!         interval.tick().await;
 //!         task_that_takes_a_second().await;
 //!     }
 //! }
 //! ```
 //!
-//! [`sleep`]: crate::time::sleep()
 //! [`interval`]: crate::time::interval()
 
 mod clock;
@@ -104,7 +99,7 @@ mod instant;
 pub use self::instant::Instant;
 
 mod interval;
-pub use interval::{interval, interval_at, Interval};
+pub use interval::{interval, interval_at, Interval, MissedTickBehavior};
 
 mod timeout;
 #[doc(inline)]

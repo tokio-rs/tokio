@@ -106,12 +106,12 @@ fn try_lock_owned() {
     let m: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
     {
         let g1 = m.clone().try_lock_owned();
-        assert_eq!(g1.is_ok(), true);
+        assert!(g1.is_ok());
         let g2 = m.clone().try_lock_owned();
-        assert_eq!(g2.is_ok(), false);
+        assert!(!g2.is_ok());
     }
     let g3 = m.try_lock_owned();
-    assert_eq!(g3.is_ok(), true);
+    assert!(g3.is_ok());
 }
 
 #[tokio::test]

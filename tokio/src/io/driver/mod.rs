@@ -51,6 +51,7 @@ pub(crate) struct Handle {
     inner: Weak<Inner>,
 }
 
+#[derive(Debug)]
 pub(crate) struct ReadyEvent {
     tick: u8,
     pub(crate) ready: Ready,
@@ -96,7 +97,7 @@ const ADDRESS: bit::Pack = bit::Pack::least_significant(24);
 //
 // The generation prevents a race condition where a slab slot is reused for a
 // new socket while the I/O driver is about to apply a readiness event. The
-// generaton value is checked when setting new readiness. If the generation do
+// generation value is checked when setting new readiness. If the generation do
 // not match, then the readiness event is discarded.
 const GENERATION: bit::Pack = ADDRESS.then(7);
 
@@ -259,8 +260,7 @@ cfg_rt! {
         /// This function panics if there is no current reactor set and `rt` feature
         /// flag is not enabled.
         pub(super) fn current() -> Self {
-            crate::runtime::context::io_handle()
-                .expect("there is no reactor running, must be called from the context of Tokio runtime")
+            crate::runtime::context::io_handle().expect("A Tokio 1.x context was found, but IO is disabled. Call `enable_io` on the runtime builder to enable IO.")
         }
     }
 }
@@ -274,7 +274,7 @@ cfg_not_rt! {
         /// This function panics if there is no current reactor set, or if the `rt`
         /// feature flag is not enabled.
         pub(super) fn current() -> Self {
-            panic!("there is no reactor running, must be called from the context of Tokio runtime with `rt` enabled.")
+            panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
         }
     }
 }

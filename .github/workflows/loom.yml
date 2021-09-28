@@ -1,0 +1,41 @@
+on:
+  push:
+    branches: ["master", "tokio-*.x"]
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+    branches: ["master", "tokio-*.x"]
+
+name: Loom
+
+env:
+  RUSTFLAGS: -Dwarnings
+  RUST_BACKTRACE: 1
+  nightly: nightly-2021-07-09
+
+jobs:
+  loom:
+    name: loom
+    # base_ref is null when it's not a pull request
+    if: contains(github.event.pull_request.labels.*.name, 'R-loom') || (github.base_ref == null)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        scope:
+          - --skip loom_pool
+          - loom_pool::group_a
+          - loom_pool::group_b
+          - loom_pool::group_c
+          - loom_pool::group_d
+          - time::driver
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+      - uses: Swatinem/rust-cache@v1
+      - name: loom ${{ matrix.scope }}
+        run: cargo test --lib --release --features full -- --nocapture $SCOPE
+        working-directory: tokio
+        env:
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
+          LOOM_MAX_PREEMPTIONS: 2
+          SCOPE: ${{ matrix.scope }}

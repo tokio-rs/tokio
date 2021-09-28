@@ -1,15 +1,12 @@
+use crate::loom::sync::Mutex;
 use crate::sync::watch;
 
-use std::sync::Mutex;
-
-/// A barrier enables multiple threads to synchronize the beginning of some computation.
+/// A barrier enables multiple tasks to synchronize the beginning of some computation.
 ///
 /// ```
 /// # #[tokio::main]
 /// # async fn main() {
 /// use tokio::sync::Barrier;
-///
-/// use futures::future::join_all;
 /// use std::sync::Arc;
 ///
 /// let mut handles = Vec::with_capacity(10);
@@ -18,17 +15,25 @@ use std::sync::Mutex;
 ///     let c = barrier.clone();
 ///     // The same messages will be printed together.
 ///     // You will NOT see any interleaving.
-///     handles.push(async move {
+///     handles.push(tokio::spawn(async move {
 ///         println!("before wait");
-///         let wr = c.wait().await;
+///         let wait_result = c.wait().await;
 ///         println!("after wait");
-///         wr
-///     });
+///         wait_result
+///     }));
 /// }
-/// // Will not resolve until all "before wait" messages have been printed
-/// let wrs = join_all(handles).await;
+///
+/// // Will not resolve until all "after wait" messages have been printed
+/// let mut num_leaders = 0;
+/// for handle in handles {
+///     let wait_result = handle.await.unwrap();
+///     if wait_result.is_leader() {
+///         num_leaders += 1;
+///     }
+/// }
+///
 /// // Exactly one barrier will resolve as the "leader"
-/// assert_eq!(wrs.into_iter().filter(|wr| wr.is_leader()).count(), 1);
+/// assert_eq!(num_leaders, 1);
 /// # }
 /// ```
 #[derive(Debug)]
@@ -46,10 +51,10 @@ struct BarrierState {
 }
 
 impl Barrier {
-    /// Creates a new barrier that can block a given number of threads.
+    /// Creates a new barrier that can block a given number of tasks.
     ///
-    /// A barrier will block `n`-1 threads which call [`Barrier::wait`] and then wake up all
-    /// threads at once when the `n`th thread calls `wait`.
+    /// A barrier will block `n`-1 tasks which call [`Barrier::wait`] and then wake up all
+    /// tasks at once when the `n`th task calls `wait`.
     pub fn new(mut n: usize) -> Barrier {
         let (waker, wait) = crate::sync::watch::channel(0);
 
@@ -73,11 +78,11 @@ impl Barrier {
 
     /// Does not resolve until all tasks have rendezvoused here.
     ///
-    /// Barriers are re-usable after all threads have rendezvoused once, and can
+    /// Barriers are re-usable after all tasks have rendezvoused once, and can
     /// be used continuously.
     ///
     /// A single (arbitrary) future will receive a [`BarrierWaitResult`] that returns `true` from
-    /// [`BarrierWaitResult::is_leader`] when returning from this function, and all other threads
+    /// [`BarrierWaitResult::is_leader`] when returning from this function, and all other tasks
     /// will receive a result that will return `false` from `is_leader`.
     pub async fn wait(&self) -> BarrierWaitResult {
         // NOTE: we are taking a _synchronous_ lock here.
@@ -88,7 +93,7 @@ impl Barrier {
         // NOTE: the extra scope here is so that the compiler doesn't think `state` is held across
         // a yield point, and thus marks the returned future as !Send.
         let generation = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             let generation = state.generation;
             state.arrived += 1;
             if state.arrived == self.n {
@@ -123,14 +128,14 @@ impl Barrier {
     }
 }
 
-/// A `BarrierWaitResult` is returned by `wait` when all threads in the `Barrier` have rendezvoused.
+/// A `BarrierWaitResult` is returned by `wait` when all tasks in the `Barrier` have rendezvoused.
 #[derive(Debug, Clone)]
 pub struct BarrierWaitResult(bool);
 
 impl BarrierWaitResult {
-    /// Returns `true` if this thread from wait is the "leader thread".
+    /// Returns `true` if this task from wait is the "leader task".
     ///
-    /// Only one thread will have `true` returned from their result, all other threads will have
+    /// Only one task will have `true` returned from their result, all other tasks will have
     /// `false` returned.
     pub fn is_leader(&self) -> bool {
         self.0

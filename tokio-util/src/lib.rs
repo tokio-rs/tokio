@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-util/0.6.0")]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
@@ -6,7 +5,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![cfg_attr(docsrs, deny(broken_intra_doc_links))]
+#![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
@@ -47,12 +46,13 @@ cfg_rt! {
     pub mod task;
 }
 
+cfg_time! {
+    pub mod time;
+}
+
 pub mod sync;
 
 pub mod either;
-
-#[cfg(feature = "time")]
-pub mod time;
 
 #[cfg(any(feature = "io", feature = "codec"))]
 mod util {

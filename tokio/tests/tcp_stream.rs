@@ -55,7 +55,7 @@ async fn try_read_write() {
         tokio::task::yield_now().await;
     }
 
-    // Fill the write buffer
+    // Fill the write buffer using non-vectored I/O
     loop {
         // Still ready
         let mut writable = task::spawn(client.writable());
@@ -75,7 +75,7 @@ async fn try_read_write() {
         let mut writable = task::spawn(client.writable());
         assert_pending!(writable.poll());
 
-        // Drain the socket from the server end
+        // Drain the socket from the server end using non-vectored I/O
         let mut read = vec![0; written.len()];
         let mut i = 0;
 
@@ -83,6 +83,51 @@ async fn try_read_write() {
             server.readable().await.unwrap();
 
             match server.try_read(&mut read[i..]) {
+                Ok(n) => i += n,
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("error = {:?}", e),
+            }
+        }
+
+        assert_eq!(read, written);
+    }
+
+    written.clear();
+    client.writable().await.unwrap();
+
+    // Fill the write buffer using vectored I/O
+    let data_bufs: Vec<_> = DATA.chunks(10).map(io::IoSlice::new).collect();
+    loop {
+        // Still ready
+        let mut writable = task::spawn(client.writable());
+        assert_ready_ok!(writable.poll());
+
+        match client.try_write_vectored(&data_bufs) {
+            Ok(n) => written.extend(&DATA[..n]),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                break;
+            }
+            Err(e) => panic!("error = {:?}", e),
+        }
+    }
+
+    {
+        // Write buffer full
+        let mut writable = task::spawn(client.writable());
+        assert_pending!(writable.poll());
+
+        // Drain the socket from the server end using vectored I/O
+        let mut read = vec![0; written.len()];
+        let mut i = 0;
+
+        while i < read.len() {
+            server.readable().await.unwrap();
+
+            let mut bufs: Vec<_> = read[i..]
+                .chunks_mut(0x10000)
+                .map(io::IoSliceMut::new)
+                .collect();
+            match server.try_read_vectored(&mut bufs) {
                 Ok(n) => i += n,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
                 Err(e) => panic!("error = {:?}", e),

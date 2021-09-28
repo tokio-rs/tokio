@@ -97,6 +97,51 @@
 //! }
 //! ```
 //!
+//! With some coordination, we can also pipe the output of one command into
+//! another.
+//!
+//! ```no_run
+//! use tokio::join;
+//! use tokio::process::Command;
+//! use std::convert::TryInto;
+//! use std::process::Stdio;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let mut echo = Command::new("echo")
+//!         .arg("hello world!")
+//!         .stdout(Stdio::piped())
+//!         .spawn()
+//!         .expect("failed to spawn echo");
+//!
+//!     let tr_stdin: Stdio = echo
+//!         .stdout
+//!         .take()
+//!         .unwrap()
+//!         .try_into()
+//!         .expect("failed to convert to Stdio");
+//!
+//!     let tr = Command::new("tr")
+//!         .arg("a-z")
+//!         .arg("A-Z")
+//!         .stdin(tr_stdin)
+//!         .stdout(Stdio::piped())
+//!         .spawn()
+//!         .expect("failed to spawn tr");
+//!
+//!     let (echo_result, tr_output) = join!(echo.wait(), tr.wait_with_output());
+//!
+//!     assert!(echo_result.unwrap().success());
+//!
+//!     let tr_output = tr_output.expect("failed to await tr");
+//!     assert!(tr_output.status.success());
+//!
+//!     assert_eq!(tr_output.stdout, b"HELLO WORLD!\n");
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
 //! # Caveats
 //!
 //! ## Dropping/Cancellation
@@ -147,11 +192,14 @@ mod kill;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::process::kill::Kill;
 
+use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
+#[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, RawHandle};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::Path;
@@ -177,9 +225,9 @@ pub struct Command {
 
 pub(crate) struct SpawnedChild {
     child: imp::Child,
-    stdin: Option<imp::ChildStdin>,
-    stdout: Option<imp::ChildStdout>,
-    stderr: Option<imp::ChildStderr>,
+    stdin: Option<imp::ChildStdio>,
+    stdout: Option<imp::ChildStdio>,
+    stderr: Option<imp::ChildStdio>,
 }
 
 impl Command {
@@ -433,7 +481,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio::process::Command;;
+    /// use tokio::process::Command;
     /// use std::process::Stdio;
     ///
     /// let command = Command::new("ls")
@@ -457,7 +505,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio::process::Command;;
+    /// use tokio::process::Command;
     /// use std::process::{Stdio};
     ///
     /// let command = Command::new("ls")
@@ -505,6 +553,7 @@ impl Command {
     ///
     /// [1]: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863(v=vs.85).aspx
     #[cfg(windows)]
+    #[cfg_attr(docsrs, doc(cfg(windows)))]
     pub fn creation_flags(&mut self, flags: u32) -> &mut Command {
         self.std.creation_flags(flags);
         self
@@ -514,6 +563,7 @@ impl Command {
     /// `setuid` call in the child process. Failure in the `setuid`
     /// call will cause the spawn to fail.
     #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn uid(&mut self, id: u32) -> &mut Command {
         self.std.uid(id);
         self
@@ -522,8 +572,23 @@ impl Command {
     /// Similar to `uid` but sets the group ID of the child process. This has
     /// the same semantics as the `uid` field.
     #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn gid(&mut self, id: u32) -> &mut Command {
         self.std.gid(id);
+        self
+    }
+
+    /// Set executable argument
+    ///
+    /// Set the first process argument, `argv[0]`, to something other than the
+    /// default executable path.
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    pub fn arg0<S>(&mut self, arg: S) -> &mut Command
+    where
+        S: AsRef<OsStr>,
+    {
+        self.std.arg0(arg);
         self
     }
 
@@ -557,6 +622,7 @@ impl Command {
     /// working directory have successfully been changed, so output to these
     /// locations may not appear where intended.
     #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub unsafe fn pre_exec<F>(&mut self, f: F) -> &mut Command
     where
         F: FnMut() -> io::Result<()> + Send + Sync + 'static,
@@ -839,15 +905,38 @@ pub struct Child {
     child: FusedChild,
 
     /// The handle for writing to the child's standard input (stdin), if it has
-    /// been captured.
+    /// been captured. To avoid partially moving the `child` and thus blocking
+    /// yourself from calling functions on `child` while using `stdin`, you might
+    /// find it helpful to do:
+    ///
+    /// ```no_run
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
+    /// let stdin = child.stdin.take().unwrap();
+    /// ```
     pub stdin: Option<ChildStdin>,
 
     /// The handle for reading from the child's standard output (stdout), if it
-    /// has been captured.
+    /// has been captured. You might find it helpful to do
+    ///
+    /// ```no_run
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
+    /// let stdout = child.stdout.take().unwrap();
+    /// ```
+    ///
+    /// to avoid partially moving the `child` and thus blocking yourself from calling
+    /// functions on `child` while using `stdout`.
     pub stdout: Option<ChildStdout>,
 
     /// The handle for reading from the child's standard error (stderr), if it
-    /// has been captured.
+    /// has been captured. You might find it helpful to do
+    ///
+    /// ```no_run
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
+    /// let stderr = child.stderr.take().unwrap();
+    /// ```
+    ///
+    /// to avoid partially moving the `child` and thus blocking yourself from calling
+    /// functions on `child` while using `stderr`.
     pub stderr: Option<ChildStderr>,
 }
 
@@ -861,6 +950,16 @@ impl Child {
     pub fn id(&self) -> Option<u32> {
         match &self.child {
             FusedChild::Child(child) => Some(child.inner.id()),
+            FusedChild::Done(_) => None,
+        }
+    }
+
+    /// Extracts the raw handle of the process associated with this child while
+    /// it is still running. Returns `None` if the child has exited.
+    #[cfg(windows)]
+    pub fn raw_handle(&self) -> Option<RawHandle> {
+        match &self.child {
+            FusedChild::Child(c) => Some(c.inner.as_raw_handle()),
             FusedChild::Done(_) => None,
         }
     }
@@ -921,7 +1020,45 @@ impl Child {
     /// before waiting. This helps avoid deadlock: it ensures that the
     /// child does not block waiting for input from the parent, while
     /// the parent waits for the child to exit.
+    ///
+    /// If the caller wishes to explicitly control when the child's stdin
+    /// handle is closed, they may `.take()` it before calling `.wait()`:
+    ///
+    /// ```
+    /// # #[cfg(not(unix))]fn main(){}
+    /// # #[cfg(unix)]
+    /// use tokio::io::AsyncWriteExt;
+    /// # #[cfg(unix)]
+    /// use tokio::process::Command;
+    /// # #[cfg(unix)]
+    /// use std::process::Stdio;
+    ///
+    /// # #[cfg(unix)]
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut child = Command::new("cat")
+    ///         .stdin(Stdio::piped())
+    ///         .spawn()
+    ///         .unwrap();
+    ///
+    ///     let mut stdin = child.stdin.take().unwrap();
+    ///     tokio::spawn(async move {
+    ///         // do something with stdin here...
+    ///         stdin.write_all(b"hello world\n").await.unwrap();
+    ///
+    ///         // then drop when finished
+    ///         drop(stdin);
+    ///     });
+    ///
+    ///     // wait for the process to complete
+    ///     let _ = child.wait().await;
+    /// }
+    /// ```
     pub async fn wait(&mut self) -> io::Result<ExitStatus> {
+        // Ensure stdin is closed so the child isn't stuck waiting on
+        // input while the parent is waiting for it to exit.
+        drop(self.stdin.take());
+
         match &mut self.child {
             FusedChild::Done(exit) => Ok(*exit),
             FusedChild::Child(child) => {
@@ -995,7 +1132,6 @@ impl Child {
             Ok(vec)
         }
 
-        drop(self.stdin.take());
         let stdout_fut = read_to_end(self.stdout.take());
         let stderr_fut = read_to_end(self.stderr.take());
 
@@ -1015,7 +1151,7 @@ impl Child {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStdin {
-    inner: imp::ChildStdin,
+    inner: imp::ChildStdio,
 }
 
 /// The standard output stream for spawned children.
@@ -1024,7 +1160,7 @@ pub struct ChildStdin {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStdout {
-    inner: imp::ChildStdout,
+    inner: imp::ChildStdio,
 }
 
 /// The standard error stream for spawned children.
@@ -1033,7 +1169,52 @@ pub struct ChildStdout {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStderr {
-    inner: imp::ChildStderr,
+    inner: imp::ChildStdio,
+}
+
+impl ChildStdin {
+    /// Create an asynchronous `ChildStdin` from a synchronous one.
+    ///
+    /// # Errors
+    ///
+    /// This method may fail if an error is encountered when setting the pipe to
+    /// non-blocking mode, or when registering the pipe with the runtime's IO
+    /// driver.
+    pub fn from_std(inner: std::process::ChildStdin) -> io::Result<Self> {
+        Ok(Self {
+            inner: imp::stdio(inner)?,
+        })
+    }
+}
+
+impl ChildStdout {
+    /// Create an asynchronous `ChildStderr` from a synchronous one.
+    ///
+    /// # Errors
+    ///
+    /// This method may fail if an error is encountered when setting the pipe to
+    /// non-blocking mode, or when registering the pipe with the runtime's IO
+    /// driver.
+    pub fn from_std(inner: std::process::ChildStdout) -> io::Result<Self> {
+        Ok(Self {
+            inner: imp::stdio(inner)?,
+        })
+    }
+}
+
+impl ChildStderr {
+    /// Create an asynchronous `ChildStderr` from a synchronous one.
+    ///
+    /// # Errors
+    ///
+    /// This method may fail if an error is encountered when setting the pipe to
+    /// non-blocking mode, or when registering the pipe with the runtime's IO
+    /// driver.
+    pub fn from_std(inner: std::process::ChildStderr) -> io::Result<Self> {
+        Ok(Self {
+            inner: imp::stdio(inner)?,
+        })
+    }
 }
 
 impl AsyncWrite for ChildStdin {
@@ -1073,6 +1254,30 @@ impl AsyncRead for ChildStderr {
     ) -> Poll<io::Result<()>> {
         // Safety: pipes support reading into uninitialized memory
         unsafe { self.inner.poll_read(cx, buf) }
+    }
+}
+
+impl TryInto<Stdio> for ChildStdin {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Stdio, Self::Error> {
+        imp::convert_to_stdio(self.inner)
+    }
+}
+
+impl TryInto<Stdio> for ChildStdout {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Stdio, Self::Error> {
+        imp::convert_to_stdio(self.inner)
+    }
+}
+
+impl TryInto<Stdio> for ChildStderr {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Stdio, Self::Error> {
+        imp::convert_to_stdio(self.inner)
     }
 }
 

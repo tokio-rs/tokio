@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
@@ -20,10 +20,18 @@ cfg_net_unix! {
     /// A socket can be either named (associated with a filesystem path) or
     /// unnamed.
     ///
+    /// This type does not provide a `split` method, because this functionality
+    /// can be achieved by wrapping the socket in an [`Arc`]. Note that you do
+    /// not need a `Mutex` to share the `UnixDatagram` — an `Arc<UnixDatagram>`
+    /// is enough. This is because all of the methods take `&self` instead of
+    /// `&mut self`.
+    ///
     /// **Note:** named sockets are persisted even after the object is dropped
     /// and the program has exited, and cannot be reconnected. It is advised
     /// that you either check for and unlink the existing socket if it exists,
     /// or use a temporary file that is guaranteed to not already exist.
+    ///
+    /// [`Arc`]: std::sync::Arc
     ///
     /// # Examples
     /// Using named sockets, associated with a filesystem path:
@@ -98,6 +106,13 @@ impl UnixDatagram {
     /// false-positive and attempting an operation will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// Concurrently receive from and send to the socket on the same task
@@ -163,6 +178,13 @@ impl UnixDatagram {
     /// false-positive and attempting a `try_send()` will return with
     /// `io::ErrorKind::WouldBlock`.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -204,6 +226,39 @@ impl UnixDatagram {
         Ok(())
     }
 
+    /// Polls for write/send readiness.
+    ///
+    /// If the socket is not currently ready for sending, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the socket
+    /// becomes ready for sending, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_send_ready` or `poll_send`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_recv_ready` retains a
+    /// second, independent waker.)
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`writable`] is not feasible. Where possible, using [`writable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready for writing.
+    /// * `Poll::Ready(Ok(()))` if the socket is ready for writing.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`writable`]: method@Self::writable
+    pub fn poll_send_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.io.registration().poll_write_ready(cx).map_ok(|_| ())
+    }
+
     /// Wait for the socket to become readable.
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
@@ -212,6 +267,13 @@ impl UnixDatagram {
     /// The function may complete without the socket being readable. This is a
     /// false-positive and attempting a `try_recv()` will return with
     /// `io::ErrorKind::WouldBlock`.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -258,6 +320,39 @@ impl UnixDatagram {
     pub async fn readable(&self) -> io::Result<()> {
         self.ready(Interest::READABLE).await?;
         Ok(())
+    }
+
+    /// Polls for read/receive readiness.
+    ///
+    /// If the socket is not currently ready for receiving, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the
+    /// socket becomes ready for reading, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_recv_ready`, `poll_recv` or
+    /// `poll_peek`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup. (However,
+    /// `poll_send_ready` retains a second, independent waker.)
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`readable`] is not feasible. Where possible, using [`readable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready for reading.
+    /// * `Poll::Ready(Ok(()))` if the socket is ready for reading.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`readable`]: method@Self::readable
+    pub fn poll_recv_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.io.registration().poll_read_ready(cx).map_ok(|_| ())
     }
 
     /// Creates a new `UnixDatagram` bound to the specified path.
@@ -368,6 +463,36 @@ impl UnixDatagram {
         Ok(UnixDatagram { io })
     }
 
+    /// Turn a [`tokio::net::UnixDatagram`] into a [`std::os::unix::net::UnixDatagram`].
+    ///
+    /// The returned [`std::os::unix::net::UnixDatagram`] will have nonblocking
+    /// mode set as `true`.  Use [`set_nonblocking`] to change the blocking mode
+    /// if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use std::error::Error;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let tokio_socket = tokio::net::UnixDatagram::bind("127.0.0.1:0")?;
+    ///     let std_socket = tokio_socket.into_std()?;
+    ///     std_socket.set_nonblocking(false)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`tokio::net::UnixDatagram`]: UnixDatagram
+    /// [`std::os::unix::net::UnixDatagram`]: std::os::unix::net::UnixDatagram
+    /// [`set_nonblocking`]: fn@std::os::unix::net::UnixDatagram::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::os::unix::net::UnixDatagram> {
+        self.io
+            .into_inner()
+            .map(|io| io.into_raw_fd())
+            .map(|raw_fd| unsafe { std::os::unix::net::UnixDatagram::from_raw_fd(raw_fd) })
+    }
+
     fn new(socket: mio::net::UnixDatagram) -> io::Result<UnixDatagram> {
         let io = PollEvented::new(socket)?;
         Ok(UnixDatagram { io })
@@ -451,6 +576,12 @@ impl UnixDatagram {
     }
 
     /// Sends data on the socket to the socket's peer.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `send` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that the message was not sent.
     ///
     /// # Examples
     /// ```
@@ -574,6 +705,13 @@ impl UnixDatagram {
     }
 
     /// Receives data from the socket.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// socket.
     ///
     /// # Examples
     /// ```
@@ -782,6 +920,12 @@ impl UnixDatagram {
 
     /// Sends data on the socket to the specified address.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `send_to` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that the message was not sent.
+    ///
     /// # Examples
     /// ```
     /// # use std::error::Error;
@@ -824,6 +968,13 @@ impl UnixDatagram {
     }
 
     /// Receives data from the socket.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv_from` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// socket.
     ///
     /// # Examples
     /// ```
@@ -889,7 +1040,7 @@ impl UnixDatagram {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<SocketAddr>> {
         let (n, addr) = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uinitialized bytes.
+            // Safety: will not read the maybe uninitialized bytes.
             let b = unsafe {
                 &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
             };
@@ -990,7 +1141,7 @@ impl UnixDatagram {
     /// [`connect`]: method@Self::connect
     pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         let n = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uinitialized bytes.
+            // Safety: will not read the maybe uninitialized bytes.
             let b = unsafe {
                 &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
             };
@@ -1056,6 +1207,41 @@ impl UnixDatagram {
             .try_io(Interest::READABLE, || self.io.recv_from(buf))?;
 
         Ok((n, SocketAddr(addr)))
+    }
+
+    /// Try to read or write from the socket using a user-provided IO operation.
+    ///
+    /// If the socket is ready, the provided closure is called. The closure
+    /// should attempt to perform IO operation from the socket by manually
+    /// calling the appropriate syscall. If the operation fails because the
+    /// socket is not actually ready, then the closure should return a
+    /// `WouldBlock` error and the readiness flag is cleared. The return value
+    /// of the closure is then returned by `try_io`.
+    ///
+    /// If the socket is not ready, then the closure is not called
+    /// and a `WouldBlock` error is returned.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `UnixDatagram` type, as this will mess with the
+    /// readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`readable()`]: UnixDatagram::readable()
+    /// [`writable()`]: UnixDatagram::writable()
+    /// [`ready()`]: UnixDatagram::ready()
+    pub fn try_io<R>(
+        &self,
+        interest: Interest,
+        f: impl FnOnce() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.io.registration().try_io(interest, f)
     }
 
     /// Returns the local address that this socket is bound to.

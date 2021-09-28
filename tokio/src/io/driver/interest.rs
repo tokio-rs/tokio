@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "net"), allow(unreachable_pub))]
+#![cfg_attr(not(feature = "net"), allow(dead_code, unreachable_pub))]
 
 use crate::io::driver::Ready;
 
@@ -14,6 +14,26 @@ use std::ops;
 pub struct Interest(mio::Interest);
 
 impl Interest {
+    // The non-FreeBSD definitions in this block are active only when
+    // building documentation.
+    cfg_aio! {
+        /// Interest for POSIX AIO
+        #[cfg(target_os = "freebsd")]
+        pub const AIO: Interest = Interest(mio::Interest::AIO);
+
+        /// Interest for POSIX AIO
+        #[cfg(not(target_os = "freebsd"))]
+        pub const AIO: Interest = Interest(mio::Interest::READABLE);
+
+        /// Interest for POSIX AIO lio_listio events
+        #[cfg(target_os = "freebsd")]
+        pub const LIO: Interest = Interest(mio::Interest::LIO);
+
+        /// Interest for POSIX AIO lio_listio events
+        #[cfg(not(target_os = "freebsd"))]
+        pub const LIO: Interest = Interest(mio::Interest::READABLE);
+    }
+
     /// Interest in all readable events.
     ///
     /// Readable interest includes read-closed events.
@@ -58,7 +78,7 @@ impl Interest {
         self.0.is_writable()
     }
 
-    /// Add together two `Interst` values.
+    /// Add together two `Interest` values.
     ///
     /// This function works from a `const` context.
     ///

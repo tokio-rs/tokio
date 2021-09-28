@@ -2,8 +2,8 @@ use crate::codec::decoder::Decoder;
 use crate::codec::encoder::Encoder;
 use crate::codec::framed_impl::{FramedImpl, RWFrames, ReadFrame, WriteFrame};
 
+use futures_core::Stream;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_stream::Stream;
 
 use bytes::BytesMut;
 use futures_sink::Sink;
@@ -20,7 +20,7 @@ pin_project! {
     /// You can create a `Framed` instance by using the [`Decoder::framed`] adapter, or
     /// by using the `new` function seen below.
     ///
-    /// [`Stream`]: tokio_stream::Stream
+    /// [`Stream`]: futures_core::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`Decoder::framed`]: crate::codec::Decoder::framed()
@@ -52,7 +52,12 @@ where
     /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
     ///
-    /// [`Stream`]: tokio_stream::Stream
+    /// Note that, for some byte sources, the stream can be resumed after an EOF
+    /// by reading from it, even after it has returned `None`. Repeated attempts
+    /// to do so, without new data available, continue to return `None` without
+    /// creating more (closing) frames.
+    ///
+    /// [`Stream`]: futures_core::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`Decode`]: crate::codec::Decoder
     /// [`Encoder`]: crate::codec::Encoder
@@ -86,7 +91,7 @@ where
     /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
     ///
-    /// [`Stream`]: tokio_stream::Stream
+    /// [`Stream`]: futures_core::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`Decode`]: crate::codec::Decoder
     /// [`Encoder`]: crate::codec::Encoder
@@ -131,7 +136,7 @@ impl<T, U> Framed<T, U> {
     /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
     ///
-    /// [`Stream`]: tokio_stream::Stream
+    /// [`Stream`]: futures_core::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`Decoder`]: crate::codec::Decoder
     /// [`Encoder`]: crate::codec::Encoder
@@ -206,6 +211,16 @@ impl<T, U> Framed<T, U> {
     /// Returns a mutable reference to the read buffer.
     pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
         &mut self.inner.state.read.buffer
+    }
+
+    /// Returns a reference to the write buffer.
+    pub fn write_buffer(&self) -> &BytesMut {
+        &self.inner.state.write.buffer
+    }
+
+    /// Returns a mutable reference to the write buffer.
+    pub fn write_buffer_mut(&mut self) -> &mut BytesMut {
+        &mut self.inner.state.write.buffer
     }
 
     /// Consumes the `Framed`, returning its underlying I/O stream.

@@ -45,7 +45,11 @@ use std::task::{Context, Poll};
 pub trait AsyncWrite {
     /// Attempt to write bytes from `buf` into the object.
     ///
-    /// On success, returns `Poll::Ready(Ok(num_bytes_written))`.
+    /// On success, returns `Poll::Ready(Ok(num_bytes_written))`. If successful,
+    /// then it must be guaranteed that `n <= buf.len()`. A return value of `0`
+    /// typically means that the underlying object is no longer able to accept
+    /// bytes and will likely not be able to in the future as well, or that the
+    /// buffer provided is empty.
     ///
     /// If the object is not ready for writing, the method returns
     /// `Poll::Pending` and arranges for the current task (via

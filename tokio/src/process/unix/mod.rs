@@ -24,7 +24,7 @@
 pub(crate) mod driver;
 
 pub(crate) mod orphan;
-use orphan::{OrphanQueue, OrphanQueueImpl, ReapOrphanQueue, Wait};
+use orphan::{OrphanQueue, OrphanQueueImpl, Wait};
 
 mod reap;
 use reap::Reaper;
@@ -32,6 +32,7 @@ use reap::Reaper;
 use crate::io::PollEvented;
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
+use crate::signal::unix::driver::Handle as SignalHandle;
 use crate::signal::unix::{signal, Signal, SignalKind};
 
 use mio::event::Source;
@@ -43,7 +44,7 @@ use std::future::Future;
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::pin::Pin;
-use std::process::{Child as StdChild, ExitStatus};
+use std::process::{Child as StdChild, ExitStatus, Stdio};
 use std::task::Context;
 use std::task::Poll;
 
@@ -73,9 +74,9 @@ impl fmt::Debug for GlobalOrphanQueue {
     }
 }
 
-impl ReapOrphanQueue for GlobalOrphanQueue {
-    fn reap_orphans(&self) {
-        ORPHAN_QUEUE.reap_orphans()
+impl GlobalOrphanQueue {
+    fn reap_orphans(handle: &SignalHandle) {
+        ORPHAN_QUEUE.reap_orphans(handle)
     }
 }
 
@@ -100,9 +101,9 @@ impl fmt::Debug for Child {
 
 pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<SpawnedChild> {
     let mut child = cmd.spawn()?;
-    let stdin = stdio(child.stdin.take())?;
-    let stdout = stdio(child.stdout.take())?;
-    let stderr = stdio(child.stderr.take())?;
+    let stdin = child.stdin.take().map(stdio).transpose()?;
+    let stdout = child.stdout.take().map(stdio).transpose()?;
+    let stderr = child.stderr.take().map(stdio).transpose()?;
 
     let signal = signal(SignalKind::child())?;
 
@@ -176,6 +177,18 @@ impl AsRawFd for Pipe {
     }
 }
 
+pub(crate) fn convert_to_stdio(io: PollEvented<Pipe>) -> io::Result<Stdio> {
+    let mut fd = io.into_inner()?.fd;
+
+    // Ensure that the fd to be inherited is set to *blocking* mode, as this
+    // is the default that virtually all programs expect to have. Those
+    // programs that know how to work with nonblocking stdio will know how to
+    // change it to nonblocking mode.
+    set_nonblocking(&mut fd, false)?;
+
+    Ok(Stdio::from(fd))
+}
+
 impl Source for Pipe {
     fn register(
         &mut self,
@@ -200,34 +213,38 @@ impl Source for Pipe {
     }
 }
 
-pub(crate) type ChildStdin = PollEvented<Pipe>;
-pub(crate) type ChildStdout = PollEvented<Pipe>;
-pub(crate) type ChildStderr = PollEvented<Pipe>;
+pub(crate) type ChildStdio = PollEvented<Pipe>;
 
-fn stdio<T>(option: Option<T>) -> io::Result<Option<PollEvented<Pipe>>>
+fn set_nonblocking<T: AsRawFd>(fd: &mut T, nonblocking: bool) -> io::Result<()> {
+    unsafe {
+        let fd = fd.as_raw_fd();
+        let previous = libc::fcntl(fd, libc::F_GETFL);
+        if previous == -1 {
+            return Err(io::Error::last_os_error());
+        }
+
+        let new = if nonblocking {
+            previous | libc::O_NONBLOCK
+        } else {
+            previous & !libc::O_NONBLOCK
+        };
+
+        let r = libc::fcntl(fd, libc::F_SETFL, new);
+        if r == -1 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
+    Ok(())
+}
+
+pub(super) fn stdio<T>(io: T) -> io::Result<PollEvented<Pipe>>
 where
     T: IntoRawFd,
 {
-    let io = match option {
-        Some(io) => io,
-        None => return Ok(None),
-    };
-
     // Set the fd to nonblocking before we pass it to the event loop
-    let pipe = unsafe {
-        let pipe = Pipe::from(io);
-        let fd = pipe.as_raw_fd();
-        let r = libc::fcntl(fd, libc::F_GETFL);
-        if r == -1 {
-            return Err(io::Error::last_os_error());
-        }
-        let r = libc::fcntl(fd, libc::F_SETFL, r | libc::O_NONBLOCK);
-        if r == -1 {
-            return Err(io::Error::last_os_error());
-        }
+    let mut pipe = Pipe::from(io);
+    set_nonblocking(&mut pipe, true)?;
 
-        pipe
-    };
-
-    Ok(Some(PollEvented::new(pipe)?))
+    PollEvented::new(pipe)
 }

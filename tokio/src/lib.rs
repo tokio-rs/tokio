@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio/1.0.1")]
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
@@ -10,12 +9,14 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![cfg_attr(docsrs, deny(broken_intra_doc_links))]
+#![deny(unused_must_use)]
+#![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
 ))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, allow(unused_attributes))]
 
 //! A runtime for writing reliable network applications without compromising speed.
 //!
@@ -77,7 +78,7 @@
 //!
 //! ### Authoring libraries
 //!
-//! As a library author your goal should be to provide the lighest weight crate
+//! As a library author your goal should be to provide the lightest weight crate
 //! that is based on Tokio. To achieve this you should ensure that you only enable
 //! the features you need. This allows users to pick up your crate without having
 //! to enable unnecessary features.
@@ -160,8 +161,8 @@
 //! [`tokio::runtime`]: crate::runtime
 //! [`Builder`]: crate::runtime::Builder
 //! [`Runtime`]: crate::runtime::Runtime
-//! [rt]: runtime/index.html#basic-scheduler
-//! [rt-multi-thread]: runtime/index.html#threaded-scheduler
+//! [rt]: runtime/index.html#current-thread-scheduler
+//! [rt-multi-thread]: runtime/index.html#multi-thread-scheduler
 //! [rt-features]: runtime/index.html#runtime-scheduler
 //!
 //! ## CPU-bound tasks and blocking code
@@ -204,9 +205,15 @@
 //! ```
 //!
 //! If your code is CPU-bound and you wish to limit the number of threads used
-//! to run it, you should run it on another thread pool such as [rayon]. You
-//! can use an [`oneshot`] channel to send the result back to Tokio when the
-//! rayon task finishes.
+//! to run it, you should use a separate thread pool dedicated to CPU bound tasks.
+//! For example, you could consider using the [rayon] library for CPU-bound
+//! tasks. It is also possible to create an extra Tokio runtime dedicated to
+//! CPU-bound tasks, but if you do this, you should be careful that the extra
+//! runtime runs _only_ CPU-bound tasks, as IO-bound tasks on that runtime
+//! will behave poorly.
+//!
+//! Hint: If using rayon, you can use a [`oneshot`] channel to send the result back
+//! to Tokio when the rayon task finishes.
 //!
 //! [rayon]: https://docs.rs/rayon
 //! [`oneshot`]: crate::sync::oneshot
@@ -301,14 +308,15 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all Tokio public API features listed below.
+//! - `full`: Enables all Tokio public API features listed below except `test-util`.
 //! - `rt`: Enables `tokio::spawn`, the basic (current thread) scheduler,
 //!         and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
-//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`,
-//!          as well as (on Unix-like systems) `AsyncFd`
+//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and
+//!          `UdpSocket`, as well as (on Unix-like systems) `AsyncFd` and (on
+//!          FreeBSD) `PollAio`.
 //! - `time`: Enables `tokio::time` types and allows the schedulers to enable
 //!           the built in timer.
 //! - `process`: Enables `tokio::process` types.
@@ -411,7 +419,7 @@ mod util;
 /// # Why was `Stream` not included in Tokio 1.0?
 ///
 /// Originally, we had planned to ship Tokio 1.0 with a stable `Stream` type
-/// but unfortunetly the [RFC] had not been merged in time for `Stream` to
+/// but unfortunately the [RFC] had not been merged in time for `Stream` to
 /// reach `std` on a stable compiler in time for the 1.0 release of Tokio. For
 /// this reason, the team has decided to move all `Stream` based utilities to
 /// the [`tokio-stream`] crate. While this is not ideal, once `Stream` has made
@@ -443,6 +451,28 @@ mod util;
 /// ```
 pub mod stream {}
 
+// local re-exports of platform specific things, allowing for decent
+// documentation to be shimmed in on docs.rs
+
+#[cfg(docsrs)]
+pub mod doc;
+
+#[cfg(docsrs)]
+#[allow(unused)]
+pub(crate) use self::doc::os;
+
+#[cfg(not(docsrs))]
+#[allow(unused)]
+pub(crate) use std::os;
+
+#[cfg(docsrs)]
+#[allow(unused)]
+pub(crate) use self::doc::winapi;
+
+#[cfg(all(not(docsrs), windows, feature = "net"))]
+#[allow(unused)]
+pub(crate) use ::winapi;
+
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**
     /// intended to be used as part of the public API and is permitted to
@@ -454,15 +484,20 @@ cfg_macros! {
         #[cfg(feature = "rt-multi-thread")]
         #[cfg(not(test))] // Work around for rust-lang/rust#62127
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[doc(inline)]
         pub use tokio_macros::main;
 
         #[cfg(feature = "rt-multi-thread")]
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[doc(inline)]
         pub use tokio_macros::test;
 
         cfg_not_rt_multi_thread! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
+            #[doc(inline)]
             pub use tokio_macros::main_rt as main;
+
+            #[doc(inline)]
             pub use tokio_macros::test_rt as test;
         }
     }
@@ -470,7 +505,10 @@ cfg_macros! {
     // Always fail if rt is not enabled.
     cfg_not_rt! {
         #[cfg(not(test))]
+        #[doc(inline)]
         pub use tokio_macros::main_fail as main;
+
+        #[doc(inline)]
         pub use tokio_macros::test_fail as test;
     }
 }

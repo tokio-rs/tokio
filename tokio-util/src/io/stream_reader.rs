@@ -51,7 +51,7 @@ pin_project! {
     /// ```
     ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
-    /// [`Stream`]: tokio_stream::Stream
+    /// [`Stream`]: futures_core::Stream
     /// [`ReaderStream`]: crate::io::ReaderStream
     #[derive(Debug)]
     pub struct StreamReader<S, B> {

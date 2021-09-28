@@ -8,7 +8,8 @@ use std::{task::Context, task::Poll};
 /// Associates an IO object backed by a Unix file descriptor with the tokio
 /// reactor, allowing for readiness to be polled. The file descriptor must be of
 /// a type that can be used with the OS polling facilities (ie, `poll`, `epoll`,
-/// `kqueue`, etc), such as a network socket or pipe.
+/// `kqueue`, etc), such as a network socket or pipe, and the file descriptor
+/// must have the nonblocking mode set to true.
 ///
 /// Creating an AsyncFd registers the file descriptor with the current tokio
 /// Reactor, allowing you to directly await the file descriptor being readable
@@ -23,9 +24,11 @@ use std::{task::Context, task::Poll};
 /// to retake control from the tokio IO reactor.
 ///
 /// The inner object is required to implement [`AsRawFd`]. This file descriptor
-/// must not change while [`AsyncFd`] owns the inner object. Changing the file
-/// descriptor results in unspecified behavior in the IO driver, which may
-/// include breaking notifications for other sockets/etc.
+/// must not change while [`AsyncFd`] owns the inner object, i.e. the
+/// [`AsRawFd::as_raw_fd`] method on the inner type must always return the same
+/// file descriptor when called multiple times. Failure to uphold this results
+/// in unspecified behavior in the IO driver, which may include breaking
+/// notifications for other sockets/etc.
 ///
 /// Polling for readiness is done by calling the async functions [`readable`]
 /// and [`writable`]. These functions complete when the associated readiness
@@ -34,18 +37,19 @@ use std::{task::Context, task::Poll};
 ///
 /// On some platforms, the readiness detecting mechanism relies on
 /// edge-triggered notifications. This means that the OS will only notify Tokio
-/// when the file descriptor transitions from not-ready to ready. Tokio
-/// internally tracks when it has received a ready notification, and when
+/// when the file descriptor transitions from not-ready to ready. For this to
+/// work you should first try to read or write and only poll for readiness
+/// if that fails with an error of [`std::io::ErrorKind::WouldBlock`].
+///
+/// Tokio internally tracks when it has received a ready notification, and when
 /// readiness checking functions like [`readable`] and [`writable`] are called,
 /// if the readiness flag is set, these async functions will complete
-/// immediately.
-///
-/// This however does mean that it is critical to ensure that this ready flag is
-/// cleared when (and only when) the file descriptor ceases to be ready. The
-/// [`AsyncFdReadyGuard`] returned from readiness checking functions serves this
-/// function; after calling a readiness-checking async function, you must use
-/// this [`AsyncFdReadyGuard`] to signal to tokio whether the file descriptor is no
-/// longer in a ready state.
+/// immediately. This however does mean that it is critical to ensure that this
+/// ready flag is cleared when (and only when) the file descriptor ceases to be
+/// ready. The [`AsyncFdReadyGuard`] returned from readiness checking functions
+/// serves this function; after calling a readiness-checking async function,
+/// you must use this [`AsyncFdReadyGuard`] to signal to tokio whether the file
+/// descriptor is no longer in a ready state.
 ///
 /// ## Use with to a poll-based API
 ///
@@ -517,6 +521,8 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// create this `AsyncFdReadyGuard`.
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    // Alias for old name in 0.x
+    #[cfg_attr(docsrs, doc(alias = "with_io"))]
     pub fn try_io<R>(
         &mut self,
         f: impl FnOnce(&AsyncFd<Inner>) -> io::Result<R>,
@@ -533,6 +539,16 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
             Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
             result => Ok(result),
         }
+    }
+
+    /// Returns a shared reference to the inner [`AsyncFd`].
+    pub fn get_ref(&self) -> &AsyncFd<Inner> {
+        self.async_fd
+    }
+
+    /// Returns a shared reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner(&self) -> &Inner {
+        self.get_ref().get_ref()
     }
 }
 
@@ -594,6 +610,26 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
             Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
             result => Ok(result),
         }
+    }
+
+    /// Returns a shared reference to the inner [`AsyncFd`].
+    pub fn get_ref(&self) -> &AsyncFd<Inner> {
+        self.async_fd
+    }
+
+    /// Returns a mutable reference to the inner [`AsyncFd`].
+    pub fn get_mut(&mut self) -> &mut AsyncFd<Inner> {
+        self.async_fd
+    }
+
+    /// Returns a shared reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner(&self) -> &Inner {
+        self.get_ref().get_ref()
+    }
+
+    /// Returns a mutable reference to the backing object of the inner [`AsyncFd`].
+    pub fn get_inner_mut(&mut self) -> &mut Inner {
+        self.get_mut().get_mut()
     }
 }
 

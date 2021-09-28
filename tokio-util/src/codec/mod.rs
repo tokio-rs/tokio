@@ -246,7 +246,7 @@
 //!
 //! [`AsyncRead`]: tokio::io::AsyncRead
 //! [`AsyncWrite`]: tokio::io::AsyncWrite
-//! [`Stream`]: tokio_stream::Stream
+//! [`Stream`]: futures_core::Stream
 //! [`Sink`]: futures_sink::Sink
 //! [`SinkExt::close`]: https://docs.rs/futures/0.3/futures/sink/trait.SinkExt.html#method.close
 //! [`FramedRead`]: struct@crate::codec::FramedRead
@@ -285,3 +285,6 @@ pub use self::length_delimited::{LengthDelimitedCodec, LengthDelimitedCodecError
 
 mod lines_codec;
 pub use self::lines_codec::{LinesCodec, LinesCodecError};
+
+mod any_delimiter_codec;
+pub use self::any_delimiter_codec::{AnyDelimiterCodec, AnyDelimiterCodecError};

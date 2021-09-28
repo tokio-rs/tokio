@@ -29,7 +29,7 @@ pub(crate) struct AtomicWaker {
 
 // `AtomicWaker` is a multi-consumer, single-producer transfer cell. The cell
 // stores a `Waker` value produced by calls to `register` and many threads can
-// race to take the waker by calling `wake.
+// race to take the waker by calling `wake`.
 //
 // If a new `Waker` instance is produced by calling `register` before an existing
 // one is consumed, then the existing one is overwritten.
@@ -223,6 +223,8 @@ impl AtomicWaker {
                 waker.wake();
 
                 // This is equivalent to a spin lock, so use a spin hint.
+                // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
+                #[allow(deprecated)]
                 atomic::spin_loop_hint();
             }
             state => {

@@ -44,7 +44,7 @@
 /// Stream + Unpin`.
 ///
 /// [`Future`]: trait@std::future::Future
-/// [`Box::pin`]: #
+/// [`Box::pin`]: std::boxed::Box::pin
 ///
 /// # Usage
 ///

@@ -217,6 +217,15 @@ cfg_io_driver_impl! {
     pub(crate) use poll_evented::PollEvented;
 }
 
+cfg_aio! {
+    /// BSD-specific I/O types
+    pub mod bsd {
+        mod poll_aio;
+
+        pub use poll_aio::{Aio, AioEvent, AioSource};
+    }
+}
+
 cfg_net_unix! {
     mod async_fd;
 
@@ -246,7 +255,7 @@ cfg_io_util! {
     pub(crate) mod seek;
     pub(crate) mod util;
     pub use util::{
-        copy, copy_buf, duplex, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
+        copy, copy_bidirectional, copy_buf, duplex, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
         BufReader, BufStream, BufWriter, DuplexStream, Empty, Lines, Repeat, Sink, Split, Take,
     };
 }

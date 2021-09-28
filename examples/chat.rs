@@ -28,8 +28,8 @@
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex};
-use tokio_stream::{Stream, StreamExt};
-use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
+use tokio_stream::StreamExt;
+use tokio_util::codec::{Framed, LinesCodec};
 
 use futures::SinkExt;
 use std::collections::HashMap;
@@ -37,9 +37,7 @@ use std::env;
 use std::error::Error;
 use std::io;
 use std::net::SocketAddr;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -101,6 +99,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 /// Shorthand for the transmit half of the message channel.
 type Tx = mpsc::UnboundedSender<String>;
 
+/// Shorthand for the receive half of the message channel.
+type Rx = mpsc::UnboundedReceiver<String>;
+
 /// Data that is shared between all peers in the chat server.
 ///
 /// This is the set of `Tx` handles for all connected clients. Whenever a
@@ -124,7 +125,7 @@ struct Peer {
     ///
     /// This is used to receive messages from peers. When a message is received
     /// off of this `Rx`, it will be written to the socket.
-    rx: Pin<Box<dyn Stream<Item = String> + Send>>,
+    rx: Rx,
 }
 
 impl Shared {
@@ -156,55 +157,12 @@ impl Peer {
         let addr = lines.get_ref().peer_addr()?;
 
         // Create a channel for this peer
-        let (tx, mut rx) = mpsc::unbounded_channel();
+        let (tx, rx) = mpsc::unbounded_channel();
 
         // Add an entry for this `Peer` in the shared state map.
         state.lock().await.peers.insert(addr, tx);
 
-        let rx = Box::pin(async_stream::stream! {
-            while let Some(item) = rx.recv().await {
-                yield item;
-            }
-        });
-
         Ok(Peer { lines, rx })
-    }
-}
-
-#[derive(Debug)]
-enum Message {
-    /// A message that should be broadcasted to others.
-    Broadcast(String),
-
-    /// A message that should be received by a client
-    Received(String),
-}
-
-// Peer implements `Stream` in a way that polls both the `Rx`, and `Framed` types.
-// A message is produced whenever an event is ready until the `Framed` stream returns `None`.
-impl Stream for Peer {
-    type Item = Result<Message, LinesCodecError>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // First poll the `UnboundedReceiver`.
-
-        if let Poll::Ready(Some(v)) = Pin::new(&mut self.rx).poll_next(cx) {
-            return Poll::Ready(Some(Ok(Message::Received(v))));
-        }
-
-        // Secondly poll the `Framed` stream.
-        let result: Option<_> = futures::ready!(Pin::new(&mut self.lines).poll_next(cx));
-
-        Poll::Ready(match result {
-            // We've received a message we should broadcast to others.
-            Some(Ok(message)) => Some(Ok(Message::Broadcast(message))),
-
-            // An error occurred.
-            Some(Err(e)) => Some(Err(e)),
-
-            // The stream has been exhausted.
-            None => None,
-        })
     }
 }
 
@@ -241,28 +199,32 @@ async fn process(
     }
 
     // Process incoming messages until our stream is exhausted by a disconnect.
-    while let Some(result) = peer.next().await {
-        match result {
-            // A message was received from the current user, we should
-            // broadcast this message to the other users.
-            Ok(Message::Broadcast(msg)) => {
-                let mut state = state.lock().await;
-                let msg = format!("{}: {}", username, msg);
-
-                state.broadcast(addr, &msg).await;
-            }
-            // A message was received from a peer. Send it to the
-            // current user.
-            Ok(Message::Received(msg)) => {
+    loop {
+        tokio::select! {
+            // A message was received from a peer. Send it to the current user.
+            Some(msg) = peer.rx.recv() => {
                 peer.lines.send(&msg).await?;
             }
-            Err(e) => {
-                tracing::error!(
-                    "an error occurred while processing messages for {}; error = {:?}",
-                    username,
-                    e
-                );
-            }
+            result = peer.lines.next() => match result {
+                // A message was received from the current user, we should
+                // broadcast this message to the other users.
+                Some(Ok(msg)) => {
+                    let mut state = state.lock().await;
+                    let msg = format!("{}: {}", username, msg);
+
+                    state.broadcast(addr, &msg).await;
+                }
+                // An error occurred.
+                Some(Err(e)) => {
+                    tracing::error!(
+                        "an error occurred while processing messages for {}; error = {:?}",
+                        username,
+                        e
+                    );
+                }
+                // The stream has been exhausted.
+                None => break,
+            },
         }
     }
 

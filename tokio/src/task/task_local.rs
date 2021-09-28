@@ -2,6 +2,7 @@ use pin_project_lite::pin_project;
 use std::cell::RefCell;
 use std::error::Error;
 use std::future::Future;
+use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{fmt, thread};
@@ -115,16 +116,47 @@ impl<T: 'static> LocalKey<T> {
     /// }).await;
     /// # }
     /// ```
-    pub async fn scope<F>(&'static self, value: T, f: F) -> F::Output
+    pub fn scope<F>(&'static self, value: T, f: F) -> TaskLocalFuture<T, F>
     where
         F: Future,
     {
         TaskLocalFuture {
-            local: &self,
+            local: self,
             slot: Some(value),
             future: f,
+            _pinned: PhantomPinned,
         }
-        .await
+    }
+
+    /// Sets a value `T` as the task-local value for the closure `F`.
+    ///
+    /// On completion of `scope`, the task-local will be dropped.
+    ///
+    /// ### Examples
+    ///
+    /// ```
+    /// # async fn dox() {
+    /// tokio::task_local! {
+    ///     static NUMBER: u32;
+    /// }
+    ///
+    /// NUMBER.sync_scope(1, || {
+    ///     println!("task local value: {}", NUMBER.get());
+    /// });
+    /// # }
+    /// ```
+    pub fn sync_scope<F, R>(&'static self, value: T, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        let scope = TaskLocalFuture {
+            local: self,
+            slot: Some(value),
+            future: (),
+            _pinned: PhantomPinned,
+        };
+        crate::pin!(scope);
+        scope.with_task(|_| f())
     }
 
     /// Accesses the current task-local and runs the provided closure.
@@ -145,7 +177,7 @@ impl<T: 'static> LocalKey<T> {
 
     /// Accesses the current task-local and runs the provided closure.
     ///
-    /// If the task-local with the accociated key is not present, this
+    /// If the task-local with the associated key is not present, this
     /// method will return an `AccessError`. For a panicking variant,
     /// see `with`.
     pub fn try_with<F, R>(&'static self, f: F) -> Result<R, AccessError>
@@ -177,18 +209,42 @@ impl<T: 'static> fmt::Debug for LocalKey<T> {
 }
 
 pin_project! {
-    struct TaskLocalFuture<T: StaticLifetime, F> {
+    /// A future that sets a value `T` of a task local for the future `F` during
+    /// its execution.
+    ///
+    /// The value of the task-local must be `'static` and will be dropped on the
+    /// completion of the future.
+    ///
+    /// Created by the function [`LocalKey::scope`](self::LocalKey::scope).
+    ///
+    /// ### Examples
+    ///
+    /// ```
+    /// # async fn dox() {
+    /// tokio::task_local! {
+    ///     static NUMBER: u32;
+    /// }
+    ///
+    /// NUMBER.scope(1, async move {
+    ///     println!("task local value: {}", NUMBER.get());
+    /// }).await;
+    /// # }
+    /// ```
+    pub struct TaskLocalFuture<T, F>
+    where
+        T: 'static
+    {
         local: &'static LocalKey<T>,
         slot: Option<T>,
         #[pin]
         future: F,
+        #[pin]
+        _pinned: PhantomPinned,
     }
 }
 
-impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
-    type Output = F::Output;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+impl<T: 'static, F> TaskLocalFuture<T, F> {
+    fn with_task<F2: FnOnce(Pin<&mut F>) -> R, R>(self: Pin<&mut Self>, f: F2) -> R {
         struct Guard<'a, T: 'static> {
             local: &'static LocalKey<T>,
             slot: &'a mut Option<T>,
@@ -213,13 +269,17 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
             local: *project.local,
         };
 
-        project.future.poll(cx)
+        f(project.future)
     }
 }
 
-// Required to make `pin_project` happy.
-trait StaticLifetime: 'static {}
-impl<T: 'static> StaticLifetime for T {}
+impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.with_task(|f| f.poll(cx))
+    }
+}
 
 /// An error returned by [`LocalKey::try_with`](method@LocalKey::try_with).
 #[derive(Clone, Copy, Eq, PartialEq)]

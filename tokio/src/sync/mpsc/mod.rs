@@ -73,7 +73,7 @@
 pub(super) mod block;
 
 mod bounded;
-pub use self::bounded::{channel, Permit, Receiver, Sender};
+pub use self::bounded::{channel, OwnedPermit, Permit, Receiver, Sender};
 
 mod chan;
 

@@ -163,6 +163,11 @@ pub struct Sender<T> {
 /// Must not be used concurrently. Messages may be retrieved using
 /// [`recv`][Receiver::recv].
 ///
+/// To turn this receiver into a `Stream`, you can use the [`BroadcastStream`]
+/// wrapper.
+///
+/// [`BroadcastStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.BroadcastStream.html
+///
 /// # Examples
 ///
 /// ```
@@ -819,6 +824,13 @@ impl<T: Clone> Receiver<T> {
     /// the channel. A subsequent call to [`recv`] will return this value
     /// **unless** it has been since overwritten.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
+    ///
     /// [`Receiver`]: crate::sync::broadcast::Receiver
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
     ///
@@ -929,7 +941,7 @@ impl<T> Drop for Receiver<T> {
 
         drop(tail);
 
-        while self.next != until {
+        while self.next < until {
             match self.recv_ref(None) {
                 Ok(_) => {}
                 // The channel is closed
