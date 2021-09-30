@@ -339,10 +339,11 @@ fn parse_knobs(
         {
             let body = async #body;
             #[allow(clippy::expect_used)]
-            #tail_return tokio::task::LocalSet::new().block_on(
-              &#rt.enable_all().build().expect("Failed building the Runtime"),
-              body,
-            )#tail_semicolon
+            #tail_return #rt
+                .enable_all()
+                .build()
+                .expect("Failed building the Runtime")
+                .block_on(body)#tail_semicolon
         }
     })
     .expect("Parsing failure");

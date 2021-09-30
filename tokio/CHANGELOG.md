@@ -14,10 +14,6 @@
 - runtime: callback when a worker parks and unparks ([#4070])
 - sync: implement `try_recv` for mpsc channels ([#4113])
 
-### Changed
-
-- macros: run runtime inside `LocalSet` when using macro ([#4027])
-
 ### Documented
 
 - docs: clarify CPU-bound tasks on Tokio ([#4105])

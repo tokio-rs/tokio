@@ -1,7 +1,14 @@
+# 1.4.1 (September 30th, 2021)
+
+Reverted: run `current_thread` inside `LocalSet` ([#4027])
+
 # 1.4.0 (September 29th, 2021)
+
+(yanked)
+
 ### Changed
 
-- macros: run current_thread inside LocalSet ([#4027])
+- macros: run `current_thread` inside `LocalSet` ([#4027])
 - macros: explicitly relaxed clippy lint for `.expect()` in runtime entry macro ([#4030])
 
 ### Fixed
