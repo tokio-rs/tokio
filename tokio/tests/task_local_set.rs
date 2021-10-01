@@ -17,6 +17,17 @@ use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::time::Duration;
 
 #[tokio::test(flavor = "current_thread")]
+async fn localset_implicit_current_thread() {
+    task::spawn_local(async {}).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic]
+async fn localset_implicit_multi_thread() {
+    task::spawn_local(async {}).await.ok();
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn local_basic_scheduler() {
     LocalSet::new()
         .run_until(async {

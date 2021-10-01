@@ -98,6 +98,10 @@ use proc_macro::TokenStream;
 ///
 /// The basic scheduler is single-threaded.
 ///
+/// The function executes in the context of a
+/// [LocalSet](../tokio/task/struct.LocalSet.html), allowing calls to
+/// [spawn_local](../tokio/task/fn.spawn_local.html) without further setup.
+///
 /// ```rust
 /// #[tokio::main(flavor = "current_thread")]
 /// async fn main() {
@@ -109,13 +113,14 @@ use proc_macro::TokenStream;
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new_current_thread()
+///     let ls = tokio::task::LocalSet::new();
+///     let rt = tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
 ///         .build()
-///         .unwrap()
-///         .block_on(async {
-///             println!("Hello world");
-///         })
+///         .unwrap();
+///     ls.block_on(&rt, async {
+///         println!("Hello world");
+///     })
 /// }
 /// ```
 ///
@@ -156,14 +161,15 @@ use proc_macro::TokenStream;
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new_current_thread()
+///     let ls = tokio::task::LocalSet::new();
+///     let rt = tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
 ///         .start_paused(true)
 ///         .build()
-///         .unwrap()
-///         .block_on(async {
-///             println!("Hello world");
-///         })
+///         .unwrap();
+///     ls.block_on(&rt, async {
+///         println!("Hello world");
+///     })
 /// }
 /// ```
 ///
@@ -204,13 +210,14 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new_current_thread()
+///     let ls = tokio::task::LocalSet::new();
+///     let rt = tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
 ///         .build()
-///         .unwrap()
-///         .block_on(async {
-///             println!("Hello world");
-///         })
+///         .unwrap();
+///     ls.block_on(&rt, async {
+///         println!("Hello world");
+///     })
 /// }
 /// ```
 ///

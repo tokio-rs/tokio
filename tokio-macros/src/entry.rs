@@ -335,18 +335,33 @@ fn parse_knobs(
         ),
         _ => (quote! {}, quote! {}),
     };
-    input.block = syn::parse2(quote_spanned! {last_stmt_end_span=>
-        {
-            let body = async #body;
-            #[allow(clippy::expect_used)]
-            #tail_return #rt
-                .enable_all()
-                .build()
-                .expect("Failed building the Runtime")
-                .block_on(body)#tail_semicolon
-        }
-    })
-    .expect("Parsing failure");
+    let span = match config.flavor {
+        RuntimeFlavor::CurrentThread => quote_spanned! {last_stmt_end_span=>
+            {
+                let body = async #body;
+                #[allow(clippy::expect_used)]
+                #tail_return tokio::task::LocalSet::new().block_on(
+                    &#rt
+                        .enable_all()
+                        .build()
+                        .expect("Failed building the Runtime"),
+                    body,
+                )#tail_semicolon
+            }
+        },
+        RuntimeFlavor::Threaded => quote_spanned! {last_stmt_end_span=>
+            {
+                let body = async #body;
+                #[allow(clippy::expect_used)]
+                #tail_return #rt
+                    .enable_all()
+                    .build()
+                    .expect("Failed building the Runtime")
+                    .block_on(body)#tail_semicolon
+            }
+        },
+    };
+    input.block = syn::parse2(span).expect("Parsing failure");
     input.block.brace_token = brace_token;
 
     let result = quote! {
