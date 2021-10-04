@@ -49,7 +49,7 @@ impl<T: AsyncWrite> SyncIoBridge<T> {
     }
 }
 
-impl<T: AsyncRead + Unpin> SyncIoBridge<T> {
+impl<T: Unpin> SyncIoBridge<T> {
     /// Use a [`tokio::io::AsyncRead`] synchronously as a [`std::io::Read`] or
     /// a [`tokio::io::AsyncWrite`] as a [`std::io::Write`].
     ///
