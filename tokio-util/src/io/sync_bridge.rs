@@ -14,6 +14,23 @@ impl<T: AsyncRead + Unpin> Read for SyncIoBridge<T> {
         let src = &mut self.src;
         self.rt.block_on(src.read(buf))
     }
+
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> std::io::Result<usize> {
+        let src = &mut self.src;
+        self.rt.block_on(src.read_to_end(buf))
+    }
+
+    fn read_to_string(&mut self, buf: &mut String) -> std::io::Result<usize> {
+        let src = &mut self.src;
+        self.rt.block_on(src.read_to_string(buf))
+    }
+
+    fn read_exact(&mut self, buf: &mut [u8]) -> std::io::Result<()> {
+        let src = &mut self.src;
+        // The AsyncRead trait returns the count, synchronous doesn't.
+        let _n = self.rt.block_on(src.read_exact(buf))?;
+        Ok(())
+    }
 }
 
 impl<T: AsyncWrite + Unpin> Write for SyncIoBridge<T> {
