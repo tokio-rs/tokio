@@ -53,10 +53,16 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// Use a [`tokio::io::AsyncRead`] synchronously as a [`std::io::Read`] or
     /// a [`tokio::io::AsyncWrite`] as a [`std::io::Write`].
     ///
-    /// This is useful with e.g. [`tokio::task::spawn_blocking`].
+    /// When this struct is created, it captures a handle to the current thread's runtime with [`tokio::runtime::Handle::current`].
+    /// It is hence OK to move this struct into a separate thread outside the runtime, as created
+    /// by e.g. [`tokio::task::spawn_blocking`].
     ///
-    /// This works via capturing a handle to the current thread's runtime with [`tokio::runtime::Handle::current`].
-    /// Synchronous I/O will use that handle to block on the backing asynchronous source.
+    /// Stated even more strongly: to make use of this bridge, you *must* move
+    /// it into a separate thread outside the runtime.  The synchronous I/O will use the
+    /// underlying handle to block on the backing asynchronous source, via
+    /// [`tokio::runtime::Handle::block_on`].  As noted in the documentation for that
+    /// function, an attempt to `block_on` from an asynchronous execution context
+    /// will panic.
     ///
     /// # Panic
     ///
@@ -69,7 +75,7 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// a [`tokio::io::AsyncWrite`] as a [`std::io::Write`].
     ///
     /// This is the same as [`SyncIoBridge::new`], but allows passing an arbitrary handle and hence may
-    /// be invoked outside of an asynchronous context.
+    /// be initially invoked outside of an asynchronous context.
     pub fn new_with_handle(src: T, rt: tokio::runtime::Handle) -> Self {
         Self { src, rt }
     }
