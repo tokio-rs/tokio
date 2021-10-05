@@ -4,6 +4,7 @@ use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::CONTEXT_MISSING_ERROR;
 
 use std::future::Future;
+use std::marker::PhantomData;
 use std::{error, fmt};
 
 /// Handle to the runtime.
@@ -41,8 +42,8 @@ pub struct Handle {
 #[derive(Debug)]
 #[must_use = "Creating and dropping a guard does nothing"]
 pub struct EnterGuard<'a> {
-    handle: &'a Handle,
-    guard: context::EnterGuard,
+    _guard: context::EnterGuard,
+    _handle_lifetime: PhantomData<&'a Handle>,
 }
 
 impl Handle {
@@ -55,8 +56,8 @@ impl Handle {
     /// [`tokio::spawn`]: fn@crate::spawn
     pub fn enter(&self) -> EnterGuard<'_> {
         EnterGuard {
-            handle: self,
-            guard: context::enter(self.clone()),
+            _guard: context::enter(self.clone()),
+            _handle_lifetime: PhantomData,
         }
     }
 
