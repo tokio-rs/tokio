@@ -367,6 +367,11 @@ pub struct Interval {
 impl Interval {
     /// Completes when the next instant in the interval has been reached.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancellation safe. If `tick` is used as the branch in a `tokio::select!` and
+    /// another branch completes first, then no tick has been consumed.
+    ///
     /// # Examples
     ///
     /// ```
