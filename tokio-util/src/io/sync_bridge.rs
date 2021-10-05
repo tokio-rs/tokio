@@ -81,6 +81,10 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// function, an attempt to `block_on` from an asynchronous execution context
     /// will panic.
     ///
+    /// # Wrapping `!Unpin` types
+    ///
+    /// Use e.g. `SyncIoBridge::new(Box::pin(src))`.
+    ///
     /// # Panic
     ///
     /// This will panic if called outside the context of a Tokio runtime.
