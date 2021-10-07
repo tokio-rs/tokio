@@ -76,7 +76,7 @@
 //!         tokio::select! {
 //!             _ = interval.tick() => println!("Another 100ms"),
 //!             msg = &mut recv => {
-//!                 println!("Got message: {}", msg);
+//!                 println!("Got message: {}", msg.unwrap());
 //!                 break;
 //!             }
 //!         }
@@ -291,7 +291,7 @@ pub struct Sender<T> {
 ///         tokio::select! {
 ///             _ = interval.tick() => println!("Another 100ms"),
 ///             msg = &mut recv => {
-///                 println!("Got message: {}", msg);
+///                 println!("Got message: {}", msg.unwrap());
 ///                 break;
 ///             }
 ///         }
