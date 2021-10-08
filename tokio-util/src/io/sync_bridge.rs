@@ -12,7 +12,7 @@ pub struct SyncIoBridge<T> {
 impl<T: AsyncRead + Unpin> Read for SyncIoBridge<T> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let src = &mut self.src;
-        self.rt.block_on(src.read(buf))
+        self.rt.block_on(AsyncReadExt::read(src, buf))
     }
 
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> std::io::Result<usize> {
