@@ -12,7 +12,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
@@ -224,7 +224,7 @@ impl<P: Park> Inner<P> {
             pin!(future);
 
             'outer: loop {
-                if scheduler.spawner.was_woken() || !polled {
+                if scheduler.spawner.reset_woken() || !polled {
                     polled = true;
                     scheduler.stats.incr_poll_count();
                     if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
@@ -418,13 +418,12 @@ impl Spawner {
     }
 
     fn waker_ref(&self) -> WakerRef<'_> {
-        // clear the woken bit
-        self.shared.woken.swap(false, AcqRel);
         waker_ref(&self.shared)
     }
 
-    fn was_woken(&self) -> bool {
-        self.shared.woken.load(Acquire)
+    // reset woken to false and return original value
+    pub(crate) fn reset_woken(&self) -> bool {
+        self.shared.woken.swap(false, AcqRel)
     }
 }
 
