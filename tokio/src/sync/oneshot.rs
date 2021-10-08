@@ -51,6 +51,70 @@
 //!     }
 //! }
 //! ```
+//!
+//! To use a oneshot channel in a `tokio::select!` loop, add `&mut` in front of
+//! the channel.
+//!
+//! ```
+//! use tokio::sync::oneshot;
+//! use tokio::time::{interval, sleep, Duration};
+//!
+//! #[tokio::main]
+//! # async fn _doc() {}
+//! # #[tokio::main(flavor = "current_thread", start_paused = true)]
+//! async fn main() {
+//!     let (send, mut recv) = oneshot::channel();
+//!     let mut interval = interval(Duration::from_millis(100));
+//!
+//!     # let handle =
+//!     tokio::spawn(async move {
+//!         sleep(Duration::from_secs(1)).await;
+//!         send.send("shut down").unwrap();
+//!     });
+//!
+//!     loop {
+//!         tokio::select! {
+//!             _ = interval.tick() => println!("Another 100ms"),
+//!             msg = &mut recv => {
+//!                 println!("Got message: {}", msg.unwrap());
+//!                 break;
+//!             }
+//!         }
+//!     }
+//!     # handle.await.unwrap();
+//! }
+//! ```
+//!
+//! To use a `Sender` from a destructor, put it in an [`Option`] and call
+//! [`Option::take`].
+//!
+//! ```
+//! use tokio::sync::oneshot;
+//!
+//! struct SendOnDrop {
+//!     sender: Option<oneshot::Sender<&'static str>>,
+//! }
+//! impl Drop for SendOnDrop {
+//!     fn drop(&mut self) {
+//!         if let Some(sender) = self.sender.take() {
+//!             // Using `let _ =` to ignore send errors.
+//!             let _ = sender.send("I got dropped!");
+//!         }
+//!     }
+//! }
+//!
+//! #[tokio::main]
+//! # async fn _doc() {}
+//! # #[tokio::main(flavor = "current_thread")]
+//! async fn main() {
+//!     let (send, recv) = oneshot::channel();
+//!
+//!     let send_on_drop = SendOnDrop { sender: Some(send) };
+//!     drop(send_on_drop);
+//!
+//!     assert_eq!(recv.await, Ok("I got dropped!"));
+//! }
+//! ```
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
@@ -65,15 +129,6 @@ use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll, Waker};
 
 /// Sends a value to the associated [`Receiver`].
-///
-/// A pair of both a [`Sender`] and a [`Receiver`]  are created by the
-/// [`channel`](fn@channel) function.
-#[derive(Debug)]
-pub struct Sender<T> {
-    inner: Option<Arc<Inner<T>>>,
-}
-
-/// Receive a value from the associated [`Sender`].
 ///
 /// A pair of both a [`Sender`] and a [`Receiver`]  are created by the
 /// [`channel`](fn@channel) function.
@@ -118,6 +173,130 @@ pub struct Sender<T> {
 ///         Ok(_) => panic!("This doesn't happen"),
 ///         Err(_) => println!("the sender dropped"),
 ///     }
+/// }
+/// ```
+///
+/// To use a `Sender` from a destructor, put it in an [`Option`] and call
+/// [`Option::take`].
+///
+/// ```
+/// use tokio::sync::oneshot;
+///
+/// struct SendOnDrop {
+///     sender: Option<oneshot::Sender<&'static str>>,
+/// }
+/// impl Drop for SendOnDrop {
+///     fn drop(&mut self) {
+///         if let Some(sender) = self.sender.take() {
+///             // Using `let _ =` to ignore send errors.
+///             let _ = sender.send("I got dropped!");
+///         }
+///     }
+/// }
+///
+/// #[tokio::main]
+/// # async fn _doc() {}
+/// # #[tokio::main(flavor = "current_thread")]
+/// async fn main() {
+///     let (send, recv) = oneshot::channel();
+///
+///     let send_on_drop = SendOnDrop { sender: Some(send) };
+///     drop(send_on_drop);
+///
+///     assert_eq!(recv.await, Ok("I got dropped!"));
+/// }
+/// ```
+///
+/// [`Option`]: std::option::Option
+/// [`Option::take`]: std::option::Option::take
+#[derive(Debug)]
+pub struct Sender<T> {
+    inner: Option<Arc<Inner<T>>>,
+}
+
+/// Receive a value from the associated [`Sender`].
+///
+/// A pair of both a [`Sender`] and a [`Receiver`]  are created by the
+/// [`channel`](fn@channel) function.
+///
+/// This channel has no `recv` method because the receiver itself implements the
+/// [`Future`] trait. To receive a value, `.await` the `Receiver` object directly.
+///
+/// [`Future`]: trait@std::future::Future
+///
+/// # Examples
+///
+/// ```
+/// use tokio::sync::oneshot;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (tx, rx) = oneshot::channel();
+///
+///     tokio::spawn(async move {
+///         if let Err(_) = tx.send(3) {
+///             println!("the receiver dropped");
+///         }
+///     });
+///
+///     match rx.await {
+///         Ok(v) => println!("got = {:?}", v),
+///         Err(_) => println!("the sender dropped"),
+///     }
+/// }
+/// ```
+///
+/// If the sender is dropped without sending, the receiver will fail with
+/// [`error::RecvError`]:
+///
+/// ```
+/// use tokio::sync::oneshot;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (tx, rx) = oneshot::channel::<u32>();
+///
+///     tokio::spawn(async move {
+///         drop(tx);
+///     });
+///
+///     match rx.await {
+///         Ok(_) => panic!("This doesn't happen"),
+///         Err(_) => println!("the sender dropped"),
+///     }
+/// }
+/// ```
+///
+/// To use a `Receiver` in a `tokio::select!` loop, add `&mut` in front of the
+/// channel.
+///
+/// ```
+/// use tokio::sync::oneshot;
+/// use tokio::time::{interval, sleep, Duration};
+///
+/// #[tokio::main]
+/// # async fn _doc() {}
+/// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+/// async fn main() {
+///     let (send, mut recv) = oneshot::channel();
+///     let mut interval = interval(Duration::from_millis(100));
+///
+///     # let handle =
+///     tokio::spawn(async move {
+///         sleep(Duration::from_secs(1)).await;
+///         send.send("shut down").unwrap();
+///     });
+///
+///     loop {
+///         tokio::select! {
+///             _ = interval.tick() => println!("Another 100ms"),
+///             msg = &mut recv => {
+///                 println!("Got message: {}", msg.unwrap());
+///                 break;
+///             }
+///         }
+///     }
+///     # handle.await.unwrap();
 /// }
 /// ```
 #[derive(Debug)]
