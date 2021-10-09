@@ -219,13 +219,11 @@ impl<P: Park> Inner<P> {
             let _enter = crate::runtime::enter(false);
             let waker = scheduler.spawner.waker_ref();
             let mut cx = std::task::Context::from_waker(&waker);
-            let mut polled = false;
 
             pin!(future);
 
             'outer: loop {
-                if scheduler.spawner.reset_woken() || !polled {
-                    polled = true;
+                if scheduler.spawner.reset_woken() {
                     scheduler.stats.incr_poll_count();
                     if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
                         return v;
@@ -418,6 +416,9 @@ impl Spawner {
     }
 
     fn waker_ref(&self) -> WakerRef<'_> {
+        // Set woken to true when enter block_on, ensure outer future
+        // be polled for the first time when enter loop
+        self.shared.woken.store(true, Release);
         waker_ref(&self.shared)
     }
 
