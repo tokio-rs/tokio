@@ -1,6 +1,10 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned, ToTokens};
+use syn::parse::Parser;
+
+// syn::AttributeArgs does not implement syn::Parse
+type AttributeArgs = syn::punctuated::Punctuated<syn::NestedMeta, syn::Token![,]>;
 
 #[derive(Clone, Copy, PartialEq)]
 enum RuntimeFlavor {
@@ -26,6 +30,13 @@ struct FinalConfig {
     worker_threads: Option<usize>,
     start_paused: Option<bool>,
 }
+
+/// Config used in case of the attribute not being able to build a valid config
+const DEFAULT_ERROR_CONFIG: FinalConfig = FinalConfig {
+    flavor: RuntimeFlavor::CurrentThread,
+    worker_threads: None,
+    start_paused: None,
+};
 
 struct Configuration {
     rt_multi_thread_available: bool,
@@ -184,13 +195,13 @@ fn parse_bool(bool: syn::Lit, span: Span, field: &str) -> Result<bool, syn::Erro
     }
 }
 
-fn parse_knobs(
-    mut input: syn::ItemFn,
-    args: syn::AttributeArgs,
+fn build_config(
+    input: syn::ItemFn,
+    args: AttributeArgs,
     is_test: bool,
     rt_multi_thread: bool,
-) -> Result<TokenStream, syn::Error> {
-    if input.sig.asyncness.take().is_none() {
+) -> Result<FinalConfig, syn::Error> {
+    if input.sig.asyncness.is_none() {
         let msg = "the `async` keyword is missing from the function declaration";
         return Err(syn::Error::new_spanned(input.sig.fn_token, msg));
     }
@@ -278,7 +289,11 @@ fn parse_knobs(
         }
     }
 
-    let config = config.build()?;
+    config.build()
+}
+
+fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
+    input.sig.asyncness = None;
 
     // If type mismatch occurs, the current rustc points to the last statement.
     let (last_stmt_start_span, last_stmt_end_span) = {
@@ -354,36 +369,58 @@ fn parse_knobs(
         #input
     };
 
-    Ok(result.into())
+    result.into()
+}
+
+fn token_stream_with_error(mut tokens: TokenStream, error: syn::Error) -> TokenStream {
+    tokens.extend(TokenStream::from(error.into_compile_error()));
+    tokens
 }
 
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub(crate) fn main(args: TokenStream, item: TokenStream, rt_multi_thread: bool) -> TokenStream {
-    let input = syn::parse_macro_input!(item as syn::ItemFn);
-    let args = syn::parse_macro_input!(args as syn::AttributeArgs);
+    // If any of the steps for this macro fail, we still want to expand to an item that is as close
+    // to the expected output as possible. This helps out IDEs such that completions and other
+    // related features keep working.
+    let input: syn::ItemFn = match syn::parse(item.clone()) {
+        Ok(it) => it,
+        Err(e) => return token_stream_with_error(item, e),
+    };
 
-    if input.sig.ident == "main" && !input.sig.inputs.is_empty() {
+    let config = if input.sig.ident == "main" && !input.sig.inputs.is_empty() {
         let msg = "the main function cannot accept arguments";
-        return syn::Error::new_spanned(&input.sig.ident, msg)
-            .to_compile_error()
-            .into();
-    }
+        Err(syn::Error::new_spanned(&input.sig.ident, msg))
+    } else {
+        AttributeArgs::parse_terminated
+            .parse(args)
+            .and_then(|args| build_config(input.clone(), args, false, rt_multi_thread))
+    };
 
-    parse_knobs(input, args, false, rt_multi_thread).unwrap_or_else(|e| e.to_compile_error().into())
+    match config {
+        Ok(config) => parse_knobs(input, false, config),
+        Err(e) => token_stream_with_error(parse_knobs(input, false, DEFAULT_ERROR_CONFIG), e),
+    }
 }
 
 pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) -> TokenStream {
-    let input = syn::parse_macro_input!(item as syn::ItemFn);
-    let args = syn::parse_macro_input!(args as syn::AttributeArgs);
+    // If any of the steps for this macro fail, we still want to expand to an item that is as close
+    // to the expected output as possible. This helps out IDEs such that completions and other
+    // related features keep working.
+    let input: syn::ItemFn = match syn::parse(item.clone()) {
+        Ok(it) => it,
+        Err(e) => return token_stream_with_error(item, e),
+    };
+    let config = if let Some(attr) = input.attrs.iter().find(|attr| attr.path.is_ident("test")) {
+        let msg = "second test attribute is supplied";
+        Err(syn::Error::new_spanned(&attr, msg))
+    } else {
+        AttributeArgs::parse_terminated
+            .parse(args)
+            .and_then(|args| build_config(input.clone(), args, true, rt_multi_thread))
+    };
 
-    for attr in &input.attrs {
-        if attr.path.is_ident("test") {
-            let msg = "second test attribute is supplied";
-            return syn::Error::new_spanned(&attr, msg)
-                .to_compile_error()
-                .into();
-        }
+    match config {
+        Ok(config) => parse_knobs(input, true, config),
+        Err(e) => token_stream_with_error(parse_knobs(input, true, DEFAULT_ERROR_CONFIG), e),
     }
-
-    parse_knobs(input, args, true, rt_multi_thread).unwrap_or_else(|e| e.to_compile_error().into())
 }
