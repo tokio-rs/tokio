@@ -12,7 +12,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
@@ -219,13 +219,11 @@ impl<P: Park> Inner<P> {
             let _enter = crate::runtime::enter(false);
             let waker = scheduler.spawner.waker_ref();
             let mut cx = std::task::Context::from_waker(&waker);
-            let mut polled = false;
 
             pin!(future);
 
             'outer: loop {
-                if scheduler.spawner.was_woken() || !polled {
-                    polled = true;
+                if scheduler.spawner.reset_woken() {
                     scheduler.stats.incr_poll_count();
                     if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
                         return v;
@@ -418,13 +416,15 @@ impl Spawner {
     }
 
     fn waker_ref(&self) -> WakerRef<'_> {
-        // clear the woken bit
-        self.shared.woken.swap(false, AcqRel);
+        // Set woken to true when enter block_on, ensure outer future
+        // be polled for the first time when enter loop
+        self.shared.woken.store(true, Release);
         waker_ref(&self.shared)
     }
 
-    fn was_woken(&self) -> bool {
-        self.shared.woken.load(Acquire)
+    // reset woken to false and return original value
+    pub(crate) fn reset_woken(&self) -> bool {
+        self.shared.woken.swap(false, AcqRel)
     }
 }
 
