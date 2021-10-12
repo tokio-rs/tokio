@@ -31,6 +31,7 @@ pub(crate) struct ReadFrame {
     pub(crate) eof: bool,
     pub(crate) is_readable: bool,
     pub(crate) buffer: BytesMut,
+    pub(crate) has_errored: bool,
 }
 
 pub(crate) struct WriteFrame {
@@ -49,6 +50,7 @@ impl Default for ReadFrame {
             eof: false,
             is_readable: false,
             buffer: BytesMut::with_capacity(INITIAL_CAPACITY),
+            has_errored: false,
         }
     }
 }
@@ -72,6 +74,7 @@ impl From<BytesMut> for ReadFrame {
             buffer,
             is_readable: size > 0,
             eof: false,
+            has_errored: false,
         }
     }
 }
@@ -126,30 +129,37 @@ where
         //
         // The initial state is `reading`.
         //
-        // | state   | eof   | is_readable |
-        // |---------|-------|-------------|
-        // | reading | false | false       |
-        // | framing | false | true        |
-        // | pausing | true  | true        |
-        // | paused  | true  | false       |
-        //
-        //                                 `decode_eof`
-        //                                 returns `Some`             read 0 bytes
-        //                                   │       │                 │      │
-        //                                   │       ▼                 │      ▼
-        //                                   ┌───────┐ `decode_eof`    ┌──────┐
-        //                 ┌──read 0 bytes──▶│pausing│─returns `None`─▶│paused│──┐
-        //                 │                 └───────┘                 └──────┘  │
-        // pending read┐   │                     ┌──────┐                  │  ▲  │
-        //      │      │   │                     │      │                  │  │  │
-        //      │      ▼   │                     │  `decode` returns `Some`│ pending read
-        //      │  ╔═══════╗                 ┌───────┐◀─┘                  │
-        //      └──║reading║─read n>0 bytes─▶│framing│                     │
-        //         ╚═══════╝                 └───────┘◀──────read n>0 bytes┘
-        //             ▲                         │
-        //             │                         │
-        //             └─`decode` returns `None`─┘
+        // | state   | eof   | is_readable | has_errored |
+        // |---------|-------|-------------|-------------|
+        // | reading | false | false       | false       |
+        // | framing | false | true        | false       |
+        // | pausing | true  | true        | false       |
+        // | paused  | true  | false       | false       |
+        // | errored | <any> | <any>       | true        |             `decode_eof` returns Err
+        //                                                       ┌───────────────────────────────────────┐
+        //                                  `decode_eof`         │                                       │
+        //                                  returns Ok(`Some`)   │              read 0 bytes             │
+        //                                    │       │  ┌───────┘               │      │                │
+        //                                    │      ▼  │                       │      ▼               │
+        //                                    ┌───────────┐ `decode_eof`         ┌──────┐                │
+        //                 ┌──read 0 bytes──▶│  pausing  │─returns Ok(`None`)─▶│paused│───────┐        │
+        //                 │                  └───────────┘                      └──────┘       │        ▼
+        // pending read┐   │                     ┌──────┐                        │     ▲       │      ┌─────────┐
+        //      │      │   │                     │      │                        │      │       │      │ errored │
+        //      │     ▼   │                     │  `decode` returns `Some`      │     pending read    └─────────┘
+        //      │  ╔═══════╗                  ┌───────────┐◀─┘                  │                       ▲
+        //      └──║reading║─read n>0 bytes─▶│  framing  │                      │                       │
+        //         ╚═══════╝                  └───────────┘◀──────read n>0 bytes┘                       │
+        //             ▲                         │     │                                                │
+        //             │                          │     │           `decode` returns Err                 │
+        //             └─`decode` returns `None`──┘     └────────────────────────────────────────────────┘
         loop {
+            // Return `None` if we have encountered an error from the underlying decoder
+            // See: https://github.com/tokio-rs/tokio/issues/3976
+            if state.has_errored {
+                return Poll::Ready(None);
+            }
+
             // Repeatedly call `decode` or `decode_eof` while the buffer is "readable",
             // i.e. it _might_ contain data consumable as a frame or closing frame.
             // Both signal that there is no such data by returning `None`.
@@ -165,7 +175,10 @@ where
                 // pausing or framing
                 if state.eof {
                     // pausing
-                    let frame = pinned.codec.decode_eof(&mut state.buffer)?;
+                    let frame = pinned.codec.decode_eof(&mut state.buffer).map_err(|err| {
+                        state.has_errored = true;
+                        err
+                    })?;
                     if frame.is_none() {
                         state.is_readable = false; // prepare pausing -> paused
                     }
@@ -176,7 +189,10 @@ where
                 // framing
                 trace!("attempting to decode a frame");
 
-                if let Some(frame) = pinned.codec.decode(&mut state.buffer)? {
+                if let Some(frame) = pinned.codec.decode(&mut state.buffer).map_err(|op| {
+                    state.has_errored = true;
+                    op
+                })? {
                     trace!("frame decoded from buffer");
                     // implicit framing -> framing
                     return Poll::Ready(Some(Ok(frame)));
