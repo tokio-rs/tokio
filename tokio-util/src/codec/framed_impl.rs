@@ -141,17 +141,17 @@ where
         //                                  `decode_eof`         │                                          │
         //                                  returns Ok(`Some`)   │              read 0 bytes                │
         //                                    │       │  ┌───────┘               │      │   after returning │
-        //                                    │       ▼ │                       │      ▼  `None`          │
+        //                                    │       ▼  │                       │      ▼  `None`          │
         //                                    ┌───────────┐ `decode_eof`         ┌──────┐◀─────────┐       │
         //                 ┌──read 0 bytes──▶│  pausing  │─returns Ok(`None`)─▶│paused│───────┐   │       │
         //                 │                  └───────────┘                      └──────┘       │   │       ▼
-        // pending read┐   │                     ┌──────┐                        │     ▲       │   │  ┌─────────┐
+        // pending read┐   │                     ┌──────┐                        │      ▲       │   │  ┌─────────┐
         //      │      │   │                     │      │                        │      │       │   └──│ errored │
-        //      │     ▼   │                     │  `decode` returns `Some`      │     pending read    └─────────┘
+        //      │      ▼   │                     │  `decode` returns `Some`      │     pending read    └─────────┘
         //      │  ╔═══════╗                  ┌───────────┐◀─┘                  │                       ▲
         //      └──║reading║─read n>0 bytes─▶│  framing  │                      │                       │
         //         ╚═══════╝                  └───────────┘◀──────read n>0 bytes┘                       │
-        //             ▲                         │     │                                                │
+        //             ▲                          │     │                                                │
         //             │                          │     │           `decode` returns Err                 │
         //             └─`decode` returns `None`──┘     └────────────────────────────────────────────────┘
         loop {
