@@ -1,4 +1,4 @@
-# 1.5.0 (October 12th, 2021)
+# 1.5.0 (October 13th, 2021)
 
 - macros: make tokio-macros attributes more IDE friendly ([#4162])
 
