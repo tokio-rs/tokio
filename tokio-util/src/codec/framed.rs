@@ -106,7 +106,7 @@ where
                         eof: false,
                         is_readable: false,
                         buffer: BytesMut::with_capacity(capacity),
-                        has_errored: false
+                        has_errored: false,
                     },
                     write: WriteFrame::default(),
                 },

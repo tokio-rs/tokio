@@ -140,7 +140,7 @@ where
         //                                  `decode_eof`         │                                       │
         //                                  returns Ok(`Some`)   │              read 0 bytes             │
         //                                    │       │  ┌───────┘               │      │                │
-        //                                    │      ▼  │                       │      ▼               │
+        //                                    │       ▼ │                       │      ▼               │
         //                                    ┌───────────┐ `decode_eof`         ┌──────┐                │
         //                 ┌──read 0 bytes──▶│  pausing  │─returns Ok(`None`)─▶│paused│───────┐        │
         //                 │                  └───────────┘                      └──────┘       │        ▼
