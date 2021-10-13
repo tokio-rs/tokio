@@ -1,9 +1,7 @@
+# See https://github.com/actions/labeler for details.
 
 R-loom:
-- ./tokio/src/sync/*
-- ./tokio/src/sync/**/*
-- ./tokio-util/src/sync/*
-- ./tokio-util/src/sync/**/*
-- ./tokio/src/runtime/*
-- ./tokio/src/runtime/**/*
-
+  - tokio/src/sync/**
+  - tokio-util/src/sync/**
+  - tokio/src/runtime/**
+  - tokio/src/loom/**
