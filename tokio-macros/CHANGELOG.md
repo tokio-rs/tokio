@@ -1,3 +1,9 @@
+# 1.5.0 (October 13th, 2021)
+
+- macros: make tokio-macros attributes more IDE friendly ([#4162])
+
+[#4162]: https://github.com/tokio-rs/tokio/pull/4162
+
 # 1.4.1 (September 30th, 2021)
 
 Reverted: run `current_thread` inside `LocalSet` ([#4027])
