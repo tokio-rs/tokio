@@ -27,6 +27,7 @@ pin_project! {
 const INITIAL_CAPACITY: usize = 8 * 1024;
 const BACKPRESSURE_BOUNDARY: usize = INITIAL_CAPACITY;
 
+#[derive(Debug)]
 pub(crate) struct ReadFrame {
     pub(crate) eof: bool,
     pub(crate) is_readable: bool,
@@ -136,16 +137,16 @@ where
         // | pausing | true  | true        | false       |
         // | paused  | true  | false       | false       |
         // | errored | <any> | <any>       | true        |             `decode_eof` returns Err
-        //                                                       ┌───────────────────────────────────────┐
-        //                                  `decode_eof`         │                                       │
-        //                                  returns Ok(`Some`)   │              read 0 bytes             │
-        //                                    │       │  ┌───────┘               │      │                │
-        //                                    │       ▼ │                       │      ▼               │
-        //                                    ┌───────────┐ `decode_eof`         ┌──────┐                │
-        //                 ┌──read 0 bytes──▶│  pausing  │─returns Ok(`None`)─▶│paused│───────┐        │
-        //                 │                  └───────────┘                      └──────┘       │        ▼
-        // pending read┐   │                     ┌──────┐                        │     ▲       │      ┌─────────┐
-        //      │      │   │                     │      │                        │      │       │      │ errored │
+        //                                                       ┌──────────────────────────────────────────┐
+        //                                  `decode_eof`         │                                          │
+        //                                  returns Ok(`Some`)   │              read 0 bytes                │
+        //                                    │       │  ┌───────┘               │      │   after returning │
+        //                                    │       ▼ │                       │      ▼  `None`          │
+        //                                    ┌───────────┐ `decode_eof`         ┌──────┐◀─────────┐       │
+        //                 ┌──read 0 bytes──▶│  pausing  │─returns Ok(`None`)─▶│paused│───────┐   │       │
+        //                 │                  └───────────┘                      └──────┘       │   │       ▼
+        // pending read┐   │                     ┌──────┐                        │     ▲       │   │  ┌─────────┐
+        //      │      │   │                     │      │                        │      │       │   └──│ errored │
         //      │     ▼   │                     │  `decode` returns `Some`      │     pending read    └─────────┘
         //      │  ╔═══════╗                  ┌───────────┐◀─┘                  │                       ▲
         //      └──║reading║─read n>0 bytes─▶│  framing  │                      │                       │
@@ -157,6 +158,10 @@ where
             // Return `None` if we have encountered an error from the underlying decoder
             // See: https://github.com/tokio-rs/tokio/issues/3976
             if state.has_errored {
+                // preparing has_errored -> paused
+                trace!("Returning None and setting paused");
+                state.is_readable = false;
+                state.has_errored = false;
                 return Poll::Ready(None);
             }
 
@@ -176,6 +181,7 @@ where
                 if state.eof {
                     // pausing
                     let frame = pinned.codec.decode_eof(&mut state.buffer).map_err(|err| {
+                        trace!("Got an error, going to errored state");
                         state.has_errored = true;
                         err
                     })?;
@@ -190,6 +196,7 @@ where
                 trace!("attempting to decode a frame");
 
                 if let Some(frame) = pinned.codec.decode(&mut state.buffer).map_err(|op| {
+                    trace!("Got an error, going to errored state");
                     state.has_errored = true;
                     op
                 })? {
@@ -206,7 +213,13 @@ where
             // Make sure we've got room for at least one byte to read to ensure
             // that we don't get a spurious 0 that looks like EOF.
             state.buffer.reserve(1);
-            let bytect = match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer)? {
+            let bytect = match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer).map_err(
+                |err| {
+                    trace!("Got an error, going to errored state");
+                    state.has_errored = true;
+                    err
+                },
+            )? {
                 Poll::Ready(ct) => ct,
                 // implicit reading -> reading or implicit paused -> paused
                 Poll::Pending => return Poll::Pending,

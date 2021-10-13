@@ -36,6 +36,7 @@ fn return_none_after_error() {
         mock! {
             Ok(b"abcdef".to_vec()),
             Err(io::Error::new(io::ErrorKind::Other, "Resource errored out")),
+            Ok(b"more data".to_vec()),
         },
         BytesCodec::new(),
     );
@@ -48,6 +49,7 @@ fn return_none_after_error() {
         assert!(val.unwrap().is_err());
         let val = assert_ready!(pin!(io).poll_next(cx));
         assert!(val.is_none());
+        assert_read!(pin!(io).poll_next(cx), b"more data".to_vec());
     })
 }
 
