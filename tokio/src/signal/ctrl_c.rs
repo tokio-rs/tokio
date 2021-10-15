@@ -52,7 +52,7 @@ use std::io;
 ///
 /// ```rust,no_run
 /// tokio::spawn(async move {
-///     tokio::signal::ctrl_c().await;
+///     tokio::signal::ctrl_c().await.unwrap();
 ///     // Your handler here
 /// });
 /// ```
