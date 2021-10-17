@@ -1,4 +1,4 @@
-//! Unix handling of child processes
+//! Unix handling of child processes.
 //!
 //! Right now the only "fancy" thing about this is how we implement the
 //! `Future` implementation on `Child` to get the exit status. Unix offers

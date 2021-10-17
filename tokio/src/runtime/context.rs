@@ -51,7 +51,7 @@ cfg_rt! {
     }
 }
 
-/// Set this [`Handle`] as the current active [`Handle`].
+/// Sets this [`Handle`] as the current active [`Handle`].
 ///
 /// [`Handle`]: Handle
 pub(crate) fn enter(new: Handle) -> EnterGuard {

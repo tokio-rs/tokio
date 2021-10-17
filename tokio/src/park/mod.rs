@@ -45,12 +45,12 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Block the current thread.
+/// Blocks the current thread.
 pub(crate) trait Park {
     /// Unpark handle type for the `Park` implementation.
     type Unpark: Unpark;
 
-    /// Error returned by `park`
+    /// Error returned by `park`.
     type Error: Debug;
 
     /// Gets a new `Unpark` handle associated with this `Park` instance.
@@ -66,7 +66,7 @@ pub(crate) trait Park {
     ///
     /// This function **should** not panic, but ultimately, panics are left as
     /// an implementation detail. Refer to the documentation for the specific
-    /// `Park` implementation
+    /// `Park` implementation.
     fn park(&mut self) -> Result<(), Self::Error>;
 
     /// Parks the current thread for at most `duration`.
@@ -82,10 +82,10 @@ pub(crate) trait Park {
     ///
     /// This function **should** not panic, but ultimately, panics are left as
     /// an implementation detail. Refer to the documentation for the specific
-    /// `Park` implementation
+    /// `Park` implementation.
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error>;
 
-    /// Release all resources holded by the parker for proper leak-free shutdown
+    /// Releases all resources holded by the parker for proper leak-free shutdown.
     fn shutdown(&mut self);
 }
 
@@ -100,7 +100,7 @@ pub(crate) trait Unpark: Sync + Send + 'static {
     ///
     /// This function **should** not panic, but ultimately, panics are left as
     /// an implementation detail. Refer to the documentation for the specific
-    /// `Unpark` implementation
+    /// `Unpark` implementation.
     fn unpark(&self);
 }
 

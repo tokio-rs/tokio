@@ -13,7 +13,7 @@ macro_rules! feature {
     }
 }
 
-/// Enables enter::block_on
+/// Enables enter::block_on.
 macro_rules! cfg_block_on {
     ($($item:item)*) => {
         $(
@@ -28,7 +28,7 @@ macro_rules! cfg_block_on {
     }
 }
 
-/// Enables internal `AtomicWaker` impl
+/// Enables internal `AtomicWaker` impl.
 macro_rules! cfg_atomic_waker_impl {
     ($($item:item)*) => {
         $(

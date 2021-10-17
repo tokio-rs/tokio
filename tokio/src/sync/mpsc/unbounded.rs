@@ -129,7 +129,7 @@ impl<T> UnboundedReceiver<T> {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Try to receive the next value for this receiver.
+    /// Tries to receive the next value for this receiver.
     ///
     /// This method returns the [`Empty`] error if the channel is currently
     /// empty, but there are still outstanding [senders] or [permits].

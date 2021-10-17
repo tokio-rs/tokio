@@ -36,16 +36,16 @@ cfg_io_readiness! {
 #[derive(Debug, Default)]
 struct Waiters {
     #[cfg(feature = "net")]
-    /// List of all current waiters
+    /// List of all current waiters.
     list: WaitList,
 
-    /// Waker used for AsyncRead
+    /// Waker used for AsyncRead.
     reader: Option<Waker>,
 
-    /// Waker used for AsyncWrite
+    /// Waker used for AsyncWrite.
     writer: Option<Waker>,
 
-    /// True if this ScheduledIo has been killed due to IO driver shutdown
+    /// True if this ScheduledIo has been killed due to IO driver shutdown.
     is_shutdown: bool,
 }
 
@@ -54,19 +54,19 @@ cfg_io_readiness! {
     struct Waiter {
         pointers: linked_list::Pointers<Waiter>,
 
-        /// The waker for this task
+        /// The waker for this task.
         waker: Option<Waker>,
 
-        /// The interest this waiter is waiting on
+        /// The interest this waiter is waiting on.
         interest: Interest,
 
         is_ready: bool,
 
-        /// Should never be `!Unpin`
+        /// Should never be `!Unpin`.
         _p: PhantomPinned,
     }
 
-    /// Future returned by `readiness()`
+    /// Future returned by `readiness()`.
     struct Readiness<'a> {
         scheduled_io: &'a ScheduledIo,
 
@@ -276,7 +276,7 @@ impl ScheduledIo {
         }
     }
 
-    /// Poll version of checking readiness for a certain direction.
+    /// Polls for readiness events in a given direction.
     ///
     /// These are to support `AsyncRead` and `AsyncWrite` polling methods,
     /// which cannot use the `async fn` version. This uses reserved reader
@@ -363,7 +363,7 @@ unsafe impl Sync for ScheduledIo {}
 
 cfg_io_readiness! {
     impl ScheduledIo {
-        /// An async version of `poll_readiness` which uses a linked list of wakers
+        /// An async version of `poll_readiness` which uses a linked list of wakers.
         pub(crate) async fn readiness(&self, interest: Interest) -> ReadyEvent {
             self.readiness_fut(interest).await
         }

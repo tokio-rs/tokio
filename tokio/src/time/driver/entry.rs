@@ -345,7 +345,7 @@ impl TimerShared {
         }
     }
 
-    /// Gets the cached time-of-expiration value
+    /// Gets the cached time-of-expiration value.
     pub(super) fn cached_when(&self) -> u64 {
         // Cached-when is only accessed under the driver lock, so we can use relaxed
         self.driver_state.0.cached_when.load(Ordering::Relaxed)

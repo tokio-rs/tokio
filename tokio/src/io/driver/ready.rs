@@ -68,7 +68,7 @@ impl Ready {
         ready
     }
 
-    /// Returns true if `Ready` is the empty set
+    /// Returns true if `Ready` is the empty set.
     ///
     /// # Examples
     ///
@@ -82,7 +82,7 @@ impl Ready {
         self == Ready::EMPTY
     }
 
-    /// Returns `true` if the value includes `readable`
+    /// Returns `true` if the value includes `readable`.
     ///
     /// # Examples
     ///
@@ -98,7 +98,7 @@ impl Ready {
         self.contains(Ready::READABLE) || self.is_read_closed()
     }
 
-    /// Returns `true` if the value includes writable `readiness`
+    /// Returns `true` if the value includes writable `readiness`.
     ///
     /// # Examples
     ///
@@ -114,7 +114,7 @@ impl Ready {
         self.contains(Ready::WRITABLE) || self.is_write_closed()
     }
 
-    /// Returns `true` if the value includes read-closed `readiness`
+    /// Returns `true` if the value includes read-closed `readiness`.
     ///
     /// # Examples
     ///
@@ -129,7 +129,7 @@ impl Ready {
         self.contains(Ready::READ_CLOSED)
     }
 
-    /// Returns `true` if the value includes write-closed `readiness`
+    /// Returns `true` if the value includes write-closed `readiness`.
     ///
     /// # Examples
     ///
@@ -154,7 +154,7 @@ impl Ready {
         (self & other) == other
     }
 
-    /// Create a `Ready` instance using the given `usize` representation.
+    /// Creates a `Ready` instance using the given `usize` representation.
     ///
     /// The `usize` representation must have been obtained from a call to
     /// `Readiness::as_usize`.

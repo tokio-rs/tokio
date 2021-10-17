@@ -126,7 +126,7 @@ impl Idle {
         }
     }
 
-    /// Returns `true` if `worker_id` is contained in the sleep set
+    /// Returns `true` if `worker_id` is contained in the sleep set.
     pub(super) fn is_parked(&self, worker_id: usize) -> bool {
         let sleepers = self.sleepers.lock();
         sleepers.contains(&worker_id)

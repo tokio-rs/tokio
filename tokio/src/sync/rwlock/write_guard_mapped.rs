@@ -21,7 +21,7 @@ pub struct RwLockMappedWriteGuard<'a, T: ?Sized> {
 }
 
 impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
-    /// Make a new `RwLockMappedWriteGuard` for a component of the locked data.
+    /// Makes a new `RwLockMappedWriteGuard` for a component of the locked data.
     ///
     /// This operation cannot fail as the `RwLockMappedWriteGuard` passed in already
     /// locked the data.

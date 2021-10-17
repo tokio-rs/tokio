@@ -1,4 +1,4 @@
-//! TCP utility types
+//! TCP utility types.
 
 pub(crate) mod listener;
 

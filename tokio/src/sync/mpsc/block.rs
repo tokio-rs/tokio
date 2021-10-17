@@ -40,7 +40,7 @@ struct Values<T>([UnsafeCell<MaybeUninit<T>>; BLOCK_CAP]);
 
 use super::BLOCK_CAP;
 
-/// Masks an index to get the block identifier
+/// Masks an index to get the block identifier.
 const BLOCK_MASK: usize = !(BLOCK_CAP - 1);
 
 /// Masks an index to get the value offset in a block.
@@ -89,7 +89,7 @@ impl<T> Block<T> {
         }
     }
 
-    /// Returns `true` if the block matches the given index
+    /// Returns `true` if the block matches the given index.
     pub(crate) fn is_at_index(&self, index: usize) -> bool {
         debug_assert!(offset(index) == 0);
         self.start_index == index

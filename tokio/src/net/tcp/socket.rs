@@ -87,7 +87,7 @@ cfg_net! {
 }
 
 impl TcpSocket {
-    /// Create a new socket configured for IPv4.
+    /// Creates a new socket configured for IPv4.
     ///
     /// Calls `socket(2)` with `AF_INET` and `SOCK_STREAM`.
     ///
@@ -121,7 +121,7 @@ impl TcpSocket {
         Ok(TcpSocket { inner })
     }
 
-    /// Create a new socket configured for IPv6.
+    /// Creates a new socket configured for IPv6.
     ///
     /// Calls `socket(2)` with `AF_INET6` and `SOCK_STREAM`.
     ///
@@ -155,7 +155,7 @@ impl TcpSocket {
         Ok(TcpSocket { inner })
     }
 
-    /// Allow the socket to bind to an in-use address.
+    /// Allows the socket to bind to an in-use address.
     ///
     /// Behavior is platform specific. Refer to the target platform's
     /// documentation for more details.
@@ -185,7 +185,7 @@ impl TcpSocket {
         self.inner.set_reuseaddr(reuseaddr)
     }
 
-    /// Retrieves the value set for `SO_REUSEADDR` on this socket
+    /// Retrieves the value set for `SO_REUSEADDR` on this socket.
     ///
     /// # Examples
     ///
@@ -211,7 +211,7 @@ impl TcpSocket {
         self.inner.get_reuseaddr()
     }
 
-    /// Allow the socket to bind to an in-use port. Only available for unix systems
+    /// Allows the socket to bind to an in-use port. Only available for unix systems
     /// (excluding Solaris & Illumos).
     ///
     /// Behavior is platform specific. Refer to the target platform's
@@ -245,7 +245,7 @@ impl TcpSocket {
         self.inner.set_reuseport(reuseport)
     }
 
-    /// Allow the socket to bind to an in-use port. Only available for unix systems
+    /// Allows the socket to bind to an in-use port. Only available for unix systems
     /// (excluding Solaris & Illumos).
     ///
     /// Behavior is platform specific. Refer to the target platform's
@@ -348,7 +348,7 @@ impl TcpSocket {
         self.inner.get_recv_buffer_size()
     }
 
-    /// Get the local address of this socket.
+    /// Gets the local address of this socket.
     ///
     /// Will fail on windows if called before `bind`.
     ///
@@ -374,7 +374,7 @@ impl TcpSocket {
         self.inner.get_localaddr()
     }
 
-    /// Bind the socket to the given address.
+    /// Binds the socket to the given address.
     ///
     /// This calls the `bind(2)` operating-system function. Behavior is
     /// platform specific. Refer to the target platform's documentation for more
@@ -406,7 +406,7 @@ impl TcpSocket {
         self.inner.bind(addr)
     }
 
-    /// Establish a TCP connection with a peer at the specified socket address.
+    /// Establishes a TCP connection with a peer at the specified socket address.
     ///
     /// The `TcpSocket` is consumed. Once the connection is established, a
     /// connected [`TcpStream`] is returned. If the connection fails, the
@@ -443,7 +443,7 @@ impl TcpSocket {
         TcpStream::connect_mio(mio).await
     }
 
-    /// Convert the socket into a `TcpListener`.
+    /// Converts the socket into a `TcpListener`.
     ///
     /// `backlog` defines the maximum number of pending connections are queued
     /// by the operating system at any given time. Connection are removed from

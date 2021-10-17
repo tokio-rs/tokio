@@ -14,7 +14,7 @@ use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 
-/// Channel sender
+/// Channel sender.
 pub(crate) struct Tx<T, S> {
     inner: Arc<Chan<T, S>>,
 }
@@ -25,7 +25,7 @@ impl<T, S: fmt::Debug> fmt::Debug for Tx<T, S> {
     }
 }
 
-/// Channel receiver
+/// Channel receiver.
 pub(crate) struct Rx<T, S: Semaphore> {
     inner: Arc<Chan<T, S>>,
 }
@@ -47,7 +47,7 @@ pub(crate) trait Semaphore {
 }
 
 struct Chan<T, S> {
-    /// Notifies all tasks listening for the receiver being dropped
+    /// Notifies all tasks listening for the receiver being dropped.
     notify_rx_closed: Notify,
 
     /// Handle to the push half of the lock-free list.

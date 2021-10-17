@@ -10,7 +10,7 @@ use std::panic;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
 
-/// Typed raw task handle
+/// Typed raw task handle.
 pub(super) struct Harness<T: Future, S: 'static> {
     cell: NonNull<Cell<T, S>>,
 }
@@ -74,7 +74,7 @@ where
         }
     }
 
-    /// Poll the task and cancel it if necessary. This takes ownership of a
+    /// Polls the task and cancel it if necessary. This takes ownership of a
     /// ref-count.
     ///
     /// If the return value is Notified, the caller is given ownership of two
@@ -124,7 +124,7 @@ where
         }
     }
 
-    /// Forcibly shutdown the task
+    /// Forcibly shuts down the task.
     ///
     /// Attempt to transition to `Running` in order to forcibly shutdown the
     /// task. If the task is currently running or in a state of completion, then
@@ -192,7 +192,7 @@ where
         }
     }
 
-    /// Remotely abort the task.
+    /// Remotely aborts the task.
     ///
     /// The caller should hold a ref-count, but we do not consume it.
     ///
@@ -280,7 +280,7 @@ where
 
     // ====== internal ======
 
-    /// Complete the task. This method assumes that the state is RUNNING.
+    /// Completes the task. This method assumes that the state is RUNNING.
     fn complete(self) {
         // The future has completed and its output has been written to the task
         // stage. We transition from running to complete.
@@ -310,7 +310,7 @@ where
         }
     }
 
-    /// Release the task from the scheduler. Returns the number of ref-counts
+    /// Releases the task from the scheduler. Returns the number of ref-counts
     /// that should be decremented.
     fn release(&self) -> usize {
         // We don't actually increment the ref-count here, but the new task is
@@ -325,7 +325,7 @@ where
         }
     }
 
-    /// Create a new task that holds its own ref-count.
+    /// Creates a new task that holds its own ref-count.
     ///
     /// # Safety
     ///
@@ -425,7 +425,7 @@ enum PollFuture {
     Dealloc,
 }
 
-/// Cancel the task and store the appropriate error in the stage field.
+/// Cancels the task and store the appropriate error in the stage field.
 fn cancel_task<T: Future>(stage: &CoreStage<T>) {
     // Drop the future from a panic guard.
     let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
@@ -442,7 +442,7 @@ fn cancel_task<T: Future>(stage: &CoreStage<T>) {
     }
 }
 
-/// Poll the future. If the future completes, the output is written to the
+/// Polls the future. If the future completes, the output is written to the
 /// stage field.
 fn poll_future<T: Future>(core: &CoreStage<T>, cx: Context<'_>) -> Poll<()> {
     // Poll the future.

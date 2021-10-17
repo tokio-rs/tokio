@@ -20,7 +20,7 @@ use std::task::{Context, Poll, Waker};
 
 type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
 
-/// Notify a single task to wake up.
+/// Notifies a single task to wake up.
 ///
 /// `Notify` provides a basic mechanism to notify a single task of an event.
 /// `Notify` itself does not carry any data. Instead, it is to be used to signal
@@ -128,10 +128,10 @@ enum NotificationType {
 
 #[derive(Debug)]
 struct Waiter {
-    /// Intrusive linked-list pointers
+    /// Intrusive linked-list pointers.
     pointers: linked_list::Pointers<Waiter>,
 
-    /// Waiting task's waker
+    /// Waiting task's waker.
     waker: Option<Waker>,
 
     /// `true` if the notification has been assigned to this waiter.
@@ -168,13 +168,13 @@ const NOTIFY_WAITERS_SHIFT: usize = 2;
 const STATE_MASK: usize = (1 << NOTIFY_WAITERS_SHIFT) - 1;
 const NOTIFY_WAITERS_CALLS_MASK: usize = !STATE_MASK;
 
-/// Initial "idle" state
+/// Initial "idle" state.
 const EMPTY: usize = 0;
 
 /// One or more threads are currently waiting to be notified.
 const WAITING: usize = 1;
 
-/// Pending notification
+/// Pending notification.
 const NOTIFIED: usize = 2;
 
 fn set_state(data: usize, state: usize) -> usize {
@@ -289,7 +289,7 @@ impl Notify {
         }
     }
 
-    /// Notifies a waiting task
+    /// Notifies a waiting task.
     ///
     /// If a task is currently waiting, that task is notified. Otherwise, a
     /// permit is stored in this `Notify` value and the **next** call to
@@ -359,7 +359,7 @@ impl Notify {
         }
     }
 
-    /// Notifies all waiting tasks
+    /// Notifies all waiting tasks.
     ///
     /// If a task is currently waiting, that task is notified. Unlike with
     /// `notify_one()`, no permit is stored to be used by the next call to

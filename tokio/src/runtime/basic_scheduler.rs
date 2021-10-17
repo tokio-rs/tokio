@@ -213,7 +213,7 @@ impl<P: Park> BasicScheduler<P> {
 }
 
 impl<P: Park> Inner<P> {
-    /// Block on the future provided and drive the runtime's driver.
+    /// Blocks on the provided future and drives the runtime's driver.
     fn block_on<F: Future>(&mut self, future: F) -> F::Output {
         enter(self, |scheduler, context| {
             let _enter = crate::runtime::enter(false);
@@ -299,8 +299,8 @@ impl<P: Park> Inner<P> {
     }
 }
 
-/// Enter the scheduler context. This sets the queue and other necessary
-/// scheduler state in the thread-local
+/// Enters the scheduler context. This sets the queue and other necessary
+/// scheduler state in the thread-local.
 fn enter<F, R, P>(scheduler: &mut Inner<P>, f: F) -> R
 where
     F: FnOnce(&mut Inner<P>, &Context) -> R,
