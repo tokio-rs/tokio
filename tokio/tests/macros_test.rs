@@ -30,3 +30,9 @@ fn trait_method() {
     }
     ().f()
 }
+
+// https://github.com/tokio-rs/tokio/issues/4175
+#[tokio::main]
+pub async fn issue_4175() -> ! {
+    panic!();
+}
