@@ -33,10 +33,16 @@ fn trait_method() {
 
 // https://github.com/tokio-rs/tokio/issues/4175
 #[tokio::main]
-pub async fn issue_4175_1() -> ! {
+pub async fn issue_4175_main_1() -> ! {
     panic!();
 }
 #[tokio::main]
-pub async fn issue_4175_2() -> std::io::Result<()> {
+pub async fn issue_4175_main_2() -> std::io::Result<()> {
+    panic!();
+}
+#[allow(unreachable_code)]
+#[tokio::test]
+pub async fn issue_4175_test() -> std::io::Result<()> {
+    return Ok(());
     panic!();
 }
