@@ -116,7 +116,7 @@ impl WorkerStatsBatcher {
 
         let mut min = u64::MAX;
         let mut max = 0;
-        let last = self.busy_duration[self.busy_duration_i] % 16;
+        let last = self.busy_duration[self.busy_duration_i % 16];
         for &val in &self.busy_duration {
             if val <= min {
                 min = val;
