@@ -136,24 +136,25 @@ where
         // | framing | false | true        | false       |
         // | pausing | true  | true        | false       |
         // | paused  | true  | false       | false       |
-        // | errored | <any> | <any>       | true        |             `decode_eof` returns Err
-        //                                                       ┌──────────────────────────────────────────┐
-        //                                  `decode_eof`         │                                          │
-        //                                  returns Ok(`Some`)   │              read 0 bytes                │
-        //                                    │       │  ┌───────┘               │      │   after returning │
-        //                                    │       ▼  │                       │      ▼  `None`          │
-        //                                    ┌───────────┐ `decode_eof`         ┌──────┐◀─────────┐       │
-        //                 ┌──read 0 bytes──▶│  pausing  │─returns Ok(`None`)─▶│paused│───────┐   │       │
-        //                 │                  └───────────┘                      └──────┘       │   │       ▼
-        // pending read┐   │                     ┌──────┐                        │      ▲       │   │  ┌─────────┐
-        //      │      │   │                     │      │                        │      │       │   └──│ errored │
-        //      │      ▼   │                     │  `decode` returns `Some`      │     pending read    └─────────┘
-        //      │  ╔═══════╗                  ┌───────────┐◀─┘                  │                       ▲
-        //      └──║reading║─read n>0 bytes─▶│  framing  │                      │                       │
-        //         ╚═══════╝                  └───────────┘◀──────read n>0 bytes┘                       │
-        //             ▲                          │     │                                                │
-        //             │                          │     │           `decode` returns Err                 │
-        //             └─`decode` returns `None`──┘     └────────────────────────────────────────────────┘
+        // | errored | <any> | <any>       | true        |
+        //                                                       `decode_eof` returns Err
+        //                                          ┌────────────────────────────────────────────────────────┐
+        //                   `decode_eof` returns   │                                                        │
+        //                             `Ok(Some)`   │                                                        │
+        //                                 ┌─────┐  │     `decode_eof` returns               After returning │
+        //                Read 0 bytes     ├─────▼──┴┐    `Ok(None)`          ┌────────┐ ◄───┐ `None`    ┌───▼─────┐
+        //               ┌────────────────►│ Pausing ├───────────────────────►│ Paused ├─┐   └───────────┤ Errored │
+        //               │                 └─────────┘                        └─┬──▲───┘ │               └───▲───▲─┘
+        // Pending read  │                                                      │  │     │                   │   │
+        //     ┌──────┐  │            `decode` returns `Some`                   │  └─────┘                   │   │
+        //     │      │  │                   ┌──────┐                           │  Pending                   │   │
+        //     │ ┌────▼──┴─┐ Read n>0 bytes ┌┴──────▼─┐     read n>0 bytes      │  read                      │   │
+        //     └─┤ Reading ├───────────────►│ Framing │◄────────────────────────┘                            │   │
+        //       └──┬─▲────┘                └─────┬──┬┘                                                      │   │
+        //          │ │                           │  │                 `decode` returns Err                  │   │
+        //          │ └───decode` returns `None`──┘  └───────────────────────────────────────────────────────┘   │
+        //          │                             read returns Err                                               │
+        //          └────────────────────────────────────────────────────────────────────────────────────────────┘
         loop {
             // Return `None` if we have encountered an error from the underlying decoder
             // See: https://github.com/tokio-rs/tokio/issues/3976
