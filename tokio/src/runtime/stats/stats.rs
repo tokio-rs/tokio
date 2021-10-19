@@ -1,8 +1,8 @@
 //! This file contains the types necessary to collect various types of stats.
 use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
-use std::time::{Duration, Instant};
 use std::convert::TryFrom;
+use std::time::{Duration, Instant};
 
 /// This type contains methods to retrieve stats from a Tokio runtime.
 #[derive(Debug)]
