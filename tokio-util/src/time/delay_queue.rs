@@ -176,7 +176,7 @@ pub struct Expired<T> {
 ///
 /// [`DelayQueue`]: struct@DelayQueue
 /// [`DelayQueue::insert`]: method@DelayQueue::insert
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Key {
     index: usize,
 }
@@ -920,5 +920,10 @@ impl<T> Expired<T> {
     /// Returns the deadline that the expiration was set to.
     pub fn deadline(&self) -> Instant {
         self.deadline
+    }
+
+    /// Returns the key that the expiration is indexed by.
+    pub fn key(&self) -> Key {
+        self.key
     }
 }

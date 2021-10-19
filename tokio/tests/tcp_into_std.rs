@@ -10,10 +10,11 @@ use tokio::net::TcpStream;
 #[tokio::test]
 async fn tcp_into_std() -> Result<()> {
     let mut data = [0u8; 12];
-    let listener = TcpListener::bind("127.0.0.1:34254").await?;
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let addr = listener.local_addr().unwrap().to_string();
 
     let handle = tokio::spawn(async {
-        let stream: TcpStream = TcpStream::connect("127.0.0.1:34254").await.unwrap();
+        let stream: TcpStream = TcpStream::connect(addr).await.unwrap();
         stream
     });
 

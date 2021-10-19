@@ -1,4 +1,4 @@
-//! Channel error types
+//! Channel error types.
 
 use std::error::Error;
 use std::fmt;
@@ -51,18 +51,46 @@ impl<T> From<SendError<T>> for TrySendError<T> {
     }
 }
 
+// ===== TryRecvError =====
+
+/// Error returned by `try_recv`.
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum TryRecvError {
+    /// This **channel** is currently empty, but the **Sender**(s) have not yet
+    /// disconnected, so data may yet become available.
+    Empty,
+    /// The **channel**'s sending half has become disconnected, and there will
+    /// never be any more data received on it.
+    Disconnected,
+}
+
+impl fmt::Display for TryRecvError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            TryRecvError::Empty => "receiving on an empty channel".fmt(fmt),
+            TryRecvError::Disconnected => "receiving on a closed channel".fmt(fmt),
+        }
+    }
+}
+
+impl Error for TryRecvError {}
+
 // ===== RecvError =====
 
 /// Error returned by `Receiver`.
 #[derive(Debug)]
+#[doc(hidden)]
+#[deprecated(note = "This type is unused because recv returns an Option.")]
 pub struct RecvError(());
 
+#[allow(deprecated)]
 impl fmt::Display for RecvError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "channel closed")
     }
 }
 
+#[allow(deprecated)]
 impl Error for RecvError {}
 
 cfg_time! {

@@ -1,9 +1,10 @@
-use crate::runtime::blocking::task::BlockingTask;
+use crate::runtime::blocking::{BlockingTask, NoopSchedule};
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::CONTEXT_MISSING_ERROR;
 
 use std::future::Future;
+use std::marker::PhantomData;
 use std::{error, fmt};
 
 /// Handle to the runtime.
@@ -41,12 +42,12 @@ pub struct Handle {
 #[derive(Debug)]
 #[must_use = "Creating and dropping a guard does nothing"]
 pub struct EnterGuard<'a> {
-    handle: &'a Handle,
-    guard: context::EnterGuard,
+    _guard: context::EnterGuard,
+    _handle_lifetime: PhantomData<&'a Handle>,
 }
 
 impl Handle {
-    /// Enter the runtime context. This allows you to construct types that must
+    /// Enters the runtime context. This allows you to construct types that must
     /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
     /// It will also allow you to call methods such as [`tokio::spawn`].
     ///
@@ -55,12 +56,12 @@ impl Handle {
     /// [`tokio::spawn`]: fn@crate::spawn
     pub fn enter(&self) -> EnterGuard<'_> {
         EnterGuard {
-            handle: self,
-            guard: context::enter(self.clone()),
+            _guard: context::enter(self.clone()),
+            _handle_lifetime: PhantomData,
         }
     }
 
-    /// Returns a `Handle` view over the currently running `Runtime`
+    /// Returns a `Handle` view over the currently running `Runtime`.
     ///
     /// # Panic
     ///
@@ -111,7 +112,15 @@ impl Handle {
         context::current().ok_or(TryCurrentError(()))
     }
 
-    /// Spawn a future onto the Tokio runtime.
+    cfg_stats! {
+        /// Returns a view that lets you get information about how the runtime
+        /// is performing.
+        pub fn stats(&self) -> &crate::runtime::stats::RuntimeStats {
+            self.spawner.stats()
+        }
+    }
+
+    /// Spawns a future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
     /// thread pool. The thread pool is then responsible for polling the future
@@ -145,11 +154,11 @@ impl Handle {
         F::Output: Send + 'static,
     {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task");
+        let future = crate::util::trace::task(future, "task", None);
         self.spawner.spawn(future)
     }
 
-    /// Run the provided function on an executor dedicated to blocking
+    /// Runs the provided function on an executor dedicated to blocking.
     /// operations.
     ///
     /// # Examples
@@ -174,36 +183,51 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        self.spawn_blocking_inner(func, None)
+    }
+
+    #[cfg_attr(tokio_track_caller, track_caller)]
+    pub(crate) fn spawn_blocking_inner<F, R>(&self, func: F, name: Option<&str>) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let fut = BlockingTask::new(func);
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let func = {
+        let fut = {
+            use tracing::Instrument;
             #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
             #[cfg(tokio_track_caller)]
             let span = tracing::trace_span!(
-                target: "tokio::task",
-                "task",
+                target: "tokio::task::blocking",
+                "runtime.spawn",
                 kind = %"blocking",
-                function = %std::any::type_name::<F>(),
+                task.name = %name.unwrap_or_default(),
+                "fn" = %std::any::type_name::<F>(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
             );
             #[cfg(not(tokio_track_caller))]
             let span = tracing::trace_span!(
-                target: "tokio::task",
-                "task",
+                target: "tokio::task::blocking",
+                "runtime.spawn",
                 kind = %"blocking",
-                function = %std::any::type_name::<F>(),
+                task.name = %name.unwrap_or_default(),
+                "fn" = %std::any::type_name::<F>(),
             );
-            move || {
-                let _g = span.enter();
-                func()
-            }
+            fut.instrument(span)
         };
-        let (task, handle) = task::joinable(BlockingTask::new(func));
-        let _ = self.blocking_spawner.spawn(task, &self);
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let _ = name;
+
+        let (task, handle) = task::unowned(fut, NoopSchedule);
+        let _ = self.blocking_spawner.spawn(task, self);
         handle
     }
 
-    /// Run a future to completion on this `Handle`'s associated `Runtime`.
+    /// Runs a future to completion on this `Handle`'s associated `Runtime`.
     ///
     /// This runs the given future on the current thread, blocking until it is
     /// complete, and yielding its resolved result. Any tasks or timers which
@@ -273,7 +297,11 @@ impl Handle {
     /// [`tokio::fs`]: crate::fs
     /// [`tokio::net`]: crate::net
     /// [`tokio::time`]: crate::time
+    #[cfg_attr(tokio_track_caller, track_caller)]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let future = crate::util::trace::task(future, "block_on", None);
+
         // Enter the **runtime** context. This configures spawning, the current I/O driver, ...
         let _rt_enter = self.enter();
 

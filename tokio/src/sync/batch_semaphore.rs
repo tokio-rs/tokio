@@ -1,5 +1,5 @@
 #![cfg_attr(not(feature = "sync"), allow(unreachable_pub, dead_code))]
-//! # Implementation Details
+//! # Implementation Details.
 //!
 //! The semaphore is implemented using an intrusive linked list of waiters. An
 //! atomic counter tracks the number of available permits. If the semaphore does
@@ -19,6 +19,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Mutex, MutexGuard};
 use crate::util::linked_list::{self, LinkedList};
+use crate::util::WakeList;
 
 use std::future::Future;
 use std::marker::PhantomPinned;
@@ -137,7 +138,7 @@ impl Semaphore {
         }
     }
 
-    /// Creates a new semaphore with the initial number of permits
+    /// Creates a new semaphore with the initial number of permits.
     ///
     /// Maximum number of permits on 32-bit platforms is `1<<29`.
     ///
@@ -158,7 +159,7 @@ impl Semaphore {
         }
     }
 
-    /// Returns the current number of available permits
+    /// Returns the current number of available permits.
     pub(crate) fn available_permits(&self) -> usize {
         self.permits.load(Acquire) >> Self::PERMIT_SHIFT
     }
@@ -196,7 +197,7 @@ impl Semaphore {
         }
     }
 
-    /// Returns true if the semaphore is closed
+    /// Returns true if the semaphore is closed.
     pub(crate) fn is_closed(&self) -> bool {
         self.permits.load(Acquire) & Self::CLOSED == Self::CLOSED
     }
@@ -239,12 +240,12 @@ impl Semaphore {
     /// If `rem` exceeds the number of permits needed by the wait list, the
     /// remainder are assigned back to the semaphore.
     fn add_permits_locked(&self, mut rem: usize, waiters: MutexGuard<'_, Waitlist>) {
-        let mut wakers: [Option<Waker>; 8] = Default::default();
+        let mut wakers = WakeList::new();
         let mut lock = Some(waiters);
         let mut is_empty = false;
         while rem > 0 {
             let mut waiters = lock.take().unwrap_or_else(|| self.waiters.lock());
-            'inner: for slot in &mut wakers[..] {
+            'inner: while wakers.can_push() {
                 // Was the waiter assigned enough permits to wake it?
                 match waiters.queue.last() {
                     Some(waiter) => {
@@ -260,7 +261,11 @@ impl Semaphore {
                     }
                 };
                 let mut waiter = waiters.queue.pop_back().unwrap();
-                *slot = unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) };
+                if let Some(waker) =
+                    unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) }
+                {
+                    wakers.push(waker);
+                }
             }
 
             if rem > 0 && is_empty {
@@ -283,10 +288,7 @@ impl Semaphore {
 
             drop(waiters); // release the lock
 
-            wakers
-                .iter_mut()
-                .filter_map(Option::take)
-                .for_each(Waker::wake);
+            wakers.wake_all();
         }
 
         assert_eq!(rem, 0);
@@ -478,7 +480,7 @@ impl<'a> Acquire<'a> {
             let this = self.get_unchecked_mut();
             (
                 Pin::new_unchecked(&mut this.node),
-                &this.semaphore,
+                this.semaphore,
                 this.num_permits,
                 &mut this.queued,
             )

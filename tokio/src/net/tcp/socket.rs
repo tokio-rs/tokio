@@ -87,7 +87,7 @@ cfg_net! {
 }
 
 impl TcpSocket {
-    /// Create a new socket configured for IPv4.
+    /// Creates a new socket configured for IPv4.
     ///
     /// Calls `socket(2)` with `AF_INET` and `SOCK_STREAM`.
     ///
@@ -121,7 +121,7 @@ impl TcpSocket {
         Ok(TcpSocket { inner })
     }
 
-    /// Create a new socket configured for IPv6.
+    /// Creates a new socket configured for IPv6.
     ///
     /// Calls `socket(2)` with `AF_INET6` and `SOCK_STREAM`.
     ///
@@ -155,7 +155,7 @@ impl TcpSocket {
         Ok(TcpSocket { inner })
     }
 
-    /// Allow the socket to bind to an in-use address.
+    /// Allows the socket to bind to an in-use address.
     ///
     /// Behavior is platform specific. Refer to the target platform's
     /// documentation for more details.
@@ -185,7 +185,7 @@ impl TcpSocket {
         self.inner.set_reuseaddr(reuseaddr)
     }
 
-    /// Retrieves the value set for `SO_REUSEADDR` on this socket
+    /// Retrieves the value set for `SO_REUSEADDR` on this socket.
     ///
     /// # Examples
     ///
@@ -211,7 +211,7 @@ impl TcpSocket {
         self.inner.get_reuseaddr()
     }
 
-    /// Allow the socket to bind to an in-use port. Only available for unix systems
+    /// Allows the socket to bind to an in-use port. Only available for unix systems
     /// (excluding Solaris & Illumos).
     ///
     /// Behavior is platform specific. Refer to the target platform's
@@ -245,7 +245,7 @@ impl TcpSocket {
         self.inner.set_reuseport(reuseport)
     }
 
-    /// Allow the socket to bind to an in-use port. Only available for unix systems
+    /// Allows the socket to bind to an in-use port. Only available for unix systems
     /// (excluding Solaris & Illumos).
     ///
     /// Behavior is platform specific. Refer to the target platform's
@@ -348,7 +348,7 @@ impl TcpSocket {
         self.inner.get_recv_buffer_size()
     }
 
-    /// Get the local address of this socket.
+    /// Gets the local address of this socket.
     ///
     /// Will fail on windows if called before `bind`.
     ///
@@ -374,7 +374,7 @@ impl TcpSocket {
         self.inner.get_localaddr()
     }
 
-    /// Bind the socket to the given address.
+    /// Binds the socket to the given address.
     ///
     /// This calls the `bind(2)` operating-system function. Behavior is
     /// platform specific. Refer to the target platform's documentation for more
@@ -406,7 +406,7 @@ impl TcpSocket {
         self.inner.bind(addr)
     }
 
-    /// Establish a TCP connection with a peer at the specified socket address.
+    /// Establishes a TCP connection with a peer at the specified socket address.
     ///
     /// The `TcpSocket` is consumed. Once the connection is established, a
     /// connected [`TcpStream`] is returned. If the connection fails, the
@@ -443,7 +443,7 @@ impl TcpSocket {
         TcpStream::connect_mio(mio).await
     }
 
-    /// Convert the socket into a `TcpListener`.
+    /// Converts the socket into a `TcpListener`.
     ///
     /// `backlog` defines the maximum number of pending connections are queued
     /// by the operating system at any given time. Connection are removed from
@@ -481,6 +481,48 @@ impl TcpSocket {
     pub fn listen(self, backlog: u32) -> io::Result<TcpListener> {
         let mio = self.inner.listen(backlog)?;
         TcpListener::new(mio)
+    }
+
+    /// Converts a [`std::net::TcpStream`] into a `TcpSocket`. The provided
+    /// socket must not have been connected prior to calling this function. This
+    /// function is typically used together with crates such as [`socket2`] to
+    /// configure socket options that are not available on `TcpSocket`.
+    ///
+    /// [`std::net::TcpStream`]: struct@std::net::TcpStream
+    /// [`socket2`]: https://docs.rs/socket2/
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::net::TcpSocket;
+    /// use socket2::{Domain, Socket, Type};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> std::io::Result<()> {
+    ///     
+    ///     let socket2_socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
+    ///
+    ///     let socket = TcpSocket::from_std_stream(socket2_socket.into());
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn from_std_stream(std_stream: std::net::TcpStream) -> TcpSocket {
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
+
+            let raw_fd = std_stream.into_raw_fd();
+            unsafe { TcpSocket::from_raw_fd(raw_fd) }
+        }
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+
+            let raw_socket = std_stream.into_raw_socket();
+            unsafe { TcpSocket::from_raw_socket(raw_socket) }
+        }
     }
 }
 

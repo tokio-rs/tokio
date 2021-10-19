@@ -50,10 +50,10 @@ fn is_send_and_sync() {
 fn split_stream_id() {
     let (r1, w1) = split(RW);
     let (r2, w2) = split(RW);
-    assert_eq!(r1.is_pair_of(&w1), true);
-    assert_eq!(r1.is_pair_of(&w2), false);
-    assert_eq!(r2.is_pair_of(&w2), true);
-    assert_eq!(r2.is_pair_of(&w1), false);
+    assert!(r1.is_pair_of(&w1));
+    assert!(!r1.is_pair_of(&w2));
+    assert!(r2.is_pair_of(&w2));
+    assert!(!r2.is_pair_of(&w1));
 }
 
 #[test]

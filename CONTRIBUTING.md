@@ -150,7 +150,7 @@ command below instead:
 
 ```
 # Mac or Linux
-rustfmt --check --edition 2018 $(find . -name '*.rs' -print)
+rustfmt --check --edition 2018 $(git ls-files '*.rs')
 
 # Powershell
 Get-ChildItem . -Filter "*.rs" -Recurse | foreach { rustfmt --check --edition 2018 $_.FullName }

@@ -95,7 +95,7 @@ where
         let n = ready!(read_until_internal(
             me.reader, cx, *me.delim, me.buf, me.read,
         ))?;
-        // read_until_internal resets me.read to zero once it finds the delimeter
+        // read_until_internal resets me.read to zero once it finds the delimiter
         debug_assert_eq!(*me.read, 0);
 
         if n == 0 && me.buf.is_empty() {

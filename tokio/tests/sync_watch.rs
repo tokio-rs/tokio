@@ -169,3 +169,35 @@ fn poll_close() {
 
     assert!(tx.send("two").is_err());
 }
+
+#[test]
+fn borrow_and_update() {
+    let (tx, mut rx) = watch::channel("one");
+
+    tx.send("two").unwrap();
+    assert_ready!(spawn(rx.changed()).poll()).unwrap();
+    assert_pending!(spawn(rx.changed()).poll());
+
+    tx.send("three").unwrap();
+    assert_eq!(*rx.borrow_and_update(), "three");
+    assert_pending!(spawn(rx.changed()).poll());
+
+    drop(tx);
+    assert_eq!(*rx.borrow_and_update(), "three");
+    assert_ready!(spawn(rx.changed()).poll()).unwrap_err();
+}
+
+#[test]
+fn reopened_after_subscribe() {
+    let (tx, rx) = watch::channel("one");
+    assert!(!tx.is_closed());
+
+    drop(rx);
+    assert!(tx.is_closed());
+
+    let rx = tx.subscribe();
+    assert!(!tx.is_closed());
+
+    drop(rx);
+    assert!(tx.is_closed());
+}

@@ -86,7 +86,7 @@
 //! ```
 //!
 //! Again, like `std::thread`'s [`JoinHandle` type][thread_join], if the spawned
-//! task panics, awaiting its `JoinHandle` will return a [`JoinError`]`. For
+//! task panics, awaiting its `JoinHandle` will return a [`JoinError`]. For
 //! example:
 //!
 //! ```
@@ -299,4 +299,14 @@ cfg_rt! {
 
     mod unconstrained;
     pub use unconstrained::{unconstrained, Unconstrained};
+
+    cfg_trace! {
+        mod builder;
+        pub use builder::Builder;
+    }
+
+    /// Task-related futures.
+    pub mod futures {
+        pub use super::task_local::TaskLocalFuture;
+    }
 }

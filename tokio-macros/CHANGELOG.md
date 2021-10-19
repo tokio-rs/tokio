@@ -1,3 +1,36 @@
+# 1.5.0 (October 13th, 2021)
+
+- macros: make tokio-macros attributes more IDE friendly ([#4162])
+
+[#4162]: https://github.com/tokio-rs/tokio/pull/4162
+
+# 1.4.1 (September 30th, 2021)
+
+Reverted: run `current_thread` inside `LocalSet` ([#4027])
+
+# 1.4.0 (September 29th, 2021)
+
+(yanked)
+
+### Changed
+
+- macros: run `current_thread` inside `LocalSet` ([#4027])
+- macros: explicitly relaxed clippy lint for `.expect()` in runtime entry macro ([#4030])
+
+### Fixed
+
+- macros: fix invalid error messages in functions wrapped with `#[main]` or `#[test]` ([#4067])
+
+[#4027]: https://github.com/tokio-rs/tokio/pull/4027
+[#4030]: https://github.com/tokio-rs/tokio/pull/4030
+[#4067]: https://github.com/tokio-rs/tokio/pull/4067
+
+# 1.3.0 (July 7, 2021)
+
+- macros: don't trigger `clippy::unwrap_used` ([#3926])
+
+[#3926]: https://github.com/tokio-rs/tokio/pull/3926
+
 # 1.2.0 (May 14, 2021)
 
 - macros: forward input arguments in `#[tokio::test]` ([#3691])

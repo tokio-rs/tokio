@@ -1,7 +1,8 @@
 use std::any::Any;
 use std::fmt;
 use std::io;
-use std::sync::Mutex;
+
+use crate::util::SyncWrapper;
 
 cfg_rt! {
     /// Task failed to execute to completion.
@@ -12,7 +13,7 @@ cfg_rt! {
 
 enum Repr {
     Cancelled,
-    Panic(Mutex<Box<dyn Any + Send + 'static>>),
+    Panic(SyncWrapper<Box<dyn Any + Send + 'static>>),
 }
 
 impl JoinError {
@@ -24,16 +25,16 @@ impl JoinError {
 
     pub(crate) fn panic(err: Box<dyn Any + Send + 'static>) -> JoinError {
         JoinError {
-            repr: Repr::Panic(Mutex::new(err)),
+            repr: Repr::Panic(SyncWrapper::new(err)),
         }
     }
 
-    /// Returns true if the error was caused by the task being cancelled
+    /// Returns true if the error was caused by the task being cancelled.
     pub fn is_cancelled(&self) -> bool {
         matches!(&self.repr, Repr::Cancelled)
     }
 
-    /// Returns true if the error was caused by the task panicking
+    /// Returns true if the error was caused by the task panicking.
     ///
     /// # Examples
     ///
@@ -106,7 +107,7 @@ impl JoinError {
     /// ```
     pub fn try_into_panic(self) -> Result<Box<dyn Any + Send + 'static>, JoinError> {
         match self.repr {
-            Repr::Panic(p) => Ok(p.into_inner().expect("Extracting panic from mutex")),
+            Repr::Panic(p) => Ok(p.into_inner()),
             _ => Err(self),
         }
     }

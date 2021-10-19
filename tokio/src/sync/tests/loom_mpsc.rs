@@ -132,3 +132,59 @@ fn dropping_unbounded_tx() {
         assert!(v.is_none());
     });
 }
+
+#[test]
+fn try_recv() {
+    loom::model(|| {
+        use crate::sync::{mpsc, Semaphore};
+        use loom::sync::{Arc, Mutex};
+
+        const PERMITS: usize = 2;
+        const TASKS: usize = 2;
+        const CYCLES: usize = 1;
+
+        struct Context {
+            sem: Arc<Semaphore>,
+            tx: mpsc::Sender<()>,
+            rx: Mutex<mpsc::Receiver<()>>,
+        }
+
+        fn run(ctx: &Context) {
+            block_on(async {
+                let permit = ctx.sem.acquire().await;
+                assert_ok!(ctx.rx.lock().unwrap().try_recv());
+                crate::task::yield_now().await;
+                assert_ok!(ctx.tx.clone().try_send(()));
+                drop(permit);
+            });
+        }
+
+        let (tx, rx) = mpsc::channel(PERMITS);
+        let sem = Arc::new(Semaphore::new(PERMITS));
+        let ctx = Arc::new(Context {
+            sem,
+            tx,
+            rx: Mutex::new(rx),
+        });
+
+        for _ in 0..PERMITS {
+            assert_ok!(ctx.tx.clone().try_send(()));
+        }
+
+        let mut ths = Vec::new();
+
+        for _ in 0..TASKS {
+            let ctx = ctx.clone();
+
+            ths.push(thread::spawn(move || {
+                run(&ctx);
+            }));
+        }
+
+        run(&ctx);
+
+        for th in ths {
+            th.join().unwrap();
+        }
+    });
+}

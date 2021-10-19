@@ -42,11 +42,11 @@ impl Idle {
     /// worker currently sleeping.
     pub(super) fn worker_to_notify(&self) -> Option<usize> {
         // If at least one worker is spinning, work being notified will
-        // eventully be found. A searching thread will find **some** work and
+        // eventually be found. A searching thread will find **some** work and
         // notify another worker, eventually leading to our work being found.
         //
         // For this to happen, this load must happen before the thread
-        // transitioning `num_searching` to zero. Acquire / Relese does not
+        // transitioning `num_searching` to zero. Acquire / Release does not
         // provide sufficient guarantees, so this load is done with `SeqCst` and
         // will pair with the `fetch_sub(1)` when transitioning out of
         // searching.
@@ -126,7 +126,7 @@ impl Idle {
         }
     }
 
-    /// Returns `true` if `worker_id` is contained in the sleep set
+    /// Returns `true` if `worker_id` is contained in the sleep set.
     pub(super) fn is_parked(&self, worker_id: usize) -> bool {
         let sleepers = self.sleepers.lock();
         sleepers.contains(&worker_id)

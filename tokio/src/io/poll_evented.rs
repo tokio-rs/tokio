@@ -40,9 +40,8 @@ cfg_io_driver! {
     /// [`poll_read_ready`] again will also indicate read readiness.
     ///
     /// When the operation is attempted and is unable to succeed due to the I/O
-    /// resource not being ready, the caller must call `clear_read_ready` or
-    /// `clear_write_ready`. This clears the readiness state until a new
-    /// readiness event is received.
+    /// resource not being ready, the caller must call `clear_readiness`.
+    /// This clears the readiness state until a new readiness event is received.
     ///
     /// This allows the caller to implement additional functions. For example,
     /// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
@@ -114,7 +113,7 @@ impl<E: Source> PollEvented<E> {
         })
     }
 
-    /// Returns a reference to the registration
+    /// Returns a reference to the registration.
     #[cfg(any(
         feature = "net",
         all(unix, feature = "process"),
@@ -124,7 +123,7 @@ impl<E: Source> PollEvented<E> {
         &self.registration
     }
 
-    /// Deregister the inner io from the registration and returns a Result containing the inner io
+    /// Deregisters the inner io from the registration and returns a Result containing the inner io.
     #[cfg(any(feature = "net", feature = "process"))]
     pub(crate) fn into_inner(mut self) -> io::Result<E> {
         let mut inner = self.io.take().unwrap(); // As io shouldn't ever be None, just unwrap here.

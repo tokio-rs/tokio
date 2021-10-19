@@ -1,5 +1,6 @@
 use crate::runtime::queue;
-use crate::runtime::task::{self, Schedule, Task};
+use crate::runtime::stats::WorkerStatsBatcher;
+use crate::runtime::task::{self, Inject, Schedule, Task};
 
 use std::thread;
 use std::time::Duration;
@@ -7,10 +8,10 @@ use std::time::Duration;
 #[test]
 fn fits_256() {
     let (_, mut local) = queue::local();
-    let inject = queue::Inject::new();
+    let inject = Inject::new();
 
     for _ in 0..256 {
-        let (task, _) = task::joinable::<_, Runtime>(async {});
+        let (task, _) = super::unowned(async {});
         local.push_back(task, &inject);
     }
 
@@ -22,10 +23,10 @@ fn fits_256() {
 #[test]
 fn overflow() {
     let (_, mut local) = queue::local();
-    let inject = queue::Inject::new();
+    let inject = Inject::new();
 
     for _ in 0..257 {
-        let (task, _) = task::joinable::<_, Runtime>(async {});
+        let (task, _) = super::unowned(async {});
         local.push_back(task, &inject);
     }
 
@@ -44,16 +45,18 @@ fn overflow() {
 
 #[test]
 fn steal_batch() {
+    let mut stats = WorkerStatsBatcher::new(0);
+
     let (steal1, mut local1) = queue::local();
     let (_, mut local2) = queue::local();
-    let inject = queue::Inject::new();
+    let inject = Inject::new();
 
     for _ in 0..4 {
-        let (task, _) = task::joinable::<_, Runtime>(async {});
+        let (task, _) = super::unowned(async {});
         local1.push_back(task, &inject);
     }
 
-    assert!(steal1.steal_into(&mut local2).is_some());
+    assert!(steal1.steal_into(&mut local2, &mut stats).is_some());
 
     for _ in 0..1 {
         assert!(local2.pop().is_some());
@@ -78,14 +81,15 @@ fn stress1() {
 
     for _ in 0..NUM_ITER {
         let (steal, mut local) = queue::local();
-        let inject = queue::Inject::new();
+        let inject = Inject::new();
 
         let th = thread::spawn(move || {
+            let mut stats = WorkerStatsBatcher::new(0);
             let (_, mut local) = queue::local();
             let mut n = 0;
 
             for _ in 0..NUM_STEAL {
-                if steal.steal_into(&mut local).is_some() {
+                if steal.steal_into(&mut local, &mut stats).is_some() {
                     n += 1;
                 }
 
@@ -103,7 +107,7 @@ fn stress1() {
 
         for _ in 0..NUM_LOCAL {
             for _ in 0..NUM_PUSH {
-                let (task, _) = task::joinable::<_, Runtime>(async {});
+                let (task, _) = super::unowned(async {});
                 local.push_back(task, &inject);
             }
 
@@ -134,14 +138,15 @@ fn stress2() {
 
     for _ in 0..NUM_ITER {
         let (steal, mut local) = queue::local();
-        let inject = queue::Inject::new();
+        let inject = Inject::new();
 
         let th = thread::spawn(move || {
+            let mut stats = WorkerStatsBatcher::new(0);
             let (_, mut local) = queue::local();
             let mut n = 0;
 
             for _ in 0..NUM_STEAL {
-                if steal.steal_into(&mut local).is_some() {
+                if steal.steal_into(&mut local, &mut stats).is_some() {
                     n += 1;
                 }
 
@@ -158,7 +163,7 @@ fn stress2() {
         let mut num_pop = 0;
 
         for i in 0..NUM_TASKS {
-            let (task, _) = task::joinable::<_, Runtime>(async {});
+            let (task, _) = super::unowned(async {});
             local.push_back(task, &inject);
 
             if i % 128 == 0 && local.pop().is_some() {
@@ -187,11 +192,6 @@ fn stress2() {
 struct Runtime;
 
 impl Schedule for Runtime {
-    fn bind(task: Task<Self>) -> Runtime {
-        std::mem::forget(task);
-        Runtime
-    }
-
     fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
         None
     }

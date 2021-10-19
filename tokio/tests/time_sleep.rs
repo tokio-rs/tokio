@@ -24,7 +24,7 @@ async fn immediate_sleep() {
 async fn is_elapsed() {
     time::pause();
 
-    let sleep = time::sleep(Duration::from_millis(50));
+    let sleep = time::sleep(Duration::from_millis(10));
 
     tokio::pin!(sleep);
 
@@ -349,7 +349,7 @@ async fn drop_from_wake() {
 
     assert!(
         !panicked.load(Ordering::SeqCst),
-        "paniced when dropping timers"
+        "panicked when dropping timers"
     );
 
     #[derive(Clone)]

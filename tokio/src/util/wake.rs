@@ -4,12 +4,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
-/// Simplified waking interface based on Arcs
+/// Simplified waking interface based on Arcs.
 pub(crate) trait Wake: Send + Sync {
-    /// Wake by value
+    /// Wake by value.
     fn wake(self: Arc<Self>);
 
-    /// Wake by reference
+    /// Wake by reference.
     fn wake_by_ref(arc_self: &Arc<Self>);
 }
 
@@ -54,11 +54,7 @@ unsafe fn inc_ref_count<T: Wake>(data: *const ()) {
     let arc = ManuallyDrop::new(Arc::<T>::from_raw(data as *const T));
 
     // Now increase refcount, but don't drop new refcount either
-    let arc_clone: ManuallyDrop<_> = arc.clone();
-
-    // Drop explicitly to avoid clippy warnings
-    drop(arc);
-    drop(arc_clone);
+    let _arc_clone: ManuallyDrop<_> = arc.clone();
 }
 
 unsafe fn clone_arc_raw<T: Wake>(data: *const ()) -> RawWaker {

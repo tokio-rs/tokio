@@ -1,6 +1,143 @@
+//! The task module.
+//!
+//! The task module contains the code that manages spawned tasks and provides a
+//! safe API for the rest of the runtime to use. Each task in a runtime is
+//! stored in an OwnedTasks or LocalOwnedTasks object.
+//!
+//! # Task reference types
+//!
+//! A task is usually referenced by multiple handles, and there are several
+//! types of handles.
+//!
+//!  * OwnedTask - tasks stored in an OwnedTasks or LocalOwnedTasks are of this
+//!    reference type.
+//!
+//!  * JoinHandle - each task has a JoinHandle that allows access to the output
+//!    of the task.
+//!
+//!  * Waker - every waker for a task has this reference type. There can be any
+//!    number of waker references.
+//!
+//!  * Notified - tracks whether the task is notified.
+//!
+//!  * Unowned - this task reference type is used for tasks not stored in any
+//!    runtime. Mainly used for blocking tasks, but also in tests.
+//!
+//! The task uses a reference count to keep track of how many active references
+//! exist. The Unowned reference type takes up two ref-counts. All other
+//! reference types take pu a single ref-count.
+//!
+//! Besides the waker type, each task has at most one of each reference type.
+//!
+//! # State
+//!
+//! The task stores its state in an atomic usize with various bitfields for the
+//! necessary information. The state has the following bitfields:
+//!
+//!  * RUNNING - Tracks whether the task is currently being polled or cancelled.
+//!    This bit functions as a lock around the task.
+//!
+//!  * COMPLETE - Is one once the future has fully completed and has been
+//!    dropped. Never unset once set. Never set together with RUNNING.
+//!
+//!  * NOTIFIED - Tracks whether a Notified object currently exists.
+//!
+//!  * CANCELLED - Is set to one for tasks that should be cancelled as soon as
+//!    possible. May take any value for completed tasks.
+//!
+//!  * JOIN_INTEREST - Is set to one if there exists a JoinHandle.
+//!
+//!  * JOIN_WAKER - Is set to one if the JoinHandle has set a waker.
+//!
+//! The rest of the bits are used for the ref-count.
+//!
+//! # Fields in the task
+//!
+//! The task has various fields. This section describes how and when it is safe
+//! to access a field.
+//!
+//!  * The state field is accessed with atomic instructions.
+//!
+//!  * The OwnedTask reference has exclusive access to the `owned` field.
+//!
+//!  * The Notified reference has exclusive access to the `queue_next` field.
+//!
+//!  * The `owner_id` field can be set as part of construction of the task, but
+//!    is otherwise immutable and anyone can access the field immutably without
+//!    synchronization.
+//!
+//!  * If COMPLETE is one, then the JoinHandle has exclusive access to the
+//!    stage field. If COMPLETE is zero, then the RUNNING bitfield functions as
+//!    a lock for the stage field, and it can be accessed only by the thread
+//!    that set RUNNING to one.
+//!
+//!  * If JOIN_WAKER is zero, then the JoinHandle has exclusive access to the
+//!    join handle waker. If JOIN_WAKER and COMPLETE are both one, then the
+//!    thread that set COMPLETE to one has exclusive access to the join handle
+//!    waker.
+//!
+//! All other fields are immutable and can be accessed immutably without
+//! synchronization by anyone.
+//!
+//! # Safety
+//!
+//! This section goes through various situations and explains why the API is
+//! safe in that situation.
+//!
+//! ## Polling or dropping the future
+//!
+//! Any mutable access to the future happens after obtaining a lock by modifying
+//! the RUNNING field, so exclusive access is ensured.
+//!
+//! When the task completes, exclusive access to the output is transferred to
+//! the JoinHandle. If the JoinHandle is already dropped when the transition to
+//! complete happens, the thread performing that transition retains exclusive
+//! access to the output and should immediately drop it.
+//!
+//! ## Non-Send futures
+//!
+//! If a future is not Send, then it is bound to a LocalOwnedTasks.  The future
+//! will only ever be polled or dropped given a LocalNotified or inside a call
+//! to LocalOwnedTasks::shutdown_all. In either case, it is guaranteed that the
+//! future is on the right thread.
+//!
+//! If the task is never removed from the LocalOwnedTasks, then it is leaked, so
+//! there is no risk that the task is dropped on some other thread when the last
+//! ref-count drops.
+//!
+//! ## Non-Send output
+//!
+//! When a task completes, the output is placed in the stage of the task. Then,
+//! a transition that sets COMPLETE to true is performed, and the value of
+//! JOIN_INTEREST when this transition happens is read.
+//!
+//! If JOIN_INTEREST is zero when the transition to COMPLETE happens, then the
+//! output is immediately dropped.
+//!
+//! If JOIN_INTEREST is one when the transition to COMPLETE happens, then the
+//! JoinHandle is responsible for cleaning up the output. If the output is not
+//! Send, then this happens:
+//!
+//!  1. The output is created on the thread that the future was polled on. Since
+//!     only non-Send futures can have non-Send output, the future was polled on
+//!     the thread that the future was spawned from.
+//!  2. Since JoinHandle<Output> is not Send if Output is not Send, the
+//!     JoinHandle is also on the thread that the future was spawned from.
+//!  3. Thus, the JoinHandle will not move the output across threads when it
+//!     takes or drops the output.
+//!
+//! ## Recursive poll/shutdown
+//!
+//! Calling poll from inside a shutdown call or vice-versa is not prevented by
+//! the API exposed by the task module, so this has to be safe. In either case,
+//! the lock in the RUNNING bitfield makes the inner call return immediately. If
+//! the inner call is a `shutdown` call, then the CANCELLED bit is set, and the
+//! poll call will notice it when the poll finishes, and the task is cancelled
+//! at that point.
+
 mod core;
 use self::core::Cell;
-pub(crate) use self::core::Header;
+use self::core::Header;
 
 mod error;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
@@ -9,9 +146,17 @@ pub use self::error::JoinError;
 mod harness;
 use self::harness::Harness;
 
+cfg_rt_multi_thread! {
+    mod inject;
+    pub(super) use self::inject::Inject;
+}
+
 mod join;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
+
+mod list;
+pub(crate) use self::list::{LocalOwnedTasks, OwnedTasks};
 
 mod raw;
 use self::raw::RawTask;
@@ -21,19 +166,14 @@ use self::state::State;
 
 mod waker;
 
-cfg_rt_multi_thread! {
-    mod stack;
-    pub(crate) use self::stack::TransferStack;
-}
-
+use crate::future::Future;
 use crate::util::linked_list;
 
-use std::future::Future;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{fmt, mem};
 
-/// An owned handle to the task, tracked by ref count
+/// An owned handle to the task, tracked by ref count.
 #[repr(transparent)]
 pub(crate) struct Task<S: 'static> {
     raw: RawTask,
@@ -43,30 +183,43 @@ pub(crate) struct Task<S: 'static> {
 unsafe impl<S> Send for Task<S> {}
 unsafe impl<S> Sync for Task<S> {}
 
-/// A task was notified
+/// A task was notified.
 #[repr(transparent)]
 pub(crate) struct Notified<S: 'static>(Task<S>);
 
+// safety: This type cannot be used to touch the task without first verifying
+// that the value is on a thread where it is safe to poll the task.
 unsafe impl<S: Schedule> Send for Notified<S> {}
 unsafe impl<S: Schedule> Sync for Notified<S> {}
 
-/// Task result sent back
+/// A non-Send variant of Notified with the invariant that it is on a thread
+/// where it is safe to poll it.
+#[repr(transparent)]
+pub(crate) struct LocalNotified<S: 'static> {
+    task: Task<S>,
+    _not_send: PhantomData<*const ()>,
+}
+
+/// A task that is not owned by any OwnedTasks. Used for blocking tasks.
+/// This type holds two ref-counts.
+pub(crate) struct UnownedTask<S: 'static> {
+    raw: RawTask,
+    _p: PhantomData<S>,
+}
+
+// safety: This type can only be created given a Send task.
+unsafe impl<S> Send for UnownedTask<S> {}
+unsafe impl<S> Sync for UnownedTask<S> {}
+
+/// Task result sent back.
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
 pub(crate) trait Schedule: Sync + Sized + 'static {
-    /// Bind a task to the executor.
-    ///
-    /// Guaranteed to be called from the thread that called `poll` on the task.
-    /// The returned `Schedule` instance is associated with the task and is used
-    /// as `&self` in the other methods on this trait.
-    fn bind(task: Task<Self>) -> Self;
-
     /// The task has completed work and is ready to be released. The scheduler
-    /// is free to drop it whenever.
+    /// should release it immediately and return it. The task module will batch
+    /// the ref-dec with setting other options.
     ///
-    /// If the scheduler can immediately release the task, it should return
-    /// it as part of the function. This enables the task module to batch
-    /// the ref-dec with other options.
+    /// If the scheduler has already released the task, then None is returned.
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>>;
 
     /// Schedule the task
@@ -80,71 +233,86 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
 }
 
 cfg_rt! {
-    /// Create a new task with an associated join handle
-    pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
+    /// This is the constructor for a new task. Three references to the task are
+    /// created. The first task reference is usually put into an OwnedTasks
+    /// immediately. The Notified is sent to the scheduler as an ordinary
+    /// notification.
+    fn new_task<T, S>(
+        task: T,
+        scheduler: S
+    ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
-        T: Future + Send + 'static,
         S: Schedule,
-    {
-        let raw = RawTask::new::<_, S>(task);
-
-        let task = Task {
-            raw,
-            _p: PhantomData,
-        };
-
-        let join = JoinHandle::new(raw);
-
-        (Notified(task), join)
-    }
-}
-
-cfg_rt! {
-    /// Create a new `!Send` task with an associated join handle
-    pub(crate) unsafe fn joinable_local<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
-    where
         T: Future + 'static,
-        S: Schedule,
+        T::Output: 'static,
     {
-        let raw = RawTask::new::<_, S>(task);
-
+        let raw = RawTask::new::<T, S>(task, scheduler);
         let task = Task {
             raw,
             _p: PhantomData,
         };
-
+        let notified = Notified(Task {
+            raw,
+            _p: PhantomData,
+        });
         let join = JoinHandle::new(raw);
 
-        (Notified(task), join)
+        (task, notified, join)
+    }
+
+    /// Creates a new task with an associated join handle. This method is used
+    /// only when the task is not going to be stored in an `OwnedTasks` list.
+    ///
+    /// Currently only blocking tasks use this method.
+    pub(crate) fn unowned<T, S>(task: T, scheduler: S) -> (UnownedTask<S>, JoinHandle<T::Output>)
+    where
+        S: Schedule,
+        T: Send + Future + 'static,
+        T::Output: Send + 'static,
+    {
+        let (task, notified, join) = new_task(task, scheduler);
+
+        // This transfers the ref-count of task and notified into an UnownedTask.
+        // This is valid because an UnownedTask holds two ref-counts.
+        let unowned = UnownedTask {
+            raw: task.raw,
+            _p: PhantomData,
+        };
+        std::mem::forget(task);
+        std::mem::forget(notified);
+
+        (unowned, join)
     }
 }
 
 impl<S: 'static> Task<S> {
-    pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
+    unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
         Task {
             raw: RawTask::from_raw(ptr),
             _p: PhantomData,
         }
     }
 
-    pub(crate) fn header(&self) -> &Header {
+    fn header(&self) -> &Header {
         self.raw.header()
+    }
+}
+
+impl<S: 'static> Notified<S> {
+    fn header(&self) -> &Header {
+        self.0.header()
     }
 }
 
 cfg_rt_multi_thread! {
     impl<S: 'static> Notified<S> {
-        pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
+        unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
             Notified(Task::from_raw(ptr))
-        }
-
-        pub(crate) fn header(&self) -> &Header {
-            self.0.header()
         }
     }
 
     impl<S: 'static> Task<S> {
-        pub(crate) fn into_raw(self) -> NonNull<Header> {
+        fn into_raw(self) -> NonNull<Header> {
             let ret = self.header().into();
             mem::forget(self);
             ret
@@ -152,29 +320,69 @@ cfg_rt_multi_thread! {
     }
 
     impl<S: 'static> Notified<S> {
-        pub(crate) fn into_raw(self) -> NonNull<Header> {
+        fn into_raw(self) -> NonNull<Header> {
             self.0.into_raw()
         }
     }
 }
 
 impl<S: Schedule> Task<S> {
-    /// Pre-emptively cancel the task as part of the shutdown process.
-    pub(crate) fn shutdown(&self) {
-        self.raw.shutdown();
+    /// Pre-emptively cancels the task as part of the shutdown process.
+    pub(crate) fn shutdown(self) {
+        let raw = self.raw;
+        mem::forget(self);
+        raw.shutdown();
     }
 }
 
-impl<S: Schedule> Notified<S> {
-    /// Run the task
+impl<S: Schedule> LocalNotified<S> {
+    /// Runs the task.
     pub(crate) fn run(self) {
-        self.0.raw.poll();
+        let raw = self.task.raw;
         mem::forget(self);
+        raw.poll();
+    }
+}
+
+impl<S: Schedule> UnownedTask<S> {
+    // Used in test of the inject queue.
+    #[cfg(test)]
+    pub(super) fn into_notified(self) -> Notified<S> {
+        Notified(self.into_task())
     }
 
-    /// Pre-emptively cancel the task as part of the shutdown process.
+    fn into_task(self) -> Task<S> {
+        // Convert into a task.
+        let task = Task {
+            raw: self.raw,
+            _p: PhantomData,
+        };
+        mem::forget(self);
+
+        // Drop a ref-count since an UnownedTask holds two.
+        task.header().state.ref_dec();
+
+        task
+    }
+
+    pub(crate) fn run(self) {
+        let raw = self.raw;
+        mem::forget(self);
+
+        // Transfer one ref-count to a Task object.
+        let task = Task::<S> {
+            raw,
+            _p: PhantomData,
+        };
+
+        // Use the other ref-count to poll the task.
+        raw.poll();
+        // Decrement our extra ref-count
+        drop(task);
+    }
+
     pub(crate) fn shutdown(self) {
-        self.0.shutdown();
+        self.into_task().shutdown()
     }
 }
 
@@ -182,6 +390,16 @@ impl<S: 'static> Drop for Task<S> {
     fn drop(&mut self) {
         // Decrement the ref count
         if self.header().state.ref_dec() {
+            // Deallocate if this is the final ref count
+            self.raw.dealloc();
+        }
+    }
+}
+
+impl<S: 'static> Drop for UnownedTask<S> {
+    fn drop(&mut self) {
+        // Decrement the ref count
+        if self.raw.header().state.ref_dec_twice() {
             // Deallocate if this is the final ref count
             self.raw.dealloc();
         }
@@ -202,7 +420,7 @@ impl<S> fmt::Debug for Notified<S> {
 
 /// # Safety
 ///
-/// Tasks are pinned
+/// Tasks are pinned.
 unsafe impl<S> linked_list::Link for Task<S> {
     type Handle = Task<S>;
     type Target = Header;

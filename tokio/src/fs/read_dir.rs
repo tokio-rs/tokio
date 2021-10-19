@@ -1,4 +1,4 @@
-use crate::fs::{asyncify, sys};
+use crate::fs::asyncify;
 
 use std::ffi::OsString;
 use std::fs::{FileType, Metadata};
@@ -10,9 +10,23 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
+#[cfg(test)]
+use super::mocks::spawn_blocking;
+#[cfg(test)]
+use super::mocks::JoinHandle;
+#[cfg(not(test))]
+use crate::blocking::spawn_blocking;
+#[cfg(not(test))]
+use crate::blocking::JoinHandle;
+
 /// Returns a stream over the entries within a directory.
 ///
 /// This is an async version of [`std::fs::read_dir`](std::fs::read_dir)
+///
+/// This operation is implemented by running the equivalent blocking
+/// operation on a separate thread pool using [`spawn_blocking`].
+///
+/// [`spawn_blocking`]: crate::task::spawn_blocking
 pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
     let path = path.as_ref().to_owned();
     let std = asyncify(|| std::fs::read_dir(path)).await?;
@@ -20,7 +34,7 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
     Ok(ReadDir(State::Idle(Some(std))))
 }
 
-/// Read the the entries in a directory.
+/// Reads the the entries in a directory.
 ///
 /// This struct is returned from the [`read_dir`] function of this module and
 /// will yield instances of [`DirEntry`]. Through a [`DirEntry`] information
@@ -45,11 +59,15 @@ pub struct ReadDir(State);
 #[derive(Debug)]
 enum State {
     Idle(Option<std::fs::ReadDir>),
-    Pending(sys::Blocking<(Option<io::Result<std::fs::DirEntry>>, std::fs::ReadDir)>),
+    Pending(JoinHandle<(Option<io::Result<std::fs::DirEntry>>, std::fs::ReadDir)>),
 }
 
 impl ReadDir {
     /// Returns the next entry in the directory stream.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancellation safe.
     pub async fn next_entry(&mut self) -> io::Result<Option<DirEntry>> {
         use crate::future::poll_fn;
         poll_fn(|cx| self.poll_next_entry(cx)).await
@@ -79,7 +97,7 @@ impl ReadDir {
                 State::Idle(ref mut std) => {
                     let mut std = std.take().unwrap();
 
-                    self.0 = State::Pending(sys::run(move || {
+                    self.0 = State::Pending(spawn_blocking(move || {
                         let ret = std.next();
                         (ret, std)
                     }));
@@ -269,7 +287,7 @@ impl DirEntry {
         asyncify(move || std.file_type()).await
     }
 
-    /// Returns a reference to the underlying `std::fs::DirEntry`
+    /// Returns a reference to the underlying `std::fs::DirEntry`.
     #[cfg(unix)]
     pub(super) fn as_inner(&self) -> &std::fs::DirEntry {
         &self.0

@@ -421,7 +421,7 @@ pub struct LengthDelimitedCodecError {
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LengthDelimitedCodec {
     // Configuration values
     builder: Builder,
@@ -486,7 +486,7 @@ impl LengthDelimitedCodec {
             // Skip the required bytes
             src.advance(self.builder.length_field_offset);
 
-            // match endianess
+            // match endianness
             let n = if self.builder.length_field_is_big_endian {
                 src.get_uint(field_len)
             } else {

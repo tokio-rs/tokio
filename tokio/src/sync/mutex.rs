@@ -273,9 +273,15 @@ impl<T: ?Sized> Mutex<T> {
         }
     }
 
-    /// Locks this mutex, causing the current task
-    /// to yield until the lock has been acquired.
-    /// When the lock has been acquired, function returns a [`MutexGuard`].
+    /// Locks this mutex, causing the current task to yield until the lock has
+    /// been acquired.  When the lock has been acquired, function returns a
+    /// [`MutexGuard`].
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `lock` makes you lose your place in
+    /// the queue.
     ///
     /// # Examples
     ///
@@ -295,6 +301,40 @@ impl<T: ?Sized> Mutex<T> {
         MutexGuard { lock: self }
     }
 
+    /// Blocking lock this mutex. When the lock has been acquired, function returns a
+    /// [`MutexGuard`].
+    ///
+    /// This method is intended for use cases where you
+    /// need to use this mutex in asynchronous code as well as in synchronous code.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Mutex;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mutex =  Arc::new(Mutex::new(1));
+    ///
+    ///     let mutex1 = Arc::clone(&mutex);
+    ///     let sync_code = tokio::task::spawn_blocking(move || {
+    ///         let mut n = mutex1.blocking_lock();
+    ///         *n = 2;
+    ///     });
+    ///
+    ///     sync_code.await.unwrap();
+    ///
+    ///     let n = mutex.lock().await;
+    ///     assert_eq!(*n, 2);
+    /// }
+    ///
+    /// ```
+    #[cfg(feature = "sync")]
+    pub fn blocking_lock(&self) -> MutexGuard<'_, T> {
+        crate::future::block_on(self.lock())
+    }
+
     /// Locks this mutex, causing the current task to yield until the lock has
     /// been acquired. When the lock has been acquired, this returns an
     /// [`OwnedMutexGuard`].
@@ -304,6 +344,12 @@ impl<T: ?Sized> Mutex<T> {
     /// it. Therefore, the `Mutex` must be wrapped in an `Arc` to call this
     /// method, and the guard will live for the `'static` lifetime, as it keeps
     /// the `Mutex` alive by holding an `Arc`.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute locks in the order they
+    /// were requested. Cancelling a call to `lock_owned` makes you lose your
+    /// place in the queue.
     ///
     /// # Examples
     ///
@@ -450,14 +496,14 @@ where
     }
 }
 
-impl<T> std::fmt::Debug for Mutex<T>
+impl<T: ?Sized> std::fmt::Debug for Mutex<T>
 where
     T: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut d = f.debug_struct("Mutex");
         match self.try_lock() {
-            Ok(inner) => d.field("data", &*inner),
+            Ok(inner) => d.field("data", &&*inner),
             Err(_) => d.field("data", &format_args!("<locked>")),
         };
         d.finish()
@@ -561,6 +607,32 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
             marker: marker::PhantomData,
         })
     }
+
+    /// Returns a reference to the original `Mutex`.
+    ///
+    /// ```
+    /// use tokio::sync::{Mutex, MutexGuard};
+    ///
+    /// async fn unlock_and_relock<'l>(guard: MutexGuard<'l, u32>) -> MutexGuard<'l, u32> {
+    ///     println!("1. contains: {:?}", *guard);
+    ///     let mutex = MutexGuard::mutex(&guard);
+    ///     drop(guard);
+    ///     let guard = mutex.lock().await;
+    ///     println!("2. contains: {:?}", *guard);
+    ///     guard
+    /// }
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #     let mutex = Mutex::new(0u32);
+    /// #     let guard = mutex.lock().await;
+    /// #     unlock_and_relock(guard).await;
+    /// # }
+    /// ```
+    #[inline]
+    pub fn mutex(this: &Self) -> &'a Mutex<T> {
+        this.lock
+    }
 }
 
 impl<T: ?Sized> Drop for MutexGuard<'_, T> {
@@ -595,6 +667,35 @@ impl<T: ?Sized + fmt::Display> fmt::Display for MutexGuard<'_, T> {
 }
 
 // === impl OwnedMutexGuard ===
+
+impl<T: ?Sized> OwnedMutexGuard<T> {
+    /// Returns a reference to the original `Arc<Mutex>`.
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::{Mutex, OwnedMutexGuard};
+    ///
+    /// async fn unlock_and_relock(guard: OwnedMutexGuard<u32>) -> OwnedMutexGuard<u32> {
+    ///     println!("1. contains: {:?}", *guard);
+    ///     let mutex: Arc<Mutex<u32>> = OwnedMutexGuard::mutex(&guard).clone();
+    ///     drop(guard);
+    ///     let guard = mutex.lock_owned().await;
+    ///     println!("2. contains: {:?}", *guard);
+    ///     guard
+    /// }
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #     let mutex = Arc::new(Mutex::new(0u32));
+    /// #     let guard = mutex.lock_owned().await;
+    /// #     unlock_and_relock(guard).await;
+    /// # }
+    /// ```
+    #[inline]
+    pub fn mutex(this: &Self) -> &Arc<Mutex<T>> {
+        &this.lock
+    }
+}
 
 impl<T: ?Sized> Drop for OwnedMutexGuard<T> {
     fn drop(&mut self) {
