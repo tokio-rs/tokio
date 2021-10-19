@@ -2,6 +2,7 @@
 use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
 use std::time::{Duration, Instant};
+use std::convert::TryFrom;
 
 /// This type contains methods to retrieve stats from a Tokio runtime.
 #[derive(Debug)]
@@ -29,6 +30,9 @@ impl RuntimeStats {
                 park_count: AtomicU64::new(0),
                 steal_count: AtomicU64::new(0),
                 poll_count: AtomicU64::new(0),
+                busy_duration_min: AtomicU64::new(0),
+                busy_duration_max: AtomicU64::new(0),
+                busy_duration_last: AtomicU64::new(0),
             });
         }
 
