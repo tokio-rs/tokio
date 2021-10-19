@@ -12,6 +12,14 @@ async fn missing_return_type() {
 
 #[tokio::main]
 async fn extra_semicolon() -> Result<(), ()> {
+    /* TODO(taiki-e): help message still wrong
+    help: try using a variant of the expected enum
+       |
+    23 |     Ok(Ok(());)
+       |
+    23 |     Err(Ok(());)
+       |
+    */
     Ok(());
 }
 
