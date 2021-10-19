@@ -14,7 +14,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
 
-/// Require a `Future` to complete before the specified duration has elapsed.
+/// Requires a `Future` to complete before the specified duration has elapsed.
 ///
 /// If the future completes before the duration has elapsed, then the completed
 /// value is returned. Otherwise, an error is returned and the future is
@@ -63,7 +63,7 @@ where
     Timeout::new_with_delay(future, delay)
 }
 
-/// Require a `Future` to complete before the specified instant in time.
+/// Requires a `Future` to complete before the specified instant in time.
 ///
 /// If the future completes before the instant is reached, then the completed
 /// value is returned. Otherwise, an error is returned.

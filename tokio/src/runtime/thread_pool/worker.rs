@@ -126,7 +126,7 @@ pub(super) struct Shared {
     /// how they communicate between each other.
     remotes: Box<[Remote]>,
 
-    /// Submit work to the scheduler while **not** currently on a worker thread.
+    /// Submits work to the scheduler while **not** currently on a worker thread.
     inject: Inject<Arc<Shared>>,
 
     /// Coordinates idle workers
@@ -147,13 +147,13 @@ pub(super) struct Shared {
     /// Callback for a worker unparking itself
     after_unpark: Option<Callback>,
 
-    /// Collect stats from the runtime.
+    /// Collects stats from the runtime.
     stats: RuntimeStats,
 }
 
 /// Used to communicate with a worker from other threads.
 struct Remote {
-    /// Steal tasks from this worker.
+    /// Steals tasks from this worker.
     steal: queue::Steal<Arc<Shared>>,
 
     /// Unparks the associated worker thread
@@ -587,9 +587,9 @@ impl Core {
         worker.shared.transition_worker_from_searching();
     }
 
-    /// Prepare the worker state for parking
+    /// Prepares the worker state for parking.
     ///
-    /// Returns true if the transition happend, false if there is work to do first
+    /// Returns true if the transition happend, false if there is work to do first.
     fn transition_to_parked(&mut self, worker: &Worker) -> bool {
         // Workers should not park if they have work to do
         if self.lifo_slot.is_some() || self.run_queue.has_tasks() {
@@ -653,7 +653,7 @@ impl Core {
         self.stats.submit(&worker.shared.stats);
     }
 
-    /// Shutdown the core
+    /// Shuts down the core.
     fn shutdown(&mut self) {
         // Take the core
         let mut park = self.park.take().expect("park missing");
@@ -666,7 +666,7 @@ impl Core {
 }
 
 impl Worker {
-    /// Returns a reference to the scheduler's injection queue
+    /// Returns a reference to the scheduler's injection queue.
     fn inject(&self) -> &Inject<Arc<Shared>> {
         &self.shared.inject
     }

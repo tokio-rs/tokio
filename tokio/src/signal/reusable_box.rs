@@ -30,7 +30,7 @@ impl<T> ReusableBoxFuture<T> {
         Self { boxed }
     }
 
-    /// Replace the future currently stored in this box.
+    /// Replaces the future currently stored in this box.
     ///
     /// This reallocates if and only if the layout of the provided future is
     /// different from the layout of the currently stored future.
@@ -43,7 +43,7 @@ impl<T> ReusableBoxFuture<T> {
         }
     }
 
-    /// Replace the future currently stored in this box.
+    /// Replaces the future currently stored in this box.
     ///
     /// This function never reallocates, but returns an error if the provided
     /// future has a different size or alignment from the currently stored
@@ -70,7 +70,7 @@ impl<T> ReusableBoxFuture<T> {
         }
     }
 
-    /// Set the current future.
+    /// Sets the current future.
     ///
     /// # Safety
     ///
@@ -103,14 +103,14 @@ impl<T> ReusableBoxFuture<T> {
         }
     }
 
-    /// Get a pinned reference to the underlying future.
+    /// Gets a pinned reference to the underlying future.
     pub(crate) fn get_pin(&mut self) -> Pin<&mut (dyn Future<Output = T> + Send)> {
         // SAFETY: The user of this box cannot move the box, and we do not move it
         // either.
         unsafe { Pin::new_unchecked(self.boxed.as_mut()) }
     }
 
-    /// Poll the future stored inside this box.
+    /// Polls the future stored inside this box.
     pub(crate) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<T> {
         self.get_pin().poll(cx)
     }
@@ -119,7 +119,7 @@ impl<T> ReusableBoxFuture<T> {
 impl<T> Future for ReusableBoxFuture<T> {
     type Output = T;
 
-    /// Poll the future stored inside this box.
+    /// Polls the future stored inside this box.
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<T> {
         Pin::into_inner(self).get_pin().poll(cx)
     }

@@ -86,7 +86,7 @@ pub struct Sender<T> {
     shared: Arc<Shared<T>>,
 }
 
-/// Returns a reference to the inner value
+/// Returns a reference to the inner value.
 ///
 /// Outstanding borrows hold a read lock on the inner value. This means that
 /// long lived borrows could cause the produce half to block. It is recommended
@@ -98,27 +98,27 @@ pub struct Ref<'a, T> {
 
 #[derive(Debug)]
 struct Shared<T> {
-    /// The most recent value
+    /// The most recent value.
     value: RwLock<T>,
 
-    /// The current version
+    /// The current version.
     ///
     /// The lowest bit represents a "closed" state. The rest of the bits
     /// represent the current version.
     state: AtomicState,
 
-    /// Tracks the number of `Receiver` instances
+    /// Tracks the number of `Receiver` instances.
     ref_count_rx: AtomicUsize,
 
     /// Notifies waiting receivers that the value changed.
     notify_rx: Notify,
 
-    /// Notifies any task listening for `Receiver` dropped events
+    /// Notifies any task listening for `Receiver` dropped events.
     notify_tx: Notify,
 }
 
 pub mod error {
-    //! Watch error types
+    //! Watch error types.
 
     use std::fmt;
 
@@ -318,7 +318,7 @@ impl<T> Receiver<T> {
         Ref { inner }
     }
 
-    /// Wait for a change notification, then mark the newest value as seen.
+    /// Waits for a change notification, then marks the newest value as seen.
     ///
     /// If the newest value in the channel has not yet been marked seen when
     /// this method is called, the method marks that value seen and returns
@@ -617,7 +617,7 @@ impl<T> Sender<T> {
         Receiver::from_shared(version, shared)
     }
 
-    /// Returns the number of receivers that currently exist
+    /// Returns the number of receivers that currently exist.
     ///
     /// # Examples
     ///

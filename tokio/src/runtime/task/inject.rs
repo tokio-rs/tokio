@@ -11,7 +11,7 @@ use std::sync::atomic::Ordering::{Acquire, Release};
 /// Growable, MPMC queue used to inject new tasks into the scheduler and as an
 /// overflow queue when the local, fixed-size, array queue overflows.
 pub(crate) struct Inject<T: 'static> {
-    /// Pointers to the head and tail of the queue
+    /// Pointers to the head and tail of the queue.
     pointers: Mutex<Pointers>,
 
     /// Number of pending tasks in the queue. This helps prevent unnecessary
@@ -22,13 +22,13 @@ pub(crate) struct Inject<T: 'static> {
 }
 
 struct Pointers {
-    /// True if the queue is closed
+    /// True if the queue is closed.
     is_closed: bool,
 
-    /// Linked-list head
+    /// Linked-list head.
     head: Option<NonNull<task::Header>>,
 
-    /// Linked-list tail
+    /// Linked-list tail.
     tail: Option<NonNull<task::Header>>,
 }
 
@@ -52,7 +52,7 @@ impl<T: 'static> Inject<T> {
         self.len() == 0
     }
 
-    /// Close the injection queue, returns `true` if the queue is open when the
+    /// Closes the injection queue, returns `true` if the queue is open when the
     /// transition is made.
     pub(crate) fn close(&self) -> bool {
         let mut p = self.pointers.lock();
@@ -137,7 +137,7 @@ impl<T: 'static> Inject<T> {
         self.push_batch_inner(first, prev, counter);
     }
 
-    /// Insert several tasks that have been linked together into the queue.
+    /// Inserts several tasks that have been linked together into the queue.
     ///
     /// The provided head and tail may be be the same task. In this case, a
     /// single task is inserted.

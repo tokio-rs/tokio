@@ -23,10 +23,10 @@ use std::io;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
-/// I/O driver, backed by Mio
+/// I/O driver, backed by Mio.
 pub(crate) struct Driver {
     /// Tracks the number of times `turn` is called. It is safe for this to wrap
-    /// as it is mostly used to determine when to call `compact()`
+    /// as it is mostly used to determine when to call `compact()`.
     tick: u8,
 
     /// Reuse the `mio::Events` value across calls to poll.
@@ -35,17 +35,17 @@ pub(crate) struct Driver {
     /// Primary slab handle containing the state for each resource registered
     /// with this driver. During Drop this is moved into the Inner structure, so
     /// this is an Option to allow it to be vacated (until Drop this is always
-    /// Some)
+    /// Some).
     resources: Option<Slab<ScheduledIo>>,
 
-    /// The system event queue
+    /// The system event queue.
     poll: mio::Poll,
 
     /// State shared between the reactor and the handles.
     inner: Arc<Inner>,
 }
 
-/// A reference to an I/O driver
+/// A reference to an I/O driver.
 #[derive(Clone)]
 pub(crate) struct Handle {
     inner: Weak<Inner>,
@@ -66,13 +66,13 @@ pub(super) struct Inner {
     /// without risking new ones being registered in the meantime.
     resources: Mutex<Option<Slab<ScheduledIo>>>,
 
-    /// Registers I/O resources
+    /// Registers I/O resources.
     registry: mio::Registry,
 
     /// Allocates `ScheduledIo` handles when creating new resources.
     pub(super) io_dispatch: slab::Allocator<ScheduledIo>,
 
-    /// Used to wake up the reactor from a call to `turn`
+    /// Used to wake up the reactor from a call to `turn`.
     waker: mio::Waker,
 }
 
@@ -253,7 +253,7 @@ impl fmt::Debug for Driver {
 
 cfg_rt! {
     impl Handle {
-        /// Returns a handle to the current reactor
+        /// Returns a handle to the current reactor.
         ///
         /// # Panics
         ///
@@ -267,7 +267,7 @@ cfg_rt! {
 
 cfg_not_rt! {
     impl Handle {
-        /// Returns a handle to the current reactor
+        /// Returns a handle to the current reactor.
         ///
         /// # Panics
         ///

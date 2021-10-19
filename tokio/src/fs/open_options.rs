@@ -430,7 +430,7 @@ feature! {
             self
         }
 
-        /// Pass custom flags to the `flags` argument of `open`.
+        /// Passes custom flags to the `flags` argument of `open`.
         ///
         /// The bits that define the access mode are masked out with `O_ACCMODE`, to
         /// ensure they do not interfere with the access mode set by Rusts options.

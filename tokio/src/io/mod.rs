@@ -218,7 +218,7 @@ cfg_io_driver_impl! {
 }
 
 cfg_aio! {
-    /// BSD-specific I/O types
+    /// BSD-specific I/O types.
     pub mod bsd {
         mod poll_aio;
 

@@ -96,7 +96,7 @@ cfg_net_unix! {
 }
 
 impl UnixDatagram {
-    /// Wait for any of the requested ready states.
+    /// Waits for any of the requested ready states.
     ///
     /// This function is usually paired with `try_recv()` or `try_send()`. It
     /// can be used to concurrently recv / send to the same socket on a single
@@ -169,7 +169,7 @@ impl UnixDatagram {
         Ok(event.ready)
     }
 
-    /// Wait for the socket to become writable.
+    /// Waits for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is
     /// usually paired with `try_send()` or `try_send_to()`.
@@ -259,7 +259,7 @@ impl UnixDatagram {
         self.io.registration().poll_write_ready(cx).map_ok(|_| ())
     }
 
-    /// Wait for the socket to become readable.
+    /// Waits for the socket to become readable.
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_recv()`.
@@ -463,7 +463,7 @@ impl UnixDatagram {
         Ok(UnixDatagram { io })
     }
 
-    /// Turn a [`tokio::net::UnixDatagram`] into a [`std::os::unix::net::UnixDatagram`].
+    /// Turns a [`tokio::net::UnixDatagram`] into a [`std::os::unix::net::UnixDatagram`].
     ///
     /// The returned [`std::os::unix::net::UnixDatagram`] will have nonblocking
     /// mode set as `true`.  Use [`set_nonblocking`] to change the blocking mode
@@ -614,7 +614,7 @@ impl UnixDatagram {
             .await
     }
 
-    /// Try to send a datagram to the peer without waiting.
+    /// Tries to send a datagram to the peer without waiting.
     ///
     /// # Examples
     ///
@@ -658,7 +658,7 @@ impl UnixDatagram {
             .try_io(Interest::WRITABLE, || self.io.send(buf))
     }
 
-    /// Try to send a datagram to the peer without waiting.
+    /// Tries to send a datagram to the peer without waiting.
     ///
     /// # Examples
     ///
@@ -744,7 +744,7 @@ impl UnixDatagram {
             .await
     }
 
-    /// Try to receive a datagram from the peer without waiting.
+    /// Tries to receive a datagram from the peer without waiting.
     ///
     /// # Examples
     ///
@@ -795,7 +795,7 @@ impl UnixDatagram {
     }
 
     cfg_io_util! {
-        /// Try to receive data from the socket without waiting.
+        /// Tries to receive data from the socket without waiting.
         ///
         /// # Examples
         ///
@@ -856,7 +856,7 @@ impl UnixDatagram {
             Ok((n, SocketAddr(addr)))
         }
 
-        /// Try to read data from the stream into the provided buffer, advancing the
+        /// Tries to read data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
         /// # Examples
@@ -1157,7 +1157,7 @@ impl UnixDatagram {
         Poll::Ready(Ok(()))
     }
 
-    /// Try to receive data from the socket without waiting.
+    /// Tries to receive data from the socket without waiting.
     ///
     /// # Examples
     ///
@@ -1209,7 +1209,7 @@ impl UnixDatagram {
         Ok((n, SocketAddr(addr)))
     }
 
-    /// Try to read or write from the socket using a user-provided IO operation.
+    /// Tries to read or write from the socket using a user-provided IO operation.
     ///
     /// If the socket is ready, the provided closure is called. The closure
     /// should attempt to perform IO operation from the socket by manually

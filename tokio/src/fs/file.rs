@@ -74,7 +74,7 @@ use std::fs::File as StdFile;
 /// # }
 /// ```
 ///
-/// Read the contents of a file into a buffer
+/// Read the contents of a file into a buffer:
 ///
 /// ```no_run
 /// use tokio::fs::File;
@@ -383,7 +383,7 @@ impl File {
         asyncify(move || std.metadata()).await
     }
 
-    /// Create a new `File` instance that shares the same underlying file handle
+    /// Creates a new `File` instance that shares the same underlying file handle
     /// as the existing `File` instance. Reads, writes, and seeks will affect both
     /// File instances simultaneously.
     ///

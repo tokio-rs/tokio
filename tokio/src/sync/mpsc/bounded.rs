@@ -10,7 +10,7 @@ cfg_time! {
 use std::fmt;
 use std::task::{Context, Poll};
 
-/// Send values to the associated `Receiver`.
+/// Sends values to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`](channel) function.
 ///
@@ -22,7 +22,7 @@ pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
 
-/// Permit to send one value into the channel.
+/// Permits to send one value into the channel.
 ///
 /// `Permit` values are returned by [`Sender::reserve()`] and [`Sender::try_reserve()`]
 /// and are used to guarantee channel capacity before generating a message to send.
@@ -49,7 +49,7 @@ pub struct OwnedPermit<T> {
     chan: Option<chan::Tx<T, Semaphore>>,
 }
 
-/// Receive values from the associated `Sender`.
+/// Receives values from the associated `Sender`.
 ///
 /// Instances are created by the [`channel`](channel) function.
 ///
@@ -57,7 +57,7 @@ pub struct OwnedPermit<T> {
 ///
 /// [`ReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReceiverStream.html
 pub struct Receiver<T> {
-    /// The channel receiver
+    /// The channel receiver.
     chan: chan::Rx<T, Semaphore>,
 }
 
@@ -187,7 +187,7 @@ impl<T> Receiver<T> {
         poll_fn(|cx| self.chan.recv(cx)).await
     }
 
-    /// Try to receive the next value for this receiver.
+    /// Tries to receive the next value for this receiver.
     ///
     /// This method returns the [`Empty`] error if the channel is currently
     /// empty, but there are still outstanding [senders] or [permits].
@@ -672,7 +672,7 @@ impl<T> Sender<T> {
         self.chan.is_closed()
     }
 
-    /// Wait for channel capacity. Once capacity to send one message is
+    /// Waits for channel capacity. Once capacity to send one message is
     /// available, it is reserved for the caller.
     ///
     /// If the channel is full, the function waits for the number of unreceived
@@ -721,7 +721,7 @@ impl<T> Sender<T> {
         Ok(Permit { chan: &self.chan })
     }
 
-    /// Wait for channel capacity, moving the `Sender` and returning an owned
+    /// Waits for channel capacity, moving the `Sender` and returning an owned
     /// permit. Once capacity to send one message is available, it is reserved
     /// for the caller.
     ///
@@ -815,7 +815,7 @@ impl<T> Sender<T> {
         }
     }
 
-    /// Try to acquire a slot in the channel without waiting for the slot to become
+    /// Tries to acquire a slot in the channel without waiting for the slot to become
     /// available.
     ///
     /// If the channel is full this function will return [`TrySendError`], otherwise
@@ -868,7 +868,7 @@ impl<T> Sender<T> {
         Ok(Permit { chan: &self.chan })
     }
 
-    /// Try to acquire a slot in the channel without waiting for the slot to become
+    /// Tries to acquire a slot in the channel without waiting for the slot to become
     /// available, returning an owned permit.
     ///
     /// This moves the sender _by value_, and returns an owned permit that can
@@ -1117,7 +1117,7 @@ impl<T> OwnedPermit<T> {
         Sender { chan }
     }
 
-    /// Release the reserved capacity *without* sending a message, returning the
+    /// Releases the reserved capacity *without* sending a message, returning the
     /// [`Sender`].
     ///
     /// # Examples

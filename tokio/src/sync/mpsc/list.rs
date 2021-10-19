@@ -8,7 +8,7 @@ use std::fmt;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 
-/// List queue transmit handle
+/// List queue transmit handle.
 pub(crate) struct Tx<T> {
     /// Tail in the `Block` mpmc list.
     block_tail: AtomicPtr<Block<T>>,
@@ -79,7 +79,7 @@ impl<T> Tx<T> {
         }
     }
 
-    /// Closes the send half of the list
+    /// Closes the send half of the list.
     ///
     /// Similar process as pushing a value, but instead of writing the value &
     /// setting the ready flag, the TX_CLOSED flag is set on the block.
