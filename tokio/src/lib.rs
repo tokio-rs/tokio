@@ -350,6 +350,19 @@
 //!
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 
+// Test that pointer width is compatible. This asserts that e.g. usize is at
+// least 32 bits, which a lot of components in Tokio currently assumes.
+//
+// TODO: improve once we have MSRV access to const eval to make more flexible.
+#[cfg(not(any(
+    target_pointer_width = "32",
+    target_pointer_width = "64",
+    target_pointer_width = "128"
+)))]
+compile_error! {
+    "Tokio requires the platform pointer width to be 32, 64, or 128 bits"
+}
+
 // Includes re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any
