@@ -29,7 +29,7 @@ net = ["tokio/net"]
 compat = ["futures-io",]
 codec = []
 time = ["tokio/time","slab"]
-io = []
+io = ["tokio/io-util"]
 rt = ["tokio/rt"]
 
 __docs_rs = ["futures-util"]

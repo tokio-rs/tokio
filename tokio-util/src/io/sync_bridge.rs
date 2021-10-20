@@ -1,3 +1,5 @@
+#[cfg(feature = "io")]
+
 use std::io::{Read, Write};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
