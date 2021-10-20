@@ -643,7 +643,7 @@ impl<T> DelayQueue<T> {
     /// This function can take O(n) time even when the capacity cannot be reduced or the allocation is
     /// shrunk in place. Repeated calls run in O(1) though.
     ///
-    /// [`poll_expired`]: method@Self::compact
+    /// [`compact`]: method@Self::compact
     pub fn shrink_to_fit(&mut self) {
         self.slab.shrink_to_fit()
     }
@@ -701,12 +701,14 @@ impl<T> DelayQueue<T> {
                 let old_key = inverse_key_map.get(&from_key).unwrap();
 
                 *key_map.get_mut(&old_key).unwrap() = to_key;
-            } else if key_map.contains_key(&from_key) {
-                // `from_key` is a `Key` that was given out during insertion
-                // into `self`.
-                *key_map.get_mut(&from_key).unwrap() = to_key;
             } else {
-                key_map.insert(from_key, to_key);
+                let key = key_map.get_mut(&from_key);
+                match key {
+                    Some(k) => *k = to_key,
+                    None => {
+                        key_map.insert(from_key, to_key);
+                    }
+                }
             }
 
             true
