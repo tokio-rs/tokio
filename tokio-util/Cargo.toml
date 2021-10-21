@@ -30,7 +30,7 @@ compat = ["futures-io",]
 codec = []
 time = ["tokio/time","slab"]
 io = []
-io-util = ["io", "rt", "tokio/io-util"]
+io-util = ["io", "tokio/rt", "tokio/io-util"]
 rt = ["tokio/rt"]
 
 __docs_rs = ["futures-util"]
