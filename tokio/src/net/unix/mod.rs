@@ -1,4 +1,4 @@
-//! Unix domain socket utility types
+//! Unix domain socket utility types.
 
 // This module does not currently provide any public API, but it was
 // unintentionally defined as a public module. Hide it from the documentation

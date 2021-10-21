@@ -173,7 +173,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{fmt, mem};
 
-/// An owned handle to the task, tracked by ref count
+/// An owned handle to the task, tracked by ref count.
 #[repr(transparent)]
 pub(crate) struct Task<S: 'static> {
     raw: RawTask,
@@ -211,7 +211,7 @@ pub(crate) struct UnownedTask<S: 'static> {
 unsafe impl<S> Send for UnownedTask<S> {}
 unsafe impl<S> Sync for UnownedTask<S> {}
 
-/// Task result sent back
+/// Task result sent back.
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
 pub(crate) trait Schedule: Sync + Sized + 'static {
@@ -260,7 +260,7 @@ cfg_rt! {
         (task, notified, join)
     }
 
-    /// Create a new task with an associated join handle. This method is used
+    /// Creates a new task with an associated join handle. This method is used
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.
@@ -327,7 +327,7 @@ cfg_rt_multi_thread! {
 }
 
 impl<S: Schedule> Task<S> {
-    /// Pre-emptively cancel the task as part of the shutdown process.
+    /// Pre-emptively cancels the task as part of the shutdown process.
     pub(crate) fn shutdown(self) {
         let raw = self.raw;
         mem::forget(self);
@@ -336,7 +336,7 @@ impl<S: Schedule> Task<S> {
 }
 
 impl<S: Schedule> LocalNotified<S> {
-    /// Run the task
+    /// Runs the task.
     pub(crate) fn run(self) {
         let raw = self.task.raw;
         mem::forget(self);
@@ -420,7 +420,7 @@ impl<S> fmt::Debug for Notified<S> {
 
 /// # Safety
 ///
-/// Tasks are pinned
+/// Tasks are pinned.
 unsafe impl<S> linked_list::Link for Task<S> {
     type Handle = Task<S>;
     type Target = Header;

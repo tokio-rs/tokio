@@ -76,7 +76,7 @@ impl Park for ParkThread {
 // ==== impl Inner ====
 
 impl Inner {
-    /// Park the current thread for at most `dur`.
+    /// Parks the current thread for at most `dur`.
     fn park(&self) {
         // If we were previously notified then we consume this notification and
         // return quickly.
@@ -227,7 +227,7 @@ pub(crate) struct CachedParkThread {
 }
 
 impl CachedParkThread {
-    /// Create a new `ParkThread` handle for the current thread.
+    /// Creates a new `ParkThread` handle for the current thread.
     ///
     /// This type cannot be moved to other threads, so it should be created on
     /// the thread that the caller intends to park.
@@ -241,7 +241,7 @@ impl CachedParkThread {
         self.with_current(|park_thread| park_thread.unpark())
     }
 
-    /// Get a reference to the `ParkThread` handle for this thread.
+    /// Gets a reference to the `ParkThread` handle for this thread.
     fn with_current<F, R>(&self, f: F) -> Result<R, ParkError>
     where
         F: FnOnce(&ParkThread) -> R,

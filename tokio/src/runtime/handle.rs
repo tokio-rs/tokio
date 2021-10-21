@@ -47,7 +47,7 @@ pub struct EnterGuard<'a> {
 }
 
 impl Handle {
-    /// Enter the runtime context. This allows you to construct types that must
+    /// Enters the runtime context. This allows you to construct types that must
     /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
     /// It will also allow you to call methods such as [`tokio::spawn`].
     ///
@@ -61,7 +61,7 @@ impl Handle {
         }
     }
 
-    /// Returns a `Handle` view over the currently running `Runtime`
+    /// Returns a `Handle` view over the currently running `Runtime`.
     ///
     /// # Panic
     ///
@@ -120,7 +120,7 @@ impl Handle {
         }
     }
 
-    /// Spawn a future onto the Tokio runtime.
+    /// Spawns a future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
     /// thread pool. The thread pool is then responsible for polling the future
@@ -158,7 +158,7 @@ impl Handle {
         self.spawner.spawn(future)
     }
 
-    /// Run the provided function on an executor dedicated to blocking
+    /// Runs the provided function on an executor dedicated to blocking.
     /// operations.
     ///
     /// # Examples
@@ -227,7 +227,7 @@ impl Handle {
         handle
     }
 
-    /// Run a future to completion on this `Handle`'s associated `Runtime`.
+    /// Runs a future to completion on this `Handle`'s associated `Runtime`.
     ///
     /// This runs the given future on the current thread, blocking until it is
     /// complete, and yielding its resolved result. Any tasks or timers which

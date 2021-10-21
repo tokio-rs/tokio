@@ -63,6 +63,45 @@ fn block_on_num_polls() {
     });
 }
 
+#[test]
+fn assert_no_unnecessary_polls() {
+    loom::model(|| {
+        // // After we poll outer future, woken should reset to false
+        let rt = Builder::new_current_thread().build().unwrap();
+        let (tx, rx) = oneshot::channel();
+        let pending_cnt = Arc::new(AtomicUsize::new(0));
+
+        rt.spawn(async move {
+            for _ in 0..24 {
+                task::yield_now().await;
+            }
+            tx.send(()).unwrap();
+        });
+
+        let pending_cnt_clone = pending_cnt.clone();
+        rt.block_on(async move {
+            // use task::yield_now() to ensure woken set to true
+            // ResetFuture will be polled at most once
+            // Here comes two cases
+            // 1. recv no message from channel, ResetFuture will be polled
+            //    but get Pending and we record ResetFuture.pending_cnt ++.
+            //    Then when message arrive, ResetFuture returns Ready. So we
+            //    expect ResetFuture.pending_cnt = 1
+            // 2. recv message from channel, ResetFuture returns Ready immediately.
+            //    We expect ResetFuture.pending_cnt = 0
+            task::yield_now().await;
+            ResetFuture {
+                rx,
+                pending_cnt: pending_cnt_clone,
+            }
+            .await;
+        });
+
+        let pending_cnt = pending_cnt.load(Acquire);
+        assert!(pending_cnt <= 1);
+    });
+}
+
 struct BlockedFuture {
     rx: Receiver<()>,
     num_polls: Arc<AtomicUsize>,
@@ -76,6 +115,25 @@ impl Future for BlockedFuture {
 
         match Pin::new(&mut self.rx).poll(cx) {
             Poll::Pending => Poll::Pending,
+            _ => Poll::Ready(()),
+        }
+    }
+}
+
+struct ResetFuture {
+    rx: Receiver<()>,
+    pending_cnt: Arc<AtomicUsize>,
+}
+
+impl Future for ResetFuture {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match Pin::new(&mut self.rx).poll(cx) {
+            Poll::Pending => {
+                self.pending_cnt.fetch_add(1, Release);
+                Poll::Pending
+            }
             _ => Poll::Ready(()),
         }
     }

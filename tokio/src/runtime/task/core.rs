@@ -44,22 +44,22 @@ pub(super) struct CoreStage<T: Future> {
 ///
 /// Holds the future or output, depending on the stage of execution.
 pub(super) struct Core<T: Future, S> {
-    /// Scheduler used to drive this future
+    /// Scheduler used to drive this future.
     pub(super) scheduler: S,
 
-    /// Either the future or the output
+    /// Either the future or the output.
     pub(super) stage: CoreStage<T>,
 }
 
 /// Crate public as this is also needed by the pool.
 #[repr(C)]
 pub(crate) struct Header {
-    /// Task state
+    /// Task state.
     pub(super) state: State,
 
     pub(super) owned: UnsafeCell<linked_list::Pointers<Header>>,
 
-    /// Pointer to next task, used with the injection queue
+    /// Pointer to next task, used with the injection queue.
     pub(super) queue_next: UnsafeCell<Option<NonNull<Header>>>,
 
     /// Table of function pointers for executing actions on the task.
@@ -133,7 +133,7 @@ impl<T: Future> CoreStage<T> {
         self.stage.with_mut(f)
     }
 
-    /// Poll the future
+    /// Polls the future.
     ///
     /// # Safety
     ///
@@ -169,7 +169,7 @@ impl<T: Future> CoreStage<T> {
         res
     }
 
-    /// Drop the future
+    /// Drops the future.
     ///
     /// # Safety
     ///
@@ -181,7 +181,7 @@ impl<T: Future> CoreStage<T> {
         }
     }
 
-    /// Store the task output
+    /// Stores the task output.
     ///
     /// # Safety
     ///
@@ -193,7 +193,7 @@ impl<T: Future> CoreStage<T> {
         }
     }
 
-    /// Take the task output
+    /// Takes the task output.
     ///
     /// # Safety
     ///

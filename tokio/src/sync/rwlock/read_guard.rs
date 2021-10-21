@@ -19,7 +19,7 @@ pub struct RwLockReadGuard<'a, T: ?Sized> {
 }
 
 impl<'a, T: ?Sized> RwLockReadGuard<'a, T> {
-    /// Make a new `RwLockReadGuard` for a component of the locked data.
+    /// Makes a new `RwLockReadGuard` for a component of the locked data.
     ///
     /// This operation cannot fail as the `RwLockReadGuard` passed in already
     /// locked the data.

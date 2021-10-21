@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 /// if buffer contents seems to be utf8. Otherwise it only trims buffer down to MAX_BUF.
 /// That's why, wrapped writer will always receive well-formed utf-8 bytes.
 /// # Other platforms
-/// passes data to `inner` as is
+/// Passes data to `inner` as is.
 #[derive(Debug)]
 pub(crate) struct SplitByUtf8BoundaryIfWindows<W> {
     inner: W,

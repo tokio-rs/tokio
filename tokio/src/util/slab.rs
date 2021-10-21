@@ -85,11 +85,11 @@ pub(crate) struct Address(usize);
 
 /// An entry in the slab.
 pub(crate) trait Entry: Default {
-    /// Reset the entry's value and track the generation.
+    /// Resets the entry's value and track the generation.
     fn reset(&self);
 }
 
-/// A reference to a value stored in the slab
+/// A reference to a value stored in the slab.
 pub(crate) struct Ref<T> {
     value: *const Value<T>,
 }
@@ -101,9 +101,9 @@ const NUM_PAGES: usize = 19;
 const PAGE_INITIAL_SIZE: usize = 32;
 const PAGE_INDEX_SHIFT: u32 = PAGE_INITIAL_SIZE.trailing_zeros() + 1;
 
-/// A page in the slab
+/// A page in the slab.
 struct Page<T> {
-    /// Slots
+    /// Slots.
     slots: Mutex<Slots<T>>,
 
     // Number of slots currently being used. This is not guaranteed to be up to
@@ -116,7 +116,7 @@ struct Page<T> {
     // The number of slots the page can hold.
     len: usize,
 
-    // Length of all previous pages combined
+    // Length of all previous pages combined.
     prev_len: usize,
 }
 
@@ -128,9 +128,9 @@ struct CachedPage<T> {
     init: usize,
 }
 
-/// Page state
+/// Page state.
 struct Slots<T> {
-    /// Slots
+    /// Slots.
     slots: Vec<Slot<T>>,
 
     head: usize,
@@ -159,9 +159,9 @@ struct Slot<T> {
     next: u32,
 }
 
-/// Value paired with a reference to the page
+/// Value paired with a reference to the page.
 struct Value<T> {
-    /// Value stored in the value
+    /// Value stored in the value.
     value: T,
 
     /// Pointer to the page containing the slot.
@@ -171,7 +171,7 @@ struct Value<T> {
 }
 
 impl<T> Slab<T> {
-    /// Create a new, empty, slab
+    /// Create a new, empty, slab.
     pub(crate) fn new() -> Slab<T> {
         // Initializing arrays is a bit annoying. Instead of manually writing
         // out an array and every single entry, `Default::default()` is used to
@@ -455,7 +455,7 @@ impl<T> Page<T> {
         addr.0 - self.prev_len
     }
 
-    /// Returns the address for the given slot
+    /// Returns the address for the given slot.
     fn addr(&self, slot: usize) -> Address {
         Address(slot + self.prev_len)
     }
@@ -478,7 +478,7 @@ impl<T> Default for Page<T> {
 }
 
 impl<T> Page<T> {
-    /// Release a slot into the page's free list
+    /// Release a slot into the page's free list.
     fn release(&self, value: *const Value<T>) {
         let mut locked = self.slots.lock();
 
@@ -492,7 +492,7 @@ impl<T> Page<T> {
 }
 
 impl<T> CachedPage<T> {
-    /// Refresh the cache
+    /// Refreshes the cache.
     fn refresh(&mut self, page: &Page<T>) {
         let slots = page.slots.lock();
 
@@ -502,7 +502,7 @@ impl<T> CachedPage<T> {
         }
     }
 
-    // Get a value by index
+    /// Gets a value by index.
     fn get(&self, idx: usize) -> &T {
         assert!(idx < self.init);
 
@@ -576,7 +576,7 @@ impl<T: Entry> Slot<T> {
 }
 
 impl<T> Value<T> {
-    // Release the slot, returning the `Arc<Page<T>>` logically owned by the ref.
+    /// Releases the slot, returning the `Arc<Page<T>>` logically owned by the ref.
     fn release(&self) -> Arc<Page<T>> {
         // Safety: called by `Ref`, which owns an `Arc<Page<T>>` instance.
         let page = unsafe { Arc::from_raw(self.page) };

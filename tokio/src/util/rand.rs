@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-/// Fast random number generate
+/// Fast random number generate.
 ///
 /// Implement xorshift64+: 2 32-bit xorshift sequences added together.
 /// Shift triplet `[17,7,16]` was calculated as indicated in Marsaglia's
@@ -14,7 +14,7 @@ pub(crate) struct FastRand {
 }
 
 impl FastRand {
-    /// Initialize a new, thread-local, fast random number generator.
+    /// Initializes a new, thread-local, fast random number generator.
     pub(crate) fn new(seed: u64) -> FastRand {
         let one = (seed >> 32) as u32;
         let mut two = seed as u32;

@@ -20,7 +20,7 @@ use std::io::IoSlice;
 use bytes::Buf;
 
 cfg_io_util! {
-    /// Defines numeric writer
+    /// Defines numeric writer.
     macro_rules! write_impl {
         (
             $(
@@ -256,7 +256,7 @@ cfg_io_util! {
             write_buf(self, src)
         }
 
-        /// Attempts to write an entire buffer into this writer
+        /// Attempts to write an entire buffer into this writer.
         ///
         /// Equivalent to:
         ///

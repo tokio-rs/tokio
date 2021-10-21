@@ -57,11 +57,11 @@ cfg_test_util! {
         /// Instant to use as the clock's base instant.
         base: std::time::Instant,
 
-        /// Instant at which the clock was last unfrozen
+        /// Instant at which the clock was last unfrozen.
         unfrozen: Option<std::time::Instant>,
     }
 
-    /// Pause time
+    /// Pauses time.
     ///
     /// The current value of `Instant::now()` is saved and all subsequent calls
     /// to `Instant::now()` will return the saved value. The saved value can be
@@ -101,7 +101,7 @@ cfg_test_util! {
         clock.pause();
     }
 
-    /// Resume time
+    /// Resumes time.
     ///
     /// Clears the saved `Instant::now()` value. Subsequent calls to
     /// `Instant::now()` will return the value returned by the system call.
@@ -121,7 +121,7 @@ cfg_test_util! {
         inner.unfrozen = Some(std::time::Instant::now());
     }
 
-    /// Advance time.
+    /// Advances time.
     ///
     /// Increments the saved `Instant::now()` value by `duration`. Subsequent
     /// calls to `Instant::now()` will return the result of the increment.
@@ -159,7 +159,7 @@ cfg_test_util! {
         crate::task::yield_now().await;
     }
 
-    /// Return the current instant, factoring in frozen time.
+    /// Returns the current instant, factoring in frozen time.
     pub(crate) fn now() -> Instant {
         if let Some(clock) = clock() {
             clock.now()
@@ -169,7 +169,7 @@ cfg_test_util! {
     }
 
     impl Clock {
-        /// Return a new `Clock` instance that uses the current execution context's
+        /// Returns a new `Clock` instance that uses the current execution context's
         /// source of time.
         pub(crate) fn new(enable_pausing: bool, start_paused: bool) -> Clock {
             let now = std::time::Instant::now();

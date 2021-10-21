@@ -29,12 +29,12 @@ impl JoinError {
         }
     }
 
-    /// Returns true if the error was caused by the task being cancelled
+    /// Returns true if the error was caused by the task being cancelled.
     pub fn is_cancelled(&self) -> bool {
         matches!(&self.repr, Repr::Cancelled)
     }
 
-    /// Returns true if the error was caused by the task panicking
+    /// Returns true if the error was caused by the task panicking.
     ///
     /// # Examples
     ///

@@ -10,22 +10,22 @@ pub(super) struct RawTask {
 }
 
 pub(super) struct Vtable {
-    /// Poll the future
+    /// Polls the future.
     pub(super) poll: unsafe fn(NonNull<Header>),
 
-    /// Deallocate the memory
+    /// Deallocates the memory.
     pub(super) dealloc: unsafe fn(NonNull<Header>),
 
-    /// Read the task output, if complete
+    /// Reads the task output, if complete.
     pub(super) try_read_output: unsafe fn(NonNull<Header>, *mut (), &Waker),
 
-    /// The join handle has been dropped
+    /// The join handle has been dropped.
     pub(super) drop_join_handle_slow: unsafe fn(NonNull<Header>),
 
-    /// The task is remotely aborted
+    /// The task is remotely aborted.
     pub(super) remote_abort: unsafe fn(NonNull<Header>),
 
-    /// Scheduler is being shutdown
+    /// Scheduler is being shutdown.
     pub(super) shutdown: unsafe fn(NonNull<Header>),
 }
 

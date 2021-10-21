@@ -221,8 +221,9 @@ mod date {
     use std::cell::RefCell;
     use std::fmt::{self, Write};
     use std::str;
+    use std::time::SystemTime;
 
-    use time::{self, Duration};
+    use httpdate::HttpDate;
 
     pub struct Now(());
 
@@ -252,22 +253,26 @@ mod date {
     struct LastRenderedNow {
         bytes: [u8; 128],
         amt: usize,
-        next_update: time::Timespec,
+        unix_date: u64,
     }
 
     thread_local!(static LAST: RefCell<LastRenderedNow> = RefCell::new(LastRenderedNow {
         bytes: [0; 128],
         amt: 0,
-        next_update: time::Timespec::new(0, 0),
+        unix_date: 0,
     }));
 
     impl fmt::Display for Now {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             LAST.with(|cache| {
                 let mut cache = cache.borrow_mut();
-                let now = time::get_time();
-                if now >= cache.next_update {
-                    cache.update(now);
+                let now = SystemTime::now();
+                let now_unix = now
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .map(|since_epoch| since_epoch.as_secs())
+                    .unwrap_or(0);
+                if cache.unix_date != now_unix {
+                    cache.update(now, now_unix);
                 }
                 f.write_str(cache.buffer())
             })
@@ -279,11 +284,10 @@ mod date {
             str::from_utf8(&self.bytes[..self.amt]).unwrap()
         }
 
-        fn update(&mut self, now: time::Timespec) {
+        fn update(&mut self, now: SystemTime, now_unix: u64) {
             self.amt = 0;
-            write!(LocalBuffer(self), "{}", time::at(now).rfc822()).unwrap();
-            self.next_update = now + Duration::seconds(1);
-            self.next_update.nsec = 0;
+            self.unix_date = now_unix;
+            write!(LocalBuffer(self), "{}", HttpDate::from(now)).unwrap();
         }
     }
 

@@ -69,14 +69,14 @@ cfg_rt_multi_thread! {
     }
 }
 
-/// Run the given closure with a cooperative task budget. When the function
+/// Runs the given closure with a cooperative task budget. When the function
 /// returns, the budget is reset to the value prior to calling the function.
 #[inline(always)]
 pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
     with_budget(Budget::initial(), f)
 }
 
-/// Run the given closure with an unconstrained task budget. When the function returns, the budget
+/// Runs the given closure with an unconstrained task budget. When the function returns, the budget
 /// is reset to the value prior to calling the function.
 #[inline(always)]
 pub(crate) fn with_unconstrained<R>(f: impl FnOnce() -> R) -> R {
@@ -108,7 +108,7 @@ fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
 }
 
 cfg_rt_multi_thread! {
-    /// Set the current task's budget
+    /// Sets the current task's budget.
     pub(crate) fn set(budget: Budget) {
         CURRENT.with(|cell| cell.set(budget))
     }
@@ -120,7 +120,7 @@ cfg_rt_multi_thread! {
 }
 
 cfg_rt! {
-    /// Forcibly remove the budgeting constraints early.
+    /// Forcibly removes the budgeting constraints early.
     ///
     /// Returns the remaining budget
     pub(crate) fn stop() -> Budget {
@@ -186,7 +186,7 @@ cfg_coop! {
     }
 
     impl Budget {
-        /// Decrement the budget. Returns `true` if successful. Decrementing fails
+        /// Decrements the budget. Returns `true` if successful. Decrementing fails
         /// when there is not enough remaining budget.
         fn decrement(&mut self) -> bool {
             if let Some(num) = &mut self.0 {
