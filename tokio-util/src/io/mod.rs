@@ -13,10 +13,12 @@
 mod read_buf;
 mod reader_stream;
 mod stream_reader;
-mod sync_bridge;
+cfg_io_util! {
+    mod sync_bridge;
+    pub use self::sync_bridge::SyncIoBridge;
+}
 
 pub use self::read_buf::read_buf;
 pub use self::reader_stream::ReaderStream;
 pub use self::stream_reader::StreamReader;
-pub use self::sync_bridge::SyncIoBridge;
 pub use crate::util::{poll_read_buf, poll_write_buf};

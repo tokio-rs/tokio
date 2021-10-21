@@ -1,4 +1,4 @@
-#![cfg(feature = "io")]
+#![cfg(feature = "io-util")]
 
 use std::error::Error;
 use std::io::{Cursor, Read, Result as IoResult};
