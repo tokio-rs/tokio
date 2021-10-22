@@ -9,11 +9,11 @@ error[E0308]: mismatched types
 help: consider using a semicolon here
   |
 5 |     Ok(());
-  |           ^
+  |           +
 help: try adding a return type
   |
 4 | async fn missing_semicolon_or_return_type() -> Result<(), _> {
-  |                                             ^^^^^^^^^^^^^^^^
+  |                                             ++++++++++++++++
 
 error[E0308]: mismatched types
   --> $DIR/macros_type_mismatch.rs:10:5
