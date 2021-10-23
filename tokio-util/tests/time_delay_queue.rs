@@ -640,10 +640,8 @@ async fn delay_queue_poll_expired_when_empty() {
     assert!(assert_ready!(poll!(delay_queue)).is_none());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn compact_expire_empty() {
-    time::pause();
-
     let mut queue = task::spawn(DelayQueue::new());
 
     let now = Instant::now();
@@ -665,10 +663,8 @@ async fn compact_expire_empty() {
     assert_eq!(queue.capacity(), 0);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn compact_remove_empty() {
-    time::pause();
-
     let mut queue = task::spawn(DelayQueue::new());
 
     let now = Instant::now();
@@ -685,12 +681,10 @@ async fn compact_remove_empty() {
     assert_eq!(queue.capacity(), 0);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 // Trigger a re-mapping of keys in the slab due to a `compact` call and
 // test removal of re-mapped keys
 async fn compact_remove_remapped_keys() {
-    time::pause();
-
     let mut queue = task::spawn(DelayQueue::new());
 
     let now = Instant::now();
@@ -726,23 +720,10 @@ async fn compact_remove_remapped_keys() {
     queue.compact();
     assert_eq!(queue.len(), 1);
     assert_eq!(queue.capacity(), 1);
-    /*
-    sleep(ms(10)).await;
-
-    while res.len() < 4 {
-        let entry = assert_ready_ok!(poll!(queue));
-        res.push(entry.into_inner());
-    }
-
-    let entry = assert_ready!(poll!(queue));
-    assert!(entry.is_none());
-    */
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn compact_change_deadline() {
-    time::pause();
-
     let mut queue = task::spawn(DelayQueue::new());
 
     let mut now = Instant::now();
@@ -793,7 +774,7 @@ async fn compact_change_deadline() {
     assert!(entry.is_none());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn compact_new_available_keys() {
     // Tests `available_keys` functionality of `DelayQueue`.
     // We first insert 2*`AVAILABLE_KEYS_LIST_SIZE` (call this `insert1`)
@@ -808,7 +789,6 @@ async fn compact_new_available_keys() {
     // FIXME somehow coordinate this with the actual const `DelayQueue` uses
     const AVAILABLE_KEYS_LIST_SIZE: usize = 200;
 
-    time::pause();
     let now = Instant::now();
 
     let mut queue = task::spawn(DelayQueue::new());
@@ -842,7 +822,6 @@ async fn compact_new_available_keys() {
 
     // remove last inserted element
     assert_eq!(queue.remove(&key_last_elem).into_inner(), "foo_last")
->>>>>>> 0289df7c (add shrink_to_fit and compact methods to DelayQueue)
 }
 
 fn ms(n: u64) -> Duration {

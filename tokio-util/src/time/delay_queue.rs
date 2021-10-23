@@ -11,7 +11,7 @@ use tokio::time::{error::Error, sleep_until, Duration, Instant, Sleep};
 
 use slab::Slab;
 use std::cmp;
-use std::collections::{HashMap, LinkedList};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
@@ -165,7 +165,7 @@ pub struct DelayQueue<T> {
 
     /// List of keys that we can use to create new keys. See the comment for
     /// `create_available_keys` for why this is necessary.
-    available_keys: LinkedList<usize>,
+    available_keys: Vec<usize>,
 }
 
 /// An entry in `DelayQueue` that has expired and been removed.
@@ -276,7 +276,7 @@ impl<T> DelayQueue<T> {
             start: Instant::now(),
             waker: None,
             key_map: HashMap::new(),
-            available_keys: LinkedList::new(),
+            available_keys: Vec::new(),
         }
     }
 
@@ -397,7 +397,7 @@ impl<T> DelayQueue<T> {
         let mut num_created_keys = 0;
         while num_created_keys < AVAILABLE_KEYS_LIST_SIZE {
             if !self.key_map.contains_key(&Key::new(i)) {
-                self.available_keys.push_back(i);
+                self.available_keys.push(i);
                 num_created_keys += 1;
             }
             i += 1;
@@ -409,7 +409,7 @@ impl<T> DelayQueue<T> {
             self.create_available_keys();
         }
 
-        self.available_keys.pop_front().unwrap()
+        self.available_keys.pop().unwrap()
     }
 
     /// Attempts to pull out the next value of the delay queue, registering the
