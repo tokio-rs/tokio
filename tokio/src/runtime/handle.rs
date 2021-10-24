@@ -4,6 +4,7 @@ use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::CONTEXT_MISSING_ERROR;
 
 use std::future::Future;
+use std::marker::PhantomData;
 use std::{error, fmt};
 
 /// Handle to the runtime.
@@ -41,12 +42,12 @@ pub struct Handle {
 #[derive(Debug)]
 #[must_use = "Creating and dropping a guard does nothing"]
 pub struct EnterGuard<'a> {
-    handle: &'a Handle,
-    guard: context::EnterGuard,
+    _guard: context::EnterGuard,
+    _handle_lifetime: PhantomData<&'a Handle>,
 }
 
 impl Handle {
-    /// Enter the runtime context. This allows you to construct types that must
+    /// Enters the runtime context. This allows you to construct types that must
     /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
     /// It will also allow you to call methods such as [`tokio::spawn`].
     ///
@@ -55,12 +56,12 @@ impl Handle {
     /// [`tokio::spawn`]: fn@crate::spawn
     pub fn enter(&self) -> EnterGuard<'_> {
         EnterGuard {
-            handle: self,
-            guard: context::enter(self.clone()),
+            _guard: context::enter(self.clone()),
+            _handle_lifetime: PhantomData,
         }
     }
 
-    /// Returns a `Handle` view over the currently running `Runtime`
+    /// Returns a `Handle` view over the currently running `Runtime`.
     ///
     /// # Panic
     ///
@@ -119,7 +120,7 @@ impl Handle {
         }
     }
 
-    /// Spawn a future onto the Tokio runtime.
+    /// Spawns a future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
     /// thread pool. The thread pool is then responsible for polling the future
@@ -157,7 +158,7 @@ impl Handle {
         self.spawner.spawn(future)
     }
 
-    /// Run the provided function on an executor dedicated to blocking
+    /// Runs the provided function on an executor dedicated to blocking.
     /// operations.
     ///
     /// # Examples
@@ -226,7 +227,7 @@ impl Handle {
         handle
     }
 
-    /// Run a future to completion on this `Handle`'s associated `Runtime`.
+    /// Runs a future to completion on this `Handle`'s associated `Runtime`.
     ///
     /// This runs the given future on the current thread, blocking until it is
     /// complete, and yielding its resolved result. Any tasks or timers which

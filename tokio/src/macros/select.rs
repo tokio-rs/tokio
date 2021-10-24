@@ -1,4 +1,4 @@
-/// Wait on multiple concurrent branches, returning when the **first** branch
+/// Waits on multiple concurrent branches, returning when the **first** branch
 /// completes, cancelling the remaining branches.
 ///
 /// The `select!` macro must be used inside of async functions, closures, and

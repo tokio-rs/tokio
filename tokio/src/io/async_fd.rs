@@ -205,13 +205,13 @@ impl<T: AsRawFd> AsyncFd<T> {
         })
     }
 
-    /// Returns a shared reference to the backing object of this [`AsyncFd`]
+    /// Returns a shared reference to the backing object of this [`AsyncFd`].
     #[inline]
     pub fn get_ref(&self) -> &T {
         self.inner.as_ref().unwrap()
     }
 
-    /// Returns a mutable reference to the backing object of this [`AsyncFd`]
+    /// Returns a mutable reference to the backing object of this [`AsyncFd`].
     #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         self.inner.as_mut().unwrap()

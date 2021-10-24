@@ -1,4 +1,4 @@
-//! Asynchronous signal handling for Tokio
+//! Asynchronous signal handling for Tokio.
 //!
 //! Note that signal handling is in general a very tricky topic and should be
 //! used with great care. This crate attempts to implement 'best practice' for

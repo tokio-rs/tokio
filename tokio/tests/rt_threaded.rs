@@ -54,6 +54,7 @@ fn many_oneshot_futures() {
         drop(rt);
     }
 }
+
 #[test]
 fn many_multishot_futures() {
     const CHAIN: usize = 200;
@@ -471,6 +472,30 @@ fn wake_during_shutdown() {
     rt.spawn(f2);
 
     rt.block_on(async { tokio::time::sleep(tokio::time::Duration::from_millis(20)).await });
+}
+
+#[should_panic]
+#[tokio::test]
+async fn test_block_in_place1() {
+    tokio::task::block_in_place(|| {});
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_block_in_place2() {
+    tokio::task::block_in_place(|| {});
+}
+
+#[should_panic]
+#[tokio::main(flavor = "current_thread")]
+#[test]
+async fn test_block_in_place3() {
+    tokio::task::block_in_place(|| {});
+}
+
+#[tokio::main]
+#[test]
+async fn test_block_in_place4() {
+    tokio::task::block_in_place(|| {});
 }
 
 fn rt() -> Runtime {

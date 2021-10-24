@@ -1,4 +1,4 @@
-//! Channel error types
+//! Channel error types.
 
 use std::error::Error;
 use std::fmt;

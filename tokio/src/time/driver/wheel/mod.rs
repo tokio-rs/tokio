@@ -46,11 +46,11 @@ pub(crate) struct Wheel {
 /// precision of 1 millisecond.
 const NUM_LEVELS: usize = 6;
 
-/// The maximum duration of a `Sleep`
+/// The maximum duration of a `Sleep`.
 pub(super) const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 
 impl Wheel {
-    /// Create a new timing wheel
+    /// Creates a new timing wheel.
     pub(crate) fn new() -> Wheel {
         let levels = (0..NUM_LEVELS).map(Level::new).collect();
 
@@ -61,13 +61,13 @@ impl Wheel {
         }
     }
 
-    /// Return the number of milliseconds that have elapsed since the timing
+    /// Returns the number of milliseconds that have elapsed since the timing
     /// wheel's creation.
     pub(crate) fn elapsed(&self) -> u64 {
         self.elapsed
     }
 
-    /// Insert an entry into the timing wheel.
+    /// Inserts an entry into the timing wheel.
     ///
     /// # Arguments
     ///
@@ -115,7 +115,7 @@ impl Wheel {
         Ok(when)
     }
 
-    /// Remove `item` from the timing wheel.
+    /// Removes `item` from the timing wheel.
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
             let when = item.as_ref().cached_when();
@@ -136,7 +136,7 @@ impl Wheel {
         }
     }
 
-    /// Instant at which to poll
+    /// Instant at which to poll.
     pub(crate) fn poll_at(&self) -> Option<u64> {
         self.next_expiration().map(|expiration| expiration.deadline)
     }

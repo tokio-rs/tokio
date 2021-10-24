@@ -264,8 +264,8 @@ jobs:
       - name: "rustfmt --check"
         # Workaround for rust-lang/cargo#7732
         run: |
-          if ! rustfmt --check --edition 2018 $(find . -name '*.rs' -print); then
-            printf "Please run \`rustfmt --edition 2018 \$(find . -name '*.rs' -print)\` to fix rustfmt errors.\nSee CONTRIBUTING.md for more details.\n" >&2
+          if ! rustfmt --check --edition 2018 $(git ls-files '*.rs'); then
+            printf "Please run \`rustfmt --edition 2018 \$(git ls-files '*.rs')\` to fix rustfmt errors.\nSee CONTRIBUTING.md for more details.\n" >&2
             exit 1
           fi
 

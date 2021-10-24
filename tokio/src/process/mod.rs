@@ -578,7 +578,7 @@ impl Command {
         self
     }
 
-    /// Set executable argument
+    /// Sets executable argument.
     ///
     /// Set the first process argument, `argv[0]`, to something other than the
     /// default executable path.
@@ -1173,7 +1173,7 @@ pub struct ChildStderr {
 }
 
 impl ChildStdin {
-    /// Create an asynchronous `ChildStdin` from a synchronous one.
+    /// Creates an asynchronous `ChildStdin` from a synchronous one.
     ///
     /// # Errors
     ///
@@ -1188,7 +1188,7 @@ impl ChildStdin {
 }
 
 impl ChildStdout {
-    /// Create an asynchronous `ChildStderr` from a synchronous one.
+    /// Creates an asynchronous `ChildStderr` from a synchronous one.
     ///
     /// # Errors
     ///
@@ -1203,7 +1203,7 @@ impl ChildStdout {
 }
 
 impl ChildStderr {
-    /// Create an asynchronous `ChildStderr` from a synchronous one.
+    /// Creates an asynchronous `ChildStderr` from a synchronous one.
     ///
     /// # Errors
     ///

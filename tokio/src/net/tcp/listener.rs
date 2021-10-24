@@ -227,7 +227,7 @@ impl TcpListener {
         Ok(TcpListener { io })
     }
 
-    /// Turn a [`tokio::net::TcpListener`] into a [`std::net::TcpListener`].
+    /// Turns a [`tokio::net::TcpListener`] into a [`std::net::TcpListener`].
     ///
     /// The returned [`std::net::TcpListener`] will have nonblocking mode set as
     /// `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.

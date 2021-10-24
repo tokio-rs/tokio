@@ -1,4 +1,4 @@
-/// Wait on multiple concurrent branches, returning when **all** branches
+/// Waits on multiple concurrent branches, returning when **all** branches
 /// complete with `Ok(_)` or on the first `Err(_)`.
 ///
 /// The `try_join!` macro must be used inside of async functions, closures, and

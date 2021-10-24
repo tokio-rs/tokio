@@ -498,8 +498,19 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
+        let prev_deadline = self.next_deadline();
+
         self.remove_key(key);
         let data = self.slab.remove(key.index);
+
+        let next_deadline = self.next_deadline();
+        if prev_deadline != next_deadline {
+            match (next_deadline, &mut self.delay) {
+                (None, _) => self.delay = None,
+                (Some(deadline), Some(delay)) => delay.as_mut().reset(deadline),
+                (Some(deadline), None) => self.delay = Some(Box::pin(sleep_until(deadline))),
+            }
+        }
 
         Expired {
             key: Key::new(key.index),

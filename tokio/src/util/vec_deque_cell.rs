@@ -45,7 +45,7 @@ impl<T> VecDequeCell<T> {
         }
     }
 
-    /// Replace the inner VecDeque with an empty VecDeque and return the current
+    /// Replaces the inner VecDeque with an empty VecDeque and return the current
     /// contents.
     pub(crate) fn take(&self) -> VecDeque<T> {
         unsafe { self.with_inner(|inner| std::mem::take(inner)) }

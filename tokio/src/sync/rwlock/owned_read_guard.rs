@@ -22,7 +22,7 @@ pub struct OwnedRwLockReadGuard<T: ?Sized, U: ?Sized = T> {
 }
 
 impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
-    /// Make a new `OwnedRwLockReadGuard` for a component of the locked data.
+    /// Makes a new `OwnedRwLockReadGuard` for a component of the locked data.
     /// This operation cannot fail as the `OwnedRwLockReadGuard` passed in
     /// already locked the data.
     ///
