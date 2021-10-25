@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "full"), allow(dead_code))]
 
-//! An intrusive double linked list of data
+//! An intrusive double linked list of data.
 //!
 //! The data structure supports tracking pinned nodes. Most of the data
 //! structure's APIs are `unsafe` as they require the caller to ensure the
@@ -46,10 +46,10 @@ pub(crate) unsafe trait Link {
     /// This is usually a pointer-ish type.
     type Handle;
 
-    /// Node type
+    /// Node type.
     type Target;
 
-    /// Convert the handle to a raw pointer without consuming the handle
+    /// Convert the handle to a raw pointer without consuming the handle.
     #[allow(clippy::wrong_self_convention)]
     fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target>;
 
@@ -60,7 +60,7 @@ pub(crate) unsafe trait Link {
     unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>>;
 }
 
-/// Previous / next pointers
+/// Previous / next pointers.
 pub(crate) struct Pointers<T> {
     inner: UnsafeCell<PointersInner<T>>,
 }

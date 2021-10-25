@@ -1,4 +1,4 @@
-//! Use POSIX AIO futures with Tokio
+//! Use POSIX AIO futures with Tokio.
 
 use crate::io::driver::{Handle, Interest, ReadyEvent, Registration};
 use mio::event::Source;
@@ -16,14 +16,14 @@ use std::task::{Context, Poll};
 /// Tokio's consumer must pass an implementor of this trait to create a
 /// [`Aio`] object.
 pub trait AioSource {
-    /// Register this AIO event source with Tokio's reactor
+    /// Registers this AIO event source with Tokio's reactor.
     fn register(&mut self, kq: RawFd, token: usize);
 
-    /// Deregister this AIO event source with Tokio's reactor
+    /// Deregisters this AIO event source with Tokio's reactor.
     fn deregister(&mut self);
 }
 
-/// Wrap the user's AioSource in order to implement mio::event::Source, which
+/// Wraps the user's AioSource in order to implement mio::event::Source, which
 /// is what the rest of the crate wants.
 struct MioSource<T>(T);
 

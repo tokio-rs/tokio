@@ -245,7 +245,7 @@ impl<T> OnceCell<T> {
         }
     }
 
-    /// Set the value of the `OnceCell` to the given value if the `OnceCell` is
+    /// Sets the value of the `OnceCell` to the given value if the `OnceCell` is
     /// empty.
     ///
     /// If the `OnceCell` already has a value, this call will fail with an
@@ -283,7 +283,7 @@ impl<T> OnceCell<T> {
         }
     }
 
-    /// Get the value currently in the `OnceCell`, or initialize it with the
+    /// Gets the value currently in the `OnceCell`, or initialize it with the
     /// given asynchronous operation.
     ///
     /// If some other task is currently working on initializing the `OnceCell`,
@@ -331,7 +331,7 @@ impl<T> OnceCell<T> {
         }
     }
 
-    /// Get the value currently in the `OnceCell`, or initialize it with the
+    /// Gets the value currently in the `OnceCell`, or initialize it with the
     /// given asynchronous operation.
     ///
     /// If some other task is currently working on initializing the `OnceCell`,
@@ -382,7 +382,7 @@ impl<T> OnceCell<T> {
         }
     }
 
-    /// Take the value from the cell, destroying the cell in the process.
+    /// Takes the value from the cell, destroying the cell in the process.
     /// Returns `None` if the cell is empty.
     pub fn into_inner(mut self) -> Option<T> {
         if self.initialized_mut() {

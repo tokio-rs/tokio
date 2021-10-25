@@ -4,12 +4,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
-/// Simplified waking interface based on Arcs
+/// Simplified waking interface based on Arcs.
 pub(crate) trait Wake: Send + Sync {
-    /// Wake by value
+    /// Wake by value.
     fn wake(self: Arc<Self>);
 
-    /// Wake by reference
+    /// Wake by reference.
     fn wake_by_ref(arc_self: &Arc<Self>);
 }
 

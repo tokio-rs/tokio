@@ -90,7 +90,7 @@ impl<T> ReadHalf<T> {
 }
 
 impl<T> WriteHalf<T> {
-    /// Check if this `WriteHalf` and some `ReadHalf` were split from the same
+    /// Checks if this `WriteHalf` and some `ReadHalf` were split from the same
     /// stream.
     pub fn is_pair_of(&self, other: &ReadHalf<T>) -> bool {
         Arc::ptr_eq(&self.inner, &other.inner)

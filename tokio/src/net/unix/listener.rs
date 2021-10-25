@@ -88,7 +88,7 @@ impl UnixListener {
         Ok(UnixListener { io })
     }
 
-    /// Turn a [`tokio::net::UnixListener`] into a [`std::os::unix::net::UnixListener`].
+    /// Turns a [`tokio::net::UnixListener`] into a [`std::os::unix::net::UnixListener`].
     ///
     /// The returned [`std::os::unix::net::UnixListener`] will have nonblocking mode
     /// set as `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.

@@ -53,7 +53,7 @@ pub(crate) fn split(stream: &mut TcpStream) -> (ReadHalf<'_>, WriteHalf<'_>) {
 }
 
 impl ReadHalf<'_> {
-    /// Attempt to receive data on the socket, without removing that data from
+    /// Attempts to receive data on the socket, without removing that data from
     /// the queue, registering the current task for wakeup if data is not yet
     /// available.
     ///
@@ -139,7 +139,7 @@ impl ReadHalf<'_> {
         poll_fn(|cx| self.poll_peek(cx, &mut buf)).await
     }
 
-    /// Wait for any of the requested ready states.
+    /// Waits for any of the requested ready states.
     ///
     /// This function is usually paired with `try_read()` or `try_write()`. It
     /// can be used to concurrently read / write to the same socket on a single
@@ -157,7 +157,7 @@ impl ReadHalf<'_> {
         self.0.ready(interest).await
     }
 
-    /// Wait for the socket to become readable.
+    /// Waits for the socket to become readable.
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
@@ -174,7 +174,7 @@ impl ReadHalf<'_> {
         self.0.readable().await
     }
 
-    /// Try to read data from the stream into the provided buffer, returning how
+    /// Tries to read data from the stream into the provided buffer, returning how
     /// many bytes were read.
     ///
     /// Receives any pending data from the socket but does not wait for new data
@@ -197,7 +197,7 @@ impl ReadHalf<'_> {
         self.0.try_read(buf)
     }
 
-    /// Try to read data from the stream into the provided buffers, returning
+    /// Tries to read data from the stream into the provided buffers, returning
     /// how many bytes were read.
     ///
     /// Data is copied to fill each buffer in order, with the final buffer
@@ -227,7 +227,7 @@ impl ReadHalf<'_> {
     }
 
     cfg_io_util! {
-        /// Try to read data from the stream into the provided buffer, advancing the
+        /// Tries to read data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
         /// Receives any pending data from the socket but does not wait for new data
@@ -263,7 +263,7 @@ impl ReadHalf<'_> {
 }
 
 impl WriteHalf<'_> {
-    /// Wait for any of the requested ready states.
+    /// Waits for any of the requested ready states.
     ///
     /// This function is usually paired with `try_read()` or `try_write()`. It
     /// can be used to concurrently read / write to the same socket on a single
@@ -281,7 +281,7 @@ impl WriteHalf<'_> {
         self.0.ready(interest).await
     }
 
-    /// Wait for the socket to become writable.
+    /// Waits for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
@@ -296,7 +296,7 @@ impl WriteHalf<'_> {
         self.0.writable().await
     }
 
-    /// Try to write a buffer to the stream, returning how many bytes were
+    /// Tries to write a buffer to the stream, returning how many bytes were
     /// written.
     ///
     /// The function will attempt to write the entire contents of `buf`, but
@@ -313,7 +313,7 @@ impl WriteHalf<'_> {
         self.0.try_write(buf)
     }
 
-    /// Try to write several buffers to the stream, returning how many bytes
+    /// Tries to write several buffers to the stream, returning how many bytes
     /// were written.
     ///
     /// Data is written from each buffer in order, with the final buffer read

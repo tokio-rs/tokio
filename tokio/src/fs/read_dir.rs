@@ -34,7 +34,7 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
     Ok(ReadDir(State::Idle(Some(std))))
 }
 
-/// Read the the entries in a directory.
+/// Reads the the entries in a directory.
 ///
 /// This struct is returned from the [`read_dir`] function of this module and
 /// will yield instances of [`DirEntry`]. Through a [`DirEntry`] information
@@ -287,7 +287,7 @@ impl DirEntry {
         asyncify(move || std.file_type()).await
     }
 
-    /// Returns a reference to the underlying `std::fs::DirEntry`
+    /// Returns a reference to the underlying `std::fs::DirEntry`.
     #[cfg(unix)]
     pub(super) fn as_inner(&self) -> &std::fs::DirEntry {
         &self.0

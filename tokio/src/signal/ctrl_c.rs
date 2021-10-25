@@ -47,6 +47,15 @@ use std::io;
 ///     println!("received ctrl-c event");
 /// }
 /// ```
+///
+/// Listen in the background:
+///
+/// ```rust,no_run
+/// tokio::spawn(async move {
+///     tokio::signal::ctrl_c().await.unwrap();
+///     // Your handler here
+/// });
+/// ```
 pub async fn ctrl_c() -> io::Result<()> {
     os_impl::ctrl_c()?.recv().await;
     Ok(())
