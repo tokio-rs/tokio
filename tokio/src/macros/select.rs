@@ -502,7 +502,7 @@ macro_rules! select {
                                 let mut fut = unsafe { Pin::new_unchecked(fut) };
 
                                 // Try polling it
-                                let out = match fut.poll(cx) {
+                                let out = match Future::poll(fut, cx) {
                                     Ready(out) => out,
                                     Pending => {
                                         // Track that at least one future is
