@@ -12,13 +12,14 @@ use tokio::time::{error::Error, sleep_until, Duration, Instant, Sleep};
 use slab::Slab;
 use std::cmp;
 use std::collections::HashMap;
+use std::convert::From;
 use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{self, Poll, Waker};
 
-// Size of list that is used to store keys that can be used by `create_new_key`.
+// Size of vector that is used to store keys that can be used by `create_new_key`.
 const AVAILABLE_KEYS_LIST_SIZE: usize = 200;
 
 /// A queue of delayed elements.
@@ -161,9 +162,9 @@ pub struct DelayQueue<T> {
     /// cannot be changed retroactively we need to keep track of these re-mappings.
     /// The keys of `key_map` correspond to the old keys that were given out and
     /// the values to the `Key`s that were re-mapped by the `compact` call.
-    key_map: HashMap<Key, Key>,
+    key_map: HashMap<Key, KeySlab>,
 
-    /// List of keys that we can use to create new keys. See the comment for
+    /// Vector of keys that we can use to create new keys. See the comment for
     /// `create_available_keys` for why this is necessary.
     available_keys: Vec<usize>,
 }
@@ -194,6 +195,11 @@ pub struct Expired<T> {
 /// [`DelayQueue::insert`]: method@DelayQueue::insert
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Key {
+    index: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct KeySlab {
     index: usize,
 }
 
@@ -353,7 +359,7 @@ impl<T> DelayQueue<T> {
             // `key_to_give_out` -> `key` in `self.key_map`.
             let key_to_give_out = self.create_new_key();
             self.key_map
-                .insert(Key::new(key_to_give_out), Key::new(key));
+                .insert(Key::new(key_to_give_out), KeySlab::new(key));
             key = key_to_give_out
         }
 
@@ -384,14 +390,14 @@ impl<T> DelayQueue<T> {
         Key::new(key)
     }
 
-    // We use a linked list of available keys that we can use to create
-    // new keys. The creation of new keys is necessary if the `slab.insert` call
+    // We maintain a vector of available keys for efficiency reasons, so as not to calculate
+    // the smallest available key each time `slab.insert` outputs a duplicate key.
+    // The creation of new keys is necessary if the `slab.insert` call
     // in `self.insert` gives back a key that was previously given out.
     // This scenario of a duplicate key can only happen after `compact` was called.
-    // We maintain a list of available keys for efficiency reasons, so as not to calculate
-    // the smallest available key each time `slab.insert` outputs a duplicate key.
     fn create_available_keys(&mut self) {
         assert!(self.available_keys.is_empty());
+        self.available_keys.reserve_exact(AVAILABLE_KEYS_LIST_SIZE);
 
         let mut i = 0;
         let mut num_created_keys = 0;
@@ -519,7 +525,7 @@ impl<T> DelayQueue<T> {
     /// # Panics
     ///
     /// Panics if the key is not contained in the expired queue or the wheel.
-    fn remove_key(&mut self, key: &Key) {
+    fn remove_key(&mut self, key: &KeySlab) {
         use crate::time::wheel::Stack;
 
         // Special case the `expired` queue
@@ -561,7 +567,7 @@ impl<T> DelayQueue<T> {
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
         let prev_deadline = self.next_deadline();
 
-        let remapped_key = self.key_map.remove(key).unwrap_or(*key);
+        let remapped_key: KeySlab = self.key_map.remove(key).unwrap_or((*key).into());
         self.remove_key(&remapped_key);
         let data = self.slab.remove(remapped_key.index);
 
@@ -617,7 +623,10 @@ impl<T> DelayQueue<T> {
     /// ```
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
         let key_map = &self.key_map;
-        let remapped_key = *key_map.get(&*key).unwrap_or(key);
+        let remapped_key = match key_map.get(&*key) {
+            Some(k) => *k,
+            None => (*key).into(),
+        };
 
         self.remove_key(&remapped_key);
 
@@ -645,7 +654,8 @@ impl<T> DelayQueue<T> {
     ///
     /// [`compact`]: method@Self::compact
     pub fn shrink_to_fit(&mut self) {
-        self.slab.shrink_to_fit()
+        self.slab.shrink_to_fit();
+        self.key_map.shrink_to_fit();
     }
 
     /// Shrink the capacity of the slab, which `DelayQueue` uses internally for storage allocation,
@@ -684,7 +694,7 @@ impl<T> DelayQueue<T> {
 
         let mut remapped_keys = HashMap::new();
 
-        let mut inverse_key_map: HashMap<Key, Key> = HashMap::new();
+        let mut inverse_key_map: HashMap<KeySlab, Key> = HashMap::new();
         for (old_key, remapped_key) in key_map.iter() {
             inverse_key_map.insert(*remapped_key, *old_key);
         }
@@ -692,21 +702,14 @@ impl<T> DelayQueue<T> {
         slab.compact(|_, from, to| {
             remapped_keys.insert(from, to);
 
-            let from_key = Key::new(from);
-            let to_key = Key::new(to);
-
-            if inverse_key_map.contains_key(&from_key) {
-                // `from_key` is a `Key` that was previously re-mapped, get the key
-                // that was previously given out for its item.
-                let old_key = inverse_key_map.get(&from_key).unwrap();
-
-                *key_map.get_mut(&old_key).unwrap() = to_key;
+            if let Some(old_key) = inverse_key_map.get(&KeySlab::new(from)) {
+                *key_map.get_mut(&old_key).unwrap() = KeySlab::new(to);
             } else {
-                let key = key_map.get_mut(&from_key);
+                let key = key_map.get_mut(&Key::new(from));
                 match key {
-                    Some(k) => *k = to_key,
+                    Some(k) => *k = KeySlab::new(to),
                     None => {
-                        key_map.insert(from_key, to_key);
+                        key_map.insert(Key::new(from), KeySlab::new(to));
                     }
                 }
             }
@@ -1078,6 +1081,24 @@ impl<T> Default for Stack<T> {
 impl Key {
     pub(crate) fn new(index: usize) -> Key {
         Key { index }
+    }
+}
+
+impl KeySlab {
+    pub(crate) fn new(index: usize) -> KeySlab {
+        KeySlab { index }
+    }
+}
+
+impl From<Key> for KeySlab {
+    fn from(item: Key) -> Self {
+        KeySlab::new(item.index)
+    }
+}
+
+impl From<KeySlab> for Key {
+    fn from(item: KeySlab) -> Self {
+        Key::new(item.index)
     }
 }
 
