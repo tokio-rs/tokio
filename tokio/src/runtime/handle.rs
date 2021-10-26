@@ -18,15 +18,25 @@ pub struct Handle {
     pub(super) spawner: Spawner,
 
     /// Handles to the I/O drivers
+    #[cfg_attr(
+        not(any(feature = "net", feature = "process", all(unix, feature = "signal"))),
+        allow(dead_code)
+    )]
     pub(super) io_handle: driver::IoHandle,
 
     /// Handles to the signal drivers
+    #[cfg_attr(
+        not(any(feature = "signal", all(unix, feature = "process"))),
+        allow(dead_code)
+    )]
     pub(super) signal_handle: driver::SignalHandle,
 
     /// Handles to the time drivers
+    #[cfg_attr(not(feature = "time"), allow(dead_code))]
     pub(super) time_handle: driver::TimeHandle,
 
     /// Source of `Instant::now()`
+    #[cfg_attr(not(all(feature = "time", feature = "test-util")), allow(dead_code))]
     pub(super) clock: driver::Clock,
 
     /// Blocking pool spawner
