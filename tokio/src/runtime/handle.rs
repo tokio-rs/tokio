@@ -14,6 +14,7 @@ use std::{error, fmt};
 ///
 /// [`Runtime::handle`]: crate::runtime::Runtime::handle()
 #[derive(Debug, Clone)]
+#[cfg_attr(miri, allow(dead_code))]
 pub struct Handle {
     pub(super) spawner: Spawner,
 
