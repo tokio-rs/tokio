@@ -450,8 +450,8 @@ impl<T> Sender<T> {
     /// use tokio::sync::watch;
     ///
     /// let (tx, _rx) = watch::channel(1);
-    /// assert_eq!(tx.send_replace(2).unwrap(), 1);
-    /// assert_eq!(tx.send_replace(3).unwrap(), 2);
+    /// assert_eq!(tx.send_replace(2), 1);
+    /// assert_eq!(tx.send_replace(3), 2);
     /// ```
     pub fn send_replace(&self, value: T) -> T {
         let old = {
