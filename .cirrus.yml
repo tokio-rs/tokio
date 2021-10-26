@@ -3,9 +3,6 @@ freebsd_instance:
 env:
   HOME: /tmp      # Cargo cache needs it.
   RUSTFLAGS: -D warnings
-cargo_cache:
-  folder: $CARGO_HOME/registry
-  fingerprint_script: cat Cargo.lock || echo ""
 
 
 # Test FreeBSD in a full VM on cirrus-ci.com.  Test the i686 target too, in the
@@ -22,6 +19,9 @@ task:
     - |
       echo "~~~~ rustc --version ~~~~"
       rustc --version
+  cargo_cache:
+    folder: $CARGO_HOME/registry
+    fingerprint_script: cat Cargo.lock || echo ""
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --all-features
@@ -40,6 +40,9 @@ task:
     - |
       echo "~~~~ rustc --version ~~~~"
       rustc --version
+  cargo_cache:
+    folder: $CARGO_HOME/registry
+    fingerprint_script: cat Cargo.lock || echo ""
   test_script:
     - . $HOME/.cargo/env
     - cargo doc --lib --no-deps --all-features --document-private-items
@@ -56,6 +59,9 @@ task:
     - |
       echo "~~~~ rustc --version ~~~~"
       rustc --version
+  cargo_cache:
+    folder: $CARGO_HOME/registry
+    fingerprint_script: cat Cargo.lock || echo ""
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --all-features --target i686-unknown-freebsd
