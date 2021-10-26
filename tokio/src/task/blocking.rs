@@ -128,7 +128,7 @@ cfg_rt! {
     /// of the payload body using a library written for synchronous I/O.
     ///
     /// Finally, see also [Bridging with sync code][bridgesync] for discussions
-    /// around the opposite case of using tokio as part of a larger synchronous
+    /// around the opposite case of using Tokio as part of a larger synchronous
     /// codebase.
     ///
     /// [`Builder`]: struct@crate::runtime::Builder
