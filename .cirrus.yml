@@ -24,9 +24,14 @@ task:
     # Generate the Cargo.lock file for cargo-cache
     - . $HOME/.cargo/env
     - cargo generate-lockfile
-  cargo_cache:
+  registry_cache:
     folder: $HOME/.cargo/registry
-    fingerprint_script: cat Cargo.lock || echo ""
+    fingerprint_script: cat Cargo.lock
+  target_cache:
+    folder: target
+    fingerprint_script:
+      - rustc --version
+      - cat Cargo.lock
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --all-features
@@ -49,9 +54,14 @@ task:
     # Generate the Cargo.lock file for cargo-cache
     - . $HOME/.cargo/env
     - cargo generate-lockfile
-  cargo_cache:
+  registry_cache:
     folder: $HOME/.cargo/registry
-    fingerprint_script: cat Cargo.lock || echo ""
+    fingerprint_script: cat Cargo.lock
+  target_cache:
+    folder: target
+    fingerprint_script:
+      - rustc --version
+      - cat Cargo.lock
   test_script:
     - . $HOME/.cargo/env
     - cargo doc --lib --no-deps --all-features --document-private-items
@@ -72,9 +82,14 @@ task:
     # Generate the Cargo.lock file for cargo-cache
     - . $HOME/.cargo/env
     - cargo generate-lockfile
-  cargo_cache:
+  registry_cache:
     folder: $HOME/.cargo/registry
-    fingerprint_script: cat Cargo.lock || echo ""
+    fingerprint_script: cat Cargo.lock
+  target_cache:
+    folder: target
+    fingerprint_script:
+      - rustc --version
+      - cat Cargo.lock
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --all-features --target i686-unknown-freebsd
