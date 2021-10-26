@@ -1,3 +1,18 @@
+# 0.6.9 (October 26, 2021)
+
+### Added
+
+- codec: implement `Clone` for `LengthDelimitedCodec` ([#4089])
+- io: add `SyncIoBridge`  ([#4146])
+
+### Fixed
+
+- time: update deadline on removal in `DelayQueue` ([#4178])
+
+[#4089]: https://github.com/tokio-rs/tokio/pull/4089
+[#4146]: https://github.com/tokio-rs/tokio/pull/4146
+[#4178]: https://github.com/tokio-rs/tokio/pull/4178
+
 # 0.6.8 (September 3, 2021)
 
 ### Added
