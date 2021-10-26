@@ -19,7 +19,6 @@ task:
     - |
       echo "~~~~ rustc --version ~~~~"
       rustc --version
-    - echo HOME is $HOME and $CARGO_HOME is $CARGO_HOME
   cargo_generate_lockfile_script:
     # Generate the Cargo.lock file for cargo-cache
     - . $HOME/.cargo/env
@@ -30,6 +29,7 @@ task:
   target_cache:
     folder: target
     fingerprint_script:
+      - . $HOME/.cargo/env
       - rustc --version
       - cat Cargo.lock
   test_script:
@@ -60,6 +60,7 @@ task:
   target_cache:
     folder: target
     fingerprint_script:
+      - . $HOME/.cargo/env
       - rustc --version
       - cat Cargo.lock
   test_script:
@@ -88,6 +89,7 @@ task:
   target_cache:
     folder: target
     fingerprint_script:
+      - . $HOME/.cargo/env
       - rustc --version
       - cat Cargo.lock
   test_script:
