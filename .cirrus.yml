@@ -20,7 +20,7 @@ task:
       echo "~~~~ rustc --version ~~~~"
       rustc --version
     - echo HOME is $HOME and $CARGO_HOME is $CARGO_HOME
-  cargo_update:
+  cargo_update_script:
     # Generate the Cargo.lock file for cargo-cache
     - . $HOME/.cargo/env
     - cargo generate-lockfile --all-features
@@ -45,7 +45,7 @@ task:
     - |
       echo "~~~~ rustc --version ~~~~"
       rustc --version
-  cargo_update:
+  cargo_update_script:
     # Generate the Cargo.lock file for cargo-cache
     - . $HOME/.cargo/env
     - cargo generate-lockfile --all-features
@@ -68,7 +68,7 @@ task:
     - |
       echo "~~~~ rustc --version ~~~~"
       rustc --version
-  cargo_update:
+  cargo_update_script:
     # Generate the Cargo.lock file for cargo-cache
     - . $HOME/.cargo/env
     - cargo generate-lockfile --all-features
