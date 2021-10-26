@@ -1,6 +1,7 @@
 freebsd_instance:
   image: freebsd-12-2-release-amd64
 env:
+  HOME: /tmp      # Cargo cache needs it.
   RUSTFLAGS: -D warnings
 cargo_cache:
   folder: $CARGO_HOME/registry
@@ -16,7 +17,6 @@ task:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain stable
-    - echo HOME is $HOME
     - . $HOME/.cargo/env
     - |
       echo "~~~~ rustc --version ~~~~"
