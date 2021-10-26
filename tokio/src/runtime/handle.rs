@@ -32,6 +32,7 @@ pub struct Handle {
     pub(super) signal_handle: driver::SignalHandle,
 
     /// Handles to the time drivers
+    #[cfg_attr(not(feature = "time"), allow(dead_code))]
     pub(super) time_handle: driver::TimeHandle,
 
     /// Source of `Instant::now()`
