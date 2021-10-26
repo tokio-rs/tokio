@@ -8,9 +8,11 @@
 ### Fixed
 
 - time: update deadline on removal in `DelayQueue` ([#4178])
+- codec: Update stream impl for Framed to return None after Err ([#4166])
 
 [#4089]: https://github.com/tokio-rs/tokio/pull/4089
 [#4146]: https://github.com/tokio-rs/tokio/pull/4146
+[#4166]: https://github.com/tokio-rs/tokio/pull/4166
 [#4178]: https://github.com/tokio-rs/tokio/pull/4178
 
 # 0.6.8 (September 3, 2021)
