@@ -19,13 +19,18 @@ task:
     - |
       echo "~~~~ rustc --version ~~~~"
       rustc --version
+    - echo HOME is $HOME and $CARGO_HOME is $CARGO_HOME
+  cargo_update:
+    # Generate the Cargo.lock file for cargo-cache
+    - . $HOME/.cargo/env
+    - cargo generate-lockfile --all-features
   cargo_cache:
-    folder: $CARGO_HOME/registry
+    folder: $HOME/.cargo/registry
     fingerprint_script: cat Cargo.lock || echo ""
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --all-features
-  before_cache_script: rm -rf $CARGO_HOME/registry/index
+  before_cache_script: rm -rf $HOME/.cargo/registry/index
 
 task:
   name: FreeBSD docs
@@ -40,13 +45,17 @@ task:
     - |
       echo "~~~~ rustc --version ~~~~"
       rustc --version
+  cargo_update:
+    # Generate the Cargo.lock file for cargo-cache
+    - . $HOME/.cargo/env
+    - cargo generate-lockfile --all-features
   cargo_cache:
-    folder: $CARGO_HOME/registry
+    folder: $HOME/.cargo/registry
     fingerprint_script: cat Cargo.lock || echo ""
   test_script:
     - . $HOME/.cargo/env
     - cargo doc --lib --no-deps --all-features --document-private-items
-  before_cache_script: rm -rf $CARGO_HOME/registry/index
+  before_cache_script: rm -rf $HOME/.cargo/registry/index
 
 task:
   name: FreeBSD 32-bit
@@ -59,10 +68,14 @@ task:
     - |
       echo "~~~~ rustc --version ~~~~"
       rustc --version
+  cargo_update:
+    # Generate the Cargo.lock file for cargo-cache
+    - . $HOME/.cargo/env
+    - cargo generate-lockfile --all-features
   cargo_cache:
-    folder: $CARGO_HOME/registry
+    folder: $HOME/.cargo/registry
     fingerprint_script: cat Cargo.lock || echo ""
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --all-features --target i686-unknown-freebsd
-  before_cache_script: rm -rf $CARGO_HOME/registry/index
+  before_cache_script: rm -rf $HOME/.cargo/registry/index
