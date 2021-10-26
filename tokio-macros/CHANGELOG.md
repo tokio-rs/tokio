@@ -1,6 +1,6 @@
 # 1.6.0 (October 26th, 2021)
 
-- macros: fix type resolution error in `#[tokio::main]` (#4176)
+- macros: fix type resolution error in `#[tokio::main]` ([#4176])
 
 [#4176]: https://github.com/tokio-rs/tokio/pull/4176
 
