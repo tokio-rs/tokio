@@ -14,14 +14,15 @@ use std::{error, fmt};
 ///
 /// [`Runtime::handle`]: crate::runtime::Runtime::handle()
 #[derive(Debug, Clone)]
-#[cfg_attr(miri, allow(dead_code))]
 pub struct Handle {
     pub(super) spawner: Spawner,
 
     /// Handles to the I/O drivers
+    #[cfg_attr(not(any(feature = "net", feature = "process", all(unix, feature = "signal"))), allow(dead_code))]
     pub(super) io_handle: driver::IoHandle,
 
     /// Handles to the signal drivers
+    #[cfg_attr(not(any(feature = "signal", all(unix, feature = "process"))), allow(dead_code))]
     pub(super) signal_handle: driver::SignalHandle,
 
     /// Handles to the time drivers
