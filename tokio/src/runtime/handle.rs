@@ -35,6 +35,7 @@ pub struct Handle {
     pub(super) time_handle: driver::TimeHandle,
 
     /// Source of `Instant::now()`
+    #[cfg_attr(not(feature = "time"), allow(dead_code))]
     pub(super) clock: driver::Clock,
 
     /// Blocking pool spawner
