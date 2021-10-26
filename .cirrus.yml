@@ -48,7 +48,7 @@ task:
   cargo_generate_lockfile_script:
     # Generate the Cargo.lock file for cargo-cache
     - . $HOME/.cargo/env
-    - cargo generate-lockfile --offline
+    - cargo generate-lockfile
   cargo_cache:
     folder: $HOME/.cargo/registry
     fingerprint_script: cat Cargo.lock || echo ""
