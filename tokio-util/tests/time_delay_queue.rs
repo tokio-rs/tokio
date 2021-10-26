@@ -109,6 +109,7 @@ async fn multi_delay_at_start() {
 
     let start = Instant::now();
     for elapsed in 0..1200 {
+        println!("elapsed: {:?}", elapsed);
         let elapsed = elapsed + 1;
         tokio::time::sleep_until(start + ms(elapsed)).await;
 
@@ -128,10 +129,12 @@ async fn multi_delay_at_start() {
             assert_pending!(poll!(queue));
         }
     }
+    println!("finished multi_delay_start");
 }
 
 #[tokio::test]
 async fn insert_in_past_fires_immediately() {
+    println!("running insert_in_past_fires_immediately");
     time::pause();
 
     let mut queue = task::spawn(DelayQueue::new());
@@ -142,6 +145,7 @@ async fn insert_in_past_fires_immediately() {
     queue.insert_at("foo", now);
 
     assert_ready!(poll!(queue));
+    println!("finished insert_in_past_fires_immediately");
 }
 
 #[tokio::test]
@@ -822,6 +826,41 @@ async fn compact_new_available_keys() {
 
     // remove last inserted element
     assert_eq!(queue.remove(&key_last_elem).into_inner(), "foo_last")
+}
+
+#[tokio::test(start_paused = true)]
+async fn remove_after_compact() {
+    let now = Instant::now();
+    let mut queue = DelayQueue::new();
+
+    let foo_key = queue.insert_at("foo", now + ms(10));
+    queue.insert_at("bar", now + ms(20));
+    queue.remove(&foo_key);
+    queue.compact();
+
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        queue.remove(&foo_key);
+    }));
+    assert!(panic.is_err());
+}
+
+#[tokio::test(start_paused = true)]
+async fn remove_after_compact_poll() {
+    let now = Instant::now();
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let foo_key = queue.insert_at("foo", now + ms(10));
+    queue.insert_at("bar", now + ms(20));
+
+    sleep(ms(10)).await;
+    assert_eq!(assert_ready_ok!(poll!(queue)).key(), foo_key);
+
+    queue.compact();
+
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        queue.remove(&foo_key);
+    }));
+    assert!(panic.is_err());
 }
 
 fn ms(n: u64) -> Duration {

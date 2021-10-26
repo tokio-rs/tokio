@@ -6,9 +6,10 @@ mod stack;
 pub(crate) use self::stack::Stack;
 
 use std::borrow::Borrow;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::usize;
+
+use tracing::{debug, instrument};
 
 /// Timing wheel implementation.
 ///
@@ -140,8 +141,10 @@ where
     }
 
     /// Advances the timer up to the instant represented by `now`.
+    #[instrument(skip(self, store), level = "debug")]
     pub(crate) fn poll(&mut self, now: u64, store: &mut T::Store) -> Option<T::Owned> {
         loop {
+            debug!("inside loop of wheel::poll");
             let expiration = self.next_expiration().and_then(|expiration| {
                 if expiration.deadline > now {
                     None
@@ -205,6 +208,7 @@ where
     /// time and the expiration time.  for each in that population either
     /// return it for notification (in the case of the last level) or tier
     /// it down to the next level (in all other cases).
+    #[instrument(skip(self, store), level = "debug")]
     pub(crate) fn poll_expiration(
         &mut self,
         expiration: &Expiration,
@@ -246,25 +250,6 @@ where
 
     fn level_for(&self, when: u64) -> usize {
         level_for(self.elapsed, when)
-    }
-
-    // Change all indices that are used in `self.levels` according to `remapping`.
-    pub(crate) fn adjust_indices(
-        &mut self,
-        remapping: &HashMap<T::Borrowed, T::Borrowed>,
-        store: &mut T::Store,
-    ) where
-        T::Borrowed: Copy,
-    {
-        for level in self.levels.iter_mut() {
-            level.modify_items(store, |old_key| {
-                if let Some(new_key) = remapping.get(&old_key) {
-                    *new_key
-                } else {
-                    old_key
-                }
-            });
-        }
     }
 }
 

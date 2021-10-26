@@ -25,9 +25,4 @@ pub(crate) trait Stack: Default {
     fn remove(&mut self, item: &Self::Borrowed, store: &mut Self::Store);
 
     fn when(item: &Self::Borrowed, store: &Self::Store) -> u64;
-
-    fn modify_items<F>(&mut self, store: &mut Self::Store, f: F)
-    where
-        F: Fn(Self::Borrowed) -> Self::Borrowed,
-        Self::Borrowed: Copy;
 }
