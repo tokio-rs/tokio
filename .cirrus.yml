@@ -1,15 +1,45 @@
 freebsd_instance:
   image: freebsd-12-2-release-amd64
+env:
+  RUSTFLAGS: -D warnings
 
 # Test FreeBSD in a full VM on cirrus-ci.com.  Test the i686 target too, in the
 # same VM.  The binary will be built in 32-bit mode, but will execute on a
 # 64-bit kernel and in a 64-bit environment.  Our tests don't execute any of
 # the system's binaries, so the environment shouldn't matter.
 task:
-  name: FreeBSD
+  name: FreeBSD 64-bit
+  setup_script:
+    - pkg install -y bash curl
+    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - sh rustup.sh -y --profile minimal --default-toolchain stable
+    - . $HOME/.cargo/env
+    - |
+      echo "~~~~ rustc --version ~~~~"
+      rustc --version
+  test_script:
+    - . $HOME/.cargo/env
+    - cargo test --all --all-features
+
+task:
+  name: FreeBSD docs
   env:
-    LOOM_MAX_PREEMPTIONS: 2
-    RUSTFLAGS: -Dwarnings
+    RUSTFLAGS: --cfg docsrs
+    RUSTDOCFLAGS: --cfg docsrs -Dwarnings
+  setup_script:
+    - pkg install -y bash curl
+    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2021-10-25
+    - . $HOME/.cargo/env
+    - |
+      echo "~~~~ rustc --version ~~~~"
+      rustc --version
+  test_script:
+    - . $HOME/.cargo/env
+    - cargo doc --lib --no-deps --all-features --document-private-items
+
+task:
+  name: FreeBSD 32-bit
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -21,9 +51,4 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --all-features
-    - cargo doc --all --no-deps
-  i686_test_script:
-    - . $HOME/.cargo/env
-    - |
-      cargo test --all --all-features --target i686-unknown-freebsd
+    - cargo test --all --all-features --target i686-unknown-freebsd
