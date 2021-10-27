@@ -10,7 +10,7 @@
 - net: add `poll_{recv,send}_ready` methods to `udp` and `uds_datagram` ([#4131])
 - net: add `try_*`, `readable`, `writable`, `ready`, and `peer_addr` methods to split halves ([#4120])
 - sync: add `blocking_lock` to `Mutex` ([#4130])
-- sync: add `watch::Sender::send_replace` ([#3962])
+- sync: add `watch::Sender::send_replace` ([#3962], [#4195])
 - sync: expand `Debug` for `Mutex<T>` impl to unsized `T` ([#4134])
 - tracing: instrument time::Sleep ([#4072])
 - tracing: use structured location fields for spawned tasks ([#4128])
@@ -50,6 +50,7 @@
 [#4174]: https://github.com/tokio-rs/tokio/pull/4174
 [#4185]: https://github.com/tokio-rs/tokio/pull/4185
 [#4192]: https://github.com/tokio-rs/tokio/pull/4192
+[#4195]: https://github.com/tokio-rs/tokio/pull/4195
 
 # 1.12.0 (September 21, 2021)
 
