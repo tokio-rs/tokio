@@ -193,7 +193,11 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        self.spawn_blocking_inner(func, None)
+        if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+            self.spawn_blocking_inner(Box::new(func), None)
+        } else {
+            self.spawn_blocking_inner(func, None)
+        }
     }
 
     #[cfg_attr(tokio_track_caller, track_caller)]
