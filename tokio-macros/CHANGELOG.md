@@ -1,4 +1,4 @@
-# 1.6.0 (October 27th, 2021)
+# 1.6.0 (October 29th, 2021)
 
 - macros: fix type resolution error in `#[tokio::main]` ([#4176])
 
