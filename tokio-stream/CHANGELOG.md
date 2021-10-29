@@ -1,4 +1,4 @@
-# 0.1.8 (October 27, 2021)
+# 0.1.8 (October 29, 2021)
 
 - stream: add `From<Receiver<T>>` impl for receiver streams ([#4080])
 - stream: impl `FromIterator` for `StreamMap` ([#4052])
