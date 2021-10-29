@@ -1,4 +1,4 @@
-# 1.13.0 (October 27, 2021)
+# 1.13.0 (October 29, 2021)
 
 ### Fixed
 
@@ -20,6 +20,7 @@
 - io: add assert in `copy_bidirectional` that `poll_write` is sensible ([#4125])
 - macros: use qualified syntax when polling in `select!` ([#4192])
 - runtime: handle `block_on` wakeups better ([#4157])
+- task: allocate callback on heap immediately in debug mode ([#4203])
 - tokio: assert platform-minimum requirements at build time ([#3797])
 
 ### Documented
@@ -51,6 +52,7 @@
 [#4185]: https://github.com/tokio-rs/tokio/pull/4185
 [#4192]: https://github.com/tokio-rs/tokio/pull/4192
 [#4195]: https://github.com/tokio-rs/tokio/pull/4195
+[#4203]: https://github.com/tokio-rs/tokio/pull/4203
 
 # 1.12.0 (September 21, 2021)
 
