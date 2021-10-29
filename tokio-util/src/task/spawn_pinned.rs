@@ -1,13 +1,12 @@
-use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::channel;
 use std::sync::Arc;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tokio::task::{spawn_blocking, spawn_local, JoinHandle, LocalSet};
+use tokio::task::{spawn_local, JoinHandle, LocalSet};
 
 /// Create a new pool of threads to handle `!Send` tasks. Spawn tasks onto this
 /// pool via [`LocalPoolHandle::spawn_pinned`].
@@ -96,25 +95,23 @@ impl LocalPool {
         let (sender, receiver) = channel();
         let task_count = Arc::clone(&worker.task_count);
         let request = FutureRequest {
-            func: Box::new(|| {
-                Box::new(spawn_local(async move {
+            spawn: Box::new(move || {
+                let join_handle = spawn_local(async move {
                     let result = create_task().await;
 
                     // Update the task count once the future is finished
                     task_count.fetch_sub(1, Ordering::SeqCst);
 
                     result
-                }))
+                });
+
+                sender.send(join_handle).unwrap();
             }),
-            reply: sender,
         };
         worker.spawner.send(request).unwrap();
 
         // Get the join handle
-        let join_handle = receiver.recv().unwrap();
-        let join_handle: JoinHandle<Fut::Output> = *join_handle.downcast().unwrap();
-
-        join_handle
+        receiver.recv().unwrap()
     }
 
     /// Find the worker with the least number of tasks, increment its task
@@ -147,15 +144,10 @@ impl LocalPool {
     }
 }
 
-// We need to box the join handle and future spawning closure since they're
-// generic and are going through a channel. The join handle will be downcast
-// back into the correct type.
-type BoxedJoinHandle = Box<dyn Any + Send + 'static>;
-type PinnedFutureSpawner = Box<dyn FnOnce() -> BoxedJoinHandle + Send + 'static>;
+type PinnedFutureSpawner = Box<dyn FnOnce() + Send + 'static>;
 
 struct FutureRequest {
-    func: PinnedFutureSpawner,
-    reply: Sender<BoxedJoinHandle>,
+    spawn: PinnedFutureSpawner,
 }
 
 // Needed for the unwrap in LocalPool::spawn_pinned if sending fails
@@ -191,8 +183,7 @@ impl LocalWorkerHandle {
         LocalSet::new().block_on(&runtime, async {
             while let Some(task) = task_receiver.recv().await {
                 // Calls spawn_local(future)
-                let join_handle = (task.func)();
-                task.reply.send(join_handle).unwrap();
+                (task.spawn)();
             }
         });
     }
