@@ -160,7 +160,7 @@ impl LocalWorkerHandle {
     /// Create a new worker for executing pinned tasks
     fn new_worker() -> LocalWorkerHandle {
         let (sender, receiver) = unbounded_channel();
-        spawn_blocking(|| Self::run(receiver));
+        std::thread::spawn(|| Self::run(receiver));
 
         LocalWorkerHandle {
             spawner: sender,
