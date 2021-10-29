@@ -1,3 +1,59 @@
+# 1.13.0 (October 29, 2021)
+
+### Fixed
+
+- sync: fix `Notify` to clone the waker before locking its waiter list ([#4129])
+- tokio: add riscv32 to non atomic64 architectures ([#4185])
+
+### Added
+
+- net: add `poll_{recv,send}_ready` methods to `udp` and `uds_datagram` ([#4131])
+- net: add `try_*`, `readable`, `writable`, `ready`, and `peer_addr` methods to split halves ([#4120])
+- sync: add `blocking_lock` to `Mutex` ([#4130])
+- sync: add `watch::Sender::send_replace` ([#3962], [#4195])
+- sync: expand `Debug` for `Mutex<T>` impl to unsized `T` ([#4134])
+- tracing: instrument time::Sleep ([#4072])
+- tracing: use structured location fields for spawned tasks ([#4128])
+
+### Changed
+
+- io: add assert in `copy_bidirectional` that `poll_write` is sensible ([#4125])
+- macros: use qualified syntax when polling in `select!` ([#4192])
+- runtime: handle `block_on` wakeups better ([#4157])
+- task: allocate callback on heap immediately in debug mode ([#4203])
+- tokio: assert platform-minimum requirements at build time ([#3797])
+
+### Documented
+
+- docs: conversion of doc comments to indicative mood ([#4174])
+- docs: add returning on the first error example for `try_join!` ([#4133])
+- docs: fixing broken links in `tokio/src/lib.rs` ([#4132])
+- signal: add example with background listener ([#4171])
+- sync: add more oneshot examples ([#4153])
+- time: document `Interval::tick` cancel safety ([#4152])
+
+[#3797]: https://github.com/tokio-rs/tokio/pull/3797
+[#3962]: https://github.com/tokio-rs/tokio/pull/3962
+[#4072]: https://github.com/tokio-rs/tokio/pull/4072
+[#4120]: https://github.com/tokio-rs/tokio/pull/4120
+[#4125]: https://github.com/tokio-rs/tokio/pull/4125
+[#4128]: https://github.com/tokio-rs/tokio/pull/4128
+[#4129]: https://github.com/tokio-rs/tokio/pull/4129
+[#4130]: https://github.com/tokio-rs/tokio/pull/4130
+[#4131]: https://github.com/tokio-rs/tokio/pull/4131
+[#4132]: https://github.com/tokio-rs/tokio/pull/4132
+[#4133]: https://github.com/tokio-rs/tokio/pull/4133
+[#4134]: https://github.com/tokio-rs/tokio/pull/4134
+[#4152]: https://github.com/tokio-rs/tokio/pull/4152
+[#4153]: https://github.com/tokio-rs/tokio/pull/4153
+[#4157]: https://github.com/tokio-rs/tokio/pull/4157
+[#4171]: https://github.com/tokio-rs/tokio/pull/4171
+[#4174]: https://github.com/tokio-rs/tokio/pull/4174
+[#4185]: https://github.com/tokio-rs/tokio/pull/4185
+[#4192]: https://github.com/tokio-rs/tokio/pull/4192
+[#4195]: https://github.com/tokio-rs/tokio/pull/4195
+[#4203]: https://github.com/tokio-rs/tokio/pull/4203
+
 # 1.12.0 (September 21, 2021)
 
 ### Fixed
