@@ -1,3 +1,9 @@
+# 1.5.1 (October 29th, 2021)
+
+- macros: fix type resolution error in `#[tokio::main]` ([#4176])
+
+[#4176]: https://github.com/tokio-rs/tokio/pull/4176
+
 # 1.5.0 (October 13th, 2021)
 
 - macros: make tokio-macros attributes more IDE friendly ([#4162])
