@@ -170,6 +170,7 @@ impl LocalWorkerHandle {
 
     fn run(mut task_receiver: UnboundedReceiver<FutureRequest>) {
         let runtime = Builder::new_current_thread()
+            .enable_all()
             .build()
             .expect("Failed to start a pinned worker thread runtime");
 
