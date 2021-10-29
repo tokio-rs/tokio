@@ -90,11 +90,7 @@ impl LocalPool {
     where
         Fut::Output: Send + 'static,
     {
-        let worker = self.find_least_burdened_worker();
-
-        // Update task count. Do this before sending the future to ensure that
-        // the call to `fetch_sub` does not underflow.
-        worker.task_count.fetch_add(1, Ordering::SeqCst);
+        let worker = self.find_and_incr_least_burdened_worker();
 
         // Send the future to the worker
         let (sender, receiver) = channel();
@@ -121,15 +117,33 @@ impl LocalPool {
         join_handle
     }
 
-    /// Find the worker with the least number of tasks
-    fn find_least_burdened_worker(&self) -> &LocalWorkerHandle {
-        let (worker, _) = self
-            .workers
-            .iter()
-            .map(|worker| (worker, worker.task_count.load(Ordering::SeqCst)))
-            .min_by_key(|&(_, count)| count)
-            .expect("There must be more than one worker");
-        worker
+    /// Find the worker with the least number of tasks, increment its task
+    /// count, and return its handle. Make sure to actually spawn a task on
+    /// the worker so the task count is kept consistent with load.
+    fn find_and_incr_least_burdened_worker(&self) -> &LocalWorkerHandle {
+        loop {
+            let (worker, task_count) = self
+                .workers
+                .iter()
+                .map(|worker| (worker, worker.task_count.load(Ordering::SeqCst)))
+                .min_by_key(|&(_, count)| count)
+                .expect("There must be more than one worker");
+
+            // Make sure the task count hasn't changed when we choose this worker.
+            // Otherwise, restart the search.
+            if worker
+                .task_count
+                .compare_exchange(
+                    task_count,
+                    task_count + 1,
+                    Ordering::SeqCst,
+                    Ordering::Relaxed,
+                )
+                .is_ok()
+            {
+                return worker;
+            }
+        }
     }
 }
 
