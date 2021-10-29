@@ -30,11 +30,10 @@ pub struct LocalPoolHandle {
 
 impl LocalPoolHandle {
     /// Spawn a task onto a worker thread and pin it there so it can't be moved
-    /// off of the thread. Note that the future is not Send, but the `FnOnce` which
-    /// creates it is.
+    /// off of the thread. Note that the future is not [`Send`], but the
+    /// [`FnOnce`] which creates it is.
     ///
     /// # Examples
-    ///
     /// ```
     /// use std::rc::Rc;
     /// use tokio_util::task::new_local_pool;
@@ -68,6 +67,44 @@ impl LocalPoolHandle {
     {
         self.pool.spawn_pinned(create_task)
     }
+
+    /// Spawn a task onto a worker thread and pin it there so it can't be moved
+    /// off of the thread. Note that the future is not [`Send`], but the
+    /// [`FnOnce`] which creates it is.
+    ///
+    /// This is the same as [`spawn_pinned`], but is non-blocking and does not
+    /// return a join handle.
+    ///
+    /// # Examples
+    /// ```
+    /// use std::rc::Rc;
+    /// use tokio::sync::mpsc::channel;
+    /// use tokio_util::task::new_local_pool;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     // Create the local pool
+    ///     let pool = new_local_pool(1);
+    ///     let (sender, mut receiver) = channel(1);
+    ///
+    ///     // Spawn a !Send future onto the pool
+    ///     pool.spawn_pinned_nonblocking(|| {
+    ///         // Rc is !Send + !Sync
+    ///         let local_data = Rc::new("test");
+    ///
+    ///         // This future holds an Rc, so it is !Send
+    ///         async move { sender.send(*local_data).await.unwrap() }
+    ///     });
+    ///
+    ///     assert_eq!(receiver.recv().await, Some("test"));
+    /// }
+    /// ```
+    pub fn spawn_pinned_nonblocking<Fut: Future<Output = ()> + 'static>(
+        &self,
+        create_task: impl FnOnce() -> Fut + Send + 'static,
+    ) {
+        self.pool.spawn_pinned_nonblocking(create_task)
+    }
 }
 
 impl Debug for LocalPoolHandle {
@@ -89,6 +126,28 @@ impl LocalPool {
     where
         Fut::Output: Send + 'static,
     {
+        let receiver = self.spawn_pinned_inner(create_task);
+
+        // Get the join handle
+        receiver.recv().unwrap()
+    }
+
+    /// Spawn a `?Send` future onto a worker, when you don't care about the output.
+    fn spawn_pinned_nonblocking<Fut: Future<Output = ()> + 'static>(
+        &self,
+        create_task: impl FnOnce() -> Fut + Send + 'static,
+    ) {
+        // Don't wait for the join handle
+        self.spawn_pinned_inner(create_task);
+    }
+
+    fn spawn_pinned_inner<Fut: Future + 'static>(
+        &self,
+        create_task: impl FnOnce() -> Fut + Send + 'static,
+    ) -> std::sync::mpsc::Receiver<JoinHandle<Fut::Output>>
+    where
+        Fut::Output: Send + 'static,
+    {
         let worker = self.find_and_incr_least_burdened_worker();
 
         // Send the future to the worker
@@ -105,13 +164,12 @@ impl LocalPool {
                     result
                 });
 
-                sender.send(join_handle).unwrap();
+                sender.send(join_handle).ok();
             }),
         };
         worker.spawner.send(request).unwrap();
 
-        // Get the join handle
-        receiver.recv().unwrap()
+        receiver
     }
 
     /// Find the worker with the least number of tasks, increment its task
