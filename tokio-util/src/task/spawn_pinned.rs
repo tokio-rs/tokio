@@ -72,7 +72,7 @@ impl LocalPoolHandle {
     /// off of the thread. Note that the future is not [`Send`], but the
     /// [`FnOnce`] which creates it is.
     ///
-    /// This is the same as [`spawn_pinned`], but is non-blocking and does not
+    /// This is the same as [`LocalPoolHandle::spawn_pinned`], but is non-blocking and does not
     /// return a join handle.
     ///
     /// # Examples
