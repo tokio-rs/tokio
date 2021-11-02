@@ -23,7 +23,7 @@ impl CopyBuffer {
             pos: 0,
             cap: 0,
             amt: 0,
-            buf: vec![0; 2048].into_boxed_slice(),
+            buf: vec![0; super::DEFAULT_BUF_SIZE].into_boxed_slice(),
         }
     }
 
