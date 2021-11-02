@@ -91,10 +91,12 @@ pub(crate) fn enter(new: Handle) -> EnterGuard {
 ///
 /// [`Handle`]: Handle
 pub(crate) fn try_enter(new: Handle) -> Option<EnterGuard> {
-    CONTEXT.try_with(|ctx| {
-        let old = ctx.borrow_mut().replace(new);
-        EnterGuard(old)
-    }).ok()
+    CONTEXT
+        .try_with(|ctx| {
+            let old = ctx.borrow_mut().replace(new);
+            EnterGuard(old)
+        })
+        .ok()
 }
 
 #[derive(Debug)]
