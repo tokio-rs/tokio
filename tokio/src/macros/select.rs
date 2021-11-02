@@ -520,7 +520,7 @@ macro_rules! select {
                                 #[allow(unused_variables)]
                                 #[allow(unused_mut)]
                                 match &out {
-                                    $bind => {}
+                                    $crate::select_priv_clean_pattern!($bind) => {}
                                     _ => continue,
                                 }
 
