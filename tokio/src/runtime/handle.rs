@@ -1,7 +1,7 @@
 use crate::runtime::blocking::{BlockingTask, NoopSchedule};
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, context, driver, Spawner};
-use crate::util::error::CONTEXT_MISSING_ERROR;
+use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
 use std::future::Future;
 use std::marker::PhantomData;
@@ -110,7 +110,7 @@ impl Handle {
     /// # }
     /// ```
     pub fn current() -> Self {
-        context::current().expect(CONTEXT_MISSING_ERROR)
+        context::current()
     }
 
     /// Returns a Handle view over the currently running Runtime
@@ -119,7 +119,7 @@ impl Handle {
     ///
     /// Contrary to `current`, this never panics
     pub fn try_current() -> Result<Self, TryCurrentError> {
-        context::current().ok_or(TryCurrentError(()))
+        context::try_current()
     }
 
     cfg_stats! {
@@ -334,17 +334,60 @@ impl Handle {
 }
 
 /// Error returned by `try_current` when no Runtime has been started
-pub struct TryCurrentError(());
+#[derive(Debug)]
+pub struct TryCurrentError {
+    kind: TryCurrentErrorKind,
+}
 
-impl fmt::Debug for TryCurrentError {
+impl TryCurrentError {
+    pub(crate) fn new_no_context() -> Self {
+        Self {
+            kind: TryCurrentErrorKind::NoContext,
+        }
+    }
+
+    pub(crate) fn new_thread_local_destroyed() -> Self {
+        Self {
+            kind: TryCurrentErrorKind::ThreadLocalDestroyed,
+        }
+    }
+
+    /// Returns true if the call failed because there is currently no runtime in
+    /// the Tokio context.
+    pub fn is_missing_context(&self) -> bool {
+        matches!(self.kind, TryCurrentErrorKind::NoContext)
+    }
+
+    /// Returns true if the call failed because the Tokio context thread-local
+    /// had been destroyed. This can usually only happen if in the destructor of
+    /// other thread-locals.
+    pub fn is_thread_local_destroyed(&self) -> bool {
+        matches!(self.kind, TryCurrentErrorKind::ThreadLocalDestroyed)
+    }
+}
+
+enum TryCurrentErrorKind {
+    NoContext,
+    ThreadLocalDestroyed,
+}
+
+impl fmt::Debug for TryCurrentErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TryCurrentError").finish()
+        use TryCurrentErrorKind::*;
+        match self {
+            NoContext => f.write_str("NoContext"),
+            ThreadLocalDestroyed => f.write_str("ThreadLocalDestroyed"),
+        }
     }
 }
 
 impl fmt::Display for TryCurrentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(CONTEXT_MISSING_ERROR)
+        use TryCurrentErrorKind::*;
+        match self.kind {
+            NoContext => f.write_str(CONTEXT_MISSING_ERROR),
+            ThreadLocalDestroyed => f.write_str(THREAD_LOCAL_DESTROYED_ERROR),
+        }
     }
 }
 

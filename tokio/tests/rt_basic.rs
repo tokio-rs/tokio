@@ -3,10 +3,14 @@
 
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
+use tokio::time::{timeout, Duration};
 use tokio_test::{assert_err, assert_ok};
 
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::task::{Context, Poll};
 use std::thread;
-use tokio::time::{timeout, Duration};
 
 mod support {
     pub(crate) mod mpsc_stream;
@@ -133,6 +137,35 @@ fn acquire_mutex_in_drop() {
 
     // Drop the rt
     drop(rt);
+}
+
+#[test]
+fn drop_tasks_in_context() {
+    static SUCCESS: AtomicBool = AtomicBool::new(false);
+
+    struct ContextOnDrop;
+
+    impl Future for ContextOnDrop {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+            Poll::Pending
+        }
+    }
+
+    impl Drop for ContextOnDrop {
+        fn drop(&mut self) {
+            if tokio::runtime::Handle::try_current().is_ok() {
+                SUCCESS.store(true, Ordering::SeqCst);
+            }
+        }
+    }
+
+    let rt = rt();
+    rt.spawn(ContextOnDrop);
+    drop(rt);
+
+    assert!(SUCCESS.load(Ordering::SeqCst));
 }
 
 #[test]

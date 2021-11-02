@@ -2,6 +2,7 @@ use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
+use crate::runtime::context::EnterGuard;
 use crate::runtime::stats::{RuntimeStats, WorkerStatsBatcher};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::Callback;
@@ -29,6 +30,12 @@ pub(crate) struct BasicScheduler<P: Park> {
 
     /// Sendable task spawner
     spawner: Spawner,
+
+    /// This is usually None, but right before dropping the BasicScheduler, it
+    /// is changed to `Some` with the context being the runtime's own context.
+    /// This ensures that any tasks dropped in the `BasicScheduler`s destructor
+    /// run in that runtime's context.
+    context_guard: Option<EnterGuard>,
 }
 
 /// The inner scheduler that owns the task queue and the main parker P.
@@ -160,6 +167,7 @@ impl<P: Park> BasicScheduler<P> {
             inner,
             notify: Notify::new(),
             spawner,
+            context_guard: None,
         }
     }
 
@@ -209,6 +217,10 @@ impl<P: Park> BasicScheduler<P> {
             inner: Some(inner),
             basic_scheduler: self,
         })
+    }
+
+    pub(super) fn set_context_guard(&mut self, guard: EnterGuard) {
+        self.context_guard = Some(guard);
     }
 }
 
