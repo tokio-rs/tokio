@@ -138,7 +138,9 @@ impl WorkerStatsBatcher {
         worker.busy_duration_min.store(min, Relaxed);
         worker.busy_duration_max.store(max, Relaxed);
         worker.busy_duration_last.store(last, Relaxed);
-        worker.busy_duration_total.store(self.busy_duration_total, Relaxed);
+        worker
+            .busy_duration_total
+            .store(self.busy_duration_total, Relaxed);
     }
 
     pub(crate) fn about_to_park(&mut self) {
