@@ -20,6 +20,7 @@ pub struct WorkerStats {
     busy_duration_min: AtomicU64,
     busy_duration_max: AtomicU64,
     busy_duration_last: AtomicU64,
+    busy_duration_total: AtomicU64,
 }
 
 impl RuntimeStats {
@@ -33,6 +34,7 @@ impl RuntimeStats {
                 busy_duration_min: AtomicU64::new(0),
                 busy_duration_max: AtomicU64::new(0),
                 busy_duration_last: AtomicU64::new(0),
+                busy_duration_total: AtomicU64::new(0),
             });
         }
 
@@ -64,6 +66,16 @@ impl WorkerStats {
         self.poll_count.load(Relaxed)
     }
 
+    /// Returns the duration for which the runtime was busy last time it was busy.
+    pub fn busy_duration_last(&self) -> Duration {
+        Duration::from_nanos(self.busy_duration_last.load(Relaxed))
+    }
+
+    /// Returns the total amount of time this worker has been busy for.
+    pub fn busy_duration_total(&self) -> Duration {
+        Duration::from_nanos(self.busy_duration_total.load(Relaxed))
+    }
+
     /// Returns the smallest busy duration since the last 16 parks.
     pub fn busy_duration_min(&self) -> Duration {
         Duration::from_nanos(self.busy_duration_min.load(Relaxed))
@@ -72,11 +84,6 @@ impl WorkerStats {
     /// Returns the largest busy duration since the last 16 parks.
     pub fn busy_duration_max(&self) -> Duration {
         Duration::from_nanos(self.busy_duration_max.load(Relaxed))
-    }
-
-    /// Returns the last busy duration.
-    pub fn busy_duration_last(&self) -> Duration {
-        Duration::from_nanos(self.busy_duration_last.load(Relaxed))
     }
 }
 
@@ -92,6 +99,8 @@ pub(crate) struct WorkerStatsBatcher {
     /// array, then this gives the correct result.
     busy_duration: [u64; 16],
     busy_duration_i: usize,
+    /// The total busy duration in nanoseconds.
+    busy_duration_total: u64,
     last_resume_time: Instant,
 }
 
@@ -104,6 +113,7 @@ impl WorkerStatsBatcher {
             poll_count: 0,
             busy_duration: [0; 16],
             busy_duration_i: usize::MAX,
+            busy_duration_total: 0,
             last_resume_time: Instant::now(),
         }
     }
@@ -128,6 +138,7 @@ impl WorkerStatsBatcher {
         worker.busy_duration_min.store(min, Relaxed);
         worker.busy_duration_max.store(max, Relaxed);
         worker.busy_duration_last.store(last, Relaxed);
+        worker.busy_duration_total.store(self.busy_duration_total, Relaxed);
     }
 
     pub(crate) fn about_to_park(&mut self) {
@@ -135,6 +146,7 @@ impl WorkerStatsBatcher {
 
         let busy_duration = self.last_resume_time.elapsed();
         let busy_duration = u64::try_from(busy_duration.as_nanos()).unwrap_or(u64::MAX);
+        self.busy_duration_total += busy_duration;
         if self.busy_duration_i == usize::MAX {
             // We are parking for the first time. Set array to contain current
             // duration in every slot.
