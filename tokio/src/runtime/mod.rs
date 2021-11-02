@@ -580,6 +580,7 @@ cfg_rt! {
                     // runtime's context.
                     basic.set_context_guard(self::context::enter(self.handle.clone()));
                 },
+                #[cfg(feature = "rt-multi-thread")]
                 Kind::ThreadPool(_) => {
                     // The threaded scheduler drops its tasks on its worker threads, which is
                     // already in the runtime's context.
