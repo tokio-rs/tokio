@@ -2,7 +2,6 @@
 use crate::runtime::{Handle, TryCurrentError};
 
 use std::cell::RefCell;
-use std::thread::AccessError;
 
 thread_local! {
     static CONTEXT: RefCell<Option<Handle>> = RefCell::new(None)
@@ -83,19 +82,19 @@ cfg_rt! {
 /// [`Handle`]: Handle
 pub(crate) fn enter(new: Handle) -> EnterGuard {
     match try_enter(new) {
-        Ok(guard) => guard,
-        Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+        Some(guard) => guard,
+        None => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
     }
 }
 
 /// Sets this [`Handle`] as the current active [`Handle`].
 ///
 /// [`Handle`]: Handle
-pub(crate) fn try_enter(new: Handle) -> Result<EnterGuard, AccessError> {
+pub(crate) fn try_enter(new: Handle) -> Option<EnterGuard> {
     CONTEXT.try_with(|ctx| {
         let old = ctx.borrow_mut().replace(new);
         EnterGuard(old)
-    })
+    }).ok()
 }
 
 #[derive(Debug)]

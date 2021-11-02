@@ -572,6 +572,7 @@ cfg_rt! {
         }
     }
 
+    #[allow(clippy::single-match)] // there are comments in the error branch, so we don't want if-let
     impl Drop for Runtime {
         fn drop(&mut self) {
             match &mut self.kind {
@@ -579,8 +580,8 @@ cfg_rt! {
                     // This ensures that tasks spawned on the basic runtime are dropped inside the
                     // runtime's context.
                     match self::context::try_enter(self.handle.clone()) {
-                        Ok(guard) => basic.set_context_guard(guard),
-                        Err(_) => {
+                        Some(guard) => basic.set_context_guard(guard),
+                        None => {
                             // The context thread-local has alread been destroyed.
                             //
                             // We don't set the guard in this case. Calls to tokio::spawn in task
