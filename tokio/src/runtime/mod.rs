@@ -537,7 +537,7 @@ cfg_rt! {
         /// ```
         pub fn shutdown_timeout(mut self, duration: Duration) {
             // Wakeup and shutdown all the worker threads
-            self.handle.shutdown();
+            self.handle.clone().shutdown();
             self.blocking_pool.shutdown(Some(duration));
         }
 
@@ -569,6 +569,22 @@ cfg_rt! {
         /// ```
         pub fn shutdown_background(self) {
             self.shutdown_timeout(Duration::from_nanos(0))
+        }
+    }
+
+    impl Drop for Runtime {
+        fn drop(&mut self) {
+            match &mut self.kind {
+                Kind::CurrentThread(basic) => {
+                    // This ensures that tasks spawned on the basic runtime are dropped inside the
+                    // runtime's context.
+                    basic.set_context_guard(self::context::enter(self.handle.clone()));
+                },
+                Kind::ThreadPool(_) => {
+                    // The threaded scheduler drops its tasks on its worker threads, which is
+                    // already in the runtime's context.
+                },
+            }
         }
     }
 }
