@@ -1,5 +1,4 @@
 #![allow(unreachable_pub)]
-use crate::util::error::CONTEXT_MISSING_ERROR;
 use crate::{runtime::context, task::JoinHandle};
 use std::future::Future;
 
