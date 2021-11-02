@@ -205,7 +205,7 @@ cfg_rt! {
     use self::enter::enter;
 
     mod handle;
-    pub use handle::{EnterGuard, Handle};
+    pub use handle::{EnterGuard, Handle, TryCurrentError};
 
     mod spawner;
     use self::spawner::Spawner;
@@ -578,7 +578,15 @@ cfg_rt! {
                 Kind::CurrentThread(basic) => {
                     // This ensures that tasks spawned on the basic runtime are dropped inside the
                     // runtime's context.
-                    basic.set_context_guard(self::context::enter(self.handle.clone()));
+                    match self::context::try_enter(self.handle.clone()) {
+                        Ok(guard) => basic.set_context_guard(guard),
+                        Err(_) => {
+                            // The context thread-local has alread been destroyed.
+                            //
+                            // We don't set the guard in this case. Calls to tokio::spawn in task
+                            // destructors would fail regardless if this happens.
+                        },
+                    }
                 },
                 #[cfg(feature = "rt-multi-thread")]
                 Kind::ThreadPool(_) => {

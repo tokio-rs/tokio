@@ -8,7 +8,6 @@ use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
-use crate::util::error::CONTEXT_MISSING_ERROR;
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -81,7 +80,7 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let rt = context::current().expect(CONTEXT_MISSING_ERROR);
+    let rt = context::current();
     rt.spawn_blocking(func)
 }
 

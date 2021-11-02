@@ -1,53 +1,80 @@
 //! Thread local runtime context
-use crate::runtime::Handle;
+use crate::runtime::{Handle, TryCurrentError};
 
 use std::cell::RefCell;
+use std::thread::AccessError;
 
 thread_local! {
     static CONTEXT: RefCell<Option<Handle>> = RefCell::new(None)
 }
 
-pub(crate) fn current() -> Option<Handle> {
-    CONTEXT.with(|ctx| ctx.borrow().clone())
+pub(crate) fn try_current() -> Result<Handle, crate::runtime::TryCurrentError> {
+    match CONTEXT.try_with(|ctx| ctx.borrow().clone()) {
+        Ok(Some(handle)) => Ok(handle),
+        Ok(None) => Err(TryCurrentError::new_no_context()),
+        Err(_access_error) => Err(TryCurrentError::new_thread_local_destroyed()),
+    }
+}
+
+pub(crate) fn current() -> Handle {
+    match try_current() {
+        Ok(handle) => handle,
+        Err(e) => panic!("{}", e),
+    }
 }
 
 cfg_io_driver! {
     pub(crate) fn io_handle() -> crate::runtime::driver::IoHandle {
-        CONTEXT.with(|ctx| {
+        match CONTEXT.try_with(|ctx| {
             let ctx = ctx.borrow();
             ctx.as_ref().expect(crate::util::error::CONTEXT_MISSING_ERROR).io_handle.clone()
-        })
+        }) {
+            Ok(io_handle) => io_handle,
+            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+        }
     }
 }
 
 cfg_signal_internal! {
     #[cfg(unix)]
     pub(crate) fn signal_handle() -> crate::runtime::driver::SignalHandle {
-        CONTEXT.with(|ctx| {
+        match CONTEXT.try_with(|ctx| {
             let ctx = ctx.borrow();
             ctx.as_ref().expect(crate::util::error::CONTEXT_MISSING_ERROR).signal_handle.clone()
-        })
+        }) {
+            Ok(signal_handle) => signal_handle,
+            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+        }
     }
 }
 
 cfg_time! {
     pub(crate) fn time_handle() -> crate::runtime::driver::TimeHandle {
-        CONTEXT.with(|ctx| {
+        match CONTEXT.try_with(|ctx| {
             let ctx = ctx.borrow();
             ctx.as_ref().expect(crate::util::error::CONTEXT_MISSING_ERROR).time_handle.clone()
-        })
+        }) {
+            Ok(time_handle) => time_handle,
+            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+        }
     }
 
     cfg_test_util! {
         pub(crate) fn clock() -> Option<crate::runtime::driver::Clock> {
-            CONTEXT.with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.clock.clone()))
+            match CONTEXT.try_with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.clock.clone())) {
+                Ok(clock) => clock,
+                Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+            }
         }
     }
 }
 
 cfg_rt! {
     pub(crate) fn spawn_handle() -> Option<crate::runtime::Spawner> {
-        CONTEXT.with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.spawner.clone()))
+        match CONTEXT.try_with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.spawner.clone())) {
+            Ok(spawner) => spawner,
+            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+        }
     }
 }
 
@@ -55,7 +82,17 @@ cfg_rt! {
 ///
 /// [`Handle`]: Handle
 pub(crate) fn enter(new: Handle) -> EnterGuard {
-    CONTEXT.with(|ctx| {
+    match try_enter(new) {
+        Ok(guard) => guard,
+        Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+    }
+}
+
+/// Sets this [`Handle`] as the current active [`Handle`].
+///
+/// [`Handle`]: Handle
+pub(crate) fn try_enter(new: Handle) -> Result<EnterGuard, AccessError> {
+    CONTEXT.try_with(|ctx| {
         let old = ctx.borrow_mut().replace(new);
         EnterGuard(old)
     })

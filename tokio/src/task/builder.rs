@@ -98,8 +98,6 @@ impl<'a> Builder<'a> {
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
-        context::current()
-            .expect(CONTEXT_MISSING_ERROR)
-            .spawn_blocking_inner(function, self.name)
+        context::current().spawn_blocking_inner(function, self.name)
     }
 }
