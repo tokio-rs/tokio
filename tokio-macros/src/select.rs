@@ -58,14 +58,14 @@ pub(crate) fn clean_pattern_macro(input: TokenStream) -> TokenStream {
 // Removes any occurrences of ref or mut in the provided pattern.
 fn clean_pattern(pat: &mut syn::Pat) {
     match pat {
-        syn::Pat::Box(_box) => {},
-        syn::Pat::Lit(_literal) => {},
-        syn::Pat::Macro(_macro) => {},
-        syn::Pat::Path(_path) => {},
-        syn::Pat::Range(_range) => {},
-        syn::Pat::Rest(_rest) => {},
-        syn::Pat::Verbatim(_tokens) => {},
-        syn::Pat::Wild(_underscore) => {},
+        syn::Pat::Box(_box) => {}
+        syn::Pat::Lit(_literal) => {}
+        syn::Pat::Macro(_macro) => {}
+        syn::Pat::Path(_path) => {}
+        syn::Pat::Range(_range) => {}
+        syn::Pat::Rest(_rest) => {}
+        syn::Pat::Verbatim(_tokens) => {}
+        syn::Pat::Wild(_underscore) => {}
         syn::Pat::Ident(ident) => {
             ident.by_ref = None;
             ident.mutability = None;
@@ -105,6 +105,6 @@ fn clean_pattern(pat: &mut syn::Pat) {
         syn::Pat::Type(type_pat) => {
             clean_pattern(&mut *type_pat.pat);
         }
-        _ => {},
+        _ => {}
     }
 }
