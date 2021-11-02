@@ -3,7 +3,7 @@ use crate::fs::asyncify;
 use std::io;
 use std::path::Path;
 
-/// Creates a new, empty directory at the provided path
+/// Creates a new, empty directory at the provided path.
 ///
 /// This is an async version of [`std::fs::create_dir`][std]
 ///

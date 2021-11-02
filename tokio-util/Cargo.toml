@@ -6,13 +6,13 @@ name = "tokio-util"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "tokio-util-0.6.x" git tag.
-version = "0.6.8"
+version = "0.6.9"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-util/0.6.8/tokio_util"
+documentation = "https://docs.rs/tokio-util/0.6.9/tokio_util"
 description = """
 Additional utilities for working with Tokio.
 """
@@ -23,13 +23,14 @@ categories = ["asynchronous"]
 default = []
 
 # Shorthand for enabling everything
-full = ["codec", "compat", "io", "time", "net", "rt"]
+full = ["codec", "compat", "io-util", "time", "net", "rt"]
 
 net = ["tokio/net"]
 compat = ["futures-io",]
 codec = []
 time = ["tokio/time","slab"]
 io = []
+io-util = ["io", "tokio/rt", "tokio/io-util"]
 rt = ["tokio/rt"]
 
 __docs_rs = ["futures-util"]

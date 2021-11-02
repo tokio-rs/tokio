@@ -3,7 +3,7 @@ use crate::time::driver::Entry;
 
 use std::ptr;
 
-/// A doubly linked stack
+/// A doubly linked stack.
 #[derive(Debug)]
 pub(crate) struct Stack {
     head: Option<OwnedItem>,
@@ -50,7 +50,7 @@ impl Stack {
         self.head = Some(entry);
     }
 
-    /// Pops an item from the stack
+    /// Pops an item from the stack.
     pub(crate) fn pop(&mut self) -> Option<OwnedItem> {
         let entry = self.head.take();
 

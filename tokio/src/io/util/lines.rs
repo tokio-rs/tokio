@@ -8,7 +8,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Read lines from an [`AsyncBufRead`].
+    /// Reads lines from an [`AsyncBufRead`].
     ///
     /// A `Lines` can be turned into a `Stream` with [`LinesStream`].
     ///
@@ -72,12 +72,12 @@ where
         poll_fn(|cx| Pin::new(&mut *self).poll_next_line(cx)).await
     }
 
-    /// Obtain a mutable reference to the underlying reader
+    /// Obtains a mutable reference to the underlying reader.
     pub fn get_mut(&mut self) -> &mut R {
         &mut self.reader
     }
 
-    /// Obtain a reference to the underlying reader
+    /// Obtains a reference to the underlying reader.
     pub fn get_ref(&mut self) -> &R {
         &self.reader
     }

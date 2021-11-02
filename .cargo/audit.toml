@@ -1,0 +1,7 @@
+# See https://github.com/rustsec/rustsec/blob/59e1d2ad0b9cbc6892c26de233d4925074b4b97b/cargo-audit/audit.toml.example for example.
+
+[advisories]
+ignore = [
+    # https://github.com/tokio-rs/tokio/issues/4177
+    "RUSTSEC-2020-0159",
+]

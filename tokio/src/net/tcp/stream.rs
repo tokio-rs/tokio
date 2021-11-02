@@ -192,7 +192,7 @@ impl TcpStream {
         Ok(TcpStream { io })
     }
 
-    /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
+    /// Turns a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
     ///
     /// The returned [`std::net::TcpStream`] will have nonblocking mode set as `true`.
     /// Use [`set_nonblocking`] to change the blocking mode if needed.
@@ -350,7 +350,7 @@ impl TcpStream {
         }
     }
 
-    /// Wait for any of the requested ready states.
+    /// Waits for any of the requested ready states.
     ///
     /// This function is usually paired with `try_read()` or `try_write()`. It
     /// can be used to concurrently read / write to the same socket on a single
@@ -422,7 +422,7 @@ impl TcpStream {
         Ok(event.ready)
     }
 
-    /// Wait for the socket to become readable.
+    /// Waits for the socket to become readable.
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
@@ -510,7 +510,7 @@ impl TcpStream {
         self.io.registration().poll_read_ready(cx).map_ok(|_| ())
     }
 
-    /// Try to read data from the stream into the provided buffer, returning how
+    /// Tries to read data from the stream into the provided buffer, returning how
     /// many bytes were read.
     ///
     /// Receives any pending data from the socket but does not wait for new data
@@ -577,7 +577,7 @@ impl TcpStream {
             .try_io(Interest::READABLE, || (&*self.io).read(buf))
     }
 
-    /// Try to read data from the stream into the provided buffers, returning
+    /// Tries to read data from the stream into the provided buffers, returning
     /// how many bytes were read.
     ///
     /// Data is copied to fill each buffer in order, with the final buffer
@@ -656,7 +656,7 @@ impl TcpStream {
     }
 
     cfg_io_util! {
-        /// Try to read data from the stream into the provided buffer, advancing the
+        /// Tries to read data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
         /// Receives any pending data from the socket but does not wait for new data
@@ -734,7 +734,7 @@ impl TcpStream {
         }
     }
 
-    /// Wait for the socket to become writable.
+    /// Waits for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
@@ -874,7 +874,7 @@ impl TcpStream {
             .try_io(Interest::WRITABLE, || (&*self.io).write(buf))
     }
 
-    /// Try to write several buffers to the stream, returning how many bytes
+    /// Tries to write several buffers to the stream, returning how many bytes
     /// were written.
     ///
     /// Data is written from each buffer in order, with the final buffer read
@@ -936,7 +936,7 @@ impl TcpStream {
             .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(bufs))
     }
 
-    /// Try to read or write from the socket using a user-provided IO operation.
+    /// Tries to read or write from the socket using a user-provided IO operation.
     ///
     /// If the socket is ready, the provided closure is called. The closure
     /// should attempt to perform IO operation from the socket by manually

@@ -630,6 +630,16 @@ async fn insert_in_past_after_poll_fires_immediately() {
     assert_eq!(entry, "bar");
 }
 
+#[tokio::test]
+async fn delay_queue_poll_expired_when_empty() {
+    let mut delay_queue = task::spawn(DelayQueue::new());
+    let key = delay_queue.insert(0, std::time::Duration::from_secs(10));
+    assert_pending!(poll!(delay_queue));
+
+    delay_queue.remove(&key);
+    assert!(assert_ready!(poll!(delay_queue)).is_none());
+}
+
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }

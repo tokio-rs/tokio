@@ -1,13 +1,13 @@
 use libc::{gid_t, pid_t, uid_t};
 
-/// Credentials of a process
+/// Credentials of a process.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct UCred {
-    /// PID (process ID) of the process
+    /// PID (process ID) of the process.
     pid: Option<pid_t>,
-    /// UID (user ID) of the process
+    /// UID (user ID) of the process.
     uid: uid_t,
-    /// GID (group ID) of the process
+    /// GID (group ID) of the process.
     gid: gid_t,
 }
 

@@ -23,7 +23,7 @@ pub struct OwnedRwLockMappedWriteGuard<T: ?Sized, U: ?Sized = T> {
 }
 
 impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
-    /// Make a new `OwnedRwLockMappedWriteGuard` for a component of the locked
+    /// Makes a new `OwnedRwLockMappedWriteGuard` for a component of the locked
     /// data.
     ///
     /// This operation cannot fail as the `OwnedRwLockMappedWriteGuard` passed

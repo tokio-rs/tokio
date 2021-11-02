@@ -108,7 +108,7 @@ impl OwnedReadHalf {
         reunite(self, other)
     }
 
-    /// Wait for any of the requested ready states.
+    /// Waits for any of the requested ready states.
     ///
     /// This function is usually paired with `try_read()` or `try_write()`. It
     /// can be used to concurrently read / write to the same socket on a single
@@ -124,7 +124,7 @@ impl OwnedReadHalf {
         self.inner.ready(interest).await
     }
 
-    /// Wait for the socket to become readable.
+    /// Waits for the socket to become readable.
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
@@ -139,7 +139,7 @@ impl OwnedReadHalf {
         self.inner.readable().await
     }
 
-    /// Try to read data from the stream into the provided buffer, returning how
+    /// Tries to read data from the stream into the provided buffer, returning how
     /// many bytes were read.
     ///
     /// Receives any pending data from the socket but does not wait for new data
@@ -163,7 +163,7 @@ impl OwnedReadHalf {
     }
 
     cfg_io_util! {
-        /// Try to read data from the stream into the provided buffer, advancing the
+        /// Tries to read data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
         /// Receives any pending data from the socket but does not wait for new data
@@ -187,7 +187,7 @@ impl OwnedReadHalf {
         }
     }
 
-    /// Try to read data from the stream into the provided buffers, returning
+    /// Tries to read data from the stream into the provided buffers, returning
     /// how many bytes were read.
     ///
     /// Data is copied to fill each buffer in order, with the final buffer
@@ -247,7 +247,7 @@ impl OwnedWriteHalf {
         reunite(other, self)
     }
 
-    /// Destroy the write half, but don't close the write half of the stream
+    /// Destroys the write half, but don't close the write half of the stream
     /// until the read half is dropped. If the read half has already been
     /// dropped, this closes the stream.
     pub fn forget(mut self) {
@@ -255,7 +255,7 @@ impl OwnedWriteHalf {
         drop(self);
     }
 
-    /// Wait for any of the requested ready states.
+    /// Waits for any of the requested ready states.
     ///
     /// This function is usually paired with `try_read()` or `try_write()`. It
     /// can be used to concurrently read / write to the same socket on a single
@@ -271,7 +271,7 @@ impl OwnedWriteHalf {
         self.inner.ready(interest).await
     }
 
-    /// Wait for the socket to become writable.
+    /// Waits for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
@@ -286,7 +286,7 @@ impl OwnedWriteHalf {
         self.inner.writable().await
     }
 
-    /// Try to write a buffer to the stream, returning how many bytes were
+    /// Tries to write a buffer to the stream, returning how many bytes were
     /// written.
     ///
     /// The function will attempt to write the entire contents of `buf`, but
@@ -303,7 +303,7 @@ impl OwnedWriteHalf {
         self.inner.try_write(buf)
     }
 
-    /// Try to write several buffers to the stream, returning how many bytes
+    /// Tries to write several buffers to the stream, returning how many bytes
     /// were written.
     ///
     /// Data is written from each buffer in order, with the final buffer read

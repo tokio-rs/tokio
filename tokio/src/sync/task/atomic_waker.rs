@@ -123,7 +123,7 @@ pub(crate) struct AtomicWaker {
 //    Thread A still holds the `wake` lock, the call to `register` will result
 //    in the task waking itself and get scheduled again.
 
-/// Idle state
+/// Idle state.
 const WAITING: usize = 0;
 
 /// A new waker value is being registered with the `AtomicWaker` cell.

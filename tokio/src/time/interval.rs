@@ -147,7 +147,7 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 /// milliseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MissedTickBehavior {
-    /// Tick as fast as possible until caught up.
+    /// Ticks as fast as possible until caught up.
     ///
     /// When this strategy is used, [`Interval`] schedules ticks "normally" (the
     /// same as it would have if the ticks hadn't been delayed), which results
@@ -252,7 +252,7 @@ pub enum MissedTickBehavior {
     /// [`tick`]: Interval::tick
     Delay,
 
-    /// Skip missed ticks and tick on the next multiple of `period` from
+    /// Skips missed ticks and tick on the next multiple of `period` from
     /// `start`.
     ///
     /// When this strategy is used, [`Interval`] schedules the next tick to fire
@@ -342,7 +342,7 @@ impl Default for MissedTickBehavior {
     }
 }
 
-/// Interval returned by [`interval`] and [`interval_at`]
+/// Interval returned by [`interval`] and [`interval_at`].
 ///
 /// This type allows you to wait on a sequence of instants with a certain
 /// duration between each instant. Unlike calling [`sleep`] in a loop, this lets
@@ -394,7 +394,7 @@ impl Interval {
         poll_fn(|cx| self.poll_tick(cx)).await
     }
 
-    /// Poll for the next instant in the interval to be reached.
+    /// Polls for the next instant in the interval to be reached.
     ///
     /// This method can return the following values:
     ///

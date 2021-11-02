@@ -1,3 +1,13 @@
+# 0.1.8 (October 29, 2021)
+
+- stream: add `From<Receiver<T>>` impl for receiver streams ([#4080])
+- stream: impl `FromIterator` for `StreamMap` ([#4052])
+- signal: make windows docs for signal module show up on unix builds ([#3770])
+
+[#3770]: https://github.com/tokio-rs/tokio/pull/3770
+[#4052]: https://github.com/tokio-rs/tokio/pull/4052
+[#4080]: https://github.com/tokio-rs/tokio/pull/4080
+
 # 0.1.7 (July 7, 2021)
 
 ### Fixed

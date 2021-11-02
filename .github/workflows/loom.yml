@@ -10,7 +10,6 @@ name: Loom
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
-  nightly: nightly-2021-07-09
 
 jobs:
   loom:

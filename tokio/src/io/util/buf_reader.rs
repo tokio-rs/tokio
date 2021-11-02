@@ -155,7 +155,7 @@ pub(super) enum SeekState {
     Pending,
 }
 
-/// Seek to an offset, in bytes, in the underlying reader.
+/// Seeks to an offset, in bytes, in the underlying reader.
 ///
 /// The position used for seeking with `SeekFrom::Current(_)` is the
 /// position the underlying reader would be at if the `BufReader` had no

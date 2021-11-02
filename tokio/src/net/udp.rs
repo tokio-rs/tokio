@@ -12,7 +12,7 @@ cfg_io_util! {
 }
 
 cfg_net! {
-    /// A UDP socket
+    /// A UDP socket.
     ///
     /// UDP is "connectionless", unlike TCP. Meaning, regardless of what address you've bound to, a `UdpSocket`
     /// is free to communicate with many different remotes. In tokio there are basically two main ways to use `UdpSocket`:
@@ -211,7 +211,7 @@ impl UdpSocket {
         UdpSocket::new(io)
     }
 
-    /// Turn a [`tokio::net::UdpSocket`] into a [`std::net::UdpSocket`].
+    /// Turns a [`tokio::net::UdpSocket`] into a [`std::net::UdpSocket`].
     ///
     /// The returned [`std::net::UdpSocket`] will have nonblocking mode set as
     /// `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.
@@ -317,7 +317,7 @@ impl UdpSocket {
         }))
     }
 
-    /// Wait for any of the requested ready states.
+    /// Waits for any of the requested ready states.
     ///
     /// This function is usually paired with `try_recv()` or `try_send()`. It
     /// can be used to concurrently recv / send to the same socket on a single
@@ -388,7 +388,7 @@ impl UdpSocket {
         Ok(event.ready)
     }
 
-    /// Wait for the socket to become writable.
+    /// Waits for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is
     /// usually paired with `try_send()` or `try_send_to()`.
@@ -549,7 +549,7 @@ impl UdpSocket {
             .poll_write_io(cx, || self.io.send(buf))
     }
 
-    /// Try to send data on the socket to the remote address to which it is
+    /// Tries to send data on the socket to the remote address to which it is
     /// connected.
     ///
     /// When the socket buffer is full, `Err(io::ErrorKind::WouldBlock)` is
@@ -603,7 +603,7 @@ impl UdpSocket {
             .try_io(Interest::WRITABLE, || self.io.send(buf))
     }
 
-    /// Wait for the socket to become readable.
+    /// Waits for the socket to become readable.
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_recv()`.
@@ -781,7 +781,7 @@ impl UdpSocket {
         Poll::Ready(Ok(()))
     }
 
-    /// Try to receive a single datagram message on the socket from the remote
+    /// Tries to receive a single datagram message on the socket from the remote
     /// address to which it is connected. On success, returns the number of
     /// bytes read.
     ///
@@ -838,7 +838,7 @@ impl UdpSocket {
     }
 
     cfg_io_util! {
-        /// Try to receive data from the stream into the provided buffer, advancing the
+        /// Tries to receive data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
         /// The function must be called with valid byte array buf of sufficient size
@@ -903,7 +903,7 @@ impl UdpSocket {
             })
         }
 
-        /// Try to receive a single datagram message on the socket. On success,
+        /// Tries to receive a single datagram message on the socket. On success,
         /// returns the number of bytes read and the origin.
         ///
         /// The function must be called with valid byte array buf of sufficient size
@@ -1044,7 +1044,7 @@ impl UdpSocket {
             .poll_write_io(cx, || self.io.send_to(buf, target))
     }
 
-    /// Try to send data on the socket to the given address, but if the send is
+    /// Tries to send data on the socket to the given address, but if the send is
     /// blocked this will return right away.
     ///
     /// This function is usually paired with `writable()`.
@@ -1182,7 +1182,7 @@ impl UdpSocket {
         Poll::Ready(Ok(addr))
     }
 
-    /// Try to receive a single datagram message on the socket. On success,
+    /// Tries to receive a single datagram message on the socket. On success,
     /// returns the number of bytes read and the origin.
     ///
     /// The function must be called with valid byte array buf of sufficient size
@@ -1236,7 +1236,7 @@ impl UdpSocket {
             .try_io(Interest::READABLE, || self.io.recv_from(buf))
     }
 
-    /// Try to read or write from the socket using a user-provided IO operation.
+    /// Tries to read or write from the socket using a user-provided IO operation.
     ///
     /// If the socket is ready, the provided closure is called. The closure
     /// should attempt to perform IO operation from the socket by manually

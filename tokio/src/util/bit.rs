@@ -27,7 +27,7 @@ impl Pack {
         pointer_width() - (self.mask >> self.shift).leading_zeros()
     }
 
-    /// Max representable value
+    /// Max representable value.
     pub(crate) const fn max_value(&self) -> usize {
         (1 << self.width()) - 1
     }
@@ -60,7 +60,7 @@ impl fmt::Debug for Pack {
     }
 }
 
-/// Returns the width of a pointer in bits
+/// Returns the width of a pointer in bits.
 pub(crate) const fn pointer_width() -> u32 {
     std::mem::size_of::<usize>() as u32 * 8
 }
@@ -71,7 +71,7 @@ pub(crate) const fn mask_for(n: u32) -> usize {
     shift | (shift - 1)
 }
 
-/// Unpack a value using a mask & shift
+/// Unpacks a value using a mask & shift.
 pub(crate) const fn unpack(src: usize, mask: usize, shift: u32) -> usize {
     (src & mask) >> shift
 }

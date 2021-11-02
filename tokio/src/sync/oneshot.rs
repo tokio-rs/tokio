@@ -214,7 +214,7 @@ pub struct Sender<T> {
     inner: Option<Arc<Inner<T>>>,
 }
 
-/// Receive a value from the associated [`Sender`].
+/// Receives a value from the associated [`Sender`].
 ///
 /// A pair of both a [`Sender`] and a [`Receiver`]  are created by the
 /// [`channel`](fn@channel) function.
@@ -305,7 +305,7 @@ pub struct Receiver<T> {
 }
 
 pub mod error {
-    //! Oneshot error types
+    //! Oneshot error types.
 
     use std::fmt;
 
@@ -350,7 +350,7 @@ pub mod error {
 use self::error::*;
 
 struct Inner<T> {
-    /// Manages the state of the inner cell
+    /// Manages the state of the inner cell.
     state: AtomicUsize,
 
     /// The value. This is set by `Sender` and read by `Receiver`. The state of
@@ -399,7 +399,7 @@ impl Task {
 #[derive(Clone, Copy)]
 struct State(usize);
 
-/// Create a new one-shot channel for sending single values across asynchronous
+/// Creates a new one-shot channel for sending single values across asynchronous
 /// tasks.
 ///
 /// The function returns separate "send" and "receive" handles. The `Sender`
@@ -609,7 +609,7 @@ impl<T> Sender<T> {
         state.is_closed()
     }
 
-    /// Check whether the oneshot channel has been closed, and if not, schedules the
+    /// Checks whether the oneshot channel has been closed, and if not, schedules the
     /// `Waker` in the provided `Context` to receive a notification when the channel is
     /// closed.
     ///

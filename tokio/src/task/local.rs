@@ -211,10 +211,10 @@ cfg_rt! {
     /// [`task::spawn_local`]: fn@spawn_local
     /// [`mpsc`]: mod@crate::sync::mpsc
     pub struct LocalSet {
-        /// Current scheduler tick
+        /// Current scheduler tick.
         tick: Cell<u8>,
 
-        /// State available from thread-local
+        /// State available from thread-local.
         context: Context,
 
         /// This type should not be Send.
@@ -222,7 +222,7 @@ cfg_rt! {
     }
 }
 
-/// State available from the thread-local
+/// State available from the thread-local.
 struct Context {
     /// Collection of all active tasks spawned onto this executor.
     owned: LocalOwnedTasks<Arc<Shared>>,
@@ -236,10 +236,10 @@ struct Context {
 
 /// LocalSet state shared between threads.
 struct Shared {
-    /// Remote run queue sender
+    /// Remote run queue sender.
     queue: Mutex<Option<VecDeque<task::Notified<Arc<Shared>>>>>,
 
-    /// Wake the `LocalSet` task
+    /// Wake the `LocalSet` task.
     waker: AtomicWaker,
 }
 
@@ -315,13 +315,13 @@ cfg_rt! {
     }
 }
 
-/// Initial queue capacity
+/// Initial queue capacity.
 const INITIAL_CAPACITY: usize = 64;
 
 /// Max number of tasks to poll per tick.
 const MAX_TASKS_PER_TICK: usize = 61;
 
-/// How often it check the remote queue first
+/// How often it check the remote queue first.
 const REMOTE_FIRST_INTERVAL: u8 = 31;
 
 impl LocalSet {
@@ -466,7 +466,7 @@ impl LocalSet {
         rt.block_on(self.run_until(future))
     }
 
-    /// Run a future to completion on the local set, returning its output.
+    /// Runs a future to completion on the local set, returning its output.
     ///
     /// This returns a future that runs the given future with a local set,
     /// allowing it to call [`spawn_local`] to spawn additional `!Send` futures.
@@ -505,7 +505,7 @@ impl LocalSet {
         run_until.await
     }
 
-    /// Tick the scheduler, returning whether the local future needs to be
+    /// Ticks the scheduler, returning whether the local future needs to be
     /// notified again.
     fn tick(&self) -> bool {
         for _ in 0..MAX_TASKS_PER_TICK {

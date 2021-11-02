@@ -1,3 +1,5 @@
+#![cfg(feature = "sync")]
+
 use tokio::sync::watch;
 use tokio_stream::wrappers::WatchStream;
 use tokio_stream::StreamExt;

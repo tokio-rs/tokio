@@ -8,7 +8,7 @@ pub(super) struct State {
     val: AtomicUsize,
 }
 
-/// Current state value
+/// Current state value.
 #[derive(Copy, Clone)]
 pub(super) struct Snapshot(usize);
 
@@ -19,20 +19,20 @@ const RUNNING: usize = 0b0001;
 
 /// The task is complete.
 ///
-/// Once this bit is set, it is never unset
+/// Once this bit is set, it is never unset.
 const COMPLETE: usize = 0b0010;
 
-/// Extracts the task's lifecycle value from the state
+/// Extracts the task's lifecycle value from the state.
 const LIFECYCLE_MASK: usize = 0b11;
 
 /// Flag tracking if the task has been pushed into a run queue.
 const NOTIFIED: usize = 0b100;
 
-/// The join handle is still around
+/// The join handle is still around.
 #[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
 const JOIN_INTEREST: usize = 0b1_000;
 
-/// A join handle waker has been set
+/// A join handle waker has been set.
 #[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
 const JOIN_WAKER: usize = 0b10_000;
 
@@ -40,19 +40,19 @@ const JOIN_WAKER: usize = 0b10_000;
 #[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
 const CANCELLED: usize = 0b100_000;
 
-/// All bits
+/// All bits.
 const STATE_MASK: usize = LIFECYCLE_MASK | NOTIFIED | JOIN_INTEREST | JOIN_WAKER | CANCELLED;
 
 /// Bits used by the ref count portion of the state.
 const REF_COUNT_MASK: usize = !STATE_MASK;
 
-/// Number of positions to shift the ref count
+/// Number of positions to shift the ref count.
 const REF_COUNT_SHIFT: usize = REF_COUNT_MASK.count_zeros() as usize;
 
-/// One ref count
+/// One ref count.
 const REF_ONE: usize = 1 << REF_COUNT_SHIFT;
 
-/// State a task is initialized with
+/// State a task is initialized with.
 ///
 /// A task is initialized with three references:
 ///
@@ -96,7 +96,7 @@ pub(super) enum TransitionToNotifiedByRef {
 /// All transitions are performed via RMW operations. This establishes an
 /// unambiguous modification order.
 impl State {
-    /// Return a task's initial state
+    /// Returns a task's initial state.
     pub(super) fn new() -> State {
         // The raw task returned by this method has a ref-count of three. See
         // the comment on INITIAL_STATE for more.
@@ -110,7 +110,7 @@ impl State {
         Snapshot(self.val.load(Acquire))
     }
 
-    /// Attempt to transition the lifecycle to `Running`. This sets the
+    /// Attempts to transition the lifecycle to `Running`. This sets the
     /// notified bit to false so notifications during the poll can be detected.
     pub(super) fn transition_to_running(&self) -> TransitionToRunning {
         self.fetch_update_action(|mut next| {
@@ -190,7 +190,7 @@ impl State {
         Snapshot(prev.0 ^ DELTA)
     }
 
-    /// Transition from `Complete` -> `Terminal`, decrementing the reference
+    /// Transitions from `Complete` -> `Terminal`, decrementing the reference
     /// count the specified number of times.
     ///
     /// Returns true if the task should be deallocated.
@@ -270,10 +270,10 @@ impl State {
         })
     }
 
-    /// Set the cancelled bit and transition the state to `NOTIFIED` if idle.
+    /// Sets the cancelled bit and transitions the state to `NOTIFIED` if idle.
     ///
     /// Returns `true` if the task needs to be submitted to the pool for
-    /// execution
+    /// execution.
     pub(super) fn transition_to_notified_and_cancel(&self) -> bool {
         self.fetch_update_action(|mut snapshot| {
             if snapshot.is_cancelled() || snapshot.is_complete() {
@@ -306,7 +306,7 @@ impl State {
         })
     }
 
-    /// Set the `CANCELLED` bit and attempt to transition to `Running`.
+    /// Sets the `CANCELLED` bit and attempts to transition to `Running`.
     ///
     /// Returns `true` if the transition to `Running` succeeded.
     pub(super) fn transition_to_shutdown(&self) -> bool {
@@ -330,7 +330,7 @@ impl State {
     }
 
     /// Optimistically tries to swap the state assuming the join handle is
-    /// __immediately__ dropped on spawn
+    /// __immediately__ dropped on spawn.
     pub(super) fn drop_join_handle_fast(&self) -> Result<(), ()> {
         use std::sync::atomic::Ordering::Relaxed;
 
@@ -352,7 +352,7 @@ impl State {
             .map_err(|_| ())
     }
 
-    /// Try to unset the JOIN_INTEREST flag.
+    /// Tries to unset the JOIN_INTEREST flag.
     ///
     /// Returns `Ok` if the operation happens before the task transitions to a
     /// completed state, `Err` otherwise.
@@ -371,7 +371,7 @@ impl State {
         })
     }
 
-    /// Set the `JOIN_WAKER` bit.
+    /// Sets the `JOIN_WAKER` bit.
     ///
     /// Returns `Ok` if the bit is set, `Err` otherwise. This operation fails if
     /// the task has completed.

@@ -1,5 +1,5 @@
 #![cfg_attr(not(feature = "sync"), allow(unreachable_pub, dead_code))]
-//! # Implementation Details
+//! # Implementation Details.
 //!
 //! The semaphore is implemented using an intrusive linked list of waiters. An
 //! atomic counter tracks the number of available permits. If the semaphore does
@@ -138,7 +138,7 @@ impl Semaphore {
         }
     }
 
-    /// Creates a new semaphore with the initial number of permits
+    /// Creates a new semaphore with the initial number of permits.
     ///
     /// Maximum number of permits on 32-bit platforms is `1<<29`.
     ///
@@ -159,7 +159,7 @@ impl Semaphore {
         }
     }
 
-    /// Returns the current number of available permits
+    /// Returns the current number of available permits.
     pub(crate) fn available_permits(&self) -> usize {
         self.permits.load(Acquire) >> Self::PERMIT_SHIFT
     }
@@ -197,7 +197,7 @@ impl Semaphore {
         }
     }
 
-    /// Returns true if the semaphore is closed
+    /// Returns true if the semaphore is closed.
     pub(crate) fn is_closed(&self) -> bool {
         self.permits.load(Acquire) & Self::CLOSED == Self::CLOSED
     }

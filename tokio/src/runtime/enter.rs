@@ -92,7 +92,7 @@ cfg_rt_multi_thread! {
 }
 
 cfg_rt! {
-    /// Disallow blocking in the current runtime context until the guard is dropped.
+    /// Disallows blocking in the current runtime context until the guard is dropped.
     pub(crate) fn disallow_blocking() -> DisallowBlockingGuard {
         let reset = ENTERED.with(|c| {
             if let EnterContext::Entered {

@@ -1,4 +1,4 @@
-//! Definition of the MaybeDone combinator
+//! Definition of the MaybeDone combinator.
 
 use std::future::Future;
 use std::mem;
@@ -8,9 +8,9 @@ use std::task::{Context, Poll};
 /// A future that may have completed.
 #[derive(Debug)]
 pub enum MaybeDone<Fut: Future> {
-    /// A not-yet-completed future
+    /// A not-yet-completed future.
     Future(Fut),
-    /// The output of the completed future
+    /// The output of the completed future.
     Done(Fut::Output),
     /// The empty variant after the result of a [`MaybeDone`] has been
     /// taken using the [`take_output`](MaybeDone::take_output) method.
@@ -20,7 +20,7 @@ pub enum MaybeDone<Fut: Future> {
 // Safe because we never generate `Pin<&mut Fut::Output>`
 impl<Fut: Future + Unpin> Unpin for MaybeDone<Fut> {}
 
-/// Wraps a future into a `MaybeDone`
+/// Wraps a future into a `MaybeDone`.
 pub fn maybe_done<Fut: Future>(future: Fut) -> MaybeDone<Fut> {
     MaybeDone::Future(future)
 }

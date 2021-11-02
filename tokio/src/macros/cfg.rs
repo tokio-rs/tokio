@@ -13,7 +13,7 @@ macro_rules! feature {
     }
 }
 
-/// Enables enter::block_on
+/// Enables enter::block_on.
 macro_rules! cfg_block_on {
     ($($item:item)*) => {
         $(
@@ -28,7 +28,7 @@ macro_rules! cfg_block_on {
     }
 }
 
-/// Enables internal `AtomicWaker` impl
+/// Enables internal `AtomicWaker` impl.
 macro_rules! cfg_atomic_waker_impl {
     ($($item:item)*) => {
         $(
@@ -99,6 +99,7 @@ macro_rules! cfg_io_driver_impl {
                 feature = "process",
                 all(unix, feature = "signal"),
             ))]
+            #[cfg_attr(docsrs, doc(cfg(all())))]
             $item
         )*
     }
@@ -422,7 +423,8 @@ macro_rules! cfg_has_atomic_u64 {
             #[cfg(not(any(
                     target_arch = "arm",
                     target_arch = "mips",
-                    target_arch = "powerpc"
+                    target_arch = "powerpc",
+                    target_arch = "riscv32"
                     )))]
             $item
         )*
@@ -435,7 +437,8 @@ macro_rules! cfg_not_has_atomic_u64 {
             #[cfg(any(
                     target_arch = "arm",
                     target_arch = "mips",
-                    target_arch = "powerpc"
+                    target_arch = "powerpc",
+                    target_arch = "riscv32"
                     ))]
             $item
         )*

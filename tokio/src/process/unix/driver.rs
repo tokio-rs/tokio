@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
-//! Process driver
+//! Process driver.
 
 use crate::park::Park;
 use crate::process::unix::GlobalOrphanQueue;

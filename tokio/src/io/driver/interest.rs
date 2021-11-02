@@ -5,7 +5,7 @@ use crate::io::driver::Ready;
 use std::fmt;
 use std::ops;
 
-/// Readiness event interest
+/// Readiness event interest.
 ///
 /// Specifies the readiness events the caller is interested in when awaiting on
 /// I/O resource readiness states.
@@ -17,19 +17,19 @@ impl Interest {
     // The non-FreeBSD definitions in this block are active only when
     // building documentation.
     cfg_aio! {
-        /// Interest for POSIX AIO
+        /// Interest for POSIX AIO.
         #[cfg(target_os = "freebsd")]
         pub const AIO: Interest = Interest(mio::Interest::AIO);
 
-        /// Interest for POSIX AIO
+        /// Interest for POSIX AIO.
         #[cfg(not(target_os = "freebsd"))]
         pub const AIO: Interest = Interest(mio::Interest::READABLE);
 
-        /// Interest for POSIX AIO lio_listio events
+        /// Interest for POSIX AIO lio_listio events.
         #[cfg(target_os = "freebsd")]
         pub const LIO: Interest = Interest(mio::Interest::LIO);
 
-        /// Interest for POSIX AIO lio_listio events
+        /// Interest for POSIX AIO lio_listio events.
         #[cfg(not(target_os = "freebsd"))]
         pub const LIO: Interest = Interest(mio::Interest::READABLE);
     }
@@ -39,7 +39,7 @@ impl Interest {
     /// Readable interest includes read-closed events.
     pub const READABLE: Interest = Interest(mio::Interest::READABLE);
 
-    /// Interest in all writable events
+    /// Interest in all writable events.
     ///
     /// Writable interest includes write-closed events.
     pub const WRITABLE: Interest = Interest(mio::Interest::WRITABLE);

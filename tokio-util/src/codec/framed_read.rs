@@ -51,6 +51,7 @@ where
                     eof: false,
                     is_readable: false,
                     buffer: BytesMut::with_capacity(capacity),
+                    has_errored: false,
                 },
             },
         }
