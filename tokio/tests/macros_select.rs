@@ -558,3 +558,29 @@ pub async fn default_numeric_fallback() {
         else => (),
     }
 }
+
+// https://github.com/tokio-rs/tokio/issues/4182
+#[tokio::test]
+async fn mut_ref_patterns() {
+    tokio::select! {
+        Some(mut foo) = async { Some("1".to_string()) } => {
+            assert_eq!(foo, "1");
+            foo = "2".to_string();
+            assert_eq!(foo, "2");
+        },
+    };
+
+    tokio::select! {
+        Some(ref foo) = async { Some("1".to_string()) } => {
+            assert_eq!(*foo, "1");
+        },
+    };
+
+    tokio::select! {
+        Some(ref mut foo) = async { Some("1".to_string()) } => {
+            assert_eq!(*foo, "1");
+            *foo = "2".to_string();
+            assert_eq!(*foo, "2");
+        },
+    };
+}

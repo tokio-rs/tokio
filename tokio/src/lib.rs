@@ -497,6 +497,12 @@ cfg_macros! {
     #[doc(hidden)]
     pub use tokio_macros::select_priv_declare_output_enum;
 
+    /// Implementation detail of the `select!` macro. This macro is **not**
+    /// intended to be used as part of the public API and is permitted to
+    /// change.
+    #[doc(hidden)]
+    pub use tokio_macros::select_priv_clean_pattern;
+
     cfg_rt! {
         #[cfg(feature = "rt-multi-thread")]
         #[cfg(not(test))] // Work around for rust-lang/rust#62127
