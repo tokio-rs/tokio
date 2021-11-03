@@ -91,6 +91,23 @@ async fn close_sender_not_last() {
 }
 
 #[tokio::test]
+async fn close_sender_before_reserve() {
+    let (send, mut recv) = channel::<i32>(3);
+    let mut send = PollSender::new(send);
+
+    let mut recv_task = spawn(recv.recv());
+    assert_pending!(recv_task.poll());
+
+    send.close_this_sender();
+
+    assert!(recv_task.is_woken());
+    assert!(assert_ready!(recv_task.poll()).is_none());
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_ready_err!(reserve.poll());
+}
+
+#[tokio::test]
 async fn close_sender_after_reserve() {
     let (send, mut recv) = channel::<i32>(3);
     let mut send = PollSender::new(send);
