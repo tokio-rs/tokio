@@ -1,3 +1,8 @@
+# Unreleased
+
+### Fixed
+- sync: refactored `PollSender<T>` to fix a subtly broken `Sink<T>` implementation ([#xxxx])
+
 # 0.6.9 (October 29, 2021)
 
 ### Added
