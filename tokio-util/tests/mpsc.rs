@@ -28,6 +28,19 @@ async fn test_simple() {
 }
 
 #[tokio::test]
+async fn test_repeated_poll_reserve() {
+    let (send, mut recv) = channel::<i32>(1);
+    let mut send = PollSender::new(send);
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_ready_ok!(reserve.poll());
+    assert_ready_ok!(reserve.poll());
+    send.start_send(1).unwrap();
+
+    assert_eq!(recv.recv().await.unwrap(), 1);
+}
+
+#[tokio::test]
 async fn test_abort() {
     let (send, mut recv) = channel(3);
     let mut send = PollSender::new(send);
@@ -132,4 +145,28 @@ async fn close_sender_after_reserve() {
 
     let inner = result.unwrap_err().into_inner();
     assert_eq!(inner, Some(42));
+}
+
+#[should_panic]
+#[test]
+fn start_send_panics_when_idle() {
+    let (send, _) = channel::<i32>(3);
+    let mut send = PollSender::new(send);
+
+    send.start_send(1).unwrap();
+}
+
+#[should_panic]
+#[test]
+fn start_send_panics_when_acquiring() {
+    let (send, _) = channel::<i32>(1);
+    let mut send = PollSender::new(send);
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_ready_ok!(reserve.poll());
+    send.start_send(1).unwrap();
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_pending!(reserve.poll());
+    send.start_send(2).unwrap();
 }
