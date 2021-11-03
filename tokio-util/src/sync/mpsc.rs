@@ -137,7 +137,9 @@ impl<T: Send + 'static> PollSender<T> {
     pub fn start_send(&mut self, value: T) -> Result<(), PollSendError<T>> {
         let (result, next_state) = match self.take_state() {
             State::Idle(_) | State::Acquiring => panic!("`start_send` called without first calling `poll_ready`"),
+            // We have a permit to send our item, so go ahead, which gets us our sender back.
             State::ReadyToSend(permit) => (Ok(()), State::Idle(permit.send(value))),
+            // We're closed, either by choice or because the underlying sender was closed.
             State::Closed => (Err(PollSendError(Some(value))), State::Closed),
         };
 
@@ -186,7 +188,7 @@ impl<T: Send + 'static> PollSender<T> {
 
         // We don't want to abort an in-progress send since the caller might still want to complete
         // it.  If that's the case, we'll defer updating our state until `start_send` is called, but
-        // otherwise, we adjust our state here.
+        // otherwise, we can speed up the process if we're already idle.
         if let State::Idle(_) = self.state {
             self.state = State::Closed;
         }
@@ -198,16 +200,25 @@ impl<T: Send + 'static> PollSender<T> {
     /// `abort_send`, then the sender will remain in the closed state, otherwise the sender will be
     /// ready to attempt another send.
     pub fn abort_send(&mut self) -> bool {
+        // We may have been closed in the meantime, after a call to `poll_reserve` already
+        // succeeded.  We'll check if `self.sender` is `None` to see if we should transition to the
+        // closed state when we actually abort a send, rather than resetting ourselves back to idle.
+
         let (result, next_state) = match self.take_state() {
+            // We're currently trying to reserve a slot to send into.
             State::Acquiring => {
-                // Resetting the future drops the in-flight one.
+                // Replacing the future drops the in-flight one.
                 self.acquire.set(make_acquire_future(None));
+
+                // If we haven't closed yet, we have to clone our stored sender since we have no way
+                // to get it back from the acquire future we just dropped.
                 let state = match self.sender.clone() {
                     Some(sender) => State::Idle(sender),
                     None => State::Closed,
                 };
                 (true, state)
             },
+            // We got the permit.  If we haven't closed yet, get the sender back.
             State::ReadyToSend(permit) => {
                 let state = if self.sender.is_some() {
                     State::Idle(permit.release())

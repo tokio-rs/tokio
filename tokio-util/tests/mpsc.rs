@@ -109,4 +109,10 @@ async fn close_sender_after_reserve() {
 
     assert!(recv_task.is_woken());
     assert!(assert_ready!(recv_task.poll()).is_none());
+
+    let result = send.start_send(42);
+    assert!(result.is_err());
+
+    let inner = result.unwrap_err().into_inner();
+    assert_eq!(inner, Some(42));
 }
