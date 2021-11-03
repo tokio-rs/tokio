@@ -5,7 +5,7 @@ use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok
 use tokio_util::sync::PollSender;
 
 #[tokio::test]
-async fn test_simple() {
+async fn simple() {
     let (send, mut recv) = channel(3);
     let mut send = PollSender::new(send);
 
@@ -28,7 +28,7 @@ async fn test_simple() {
 }
 
 #[tokio::test]
-async fn test_repeated_poll_reserve() {
+async fn repeated_poll_reserve() {
     let (send, mut recv) = channel::<i32>(1);
     let mut send = PollSender::new(send);
 
@@ -41,10 +41,10 @@ async fn test_repeated_poll_reserve() {
 }
 
 #[tokio::test]
-async fn test_abort() {
+async fn abort_send() {
     let (send, mut recv) = channel(3);
     let mut send = PollSender::new(send);
-    let send2 = send.clone_inner().unwrap();
+    let send2 = send.get_ref().cloned().unwrap();
 
     for i in 1..=3i32 {
         let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
@@ -77,7 +77,7 @@ async fn close_sender_last() {
     let mut recv_task = spawn(recv.recv());
     assert_pending!(recv_task.poll());
 
-    send.close_this_sender();
+    send.close();
 
     assert!(recv_task.is_woken());
     assert!(assert_ready!(recv_task.poll()).is_none());
@@ -86,13 +86,13 @@ async fn close_sender_last() {
 #[tokio::test]
 async fn close_sender_not_last() {
     let (send, mut recv) = channel::<i32>(3);
-    let send2 = send.clone();
     let mut send = PollSender::new(send);
+    let send2 = send.get_ref().cloned().unwrap();
 
     let mut recv_task = spawn(recv.recv());
     assert_pending!(recv_task.poll());
 
-    send.close_this_sender();
+    send.close();
 
     assert!(!recv_task.is_woken());
     assert_pending!(recv_task.poll());
@@ -111,7 +111,7 @@ async fn close_sender_before_reserve() {
     let mut recv_task = spawn(recv.recv());
     assert_pending!(recv_task.poll());
 
-    send.close_this_sender();
+    send.close();
 
     assert!(recv_task.is_woken());
     assert!(assert_ready!(recv_task.poll()).is_none());
@@ -121,7 +121,32 @@ async fn close_sender_before_reserve() {
 }
 
 #[tokio::test]
-async fn close_sender_after_reserve() {
+async fn close_sender_after_pending_reserve() {
+    let (send, mut recv) = channel::<i32>(1);
+    let mut send = PollSender::new(send);
+
+    let mut recv_task = spawn(recv.recv());
+    assert_pending!(recv_task.poll());
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_ready_ok!(reserve.poll());
+    send.start_send(1).unwrap();
+
+    assert!(recv_task.is_woken());
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_pending!(reserve.poll());
+    drop(reserve);
+
+    send.close();
+
+    assert!(send.is_closed());
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_ready_err!(reserve.poll());
+}
+
+#[tokio::test]
+async fn close_sender_after_successful_reserve() {
     let (send, mut recv) = channel::<i32>(3);
     let mut send = PollSender::new(send);
 
@@ -130,21 +155,63 @@ async fn close_sender_after_reserve() {
 
     let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
     assert_ready_ok!(reserve.poll());
+    drop(reserve);
 
-    send.close_this_sender();
-
+    send.close();
+    assert!(send.is_closed());
     assert!(!recv_task.is_woken());
     assert_pending!(recv_task.poll());
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_ready_ok!(reserve.poll());
+}
+
+#[tokio::test]
+async fn abort_send_after_pending_reserve() {
+    let (send, mut recv) = channel::<i32>(1);
+    let mut send = PollSender::new(send);
+
+    let mut recv_task = spawn(recv.recv());
+    assert_pending!(recv_task.poll());
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_ready_ok!(reserve.poll());
+    send.start_send(1).unwrap();
+
+    assert_eq!(send.get_ref().unwrap().capacity(), 0);
+    assert!(!send.abort_send());
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_pending!(reserve.poll());
+
     assert!(send.abort_send());
+    assert_eq!(send.get_ref().unwrap().capacity(), 0);
+}
 
-    assert!(recv_task.is_woken());
-    assert!(assert_ready!(recv_task.poll()).is_none());
+#[tokio::test]
+async fn abort_send_after_successful_reserve() {
+    let (send, mut recv) = channel::<i32>(1);
+    let mut send = PollSender::new(send);
 
-    let result = send.start_send(42);
-    assert!(result.is_err());
+    let mut recv_task = spawn(recv.recv());
+    assert_pending!(recv_task.poll());
 
-    let inner = result.unwrap_err().into_inner();
-    assert_eq!(inner, Some(42));
+    assert_eq!(send.get_ref().unwrap().capacity(), 1);
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_ready_ok!(reserve.poll());
+    assert_eq!(send.get_ref().unwrap().capacity(), 0);
+
+    assert!(send.abort_send());
+    assert_eq!(send.get_ref().unwrap().capacity(), 1);
+}
+
+#[tokio::test]
+async fn closed_when_receiver_drops() {
+    let (send, _) = channel::<i32>(1);
+    let mut send = PollSender::new(send);
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_ready_err!(reserve.poll());
 }
 
 #[should_panic]

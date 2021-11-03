@@ -15,7 +15,7 @@ impl<T> PollSendError<T> {
     /// Consumes the stored value, if any.
     ///
     /// If this error was encountered when calling `start_send`, this will be the item that the
-    /// caller was attempting to send.  Otherwise, it will be `None`.
+    /// caller attempted to send.  Otherwise, it will be `None`.
     pub fn into_inner(self) -> Option<T> {
         self.0
     }
@@ -64,8 +64,8 @@ async fn make_acquire_future<T>(
     }
 }
 
-impl<T: Send + 'static> PollSender<T> {
-    /// Create a new `PollSender`.
+impl<T: fmt::Debug + Send + 'static> PollSender<T> {
+    /// Creates a new `PollSender`.
     pub fn new(sender: Sender<T>) -> Self {
         Self {
             sender: Some(sender.clone()),
@@ -95,29 +95,31 @@ impl<T: Send + 'static> PollSender<T> {
         loop {
             let (result, next_state) = match self.take_state() {
                 State::Idle(sender) => {
+                    // Start trying to acquire a permit to reserve a slot for our send, and
+                    // immediately loop back around to poll it the first time.
                     self.acquire.set(make_acquire_future(Some(sender)));
-
-                    // We set the state directly and restart the loop so that we can immediately
-                    // poll the future without duplicating the polling code here.
-                    self.state = State::Acquiring;
-                    continue;
+                    (None, State::Acquiring)
                 }
                 State::Acquiring => match self.acquire.poll(cx) {
                     // Channel has capacity.
-                    Poll::Ready(Ok(permit)) => (Poll::Ready(Ok(())), State::ReadyToSend(permit)),
+                    Poll::Ready(Ok(permit)) => {
+                        (Some(Poll::Ready(Ok(()))), State::ReadyToSend(permit))
+                    }
                     // Channel is closed.
-                    Poll::Ready(Err(e)) => (Poll::Ready(Err(e)), State::Closed),
+                    Poll::Ready(Err(e)) => (Some(Poll::Ready(Err(e))), State::Closed),
                     // Channel doesn't have capacity yet, so we need to wait.
-                    Poll::Pending => (Poll::Pending, State::Acquiring),
+                    Poll::Pending => (Some(Poll::Pending), State::Acquiring),
                 },
                 // We're closed, either by choice or because the underlying sender was closed.
-                s @ State::Closed => (Poll::Ready(Err(PollSendError(None))), s),
+                s @ State::Closed => (Some(Poll::Ready(Err(PollSendError(None)))), s),
                 // We're already ready to send an item.
-                s @ State::ReadyToSend(_) => (Poll::Ready(Ok(())), s),
+                s @ State::ReadyToSend(_) => (Some(Poll::Ready(Ok(()))), s),
             };
 
             self.state = next_state;
-            return result;
+            if let Some(result) = result {
+                return result;
+            }
         }
     }
 
@@ -145,7 +147,7 @@ impl<T: Send + 'static> PollSender<T> {
             State::Closed => (Err(PollSendError(Some(value))), State::Closed),
         };
 
-        // Handle deferred closing if `close_this_sender` was called between `poll_reserve` and `start_send`.
+        // Handle deferred closing if `close` was called between `poll_reserve` and `start_send`.
         self.state = if self.sender.is_some() {
             next_state
         } else {
@@ -154,29 +156,24 @@ impl<T: Send + 'static> PollSender<T> {
         result
     }
 
-    /// Checks whether the channel has been closed.
-    pub fn is_closed(&self) -> bool {
-        matches!(self.state, State::Closed)
-    }
-
-    /// Clones the underlying `Sender`.
+    /// Checks whether this sender is been closed.
     ///
-    /// If the channel is closed, `None` is returned.
-    pub fn clone_inner(&self) -> Option<Sender<T>> {
-        self.sender.clone()
+    /// The underlying channel that this sender was wrapping may still be open.
+    pub fn is_closed(&self) -> bool {
+        matches!(self.state, State::Closed) || self.sender.is_none()
     }
 
     /// Gets a reference to the underlying `Sender`.
     ///
     /// If the channel is closed, `None` is returned.
-    pub fn inner_ref(&self) -> Option<&Sender<T>> {
+    pub fn get_ref(&self) -> Option<&Sender<T>> {
         self.sender.as_ref()
     }
 
-    /// Closes this sender. No more messages can be sent from this sender.
+    /// Closes this sender without dropping it.
     ///
-    /// Note that this only closes the channel from the view-point of this sender. The channel
-    /// remains open until all senders have gone away, or until the [`Receiver`] closes the channel.
+    /// No more messages will be able to be sent from this sender, but the underlying channel will
+    /// remain open until all senders have dropped, or until the [`Receiver`] closes the channel.
     ///
     /// If a slot was previously reserved by calling `poll_reserve`, then a final call can be made
     /// to `start_send` in order to consume the reserved slot.  After that, no further sends will be
@@ -185,15 +182,20 @@ impl<T: Send + 'static> PollSender<T> {
     ///
     /// [`abort_send`]: crate::sync::PollSender::abort_send
     /// [`Receiver`]: tokio::sync::mpsc::Receiver
-    pub fn close_this_sender(&mut self) {
+    pub fn close(&mut self) {
         // Mark ourselves officially closed by dropping our main sender.
         self.sender = None;
 
-        // We don't want to abort an in-progress send since the caller might still want to complete
-        // it.  If that's the case, we'll defer updating our state until `start_send` is called, but
-        // otherwise, we can speed up the process if we're already idle.
-        if let State::Idle(_) = self.state {
-            self.state = State::Closed;
+        // If we're already idle, closed, or we haven't yet reserved a slot, we can quickly
+        // transition to the closed state.  Otherwise, leave the existing permit in place for the
+        // caller if they want to complete the send.
+        match self.state {
+            State::Idle(_) => self.state = State::Closed,
+            State::Acquiring => {
+                self.acquire.set(make_acquire_future(None));
+                self.state = State::Closed;
+            }
+            _ => {}
         }
     }
 
@@ -251,12 +253,14 @@ impl<T> Clone for PollSender<T> {
         Self {
             sender,
             state,
+            // We don't use `make_acquire_future` here because our relaxed bounds on `T` are not
+            // compatible with the transitive bounds required by `Sender<T>`.
             acquire: ReusableBoxFuture::new(async { unreachable!() }),
         }
     }
 }
 
-impl<T: Send + 'static> Sink<T> for PollSender<T> {
+impl<T: fmt::Debug + Send + 'static> Sink<T> for PollSender<T> {
     type Error = PollSendError<T>;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -272,7 +276,7 @@ impl<T: Send + 'static> Sink<T> for PollSender<T> {
     }
 
     fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::into_inner(self).close_this_sender();
+        Pin::into_inner(self).close();
         Poll::Ready(Ok(()))
     }
 }
