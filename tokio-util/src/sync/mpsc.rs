@@ -64,7 +64,7 @@ async fn make_acquire_future<T>(
     }
 }
 
-impl<T: fmt::Debug + Send + 'static> PollSender<T> {
+impl<T: Send + 'static> PollSender<T> {
     /// Creates a new `PollSender`.
     pub fn new(sender: Sender<T>) -> Self {
         Self {
@@ -260,7 +260,7 @@ impl<T> Clone for PollSender<T> {
     }
 }
 
-impl<T: fmt::Debug + Send + 'static> Sink<T> for PollSender<T> {
+impl<T: Send + 'static> Sink<T> for PollSender<T> {
     type Error = PollSendError<T>;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
