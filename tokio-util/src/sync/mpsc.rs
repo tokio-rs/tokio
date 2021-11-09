@@ -163,9 +163,10 @@ impl<T: Send + 'static> PollSender<T> {
         matches!(self.state, State::Closed) || self.sender.is_none()
     }
 
-    /// Gets a reference to the underlying `Sender`.
+    /// Gets a reference to the `Sender` of the underlying channel.
     ///
-    /// If the channel is closed, `None` is returned.
+    /// If `PollSender` has been closed, `None` is returned. The underlying channel that this sender
+    /// was wrapping may still be open.
     pub fn get_ref(&self) -> Option<&Sender<T>> {
         self.sender.as_ref()
     }
