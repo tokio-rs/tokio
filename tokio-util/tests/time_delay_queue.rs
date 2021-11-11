@@ -779,56 +779,6 @@ async fn compact_change_deadline() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn compact_new_available_keys() {
-    // Tests `available_keys` functionality of `DelayQueue`.
-    // We first insert 2*`AVAILABLE_KEYS_LIST_SIZE` (call this `insert1`)
-    // many elements into `queue` and let the first half of those expire (this will
-    // cause all keys in the second half to be remapped). Then we will insert
-    // `AVAILABLE_KEYS_LIST_SIZE + 1` many elements into delay queue (insert2). Since the first
-    // half of the keys in the delay_queue have all been re-mapped `delay_queue` will have
-    // to create new keys using `create_available_keys`. Here we want to trigger the creation
-    // of that list of available keys twice. Once for the first `AVAILABLE_KEYS_LIST_SIZE`
-    // many elements in `insert2` and again for the last key of the second insertion.
-
-    // FIXME somehow coordinate this with the actual const `DelayQueue` uses
-    const AVAILABLE_KEYS_LIST_SIZE: usize = 200;
-
-    let now = Instant::now();
-
-    let mut queue = task::spawn(DelayQueue::new());
-
-    // insert1
-    for i in 0..(2 * AVAILABLE_KEYS_LIST_SIZE) {
-        if i < AVAILABLE_KEYS_LIST_SIZE {
-            queue.insert_at(format!("foo{}", i), now + ms(10));
-        } else {
-            queue.insert_at(format!("foo{}", i), now + ms(20));
-        }
-    }
-
-    sleep(ms(10)).await;
-
-    let mut res = vec![];
-    while res.len() < 2 {
-        let entry = assert_ready_ok!(poll!(queue));
-        res.push(entry.into_inner());
-    }
-
-    // First half of elements in `queue` expired. Calling `compact` will now
-    // re-map all remaining keys
-    queue.compact();
-
-    // insert2
-    for i in 0..(AVAILABLE_KEYS_LIST_SIZE) {
-        queue.insert_at(format!("foo{}", AVAILABLE_KEYS_LIST_SIZE + i), now + ms(10));
-    }
-    let key_last_elem = queue.insert_at("foo_last".to_string(), now + ms(10));
-
-    // remove last inserted element
-    assert_eq!(queue.remove(&key_last_elem).into_inner(), "foo_last")
-}
-
-#[tokio::test(start_paused = true)]
 async fn remove_after_compact() {
     let now = Instant::now();
     let mut queue = DelayQueue::new();

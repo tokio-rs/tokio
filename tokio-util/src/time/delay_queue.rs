@@ -21,9 +21,6 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{self, Poll, Waker};
 
-// Size of set that is used to store keys that can be used by `create_new_key`.
-const AVAILABLE_KEYS_SET_SIZE: usize = 200;
-
 /// A queue of delayed elements.
 ///
 /// Once an element is inserted into the `DelayQueue`, it is yielded once the
@@ -171,9 +168,8 @@ struct SlabStorage<T> {
     // the values to the `Key`s that were re-mapped by the `compact` call.
     key_map: HashMap<Key, KeyInternal>,
 
-    // Set of keys that we can use to create new keys. See the comment for
-    // `create_available_keys` for why this is necessary.
-    available_keys: HashSet<KeyInternal>,
+    // Index used to create new keys to hand out.
+    next_key_index: usize,
 
     // Whether `compact` has been called, necessary in order to decide whether
     // to include keys in `key_map`.
@@ -185,7 +181,7 @@ impl<T> SlabStorage<T> {
         SlabStorage {
             inner: Slab::with_capacity(capacity),
             key_map: HashMap::new(),
-            available_keys: HashSet::new(),
+            next_key_index: 0,
             compact_called: false,
         }
     }
@@ -210,8 +206,6 @@ impl<T> SlabStorage<T> {
             // panic if a key that was handed out is removed more than once.
             self.key_map.insert(key.into(), key);
         }
-
-        self.available_keys.remove(&key);
 
         key.into()
     }
@@ -258,8 +252,6 @@ impl<T> SlabStorage<T> {
             .iter()
             .map(|(_, item)| self.inner.key_of(&item))
             .collect();
-
-        self.available_keys.clear();
 
         let key_map = &mut self.key_map;
         let slab = &mut self.inner;
@@ -322,34 +314,12 @@ impl<T> SlabStorage<T> {
         remapped_key
     }
 
-    // We maintain a set of available keys for efficiency reasons, so as not to calculate
-    // the smallest available key each time `self.inner.insert` outputs a duplicate key.
-    // The creation of new keys is necessary if the `self.inner.insert` call
-    // in `self.insert` gives back a key that was previously given out.
-    // This scenario of a duplicate key can only happen after `compact` was called.
-    fn create_available_keys(&mut self) {
-        assert!(self.available_keys.is_empty());
-        self.available_keys.reserve(AVAILABLE_KEYS_SET_SIZE);
-
-        let mut i = 0;
-        let mut num_created_keys = 0;
-        while num_created_keys < AVAILABLE_KEYS_SET_SIZE {
-            if !self.key_map.contains_key(&Key::new(i)) {
-                self.available_keys.insert(KeyInternal::new(i));
-                num_created_keys += 1;
-            }
-            i += 1;
-        }
-    }
-
     fn create_new_key(&mut self) -> KeyInternal {
-        if self.available_keys.is_empty() {
-            self.create_available_keys();
+        while self.key_map.contains_key(&Key::new(self.next_key_index)) {
+            self.next_key_index = self.next_key_index.wrapping_add(1);
         }
 
-        let next = *self.available_keys.iter().nth(0).unwrap();
-        let new_key = self.available_keys.take(&next).unwrap();
-        new_key
+        KeyInternal::new(self.next_key_index)
     }
 
     pub(crate) fn len(&self) -> usize {
