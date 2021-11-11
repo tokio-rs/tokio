@@ -102,7 +102,7 @@ parking_lot = { version = "0.11.0", optional = true }
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
 [target.'cfg(tokio_unstable)'.dependencies]
-tracing = { version = "0.1.21", default-features = false, features = ["std"], optional = true } # Not in full
+tracing = { version = "0.1.25", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.42", optional = true }
