@@ -56,18 +56,32 @@ fn changing_rx_task() {
 }
 
 #[test]
-fn recv_close() {
+fn try_recv_close() {
     // reproduces https://github.com/tokio-rs/tokio/issues/4225
     loom::model(|| {
         let (tx, mut rx) = oneshot::channel();
         thread::spawn(move || {
             let _ = tx.send(());
         });
-        thread::spawn(move || {
-            rx.close();
-            let _ = rx.try_recv();
-        });
+
+        rx.close();
+        let _ = rx.try_recv();
     })
+}
+
+#[test]
+fn recv_closed() {
+    // reproduces https://github.com/tokio-rs/tokio/issues/4225
+    loom::model(|| {
+        let (tx, mut rx) = oneshot::channel();
+
+        thread::spawn(move || {
+            tx.send(1).unwrap();
+        });
+
+        rx.close();
+        let _ = block_on(rx);
+    });
 }
 
 // TODO: Move this into `oneshot` proper.
