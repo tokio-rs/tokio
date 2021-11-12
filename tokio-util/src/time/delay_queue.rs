@@ -12,7 +12,7 @@ use tokio::time::{error::Error, sleep_until, Duration, Instant, Sleep};
 use core::ops::{Index, IndexMut};
 use slab::Slab;
 use std::cmp;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::convert::From;
 use std::fmt;
 use std::fmt::Debug;
@@ -245,63 +245,26 @@ impl<T> SlabStorage<T> {
     }
 
     pub(crate) fn compact(&mut self) {
-        self.compact_called = true;
-
-        let keys_in_slab: HashSet<_> = self
-            .inner
-            .iter()
-            .map(|(_, item)| self.inner.key_of(&item))
-            .collect();
-
-        let key_map = &mut self.key_map;
-        let slab = &mut self.inner;
-
-        // We need to invert `key_map` since during a `inner.compact` call
-        // previously re-mapped keys (the values in `key_map`) might be re-mapped.
-        let mut inverse_key_map: HashMap<KeyInternal, Key> = HashMap::new();
-        for (old_key, remapped_key) in key_map.iter() {
-            inverse_key_map.insert(*remapped_key, *old_key);
+        if !self.compact_called {
+            for (key, _) in self.inner.iter() {
+                self.key_map.insert(Key::new(key), KeyInternal::new(key));
+            }
         }
 
-        let keys_given_out: HashSet<_> = keys_in_slab
-            .iter()
-            .map(|idx| {
-                let key = Key::new(*idx);
-
-                match inverse_key_map.get(&key.into()) {
-                    Some(remapped) => *remapped,
-                    None => key,
-                }
-            })
-            .collect();
-
-        let mut remapped_keys = HashSet::new();
-
-        slab.compact(|_, from, to| {
-            if let Some(old_key) = inverse_key_map.get(&KeyInternal::new(from)) {
-                // We previously re-mapped old_key -> KeyInternal(from) and now have to
-                // update the internal key since it has been re-mapped again to KeyInternal(to).
-                *key_map.get_mut(&old_key).unwrap() = KeyInternal::new(to);
-
-                remapped_keys.insert(*old_key);
-            } else {
-                let key = Key::new(from);
-                assert!(!key_map.contains_key(&key));
-
-                key_map.insert(Key::new(from), KeyInternal::new(to));
-                remapped_keys.insert(key);
-            }
-
+        let mut remapping = HashMap::new();
+        self.inner.compact(|_, from, to| {
+            remapping.insert(from, to);
             true
         });
 
-        // get all keys that we need to map to itself in `key_map`, these are
-        // all keys in `keys_given_out` that weren't re-mapped.
-        // See comment for `remove` method for why this identity mapping is necessary.
-        for key in keys_given_out.difference(&remapped_keys) {
-            assert!(!self.key_map.contains_key(key));
-            self.key_map.insert(*key, (*key).into());
+        // At this point `key_map` contains a mapping for every element.
+        for internal_key in self.key_map.values_mut() {
+            if let Some(new_internal_key) = remapping.get(&internal_key.index) {
+                *internal_key = KeyInternal::new(*new_internal_key);
+            }
         }
+
+        self.compact_called = true;
     }
 
     // Re-maps a `Key` that was given out to the user to its corresponding internal key
