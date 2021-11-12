@@ -839,13 +839,15 @@ impl<T> Receiver<T> {
         let result = if let Some(inner) = self.inner.as_ref() {
             let state = State::load(&inner.state, Acquire);
 
-            if state.is_complete() {
+            // First, check if the channel has been closed. If the channel is
+            // closed, return an error.
+            if state.is_closed() {
+                Err(TryRecvError::Closed)
+            } else if state.is_complete() {
                 match unsafe { inner.consume_value() } {
                     Some(value) => Ok(value),
                     None => Err(TryRecvError::Closed),
                 }
-            } else if state.is_closed() {
-                Err(TryRecvError::Closed)
             } else {
                 // Not ready, this does not clear `inner`
                 return Err(TryRecvError::Empty);
