@@ -493,7 +493,7 @@ impl<T> Sender<T> {
             *ptr = Some(t);
         });
 
-        if dbg!(!inner.complete()) {
+        if !inner.complete() {
             unsafe {
                 return Err(inner.consume_value().unwrap());
             }
@@ -887,7 +887,7 @@ impl<T> Future for Receiver<T> {
 
 impl<T> Inner<T> {
     fn complete(&self) -> bool {
-        let prev = dbg!(State::set_complete(&self.state));
+        let prev = State::set_complete(&self.state);
 
         if prev.is_closed() {
             return false;
@@ -968,7 +968,7 @@ impl<T> Inner<T> {
 
     /// Called by `Receiver` to indicate that the value will never be received.
     fn close(&self) {
-        let prev = dbg!(State::set_closed(&self.state));
+        let prev = State::set_closed(&self.state);
 
         if prev.is_tx_task_set() && !prev.is_complete() {
             unsafe {
