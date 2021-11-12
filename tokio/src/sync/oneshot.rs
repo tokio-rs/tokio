@@ -839,15 +839,13 @@ impl<T> Receiver<T> {
         let result = if let Some(inner) = self.inner.as_ref() {
             let state = State::load(&inner.state, Acquire);
 
-            // First, check if the channel has been closed. If the channel is
-            // closed, return an error.
-            if state.is_closed() {
-                Err(TryRecvError::Closed)
-            } else if state.is_complete() {
+            if state.is_complete() {
                 match unsafe { inner.consume_value() } {
                     Some(value) => Ok(value),
                     None => Err(TryRecvError::Closed),
                 }
+            } else if state.is_closed() {
+                Err(TryRecvError::Closed)
             } else {
                 // Not ready, this does not clear `inner`
                 return Err(TryRecvError::Empty);
@@ -910,15 +908,15 @@ impl<T> Inner<T> {
         // Load the state
         let mut state = State::load(&self.state, Acquire);
 
-        if state.is_closed() {
-            coop.made_progress();
-            Ready(Err(RecvError(())))
-        } else if state.is_complete() {
+        if state.is_complete() {
             coop.made_progress();
             match unsafe { self.consume_value() } {
                 Some(value) => Ready(Ok(value)),
                 None => Ready(Err(RecvError(()))),
             }
+        } else if state.is_closed() {
+            coop.made_progress();
+            Ready(Err(RecvError(())))
         } else {
             if state.is_rx_task_set() {
                 let will_notify = unsafe { self.rx_task.will_wake(cx) };
@@ -1033,11 +1031,25 @@ impl State {
     }
 
     fn set_complete(cell: &AtomicUsize) -> State {
-        // TODO: This could be `Release`, followed by an `Acquire` fence *if*
-        // the `RX_TASK_SET` flag is set. However, `loom` does not support
-        // fences yet.
-        let val = cell.fetch_or(VALUE_SENT, AcqRel);
-        State(val)
+        let mut state = cell.load(Ordering::Relaxed);
+        loop {
+            if State(state).is_closed() {
+                break;
+            }
+            // TODO: This could be `Release`, followed by an `Acquire` fence *if*
+            // the `RX_TASK_SET` flag is set. However, `loom` does not support
+            // fences yet.
+            match cell.compare_exchange_weak(
+                state,
+                state | VALUE_SENT,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => break,
+                Err(actual) => state = actual,
+            }
+        }
+        State(state)
     }
 
     fn is_rx_task_set(self) -> bool {
