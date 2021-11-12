@@ -121,6 +121,24 @@ cfg_rt! {
     /// ```text
     /// error[E0391]: cycle detected when processing `main`
     /// ```
+    /// =================================================
+    /// 
+    ///Warning: Large futures may cause a stack overflow! 
+    ///
+    ///Example:
+    /// ```no_run
+    ///#[tokio::main]
+    ///async fn main() {
+    ///     tokio::spawn(async move {
+    ///         let mut buf = [0; 2097151];
+    ///     }).await;
+    ///}
+    ///```
+    ///thread 'tokio-runtime-worker' has overflowed its stack
+    /// 
+    ///fatal runtime error: stack overflow 
+    /// 
+    ///timeout: the monitored command dumped core
     #[cfg_attr(tokio_track_caller, track_caller)]
     pub fn spawn<T>(future: T) -> JoinHandle<T::Output>
     where
