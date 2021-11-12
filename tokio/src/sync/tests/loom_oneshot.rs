@@ -76,7 +76,7 @@ fn recv_closed() {
         let (tx, mut rx) = oneshot::channel();
 
         thread::spawn(move || {
-            tx.send(1).unwrap();
+            let _ = tx.send(1);
         });
 
         rx.close();
