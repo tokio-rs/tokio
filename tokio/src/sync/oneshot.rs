@@ -493,7 +493,7 @@ impl<T> Sender<T> {
             *ptr = Some(t);
         });
 
-        if !inner.complete() {
+        if dbg!(!inner.complete()) {
             unsafe {
                 return Err(inner.consume_value().unwrap());
             }
@@ -887,7 +887,7 @@ impl<T> Future for Receiver<T> {
 
 impl<T> Inner<T> {
     fn complete(&self) -> bool {
-        let prev = State::set_complete(&self.state);
+        let prev = dbg!(State::set_complete(&self.state));
 
         if prev.is_closed() {
             return false;
@@ -910,15 +910,15 @@ impl<T> Inner<T> {
         // Load the state
         let mut state = State::load(&self.state, Acquire);
 
-        if state.is_complete() {
+        if state.is_closed() {
+            coop.made_progress();
+            Ready(Err(RecvError(())))
+        } else if state.is_complete() {
             coop.made_progress();
             match unsafe { self.consume_value() } {
                 Some(value) => Ready(Ok(value)),
                 None => Ready(Err(RecvError(()))),
             }
-        } else if state.is_closed() {
-            coop.made_progress();
-            Ready(Err(RecvError(())))
         } else {
             if state.is_rx_task_set() {
                 let will_notify = unsafe { self.rx_task.will_wake(cx) };
@@ -968,7 +968,7 @@ impl<T> Inner<T> {
 
     /// Called by `Receiver` to indicate that the value will never be received.
     fn close(&self) {
-        let prev = State::set_closed(&self.state);
+        let prev = dbg!(State::set_closed(&self.state));
 
         if prev.is_tx_task_set() && !prev.is_complete() {
             unsafe {
