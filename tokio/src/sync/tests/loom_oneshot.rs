@@ -55,6 +55,21 @@ fn changing_rx_task() {
     });
 }
 
+#[test]
+fn recv_close() {
+    // reproduces https://github.com/tokio-rs/tokio/issues/4225
+    loom::model(|| {
+        let (tx, mut rx) = oneshot::channel();
+        thread::spawn(move || {
+            let _ = tx.send(());
+        });
+        thread::spawn(move || {
+            rx.close();
+            let _ = rx.try_recv();
+        });
+    })
+}
+
 // TODO: Move this into `oneshot` proper.
 
 use std::future::Future;
