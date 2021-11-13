@@ -863,6 +863,11 @@ impl<T> Receiver<T> {
             let state = State::load(&inner.state, Acquire);
 
             if state.is_complete() {
+                // SAFETY: If `state.is_complete()` returns true, then the
+                // `VALUE_SENT` bit has been set and the sender side of the
+                // channel will no longer attempt to access the inner
+                // `UnsafeCell`. Therefore, it is now safe for us to access the
+                // cell.
                 match unsafe { inner.consume_value() } {
                     Some(value) => Ok(value),
                     None => Err(TryRecvError::Closed),
@@ -953,6 +958,11 @@ impl<T> Inner<T> {
                         State::set_rx_task(&self.state);
 
                         coop.made_progress();
+                        // SAFETY: If `state.is_complete()` returns true, then the
+                        // `VALUE_SENT` bit has been set and the sender side of the
+                        // channel will no longer attempt to access the inner
+                        // `UnsafeCell`. Therefore, it is now safe for us to access the
+                        // cell.
                         return match unsafe { self.consume_value() } {
                             Some(value) => Ready(Ok(value)),
                             None => Ready(Err(RecvError(()))),
@@ -999,6 +1009,14 @@ impl<T> Inner<T> {
     }
 
     /// Consumes the value. This function does not check `state`.
+    ///
+    /// # Safety
+    ///
+    /// Calling this method concurrently on multiple threads will result in a
+    /// data race. The `VALUE_SENT` state bit is used to ensure that only the
+    /// sender *or* the receiver will call this method at a given point in time.
+    /// If `VALUE_SENT` is not set, then only the sender may call this method;
+    /// if it is set, then only the receiver may call this method.
     unsafe fn consume_value(&self) -> Option<T> {
         self.value.with_mut(|ptr| (*ptr).take())
     }
