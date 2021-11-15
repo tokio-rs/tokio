@@ -18,6 +18,16 @@ macro_rules! cfg_io_util {
     }
 }
 
+macro_rules! cfg_task {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "task")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "task")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_net {
     ($($item:item)*) => {
         $(

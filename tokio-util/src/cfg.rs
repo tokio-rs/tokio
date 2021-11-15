@@ -8,6 +8,16 @@ macro_rules! cfg_codec {
     }
 }
 
+macro_rules! cfg_task {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "task")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "task")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_compat {
     ($($item:item)*) => {
         $(

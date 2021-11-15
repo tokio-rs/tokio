@@ -26,6 +26,7 @@ io-util = ["tokio/io-util"]
 fs = ["tokio/fs"]
 sync = ["tokio/sync", "tokio-util"]
 signal = ["tokio/signal"]
+task = ["tokio-util/task"]
 
 [dependencies]
 futures-core = { version = "0.3.0" }

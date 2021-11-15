@@ -45,6 +45,10 @@ cfg_rt! {
     pub mod context;
 }
 
+cfg_task! {
+    pub mod taskset;
+}
+
 cfg_time! {
     pub mod time;
 }

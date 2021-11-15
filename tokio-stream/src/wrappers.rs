@@ -48,6 +48,11 @@ cfg_net! {
     pub use unix_listener::UnixListenerStream;
 }
 
+cfg_task! {
+    mod task;
+    pub use task::TaskSetStream;
+}
+
 cfg_io_util! {
     mod split;
     pub use split::SplitStream;
