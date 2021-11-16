@@ -81,6 +81,7 @@ cfg_net! {
     /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
     /// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html
     /// [`socket2`]: https://docs.rs/socket2/
+    #[cfg_attr(docsrs, doc(alias = "connect_std"))]
     pub struct TcpSocket {
         inner: mio::net::TcpSocket,
     }
