@@ -104,7 +104,7 @@ impl<T> TaskSet<T> {
     /// let mut set = TaskSet::new();
     ///
     /// set.spawn(async { 5u8 });
-    /// set.spawn(futures::future::pending());
+    /// set.spawn(std::future::pending());
     ///
     /// let joined = set.next_finished().await.unwrap().unwrap();
     /// assert_eq!(5u8, joined);
@@ -150,7 +150,7 @@ impl<T> TaskSet<T> {
     ///     set.spawn(async move {
     ///         let _guard = guard;
     ///         // we must never surrender to the forces of time
-    ///         let _: () = futures::future::pending().await;
+    ///         let _: () = std::future::pending().await;
     ///     });
     /// }
     ///
@@ -180,7 +180,7 @@ impl<T> TaskSet<T> {
     ///
     ///     set.spawn(async move {
     ///         let _guard = guard;
-    ///         let _: () = futures::future::pending().await;
+    ///         let _: () = std::future::pending().await;
     ///     });
     /// }
     ///
@@ -309,7 +309,7 @@ mod tests {
 
             set.spawn(async move {
                 let _guard = guard;
-                let _: () = futures::future::pending().await;
+                let _: () = std::future::pending().await;
             });
         }
 
@@ -333,7 +333,7 @@ mod tests {
 
             set.spawn(async move {
                 let _guard = guard;
-                let _: () = futures::future::pending().await;
+                let _: () = std::future::pending().await;
             });
         }
 
