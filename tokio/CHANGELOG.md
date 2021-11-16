@@ -1,3 +1,12 @@
+# 1.13.1 (November 15, 2021)
+
+### Fixed
+
+- sync: fix a data race between `oneshot::Sender::send` and awaiting a
+  `oneshot::Receiver` when the oneshot has been closed ([#4226])
+
+[#4226]: https://github.com/tokio-rs/tokio/pull/4226
+
 # 1.13.0 (October 29, 2021)
 
 ### Fixed
