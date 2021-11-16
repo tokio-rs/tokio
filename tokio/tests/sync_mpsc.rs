@@ -603,7 +603,7 @@ async fn recv_timeout() {
     use tokio::time::Duration;
     use tokio::sync::mpsc::error::SendTimeoutError::{Timeout, Closed};
 
-    let (tx, mut rx) = mpsc::channel(5);
+    let (tx, rx) = mpsc::channel(5);
 
     assert_eq!(tx.send_timeout(10, Duration::from_secs(1)).await, Ok(()));
     assert_eq!(tx.send_timeout(20, Duration::from_secs(1)).await, Ok(()));
