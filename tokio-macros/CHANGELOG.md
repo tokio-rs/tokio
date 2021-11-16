@@ -1,3 +1,9 @@
+# 1.6.0 (November 16th, 2021)
+
+- macros: fix mut patterns in `select!` macro ([#4211])
+
+[#4211]: https://github.com/tokio-rs/tokio/pull/4211
+
 # 1.5.1 (October 29th, 2021)
 
 - macros: fix type resolution error in `#[tokio::main]` ([#4176])
