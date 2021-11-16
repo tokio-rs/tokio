@@ -85,7 +85,7 @@ impl<T> TaskSet<T> {
     pub async fn join_all(mut self) -> Vec<Result<T, JoinError>> {
         let mut output = Vec::with_capacity(self.tasks.len());
 
-        for task in self.tasks.iter_mut().rev() {
+        for task in self.tasks.iter_mut() {
             output.push(task.await)
         }
 
