@@ -600,8 +600,8 @@ fn try_recv_close_while_empty_unbounded() {
 
 #[tokio::test(start_paused = true)]
 async fn recv_timeout() {
+    use tokio::sync::mpsc::error::SendTimeoutError::{Closed, Timeout};
     use tokio::time::Duration;
-    use tokio::sync::mpsc::error::SendTimeoutError::{Timeout, Closed};
 
     let (tx, rx) = mpsc::channel(5);
 
@@ -610,17 +610,23 @@ async fn recv_timeout() {
     assert_eq!(tx.send_timeout(30, Duration::from_secs(1)).await, Ok(()));
     assert_eq!(tx.send_timeout(40, Duration::from_secs(1)).await, Ok(()));
     assert_eq!(tx.send_timeout(50, Duration::from_secs(1)).await, Ok(()));
-    assert_eq!(tx.send_timeout(60, Duration::from_secs(1)).await, Err(Timeout(60)));
+    assert_eq!(
+        tx.send_timeout(60, Duration::from_secs(1)).await,
+        Err(Timeout(60))
+    );
 
     drop(rx);
-    assert_eq!(tx.send_timeout(70, Duration::from_secs(1)).await, Err(Closed(70)));
+    assert_eq!(
+        tx.send_timeout(70, Duration::from_secs(1)).await,
+        Err(Closed(70))
+    );
 }
 
 #[test]
 #[should_panic = "there is no reactor running, must be called from the context of a Tokio 1.x runtime"]
 fn recv_timeout_panic() {
-    use tokio::time::Duration;
     use futures::future::FutureExt;
+    use tokio::time::Duration;
 
     let (tx, _rx) = mpsc::channel(5);
     tx.send_timeout(10, Duration::from_secs(1)).now_or_never();
