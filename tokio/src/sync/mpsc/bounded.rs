@@ -566,7 +566,7 @@ impl<T> Sender<T> {
     /// # Panics
     ///
     /// This function panics if it is called outside the context of a Tokio
-    /// runtime [with time enabled](tokio::runtime::Builder::enable_time).
+    /// runtime [with time enabled](crate::runtime::Builder::enable_time).
     ///
     /// # Examples
     ///
