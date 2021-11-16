@@ -9,6 +9,9 @@
 //!
 //! Each handle can be used on separate tasks.
 //!
+//! Since the `send` method is not async, it can be used anywhere. This includes
+//! sending between two runtimes, and using it from non-async code.
+//!
 //! # Examples
 //!
 //! ```
