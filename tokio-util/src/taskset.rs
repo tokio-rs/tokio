@@ -3,8 +3,8 @@
 //! This module includes a TaskSet API for scoping the lifetimes of tasks and joining tasks in a
 //! manner similar to [`futures_util::stream::FuturesUnordered`]
 
+use futures_util::FutureExt;
 use std::future::Future;
-use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::runtime::Handle;
 use tokio::task::{JoinError, JoinHandle};
@@ -83,14 +83,16 @@ impl<T> TaskSet<T> {
     /// # });
     /// ```
     pub async fn join_all(mut self) -> Vec<Result<T, JoinError>> {
-        let output = futures_util::future::join_all(self.tasks.iter_mut()).await;
+        let mut output = Vec::with_capacity(self.tasks.len());
+
+        for task in self.tasks.iter_mut().rev() {
+            output.push(task.await)
+        }
 
         output
     }
 
     /// Join onto the next available task, removing it from the set.
-    ///
-    /// This does not affect the underlying order of tasks, other than removing the joined task.
     ///
     /// # Cancellation Safety
     /// This function is cancellation-safe. If dropped, it will be as if this was never called.
@@ -112,11 +114,7 @@ impl<T> TaskSet<T> {
         if self.tasks.is_empty() {
             None
         } else {
-            let (t, idx, _tasks) = futures_util::future::select_all(self.tasks.iter_mut()).await;
-
-            self.tasks.remove(idx);
-
-            Some(t)
+            futures_util::future::poll_fn(|cx| self.poll_next_finished(cx)).await
         }
     }
 
@@ -207,19 +205,26 @@ impl<T> TaskSet<T> {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<T, JoinError>>> {
+        // implementation based off of futures_util::select_all
+        // o(n) due to scan in search of ready tasks
+
         if self.tasks.is_empty() {
             Poll::Ready(None)
         } else {
-            let mut selected = futures_util::future::select_all(self.tasks.iter_mut());
-            let pinned = Pin::new(&mut selected);
-            let completion = pinned.poll(cx);
-
-            match completion {
-                Poll::Ready((t, idx, _tasks)) => {
-                    self.tasks.remove(idx);
-                    Poll::Ready(Some(t))
+            let item =
+                self.tasks
+                    .iter_mut()
+                    .enumerate()
+                    .find_map(|(i, f)| match f.poll_unpin(cx) {
+                        Poll::Pending => None,
+                        Poll::Ready(e) => Some((i, e)),
+                    });
+            match item {
+                Some((idx, res)) => {
+                    let _ = self.tasks.swap_remove(idx);
+                    Poll::Ready(Some(res))
                 }
-                Poll::Pending => Poll::Pending,
+                None => Poll::Pending,
             }
         }
     }
