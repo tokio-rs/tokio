@@ -563,6 +563,11 @@ impl<T> Sender<T> {
     /// [`close`]: Receiver::close
     /// [`Receiver`]: Receiver
     ///
+    /// # Panics
+    ///
+    /// This function panics if it is called outside the context of a Tokio
+    /// runtime [with time enabled](crate::runtime::Builder::enable_time).
+    ///
     /// # Examples
     ///
     /// In the following example, each call to `send_timeout` will block until the
