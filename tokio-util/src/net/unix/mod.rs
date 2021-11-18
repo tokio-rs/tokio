@@ -55,7 +55,7 @@ impl Listener for tokio::net::TcpListener {
         >,
     > {
         let accept = self.accept();
-        Box::pin(async move {
+        Box::pin(async {
             let (stream, addr) = accept.await?;
             Ok((Box::new(stream) as Box<_>, addr.into()))
         })
