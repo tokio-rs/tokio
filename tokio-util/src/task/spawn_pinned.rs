@@ -58,11 +58,11 @@ impl LocalPoolHandle {
     ///     assert_eq!(output, "test");
     /// }
     /// ```
-    pub fn spawn_pinned<Fut: Future + 'static>(
-        &self,
-        create_task: impl FnOnce() -> Fut + Send + 'static,
-    ) -> JoinHandle<Fut::Output>
+    pub fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
     where
+        F: FnOnce() -> Fut,
+        F: Send + 'static,
+        Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
         self.pool.spawn_pinned(create_task)
@@ -99,10 +99,12 @@ impl LocalPoolHandle {
     ///     assert_eq!(receiver.recv().await, Some("test"));
     /// }
     /// ```
-    pub fn spawn_pinned_nonblocking<Fut: Future<Output = ()> + 'static>(
-        &self,
-        create_task: impl FnOnce() -> Fut + Send + 'static,
-    ) {
+    pub fn spawn_pinned_nonblocking<F, Fut>(&self, create_task: F)
+    where
+        F: FnOnce() -> Fut,
+        F: Send + 'static,
+        Fut: Future<Output = ()> + 'static,
+    {
         self.pool.spawn_pinned_nonblocking(create_task)
     }
 }
@@ -119,11 +121,11 @@ struct LocalPool {
 
 impl LocalPool {
     /// Spawn a `?Send` future onto a worker
-    fn spawn_pinned<Fut: Future + 'static>(
-        &self,
-        create_task: impl FnOnce() -> Fut + Send + 'static,
-    ) -> JoinHandle<Fut::Output>
+    fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
     where
+        F: FnOnce() -> Fut,
+        F: Send + 'static,
+        Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
         let receiver = self.spawn_pinned_inner(create_task);
@@ -133,19 +135,24 @@ impl LocalPool {
     }
 
     /// Spawn a `?Send` future onto a worker, when you don't care about the output.
-    fn spawn_pinned_nonblocking<Fut: Future<Output = ()> + 'static>(
-        &self,
-        create_task: impl FnOnce() -> Fut + Send + 'static,
-    ) {
+    fn spawn_pinned_nonblocking<F, Fut>(&self, create_task: F)
+    where
+        F: FnOnce() -> Fut,
+        F: Send + 'static,
+        Fut: Future<Output = ()> + 'static,
+    {
         // Don't wait for the join handle
         self.spawn_pinned_inner(create_task);
     }
 
-    fn spawn_pinned_inner<Fut: Future + 'static>(
+    fn spawn_pinned_inner<F, Fut>(
         &self,
-        create_task: impl FnOnce() -> Fut + Send + 'static,
+        create_task: F,
     ) -> std::sync::mpsc::Receiver<JoinHandle<Fut::Output>>
     where
+        F: FnOnce() -> Fut,
+        F: Send + 'static,
+        Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
         let worker = self.find_and_incr_least_burdened_worker();
