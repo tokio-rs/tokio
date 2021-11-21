@@ -44,9 +44,7 @@ async fn can_spawn_multiple_futures() {
             async move { local_data.to_string() }
         })
         .unwrap_or_else(|e| panic!("Join error: {}", e));
-    let joined_future =
-        futures::future::join(future1, future2).map(|(str1, str2)| format!("{} {}", str1, str2));
 
-    let output = joined_future.await;
-    assert_eq!(output, "test1 test2");
+    assert_eq!(future1.await, "test1");
+    assert_eq!(future2.await, "test2");
 }
