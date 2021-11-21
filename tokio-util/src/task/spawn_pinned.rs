@@ -171,7 +171,7 @@ impl LocalPool {
                     result
                 });
 
-                sender.send(join_handle).ok();
+                let _ = sender.send(join_handle);
             }),
         };
         worker.spawner.send(request).unwrap();
