@@ -79,12 +79,12 @@ impl LocalPoolHandle {
     /// ```
     /// use std::rc::Rc;
     /// use tokio::sync::mpsc::channel;
-    /// use tokio_util::task::new_local_pool;
+    /// use tokio_util::task::LocalPoolHandle;
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     // Create the local pool
-    ///     let pool = new_local_pool(1);
+    ///     let pool = LocalPoolHandle::new(1);
     ///     let (sender, mut receiver) = channel(1);
     ///
     ///     // Spawn a !Send future onto the pool

@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use futures::{FutureExt, TryFutureExt};
+use futures::TryFutureExt;
 use std::rc::Rc;
 use tokio_util::task;
 
@@ -25,7 +25,7 @@ async fn can_spawn_not_send_future() {
 #[test]
 #[should_panic(expected = "assertion failed: pool_size > 0")]
 fn cannot_create_zero_sized_pool() {
-    let _pool = task::new_local_pool(0);
+    let _pool = task::LocalPoolHandle::new(0);
 }
 
 #[tokio::test]
