@@ -157,7 +157,7 @@ impl Handle {
     /// });
     /// # }
     /// ```
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
@@ -187,7 +187,7 @@ impl Handle {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -200,7 +200,7 @@ impl Handle {
         }
     }
 
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub(crate) fn spawn_blocking_inner<F, R>(&self, func: F, name: Option<&str>) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -211,9 +211,7 @@ impl Handle {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let fut = {
             use tracing::Instrument;
-            #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
-            #[cfg(tokio_track_caller)]
             let span = tracing::trace_span!(
                 target: "tokio::task::blocking",
                 "runtime.spawn",
@@ -221,14 +219,6 @@ impl Handle {
                 task.name = %name.unwrap_or_default(),
                 "fn" = %std::any::type_name::<F>(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
-            );
-            #[cfg(not(tokio_track_caller))]
-            let span = tracing::trace_span!(
-                target: "tokio::task::blocking",
-                "runtime.spawn",
-                kind = %"blocking",
-                task.name = %name.unwrap_or_default(),
-                "fn" = %std::any::type_name::<F>(),
             );
             fut.instrument(span)
         };
@@ -311,7 +301,7 @@ impl Handle {
     /// [`tokio::fs`]: crate::fs
     /// [`tokio::net`]: crate::net
     /// [`tokio::time`]: crate::time
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "block_on", None);

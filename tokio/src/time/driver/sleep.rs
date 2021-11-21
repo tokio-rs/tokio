@@ -45,7 +45,7 @@ cfg_trace! {
 /// [`interval`]: crate::time::interval()
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_until"))]
-#[cfg_attr(tokio_track_caller, track_caller)]
+#[track_caller]
 pub fn sleep_until(deadline: Instant) -> Sleep {
     return Sleep::new_timeout(deadline, trace::caller_location());
 }
@@ -89,7 +89,7 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_for"))]
 #[cfg_attr(docsrs, doc(alias = "wait"))]
-#[cfg_attr(tokio_track_caller, track_caller)]
+#[track_caller]
 pub fn sleep(duration: Duration) -> Sleep {
     let location = trace::caller_location();
 
@@ -232,10 +232,8 @@ impl Sleep {
             let deadline_tick = time_source.deadline_to_tick(deadline);
             let duration = deadline_tick.checked_sub(time_source.now()).unwrap_or(0);
 
-            #[cfg(tokio_track_caller)]
             let location = location.expect("should have location if tracking caller");
 
-            #[cfg(tokio_track_caller)]
             let resource_span = tracing::trace_span!(
                 "runtime.resource",
                 concrete_type = "Sleep",
@@ -244,10 +242,6 @@ impl Sleep {
                 loc.line = location.line(),
                 loc.col = location.column(),
             );
-
-            #[cfg(not(tokio_track_caller))]
-            let resource_span =
-                tracing::trace_span!("runtime.resource", concrete_type = "Sleep", kind = "timer");
 
             let async_op_span =
                 tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout");

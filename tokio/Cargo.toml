@@ -138,9 +138,6 @@ mio-aio = { version = "0.6.0", features = ["tokio"] }
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.5", features = ["futures", "checkpoint"] }
 
-[build-dependencies]
-autocfg = "1" # Needed for conditionally enabling `track-caller`
-
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

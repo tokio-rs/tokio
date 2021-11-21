@@ -48,7 +48,7 @@ use std::task::{self, Poll};
 /// }
 /// # }
 /// ```
-#[cfg_attr(tokio_track_caller, track_caller)]
+#[track_caller]
 pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
 where
     T: Future,
