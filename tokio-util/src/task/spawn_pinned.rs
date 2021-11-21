@@ -8,27 +8,27 @@ use tokio::runtime::Builder;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::task::{spawn_local, JoinHandle, LocalSet};
 
-/// Create a new pool of threads to handle `!Send` tasks. Spawn tasks onto this
-/// pool via [`LocalPoolHandle::spawn_pinned`].
-pub fn new_local_pool(pool_size: usize) -> LocalPoolHandle {
-    assert!(pool_size > 0);
-
-    let workers = (0..pool_size)
-        .map(|_| LocalWorkerHandle::new_worker())
-        .collect();
-
-    let pool = Arc::new(LocalPool { workers });
-
-    LocalPoolHandle { pool }
-}
-
-/// A handle to a local pool created by [`new_local_pool`]
+/// A handle to a local pool, used for spawning `!Send` tasks.
 #[derive(Clone)]
 pub struct LocalPoolHandle {
     pool: Arc<LocalPool>,
 }
 
 impl LocalPoolHandle {
+    /// Create a new pool of threads to handle `!Send` tasks. Spawn tasks onto this
+    /// pool via [`LocalPoolHandle::spawn_pinned`].
+    pub fn new(pool_size: usize) -> LocalPoolHandle {
+        assert!(pool_size > 0);
+
+        let workers = (0..pool_size)
+            .map(|_| LocalWorkerHandle::new_worker())
+            .collect();
+
+        let pool = Arc::new(LocalPool { workers });
+
+        LocalPoolHandle { pool }
+    }
+
     /// Spawn a task onto a worker thread and pin it there so it can't be moved
     /// off of the thread. Note that the future is not [`Send`], but the
     /// [`FnOnce`] which creates it is.
@@ -36,12 +36,12 @@ impl LocalPoolHandle {
     /// # Examples
     /// ```
     /// use std::rc::Rc;
-    /// use tokio_util::task::new_local_pool;
+    /// use tokio_util::task::LocalPoolHandle;
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     // Create the local pool
-    ///     let pool = new_local_pool(1);
+    ///     let pool = LocalPoolHandle::new(1);
     ///
     ///     // Spawn a !Send future onto the pool and await it
     ///     let output = pool
