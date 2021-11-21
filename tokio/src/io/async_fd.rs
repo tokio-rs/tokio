@@ -598,7 +598,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
         &mut self,
         f: impl FnOnce(&mut AsyncFd<Inner>) -> io::Result<R>,
     ) -> Result<io::Result<R>, TryIoError> {
-        let result = f(&mut self.async_fd);
+        let result = f(self.async_fd);
 
         if let Err(e) = result.as_ref() {
             if e.kind() == io::ErrorKind::WouldBlock {
