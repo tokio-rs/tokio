@@ -231,7 +231,12 @@ impl LocalWorkerHandle {
     /// Create a new worker for executing pinned tasks
     fn new_worker() -> LocalWorkerHandle {
         let (sender, receiver) = unbounded_channel();
-        std::thread::spawn(|| Self::run(receiver));
+        let runtime = Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Failed to start a pinned worker thread runtime");
+
+        std::thread::spawn(|| Self::run(runtime, receiver));
 
         LocalWorkerHandle {
             spawner: sender,
@@ -239,12 +244,7 @@ impl LocalWorkerHandle {
         }
     }
 
-    fn run(mut task_receiver: UnboundedReceiver<FutureRequest>) {
-        let runtime = Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("Failed to start a pinned worker thread runtime");
-
+    fn run(runtime: tokio::runtime::Runtime, mut task_receiver: UnboundedReceiver<FutureRequest>) {
         LocalSet::new().block_on(&runtime, async {
             while let Some(task) = task_receiver.recv().await {
                 // Calls spawn_local(future)
