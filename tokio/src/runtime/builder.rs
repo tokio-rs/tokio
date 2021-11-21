@@ -5,6 +5,10 @@ use std::fmt;
 use std::io;
 use std::time::Duration;
 
+/// This key is used to specify the default worker thread for multi-thread runtime.
+#[cfg(feature = "rt-multi-thread")]
+const ENV_WORKER_THREAD: &str = "TOKIO_WORKER_THREAD";
+
 /// Builds Tokio Runtime with custom configuration values.
 ///
 /// Methods can be chained in order to set the configuration values. The
@@ -82,6 +86,7 @@ pub struct Builder {
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
+#[derive(Clone, Copy)]
 pub(crate) enum Kind {
     CurrentThread,
     #[cfg(feature = "rt-multi-thread")]
@@ -127,8 +132,9 @@ impl Builder {
             // The clock starts not-paused
             start_paused: false,
 
+            // Read from environment variable first in multi-threaded mode.
             // Default to lazy auto-detection (one thread per CPU core)
-            worker_threads: None,
+            worker_threads: Self::default_worker_thread(kind),
 
             max_blocking_threads: 512,
 
@@ -177,6 +183,8 @@ impl Builder {
     ///
     /// This can be any number above 0 though it is advised to keep this value
     /// on the smaller side.
+    ///
+    /// This will override the value read from environment variable "TOKIO_WORKER_THREAD".
     ///
     /// # Default
     ///
@@ -583,6 +591,33 @@ impl Builder {
             },
             blocking_pool,
         })
+    }
+
+    #[cfg(not(feature = "rt-multi-thread"))]
+    fn default_worker_thread(_: Kind) -> Option<usize> {
+        None
+    }
+
+    #[cfg(feature = "rt-multi-thread")]
+    fn default_worker_thread(kind: Kind) -> Option<usize> {
+        match kind {
+            // Always return None if using current thread
+            Kind::CurrentThread => return None,
+            Kind::MultiThread => {}
+        };
+        match std::env::var(ENV_WORKER_THREAD) {
+            Ok(s) => {
+                let n: usize = s.parse().unwrap_or_else(|e| {
+                    panic!(
+                        "{} must be usize, error: {}, value: {}",
+                        ENV_WORKER_THREAD, e, s
+                    )
+                });
+                assert!(n > 0, "{} cannot be set to 0", ENV_WORKER_THREAD);
+                Some(n)
+            }
+            Err(_) => None,
+        }
     }
 }
 
