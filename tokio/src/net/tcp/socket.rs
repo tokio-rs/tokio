@@ -509,7 +509,7 @@ impl TcpSocket {
         #[cfg(windows)]
         let mio = {
             use std::os::windows::io::{AsRawSocket, FromRawSocket};
-            unsafe { mio::net::TcpListener::from_raw_socket(socket.as_raw_fd()) }
+            unsafe { mio::net::TcpListener::from_raw_socket(socket.as_raw_socket()) }
         };
         #[cfg(unix)]
         let mio = {
