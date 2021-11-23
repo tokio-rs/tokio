@@ -435,6 +435,36 @@ impl Interval {
         Poll::Ready(timeout)
     }
 
+    /// Resets the interval to complete one period after the current time.
+    ///
+    /// This method ignores [`MissedTickBehavior`] strategy.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::time;
+    ///
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut interval = time::interval(Duration::from_millis(100));
+    ///
+    ///     interval.tick().await;
+    ///
+    ///     time::sleep(Duration::from_millis(50)).await;
+    ///     interval.reset();
+    ///
+    ///     interval.tick().await;
+    ///     interval.tick().await;
+    ///
+    ///     // approximately 250ms have elapsed.
+    /// }
+    /// ```
+    pub fn reset(&mut self) {
+        self.delay.as_mut().reset(Instant::now() + self.period);
+    }
+
     /// Returns the [`MissedTickBehavior`] strategy currently being used.
     pub fn missed_tick_behavior(&self) -> MissedTickBehavior {
         self.missed_tick_behavior
