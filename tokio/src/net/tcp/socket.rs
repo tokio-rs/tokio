@@ -1,5 +1,6 @@
 use crate::net::{TcpListener, TcpStream};
 
+use std::convert::TryInto;
 use std::fmt;
 use std::io;
 use std::net::SocketAddr;
@@ -497,7 +498,8 @@ impl TcpSocket {
     /// }
     /// ```
     pub fn listen(self, backlog: u32) -> io::Result<TcpListener> {
-        self.inner.listen(backlog as i32)?;
+        let backlog = backlog.try_into().unwrap_or(i32::MAX);
+        self.inner.listen(backlog)?;
 
         let socket = std::mem::ManuallyDrop::new(self.inner);
         #[cfg(windows)]
