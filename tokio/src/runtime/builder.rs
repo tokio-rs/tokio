@@ -7,7 +7,7 @@ use std::time::Duration;
 
 /// This key is used to specify the default worker thread for multi-thread runtime.
 #[cfg(feature = "rt-multi-thread")]
-const ENV_WORKER_THREAD: &str = "TOKIO_WORKER_THREAD";
+const ENV_WORKER_THREAD: &str = "TOKIO_WORKER_THREADS";
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
