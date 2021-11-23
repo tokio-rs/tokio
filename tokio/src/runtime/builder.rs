@@ -5,9 +5,9 @@ use std::fmt;
 use std::io;
 use std::time::Duration;
 
-/// This key is used to specify the default worker thread for multi-thread runtime.
+/// This key is used to specify the default worker threads for multi-thread runtime.
 #[cfg(feature = "rt-multi-thread")]
-const ENV_WORKER_THREAD: &str = "TOKIO_WORKER_THREADS";
+const ENV_WORKER_THREADS: &str = "TOKIO_WORKER_THREADS";
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -134,7 +134,7 @@ impl Builder {
 
             // Read from environment variable first in multi-threaded mode.
             // Default to lazy auto-detection (one thread per CPU core)
-            worker_threads: Self::default_worker_thread(kind),
+            worker_threads: Self::default_worker_threads(kind),
 
             max_blocking_threads: 512,
 
@@ -594,26 +594,26 @@ impl Builder {
     }
 
     #[cfg(not(feature = "rt-multi-thread"))]
-    fn default_worker_thread(_: Kind) -> Option<usize> {
+    fn default_worker_threads(_: Kind) -> Option<usize> {
         None
     }
 
     #[cfg(feature = "rt-multi-thread")]
-    fn default_worker_thread(kind: Kind) -> Option<usize> {
+    fn default_worker_threads(kind: Kind) -> Option<usize> {
         match kind {
             // Always return None if using current thread
             Kind::CurrentThread => return None,
             Kind::MultiThread => {}
         };
-        match std::env::var(ENV_WORKER_THREAD) {
+        match std::env::var(ENV_WORKER_THREADS) {
             Ok(s) => {
                 let n: usize = s.parse().unwrap_or_else(|e| {
                     panic!(
                         "{} must be usize, error: {}, value: {}",
-                        ENV_WORKER_THREAD, e, s
+                        ENV_WORKER_THREADS, e, s
                     )
                 });
-                assert!(n > 0, "{} cannot be set to 0", ENV_WORKER_THREAD);
+                assert!(n > 0, "{} cannot be set to 0", ENV_WORKER_THREADS);
                 Some(n)
             }
             Err(_) => None,
