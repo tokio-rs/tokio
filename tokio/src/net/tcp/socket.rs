@@ -454,15 +454,9 @@ impl TcpSocket {
 
         let socket = std::mem::ManuallyDrop::new(self.inner);
         #[cfg(windows)]
-        let mio = {
-            use std::os::windows::io::{AsRawSocket, FromRawSocket};
-            unsafe { mio::net::TcpStream::from_raw_socket(socket.as_raw_socket()) }
-        };
+        let mio = unsafe { mio::net::TcpStream::from_raw_socket(socket.as_raw_socket()) };
         #[cfg(unix)]
-        let mio = {
-            use std::os::unix::io::{AsRawFd, FromRawFd};
-            unsafe { mio::net::TcpStream::from_raw_fd(socket.as_raw_fd()) }
-        };
+        let mio = unsafe { mio::net::TcpStream::from_raw_fd(socket.as_raw_fd()) };
 
         TcpStream::connect_mio(mio).await
     }
@@ -507,15 +501,9 @@ impl TcpSocket {
 
         let socket = std::mem::ManuallyDrop::new(self.inner);
         #[cfg(windows)]
-        let mio = {
-            use std::os::windows::io::{AsRawSocket, FromRawSocket};
-            unsafe { mio::net::TcpListener::from_raw_socket(socket.as_raw_socket()) }
-        };
+        let mio = unsafe { mio::net::TcpListener::from_raw_socket(socket.as_raw_socket()) };
         #[cfg(unix)]
-        let mio = {
-            use std::os::unix::io::{AsRawFd, FromRawFd};
-            unsafe { mio::net::TcpListener::from_raw_fd(socket.as_raw_fd()) }
-        };
+        let mio = unsafe { mio::net::TcpListener::from_raw_fd(socket.as_raw_fd()) };
 
         TcpListener::new(mio)
     }
@@ -547,16 +535,12 @@ impl TcpSocket {
     pub fn from_std_stream(std_stream: std::net::TcpStream) -> TcpSocket {
         #[cfg(unix)]
         {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
-
             let raw_fd = std_stream.into_raw_fd();
             unsafe { TcpSocket::from_raw_fd(raw_fd) }
         }
 
         #[cfg(windows)]
         {
-            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
-
             let raw_socket = std_stream.into_raw_socket();
             unsafe { TcpSocket::from_raw_socket(raw_socket) }
         }
