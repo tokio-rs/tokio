@@ -121,7 +121,7 @@ cfg_rt! {
     /// ```text
     /// error[E0391]: cycle detected when processing `main`
     /// ```
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn<T>(future: T) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
@@ -136,7 +136,7 @@ cfg_rt! {
         }
     }
 
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub(super) fn spawn_inner<T>(future: T, name: Option<&str>) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,

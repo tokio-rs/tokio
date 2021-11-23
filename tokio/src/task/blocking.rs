@@ -188,7 +188,7 @@ cfg_rt! {
     /// worker.await.unwrap();
     /// # }
     /// ```
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,

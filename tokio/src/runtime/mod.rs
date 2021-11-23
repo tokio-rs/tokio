@@ -375,7 +375,7 @@ cfg_rt! {
         /// });
         /// # }
         /// ```
-        #[cfg_attr(tokio_track_caller, track_caller)]
+        #[track_caller]
         pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
@@ -400,7 +400,7 @@ cfg_rt! {
         ///     println!("now running on a worker thread");
         /// });
         /// # }
-        #[cfg_attr(tokio_track_caller, track_caller)]
+        #[track_caller]
         pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
         where
             F: FnOnce() -> R + Send + 'static,
@@ -450,7 +450,7 @@ cfg_rt! {
         /// ```
         ///
         /// [handle]: fn@Handle::block_on
-        #[cfg_attr(tokio_track_caller, track_caller)]
+        #[track_caller]
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             let future = crate::util::trace::task(future, "block_on", None);
