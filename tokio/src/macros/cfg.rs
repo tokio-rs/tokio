@@ -362,16 +362,28 @@ macro_rules! cfg_not_time {
 }
 
 macro_rules! cfg_trace {
+    ($($stmt:stmt;)*) => {
+        $(
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            $stmt;
+        )*
+    };
     ($($item:item)*) => {
         $(
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
             $item
         )*
-    }
+    };
 }
 
 macro_rules! cfg_not_trace {
+    ($($stmt:stmt;)*) => {
+        $(
+            #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+            $stmt;
+        )*
+    };
     ($($item:item)*) => {
         $(
             #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]

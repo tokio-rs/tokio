@@ -19,6 +19,8 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Mutex, MutexGuard};
 use crate::util::linked_list::{self, LinkedList};
+#[cfg(all(tokio_unstable, feature = "tracing"))]
+use crate::util::trace;
 use crate::util::WakeList;
 
 use std::future::Future;
@@ -35,6 +37,8 @@ pub(crate) struct Semaphore {
     waiters: Mutex<Waitlist>,
     /// The current number of available permits in the semaphore.
     permits: AtomicUsize,
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
 }
 
 struct Waitlist {
@@ -101,6 +105,9 @@ struct Waiter {
     /// use `UnsafeCell` internally.
     pointers: linked_list::Pointers<Waiter>,
 
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    ctx: trace::AsyncOpTracingCtx,
+
     /// Should not be `Unpin`.
     _p: PhantomPinned,
 }
@@ -129,12 +136,40 @@ impl Semaphore {
             "a semaphore may not have more than MAX_PERMITS permits ({})",
             Self::MAX_PERMITS
         );
-        Self {
-            permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
-            waiters: Mutex::new(Waitlist {
-                queue: LinkedList::new(),
-                closed: false,
-            }),
+
+        cfg_trace! {
+            let resource_span = tracing::trace_span!(
+                "runtime.resource",
+                concrete_type = "Semaphore",
+                kind = "Sync",
+                is_internal = true
+            );
+
+            resource_span.in_scope(|| {
+                tracing::trace!(
+                    target: "runtime::resource::state_update",
+                    permits = permits,
+                    permits.op = "override",
+                )
+            });
+
+            return Self {
+                permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
+                waiters: Mutex::new(Waitlist {
+                    queue: LinkedList::new(),
+                    closed: false,
+                }),
+                resource_span,
+            };
+        }
+        cfg_not_trace! {
+            return Self {
+                permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
+                waiters: Mutex::new(Waitlist {
+                    queue: LinkedList::new(),
+                    closed: false,
+                }),
+            };
         }
     }
 
@@ -150,12 +185,25 @@ impl Semaphore {
         // currently we just clamp the permit count when it exceeds the max
         permits &= Self::MAX_PERMITS;
 
-        Self {
-            permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
-            waiters: Mutex::const_new(Waitlist {
-                queue: LinkedList::new(),
-                closed: false,
-            }),
+        cfg_trace! {
+            return Self {
+                permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
+                waiters: Mutex::const_new(Waitlist {
+                    queue: LinkedList::new(),
+                    closed: false,
+                }),
+                resource_span: tracing::Span::none(),
+            };
+        }
+
+        cfg_not_trace! {
+            return Self {
+                permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
+                waiters: Mutex::const_new(Waitlist {
+                    queue: LinkedList::new(),
+                    closed: false,
+                }),
+            };
         }
     }
 
@@ -224,7 +272,10 @@ impl Semaphore {
             let next = curr - num_permits;
 
             match self.permits.compare_exchange(curr, next, AcqRel, Acquire) {
-                Ok(_) => return Ok(()),
+                Ok(_) => {
+                    // TODO: Instrument once issue has been solved}
+                    return Ok(());
+                }
                 Err(actual) => curr = actual,
             }
         }
@@ -283,6 +334,17 @@ impl Semaphore {
                     rem,
                     Self::MAX_PERMITS
                 );
+
+                // add remaining permits back
+                cfg_trace! {
+                    self.resource_span.in_scope(|| {
+                        tracing::trace!(
+                        target: "runtime::resource::state_update",
+                        permits = rem,
+                        permits.op = "add",
+                        )
+                    });
+                }
                 rem = 0;
             }
 
@@ -347,6 +409,20 @@ impl Semaphore {
                     acquired += acq;
                     if remaining == 0 {
                         if !queued {
+                            cfg_trace! {
+                                self.resource_span.in_scope(|| {
+                                    tracing::trace!(
+                                        target: "runtime::resource::state_update",
+                                        permits = acquired,
+                                        permits.op = "sub",
+                                    );
+                                    tracing::trace!(
+                                        target: "runtime::resource::async_op::state_update",
+                                        permits_obtained = acquired,
+                                        permits.op = "add",
+                                    )
+                                });
+                            }
                             return Ready(Ok(()));
                         } else if lock.is_none() {
                             break self.waiters.lock();
@@ -360,6 +436,16 @@ impl Semaphore {
 
         if waiters.closed {
             return Ready(Err(AcquireError::closed()));
+        }
+
+        cfg_trace! {
+            self.resource_span.in_scope(|| {
+                tracing::trace!(
+                    target: "runtime::resource::state_update",
+                    permits = acquired,
+                    permits.op = "sub",
+                )
+            });
         }
 
         if node.assign_permits(&mut acquired) {
@@ -406,12 +492,26 @@ impl fmt::Debug for Semaphore {
 }
 
 impl Waiter {
-    fn new(num_permits: u32) -> Self {
-        Waiter {
-            waker: UnsafeCell::new(None),
-            state: AtomicUsize::new(num_permits as usize),
-            pointers: linked_list::Pointers::new(),
-            _p: PhantomPinned,
+    cfg_not_trace! {
+        fn new(num_permits: u32) -> Self {
+            Waiter {
+                waker: UnsafeCell::new(None),
+                state: AtomicUsize::new(num_permits as usize),
+                pointers: linked_list::Pointers::new(),
+                _p: PhantomPinned,
+            }
+        }
+    }
+
+    cfg_trace! {
+        fn new(num_permits: u32, ctx: trace::AsyncOpTracingCtx) -> Self {
+            Waiter {
+                waker: UnsafeCell::new(None),
+                state: AtomicUsize::new(num_permits as usize),
+                pointers: linked_list::Pointers::new(),
+                ctx,
+                _p: PhantomPinned,
+            }
         }
     }
 
@@ -426,6 +526,14 @@ impl Waiter {
             match self.state.compare_exchange(curr, next, AcqRel, Acquire) {
                 Ok(_) => {
                     *n -= assign;
+                    #[cfg(all(tokio_unstable, feature = "tracing"))]
+                    self.ctx.async_op_span.in_scope(|| {
+                        tracing::trace!(
+                            target: "runtime::resource::async_op::state_update",
+                            permits_obtained = assign,
+                            permits.op = "add",
+                        );
+                    });
                     return next == 0;
                 }
                 Err(actual) => curr = actual,
@@ -438,12 +546,26 @@ impl Future for Acquire<'_> {
     type Output = Result<(), AcquireError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // First, ensure the current task has enough budget to proceed.
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _resource_span = self.node.ctx.resource_span.clone().entered();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _async_op_span = self.node.ctx.async_op_span.clone().entered();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _async_op_poll_span = self.node.ctx.async_op_poll_span.clone().entered();
 
         let (node, semaphore, needed, queued) = self.project();
 
-        match semaphore.poll_acquire(cx, needed, node, *queued) {
+        // First, ensure the current task has enough budget to proceed.
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let coop = ready!(trace_poll_op!(
+            "poll_acquire",
+            crate::coop::poll_proceed(cx),
+        ));
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let coop = ready!(crate::coop::poll_proceed(cx));
+
+        let result = match semaphore.poll_acquire(cx, needed, node, *queued) {
             Pending => {
                 *queued = true;
                 Pending
@@ -454,18 +576,59 @@ impl Future for Acquire<'_> {
                 *queued = false;
                 Ready(Ok(()))
             }
-        }
+        };
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return trace_poll_op!("poll_acquire", result);
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        return result;
     }
 }
 
 impl<'a> Acquire<'a> {
     fn new(semaphore: &'a Semaphore, num_permits: u32) -> Self {
-        Self {
+        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        return Self {
             node: Waiter::new(num_permits),
             semaphore,
             num_permits,
             queued: false,
-        }
+        };
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return semaphore.resource_span.in_scope(|| {
+            let async_op_span =
+                tracing::trace_span!("runtime.resource.async_op", source = "Acquire::new");
+            let async_op_poll_span = async_op_span.in_scope(|| {
+                tracing::trace!(
+                    target: "runtime::resource::async_op::state_update",
+                    permits_requested = num_permits,
+                    permits.op = "override",
+                );
+
+                tracing::trace!(
+                    target: "runtime::resource::async_op::state_update",
+                    permits_obtained = 0 as usize,
+                    permits.op = "override",
+                );
+
+                tracing::trace_span!("runtime.resource.async_op.poll")
+            });
+
+            let ctx = trace::AsyncOpTracingCtx {
+                async_op_span,
+                async_op_poll_span,
+                resource_span: semaphore.resource_span.clone(),
+            };
+
+            Self {
+                node: Waiter::new(num_permits, ctx),
+                semaphore,
+                num_permits,
+                queued: false,
+            }
+        });
     }
 
     fn project(self: Pin<&mut Self>) -> (Pin<&mut Waiter>, &Semaphore, u32, &mut bool) {

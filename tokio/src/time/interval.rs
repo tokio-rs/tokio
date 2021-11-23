@@ -1,6 +1,8 @@
 use crate::future::poll_fn;
 use crate::time::{sleep_until, Duration, Instant, Sleep};
+use crate::util::trace;
 
+use std::panic::Location;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{convert::TryInto, future::Future};
@@ -68,10 +70,10 @@ use std::{convert::TryInto, future::Future};
 ///
 /// [`sleep`]: crate::time::sleep()
 /// [`.tick().await`]: Interval::tick
+#[cfg_attr(tokio_track_caller, track_caller)]
 pub fn interval(period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
-
-    interval_at(Instant::now(), period)
+    internal_interval_at(Instant::now(), period, trace::caller_location())
 }
 
 /// Creates new [`Interval`] that yields with interval of `period` with the
@@ -103,14 +105,60 @@ pub fn interval(period: Duration) -> Interval {
 ///     // approximately 70ms have elapsed.
 /// }
 /// ```
+#[cfg_attr(tokio_track_caller, track_caller)]
 pub fn interval_at(start: Instant, period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
+    internal_interval_at(start, period, trace::caller_location())
+}
 
-    Interval {
+#[cfg_attr(
+    not(all(tokio_unstable, tokio_track_caller, feature = "tracing")),
+    allow(unused_variables)
+)]
+fn internal_interval_at(
+    start: Instant,
+    period: Duration,
+    location: Option<&'static Location<'static>>,
+) -> Interval {
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    let interval = {
+        #[cfg(tokio_track_caller)]
+        let location = location.expect("should have location if tracking caller");
+
+        #[cfg(tokio_track_caller)]
+        let resource_span = tracing::trace_span!(
+            "runtime.resource",
+            concrete_type = "Interval",
+            kind = "timer",
+            loc.file = location.file(),
+            loc.line = location.line(),
+            loc.col = location.column(),
+        );
+
+        #[cfg(not(tokio_track_caller))]
+        let resource_span = tracing::trace_span!(
+            "runtime.resource",
+            concrete_type = "Interval",
+            kind = "timer"
+        );
+
+        let delay = resource_span.in_scope(|| Box::pin(sleep_until(start)));
+        Interval {
+            delay,
+            period,
+            missed_tick_behavior: Default::default(),
+            resource_span,
+        }
+    };
+
+    #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+    let interval = Interval {
         delay: Box::pin(sleep_until(start)),
         period,
         missed_tick_behavior: Default::default(),
-    }
+    };
+
+    interval
 }
 
 /// Defines the behavior of an [`Interval`] when it misses a tick.
@@ -362,6 +410,9 @@ pub struct Interval {
 
     /// The strategy `Interval` should use when a tick is missed.
     missed_tick_behavior: MissedTickBehavior,
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
 }
 
 impl Interval {
@@ -391,7 +442,20 @@ impl Interval {
     /// }
     /// ```
     pub async fn tick(&mut self) -> Instant {
-        poll_fn(|cx| self.poll_tick(cx)).await
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = self.resource_span.clone();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let instant = trace::async_op(
+            || poll_fn(|cx| self.poll_tick(cx)),
+            resource_span,
+            "Interval::tick",
+            "poll_tick",
+            false,
+        );
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let instant = poll_fn(|cx| self.poll_tick(cx));
+
+        instant.await
     }
 
     /// Polls for the next instant in the interval to be reached.
