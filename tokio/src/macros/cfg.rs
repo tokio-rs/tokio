@@ -99,7 +99,6 @@ macro_rules! cfg_io_driver_impl {
                 feature = "process",
                 all(unix, feature = "signal"),
             ))]
-            #[cfg_attr(docsrs, doc(cfg(all())))]
             $item
         )*
     }

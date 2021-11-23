@@ -66,7 +66,7 @@ use std::task::{self, Poll};
 ///
 /// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
 /// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
-#[cfg_attr(tokio_track_caller, track_caller)]
+#[track_caller]
 pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
 where
     T: Future,

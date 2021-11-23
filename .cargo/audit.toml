@@ -4,4 +4,7 @@
 ignore = [
     # https://github.com/tokio-rs/tokio/issues/4177
     "RUSTSEC-2020-0159",
+    # We depend on nix 0.22 only via mio-aio, a dev-dependency.
+    # https://github.com/tokio-rs/tokio/pull/4255#issuecomment-974786349
+    "RUSTSEC-2021-0119",
 ]

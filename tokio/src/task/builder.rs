@@ -65,7 +65,7 @@ impl<'a> Builder<'a> {
     ///
     /// See [`task::spawn`](crate::task::spawn) for
     /// more details.
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
     where
         Fut: Future + Send + 'static,
@@ -78,7 +78,7 @@ impl<'a> Builder<'a> {
     ///
     /// See [`task::spawn_local`](crate::task::spawn_local)
     /// for more details.
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn_local<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
     where
         Fut: Future + 'static,
@@ -91,7 +91,7 @@ impl<'a> Builder<'a> {
     ///
     /// See [`task::spawn_blocking`](crate::task::spawn_blocking)
     /// for more details.
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn_blocking<Function, Output>(self, function: Function) -> JoinHandle<Output>
     where
         Function: FnOnce() -> Output + Send + 'static,

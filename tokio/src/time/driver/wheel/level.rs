@@ -53,7 +53,7 @@ impl Level {
         // However, that is only supported for arrays of size
         // 32 or fewer.  So in our case we have to explicitly
         // invoke the constructor for each array element.
-        let ctor = || EntryList::default();
+        let ctor = EntryList::default;
 
         Level {
             level,

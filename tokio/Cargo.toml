@@ -9,6 +9,7 @@ name = "tokio"
 # - Create "v1.0.x" git tag.
 version = "1.14.0"
 edition = "2018"
+rust-version = "1.46"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
@@ -110,7 +111,7 @@ signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.42" }
-nix = { version = "0.22.0" }
+nix = { version = "0.23" }
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"
@@ -136,9 +137,6 @@ mio-aio = { version = "0.6.0", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.5", features = ["futures", "checkpoint"] }
-
-[build-dependencies]
-autocfg = "1" # Needed for conditionally enabling `track-caller`
 
 [package.metadata.docs.rs]
 all-features = true
