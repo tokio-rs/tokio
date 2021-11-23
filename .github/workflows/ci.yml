@@ -267,8 +267,6 @@ jobs:
       - name: Install Rust
         run: rustup update stable
       - uses: Swatinem/rust-cache@v1
-      - name: Install rustfmt
-        run: rustup component add rustfmt
 
       # Check fmt
       - name: "rustfmt --check"
@@ -285,7 +283,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
-        run: rustup update 1.52.1 && rustup default 1.52.1
+        run: rustup update 1.56 && rustup default 1.56
       - uses: Swatinem/rust-cache@v1
       - name: Install clippy
         run: rustup component add clippy
