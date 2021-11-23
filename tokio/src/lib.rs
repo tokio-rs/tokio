@@ -307,7 +307,7 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all Tokio public API features listed below except `test-util`.
+//! - `full`: Enables all features listed below except `test-util` and `tracing`.
 //! - `rt`: Enables `tokio::spawn`, the basic (current thread) scheduler,
 //!         and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
