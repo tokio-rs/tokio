@@ -29,7 +29,7 @@ task:
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2021-10-25
+    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2021-11-23
     - . $HOME/.cargo/env
     - |
       echo "~~~~ rustc --version ~~~~"
