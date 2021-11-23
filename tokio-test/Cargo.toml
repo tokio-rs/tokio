@@ -2,8 +2,6 @@
 name = "tokio-test"
 # When releasing to crates.io:
 # - Remove path dependencies
-# - Update doc url
-#   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "tokio-test-0.4.x" git tag.
 version = "0.4.2"
@@ -13,7 +11,6 @@ authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-test/0.4.2/tokio_test"
 description = """
 Testing utilities for Tokio- and futures-based code
 """

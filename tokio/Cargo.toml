@@ -3,7 +3,6 @@ name = "tokio"
 # When releasing to crates.io:
 # - Remove path dependencies
 # - Update doc url
-#   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.0.x" git tag.
@@ -13,7 +12,6 @@ rust-version = "1.46"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/1.14.0/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
