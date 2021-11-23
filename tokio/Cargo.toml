@@ -51,20 +51,19 @@ macros = ["tokio-macros"]
 stats = []
 net = [
   "libc",
+  "mio/net",
+  "mio/os-ext",
   "mio/os-poll",
-  "mio/os-util",
-  "mio/tcp",
-  "mio/udp",
-  "mio/uds",
+  "socket2/all",
   "winapi/namedpipeapi",
 ]
 process = [
   "bytes",
   "once_cell",
   "libc",
+  "mio/net",
+  "mio/os-ext",
   "mio/os-poll",
-  "mio/os-util",
-  "mio/uds",
   "signal-hook-registry",
   "winapi/threadpoollegacyapiset",
 ]
@@ -77,9 +76,9 @@ rt-multi-thread = [
 signal = [
   "once_cell",
   "libc",
+  "mio/net",
+  "mio/os-ext",
   "mio/os-poll",
-  "mio/uds",
-  "mio/os-util",
   "signal-hook-registry",
   "winapi/consoleapi",
 ]
@@ -96,9 +95,10 @@ pin-project-lite = "0.2.0"
 bytes = { version = "1.0.0", optional = true }
 once_cell = { version = "1.5.2", optional = true }
 memchr = { version = "2.2", optional = true }
-mio = { version = "0.7.6", optional = true }
+mio = { version = "0.8.0", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.11.0", optional = true }
+socket2 = { version = "0.4.2", optional = true }
 
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
