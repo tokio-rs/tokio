@@ -181,6 +181,7 @@ released as a new patch release for each LTS minor version. Our current LTS
 releases are:
 
  * `1.8.x` - LTS release until February 2022.
+ * `1.14.x` - LTS release until June 2022.
 
 Each LTS release will continue to receive backported fixes for at least half a
 year. If you wish to use a fixed minor release in your project, we recommend
