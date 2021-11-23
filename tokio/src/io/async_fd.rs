@@ -525,7 +525,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     #[cfg_attr(docsrs, doc(alias = "with_io"))]
     pub fn try_io<R>(
         &mut self,
-        f: impl FnOnce(&AsyncFd<Inner>) -> io::Result<R>,
+        f: impl FnOnce(&'a AsyncFd<Inner>) -> io::Result<R>,
     ) -> Result<io::Result<R>, TryIoError> {
         let result = f(self.async_fd);
 
@@ -542,12 +542,12 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     }
 
     /// Returns a shared reference to the inner [`AsyncFd`].
-    pub fn get_ref(&self) -> &AsyncFd<Inner> {
+    pub fn get_ref(&self) -> &'a AsyncFd<Inner> {
         self.async_fd
     }
 
     /// Returns a shared reference to the backing object of the inner [`AsyncFd`].
-    pub fn get_inner(&self) -> &Inner {
+    pub fn get_inner(&self) -> &'a Inner {
         self.get_ref().get_ref()
     }
 }
