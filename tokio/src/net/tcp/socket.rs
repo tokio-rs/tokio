@@ -453,11 +453,10 @@ impl TcpSocket {
     pub async fn connect(self, addr: SocketAddr) -> io::Result<TcpStream> {
         self.inner.connect(&addr.into())?;
 
-        let socket = std::mem::ManuallyDrop::new(self.inner);
         #[cfg(windows)]
-        let mio = unsafe { mio::net::TcpStream::from_raw_socket(socket.as_raw_socket()) };
+        let mio = unsafe { mio::net::TcpStream::from_raw_socket(self.inner.into_raw_socket()) };
         #[cfg(unix)]
-        let mio = unsafe { mio::net::TcpStream::from_raw_fd(socket.as_raw_fd()) };
+        let mio = unsafe { mio::net::TcpStream::from_raw_fd(self.inner.into_raw_fd()) };
 
         TcpStream::connect_mio(mio).await
     }
@@ -501,11 +500,10 @@ impl TcpSocket {
         let backlog = backlog.try_into().unwrap_or(i32::MAX);
         self.inner.listen(backlog)?;
 
-        let socket = std::mem::ManuallyDrop::new(self.inner);
         #[cfg(windows)]
-        let mio = unsafe { mio::net::TcpListener::from_raw_socket(socket.as_raw_socket()) };
+        let mio = unsafe { mio::net::TcpListener::from_raw_socket(self.inner.into_raw_socket()) };
         #[cfg(unix)]
-        let mio = unsafe { mio::net::TcpListener::from_raw_fd(socket.as_raw_fd()) };
+        let mio = unsafe { mio::net::TcpListener::from_raw_fd(self.inner.into_raw_fd()) };
 
         TcpListener::new(mio)
     }
