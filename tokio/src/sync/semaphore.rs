@@ -124,14 +124,12 @@ fn bounds() {
 
 impl Semaphore {
     /// Creates a new semaphore with the initial number of permits.
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn new(permits: usize) -> Self {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let sem = {
-            #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
 
-            #[cfg(tokio_track_caller)]
             let resource_span = tracing::trace_span!(
                 "runtime.resource",
                 concrete_type = "Semaphore",
@@ -140,14 +138,6 @@ impl Semaphore {
                 loc.line = location.line(),
                 loc.col = location.column(),
                 inherits_child_attrs = true,
-            );
-
-            #[cfg(not(tokio_track_caller))]
-            let resource_span = tracing::trace_span!(
-                "runtime.resource",
-                concrete_type = "Semaphore",
-                kind = "Sync",
-                inherits_child_attrs = true
             );
 
             let ll_sem = resource_span.in_scope(|| ll::Semaphore::new(permits));

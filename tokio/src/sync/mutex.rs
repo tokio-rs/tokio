@@ -250,17 +250,15 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// let lock = Mutex::new(5);
     /// ```
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn new(t: T) -> Self
     where
         T: Sized,
     {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let mutex = {
-            #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
 
-            #[cfg(tokio_track_caller)]
             let resource_span = tracing::trace_span!(
                 "runtime.resource",
                 concrete_type = "Mutex",
@@ -269,10 +267,6 @@ impl<T: ?Sized> Mutex<T> {
                 loc.line = location.line(),
                 loc.col = location.column(),
             );
-
-            #[cfg(not(tokio_track_caller))]
-            let resource_span =
-                tracing::trace_span!("runtime.resource", concrete_type = "Mutex", kind = "Sync");
 
             let s = resource_span.in_scope(|| {
                 tracing::trace!(

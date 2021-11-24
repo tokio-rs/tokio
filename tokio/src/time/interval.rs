@@ -70,7 +70,7 @@ use std::{convert::TryInto, future::Future};
 ///
 /// [`sleep`]: crate::time::sleep()
 /// [`.tick().await`]: Interval::tick
-#[cfg_attr(tokio_track_caller, track_caller)]
+#[track_caller]
 pub fn interval(period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
     internal_interval_at(Instant::now(), period, trace::caller_location())
@@ -105,16 +105,13 @@ pub fn interval(period: Duration) -> Interval {
 ///     // approximately 70ms have elapsed.
 /// }
 /// ```
-#[cfg_attr(tokio_track_caller, track_caller)]
+#[track_caller]
 pub fn interval_at(start: Instant, period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
     internal_interval_at(start, period, trace::caller_location())
 }
 
-#[cfg_attr(
-    not(all(tokio_unstable, tokio_track_caller, feature = "tracing")),
-    allow(unused_variables)
-)]
+#[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
 fn internal_interval_at(
     start: Instant,
     period: Duration,
@@ -122,10 +119,8 @@ fn internal_interval_at(
 ) -> Interval {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     let interval = {
-        #[cfg(tokio_track_caller)]
-        let location = location.expect("should have location if tracking caller");
+        let location = location.expect("should have location if tracing");
 
-        #[cfg(tokio_track_caller)]
         let resource_span = tracing::trace_span!(
             "runtime.resource",
             concrete_type = "Interval",
@@ -133,13 +128,6 @@ fn internal_interval_at(
             loc.file = location.file(),
             loc.line = location.line(),
             loc.col = location.column(),
-        );
-
-        #[cfg(not(tokio_track_caller))]
-        let resource_span = tracing::trace_span!(
-            "runtime.resource",
-            concrete_type = "Interval",
-            kind = "timer"
         );
 
         let delay = resource_span.in_scope(|| Box::pin(sleep_until(start)));

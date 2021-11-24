@@ -251,10 +251,7 @@ cfg_not_trace! {
 }
 
 impl Sleep {
-    #[cfg_attr(
-        not(all(tokio_unstable, tokio_track_caller, feature = "tracing")),
-        allow(unused_variables)
-    )]
+    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
     pub(crate) fn new_timeout(
         deadline: Instant,
         location: Option<&'static Location<'static>>,
@@ -268,10 +265,7 @@ impl Sleep {
             let deadline_tick = time_source.deadline_to_tick(deadline);
             let duration = deadline_tick.checked_sub(time_source.now()).unwrap_or(0);
 
-            #[cfg(tokio_track_caller)]
-            let location = location.expect("should have location if tracking caller");
-
-            #[cfg(tokio_track_caller)]
+            let location = location.expect("should have location if tracing");
             let resource_span = tracing::trace_span!(
                 "runtime.resource",
                 concrete_type = "Sleep",
@@ -280,10 +274,6 @@ impl Sleep {
                 loc.line = location.line(),
                 loc.col = location.column(),
             );
-
-            #[cfg(not(tokio_track_caller))]
-            let resource_span =
-                tracing::trace_span!("runtime.resource", concrete_type = "Sleep", kind = "timer");
 
             let async_op_span = resource_span.in_scope(|| {
                 tracing::trace!(
