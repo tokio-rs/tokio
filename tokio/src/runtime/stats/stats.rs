@@ -1,6 +1,9 @@
 //! This file contains the types necessary to collect various types of stats.
 use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
+use std::convert::TryFrom;
+use std::time::{Duration, Instant};
+
 /// This type contains methods to retrieve stats from a Tokio runtime.
 #[derive(Debug)]
 pub struct RuntimeStats {
@@ -14,6 +17,7 @@ pub struct WorkerStats {
     park_count: AtomicU64,
     steal_count: AtomicU64,
     poll_count: AtomicU64,
+    busy_duration_total: AtomicU64,
 }
 
 impl RuntimeStats {
@@ -24,6 +28,7 @@ impl RuntimeStats {
                 park_count: AtomicU64::new(0),
                 steal_count: AtomicU64::new(0),
                 poll_count: AtomicU64::new(0),
+                busy_duration_total: AtomicU64::new(0),
             });
         }
 
@@ -54,6 +59,11 @@ impl WorkerStats {
     pub fn poll_count(&self) -> u64 {
         self.poll_count.load(Relaxed)
     }
+
+    /// Returns the total amount of time this worker has been busy for.
+    pub fn total_busy_duration(&self) -> Duration {
+        Duration::from_nanos(self.busy_duration_total.load(Relaxed))
+    }
 }
 
 pub(crate) struct WorkerStatsBatcher {
@@ -61,6 +71,9 @@ pub(crate) struct WorkerStatsBatcher {
     park_count: u64,
     steal_count: u64,
     poll_count: u64,
+    /// The total busy duration in nanoseconds.
+    busy_duration_total: u64,
+    last_resume_time: Instant,
 }
 
 impl WorkerStatsBatcher {
@@ -70,6 +83,8 @@ impl WorkerStatsBatcher {
             park_count: 0,
             steal_count: 0,
             poll_count: 0,
+            busy_duration_total: 0,
+            last_resume_time: Instant::now(),
         }
     }
     pub(crate) fn submit(&mut self, to: &RuntimeStats) {
@@ -78,13 +93,23 @@ impl WorkerStatsBatcher {
         worker.park_count.store(self.park_count, Relaxed);
         worker.steal_count.store(self.steal_count, Relaxed);
         worker.poll_count.store(self.poll_count, Relaxed);
+
+        worker
+            .busy_duration_total
+            .store(self.busy_duration_total, Relaxed);
     }
 
     pub(crate) fn about_to_park(&mut self) {
         self.park_count += 1;
+
+        let busy_duration = self.last_resume_time.elapsed();
+        let busy_duration = u64::try_from(busy_duration.as_nanos()).unwrap_or(u64::MAX);
+        self.busy_duration_total += busy_duration;
     }
 
-    pub(crate) fn returned_from_park(&mut self) {}
+    pub(crate) fn returned_from_park(&mut self) {
+        self.last_resume_time = Instant::now();
+    }
 
     #[cfg(feature = "rt-multi-thread")]
     pub(crate) fn incr_steal_count(&mut self, by: u16) {

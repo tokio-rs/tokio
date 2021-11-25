@@ -1,7 +1,7 @@
 use crate::runtime::blocking::{BlockingTask, NoopSchedule};
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, context, driver, Spawner};
-use crate::util::error::CONTEXT_MISSING_ERROR;
+use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
 use std::future::Future;
 use std::marker::PhantomData;
@@ -18,15 +18,25 @@ pub struct Handle {
     pub(super) spawner: Spawner,
 
     /// Handles to the I/O drivers
+    #[cfg_attr(
+        not(any(feature = "net", feature = "process", all(unix, feature = "signal"))),
+        allow(dead_code)
+    )]
     pub(super) io_handle: driver::IoHandle,
 
     /// Handles to the signal drivers
+    #[cfg_attr(
+        not(any(feature = "signal", all(unix, feature = "process"))),
+        allow(dead_code)
+    )]
     pub(super) signal_handle: driver::SignalHandle,
 
     /// Handles to the time drivers
+    #[cfg_attr(not(feature = "time"), allow(dead_code))]
     pub(super) time_handle: driver::TimeHandle,
 
     /// Source of `Instant::now()`
+    #[cfg_attr(not(all(feature = "time", feature = "test-util")), allow(dead_code))]
     pub(super) clock: driver::Clock,
 
     /// Blocking pool spawner
@@ -100,7 +110,7 @@ impl Handle {
     /// # }
     /// ```
     pub fn current() -> Self {
-        context::current().expect(CONTEXT_MISSING_ERROR)
+        context::current()
     }
 
     /// Returns a Handle view over the currently running Runtime
@@ -109,7 +119,7 @@ impl Handle {
     ///
     /// Contrary to `current`, this never panics
     pub fn try_current() -> Result<Self, TryCurrentError> {
-        context::current().ok_or(TryCurrentError(()))
+        context::try_current()
     }
 
     cfg_stats! {
@@ -147,7 +157,7 @@ impl Handle {
     /// });
     /// # }
     /// ```
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
@@ -177,16 +187,20 @@ impl Handle {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        self.spawn_blocking_inner(func, None)
+        if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+            self.spawn_blocking_inner(Box::new(func), None)
+        } else {
+            self.spawn_blocking_inner(func, None)
+        }
     }
 
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub(crate) fn spawn_blocking_inner<F, R>(&self, func: F, name: Option<&str>) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -197,9 +211,7 @@ impl Handle {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let fut = {
             use tracing::Instrument;
-            #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
-            #[cfg(tokio_track_caller)]
             let span = tracing::trace_span!(
                 target: "tokio::task::blocking",
                 "runtime.spawn",
@@ -207,14 +219,6 @@ impl Handle {
                 task.name = %name.unwrap_or_default(),
                 "fn" = %std::any::type_name::<F>(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
-            );
-            #[cfg(not(tokio_track_caller))]
-            let span = tracing::trace_span!(
-                target: "tokio::task::blocking",
-                "runtime.spawn",
-                kind = %"blocking",
-                task.name = %name.unwrap_or_default(),
-                "fn" = %std::any::type_name::<F>(),
             );
             fut.instrument(span)
         };
@@ -297,7 +301,7 @@ impl Handle {
     /// [`tokio::fs`]: crate::fs
     /// [`tokio::net`]: crate::net
     /// [`tokio::time`]: crate::time
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "block_on", None);
@@ -320,17 +324,60 @@ impl Handle {
 }
 
 /// Error returned by `try_current` when no Runtime has been started
-pub struct TryCurrentError(());
+#[derive(Debug)]
+pub struct TryCurrentError {
+    kind: TryCurrentErrorKind,
+}
 
-impl fmt::Debug for TryCurrentError {
+impl TryCurrentError {
+    pub(crate) fn new_no_context() -> Self {
+        Self {
+            kind: TryCurrentErrorKind::NoContext,
+        }
+    }
+
+    pub(crate) fn new_thread_local_destroyed() -> Self {
+        Self {
+            kind: TryCurrentErrorKind::ThreadLocalDestroyed,
+        }
+    }
+
+    /// Returns true if the call failed because there is currently no runtime in
+    /// the Tokio context.
+    pub fn is_missing_context(&self) -> bool {
+        matches!(self.kind, TryCurrentErrorKind::NoContext)
+    }
+
+    /// Returns true if the call failed because the Tokio context thread-local
+    /// had been destroyed. This can usually only happen if in the destructor of
+    /// other thread-locals.
+    pub fn is_thread_local_destroyed(&self) -> bool {
+        matches!(self.kind, TryCurrentErrorKind::ThreadLocalDestroyed)
+    }
+}
+
+enum TryCurrentErrorKind {
+    NoContext,
+    ThreadLocalDestroyed,
+}
+
+impl fmt::Debug for TryCurrentErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TryCurrentError").finish()
+        use TryCurrentErrorKind::*;
+        match self {
+            NoContext => f.write_str("NoContext"),
+            ThreadLocalDestroyed => f.write_str("ThreadLocalDestroyed"),
+        }
     }
 }
 
 impl fmt::Display for TryCurrentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(CONTEXT_MISSING_ERROR)
+        use TryCurrentErrorKind::*;
+        match self.kind {
+            NoContext => f.write_str(CONTEXT_MISSING_ERROR),
+            ThreadLocalDestroyed => f.write_str(THREAD_LOCAL_DESTROYED_ERROR),
+        }
     }
 }
 

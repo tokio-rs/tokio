@@ -1,5 +1,4 @@
 #![allow(unreachable_pub)]
-use crate::util::error::CONTEXT_MISSING_ERROR;
 use crate::{runtime::context, task::JoinHandle};
 use std::future::Future;
 
@@ -66,7 +65,7 @@ impl<'a> Builder<'a> {
     ///
     /// See [`task::spawn`](crate::task::spawn) for
     /// more details.
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
     where
         Fut: Future + Send + 'static,
@@ -79,7 +78,7 @@ impl<'a> Builder<'a> {
     ///
     /// See [`task::spawn_local`](crate::task::spawn_local)
     /// for more details.
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn_local<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
     where
         Fut: Future + 'static,
@@ -92,14 +91,12 @@ impl<'a> Builder<'a> {
     ///
     /// See [`task::spawn_blocking`](crate::task::spawn_blocking)
     /// for more details.
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn_blocking<Function, Output>(self, function: Function) -> JoinHandle<Output>
     where
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
-        context::current()
-            .expect(CONTEXT_MISSING_ERROR)
-            .spawn_blocking_inner(function, self.name)
+        context::current().spawn_blocking_inner(function, self.name)
     }
 }

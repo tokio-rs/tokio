@@ -10,7 +10,6 @@
     unreachable_pub
 )]
 #![deny(unused_must_use)]
-#![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
@@ -308,7 +307,7 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all Tokio public API features listed below except `test-util`.
+//! - `full`: Enables all features listed below except `test-util` and `tracing`.
 //! - `rt`: Enables `tokio::spawn`, the basic (current thread) scheduler,
 //!         and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
@@ -492,6 +491,12 @@ cfg_macros! {
     /// change.
     #[doc(hidden)]
     pub use tokio_macros::select_priv_declare_output_enum;
+
+    /// Implementation detail of the `select!` macro. This macro is **not**
+    /// intended to be used as part of the public API and is permitted to
+    /// change.
+    #[doc(hidden)]
+    pub use tokio_macros::select_priv_clean_pattern;
 
     cfg_rt! {
         #[cfg(feature = "rt-multi-thread")]

@@ -428,7 +428,12 @@ impl<T> Sender<T> {
     /// This method fails if the channel has been closed, which happens when
     /// every receiver has been dropped.
     pub fn send(&self, value: T) -> Result<(), error::SendError<T>> {
-        self.send_replace(value)?;
+        // This is pretty much only useful as a hint anyway, so synchronization isn't critical.
+        if 0 == self.receiver_count() {
+            return Err(error::SendError(value));
+        }
+
+        self.send_replace(value);
         Ok(())
     }
 
@@ -436,6 +441,8 @@ impl<T> Sender<T> {
     /// the previous value in the channel.
     ///
     /// This can be useful for reusing the buffers inside a watched value.
+    /// Additionally, this method permits sending values even when there are no
+    /// receivers.
     ///
     /// # Examples
     ///
@@ -443,15 +450,10 @@ impl<T> Sender<T> {
     /// use tokio::sync::watch;
     ///
     /// let (tx, _rx) = watch::channel(1);
-    /// assert_eq!(tx.send_replace(2).unwrap(), 1);
-    /// assert_eq!(tx.send_replace(3).unwrap(), 2);
+    /// assert_eq!(tx.send_replace(2), 1);
+    /// assert_eq!(tx.send_replace(3), 2);
     /// ```
-    pub fn send_replace(&self, value: T) -> Result<T, error::SendError<T>> {
-        // This is pretty much only useful as a hint anyway, so synchronization isn't critical.
-        if 0 == self.receiver_count() {
-            return Err(error::SendError(value));
-        }
-
+    pub fn send_replace(&self, value: T) -> T {
         let old = {
             // Acquire the write lock and update the value.
             let mut lock = self.shared.value.write().unwrap();
@@ -472,7 +474,7 @@ impl<T> Sender<T> {
         // Notify all watchers
         self.shared.notify_rx.notify_waiters();
 
-        Ok(old)
+        old
     }
 
     /// Returns a reference to the most recently sent value

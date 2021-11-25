@@ -40,16 +40,19 @@ cfg_rt! {
         ///
         /// This function panics if there is no current timer set.
         ///
-        /// It can be triggered when `Builder::enable_time()` or
-        /// `Builder::enable_all()` are not included in the builder.
+        /// It can be triggered when [`Builder::enable_time`] or
+        /// [`Builder::enable_all`] are not included in the builder.
         ///
         /// It can also panic whenever a timer is created outside of a
-        /// Tokio runtime. That is why `rt.block_on(delay_for(...))` will panic,
+        /// Tokio runtime. That is why `rt.block_on(sleep(...))` will panic,
         /// since the function is executed outside of the runtime.
-        /// Whereas `rt.block_on(async {delay_for(...).await})` doesn't panic.
+        /// Whereas `rt.block_on(async {sleep(...).await})` doesn't panic.
         /// And this is because wrapping the function on an async makes it lazy,
         /// and so gets executed inside the runtime successfully without
         /// panicking.
+        ///
+        /// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
+        /// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
         pub(crate) fn current() -> Self {
             crate::runtime::context::time_handle()
                 .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
@@ -65,16 +68,19 @@ cfg_not_rt! {
         ///
         /// This function panics if there is no current timer set.
         ///
-        /// It can be triggered when `Builder::enable_time()` or
-        /// `Builder::enable_all()` are not included in the builder.
+        /// It can be triggered when [`Builder::enable_time`] or
+        /// [`Builder::enable_all`] are not included in the builder.
         ///
-        /// It can also panic whenever a timer is created outside of a Tokio
-        /// runtime. That is why `rt.block_on(delay_for(...))` will panic,
+        /// It can also panic whenever a timer is created outside of a
+        /// Tokio runtime. That is why `rt.block_on(sleep(...))` will panic,
         /// since the function is executed outside of the runtime.
-        /// Whereas `rt.block_on(async {delay_for(...).await})` doesn't
-        /// panic. And this is because wrapping the function on an async makes it
-        /// lazy, and so outside executed inside the runtime successfully without
+        /// Whereas `rt.block_on(async {sleep(...).await})` doesn't panic.
+        /// And this is because wrapping the function on an async makes it lazy,
+        /// and so gets executed inside the runtime successfully without
         /// panicking.
+        ///
+        /// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
+        /// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
         pub(crate) fn current() -> Self {
             panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
         }
