@@ -15,8 +15,7 @@ pub struct LocalPoolHandle {
 
 impl LocalPoolHandle {
     /// Create a new pool of threads to handle `!Send` tasks. Spawn tasks onto this
-    /// pool via [`LocalPoolHandle::spawn_pinned`] or
-    /// [`LocalPoolHandle::spawn_pinned_blocking`].
+    /// pool via [`LocalPoolHandle::spawn_pinned`].
     ///
     /// # Panics
     /// Panics if the pool size is less than one.
