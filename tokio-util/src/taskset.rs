@@ -89,6 +89,8 @@ impl<T> TaskSet<T> {
             output.push(task.await)
         }
 
+        self.tasks.clear();
+
         output
     }
 
