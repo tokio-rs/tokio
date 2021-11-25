@@ -24,23 +24,23 @@ async fn can_spawn_not_send_future() {
     assert_eq!(output, "test");
 }
 
-// Simple test of running a !Send future via spawn_pinned_blocking
-#[tokio::test]
-async fn can_spawn_not_send_future_blocking() {
+// Dropping the result of spawn_pinned still lets the task execute
+#[test]
+fn can_drop_future_and_still_get_output() {
     let pool = task::LocalPoolHandle::new(1);
+    let (sender, receiver) = std::sync::mpsc::channel();
 
-    let output = pool
-        .spawn_pinned_blocking(|| {
-            // Rc is !Send + !Sync
-            let local_data = Rc::new("test");
+    let _ = pool.spawn_pinned(move || {
+        // Rc is !Send + !Sync
+        let local_data = Rc::new("test");
 
-            // This future holds an Rc, so it is !Send
-            async move { local_data.to_string() }
-        })
-        .await
-        .unwrap();
+        // This future holds an Rc, so it is !Send
+        async move {
+            let _ = sender.send(local_data.to_string());
+        }
+    });
 
-    assert_eq!(output, "test");
+    assert_eq!(receiver.recv(), Ok("test".to_string()));
 }
 
 #[test]
@@ -54,7 +54,6 @@ fn cannot_create_zero_sized_pool() {
 async fn can_spawn_multiple_futures() {
     let pool = task::LocalPoolHandle::new(2);
 
-    // Use both spawning functions for variety
     let future1 = pool
         .spawn_pinned(|| {
             let local_data = Rc::new("test1");
@@ -63,10 +62,11 @@ async fn can_spawn_multiple_futures() {
         .await
         .unwrap_or_else(|e| panic!("Join error: {}", e));
     let future2 = pool
-        .spawn_pinned_blocking(|| {
+        .spawn_pinned(|| {
             let local_data = Rc::new("test2");
             async move { local_data.to_string() }
         })
+        .await
         .unwrap_or_else(|e| panic!("Join error: {}", e));
 
     assert_eq!(future1.await, "test1");

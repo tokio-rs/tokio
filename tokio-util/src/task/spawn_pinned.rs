@@ -36,10 +36,11 @@ impl LocalPoolHandle {
     /// off of the thread. Note that the future is not [`Send`], but the
     /// [`FnOnce`] which creates it is.
     ///
-    /// This function is async because the `create_task` function must be sent
-    /// to a worker thread and spawned there, so we need to wait for the join
-    /// handle to be sent back. Alternatively, [`LocalPoolHandle::spawn_pinned_blocking`]
-    /// blocks while waiting for the join handle to be send back.
+    /// This function returns a future because the `create_task` function must
+    /// be sent to a worker thread and spawned there, so we need to
+    /// (asynchronously) wait for the join handle to be sent back. The task is
+    /// sent to the pool immediately, so if you don't need the join handle you
+    /// can drop the future.
     ///
     /// # Examples
     /// ```
@@ -69,56 +70,17 @@ impl LocalPoolHandle {
     ///     assert_eq!(output, "test");
     /// }
     /// ```
-    pub async fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
+    pub fn spawn_pinned<F, Fut>(
+        &self,
+        create_task: F,
+    ) -> impl Future<Output = JoinHandle<Fut::Output>>
     where
         F: FnOnce() -> Fut,
         F: Send + 'static,
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
-        self.pool.spawn_pinned(create_task).await
-    }
-
-    /// Spawn a task onto a worker thread and pin it there so it can't be moved
-    /// off of the thread. Note that the future is not [`Send`], but the
-    /// [`FnOnce`] which creates it is.
-    ///
-    /// This is the same as [`LocalPoolHandle::spawn_pinned`], but blocks when
-    /// waiting for the join handle.
-    ///
-    /// # Examples
-    /// ```
-    /// use std::rc::Rc;
-    /// use tokio_util::task::LocalPoolHandle;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     // Create the local pool
-    ///     let pool = LocalPoolHandle::new(1);
-    ///
-    ///     // Spawn a !Send future onto the pool and await it
-    ///     let output = pool
-    ///         .spawn_pinned_blocking(|| {
-    ///             // Rc is !Send + !Sync
-    ///             let local_data = Rc::new("test");
-    ///
-    ///             // This future holds an Rc, so it is !Send
-    ///             async move { local_data.to_string() }
-    ///         })
-    ///         .await
-    ///         .unwrap();
-    ///
-    ///     assert_eq!(output, "test");
-    /// }
-    /// ```
-    pub fn spawn_pinned_blocking<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
-    where
-        F: FnOnce() -> Fut,
-        F: Send + 'static,
-        Fut: Future + 'static,
-        Fut::Output: Send + 'static,
-    {
-        self.pool.spawn_pinned_blocking(create_task)
+        self.pool.spawn_pinned(create_task)
     }
 }
 
@@ -134,7 +96,7 @@ struct LocalPool {
 
 impl LocalPool {
     /// Spawn a `?Send` future onto a worker
-    async fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
+    fn spawn_pinned<F, Fut>(&self, create_task: F) -> impl Future<Output = JoinHandle<Fut::Output>>
     where
         F: FnOnce() -> Fut,
         F: Send + 'static,
@@ -143,42 +105,6 @@ impl LocalPool {
     {
         let (sender, receiver) = tokio::sync::oneshot::channel();
 
-        self.spawn_pinned_inner(create_task, move |join_handle| {
-            let _ = sender.send(join_handle);
-        });
-
-        receiver.await.expect("Worker failed to send join handle")
-    }
-
-    /// Spawn a `?Send` future onto a worker, but block while waiting for the
-    /// join handle.
-    fn spawn_pinned_blocking<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
-    where
-        F: FnOnce() -> Fut,
-        F: Send + 'static,
-        Fut: Future + 'static,
-        Fut::Output: Send + 'static,
-    {
-        let (sender, receiver) = std::sync::mpsc::channel();
-
-        self.spawn_pinned_inner(create_task, move |join_handle| {
-            let _ = sender.send(join_handle);
-        });
-
-        receiver.recv().expect("Worker failed to send join handle")
-    }
-
-    /// Find a worker and send the task to it. This function is generalized to
-    /// work with any type of send back channel.
-    fn spawn_pinned_inner<CreateFn, Fut, SendFn>(&self, create_task: CreateFn, send: SendFn)
-    where
-        CreateFn: FnOnce() -> Fut,
-        CreateFn: Send + 'static,
-        Fut: Future + 'static,
-        Fut::Output: Send + 'static,
-        SendFn: FnOnce(JoinHandle<Fut::Output>),
-        SendFn: Send + 'static,
-    {
         let worker = self.find_and_incr_least_burdened_worker();
         let task_count = Arc::clone(&worker.task_count);
         let request = FutureRequest {
@@ -193,7 +119,7 @@ impl LocalPool {
                 });
 
                 // Send the join handle back to the spawner.
-                send(join_handle);
+                let _ = sender.send(join_handle);
             }),
         };
 
@@ -201,6 +127,11 @@ impl LocalPool {
             .spawner
             .send(request)
             .expect("Worker is no longer available");
+
+        #[allow(clippy::async_yields_async)]
+        async move {
+            receiver.await.expect("Worker failed to send join handle")
+        }
     }
 
     /// Find the worker with the least number of tasks, increment its task
