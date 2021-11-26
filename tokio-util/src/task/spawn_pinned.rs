@@ -101,18 +101,16 @@ impl LocalPool {
             // Inside the future we can't run spawn_local yet because we're not
             // in the context of a LocalSet. We need to send create_task to the
             // LocalSet task for spawning.
-            let request = FutureRequest {
-                spawn: Box::new(move || {
-                    // Once we're in the LocalSet context we can call spawn_local
-                    let join_handle = spawn_local(create_task());
+            let spawn_task = Box::new(move || {
+                // Once we're in the LocalSet context we can call spawn_local
+                let join_handle = spawn_local(create_task());
 
-                    // Send the join handle back to the spawner.
-                    let _ = sender.send(join_handle);
-                }),
-            };
+                // Send the join handle back to the spawner.
+                let _ = sender.send(join_handle);
+            });
 
-            // Send the future request to the LocalSet task
-            if let Err(e) = worker_handle_clone.spawner.send(request) {
+            // Send the callback to the LocalSet task
+            if let Err(e) = worker_handle_clone.spawner.send(spawn_task) {
                 // Failed to spawn the task on the worker, so we need to remove
                 // the task from the count.
                 worker_handle_clone.decrement_task_count();
@@ -190,14 +188,10 @@ impl LocalPool {
 
 type PinnedFutureSpawner = Box<dyn FnOnce() + Send + 'static>;
 
-struct FutureRequest {
-    spawn: PinnedFutureSpawner,
-}
-
 #[derive(Clone)]
 struct LocalWorkerHandle {
     runtime_handle: tokio::runtime::Handle,
-    spawner: UnboundedSender<FutureRequest>,
+    spawner: UnboundedSender<PinnedFutureSpawner>,
     task_count: Arc<AtomicUsize>,
 }
 
@@ -220,11 +214,14 @@ impl LocalWorkerHandle {
         }
     }
 
-    fn run(runtime: tokio::runtime::Runtime, mut task_receiver: UnboundedReceiver<FutureRequest>) {
+    fn run(
+        runtime: tokio::runtime::Runtime,
+        mut task_receiver: UnboundedReceiver<PinnedFutureSpawner>,
+    ) {
         LocalSet::new().block_on(&runtime, async {
-            while let Some(task) = task_receiver.recv().await {
+            while let Some(spawn_task) = task_receiver.recv().await {
                 // Calls spawn_local(future)
-                (task.spawn)();
+                (spawn_task)();
             }
         });
     }
