@@ -35,12 +35,6 @@ impl LocalPoolHandle {
     /// off of the thread. Note that the future is not [`Send`], but the
     /// [`FnOnce`] which creates it is.
     ///
-    /// This function returns a future because the `create_task` function must
-    /// be sent to a worker thread and spawned there, so we need to
-    /// (asynchronously) wait for the join handle to be sent back. The task is
-    /// sent to the pool immediately, so if you don't need the join handle you
-    /// can drop the future.
-    ///
     /// # Examples
     /// ```
     /// use std::rc::Rc;
@@ -60,19 +54,13 @@ impl LocalPoolHandle {
     ///             // This future holds an Rc, so it is !Send
     ///             async move { local_data.to_string() }
     ///         })
-    ///         // First await is to get the JoinHandle
-    ///         .await // JoinHandle<String>
-    ///         // Second await is to get the task output
-    ///         .await // Result<String, JoinError>
+    ///         .await
     ///         .unwrap();
     ///
     ///     assert_eq!(output, "test");
     /// }
     /// ```
-    pub fn spawn_pinned<F, Fut>(
-        &self,
-        create_task: F,
-    ) -> impl Future<Output = JoinHandle<Fut::Output>>
+    pub fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut,
         F: Send + 'static,
@@ -95,7 +83,7 @@ struct LocalPool {
 
 impl LocalPool {
     /// Spawn a `?Send` future onto a worker
-    fn spawn_pinned<F, Fut>(&self, create_task: F) -> impl Future<Output = JoinHandle<Fut::Output>>
+    fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut,
         F: Send + 'static,
@@ -105,32 +93,69 @@ impl LocalPool {
         let (sender, receiver) = tokio::sync::oneshot::channel();
 
         let worker = self.find_and_incr_least_burdened_worker();
-        let task_count = Arc::clone(&worker.task_count);
-        let request = FutureRequest {
-            spawn: Box::new(move || {
-                let join_handle = spawn_local(async move {
-                    let result = create_task().await;
+        let worker_handle_clone = worker.clone();
 
-                    // Update the task count once the future is finished
-                    task_count.fetch_sub(1, Ordering::SeqCst);
+        // Spawn a future onto the worker's runtime so can immediately return
+        // a join handle.
+        worker.runtime_handle.spawn(async move {
+            // Inside the future we can't run spawn_local yet because we're not
+            // in the context of a LocalSet. We need to send create_task to the
+            // LocalSet task for spawning.
+            let request = FutureRequest {
+                spawn: Box::new(move || {
+                    // Once we're in the LocalSet context we can call spawn_local
+                    let join_handle = spawn_local(create_task());
 
-                    result
-                });
+                    // Send the join handle back to the spawner.
+                    let _ = sender.send(join_handle);
+                }),
+            };
 
-                // Send the join handle back to the spawner.
-                let _ = sender.send(join_handle);
-            }),
-        };
+            // Send the future request to the LocalSet task
+            if let Err(e) = worker_handle_clone.spawner.send(request) {
+                // Failed to spawn the task on the worker, so we need to remove
+                // the task from the count.
+                worker_handle_clone.decrement_task_count();
 
-        worker
-            .spawner
-            .send(request)
-            .expect("Worker is no longer available");
+                // TODO: Recreate worker? Otherwise future spawn_pinned calls
+                //       might fail if they try to use this worker.
 
-        #[allow(clippy::async_yields_async)]
-        async move {
-            receiver.await.expect("Worker failed to send join handle")
-        }
+                // Propagate the error as a panic in the join handle.
+                panic!("Worker is no longer available: {}", e);
+            }
+
+            // Wait for the task's join handle
+            let join_handle = match receiver.await {
+                Ok(handle) => handle,
+                Err(e) => {
+                    // We sent the task successfully, but failed to get its
+                    // join handle... We create_task panicked and the task was
+                    // not spawned, so we need to remove the task from the count.
+                    worker_handle_clone.decrement_task_count();
+
+                    // TODO: Recreate worker? Otherwise future spawn_pinned calls
+                    //       might fail if they try to use this worker.
+
+                    // Propagate the error as a panic in the join handle.
+                    panic!("Worker failed to send join handle: {}", e);
+                }
+            };
+
+            // Wait for the task to complete
+            let join_result = join_handle.await;
+
+            // Update the task count once the future has finished
+            worker_handle_clone.decrement_task_count();
+
+            match join_result {
+                Ok(output) => output,
+                Err(e) => {
+                    // Task panicked or was canceled. Forward this error as a
+                    // panic in the join handle.
+                    panic!("spawn_pinned task panicked or aborted: {}", e);
+                }
+            }
+        })
     }
 
     /// Find the worker with the least number of tasks, increment its task
@@ -169,14 +194,9 @@ struct FutureRequest {
     spawn: PinnedFutureSpawner,
 }
 
-// Needed for the unwrap in LocalPool::spawn_pinned_inner if sending fails
-impl Debug for FutureRequest {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str("FutureRequest")
-    }
-}
-
+#[derive(Clone)]
 struct LocalWorkerHandle {
+    runtime_handle: tokio::runtime::Handle,
     spawner: UnboundedSender<FutureRequest>,
     task_count: Arc<AtomicUsize>,
 }
@@ -189,10 +209,12 @@ impl LocalWorkerHandle {
             .enable_all()
             .build()
             .expect("Failed to start a pinned worker thread runtime");
+        let runtime_handle = runtime.handle().clone();
 
         std::thread::spawn(|| Self::run(runtime, receiver));
 
         LocalWorkerHandle {
+            runtime_handle,
             spawner: sender,
             task_count: Arc::new(AtomicUsize::new(0)),
         }
@@ -205,5 +227,9 @@ impl LocalWorkerHandle {
                 (task.spawn)();
             }
         });
+    }
+
+    fn decrement_task_count(&self) {
+        self.task_count.fetch_sub(1, Ordering::SeqCst);
     }
 }

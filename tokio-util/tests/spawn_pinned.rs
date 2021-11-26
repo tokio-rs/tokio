@@ -1,6 +1,5 @@
 #![warn(rust_2018_idioms)]
 
-use futures::TryFutureExt;
 use std::rc::Rc;
 use tokio_util::task;
 
@@ -18,13 +17,12 @@ async fn can_spawn_not_send_future() {
             async move { local_data.to_string() }
         })
         .await
-        .await
         .unwrap();
 
     assert_eq!(output, "test");
 }
 
-// Dropping the result of spawn_pinned still lets the task execute
+// Dropping the join handle still lets the task execute
 #[test]
 fn can_drop_future_and_still_get_output() {
     let pool = task::LocalPoolHandle::new(1);
@@ -54,21 +52,62 @@ fn cannot_create_zero_sized_pool() {
 async fn can_spawn_multiple_futures() {
     let pool = task::LocalPoolHandle::new(2);
 
-    let future1 = pool
-        .spawn_pinned(|| {
-            let local_data = Rc::new("test1");
-            async move { local_data.to_string() }
-        })
-        .await
-        .unwrap_or_else(|e| panic!("Join error: {}", e));
-    let future2 = pool
-        .spawn_pinned(|| {
-            let local_data = Rc::new("test2");
-            async move { local_data.to_string() }
-        })
-        .await
-        .unwrap_or_else(|e| panic!("Join error: {}", e));
+    let join_handle1 = pool.spawn_pinned(|| {
+        let local_data = Rc::new("test1");
+        async move { local_data.to_string() }
+    });
+    let join_handle2 = pool.spawn_pinned(|| {
+        let local_data = Rc::new("test2");
+        async move { local_data.to_string() }
+    });
 
-    assert_eq!(future1.await, "test1");
-    assert_eq!(future2.await, "test2");
+    assert_eq!(join_handle1.await.unwrap(), "test1");
+    assert_eq!(join_handle2.await.unwrap(), "test2");
+}
+
+// A panic in the spawned task causes the join handle to return an error.
+// But, you can continue to spawn tasks.
+#[tokio::test]
+async fn task_panic_propagates() {
+    let pool = task::LocalPoolHandle::new(1);
+
+    let join_handle = pool.spawn_pinned(|| async {
+        panic!("Test panic");
+    });
+
+    let result = join_handle.await;
+    assert!(result.is_err());
+    let error = result.unwrap_err();
+    assert!(error.is_panic());
+
+    // Trying again with a "safe" task still works
+    let join_handle = pool.spawn_pinned(|| async { "test" });
+    let result = join_handle.await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "test");
+}
+
+// A panic in the task creation callback kills the worker.
+// See TODOs in spawn_pinned implementation for possible fixes.
+#[tokio::test]
+async fn callback_panic_kills_worker() {
+    let pool = task::LocalPoolHandle::new(1);
+
+    let join_handle = pool.spawn_pinned(|| {
+        panic!("Test panic");
+        #[allow(unreachable_code)]
+        async {}
+    });
+
+    let result = join_handle.await;
+    assert!(result.is_err());
+    let error = result.unwrap_err();
+    assert!(error.is_cancelled());
+
+    // Trying again with a "safe" callback still fails
+    let join_handle = pool.spawn_pinned(|| async { "test" });
+    let result = join_handle.await;
+    assert!(result.is_err());
+    let error = result.unwrap_err();
+    assert!(error.is_cancelled());
 }
