@@ -50,7 +50,7 @@ use take_while::TakeWhile;
 
 cfg_time! {
     mod timeout;
-    use timeout::Timeout;
+    use timeout::{Elapsed, Timeout};
     use tokio::time::Duration;
     mod throttle;
     use throttle::{throttle, Throttle};
