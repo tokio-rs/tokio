@@ -15,6 +15,8 @@ use std::ops;
 /// [`write`]: method@crate::sync::RwLock::write
 /// [`RwLock`]: struct@crate::sync::RwLock
 pub struct RwLockWriteGuard<'a, T: ?Sized> {
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(super) resource_span: tracing::Span,
     pub(super) permits_acquired: u32,
     pub(super) s: &'a Semaphore,
     pub(super) data: *mut T,
@@ -66,14 +68,26 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         let data = f(&mut *this) as *mut U;
         let s = this.s;
         let permits_acquired = this.permits_acquired;
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = this.resource_span.clone();
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
-        RwLockMappedWriteGuard {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return RwLockMappedWriteGuard {
             permits_acquired,
             s,
             data,
             marker: marker::PhantomData,
-        }
+            resource_span,
+        };
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        return RwLockMappedWriteGuard {
+            permits_acquired,
+            s,
+            data,
+            marker: marker::PhantomData,
+        };
     }
 
     /// Attempts to make  a new [`RwLockMappedWriteGuard`] for a component of
@@ -129,14 +143,26 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         };
         let s = this.s;
         let permits_acquired = this.permits_acquired;
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = this.resource_span.clone();
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
-        Ok(RwLockMappedWriteGuard {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return Ok(RwLockMappedWriteGuard {
             permits_acquired,
             s,
             data,
             marker: marker::PhantomData,
-        })
+            resource_span,
+        });
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        return Ok(RwLockMappedWriteGuard {
+            permits_acquired,
+            s,
+            data,
+            marker: marker::PhantomData,
+        });
     }
 
     /// Converts this `RwLockWriteGuard` into an `RwLockMappedWriteGuard`. This
@@ -188,16 +214,46 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// [`RwLock`]: struct@crate::sync::RwLock
     pub fn downgrade(self) -> RwLockReadGuard<'a, T> {
         let RwLockWriteGuard { s, data, .. } = self;
-
+        let to_release = (self.permits_acquired - 1) as usize;
         // Release all but one of the permits held by the write guard
-        s.release((self.permits_acquired - 1) as usize);
+        s.release(to_release);
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            write_locked = false,
+            write_locked.op = "override",
+            )
+        });
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            current_readers = 1,
+            current_readers.op = "add",
+            )
+        });
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = self.resource_span.clone();
         // NB: Forget to avoid drop impl from being called.
         mem::forget(self);
-        RwLockReadGuard {
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return RwLockReadGuard {
             s,
             data,
             marker: marker::PhantomData,
-        }
+            resource_span,
+        };
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        return RwLockReadGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        };
     }
 }
 
@@ -236,5 +292,14 @@ where
 impl<'a, T: ?Sized> Drop for RwLockWriteGuard<'a, T> {
     fn drop(&mut self) {
         self.s.release(self.permits_acquired as usize);
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            write_locked = false,
+            write_locked.op = "override",
+            )
+        });
     }
 }

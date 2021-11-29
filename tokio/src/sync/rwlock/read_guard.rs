@@ -13,6 +13,8 @@ use std::ops;
 /// [`read`]: method@crate::sync::RwLock::read
 /// [`RwLock`]: struct@crate::sync::RwLock
 pub struct RwLockReadGuard<'a, T: ?Sized> {
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(super) resource_span: tracing::Span,
     pub(super) s: &'a Semaphore,
     pub(super) data: *const T,
     pub(super) marker: marker::PhantomData<&'a T>,
@@ -59,13 +61,25 @@ impl<'a, T: ?Sized> RwLockReadGuard<'a, T> {
     {
         let data = f(&*this) as *const U;
         let s = this.s;
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = this.resource_span.clone();
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
-        RwLockReadGuard {
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return RwLockReadGuard {
             s,
             data,
             marker: marker::PhantomData,
-        }
+            resource_span,
+        };
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        return RwLockReadGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        };
     }
 
     /// Attempts to make a new [`RwLockReadGuard`] for a component of the
@@ -113,13 +127,25 @@ impl<'a, T: ?Sized> RwLockReadGuard<'a, T> {
             None => return Err(this),
         };
         let s = this.s;
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = this.resource_span.clone();
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
-        Ok(RwLockReadGuard {
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return Ok(RwLockReadGuard {
             s,
             data,
             marker: marker::PhantomData,
-        })
+            resource_span,
+        });
+
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        return Ok(RwLockReadGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        });
     }
 }
 
@@ -152,5 +178,14 @@ where
 impl<'a, T: ?Sized> Drop for RwLockReadGuard<'a, T> {
     fn drop(&mut self) {
         self.s.release(1);
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            current_readers = 1,
+            current_readers.op = "sub",
+            )
+        });
     }
 }
