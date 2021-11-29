@@ -14,6 +14,12 @@
 ///
 /// [`try_join!`]: macro@try_join
 ///
+///
+/// # Join on Vec or iterator
+///
+/// If you need to join an arbitrary number of futures at runtime, you
+/// should use [futures::future::join_all](https://docs.rs/futures/latest/futures/future/fn.join_all.html) instead.
+///
 /// # Notes
 ///
 /// The supplied futures are stored inline and does not require allocating a

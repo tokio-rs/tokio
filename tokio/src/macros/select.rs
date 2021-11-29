@@ -45,6 +45,11 @@
 /// 5. If **all** branches are disabled, evaluate the `else` expression. If no
 ///    else branch is provided, panic.
 ///
+/// # Select on Vec or iterator
+///
+/// If you need to select an arbitrary number of futures at runtime, you
+/// should use [futures::future::select_all](https://docs.rs/futures/latest/futures/future/fn.select_all.html) instead.
+///
 /// # Runtime characteristics
 ///
 /// By running all async expressions on the current task, the expressions are
