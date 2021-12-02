@@ -5,9 +5,9 @@
 //!
 //! # Ground rules
 //!
-//! The heart of the timer implementation here is the `TimerShared` structure,
-//! shared between the `TimerEntry` and the driver. Generally, we permit access
-//! to `TimerShared` ONLY via either 1) a mutable reference to `TimerEntry` or
+//! The heart of the timer implementation here is the [`TimerShared`] structure,
+//! shared between the [`TimerEntry`] and the driver. Generally, we permit access
+//! to [`TimerShared`] ONLY via either 1) a mutable reference to [`TimerEntry`] or
 //! 2) a held driver lock.
 //!
 //! It follows from this that any changes made while holding BOTH 1 and 2 will
@@ -49,8 +49,10 @@
 //! There is of course a race condition between timer reset and timer
 //! expiration. If the driver fails to observe the updated expiration time, it
 //! could trigger expiration of the timer too early. However, because
-//! `mark_pending` performs a compare-and-swap, it will identify this race and
+//! [`mark_pending`][mark_pending] performs a compare-and-swap, it will identify this race and
 //! refuse to mark the timer as pending.
+//!
+//! [mark_pending]: TimerHandle::mark_pending
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicU64;
