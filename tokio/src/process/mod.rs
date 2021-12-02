@@ -264,6 +264,12 @@ impl Command {
         Self::from(StdCommand::new(program))
     }
 
+    /// Cheaply convert to a `&std::process::Command` for places where the type from the standard
+    /// library is expected.
+    pub fn as_std(&self) -> &StdCommand {
+        &self.std
+    }
+
     /// Adds an argument to pass to the program.
     ///
     /// Only one argument can be passed per use. So instead of:
