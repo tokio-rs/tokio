@@ -81,6 +81,7 @@ use std::{task::Context, task::Poll};
 ///
 /// impl AsyncTcpStream {
 ///     pub fn new(tcp: TcpStream) -> io::Result<Self> {
+///         tcp.set_nonblocking(true)?;
 ///         Ok(Self {
 ///             inner: AsyncFd::new(tcp)?,
 ///         })
