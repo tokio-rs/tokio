@@ -26,7 +26,11 @@ pub struct Handle {
 
     /// Handles to the signal drivers
     #[cfg_attr(
-        not(any(feature = "signal", all(unix, feature = "process"))),
+        any(
+            loom,
+            not(all(unix, feature = "signal")),
+            not(all(unix, feature = "process")),
+        ),
         allow(dead_code)
     )]
     pub(super) signal_handle: driver::SignalHandle,
