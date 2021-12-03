@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
+use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::runtime::Builder;
@@ -102,11 +103,24 @@ impl LocalPool {
             // in the context of a LocalSet. We need to send create_task to the
             // LocalSet task for spawning.
             let spawn_task = Box::new(move || {
-                // Once we're in the LocalSet context we can call spawn_local
-                let join_handle = spawn_local(create_task());
+                // Once we're in the LocalSet context we can call spawn_local,
+                // but first try to create the task. We use catch_unwind here so
+                // we don't kill the worker if create_task panics.
+                let task = match std::panic::catch_unwind(AssertUnwindSafe(create_task)) {
+                    Ok(task) => task,
+                    Err(e) => {
+                        // Creating the task triggered a panic. Send the error
+                        // back so it gets propagated.
+                        let _ = sender.send(Err(e));
+                        return;
+                    }
+                };
+
+                // Task was created successfully, now spawn it.
+                let join_handle = spawn_local(task);
 
                 // Send the join handle back to the spawner.
-                let _ = sender.send(join_handle);
+                let _ = sender.send(Ok(join_handle));
             });
 
             // Send the callback to the LocalSet task
@@ -115,24 +129,25 @@ impl LocalPool {
                 // the task from the count.
                 worker_handle_clone.decrement_task_count();
 
-                // TODO: Recreate worker? Otherwise future spawn_pinned calls
-                //       might fail if they try to use this worker.
-
                 // Propagate the error as a panic in the join handle.
-                panic!("Worker is no longer available: {}", e);
+                panic!("Failed to send job to worker: {}", e);
             }
 
             // Wait for the task's join handle
             let join_handle = match receiver.await {
-                Ok(handle) => handle,
+                Ok(Ok(handle)) => handle,
+                Ok(Err(e)) => {
+                    // create_task panicked. Decrement the task count and
+                    // propagate the panic here.
+                    worker_handle_clone.decrement_task_count();
+                    std::panic::resume_unwind(e);
+                }
                 Err(e) => {
                     // We sent the task successfully, but failed to get its
-                    // join handle... We create_task panicked and the task was
-                    // not spawned, so we need to remove the task from the count.
+                    // join handle... We assume something happened to the worker
+                    // and the task was not spawned, so we need to remove the
+                    // task from the count.
                     worker_handle_clone.decrement_task_count();
-
-                    // TODO: Recreate worker? Otherwise future spawn_pinned calls
-                    //       might fail if they try to use this worker.
 
                     // Propagate the error as a panic in the join handle.
                     panic!("Worker failed to send join handle: {}", e);

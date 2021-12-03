@@ -87,10 +87,9 @@ async fn task_panic_propagates() {
     assert_eq!(result.unwrap(), "test");
 }
 
-// A panic in the task creation callback kills the worker.
-// See TODOs in spawn_pinned implementation for possible fixes.
+// A panic in the task creation callback does not kill the worker.
 #[tokio::test]
-async fn callback_panic_kills_worker() {
+async fn callback_panic_does_not_kill_worker() {
     let pool = task::LocalPoolHandle::new(1);
 
     let join_handle = pool.spawn_pinned(|| {
@@ -102,12 +101,11 @@ async fn callback_panic_kills_worker() {
     let result = join_handle.await;
     assert!(result.is_err());
     let error = result.unwrap_err();
-    assert!(error.is_cancelled());
+    assert!(error.is_panic());
 
-    // Trying again with a "safe" callback still fails
+    // Trying again with a "safe" callback works
     let join_handle = pool.spawn_pinned(|| async { "test" });
     let result = join_handle.await;
-    assert!(result.is_err());
-    let error = result.unwrap_err();
-    assert!(error.is_cancelled());
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "test");
 }
