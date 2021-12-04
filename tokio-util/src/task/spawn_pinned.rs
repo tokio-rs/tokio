@@ -144,9 +144,19 @@ impl LocalPool {
             match join_result {
                 Ok(output) => output,
                 Err(e) => {
-                    // Task panicked or was canceled. Forward this error as a
-                    // panic in the join handle.
-                    panic!("spawn_pinned task panicked or aborted: {}", e);
+                    if e.is_panic() {
+                        std::panic::resume_unwind(e.into_panic());
+                    } else if e.is_cancelled() {
+                        // No one else should have the join handle, so this is
+                        // unexpected. Forward this error as a panic in the join
+                        // handle.
+                        panic!("spawn_pinned task was canceled: {}", e);
+                    } else {
+                        // Something unknown happened (not a panic or
+                        // cancellation). Forward this error as a panic in the
+                        // join handle.
+                        panic!("spawn_pinned task failed: {}", e);
+                    }
                 }
             }
         })
