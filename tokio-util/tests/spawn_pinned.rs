@@ -1,6 +1,8 @@
 #![warn(rust_2018_idioms)]
 
 use std::rc::Rc;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio_util::task;
 
 // Simple test of running a !Send future via spawn_pinned
@@ -87,7 +89,8 @@ async fn task_panic_propagates() {
     assert_eq!(result.unwrap(), "test");
 }
 
-// A panic in the task creation callback does not kill the worker.
+// A panic during task creation causes the join handle to return an error.
+// But, you can continue to spawn tasks.
 #[tokio::test]
 async fn callback_panic_does_not_kill_worker() {
     let pool = task::LocalPoolHandle::new(1);
@@ -108,4 +111,36 @@ async fn callback_panic_does_not_kill_worker() {
     let result = join_handle.await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "test");
+}
+
+// Canceling the task via the returned join handle cancels the spawned task
+// (which has a different, internal join handle).
+// This test is loosely based off of `test_abort_wakes_task_3964` in
+// `tokio/tests/test_abort.rs`
+#[tokio::test]
+async fn task_cancellation_propagates() {
+    let pool = task::LocalPoolHandle::new(1);
+    let notify_dropped = Arc::new(());
+    let weak_notify_dropped = Arc::downgrade(&notify_dropped);
+
+    let join_handle = pool.spawn_pinned(|| async move {
+        // Move the Arc into the task
+        let _notify_dropped = notify_dropped;
+        println!("task started");
+
+        // Sleep for a while (should be canceled before it elapses)
+        tokio::time::sleep(Duration::new(100, 0)).await
+    });
+
+    // Wait for inner task to sleep
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    join_handle.abort();
+
+    // Wait for inner task to abort
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    // Check that the Arc has been dropped. This verifies that the inner task
+    // was canceled as well.
+    assert!(weak_notify_dropped.upgrade().is_none());
 }

@@ -1,8 +1,10 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::task::{spawn_local, JoinHandle, LocalSet};
@@ -109,8 +111,12 @@ impl LocalPool {
                 // Once we're in the LocalSet context we can call spawn_local
                 let join_handle = spawn_local(async move { create_task().await });
 
-                // Send the join handle back to the spawner.
-                let _ = sender.send(join_handle);
+                // Send the join handle back to the spawner. If sending fails,
+                // we assume the parent task was canceled, so cancel this task
+                // as well.
+                if let Err(join_handle) = sender.send(join_handle) {
+                    join_handle.abort()
+                }
             });
 
             // Send the callback to the LocalSet task
@@ -131,8 +137,10 @@ impl LocalPool {
                 }
             };
 
-            // Wait for the task to complete
-            let join_result = join_handle.await;
+            // Wait for the task to complete. Forward task cancellation in case
+            // this task gets canceled.
+            let cancel_guard = CancelGuard(join_handle);
+            let join_result = cancel_guard.await;
 
             match join_result {
                 Ok(output) => output,
@@ -193,6 +201,29 @@ impl Drop for JobGuard {
     fn drop(&mut self) {
         // Decrement the job count
         self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Automatically abort/cancel the task when this guard gets dropped. This will
+/// forward a cancellation from one task to another.
+///
+/// This implements Future by polling the join handle, so just await it.
+struct CancelGuard<T>(JoinHandle<T>);
+
+impl<T> Future for CancelGuard<T> {
+    type Output = <JoinHandle<T> as Future>::Output;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let join_handle = Pin::new(&mut self.0);
+        join_handle.poll(cx)
+    }
+}
+
+impl<T> Drop for CancelGuard<T> {
+    fn drop(&mut self) {
+        // Attempt to abort the task. This does nothing if the task has already
+        // completed.
+        self.0.abort();
     }
 }
 
