@@ -1,7 +1,6 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
-use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::runtime::Builder;
@@ -94,11 +93,15 @@ impl LocalPool {
         let (sender, receiver) = tokio::sync::oneshot::channel();
 
         let worker = self.find_and_incr_least_burdened_worker();
-        let worker_handle_clone = worker.clone();
+        let job_guard = JobGuard(Arc::clone(&worker.task_count));
+        let worker_spawner = worker.spawner.clone();
 
         // Spawn a future onto the worker's runtime so can immediately return
         // a join handle.
         worker.runtime_handle.spawn(async move {
+            // Move the job guard into the task
+            let _ = job_guard;
+
             // Inside the future we can't run spawn_local yet because we're not
             // in the context of a LocalSet. We need to send create_task to the
             // LocalSet task for spawning.
@@ -111,11 +114,7 @@ impl LocalPool {
             });
 
             // Send the callback to the LocalSet task
-            if let Err(e) = worker_handle_clone.spawner.send(spawn_task) {
-                // Failed to spawn the task on the worker, so we need to remove
-                // the task from the count.
-                worker_handle_clone.decrement_task_count();
-
+            if let Err(e) = worker_spawner.send(spawn_task) {
                 // Propagate the error as a panic in the join handle.
                 panic!("Failed to send job to worker: {}", e);
             }
@@ -126,20 +125,14 @@ impl LocalPool {
                 Err(e) => {
                     // We sent the task successfully, but failed to get its
                     // join handle... We assume something happened to the worker
-                    // and the task was not spawned, so we need to remove the
-                    // task from the count.
-                    worker_handle_clone.decrement_task_count();
-
-                    // Propagate the error as a panic in the join handle.
+                    // and the task was not spawned. Propagate the error as a
+                    // panic in the join handle.
                     panic!("Worker failed to send join handle: {}", e);
                 }
             };
 
             // Wait for the task to complete
             let join_result = join_handle.await;
-
-            // Update the task count once the future has finished
-            worker_handle_clone.decrement_task_count();
 
             match join_result {
                 Ok(output) => output,
@@ -192,9 +185,19 @@ impl LocalPool {
     }
 }
 
+/// Automatically decrements a worker's job count when a job finishes (when
+/// this gets dropped).
+struct JobGuard(Arc<AtomicUsize>);
+
+impl Drop for JobGuard {
+    fn drop(&mut self) {
+        // Decrement the job count
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 type PinnedFutureSpawner = Box<dyn FnOnce() + Send + 'static>;
 
-#[derive(Clone)]
 struct LocalWorkerHandle {
     runtime_handle: tokio::runtime::Handle,
     spawner: UnboundedSender<PinnedFutureSpawner>,
@@ -230,9 +233,5 @@ impl LocalWorkerHandle {
                 (spawn_task)();
             }
         });
-    }
-
-    fn decrement_task_count(&self) {
-        self.task_count.fetch_sub(1, Ordering::SeqCst);
     }
 }
