@@ -141,8 +141,7 @@ impl LocalPool {
 
             // Wait for the task to complete. Forward task cancellation in case
             // this task gets canceled.
-            let cancel_guard = CancelGuard(join_handle);
-            let join_result = cancel_guard.await;
+            let join_result = JoinHandleCancelGuard(join_handle).await;
 
             match join_result {
                 Ok(output) => output,
@@ -210,9 +209,9 @@ impl Drop for JobGuard {
 /// forward a cancellation from one task to another.
 ///
 /// This implements Future by polling the join handle, so just await it.
-struct CancelGuard<T>(JoinHandle<T>);
+struct JoinHandleCancelGuard<T>(JoinHandle<T>);
 
-impl<T> Future for CancelGuard<T> {
+impl<T> Future for JoinHandleCancelGuard<T> {
     type Output = <JoinHandle<T> as Future>::Output;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -221,7 +220,7 @@ impl<T> Future for CancelGuard<T> {
     }
 }
 
-impl<T> Drop for CancelGuard<T> {
+impl<T> Drop for JoinHandleCancelGuard<T> {
     fn drop(&mut self) {
         // Attempt to abort the task. This does nothing if the task has already
         // completed.
