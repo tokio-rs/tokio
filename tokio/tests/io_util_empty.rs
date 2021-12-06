@@ -1,3 +1,4 @@
+#![cfg(feature = "full")]
 use tokio::io::{AsyncBufReadExt, AsyncReadExt};
 
 #[tokio::test]
