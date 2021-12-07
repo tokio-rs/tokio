@@ -124,7 +124,7 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     // ticks every 2 seconds
+///     // ticks every 2 milliseconds
 ///     let mut interval = time::interval(Duration::from_millis(2));
 ///     for _ in 0..5 {
 ///         interval.tick().await;
