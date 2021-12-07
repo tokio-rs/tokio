@@ -53,7 +53,7 @@ impl AsyncRead for Empty {
         cx: &mut Context<'_>,
         _: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        let _ = ready!(poll_proceed_and_make_progress(cx));
+        ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }
 }
@@ -61,7 +61,7 @@ impl AsyncRead for Empty {
 impl AsyncBufRead for Empty {
     #[inline]
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        let _ = ready!(poll_proceed_and_make_progress(cx));
+        ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(&[]))
     }
 
