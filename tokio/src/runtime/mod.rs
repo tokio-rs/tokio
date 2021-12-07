@@ -582,7 +582,7 @@ cfg_rt! {
                     match self::context::try_enter(self.handle.clone()) {
                         Some(guard) => basic.set_context_guard(guard),
                         None => {
-                            // The context thread-local has alread been destroyed.
+                            // The context thread-local has already been destroyed.
                             //
                             // We don't set the guard in this case. Calls to tokio::spawn in task
                             // destructors would fail regardless if this happens.
