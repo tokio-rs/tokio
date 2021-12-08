@@ -116,7 +116,7 @@ impl<'a> ReadBuf<'a> {
     /// initialized.
     ///
     /// The elements between 0 and `self.filled().len()` are filled, and those between 0 and
-    /// `self.initialized().len()` are initialized (and so can be transmuted to a `&mut [u8]`).
+    /// `self.initialized().len()` are initialized (and so can be converted to a `&mut [u8]`).
     ///
     /// The caller of this method must ensure that these invariants are upheld. For example, if the
     /// caller initializes some of the uninitialized section of the buffer, it must call
