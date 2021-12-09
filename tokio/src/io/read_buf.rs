@@ -32,9 +32,7 @@ impl<'a> ReadBuf<'a> {
     #[inline]
     pub fn new(buf: &'a mut [u8]) -> ReadBuf<'a> {
         let initialized = buf.len();
-        let buf = unsafe {
-            slice::from_raw_parts_mut::<'a, MaybeUninit<u8>>(buf.as_mut_ptr().cast(), initialized)
-        };
+        let buf = slice_to_uninit_mut(buf);
         ReadBuf {
             buf,
             filled: 0,
@@ -67,7 +65,7 @@ impl<'a> ReadBuf<'a> {
         // safety: filled describes how far into the buffer that the
         // user has filled with bytes, so it's been initialized.
         // TODO: This could use `MaybeUninit::slice_get_ref` when it is stable.
-        unsafe { slice::from_raw_parts(slice.as_ptr().cast(), slice.len()) }
+        unsafe { slice_assume_init(slice) }
     }
 
     /// Returns a mutable reference to the filled portion of the buffer.
@@ -77,7 +75,7 @@ impl<'a> ReadBuf<'a> {
         // safety: filled describes how far into the buffer that the
         // user has filled with bytes, so it's been initialized.
         // TODO: This could use `MaybeUninit::slice_get_mut` when it is stable.
-        unsafe { slice::from_raw_parts_mut(slice.as_mut_ptr().cast(), slice.len()) }
+        unsafe { slice_assume_init_mut(slice) }
     }
 
     /// Returns a new `ReadBuf` comprised of the unfilled section up to `n`.
@@ -97,7 +95,7 @@ impl<'a> ReadBuf<'a> {
         // safety: initialized describes how far into the buffer that the
         // user has at some point initialized with bytes.
         // TODO: This could use `MaybeUninit::slice_get_ref` when it is stable.
-        unsafe { slice::from_raw_parts(slice.as_ptr().cast(), slice.len()) }
+        unsafe { slice_assume_init(slice) }
     }
 
     /// Returns a mutable reference to the initialized portion of the buffer.
@@ -109,7 +107,7 @@ impl<'a> ReadBuf<'a> {
         // safety: initialized describes how far into the buffer that the
         // user has at some point initialized with bytes.
         // TODO: This could use `MaybeUninit::slice_get_mut` when it is stable.
-        unsafe { slice::from_raw_parts_mut(slice.as_mut_ptr().cast(), slice.len()) }
+        unsafe { slice_assume_init_mut(slice) }
     }
 
     /// Returns a mutable reference to the entire buffer, without ensuring that it has been fully
@@ -177,7 +175,7 @@ impl<'a> ReadBuf<'a> {
         let slice = &mut self.buf[self.filled..end];
         // safety: just above, we checked that the end of the buf has
         // been initialized to some value.
-        unsafe { slice::from_raw_parts_mut(slice.as_mut_ptr().cast(), slice.len()) }
+        unsafe { slice_assume_init_mut(slice) }
     }
 
     /// Returns the number of bytes at the end of the slice that have not yet been filled.
@@ -281,4 +279,16 @@ impl fmt::Debug for ReadBuf<'_> {
             .field("capacity", &self.capacity())
             .finish()
     }
+}
+
+fn slice_to_uninit_mut(slice: &mut [u8]) -> &mut [MaybeUninit<u8>] {
+    unsafe {slice::from_raw_parts_mut::<MaybeUninit<u8>>(slice.as_mut_ptr().cast(), slice.len())}
+}
+
+unsafe fn slice_assume_init(slice: &[MaybeUninit<u8>]) -> &[u8] {
+    slice::from_raw_parts(slice.as_ptr().cast(), slice.len())
+}
+
+unsafe fn slice_assume_init_mut(slice: &mut [MaybeUninit<u8>]) -> &mut [u8] {
+    slice::from_raw_parts_mut(slice.as_mut_ptr().cast(), slice.len())
 }
