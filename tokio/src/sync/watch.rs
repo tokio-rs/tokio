@@ -444,7 +444,15 @@ impl<T> Sender<T> {
     /// having to allocate a new instance. Additionally, this
     /// method permits sending values even when there are no receivers.
     ///
+    /// # Panics
+    ///
+    /// This function panics if calling `func` results in a panic.
+    /// No receivers are notified if panic occurred.
+    /// If the panic is caught, this might leave the watched value
+    /// in an inconsistent state.
+    ///
     /// # Examples
+    ///
     /// ```
     /// use tokio::sync::watch;
     ///
