@@ -1,6 +1,5 @@
 use std::fmt;
 use std::mem::MaybeUninit;
-use std::slice;
 
 /// A wrapper around a byte buffer that is incrementally filled and initialized.
 ///
