@@ -60,6 +60,7 @@ use crate::loom::sync::atomic::Ordering::Relaxed;
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::mem;
 use std::ops;
+use std::panic;
 
 /// Receives values from the associated [`Sender`](struct@Sender).
 ///
@@ -461,8 +462,14 @@ impl<T> Sender<T> {
         {
             // Acquire the write lock and update the value.
             let mut lock = self.shared.value.write().unwrap();
-            // Update the value.
-            func(&mut lock);
+            // Update the value and catch possible panic inside func.
+            let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                func(&mut lock);
+            }));
+            // If the func panicked return the panic to the caller.
+            if let Err(error) = result {
+                panic::resume_unwind(error);
+            }
 
             self.shared.state.increment_version();
 
