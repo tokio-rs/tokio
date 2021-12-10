@@ -493,28 +493,11 @@ impl<T> Sender<T> {
     /// assert_eq!(tx.send_replace(2), 1);
     /// assert_eq!(tx.send_replace(3), 2);
     /// ```
-    pub fn send_replace(&self, value: T) -> T {
-        let old = {
-            // Acquire the write lock and update the value.
-            let mut lock = self.shared.value.write().unwrap();
-            let old = mem::replace(&mut *lock, value);
+    pub fn send_replace(&self, mut value: T) -> T {
+        // swap old watched value with the new one
+        self.send_modify(|old| mem::swap(old, &mut value));
 
-            self.shared.state.increment_version();
-
-            // Release the write lock.
-            //
-            // Incrementing the version counter while holding the lock ensures
-            // that receivers are able to figure out the version number of the
-            // value they are currently looking at.
-            drop(lock);
-
-            old
-        };
-
-        // Notify all watchers
-        self.shared.notify_rx.notify_waiters();
-
-        old
+        value
     }
 
     /// Returns a reference to the most recently sent value
