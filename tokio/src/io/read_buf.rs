@@ -31,7 +31,7 @@ impl<'a> ReadBuf<'a> {
     #[inline]
     pub fn new(buf: &'a mut [u8]) -> ReadBuf<'a> {
         let initialized = buf.len();
-        let buf = unsafe { slice_to_uninit_mut(buf) } ;
+        let buf = unsafe { slice_to_uninit_mut(buf) };
         ReadBuf {
             buf,
             filled: 0,
