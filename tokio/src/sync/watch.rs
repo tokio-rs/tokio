@@ -437,6 +437,36 @@ impl<T> Sender<T> {
         Ok(())
     }
 
+    /// Modifies watched value, notifying all receivers.
+    ///
+    /// This can useful for modyfing the watched value, without
+    /// having to allocate a new instance. Additionally, this
+    /// method permits sending values even when there are no receivers.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// struct State {
+    ///     counter: usize,
+    /// }
+    /// let (state_tx, state_rx) = watch::channel(State { counter: 0 });
+    /// state_tx.send_modify(|state| state.counter += 1);
+    /// assert_eq!(state_rx.borrow().counter, 1);
+    /// ```
+    pub fn send_modify<F>(&self, func: F)
+    where
+        F: FnOnce(&mut T),
+    {
+        {
+            let mut lock = self.shared.value.write().unwrap();
+            func(&mut lock);
+            self.shared.state.increment_version();
+        }
+
+        self.shared.notify_rx.notify_waiters();
+    }
+
     /// Sends a new value via the channel, notifying all receivers and returning
     /// the previous value in the channel.
     ///
