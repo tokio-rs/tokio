@@ -9,7 +9,7 @@ tokio = { version = "1.5.0", path = "../tokio", features = ["full"] }
 bencher = "0.1.5"
 
 [dev-dependencies]
-tokio-util = { version = "0.6.6", path = "../tokio-util", features = ["full"] }
+tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
 tokio-stream = { path = "../tokio-stream" }
 
 [target.'cfg(unix)'.dependencies]
