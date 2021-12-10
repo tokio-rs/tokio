@@ -14,8 +14,8 @@ pub struct PollSendError<T>(Option<T>);
 impl<T> PollSendError<T> {
     /// Consumes the stored value, if any.
     ///
-    /// If this error was encountered when calling `start_send`, this will be the item that the
-    /// caller attempted to send.  Otherwise, it will be `None`.
+    /// If this error was encountered when calling `start_send`/`send_item`, this will be the item
+    /// that the caller attempted to send.  Otherwise, it will be `None`.
     pub fn into_inner(self) -> Option<T> {
         self.0
     }
@@ -81,7 +81,7 @@ impl<T: Send + 'static> PollSender<T> {
     /// Attempts to prepare the sender to receive a value.
     ///
     /// This method must be called and return `Poll::Ready(Ok(()))` prior to each call to
-    /// `start_send`.
+    /// `send_item`.
     ///
     /// This method returns `Poll::Ready` once the underlying channel is ready to receive a value,
     /// by reserving a slot in the channel for the item to be sent. If this method returns
@@ -125,7 +125,7 @@ impl<T: Send + 'static> PollSender<T> {
 
     /// Sends an item to the channel.
     ///
-    /// Before calling `start_send`, `poll_reserve` must be called with a successful return
+    /// Before calling `send_item`, `poll_reserve` must be called with a successful return
     /// value of `Poll::Ready(Ok(()))`.
     ///
     /// # Errors
@@ -134,12 +134,12 @@ impl<T: Send + 'static> PollSender<T> {
     ///
     /// # Panics
     ///
-    /// If `poll_reserve` was not successfully called prior to calling `start_send`, then this method
+    /// If `poll_reserve` was not successfully called prior to calling `send_item`, then this method
     /// will panic.
-    pub fn start_send(&mut self, value: T) -> Result<(), PollSendError<T>> {
+    pub fn send_item(&mut self, value: T) -> Result<(), PollSendError<T>> {
         let (result, next_state) = match self.take_state() {
             State::Idle(_) | State::Acquiring => {
-                panic!("`start_send` called without first calling `poll_reserve`")
+                panic!("`send_item` called without first calling `poll_reserve`")
             }
             // We have a permit to send our item, so go ahead, which gets us our sender back.
             State::ReadyToSend(permit) => (Ok(()), State::Idle(permit.send(value))),
@@ -147,7 +147,7 @@ impl<T: Send + 'static> PollSender<T> {
             State::Closed => (Err(PollSendError(Some(value))), State::Closed),
         };
 
-        // Handle deferred closing if `close` was called between `poll_reserve` and `start_send`.
+        // Handle deferred closing if `close` was called between `poll_reserve` and `send_item`.
         self.state = if self.sender.is_some() {
             next_state
         } else {
@@ -171,13 +171,13 @@ impl<T: Send + 'static> PollSender<T> {
         self.sender.as_ref()
     }
 
-    /// Closes this sender without dropping it.
+    /// Closes this sender.
     ///
     /// No more messages will be able to be sent from this sender, but the underlying channel will
     /// remain open until all senders have dropped, or until the [`Receiver`] closes the channel.
     ///
     /// If a slot was previously reserved by calling `poll_reserve`, then a final call can be made
-    /// to `start_send` in order to consume the reserved slot.  After that, no further sends will be
+    /// to `send_item` in order to consume the reserved slot.  After that, no further sends will be
     /// possible.  If you do not intend to send another item, you can release the reserved slot back
     /// to the underlying sender by calling [`abort_send`].
     ///
@@ -273,7 +273,7 @@ impl<T: Send + 'static> Sink<T> for PollSender<T> {
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        Pin::into_inner(self).start_send(item)
+        Pin::into_inner(self).send_item(item)
     }
 
     fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

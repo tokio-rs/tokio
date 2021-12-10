@@ -12,7 +12,7 @@ async fn simple() {
     for i in 1..=3i32 {
         let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
         assert_ready_ok!(reserve.poll());
-        send.start_send(i).unwrap();
+        send.send_item(i).unwrap();
     }
 
     let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
@@ -24,7 +24,7 @@ async fn simple() {
 
     drop(recv);
 
-    send.start_send(42).unwrap();
+    send.send_item(42).unwrap();
 }
 
 #[tokio::test]
@@ -35,7 +35,7 @@ async fn repeated_poll_reserve() {
     let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
     assert_ready_ok!(reserve.poll());
     assert_ready_ok!(reserve.poll());
-    send.start_send(1).unwrap();
+    send.send_item(1).unwrap();
 
     assert_eq!(recv.recv().await.unwrap(), 1);
 }
@@ -49,7 +49,7 @@ async fn abort_send() {
     for i in 1..=3i32 {
         let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
         assert_ready_ok!(reserve.poll());
-        send.start_send(i).unwrap();
+        send.send_item(i).unwrap();
     }
 
     let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
@@ -130,7 +130,7 @@ async fn close_sender_after_pending_reserve() {
 
     let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
     assert_ready_ok!(reserve.poll());
-    send.start_send(1).unwrap();
+    send.send_item(1).unwrap();
 
     assert!(recv_task.is_woken());
 
@@ -176,7 +176,7 @@ async fn abort_send_after_pending_reserve() {
 
     let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
     assert_ready_ok!(reserve.poll());
-    send.start_send(1).unwrap();
+    send.send_item(1).unwrap();
 
     assert_eq!(send.get_ref().unwrap().capacity(), 0);
     assert!(!send.abort_send());
@@ -220,7 +220,7 @@ fn start_send_panics_when_idle() {
     let (send, _) = channel::<i32>(3);
     let mut send = PollSender::new(send);
 
-    send.start_send(1).unwrap();
+    send.send_item(1).unwrap();
 }
 
 #[should_panic]
@@ -231,9 +231,9 @@ fn start_send_panics_when_acquiring() {
 
     let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
     assert_ready_ok!(reserve.poll());
-    send.start_send(1).unwrap();
+    send.send_item(1).unwrap();
 
     let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
     assert_pending!(reserve.poll());
-    send.start_send(2).unwrap();
+    send.send_item(2).unwrap();
 }
