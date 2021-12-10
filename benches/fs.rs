@@ -21,7 +21,7 @@ fn rt() -> tokio::runtime::Runtime {
 const BLOCK_COUNT: usize = 1_000;
 
 const BUFFER_SIZE: usize = 4096;
-const DEV_ZERO: &'static str = "/dev/zero";
+const DEV_ZERO: &str = "/dev/zero";
 
 fn async_read_codec(b: &mut Bencher) {
     let rt = rt();

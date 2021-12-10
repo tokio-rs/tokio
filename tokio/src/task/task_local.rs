@@ -258,14 +258,14 @@ impl<T: 'static, F> TaskLocalFuture<T, F> {
             }
         }
 
-        let mut project = self.project();
+        let project = self.project();
         let val = project.slot.take();
 
         let prev = project.local.inner.with(|c| c.replace(val));
 
         let _guard = Guard {
             prev,
-            slot: &mut project.slot,
+            slot: project.slot,
             local: *project.local,
         };
 

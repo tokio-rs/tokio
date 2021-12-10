@@ -25,7 +25,7 @@
 //!
 //! The task uses a reference count to keep track of how many active references
 //! exist. The Unowned reference type takes up two ref-counts. All other
-//! reference types take pu a single ref-count.
+//! reference types take up a single ref-count.
 //!
 //! Besides the waker type, each task has at most one of each reference type.
 //!

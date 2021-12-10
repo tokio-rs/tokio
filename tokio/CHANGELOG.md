@@ -1,3 +1,46 @@
+# 1.14.0 (November 15, 2021)
+
+### Fixed
+
+- macros: fix compiler errors when using `mut` patterns in `select!` ([#4211])
+- sync: fix a data race between `oneshot::Sender::send` and awaiting a
+  `oneshot::Receiver` when the oneshot has been closed ([#4226])
+- sync: make `AtomicWaker` panic safe ([#3689])
+- runtime: fix basic scheduler dropping tasks outside a runtime context
+  ([#4213])
+
+### Added
+
+- stats: add `RuntimeStats::busy_duration_total` ([#4179], [#4223])
+
+### Changed
+
+- io: updated `copy` buffer size to match `std::io::copy` ([#4209])
+
+### Documented
+
+-  io: rename buffer to file in doc-test ([#4230])
+-  sync: fix Notify example ([#4212])
+
+[#4211]: https://github.com/tokio-rs/tokio/pull/4211
+[#4226]: https://github.com/tokio-rs/tokio/pull/4226
+[#3689]: https://github.com/tokio-rs/tokio/pull/3689
+[#4213]: https://github.com/tokio-rs/tokio/pull/4213
+[#4179]: https://github.com/tokio-rs/tokio/pull/4179
+[#4223]: https://github.com/tokio-rs/tokio/pull/4223
+[#4209]: https://github.com/tokio-rs/tokio/pull/4209
+[#4230]: https://github.com/tokio-rs/tokio/pull/4230
+[#4212]: https://github.com/tokio-rs/tokio/pull/4212
+
+# 1.13.1 (November 15, 2021)
+
+### Fixed
+
+- sync: fix a data race between `oneshot::Sender::send` and awaiting a
+  `oneshot::Receiver` when the oneshot has been closed ([#4226])
+
+[#4226]: https://github.com/tokio-rs/tokio/pull/4226
+
 # 1.13.0 (October 29, 2021)
 
 ### Fixed
