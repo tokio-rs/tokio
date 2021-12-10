@@ -277,8 +277,8 @@ impl fmt::Debug for ReadBuf<'_> {
     }
 }
 
-fn slice_to_uninit_mut(slice: &mut [u8]) -> &mut [MaybeUninit<u8>] {
-    unsafe {slice::from_raw_parts_mut::<MaybeUninit<u8>>(slice.as_mut_ptr().cast(), slice.len())}
+unsafe fn slice_to_uninit_mut(slice: &mut [u8]) -> &mut [MaybeUninit<u8>] {
+    slice::from_raw_parts_mut::<MaybeUninit<u8>>(slice.as_mut_ptr().cast(), slice.len())
 }
 
 // TODO: This could use `MaybeUninit::slice_assume_init` when it is stable.
