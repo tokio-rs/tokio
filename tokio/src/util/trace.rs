@@ -69,7 +69,7 @@ cfg_trace! {
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 let this = self.project();
-                let poll_op_name = &*this.poll_op_name
+                let poll_op_name = &*this.poll_op_name;
                 let _res_enter = this.tracing_ctx.resource_span.enter();
                 let _async_op_enter = this.tracing_ctx.async_op_span.enter();
                 let _async_op_poll_enter = this.tracing_ctx.async_op_poll_span.enter();
