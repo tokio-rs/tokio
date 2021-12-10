@@ -368,13 +368,13 @@ impl<T: ?Sized> RwLock<T> {
         T: Sized,
     {
         max_reads &= MAX_READS;
-        return RwLock {
+        RwLock {
             mr: max_reads,
             c: UnsafeCell::new(value),
             s: Semaphore::const_new(max_reads as usize),
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: tracing::Span::none(),
-        };
+        }
     }
 
     /// Locks this `RwLock` with shared read access, causing the current task
