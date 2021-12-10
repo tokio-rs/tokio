@@ -439,7 +439,7 @@ impl<T> Sender<T> {
 
     /// Modifies watched value, notifying all receivers.
     ///
-    /// This can useful for modyfing the watched value, without
+    /// This can useful for modifying the watched value, without
     /// having to allocate a new instance. Additionally, this
     /// method permits sending values even when there are no receivers.
     ///
