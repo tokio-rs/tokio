@@ -72,22 +72,14 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         let resource_span = this.resource_span.clone();
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return RwLockMappedWriteGuard {
+        RwLockMappedWriteGuard {
             permits_acquired,
             s,
             data,
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return RwLockMappedWriteGuard {
-            permits_acquired,
-            s,
-            data,
-            marker: marker::PhantomData,
-        };
+        }
     }
 
     /// Attempts to make  a new [`RwLockMappedWriteGuard`] for a component of
@@ -147,22 +139,14 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         let resource_span = this.resource_span.clone();
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Ok(RwLockMappedWriteGuard {
+        Ok(RwLockMappedWriteGuard {
             permits_acquired,
             s,
             data,
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        });
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return Ok(RwLockMappedWriteGuard {
-            permits_acquired,
-            s,
-            data,
-            marker: marker::PhantomData,
-        });
+        })
     }
 
     /// Converts this `RwLockWriteGuard` into an `RwLockMappedWriteGuard`. This
@@ -240,20 +224,13 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(self);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return RwLockReadGuard {
+        RwLockReadGuard {
             s,
             data,
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return RwLockReadGuard {
-            s,
-            data,
-            marker: marker::PhantomData,
-        };
+        }
     }
 }
 

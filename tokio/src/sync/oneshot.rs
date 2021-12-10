@@ -217,6 +217,8 @@ use std::task::{Context, Poll, Waker};
 #[derive(Debug)]
 pub struct Sender<T> {
     inner: Option<Arc<Inner<T>>>,
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
 }
 
 /// Receives a value from the associated [`Sender`].
@@ -308,6 +310,8 @@ pub struct Sender<T> {
 pub struct Receiver<T> {
     inner: Option<Arc<Inner<T>>>,
     #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
     async_op_span: tracing::Span,
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     async_op_poll_span: tracing::Span,
@@ -381,9 +385,6 @@ struct Inner<T> {
     /// The `RX_TASK_SET` bit in the `state` field is set if this field is
     /// initialized. If that bit is unset, this field may be uninitialized.
     rx_task: Task,
-
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    resource_span: tracing::Span,
 }
 
 struct Task(UnsafeCell<MaybeUninit<Waker>>);
@@ -454,7 +455,7 @@ struct State(usize);
 #[track_caller]
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
-    let inner = {
+    let resource_span = {
         let location = std::panic::Location::caller();
 
         let resource_span = tracing::trace_span!(
@@ -498,16 +499,9 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
             )
         });
 
-        Arc::new(Inner {
-            state: AtomicUsize::new(State::new().as_usize()),
-            value: UnsafeCell::new(None),
-            tx_task: Task(UnsafeCell::new(MaybeUninit::uninit())),
-            rx_task: Task(UnsafeCell::new(MaybeUninit::uninit())),
-            resource_span,
-        })
+        resource_span
     };
 
-    #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
     let inner = Arc::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
         value: UnsafeCell::new(None),
@@ -517,26 +511,27 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 
     let tx = Sender {
         inner: Some(inner.clone()),
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        resource_span: resource_span.clone(),
     };
 
     #[cfg(all(tokio_unstable, feature = "tracing"))]
-    let rx = {
-        let async_op_span = inner.resource_span.in_scope(|| {
-            tracing::trace_span!("runtime.resource.async_op", source = "Receiver::await")
-        });
+    let async_op_span = resource_span
+        .in_scope(|| tracing::trace_span!("runtime.resource.async_op", source = "Receiver::await"));
 
-        let async_op_poll_span =
-            async_op_span.in_scope(|| tracing::trace_span!("runtime.resource.async_op.poll"));
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    let async_op_poll_span =
+        async_op_span.in_scope(|| tracing::trace_span!("runtime.resource.async_op.poll"));
 
-        Receiver {
-            inner: Some(inner),
-            async_op_span,
-            async_op_poll_span,
-        }
+    let rx = Receiver {
+        inner: Some(inner),
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        resource_span: resource_span,
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        async_op_span,
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        async_op_poll_span,
     };
-
-    #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-    let rx = Receiver { inner: Some(inner) };
 
     (tx, rx)
 }
@@ -609,7 +604,7 @@ impl<T> Sender<T> {
         }
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        inner.resource_span.in_scope(|| {
+        self.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             value_sent = true,
@@ -691,7 +686,7 @@ impl<T> Sender<T> {
         use crate::future::poll_fn;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = self.inner.as_ref().unwrap().resource_span.clone();
+        let resource_span = self.resource_span.clone();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let closed = trace::async_op(
             || poll_fn(|cx| self.poll_closed(cx)),
@@ -834,7 +829,7 @@ impl<T> Drop for Sender<T> {
         if let Some(inner) = self.inner.as_ref() {
             inner.complete();
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            inner.resource_span.in_scope(|| {
+            self.resource_span.in_scope(|| {
                 tracing::trace!(
                 target: "runtime::resource::state_update",
                 tx_dropped = true,
@@ -909,7 +904,7 @@ impl<T> Receiver<T> {
         if let Some(inner) = self.inner.as_ref() {
             inner.close();
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            inner.resource_span.in_scope(|| {
+            self.resource_span.in_scope(|| {
                 tracing::trace!(
                 target: "runtime::resource::state_update",
                 rx_dropped = true,
@@ -995,7 +990,7 @@ impl<T> Receiver<T> {
                 match unsafe { inner.consume_value() } {
                     Some(value) => {
                         #[cfg(all(tokio_unstable, feature = "tracing"))]
-                        inner.resource_span.in_scope(|| {
+                        self.resource_span.in_scope(|| {
                             tracing::trace!(
                             target: "runtime::resource::state_update",
                             value_received = true,
@@ -1026,7 +1021,7 @@ impl<T> Drop for Receiver<T> {
         if let Some(inner) = self.inner.as_ref() {
             inner.close();
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            inner.resource_span.in_scope(|| {
+            self.resource_span.in_scope(|| {
                 tracing::trace!(
                 target: "runtime::resource::state_update",
                 rx_dropped = true,
@@ -1042,20 +1037,14 @@ impl<T> Future for Receiver<T> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // If `inner` is `None`, then `poll()` has already completed.
-
-        cfg_trace! {
-            let mut _res_span;
-            let mut _ao_span;
-            let mut _ao_poll_span;
-        }
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _res_span = self.resource_span.clone().entered();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _ao_span = self.async_op_span.clone().entered();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _ao_poll_span = self.async_op_poll_span.clone().entered();
 
         let ret = if let Some(inner) = self.as_ref().get_ref().inner.as_ref() {
-            cfg_trace! {
-                _res_span = inner.resource_span.clone().entered();
-                _ao_span = self.async_op_span.clone().entered();
-                _ao_poll_span = self.async_op_poll_span.clone().entered();
-            }
-
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx)))?;
 

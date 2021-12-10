@@ -70,22 +70,14 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return OwnedRwLockMappedWriteGuard {
+        OwnedRwLockMappedWriteGuard {
             permits_acquired,
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return OwnedRwLockMappedWriteGuard {
-            permits_acquired,
-            lock: ManuallyDrop::new(lock),
-            data,
-            _p: PhantomData,
-        };
+        }
     }
 
     /// Attempts to make a new `OwnedRwLockMappedWriteGuard` for a component
@@ -140,22 +132,14 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Ok(OwnedRwLockMappedWriteGuard {
+        Ok(OwnedRwLockMappedWriteGuard {
             permits_acquired,
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        });
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return Ok(OwnedRwLockMappedWriteGuard {
-            permits_acquired,
-            lock: ManuallyDrop::new(lock),
-            data,
-            _p: PhantomData,
-        });
+        })
     }
 }
 

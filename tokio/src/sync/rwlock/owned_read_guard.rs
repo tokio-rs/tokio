@@ -63,20 +63,13 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return OwnedRwLockReadGuard {
+        OwnedRwLockReadGuard {
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return OwnedRwLockReadGuard {
-            lock: ManuallyDrop::new(lock),
-            data,
-            _p: PhantomData,
-        };
+        }
     }
 
     /// Attempts to make a new [`OwnedRwLockReadGuard`] for a component of the
@@ -124,20 +117,13 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Ok(OwnedRwLockReadGuard {
+        Ok(OwnedRwLockReadGuard {
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        });
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return Ok(OwnedRwLockReadGuard {
-            lock: ManuallyDrop::new(lock),
-            data,
-            _p: PhantomData,
-        });
+        })
     }
 }
 

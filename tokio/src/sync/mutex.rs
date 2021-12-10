@@ -256,40 +256,37 @@ impl<T: ?Sized> Mutex<T> {
         T: Sized,
     {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let mutex = {
+        let resource_span = {
             let location = std::panic::Location::caller();
 
-            let resource_span = tracing::trace_span!(
+            tracing::trace_span!(
                 "runtime.resource",
                 concrete_type = "Mutex",
                 kind = "Sync",
                 loc.file = location.file(),
                 loc.line = location.line(),
                 loc.col = location.column(),
-            );
-
-            let s = resource_span.in_scope(|| {
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    locked = false,
-                );
-                semaphore::Semaphore::new(1)
-            });
-
-            Self {
-                c: UnsafeCell::new(t),
-                s,
-                resource_span,
-            }
+            )
         };
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let s = resource_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                locked = false,
+            );
+            semaphore::Semaphore::new(1)
+        });
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let mutex = Self {
-            c: UnsafeCell::new(t),
-            s: semaphore::Semaphore::new(1),
-        };
+        let s = semaphore::Semaphore::new(1);
 
-        mutex
+        Self {
+            c: UnsafeCell::new(t),
+            s,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
+        }
     }
 
     /// Creates a new lock in an unlocked state ready for use.
@@ -307,18 +304,12 @@ impl<T: ?Sized> Mutex<T> {
     where
         T: Sized,
     {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Self {
+        Self {
             c: UnsafeCell::new(t),
             s: semaphore::Semaphore::const_new(1),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: tracing::Span::none(),
-        };
-
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        return Self {
-            c: UnsafeCell::new(t),
-            s: semaphore::Semaphore::const_new(1),
-        };
+        }
     }
 
     /// Locks this mutex, causing the current task to yield until the lock has
@@ -346,36 +337,31 @@ impl<T: ?Sized> Mutex<T> {
     /// ```
     pub async fn lock(&self) -> MutexGuard<'_, T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let guard = {
-            trace::async_op(
-                || self.acquire(),
-                self.resource_span.clone(),
-                "Mutex::lock",
-                "poll",
-                false,
-            )
-            .await;
+        trace::async_op(
+            || self.acquire(),
+            self.resource_span.clone(),
+            "Mutex::lock",
+            "poll",
+            false,
+        )
+        .await;
 
-            self.resource_span.in_scope(|| {
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    locked = true,
-                );
-            });
-
-            MutexGuard {
-                lock: self,
-                resource_span: self.resource_span.clone(),
-            }
-        };
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                locked = true,
+            );
+        });
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let guard = {
-            self.acquire().await;
-            MutexGuard { lock: self }
-        };
+        self.acquire().await;
 
-        guard
+        MutexGuard {
+            lock: self,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: self.resource_span.clone(),
+        }
     }
 
     /// Blocking lock this mutex. When the lock has been acquired, function returns a
@@ -446,37 +432,34 @@ impl<T: ?Sized> Mutex<T> {
     /// [`Arc`]: std::sync::Arc
     pub async fn lock_owned(self: Arc<Self>) -> OwnedMutexGuard<T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let guard = {
-            trace::async_op(
-                || self.acquire(),
-                self.resource_span.clone(),
-                "Mutex::lock_owned",
-                "poll",
-                false,
-            )
-            .await;
+        trace::async_op(
+            || self.acquire(),
+            self.resource_span.clone(),
+            "Mutex::lock_owned",
+            "poll",
+            false,
+        )
+        .await;
 
-            self.resource_span.in_scope(|| {
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    locked = true,
-                );
-            });
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                locked = true,
+            );
+        });
 
-            let resource_span = self.resource_span.clone();
-            OwnedMutexGuard {
-                lock: self,
-                resource_span,
-            }
-        };
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = self.resource_span.clone();
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let guard = {
-            self.acquire().await;
-            OwnedMutexGuard { lock: self }
-        };
+        self.acquire().await;
 
-        guard
+        OwnedMutexGuard {
+            lock: self,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
+        }
     }
 
     async fn acquire(&self) {
@@ -508,23 +491,18 @@ impl<T: ?Sized> Mutex<T> {
         match self.s.try_acquire(1) {
             Ok(_) => {
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
-                let guard = {
-                    self.resource_span.in_scope(|| {
-                        tracing::trace!(
-                            target: "runtime::resource::state_update",
-                            locked = true,
-                        );
-                    });
-                    Ok(MutexGuard {
-                        lock: self,
-                        resource_span: self.resource_span.clone(),
-                    })
-                };
+                self.resource_span.in_scope(|| {
+                    tracing::trace!(
+                        target: "runtime::resource::state_update",
+                        locked = true,
+                    );
+                });
 
-                #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-                let guard = Ok(MutexGuard { lock: self });
-
-                guard
+                Ok(MutexGuard {
+                    lock: self,
+                    #[cfg(all(tokio_unstable, feature = "tracing"))]
+                    resource_span: self.resource_span.clone(),
+                })
             }
             Err(_) => Err(TryLockError(())),
         }
@@ -582,23 +560,21 @@ impl<T: ?Sized> Mutex<T> {
         match self.s.try_acquire(1) {
             Ok(_) => {
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
-                let guard = {
-                    self.resource_span.in_scope(|| {
-                        tracing::trace!(
-                            target: "runtime::resource::state_update",
-                            locked = true,
-                        );
-                    });
-                    let resource_span = self.resource_span.clone();
-                    Ok(OwnedMutexGuard {
-                        lock: self,
-                        resource_span,
-                    })
-                };
-                #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-                let guard = Ok(OwnedMutexGuard { lock: self });
+                self.resource_span.in_scope(|| {
+                    tracing::trace!(
+                        target: "runtime::resource::state_update",
+                        locked = true,
+                    );
+                });
 
-                guard
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                let resource_span = self.resource_span.clone();
+
+                Ok(OwnedMutexGuard {
+                    lock: self,
+                    #[cfg(all(tokio_unstable, feature = "tracing"))]
+                    resource_span,
+                })
             }
             Err(_) => Err(TryLockError(())),
         }

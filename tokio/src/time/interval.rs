@@ -118,35 +118,32 @@ fn internal_interval_at(
     location: Option<&'static Location<'static>>,
 ) -> Interval {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
-    let interval = {
+    let resource_span = {
         let location = location.expect("should have location if tracing");
 
-        let resource_span = tracing::trace_span!(
+        tracing::trace_span!(
             "runtime.resource",
             concrete_type = "Interval",
             kind = "timer",
             loc.file = location.file(),
             loc.line = location.line(),
             loc.col = location.column(),
-        );
-
-        let delay = resource_span.in_scope(|| Box::pin(sleep_until(start)));
-        Interval {
-            delay,
-            period,
-            missed_tick_behavior: Default::default(),
-            resource_span,
-        }
+        )
     };
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    let delay = resource_span.in_scope(|| Box::pin(sleep_until(start)));
 
     #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-    let interval = Interval {
-        delay: Box::pin(sleep_until(start)),
+    let delay = Box::pin(sleep_until(start));
+
+    Interval {
+        delay,
         period,
         missed_tick_behavior: Default::default(),
-    };
-
-    interval
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        resource_span,
+    }
 }
 
 /// Defines the behavior of an [`Interval`] when it misses a tick.

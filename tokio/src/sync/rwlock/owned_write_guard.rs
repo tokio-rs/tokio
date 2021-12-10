@@ -71,22 +71,14 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return OwnedRwLockMappedWriteGuard {
+        OwnedRwLockMappedWriteGuard {
             permits_acquired,
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return OwnedRwLockMappedWriteGuard {
-            permits_acquired,
-            lock: ManuallyDrop::new(lock),
-            data,
-            _p: PhantomData,
-        };
+        }
     }
 
     /// Attempts to make  a new [`OwnedRwLockMappedWriteGuard`] for a component
@@ -144,22 +136,14 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Ok(OwnedRwLockMappedWriteGuard {
+        Ok(OwnedRwLockMappedWriteGuard {
             permits_acquired,
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        });
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return Ok(OwnedRwLockMappedWriteGuard {
-            permits_acquired,
-            lock: ManuallyDrop::new(lock),
-            data,
-            _p: PhantomData,
-        });
+        })
     }
 
     /// Converts this `OwnedRwLockWriteGuard` into an
@@ -237,20 +221,13 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(self);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return OwnedRwLockReadGuard {
+        OwnedRwLockReadGuard {
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return OwnedRwLockReadGuard {
-            lock: ManuallyDrop::new(lock),
-            data,
-            _p: PhantomData,
-        };
+        }
     }
 }
 

@@ -362,12 +362,6 @@ macro_rules! cfg_not_time {
 }
 
 macro_rules! cfg_trace {
-    ($($stmt:stmt;)*) => {
-        $(
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            $stmt;
-        )*
-    };
     ($($item:item)*) => {
         $(
             #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -378,12 +372,6 @@ macro_rules! cfg_trace {
 }
 
 macro_rules! cfg_not_trace {
-    ($($stmt:stmt;)*) => {
-        $(
-            #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-            $stmt;
-        )*
-    };
     ($($item:item)*) => {
         $(
             #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]

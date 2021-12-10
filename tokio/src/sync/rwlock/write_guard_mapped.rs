@@ -71,22 +71,14 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return RwLockMappedWriteGuard {
+        RwLockMappedWriteGuard {
             permits_acquired,
             s,
             data,
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return RwLockMappedWriteGuard {
-            permits_acquired,
-            s,
-            data,
-            marker: marker::PhantomData,
-        };
+        }
     }
 
     /// Attempts to make a new [`RwLockMappedWriteGuard`] for a component of
@@ -146,22 +138,14 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Ok(RwLockMappedWriteGuard {
+        Ok(RwLockMappedWriteGuard {
             permits_acquired,
             s,
             data,
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        });
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return Ok(RwLockMappedWriteGuard {
-            permits_acquired,
-            s,
-            data,
-            marker: marker::PhantomData,
-        });
+        })
     }
 }
 

@@ -1,3 +1,5 @@
+#[cfg(all(tokio_unstable, feature = "tracing"))]
+use crate::time::driver::ClockTime;
 use crate::time::driver::{Handle, TimerEntry};
 use crate::time::{error::Error, Duration, Instant};
 use crate::util::trace;
@@ -7,10 +9,6 @@ use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
 use std::task::{self, Poll};
-
-cfg_trace! {
-    use crate::time::driver::ClockTime;
-}
 
 /// Waits until `deadline` is reached.
 ///
@@ -387,36 +385,29 @@ impl Sleep {
         }
     }
 
-    cfg_not_trace! {
-        fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
-            let me = self.project();
+    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+        let me = self.project();
 
-            // Keep track of task budget
-            let coop = ready!(crate::coop::poll_proceed(cx));
+        // Keep track of task budget
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let coop = ready!(trace_poll_op!(
+            "poll_elapsed",
+            crate::coop::poll_proceed(cx),
+        ));
 
-            me.entry.poll_elapsed(cx).map(move |r| {
-                coop.made_progress();
-                r
-            })
-        }
-    }
+        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        let coop = ready!(crate::coop::poll_proceed(cx));
 
-    cfg_trace! {
-        fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
-            let me = self.project();
-            // Keep track of task budget
-            let coop = ready!(trace_poll_op!(
-                "poll_elapsed",
-                crate::coop::poll_proceed(cx),
-            ));
+        let result = me.entry.poll_elapsed(cx).map(move |r| {
+            coop.made_progress();
+            r
+        });
 
-            let result =  me.entry.poll_elapsed(cx).map(move |r| {
-                coop.made_progress();
-                r
-            });
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return trace_poll_op!("poll_elapsed", result);
 
-            trace_poll_op!("poll_elapsed", result)
-        }
+        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        return result;
     }
 }
 

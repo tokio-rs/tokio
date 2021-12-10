@@ -66,20 +66,13 @@ impl<'a, T: ?Sized> RwLockReadGuard<'a, T> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return RwLockReadGuard {
+        RwLockReadGuard {
             s,
             data,
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return RwLockReadGuard {
-            s,
-            data,
-            marker: marker::PhantomData,
-        };
+        }
     }
 
     /// Attempts to make a new [`RwLockReadGuard`] for a component of the
@@ -132,20 +125,13 @@ impl<'a, T: ?Sized> RwLockReadGuard<'a, T> {
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Ok(RwLockReadGuard {
+        Ok(RwLockReadGuard {
             s,
             data,
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        });
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return Ok(RwLockReadGuard {
-            s,
-            data,
-            marker: marker::PhantomData,
-        });
+        })
     }
 }
 

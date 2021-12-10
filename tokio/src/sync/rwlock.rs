@@ -208,9 +208,8 @@ impl<T: ?Sized> RwLock<T> {
         T: Sized,
     {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let rwlock = {
+        let resource_span = {
             let location = std::panic::Location::caller();
-
             let resource_span = tracing::trace_span!(
                 "runtime.resource",
                 concrete_type = "RwLock",
@@ -220,7 +219,7 @@ impl<T: ?Sized> RwLock<T> {
                 loc.col = location.column(),
             );
 
-            let s = resource_span.in_scope(|| {
+            resource_span.in_scope(|| {
                 tracing::trace!(
                     target: "runtime::resource::state_update",
                     max_readers = MAX_READS,
@@ -235,25 +234,24 @@ impl<T: ?Sized> RwLock<T> {
                     target: "runtime::resource::state_update",
                     current_readers = 0,
                 );
-                Semaphore::new(MAX_READS as usize)
             });
 
-            RwLock {
-                mr: MAX_READS,
-                c: UnsafeCell::new(value),
-                s,
-                resource_span,
-            }
+            resource_span
         };
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let s = resource_span.in_scope(|| Semaphore::new(MAX_READS as usize));
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let rwlock = RwLock {
+        let s = Semaphore::new(MAX_READS as usize);
+
+        RwLock {
             mr: MAX_READS,
             c: UnsafeCell::new(value),
-            s: Semaphore::new(MAX_READS as usize),
-        };
-
-        rwlock
+            s,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
+        }
     }
 
     /// Creates a new instance of an `RwLock<T>` which is unlocked
@@ -282,7 +280,7 @@ impl<T: ?Sized> RwLock<T> {
         );
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let rwlock = {
+        let resource_span = {
             let location = std::panic::Location::caller();
 
             let resource_span = tracing::trace_span!(
@@ -294,7 +292,7 @@ impl<T: ?Sized> RwLock<T> {
                 loc.col = location.column(),
             );
 
-            let s = resource_span.in_scope(|| {
+            resource_span.in_scope(|| {
                 tracing::trace!(
                     target: "runtime::resource::state_update",
                     max_readers = max_reads,
@@ -309,25 +307,24 @@ impl<T: ?Sized> RwLock<T> {
                     target: "runtime::resource::state_update",
                     current_readers = 0,
                 );
-                Semaphore::new(max_reads as usize)
             });
 
-            RwLock {
-                mr: max_reads,
-                c: UnsafeCell::new(value),
-                s,
-                resource_span,
-            }
+            resource_span
         };
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let s = resource_span.in_scope(|| Semaphore::new(max_reads as usize));
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let rwlock = RwLock {
+        let s = Semaphore::new(max_reads as usize);
+
+        RwLock {
             mr: max_reads,
             c: UnsafeCell::new(value),
-            s: Semaphore::new(max_reads as usize),
-        };
-
-        rwlock
+            s,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
+        }
     }
 
     /// Creates a new instance of an `RwLock<T>` which is unlocked.
@@ -345,20 +342,13 @@ impl<T: ?Sized> RwLock<T> {
     where
         T: Sized,
     {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return RwLock {
+        RwLock {
             mr: MAX_READS,
             c: UnsafeCell::new(value),
             s: Semaphore::const_new(MAX_READS as usize),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: tracing::Span::none(),
-        };
-
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        return RwLock {
-            mr: MAX_READS,
-            c: UnsafeCell::new(value),
-            s: Semaphore::const_new(MAX_READS as usize),
-        };
+        }
     }
 
     /// Creates a new instance of an `RwLock<T>` which is unlocked
@@ -378,19 +368,12 @@ impl<T: ?Sized> RwLock<T> {
         T: Sized,
     {
         max_reads &= MAX_READS;
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
         return RwLock {
             mr: max_reads,
             c: UnsafeCell::new(value),
             s: Semaphore::const_new(max_reads as usize),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: tracing::Span::none(),
-        };
-
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        return RwLock {
-            mr: max_reads,
-            c: UnsafeCell::new(value),
-            s: Semaphore::const_new(max_reads as usize),
         };
     }
 
@@ -467,22 +450,13 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let guard = RwLockReadGuard {
+        RwLockReadGuard {
             s: &self.s,
             data: self.c.get(),
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: self.resource_span.clone(),
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let guard = RwLockReadGuard {
-            s: &self.s,
-            data: self.c.get(),
-            marker: marker::PhantomData,
-        };
-
-        guard
+        }
     }
 
     /// Locks this `RwLock` with shared read access, causing the current task
@@ -567,22 +541,13 @@ impl<T: ?Sized> RwLock<T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let resource_span = self.resource_span.clone();
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let guard = OwnedRwLockReadGuard {
+        OwnedRwLockReadGuard {
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let guard = OwnedRwLockReadGuard {
-            data: self.c.get(),
-            lock: ManuallyDrop::new(self),
-            _p: PhantomData,
-        };
-
-        guard
+        }
     }
 
     /// Attempts to acquire this `RwLock` with shared read access.
@@ -633,19 +598,12 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Ok(RwLockReadGuard {
-            s: &self.s,
-            data: self.c.get(),
-            marker: marker::PhantomData,
-            resource_span: self.resource_span.clone(),
-        });
-
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         Ok(RwLockReadGuard {
             s: &self.s,
             data: self.c.get(),
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: self.resource_span.clone(),
         })
     }
 
@@ -706,20 +664,13 @@ impl<T: ?Sized> RwLock<T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let resource_span = self.resource_span.clone();
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Ok(OwnedRwLockReadGuard {
+        Ok(OwnedRwLockReadGuard {
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        });
-
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        return Ok(OwnedRwLockReadGuard {
-            data: self.c.get(),
-            lock: ManuallyDrop::new(self),
-            _p: PhantomData,
-        });
+        })
     }
 
     /// Locks this `RwLock` with exclusive write access, causing the current
@@ -778,22 +729,14 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return RwLockWriteGuard {
+        RwLockWriteGuard {
             permits_acquired: self.mr,
             s: &self.s,
             data: self.c.get(),
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: self.resource_span.clone(),
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return RwLockWriteGuard {
-            permits_acquired: self.mr,
-            s: &self.s,
-            data: self.c.get(),
-            marker: marker::PhantomData,
-        };
+        }
     }
 
     /// Locks this `RwLock` with exclusive write access, causing the current
@@ -862,22 +805,14 @@ impl<T: ?Sized> RwLock<T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let resource_span = self.resource_span.clone();
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return OwnedRwLockWriteGuard {
+        OwnedRwLockWriteGuard {
             permits_acquired: self.mr,
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return OwnedRwLockWriteGuard {
-            permits_acquired: self.mr,
-            data: self.c.get(),
-            lock: ManuallyDrop::new(self),
-            _p: PhantomData,
-        };
+        }
     }
 
     /// Attempts to acquire this `RwLock` with exclusive write access.
@@ -919,22 +854,14 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Ok(RwLockWriteGuard {
+        Ok(RwLockWriteGuard {
             permits_acquired: self.mr,
             s: &self.s,
             data: self.c.get(),
             marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: self.resource_span.clone(),
-        });
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return Ok(RwLockWriteGuard {
-            permits_acquired: self.mr,
-            s: &self.s,
-            data: self.c.get(),
-            marker: marker::PhantomData,
-        });
+        })
     }
 
     /// Attempts to acquire this `RwLock` with exclusive write access.
@@ -986,22 +913,14 @@ impl<T: ?Sized> RwLock<T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let resource_span = self.resource_span.clone();
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Ok(OwnedRwLockWriteGuard {
+        Ok(OwnedRwLockWriteGuard {
             permits_acquired: self.mr,
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
-        });
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return Ok(OwnedRwLockWriteGuard {
-            permits_acquired: self.mr,
-            data: self.c.get(),
-            lock: ManuallyDrop::new(self),
-            _p: PhantomData,
-        });
+        })
     }
 
     /// Returns a mutable reference to the underlying data.

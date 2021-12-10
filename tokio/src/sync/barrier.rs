@@ -71,7 +71,7 @@ impl Barrier {
         }
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let barrier = {
+        let resource_span = {
             let location = std::panic::Location::caller();
             let resource_span = tracing::trace_span!(
                 "runtime.resource",
@@ -93,21 +93,10 @@ impl Barrier {
                     arrived = 0,
                 )
             });
-
-            Barrier {
-                state: Mutex::new(BarrierState {
-                    waker,
-                    arrived: 0,
-                    generation: 1,
-                }),
-                n,
-                wait,
-                resource_span: resource_span,
-            }
+            resource_span
         };
 
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let barrier = Barrier {
+        Barrier {
             state: Mutex::new(BarrierState {
                 waker,
                 arrived: 0,
@@ -115,9 +104,9 @@ impl Barrier {
             }),
             n,
             wait,
-        };
-
-        barrier
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: resource_span,
+        }
     }
 
     /// Does not resolve until all tasks have rendezvoused here.

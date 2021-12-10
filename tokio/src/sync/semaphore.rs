@@ -127,10 +127,10 @@ impl Semaphore {
     #[track_caller]
     pub fn new(permits: usize) -> Self {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let sem = {
+        let resource_span = {
             let location = std::panic::Location::caller();
 
-            let resource_span = tracing::trace_span!(
+            tracing::trace_span!(
                 "runtime.resource",
                 concrete_type = "Semaphore",
                 kind = "Sync",
@@ -138,21 +138,20 @@ impl Semaphore {
                 loc.line = location.line(),
                 loc.col = location.column(),
                 inherits_child_attrs = true,
-            );
-
-            let ll_sem = resource_span.in_scope(|| ll::Semaphore::new(permits));
-            Self {
-                ll_sem,
-                resource_span,
-            }
+            )
         };
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let ll_sem = resource_span.in_scope(|| ll::Semaphore::new(permits));
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let sem = Self {
-            ll_sem: ll::Semaphore::new(permits),
-        };
+        let ll_sem = ll::Semaphore::new(permits);
 
-        sem
+        Self {
+            ll_sem,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
+        }
     }
 
     /// Creates a new semaphore with the initial number of permits.
@@ -275,17 +274,18 @@ impl Semaphore {
     /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
     pub async fn acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, AcquireError> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let inner = trace::async_op(
+        trace::async_op(
             || self.ll_sem.acquire(n),
             self.resource_span.clone(),
             "Semaphore::acquire_many",
             "poll",
             true,
-        );
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = self.ll_sem.acquire(n);
+        )
+        .await?;
 
-        inner.await?;
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        self.ll_sem.acquire(n).await?;
+
         Ok(SemaphorePermit {
             sem: self,
             permits: n,
