@@ -468,6 +468,8 @@ impl<T> Sender<T> {
             }));
             // If the func panicked return the panic to the caller.
             if let Err(error) = result {
+                // Drop the lock to avoid poisoning it.
+                drop(lock);
                 panic::resume_unwind(error);
             }
 
