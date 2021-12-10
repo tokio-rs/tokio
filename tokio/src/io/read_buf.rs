@@ -64,7 +64,6 @@ impl<'a> ReadBuf<'a> {
         let slice = &self.buf[..self.filled];
         // safety: filled describes how far into the buffer that the
         // user has filled with bytes, so it's been initialized.
-        // TODO: This could use `MaybeUninit::slice_get_ref` when it is stable.
         unsafe { slice_assume_init(slice) }
     }
 
@@ -74,7 +73,6 @@ impl<'a> ReadBuf<'a> {
         let slice = &mut self.buf[..self.filled];
         // safety: filled describes how far into the buffer that the
         // user has filled with bytes, so it's been initialized.
-        // TODO: This could use `MaybeUninit::slice_get_mut` when it is stable.
         unsafe { slice_assume_init_mut(slice) }
     }
 
@@ -94,7 +92,6 @@ impl<'a> ReadBuf<'a> {
         let slice = &self.buf[..self.initialized];
         // safety: initialized describes how far into the buffer that the
         // user has at some point initialized with bytes.
-        // TODO: This could use `MaybeUninit::slice_get_ref` when it is stable.
         unsafe { slice_assume_init(slice) }
     }
 
@@ -106,7 +103,6 @@ impl<'a> ReadBuf<'a> {
         let slice = &mut self.buf[..self.initialized];
         // safety: initialized describes how far into the buffer that the
         // user has at some point initialized with bytes.
-        // TODO: This could use `MaybeUninit::slice_get_mut` when it is stable.
         unsafe { slice_assume_init_mut(slice) }
     }
 
@@ -285,10 +281,12 @@ fn slice_to_uninit_mut(slice: &mut [u8]) -> &mut [MaybeUninit<u8>] {
     unsafe {slice::from_raw_parts_mut::<MaybeUninit<u8>>(slice.as_mut_ptr().cast(), slice.len())}
 }
 
+// TODO: This could use `MaybeUninit::slice_assume_init` when it is stable.
 unsafe fn slice_assume_init(slice: &[MaybeUninit<u8>]) -> &[u8] {
     slice::from_raw_parts(slice.as_ptr().cast(), slice.len())
 }
 
+// TODO: This could use `MaybeUninit::slice_assume_init_mut` when it is stable.
 unsafe fn slice_assume_init_mut(slice: &mut [MaybeUninit<u8>]) -> &mut [u8] {
     slice::from_raw_parts_mut(slice.as_mut_ptr().cast(), slice.len())
 }
