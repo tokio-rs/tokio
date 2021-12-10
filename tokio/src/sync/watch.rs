@@ -459,9 +459,19 @@ impl<T> Sender<T> {
         F: FnOnce(&mut T),
     {
         {
+            // Acquire the write lock and update the value.
             let mut lock = self.shared.value.write().unwrap();
+            // Update the value.
             func(&mut lock);
+
             self.shared.state.increment_version();
+
+            // Release the write lock.
+            //
+            // Incrementing the version counter while holding the lock ensures
+            // that receivers are able to figure out the version number of the
+            // value they are currently looking at.
+            drop(lock);
         }
 
         self.shared.notify_rx.notify_waiters();
