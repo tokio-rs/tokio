@@ -8,7 +8,7 @@ edition = "2018"
 # [dependencies] instead.
 [dev-dependencies]
 tokio = { version = "1.0.0", path = "../tokio",features = ["full", "tracing"] }
-tokio-util = { version = "0.6.3", path = "../tokio-util",features = ["full"] }
+tokio-util = { version = "0.7.0", path = "../tokio-util",features = ["full"] }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
 tracing = "0.1"
