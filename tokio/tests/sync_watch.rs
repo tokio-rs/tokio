@@ -223,6 +223,7 @@ fn send_modify_panic() {
     assert!(result.is_err());
 
     assert_pending!(task.poll());
+    assert_eq!(*rx.borrow(), "panicked");
 
     tx.send_modify(|old| *old = "three");
     assert_ready_ok!(task.poll());

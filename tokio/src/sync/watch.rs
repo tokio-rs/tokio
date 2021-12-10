@@ -447,9 +447,8 @@ impl<T> Sender<T> {
     /// # Panics
     ///
     /// This function panics if calling `func` results in a panic.
-    /// No receivers are notified if panic occurred.
-    /// If the panic is caught, this might leave the watched value
-    /// in an inconsistent state.
+    /// No receivers are notified if panic occurred, but if the closure has modified
+    /// the value, that change is still visible to future calls to `borrow`.
     ///
     /// # Examples
     ///
