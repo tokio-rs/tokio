@@ -5,9 +5,9 @@
 //! [`Timeout`]: struct@Timeout
 
 use crate::{
+    coop,
     time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
     util::trace,
-    coop
 };
 
 use pin_project_lite::pin_project;

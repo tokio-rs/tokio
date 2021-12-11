@@ -60,7 +60,6 @@ impl Budget {
         Budget(None)
     }
 
-
     fn has_remaining(self) -> bool {
         self.0.map(|budget| budget > 0).unwrap_or(true)
     }
