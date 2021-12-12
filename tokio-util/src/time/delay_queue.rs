@@ -189,8 +189,9 @@ impl<T> SlabStorage<T> {
     // Inserts data into the inner slab and re-maps keys if necessary
     pub(crate) fn insert(&mut self, val: Data<T>) -> Key {
         let mut key = KeyInternal::new(self.inner.insert(val));
+        let key_contained = self.key_map.contains_key(&key.into());
 
-        if self.key_map.contains_key(&key.into()) {
+        if key_contained {
             // It's possible that a `compact` call creates capacitiy in `self.inner` in
             // such a way that a `self.inner.insert` call creates a `key` which was
             // previously given out during an `insert` call prior to the `compact` call.
@@ -267,22 +268,26 @@ impl<T> SlabStorage<T> {
         self.compact_called = true;
     }
 
-    // Re-maps a `Key` that was given out to the user to its corresponding internal key
-    fn remap_key(&self, key: &Key) -> KeyInternal {
+    // Tries to re-map a `Key` that was given out to the user to its
+    // corresponding internal key. Returns None if there was no compact
+    // call.
+    fn remap_key(&self, key: &Key) -> Option<KeyInternal> {
         let key_map = &self.key_map;
-        let remapped_key = match key_map.get(&*key) {
-            Some(k) => *k,
-            None => (*key).into(),
-        };
-        remapped_key
+        if self.compact_called {
+            key_map.get(&*key).copied()
+        } else {
+            Some((*key).into())
+        }
     }
 
-    fn create_new_key(&mut self) -> KeyInternal {
-        while self.key_map.contains_key(&Key::new(self.next_key_index)) {
-            self.next_key_index = self.next_key_index.wrapping_add(1);
+    fn create_new_key(&self) -> KeyInternal {
+        let mut next_key_index = self.next_key_index;
+
+        while self.key_map.contains_key(&Key::new(next_key_index)) {
+            next_key_index = next_key_index.wrapping_add(1);
         }
 
-        KeyInternal::new(self.next_key_index)
+        KeyInternal::new(next_key_index)
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -294,11 +299,17 @@ impl<T> SlabStorage<T> {
     }
 
     pub(crate) fn clear(&mut self) {
-        self.inner.clear()
+        self.inner.clear();
+        self.key_map.clear();
+        self.compact_called = false;
     }
 
     pub(crate) fn reserve(&mut self, additional: usize) {
         self.inner.reserve(additional);
+
+        if self.compact_called {
+            self.key_map.reserve(additional);
+        }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -306,8 +317,12 @@ impl<T> SlabStorage<T> {
     }
 
     pub(crate) fn contains(&self, key: &Key) -> bool {
-        let remapped_key = self.remap_key(&key);
-        self.inner.contains(remapped_key.index)
+        let remapped_key = self.remap_key(key);
+
+        match remapped_key {
+            Some(internal_key) => self.inner.contains(internal_key.index),
+            None => false,
+        }
     }
 }
 
@@ -332,14 +347,22 @@ impl<T> Index<Key> for SlabStorage<T> {
 
     fn index(&self, key: Key) -> &Self::Output {
         let remapped_key = self.remap_key(&key);
-        &self.inner[remapped_key.index]
+
+        match remapped_key {
+            Some(internal_key) => &self.inner[internal_key.index],
+            None => panic!("Invalid index {}", key.index),
+        }
     }
 }
 
 impl<T> IndexMut<Key> for SlabStorage<T> {
     fn index_mut(&mut self, key: Key) -> &mut Data<T> {
         let remapped_key = self.remap_key(&key);
-        &mut self.inner[remapped_key.index]
+
+        match remapped_key {
+            Some(internal_key) => &mut self.inner[internal_key.index],
+            None => panic!("Invalid index {}", key.index),
+        }
     }
 }
 
@@ -773,8 +796,9 @@ impl<T> DelayQueue<T> {
 
     /// Shrink the capacity of the slab, which `DelayQueue` uses internally for storage allocation.
     /// This function is not guaranteed to, and in most cases, won't decrease the capacity of the slab
-    /// to the number of elements still contained in it. To decrease the capacity to the size of
-    /// the slab use [`compact`]
+    /// to the number of elements still contained in it, because elements cannot be moved to a different
+    /// index. To decrease the capacity to the size of the slab use [`compact`].
+    ///
     /// This function can take O(n) time even when the capacity cannot be reduced or the allocation is
     /// shrunk in place. Repeated calls run in O(1) though.
     ///
@@ -804,7 +828,7 @@ impl<T> DelayQueue<T> {
     /// let key2 = delay_queue.insert(10, Duration::from_secs(10));
     /// let key3 = delay_queue.insert(15, Duration::from_secs(15));
     ///
-    /// delay_queue.remove(&key3);
+    /// delay_queue.remove(&key2);
     ///
     /// delay_queue.compact();
     /// assert_eq!(delay_queue.capacity(), 2);
