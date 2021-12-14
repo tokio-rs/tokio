@@ -1,3 +1,9 @@
+# 1.7.0 (December 15th, 2021)
+
+- macros: address remainging clippy::semicolon_if_nothing_returned warning ([#4252])
+
+[#4252]: https://github.com/tokio-rs/tokio/pull/4252
+
 # 1.6.0 (November 16th, 2021)
 
 - macros: fix mut patterns in `select!` macro ([#4211])
