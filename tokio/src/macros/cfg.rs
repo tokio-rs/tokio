@@ -368,7 +368,7 @@ macro_rules! cfg_trace {
             #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
             $item
         )*
-    }
+    };
 }
 
 macro_rules! cfg_not_trace {
