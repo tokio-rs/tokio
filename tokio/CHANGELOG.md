@@ -1,3 +1,31 @@
+# 1.15.0 (December 15, 2021)
+
+### Fixed
+
+- io: add cooperative yielding support to `io::empty()` ([#4300])
+- time: make timeout robust against budget-depleting tasks ([#4314])
+
+### Changed
+
+- update minimum supported Rust version to 1.46.
+
+### Added
+
+- time: add `Interval::reset()` ([#4248])
+- io: add explicit lifetimes to `AsyncFdReadyGuard` ([#4267])
+- process: add `Command::as_std()` ([#4295])
+
+### Added (unstable)
+
+- tracing: instrument `tokio::sync` types ([#4302])
+
+[#4302]: https://github.com/tokio-rs/tokio/pull/4302
+[#4300]: https://github.com/tokio-rs/tokio/pull/4300
+[#4295]: https://github.com/tokio-rs/tokio/pull/4295
+[#4267]: https://github.com/tokio-rs/tokio/pull/4267
+[#4248]: https://github.com/tokio-rs/tokio/pull/4248
+[#4314]: https://github.com/tokio-rs/tokio/pull/4314
+
 # 1.14.0 (November 15, 2021)
 
 ### Fixed
