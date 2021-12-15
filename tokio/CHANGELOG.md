@@ -3,6 +3,7 @@
 ### Fixed
 
 - io: add cooperative yielding support to `io::empty()` ([#4300])
+- time: make timeout robust against budget-depleting tasks ([#4314])
 
 ### Changed
 
@@ -23,6 +24,7 @@
 [#4295]: https://github.com/tokio-rs/tokio/pull/4295
 [#4267]: https://github.com/tokio-rs/tokio/pull/4267
 [#4248]: https://github.com/tokio-rs/tokio/pull/4248
+[#4314]: https://github.com/tokio-rs/tokio/pull/4314
 
 # 1.14.0 (November 15, 2021)
 
