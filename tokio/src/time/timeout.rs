@@ -5,6 +5,7 @@
 //! [`Timeout`]: struct@Timeout
 
 use crate::{
+    coop,
     time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
     util::trace,
 };
@@ -169,15 +170,33 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         let me = self.project();
 
+        let had_budget_before = coop::has_budget_remaining();
+
         // First, try polling the future
         if let Poll::Ready(v) = me.value.poll(cx) {
             return Poll::Ready(Ok(v));
         }
 
-        // Now check the timer
-        match me.delay.poll(cx) {
-            Poll::Ready(()) => Poll::Ready(Err(Elapsed::new())),
-            Poll::Pending => Poll::Pending,
+        let has_budget_now = coop::has_budget_remaining();
+
+        let delay = me.delay;
+
+        let poll_delay = || -> Poll<Self::Output> {
+            match delay.poll(cx) {
+                Poll::Ready(()) => Poll::Ready(Err(Elapsed::new())),
+                Poll::Pending => Poll::Pending,
+            }
+        };
+
+        if let (true, false) = (had_budget_before, has_budget_now) {
+            // if it is the underlying future that exhausted the budget, we poll
+            // the `delay` with an unconstrained one. This prevents pathological
+            // cases where the underlying future always exhausts the budget and
+            // we never get a chance to evaluate whether the timeout was hit or
+            // not.
+            coop::with_unconstrained(poll_delay)
+        } else {
+            poll_delay()
         }
     }
 }

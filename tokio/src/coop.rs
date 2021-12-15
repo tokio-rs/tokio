@@ -59,13 +59,9 @@ impl Budget {
     const fn unconstrained() -> Budget {
         Budget(None)
     }
-}
 
-cfg_rt_multi_thread! {
-    impl Budget {
-        fn has_remaining(self) -> bool {
-            self.0.map(|budget| budget > 0).unwrap_or(true)
-        }
+    fn has_remaining(self) -> bool {
+        self.0.map(|budget| budget > 0).unwrap_or(true)
     }
 }
 
@@ -107,15 +103,15 @@ fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
     })
 }
 
+#[inline(always)]
+pub(crate) fn has_budget_remaining() -> bool {
+    CURRENT.with(|cell| cell.get().has_remaining())
+}
+
 cfg_rt_multi_thread! {
     /// Sets the current task's budget.
     pub(crate) fn set(budget: Budget) {
         CURRENT.with(|cell| cell.set(budget))
-    }
-
-    #[inline(always)]
-    pub(crate) fn has_budget_remaining() -> bool {
-        CURRENT.with(|cell| cell.get().has_remaining())
     }
 }
 
