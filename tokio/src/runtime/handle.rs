@@ -190,14 +190,34 @@ impl Handle {
         R: Send + 'static,
     {
         if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
-            self.spawn_blocking_inner(Box::new(func), None)
+            self.spawn_blocking_inner(Box::new(func), false, None)
         } else {
-            self.spawn_blocking_inner(func, None)
+            self.spawn_blocking_inner(func, false, None)
         }
     }
 
+
     #[track_caller]
-    pub(crate) fn spawn_blocking_inner<F, R>(&self, func: F, name: Option<&str>) -> JoinHandle<R>
+    pub(crate) fn spawn_mandatory_blocking<F, R>(&self, func: F) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+            self.spawn_blocking_inner(Box::new(func), true, None)
+        } else {
+            self.spawn_blocking_inner(func, true, None)
+        }
+    }
+
+
+    #[track_caller]
+    pub(crate) fn spawn_blocking_inner<F, R>(
+        &self,
+        func: F,
+        is_mandatory: bool,
+        name: Option<&str>
+    ) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -222,7 +242,7 @@ impl Handle {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
 
-        let (task, handle) = task::unowned(fut, NoopSchedule);
+        let (task, handle) = task::unowned(fut, NoopSchedule, is_mandatory);
         let _ = self.blocking_spawner.spawn(task, self);
         handle
     }

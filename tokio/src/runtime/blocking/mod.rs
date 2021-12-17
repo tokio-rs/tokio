@@ -4,7 +4,10 @@
 //! compilation.
 
 mod pool;
-pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
+pub(crate) use pool::{
+    spawn_blocking,
+    spawn_mandatory_blocking,
+    BlockingPool, Spawner};
 
 mod schedule;
 mod shutdown;

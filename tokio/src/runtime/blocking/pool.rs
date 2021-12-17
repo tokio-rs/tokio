@@ -84,6 +84,17 @@ where
     rt.spawn_blocking(func)
 }
 
+/// Runs the provided function on an executor dedicated to blocking operations.
+pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let rt = context::current();
+    rt.spawn_mandatory_blocking(func)
+}
+
+
 // ===== impl BlockingPool =====
 
 impl BlockingPool {
@@ -302,7 +313,12 @@ impl Inner {
                 // Drain the queue
                 while let Some(task) = shared.queue.pop_front() {
                     drop(shared);
-                    task.shutdown();
+
+                    if task.is_mandatory() {
+                        task.run();
+                    } else {
+                        task.shutdown();
+                    }
 
                     shared = self.shared.lock();
                 }

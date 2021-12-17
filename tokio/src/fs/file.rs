@@ -20,13 +20,13 @@ use std::task::Poll;
 use std::task::Poll::*;
 
 #[cfg(test)]
-use super::mocks::spawn_blocking;
+use super::mocks::{spawn_blocking, spawn_mandatory_blocking};
 #[cfg(test)]
 use super::mocks::JoinHandle;
 #[cfg(test)]
 use super::mocks::MockFile as StdFile;
 #[cfg(not(test))]
-use crate::blocking::spawn_blocking;
+use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
 #[cfg(not(test))]
 use crate::blocking::JoinHandle;
 #[cfg(not(test))]
@@ -649,7 +649,7 @@ impl AsyncWrite for File {
                     let n = buf.copy_from(src);
                     let std = me.std.clone();
 
-                    inner.state = Busy(spawn_blocking(move || {
+                    inner.state = Busy(spawn_mandatory_blocking(move || {
                         let res = if let Some(seek) = seek {
                             (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
                         } else {
