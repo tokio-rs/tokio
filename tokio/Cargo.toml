@@ -37,6 +37,7 @@ full = [
   "rt",
   "rt-multi-thread",
   "signal",
+  "stats",
   "sync",
   "time",
 ]
