@@ -45,6 +45,11 @@ use std::future::Future;
 ///     }
 /// }
 /// ```
+///
+/// [`name`]: Builder::name
+/// [`spawn_local`]: Builder::spawn_local
+/// [`spawn`]: Builder::spawn
+/// [`spawn_blocking`]: Builder::spawn_blocking
 #[derive(Default, Debug)]
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 pub struct Builder<'a> {
