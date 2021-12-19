@@ -180,7 +180,7 @@ impl Builder {
     ///
     /// # Default
     ///
-    /// The default value is the number of virtual cores available to the system.
+    /// The default value is the number of virtual CPU cores available to the system.
     /// Caution: This setup may result in degraded performance under certain setups.
     /// The best way to decide on this configuration is through benchmarks.
     /// See the examples below for alternate setups.
@@ -193,7 +193,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ## Multi threaded runtime with 4 threads
+    /// ## Multi threaded runtime with a hardcoded value of (4) threads
     ///
     /// ```
     /// use tokio::runtime;
@@ -201,6 +201,20 @@ impl Builder {
     /// // This will spawn a work-stealing runtime with 4 worker threads.
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .worker_threads(4)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// rt.spawn(async move {});
+    /// ```
+    /// ## Multi threaded runtime with a fixed amount of threads, equal to the physical CPU cores
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// // This will spawn a work-stealing runtime with as many threads
+    /// // as the number of the physical CPU cores on the system.
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .worker_threads(num_cpus::get_physical())
     ///     .build()
     ///     .unwrap();
     ///
