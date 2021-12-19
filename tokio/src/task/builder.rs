@@ -46,6 +46,7 @@ use std::future::Future;
 /// }
 /// ```
 #[derive(Default, Debug)]
+#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 pub struct Builder<'a> {
     name: Option<&'a str>,
 }
