@@ -4,6 +4,10 @@ use std::future::Future;
 
 /// Factory which is used to configure the properties of a new task.
 ///
+/// **Note**: This is an [unstable API][unstable]. The public API of this type
+/// may break in 1.x releases. See [the documentation on unstable
+/// features][unstable] for details.
+///
 /// Methods can be chained in order to configure it.
 ///
 /// Currently, there is only one configuration option:
@@ -45,7 +49,7 @@ use std::future::Future;
 ///     }
 /// }
 /// ```
-///
+/// [unstable API]: crate#unstable-features
 /// [`name`]: Builder::name
 /// [`spawn_local`]: Builder::spawn_local
 /// [`spawn`]: Builder::spawn
