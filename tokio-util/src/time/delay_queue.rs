@@ -265,12 +265,15 @@ impl<T> SlabStorage<T> {
             }
         }
 
+        if self.key_map.capacity() > 2 * self.key_map.len() {
+            self.key_map.shrink_to_fit();
+        }
+
         self.compact_called = true;
     }
 
     // Tries to re-map a `Key` that was given out to the user to its
-    // corresponding internal key. Returns None if there was no compact
-    // call.
+    // corresponding internal key.
     fn remap_key(&self, key: &Key) -> Option<KeyInternal> {
         let key_map = &self.key_map;
         if self.compact_called {
@@ -280,14 +283,12 @@ impl<T> SlabStorage<T> {
         }
     }
 
-    fn create_new_key(&self) -> KeyInternal {
-        let mut next_key_index = self.next_key_index;
-
-        while self.key_map.contains_key(&Key::new(next_key_index)) {
-            next_key_index = next_key_index.wrapping_add(1);
+    fn create_new_key(&mut self) -> KeyInternal {
+        while self.key_map.contains_key(&Key::new(self.next_key_index)) {
+            self.next_key_index = self.next_key_index.wrapping_add(1);
         }
 
-        KeyInternal::new(next_key_index)
+        KeyInternal::new(self.next_key_index)
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -423,10 +424,10 @@ struct Data<T> {
     expired: bool,
 
     /// Next entry in the stack
-    next: Option<usize>,
+    next: Option<Key>,
 
     /// Previous entry in the stack
-    prev: Option<usize>,
+    prev: Option<Key>,
 }
 
 /// Maximum number of entries the queue can handle
@@ -1102,17 +1103,17 @@ impl<T> wheel::Stack for Stack<T> {
         let old = self.head.take();
 
         if let Some(idx) = old {
-            store[Key::new(idx)].prev = Some(item);
+            store[Key::new(idx)].prev = Some(key);
         }
 
-        store[key].next = old;
+        store[key].next = old.map(Key::new);
         self.head = Some(item);
     }
 
     fn pop(&mut self, store: &mut Self::Store) -> Option<Self::Owned> {
         if let Some(idx) = self.head {
             let key = Key::new(idx);
-            self.head = store[key].next;
+            self.head = store[key].next.map(|k| k.index);
 
             if let Some(idx) = self.head {
                 store[Key::new(idx)].prev = None;
@@ -1145,20 +1146,20 @@ impl<T> wheel::Stack for Stack<T> {
                     contains = true;
                 }
 
-                next = data.next;
+                next = data.next.map(|k| k.index);
             }
 
             contains
         });
 
         if let Some(next) = store[key].next {
-            store[Key::new(next)].prev = store[key].prev;
+            store[next].prev = store[key].prev;
         }
 
         if let Some(prev) = store[key].prev {
-            store[Key::new(prev)].next = store[key].next;
+            store[prev].next = store[key].next;
         } else {
-            self.head = store[key].next;
+            self.head = store[key].next.map(|k| k.index);
         }
 
         store[key].next = None;
