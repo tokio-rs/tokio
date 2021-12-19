@@ -181,8 +181,11 @@ impl Builder {
     /// # Default
     ///
     /// The default value is the number of virtual CPU cores available to the system.
-    /// Caution: This setup may result in degraded performance under certain setups.
+    ///
+    /// Caution!: This setup may result in degraded performance under certain setups.
+    ///
     /// The best way to decide on this configuration is through benchmarks.
+    ///
     /// See the examples below for alternate setups.
     ///
     /// # Panic
