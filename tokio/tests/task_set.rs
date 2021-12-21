@@ -78,15 +78,15 @@ async fn alternating() {
     let mut set = TaskSet::new();
 
     assert_eq!(set.len(), 0);
-    set.spawn(async { () });
+    set.spawn(async {});
     assert_eq!(set.len(), 1);
-    set.spawn(async { () });
+    set.spawn(async {});
     assert_eq!(set.len(), 2);
 
     for _ in 0..16 {
         let () = set.join_one().await.unwrap().unwrap();
         assert_eq!(set.len(), 1);
-        set.spawn(async { () });
+        set.spawn(async {});
         assert_eq!(set.len(), 2);
     }
 }
