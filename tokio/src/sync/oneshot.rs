@@ -1040,6 +1040,7 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap();
     /// }
     /// ```
+    #[cfg(feature = "sync")]
     pub fn blocking_recv(self) -> Option<T> {
         crate::future::block_on(self).ok()
     }
