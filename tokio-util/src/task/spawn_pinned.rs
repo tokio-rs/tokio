@@ -103,7 +103,7 @@ impl LocalPool {
         // a join handle.
         worker.runtime_handle.spawn(async move {
             // Move the job guard into the task
-            let _ = job_guard;
+            let _job_guard = job_guard;
 
             // Inside the future we can't run spawn_local yet because we're not
             // in the context of a LocalSet. We need to send create_task to the
