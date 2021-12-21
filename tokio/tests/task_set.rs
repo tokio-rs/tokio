@@ -24,8 +24,8 @@ async fn test_with_sleep() {
         seen[res] = true;
     }
 
-    for i in 0..10 {
-        assert!(seen[i]);
+    for was_seen in &seen {
+        assert!(was_seen);
     }
     assert!(matches!(set.join_one().await, Ok(None)));
 
@@ -42,8 +42,8 @@ async fn test_with_sleep() {
         seen[res] = true;
     }
 
-    for i in 0..10 {
-        assert!(seen[i]);
+    for was_seen in &seen {
+        assert!(was_seen);
     }
     assert!(matches!(set.join_one().await, Ok(None)));
 }
