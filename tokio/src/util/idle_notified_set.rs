@@ -294,7 +294,7 @@ impl<T> Drop for IdleNotifiedSet<T> {
 /// that setting `my_list` to `Neither` is ok.
 unsafe fn move_to_new_list<T>(from: &mut LinkedList<T>, to: &mut LinkedList<T>) {
     while let Some(entry) = from.pop_back() {
-        entry.entry.my_list.with_mut(|ptr| unsafe {
+        entry.entry.my_list.with_mut(|ptr| {
             *ptr = List::Neither;
         });
         to.push_front(entry);
@@ -304,7 +304,7 @@ unsafe fn move_to_new_list<T>(from: &mut LinkedList<T>, to: &mut LinkedList<T>) 
 /// The mutex for the entries must be held.
 unsafe fn clear_list<T>(list: &mut LinkedList<T>) {
     while let Some(entry) = list.pop_back() {
-        entry.entry.my_list.with_mut(|ptr| unsafe {
+        entry.entry.my_list.with_mut(|ptr| {
             *ptr = List::Neither;
         });
     }
