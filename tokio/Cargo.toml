@@ -134,7 +134,7 @@ socket2 = "0.4"
 mio-aio = { version = "0.6.0", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.5", features = ["futures", "checkpoint"] }
+loom = { version = "0.5.2", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true

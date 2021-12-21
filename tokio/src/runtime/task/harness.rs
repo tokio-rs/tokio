@@ -164,6 +164,11 @@ where
         }
     }
 
+    /// Try to set the waker notified when the task is complete.
+    pub(super) fn try_set_join_waker(self, waker: &Waker) -> bool {
+        can_read_output(self.header(), self.trailer(), waker)
+    }
+
     pub(super) fn drop_join_handle_slow(self) {
         let mut maybe_panic = None;
 

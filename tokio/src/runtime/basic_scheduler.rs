@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
-use crate::loom::sync::Mutex;
+use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::stats::{RuntimeStats, WorkerStatsBatcher};
@@ -14,7 +14,6 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::sync::atomic::Ordering::{AcqRel, Release};
-use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
 
@@ -473,8 +472,8 @@ impl Schedule for Arc<Shared> {
 }
 
 impl Wake for Shared {
-    fn wake(self: Arc<Self>) {
-        Wake::wake_by_ref(&self)
+    fn wake(arc_self: Arc<Self>) {
+        Wake::wake_by_ref(&arc_self)
     }
 
     /// Wake by reference
