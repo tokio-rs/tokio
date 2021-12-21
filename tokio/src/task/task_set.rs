@@ -18,6 +18,8 @@ use crate::util::IdleNotifiedSet;
 /// Spawn multiple tasks and wait for them.
 ///
 /// ```
+/// use tokio::task::TaskSet;
+///
 /// #[tokio::main]
 /// async fn main() {
 ///     let mut set = TaskSet::new();

@@ -17,6 +17,7 @@ type LinkedList<T> =
 /// This is the main handle to the collection.
 pub(crate) struct IdleNotifiedSet<T> {
     lists: Arc<Lists<T>>,
+    length: usize,
 }
 
 /// This is a handle to an element in the list. It can be converted into a
@@ -28,8 +29,6 @@ pub(crate) struct IdleNotifiedEntry<T> {
 
 struct Lists<T> {
     inner: Mutex<ListsInner<T>>,
-    /// Only accessed by `IdleNotifiedSet`.
-    length: UnsafeCell<usize>,
 }
 
 /// The linked lists hold strong references to the ListEntry items, and the
@@ -108,25 +107,21 @@ impl<T> IdleNotifiedSet<T> {
                 idle: LinkedList::new(),
                 waker: None,
             }),
-            length: UnsafeCell::new(0),
         };
 
         IdleNotifiedSet {
             lists: Arc::new(lists),
+            length: 0,
         }
     }
 
     pub(crate) fn len(&self) -> usize {
-        // Safety: We are the IdleNotifiedSet, so we may access the length.
-        self.lists.length.with(|ptr| unsafe { *ptr })
+        self.length
     }
 
     /// Insert the given value into the `idle` list.
     pub(crate) fn insert_idle(&mut self, value: T) -> IdleNotifiedEntry<T> {
-        // Safety: We are the IdleNotifiedSet, so we may access the length.
-        self.lists.length.with_mut(|ptr| unsafe {
-            *ptr += 1;
-        });
+        self.length += 1;
 
         let entry = Arc::new(ListEntry {
             parent: self.lists.clone(),
@@ -146,12 +141,9 @@ impl<T> IdleNotifiedSet<T> {
     /// Pop an entry from the notified list to poll it. The entry is moved to
     /// the idle list atomically.
     pub(crate) fn pop_notified(&mut self, waker: &Waker) -> Option<IdleNotifiedEntry<T>> {
-        // Safety: We are the IdleNotifiedSet, so we may access the length.
-        //
         // We don't decrement the length because this call moves the entry to
         // the idle list rather than removing it.
-        let is_empty = self.lists.length.with(|ptr| unsafe { *ptr == 0 });
-        if is_empty {
+        if self.length == 0 {
             // Fast path.
             return None;
         }
@@ -186,7 +178,7 @@ impl<T> IdleNotifiedSet<T> {
     /// which list it is in.
     ///
     /// Returns whether it was actually removed.
-    pub(crate) fn remove(&self, entry: &IdleNotifiedEntry<T>) -> bool {
+    pub(crate) fn remove(&mut self, entry: &IdleNotifiedEntry<T>) -> bool {
         assert!(Arc::ptr_eq(&self.lists, &entry.entry.parent));
 
         let was_removed = {
@@ -224,10 +216,7 @@ impl<T> IdleNotifiedSet<T> {
         };
 
         if was_removed {
-            // We are the IdleNotifiedSet, so we may access the length.
-            self.lists.length.with_mut(|ptr| unsafe {
-                *ptr -= 1;
-            });
+            self.length -= 1;
         }
 
         was_removed
@@ -251,11 +240,7 @@ impl<T> IdleNotifiedSet<T> {
     /// If the closure panics, it is not applied to the remaining elements, but the list is still
     /// cleared.
     pub(crate) fn drain<F: FnMut(&mut T)>(&mut self, mut func: F) {
-        // We are the IdleNotifiedSet, so we may access the length.
-        self.lists.length.with_mut(|ptr| unsafe {
-            *ptr = 0;
-        });
-
+        self.length = 0;
         // The LinkedList is not cleared on panic, so we use a bomb to clear it.
         struct AllEntries<T> {
             all_entries: LinkedList<T>,
