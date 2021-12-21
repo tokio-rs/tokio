@@ -138,7 +138,11 @@ loom = { version = "0.5", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+# enable unstable features in the documentation
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
+# it's necessary to _also_ pass `--cfg tokio_unstable` to rustc, or else
+# dependencies will not be enabled, and the docs build will fail.
+rustc-args = ["--cfg", "tokio_unstable"]
 
 [package.metadata.playground]
 features = ["full", "test-util"]
