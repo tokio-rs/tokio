@@ -74,8 +74,7 @@ struct ListEntry<T> {
     pointers: linked_list::Pointers<ListEntry<T>>,
     /// Pointer to the shared `Lists` struct.
     parent: Arc<Lists<T>>,
-    /// The value stored in this entry. The value is dropped when the item stops
-    /// being a member of one of the two lists.
+    /// The value stored in this entry.
     value: UnsafeCell<T>,
     /// Used to remember which list this entry is in.
     my_list: UnsafeCell<List>,
