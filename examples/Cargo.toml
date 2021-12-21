@@ -5,10 +5,10 @@ publish = false
 edition = "2018"
 
 # If you copy one of the examples into a new project, you should be using
-# [dependencies] instead.
+# [dependencies] instead, and delete the **path**.
 [dev-dependencies]
-tokio = { version = "1.0.0", path = "../tokio",features = ["full", "tracing"] }
-tokio-util = { version = "0.7.0", path = "../tokio-util",features = ["full"] }
+tokio = { version = "1.0.0", path = "../tokio", features = ["full", "tracing"] }
+tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
 tracing = "0.1"
