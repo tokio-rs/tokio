@@ -174,17 +174,24 @@ fn poll_close() {
 fn borrow_and_update() {
     let (tx, mut rx) = watch::channel("one");
 
+    assert!(!rx.has_changed().unwrap());
+
     tx.send("two").unwrap();
+    assert!(rx.has_changed().unwrap());
     assert_ready!(spawn(rx.changed()).poll()).unwrap();
     assert_pending!(spawn(rx.changed()).poll());
+    assert!(!rx.has_changed().unwrap());
 
     tx.send("three").unwrap();
+    assert!(rx.has_changed().unwrap());
     assert_eq!(*rx.borrow_and_update(), "three");
     assert_pending!(spawn(rx.changed()).poll());
+    assert!(!rx.has_changed().unwrap());
 
     drop(tx);
     assert_eq!(*rx.borrow_and_update(), "three");
     assert_ready!(spawn(rx.changed()).poll()).unwrap_err();
+    assert!(rx.has_changed().is_err());
 }
 
 #[test]
