@@ -227,6 +227,61 @@ fn stress2() {
     }
 }
 
+#[test]
+fn mandatory_blocking_tasks_get_executed() {
+    use crate::runtime;
+    use std::sync::{Arc, atomic::AtomicBool};
+
+    // We need to execute the test a few times because the failure is
+    // non-deterministic. I tried to write a loom that would prove the
+    // bug is there (when using spawn_blocking) but failed. The test
+    // I wrote didn't fail, even when running >30 minutes.
+    for i in 1..1000 {
+        let rt = runtime::Builder::new_multi_thread()
+            .max_blocking_threads(1)
+            .worker_threads(1)
+            .build().unwrap();
+
+        let did_blocking_task_execute = Arc::new(
+            AtomicBool::new(false)
+        );
+
+        {
+            let did_blocking_task_execute = did_blocking_task_execute.clone();
+            let _enter = rt.enter();
+
+            rt.block_on(async move {
+                // We need to have spawned a previous blocking task
+                // so that the thread in the blocking pool gets to
+                // the state where it's waiting either for a shutdown
+                // or another task.
+                runtime::spawn_blocking(move || {
+
+                }).await.unwrap();
+
+                // Changing this spawn_mandatory_blocking to
+                // spawn_mandatory makes the test fail in a few
+                // iterations
+                runtime::spawn_mandatory_blocking(move || {
+                    did_blocking_task_execute.store(
+                        true,
+                        std::sync::atomic::Ordering::Release
+                    );
+                })
+            });
+            drop(rt);
+        }
+
+        assert!(
+            did_blocking_task_execute.load(
+                std::sync::atomic::Ordering::Acquire
+            ),
+            "Failed at iteration {:?}", i
+        );
+    }
+}
+
+
 struct Runtime;
 
 impl Schedule for Runtime {
