@@ -68,7 +68,7 @@ cfg_io_std! {
     pub fn stderr() -> Stderr {
         let std = io::stderr();
         Stderr {
-            std: SplitByUtf8BoundaryIfWindows::new(Blocking::new(std)),
+            std: SplitByUtf8BoundaryIfWindows::new(Blocking::new_always_flush(std)),
         }
     }
 }

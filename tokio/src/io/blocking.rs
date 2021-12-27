@@ -17,7 +17,17 @@ pub(crate) struct Blocking<T> {
     inner: Option<T>,
     state: State<T>,
     /// `true` if the lower IO layer needs flushing.
+    ///
+    /// This can be `false` even if `always_flush` is `true`. This happens when
+    /// a flush is in-progress, and it is reset back to `true` when the flush has
+    /// completed and `poll_flush` has returned `Poll::Ready`.
     need_flush: bool,
+    /// If this is `false`, then we only try to flush when we have actually
+    /// written something.
+    ///
+    /// If this is `true`, then we will always try to flush the underlying IO
+    /// resource even if we haven't written anything.
+    always_flush: bool,
 }
 
 #[derive(Debug)]
@@ -41,6 +51,16 @@ cfg_io_std! {
                 inner: Some(inner),
                 state: State::Idle(Some(Buf::with_capacity(0))),
                 need_flush: false,
+                always_flush: false,
+            }
+        }
+
+        pub(crate) fn new_always_flush(inner: T) -> Blocking<T> {
+            Blocking {
+                inner: Some(inner),
+                state: State::Idle(Some(Buf::with_capacity(0))),
+                need_flush: true,
+                always_flush: true,
             }
         }
     }
@@ -153,8 +173,15 @@ where
                             (res, buf, inner)
                         }));
 
+                        // Even if `always_flush` is true, we set this flag to
+                        // false so that we can return `Poll::Ready` once the
+                        // current flush completes.
                         self.need_flush = false;
                     } else {
+                        // If we always need flushing, reset it back to true so
+                        // future calls to flush will attempt to flush.
+                        self.need_flush = self.always_flush;
+
                         return Ready(Ok(()));
                     }
                 }

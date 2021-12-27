@@ -67,7 +67,7 @@ cfg_io_std! {
     pub fn stdout() -> Stdout {
         let std = io::stdout();
         Stdout {
-            std: SplitByUtf8BoundaryIfWindows::new(Blocking::new(std)),
+            std: SplitByUtf8BoundaryIfWindows::new(Blocking::new_always_flush(std)),
         }
     }
 }
