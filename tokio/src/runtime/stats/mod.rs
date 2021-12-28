@@ -19,5 +19,5 @@ cfg_not_stats! {
     #[path = "mock.rs"]
     mod stats;
 
-    pub(crate) use self::stats::{RuntimeStats, WorkerStatsBatcher};
+    pub(crate) use self::stats::{RuntimeStats, WorkerStats, WorkerStatsBatcher};
 }

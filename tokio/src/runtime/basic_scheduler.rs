@@ -411,10 +411,14 @@ impl Schedule for Arc<Shared> {
                 // If `None`, the runtime is shutting down, so there is no need
                 // to schedule the task.
                 if let Some(core) = core.as_mut() {
+                    core.stats.inc_local_schedule_count();
                     core.tasks.push_back(task);
                 }
             }
             _ => {
+                // Track that a task was scheduled from **outside** of the runtime.
+                self.stats.inc_remote_schedule_count();
+
                 // If the queue is None, then the runtime has shut down. We
                 // don't need to do anything with the notification in that case.
                 let mut guard = self.queue.lock();

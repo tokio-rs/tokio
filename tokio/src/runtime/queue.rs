@@ -3,7 +3,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicU16, AtomicU32};
 use crate::loom::sync::Arc;
-use crate::runtime::stats::WorkerStatsBatcher;
+use crate::runtime::stats::{WorkerStats, WorkerStatsBatcher};
 use crate::runtime::task::{self, Inject};
 
 use std::mem::MaybeUninit;
@@ -102,7 +102,12 @@ impl<T> Local<T> {
     }
 
     /// Pushes a task to the back of the local queue, skipping the LIFO slot.
-    pub(super) fn push_back(&mut self, mut task: task::Notified<T>, inject: &Inject<T>) {
+    pub(super) fn push_back(
+        &mut self,
+        mut task: task::Notified<T>,
+        inject: &Inject<T>,
+        stats: &mut WorkerStatsBatcher,
+    ) {
         let tail = loop {
             let head = self.inner.head.load(Acquire);
             let (steal, real) = unpack(head);
@@ -117,11 +122,12 @@ impl<T> Local<T> {
                 // Concurrently stealing, this will free up capacity, so only
                 // push the task onto the inject queue
                 inject.push(task);
+                stats.incr_overflow_count(1);
                 return;
             } else {
                 // Push the current task and half of the queue into the
                 // inject queue.
-                match self.push_overflow(task, real, tail, inject) {
+                match self.push_overflow(task, real, tail, inject, stats) {
                     Ok(_) => return,
                     // Lost the race, try again
                     Err(v) => {
@@ -163,6 +169,7 @@ impl<T> Local<T> {
         head: u16,
         tail: u16,
         inject: &Inject<T>,
+        stats: &mut WorkerStatsBatcher,
     ) -> Result<(), task::Notified<T>> {
         /// How many elements are we taking from the local queue.
         ///
@@ -246,6 +253,9 @@ impl<T> Local<T> {
         };
         inject.push_batch(batch_iter.chain(std::iter::once(task)));
 
+        // Add 1 to factor in the task currently being scheduled.
+        stats.incr_overflow_count(NUM_TASKS_TAKEN + 1);
+
         Ok(())
     }
 
@@ -300,7 +310,8 @@ impl<T> Steal<T> {
     pub(super) fn steal_into(
         &self,
         dst: &mut Local<T>,
-        stats: &mut WorkerStatsBatcher,
+        dst_stats: &mut WorkerStatsBatcher,
+        src_stats: &WorkerStats,
     ) -> Option<task::Notified<T>> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
@@ -320,12 +331,14 @@ impl<T> Steal<T> {
         // Steal the tasks into `dst`'s buffer. This does not yet expose the
         // tasks in `dst`.
         let mut n = self.steal_into2(dst, dst_tail);
-        stats.incr_steal_count(n);
 
         if n == 0 {
             // No tasks were stolen
             return None;
         }
+
+        dst_stats.incr_steal_count(n);
+        src_stats.incr_stolen_count(n);
 
         // We are returning a task here
         n -= 1;
