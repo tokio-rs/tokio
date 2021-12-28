@@ -746,7 +746,7 @@ impl Builder {
         }
     }
 
-    /// Sets the max frame length
+    /// Sets the max frame length in bytes
     ///
     /// This configuration option applies to both encoding and decoding. The
     /// default value is 8MB.
@@ -767,7 +767,7 @@ impl Builder {
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// LengthDelimitedCodec::builder()
-    ///     .max_frame_length(8 * 1024)
+    ///     .max_frame_length(8 * 1024 * 1024)
     ///     .new_read(io);
     /// # }
     /// # pub fn main() {}
