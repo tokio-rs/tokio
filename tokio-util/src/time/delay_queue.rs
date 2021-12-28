@@ -686,9 +686,9 @@ impl<T> DelayQueue<T> {
 
         // Special case the `expired` queue
         if self.slab[*key].expired {
-            self.expired.remove(&key, &mut self.slab);
+            self.expired.remove(key, &mut self.slab);
         } else {
-            self.wheel.remove(&key, &mut self.slab);
+            self.wheel.remove(key, &mut self.slab);
         }
     }
 
