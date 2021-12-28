@@ -10,9 +10,8 @@ pin_project! {
     #[must_use = "streams do nothing unless polled"]
     pub struct MapWhile<St, F> {
         #[pin]
-        stream: St,
+        stream: Option<St>,
         f: F,
-        done: bool
     }
 }
 
@@ -30,9 +29,8 @@ where
 impl<St, F> MapWhile<St, F> {
     pub(super) fn new(stream: St, f: F) -> Self {
         MapWhile {
-            stream,
+            stream: Some(stream),
             f,
-            done: false,
         }
     }
 }
@@ -44,29 +42,29 @@ where
 {
     type Item = T;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        if !*self.as_mut().project().done {
-            self.as_mut().project().stream.poll_next(cx).map(|ready| {
-                let ready = ready.and_then(self.as_mut().project().f);
-
-                if ready.is_none() {
-                    *self.as_mut().project().done = true;
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        let mut me = self.project();
+        let f = me.f;
+        match me.stream.as_mut().as_pin_mut() {
+            Some(stream) => match stream.poll_next(cx).map(|opt| opt.and_then(f)) {
+                Poll::Ready(Some(item)) => Poll::Ready(Some(item)),
+                Poll::Ready(None) => {
+                    me.stream.set(None);
+                    Poll::Ready(None)
                 }
-
-                ready
-            })
-        } else {
-            Poll::Ready(None)
+                Poll::Pending => Poll::Pending,
+            },
+            None => Poll::Ready(None),
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.done {
-            return (0, Some(0));
-        }
-
-        let (_, upper) = self.stream.size_hint();
-
-        (0, upper)
+        self.stream
+            .as_ref()
+            .map(|stream| {
+                let (_, upper) = stream.size_hint();
+                (0, upper)
+            })
+            .unwrap_or((0, Some(0)))
     }
 }
