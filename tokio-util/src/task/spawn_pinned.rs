@@ -98,7 +98,7 @@ impl LocalPool {
         let job_guard = JobCountGuard(Arc::clone(&worker.task_count));
         let worker_spawner = worker.spawner.clone();
 
-        // Spawn a future onto the worker's runtime so can immediately return
+        // Spawn a future onto the worker's runtime so we can immediately return
         // a join handle.
         worker.runtime_handle.spawn(async move {
             // Move the job guard into the task
