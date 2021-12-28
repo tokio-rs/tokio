@@ -1,5 +1,5 @@
-use futures_core::Stream;
 use core::future::Future;
+use futures_core::Stream;
 
 mod all;
 use all::AllFuture;

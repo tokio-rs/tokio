@@ -1,9 +1,9 @@
 use crate::Stream;
 
 use core::fmt;
+use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
-use core::future::Future;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -23,13 +23,19 @@ where
     St: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Then").field("stream", &self.stream).finish()
+        f.debug_struct("Then")
+            .field("stream", &self.stream)
+            .finish()
     }
 }
 
 impl<St, Fut, F> Then<St, Fut, F> {
     pub(super) fn new(stream: St, f: F) -> Self {
-        Then { stream, future: None, f }
+        Then {
+            stream,
+            future: None,
+            f,
+        }
     }
 }
 
@@ -50,7 +56,7 @@ where
                     Poll::Ready(item) => {
                         me.future.set(None);
                         return Poll::Ready(Some(item));
-                    },
+                    }
                     Poll::Pending => return Poll::Pending,
                 }
             }
@@ -58,7 +64,7 @@ where
             match me.stream.as_mut().poll_next(cx) {
                 Poll::Ready(Some(item)) => {
                     me.future.set(Some((me.f)(item)));
-                },
+                }
                 Poll::Ready(None) => return Poll::Ready(None),
                 Poll::Pending => return Poll::Pending,
             }
