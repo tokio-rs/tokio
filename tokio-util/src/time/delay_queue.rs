@@ -407,7 +407,7 @@ struct KeyInternal {
 #[derive(Debug)]
 struct Stack<T> {
     /// Head of the stack
-    head: Option<usize>,
+    head: Option<Key>,
     _p: PhantomData<fn() -> T>,
 }
 
@@ -592,8 +592,7 @@ impl<T> DelayQueue<T> {
 
         let item = ready!(self.poll_idx(cx));
         Poll::Ready(item.map(|result| {
-            result.map(|idx| {
-                let key = Key::new(idx);
+            result.map(|key| {
                 let data = self.slab.remove(&key);
                 debug_assert!(data.next.is_none());
                 debug_assert!(data.prev.is_none());
@@ -665,12 +664,12 @@ impl<T> DelayQueue<T> {
         use self::wheel::{InsertError, Stack};
 
         // Register the deadline with the timer wheel
-        match self.wheel.insert(when, key.index, &mut self.slab) {
+        match self.wheel.insert(when, key, &mut self.slab) {
             Ok(_) => {}
             Err((_, InsertError::Elapsed)) => {
                 self.slab[key].expired = true;
                 // The delay is already expired, store it in the expired queue
-                self.expired.push(key.index, &mut self.slab);
+                self.expired.push(key, &mut self.slab);
             }
             Err((_, err)) => panic!("invalid deadline; err={:?}", err),
         }
@@ -687,9 +686,9 @@ impl<T> DelayQueue<T> {
 
         // Special case the `expired` queue
         if self.slab[*key].expired {
-            self.expired.remove(&key.index, &mut self.slab);
+            self.expired.remove(&key, &mut self.slab);
         } else {
-            self.wheel.remove(&key.index, &mut self.slab);
+            self.wheel.remove(&key, &mut self.slab);
         }
     }
 
@@ -1018,7 +1017,7 @@ impl<T> DelayQueue<T> {
     /// should be returned.
     ///
     /// A slot should be returned when the associated deadline has been reached.
-    fn poll_idx(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Result<usize, Error>>> {
+    fn poll_idx(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Result<Key, Error>>> {
         use self::wheel::Stack;
 
         let expired = self.expired.pop(&mut self.slab);
@@ -1084,8 +1083,8 @@ impl<T> futures_core::Stream for DelayQueue<T> {
 }
 
 impl<T> wheel::Stack for Stack<T> {
-    type Owned = usize;
-    type Borrowed = usize;
+    type Owned = Key;
+    type Borrowed = Key;
     type Store = SlabStorage<T>;
 
     fn is_empty(&self) -> bool {
@@ -1093,44 +1092,41 @@ impl<T> wheel::Stack for Stack<T> {
     }
 
     fn push(&mut self, item: Self::Owned, store: &mut Self::Store) {
-        let key = Key::new(item);
-
         // Ensure the entry is not already in a stack.
-        debug_assert!(store[key].next.is_none());
-        debug_assert!(store[key].prev.is_none());
+        debug_assert!(store[item].next.is_none());
+        debug_assert!(store[item].prev.is_none());
 
         // Remove the old head entry
         let old = self.head.take();
 
         if let Some(idx) = old {
-            store[Key::new(idx)].prev = Some(key);
+            store[idx].prev = Some(item);
         }
 
-        store[key].next = old.map(Key::new);
+        store[item].next = old;
         self.head = Some(item);
     }
 
     fn pop(&mut self, store: &mut Self::Store) -> Option<Self::Owned> {
-        if let Some(idx) = self.head {
-            let key = Key::new(idx);
-            self.head = store[key].next.map(|k| k.index);
+        if let Some(key) = self.head {
+            self.head = store[key].next;
 
             if let Some(idx) = self.head {
-                store[Key::new(idx)].prev = None;
+                store[idx].prev = None;
             }
 
             store[key].next = None;
             debug_assert!(store[key].prev.is_none());
 
-            Some(idx)
+            Some(key)
         } else {
             None
         }
     }
 
     fn remove(&mut self, item: &Self::Borrowed, store: &mut Self::Store) {
-        let key = Key::new(*item);
-        assert!(store.contains(&key));
+        let key = *item;
+        assert!(store.contains(item));
 
         // Ensure that the entry is in fact contained by the stack
         debug_assert!({
@@ -1139,14 +1135,14 @@ impl<T> wheel::Stack for Stack<T> {
             let mut contains = false;
 
             while let Some(idx) = next {
-                let data = &store[Key::new(idx)];
+                let data = &store[idx];
 
                 if idx == *item {
                     debug_assert!(!contains);
                     contains = true;
                 }
 
-                next = data.next.map(|k| k.index);
+                next = data.next;
             }
 
             contains
@@ -1159,7 +1155,7 @@ impl<T> wheel::Stack for Stack<T> {
         if let Some(prev) = store[key].prev {
             store[prev].next = store[key].next;
         } else {
-            self.head = store[key].next.map(|k| k.index);
+            self.head = store[key].next;
         }
 
         store[key].next = None;
@@ -1167,7 +1163,7 @@ impl<T> wheel::Stack for Stack<T> {
     }
 
     fn when(item: &Self::Borrowed, store: &Self::Store) -> u64 {
-        store[Key::new(*item)].when
+        store[*item].when
     }
 }
 
