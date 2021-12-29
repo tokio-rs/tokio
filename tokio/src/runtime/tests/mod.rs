@@ -13,7 +13,7 @@ mod unowned_wrapper {
         use tracing::Instrument;
         let span = tracing::trace_span!("test_span");
         let task = task.instrument(span);
-        let (task, handle) = crate::runtime::task::unowned(task, NoopSchedule);
+        let (task, handle) = crate::runtime::task::unowned(task, NoopSchedule, false);
         (task.into_notified(), handle)
     }
 
