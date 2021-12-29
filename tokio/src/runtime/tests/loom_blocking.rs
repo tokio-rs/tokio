@@ -24,15 +24,15 @@ fn blocking_shutdown() {
 }
 
 #[test]
-fn spawn_blocking_should_always_run() {
+fn spawn_mandatory_blocking_should_always_run() {
     use crate::runtime::tests::loom_oneshot;
     loom::model(|| {
-        let rt = runtime::Builder::new_current_thread().build.unwrap();
+        let rt = runtime::Builder::new_current_thread().build().unwrap();
 
         let (tx, rx) = loom_oneshot::channel();
         let _enter = rt.enter();
         runtime::spawn_blocking(|| {});
-        runtime::spawn_blocking(move || {
+        runtime::spawn_mandatory_blocking(move || {
             let _ = tx.send(());
         });
 
