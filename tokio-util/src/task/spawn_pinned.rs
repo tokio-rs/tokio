@@ -260,11 +260,45 @@ impl LocalWorkerHandle {
         runtime: tokio::runtime::Runtime,
         mut task_receiver: UnboundedReceiver<PinnedFutureSpawner>,
     ) {
-        LocalSet::new().block_on(&runtime, async {
+        let mut local_set = LocalSet::new();
+        local_set.block_on(&runtime, async {
             while let Some(spawn_task) = task_receiver.recv().await {
                 // Calls spawn_local(future)
                 (spawn_task)();
             }
         });
+
+        // If there are any tasks on the runtime associated with a LocalSet task
+        // that has already completed, but whose output has not yet been
+        // reported, let that task complete.
+        //
+        // Since the task_count is decremented when the runtime task exits,
+        // reading that counter lets us know if any such tasks completed during
+        // the call to `block_on`.
+        //
+        // Tasks on the LocalSet can't complete during this loop since they're
+        // stored on the LocalSet and we aren't accessing it.
+        let mut previous_task_count = task_count.load(Ordering::SeqCst);
+        loop {
+            // This call will also run tasks spawned on the runtime.
+            rt.block_on(tokio::task::yield_now());
+            let new_task_count = task_count.load(Ordering::SeqCst);
+            if new_task_count == previous_task_count {
+                break;
+            } else {
+                previous_task_count = new_task_count;
+            }
+        }
+
+        // It's now no longer possible for a task on the runtime to be
+        // associated with a LocalSet task that has completed. Drop both the
+        // LocalSet and runtime to let tasks on the runtime be cancelled if and
+        // only if they are still on the LocalSet.
+        //
+        // Drop the LocalSet task first so that anyone awaiting the runtime
+        // JoinHandle will see the cancelled error after the LocalSet task
+        // destructor has completed.
+        drop(local_set);
+        drop(runtime);
     }
 }
