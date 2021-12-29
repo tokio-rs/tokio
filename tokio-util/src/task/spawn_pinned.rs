@@ -94,8 +94,7 @@ impl LocalPool {
     {
         let (sender, receiver) = oneshot::channel();
 
-        let worker = self.find_and_incr_least_burdened_worker();
-        let job_guard = JobCountGuard(Arc::clone(&worker.task_count));
+        let (worker, job_guard) = self.find_and_incr_least_burdened_worker();
         let worker_spawner = worker.spawner.clone();
 
         // Spawn a future onto the worker's runtime so we can immediately return
@@ -179,7 +178,10 @@ impl LocalPool {
     /// Find the worker with the least number of tasks, increment its task
     /// count, and return its handle. Make sure to actually spawn a task on
     /// the worker so the task count is kept consistent with load.
-    fn find_and_incr_least_burdened_worker(&self) -> &LocalWorkerHandle {
+    ///
+    /// A job count guard is also returned to ensure the task count gets
+    /// decremented when the job is done.
+    fn find_and_incr_least_burdened_worker(&self) -> (&LocalWorkerHandle, JobCountGuard) {
         loop {
             let (worker, task_count) = self
                 .workers
@@ -200,7 +202,7 @@ impl LocalPool {
                 )
                 .is_ok()
             {
-                return worker;
+                return (worker, JobCountGuard(Arc::clone(&worker.task_count)));
             }
         }
     }
