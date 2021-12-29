@@ -215,7 +215,8 @@ struct JobCountGuard(Arc<AtomicUsize>);
 impl Drop for JobCountGuard {
     fn drop(&mut self) {
         // Decrement the job count
-        self.0.fetch_sub(1, Ordering::SeqCst);
+        let previous_value = self.0.fetch_sub(1, Ordering::SeqCst);
+        debug_assert!(previous_value >= 1);
     }
 }
 
