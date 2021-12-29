@@ -23,6 +23,26 @@ fn blocking_shutdown() {
     });
 }
 
+#[test]
+fn spawn_blocking_should_always_run() {
+    use crate::runtime::tests::loom_oneshot;
+    loom::model(|| {
+        let rt = runtime::Builder::new_current_thread().build.unwrap();
+
+        let (tx, rx) = loom_oneshot::channel();
+        let _enter = rt.enter();
+        runtime::spawn_blocking(|| {});
+        runtime::spawn_blocking(move || {
+            let _ = tx.send(());
+        });
+
+        drop(rt);
+
+        // This call will deadlock if `spawn_mandatory_blocking` doesn't run.
+        let () = rx.recv();
+    });
+}
+
 fn mk_runtime(num_threads: usize) -> Runtime {
     runtime::Builder::new_multi_thread()
         .worker_threads(num_threads)

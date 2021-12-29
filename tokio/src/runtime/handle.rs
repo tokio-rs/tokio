@@ -196,7 +196,6 @@ impl Handle {
         }
     }
 
-
     #[track_caller]
     pub(crate) fn spawn_mandatory_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
@@ -210,13 +209,12 @@ impl Handle {
         }
     }
 
-
     #[track_caller]
     pub(crate) fn spawn_blocking_inner<F, R>(
         &self,
         func: F,
         is_mandatory: bool,
-        name: Option<&str>
+        name: Option<&str>,
     ) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,

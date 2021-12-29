@@ -94,7 +94,6 @@ where
     rt.spawn_mandatory_blocking(func)
 }
 
-
 // ===== impl BlockingPool =====
 
 impl BlockingPool {
@@ -281,10 +280,6 @@ impl Inner {
             shared.num_idle += 1;
 
             while !shared.shutdown {
-                // NOTE: A task spawned by spawn_blocking if:
-                // 1. It is spawned (thus the `condvar` gets a `notify_one`)
-                // 2. `shutdown` is called and manages to acquire the `shared.lock` *before* the
-                //    thread woken up here gets a hold of it. Then `shutdown` will be true.
                 let lock_result = self.condvar.wait_timeout(shared, self.keep_alive).unwrap();
 
                 shared = lock_result.0;

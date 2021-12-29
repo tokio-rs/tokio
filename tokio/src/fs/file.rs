@@ -20,15 +20,15 @@ use std::task::Poll;
 use std::task::Poll::*;
 
 #[cfg(test)]
-use super::mocks::{spawn_blocking, spawn_mandatory_blocking};
-#[cfg(test)]
 use super::mocks::JoinHandle;
 #[cfg(test)]
 use super::mocks::MockFile as StdFile;
-#[cfg(not(test))]
-use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
+#[cfg(test)]
+use super::mocks::{spawn_blocking, spawn_mandatory_blocking};
 #[cfg(not(test))]
 use crate::blocking::JoinHandle;
+#[cfg(not(test))]
+use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
 #[cfg(not(test))]
 use std::fs::File as StdFile;
 
