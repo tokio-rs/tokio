@@ -2,7 +2,6 @@
 
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio_util::task;
 
 /// Simple test of running a !Send future via spawn_pinned
@@ -119,30 +118,34 @@ async fn callback_panic_does_not_kill_worker() {
 
 /// Canceling the task via the returned join handle cancels the spawned task
 /// (which has a different, internal join handle).
-/// This test is loosely based off of `test_abort_wakes_task_3964` in
-/// `tokio/tests/test_abort.rs`
 #[tokio::test]
 async fn task_cancellation_propagates() {
     let pool = task::LocalPoolHandle::new(1);
     let notify_dropped = Arc::new(());
     let weak_notify_dropped = Arc::downgrade(&notify_dropped);
 
+    let (start_sender, start_receiver) = tokio::sync::oneshot::channel();
+    let (drop_sender, drop_receiver) = tokio::sync::oneshot::channel::<()>();
     let join_handle = pool.spawn_pinned(|| async move {
+        let _drop_sender = drop_sender;
         // Move the Arc into the task
         let _notify_dropped = notify_dropped;
-        println!("task started");
+        let _ = start_sender.send(());
 
-        // Sleep for a while (should be canceled before it elapses)
-        tokio::time::sleep(Duration::new(100, 0)).await
+        // Keep the task running until it gets aborted
+        futures::future::pending::<()>().await;
     });
 
-    // Wait for inner task to sleep
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    // Wait for the task to start
+    let _ = start_receiver.await;
 
     join_handle.abort();
 
-    // Wait for inner task to abort
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    // Wait for the inner task to abort, dropping the sender.
+    // The top level join handle aborts quicker than the inner task (the abort
+    // needs to propagate and get processed on the worker thread), so we can't
+    // just await the top level join handle.
+    let _ = drop_receiver.await;
 
     // Check that the Arc has been dropped. This verifies that the inner task
     // was canceled as well.
