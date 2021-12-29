@@ -196,16 +196,18 @@ impl Handle {
         }
     }
 
-    #[track_caller]
-    pub(crate) fn spawn_mandatory_blocking<F, R>(&self, func: F) -> JoinHandle<R>
-    where
-        F: FnOnce() -> R + Send + 'static,
+    cfg_fs! {
+        #[track_caller]
+        pub(crate) fn spawn_mandatory_blocking<F, R>(&self, func: F) -> JoinHandle<R>
+        where
+            F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
-    {
-        if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
-            self.spawn_blocking_inner(Box::new(func), true, None)
-        } else {
-            self.spawn_blocking_inner(func, true, None)
+        {
+            if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+                self.spawn_blocking_inner(Box::new(func), true, None)
+            } else {
+                self.spawn_blocking_inner(func, true, None)
+            }
         }
     }
 

@@ -84,14 +84,16 @@ where
     rt.spawn_blocking(func)
 }
 
-/// Runs the provided function on an executor dedicated to blocking operations.
-pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> JoinHandle<R>
-where
-    F: FnOnce() -> R + Send + 'static,
+cfg_fs! {
+    /// Runs the provided function on an executor dedicated to blocking operations.
+    pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
-{
-    let rt = context::current();
-    rt.spawn_mandatory_blocking(func)
+    {
+        let rt = context::current();
+        rt.spawn_mandatory_blocking(func)
+    }
 }
 
 // ===== impl BlockingPool =====

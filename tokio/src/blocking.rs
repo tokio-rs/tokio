@@ -1,8 +1,10 @@
 cfg_rt! {
-    pub(crate) use crate::runtime::{
-        spawn_blocking,
-        spawn_mandatory_blocking
-    };
+    pub(crate) use crate::runtime::spawn_blocking;
+
+    cfg_fs! {
+        pub(crate) use crate::runtime::spawn_mandatory_blocking;
+    }
+
     pub(crate) use crate::task::JoinHandle;
 }
 
@@ -19,7 +21,16 @@ cfg_not_rt! {
     {
         assert_send_sync::<JoinHandle<std::cell::Cell<()>>>();
         panic!("requires the `rt` Tokio feature flag")
+    }
 
+    cfg_fs! {
+        pub(crate) fn spawn_mandatory_blocking<F, R>(_f: F) -> JoinHandle<R>
+        where
+            F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+        {
+            panic!("requires the `rt` Tokio feature flag")
+        }
     }
 
     pub(crate) struct JoinHandle<R> {

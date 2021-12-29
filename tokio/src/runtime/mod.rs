@@ -199,10 +199,11 @@ cfg_rt! {
 
     mod blocking;
     use blocking::BlockingPool;
-    pub(crate) use blocking::{
-        spawn_blocking,
-        spawn_mandatory_blocking
-    };
+    pub(crate) use blocking::spawn_blocking;
+
+    cfg_fs! {
+        pub(crate) use blocking::spawn_mandatory_blocking;
+    }
 
     mod builder;
     pub use self::builder::Builder;
