@@ -246,21 +246,24 @@ impl LocalWorkerHandle {
             .build()
             .expect("Failed to start a pinned worker thread runtime");
         let runtime_handle = runtime.handle().clone();
+        let task_count = Arc::new(AtomicUsize::new(0));
+        let task_count_clone = Arc::clone(&task_count);
 
-        std::thread::spawn(|| Self::run(runtime, receiver));
+        std::thread::spawn(|| Self::run(runtime, receiver, task_count_clone));
 
         LocalWorkerHandle {
             runtime_handle,
             spawner: sender,
-            task_count: Arc::new(AtomicUsize::new(0)),
+            task_count,
         }
     }
 
     fn run(
         runtime: tokio::runtime::Runtime,
         mut task_receiver: UnboundedReceiver<PinnedFutureSpawner>,
+        task_count: Arc<AtomicUsize>,
     ) {
-        let mut local_set = LocalSet::new();
+        let local_set = LocalSet::new();
         local_set.block_on(&runtime, async {
             while let Some(spawn_task) = task_receiver.recv().await {
                 // Calls spawn_local(future)
@@ -281,7 +284,7 @@ impl LocalWorkerHandle {
         let mut previous_task_count = task_count.load(Ordering::SeqCst);
         loop {
             // This call will also run tasks spawned on the runtime.
-            rt.block_on(tokio::task::yield_now());
+            runtime.block_on(tokio::task::yield_now());
             let new_task_count = task_count.load(Ordering::SeqCst);
             if new_task_count == previous_task_count {
                 break;
