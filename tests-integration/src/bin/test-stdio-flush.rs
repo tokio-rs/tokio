@@ -1,4 +1,4 @@
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 fn main() {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -6,7 +6,10 @@ fn main() {
         .unwrap();
 
     rt.block_on(async {
-        tokio::io::stdout().write_all(b"Hello world!").await.unwrap();
+        tokio::io::stdout()
+            .write_all(b"Hello world!")
+            .await
+            .unwrap();
         tokio::io::stdout().flush().await.unwrap();
 
         let mut buf = [0];

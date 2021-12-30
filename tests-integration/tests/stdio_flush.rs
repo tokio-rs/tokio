@@ -32,10 +32,12 @@ async fn assert_flush_works_fn() {
     assert!(status.success());
 }
 
-
 #[tokio::test]
 async fn assert_flush_works() {
-    if timeout(Duration::from_secs(10), assert_flush_works_fn()).await.is_err() {
+    if timeout(Duration::from_secs(10), assert_flush_works_fn())
+        .await
+        .is_err()
+    {
         panic!("Test timed out.");
     }
 }
