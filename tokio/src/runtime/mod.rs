@@ -201,6 +201,10 @@ cfg_rt! {
     use blocking::BlockingPool;
     pub(crate) use blocking::spawn_blocking;
 
+    cfg_trace! {
+        pub(crate) use blocking::Mandatory;
+    }
+
     cfg_fs! {
         pub(crate) use blocking::spawn_mandatory_blocking;
     }

@@ -107,6 +107,7 @@ impl<'a> Builder<'a> {
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
-        context::current().spawn_blocking_inner(function, false, self.name)
+        use crate::runtime::Mandatory;
+        context::current().spawn_blocking_inner(function, Mandatory::NonMandatory, self.name)
     }
 }

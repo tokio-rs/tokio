@@ -190,9 +190,9 @@ impl Handle {
         R: Send + 'static,
     {
         if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
-            self.spawn_blocking_inner(Box::new(func), false, None)
+            self.spawn_blocking_inner(Box::new(func), blocking::Mandatory::NonMandatory, None)
         } else {
-            self.spawn_blocking_inner(func, false, None)
+            self.spawn_blocking_inner(func, blocking::Mandatory::NonMandatory, None)
         }
     }
 
@@ -204,9 +204,17 @@ impl Handle {
             R: Send + 'static,
         {
             if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
-                self.spawn_blocking_inner(Box::new(func), true, None)
+                self.spawn_blocking_inner(
+                    Box::new(func),
+                    blocking::Mandatory::Mandatory,
+                    None
+                )
             } else {
-                self.spawn_blocking_inner(func, true, None)
+                self.spawn_blocking_inner(
+                    func,
+                    blocking::Mandatory::Mandatory,
+                    None
+                )
             }
         }
     }
@@ -215,7 +223,7 @@ impl Handle {
     pub(crate) fn spawn_blocking_inner<F, R>(
         &self,
         func: F,
-        is_mandatory: bool,
+        is_mandatory: blocking::Mandatory,
         name: Option<&str>,
     ) -> JoinHandle<R>
     where

@@ -72,12 +72,30 @@ struct Shared {
 
 pub(crate) struct Task {
     task: task::UnownedTask<NoopSchedule>,
-    is_mandatory: bool,
+    mandatory: Mandatory,
+}
+
+#[derive(PartialEq, Eq)]
+pub(crate) enum Mandatory {
+    #[cfg_attr(not(fs), allow(dead_code))]
+    Mandatory,
+    NonMandatory,
 }
 
 impl Task {
-    pub(crate) fn new(task: task::UnownedTask<NoopSchedule>, is_mandatory: bool) -> Task {
-        Task { task, is_mandatory }
+    pub(crate) fn new(task: task::UnownedTask<NoopSchedule>, mandatory: Mandatory) -> Task {
+        Task { task, mandatory }
+    }
+
+    fn run(self) {
+        self.task.run();
+    }
+
+    fn shutdown_or_run_if_mandatory(self) {
+        match self.mandatory {
+            Mandatory::NonMandatory => self.task.shutdown(),
+            Mandatory::Mandatory => self.task.run(),
+        }
     }
 }
 
@@ -283,7 +301,7 @@ impl Inner {
             // BUSY
             while let Some(task) = shared.queue.pop_front() {
                 drop(shared);
-                task.task.run();
+                task.run();
 
                 shared = self.shared.lock();
             }
@@ -325,11 +343,7 @@ impl Inner {
                 while let Some(task) = shared.queue.pop_front() {
                     drop(shared);
 
-                    if task.is_mandatory {
-                        task.task.run();
-                    } else {
-                        task.task.shutdown();
-                    }
+                    task.shutdown_or_run_if_mandatory();
 
                     shared = self.shared.lock();
                 }
