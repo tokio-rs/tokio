@@ -28,7 +28,7 @@ cfg_not_rt! {
         pub(crate) fn spawn_mandatory_blocking<F, R>(_f: F) -> JoinHandle<R>
         where
             F: FnOnce() -> R + Send + 'static,
-        R: Send + 'static,
+            R: Send + 'static,
         {
             panic!("requires the `rt` Tokio feature flag")
         }
