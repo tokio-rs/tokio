@@ -283,7 +283,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
-        run: rustup update 1.56 && rustup default 1.56
+        run: rustup update 1.57 && rustup default 1.57
       - uses: Swatinem/rust-cache@v1
       - name: Install clippy
         run: rustup component add clippy
