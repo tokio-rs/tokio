@@ -72,6 +72,12 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.stream.size_hint()
+        let future_len = if self.future.is_some() { 1 } else { 0 };
+        let (lower, upper) = self.stream.size_hint();
+
+        let lower = lower.saturating_add(future_len);
+        let upper = upper.and_then(|upper| upper.checked_add(future_len));
+
+        (lower, upper)
     }
 }
