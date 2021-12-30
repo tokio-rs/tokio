@@ -198,6 +198,10 @@ impl Handle {
 
     cfg_fs! {
         #[track_caller]
+        #[cfg_attr(any(
+            all(loom, not(test)), // the function is covered by loom tests
+            test
+        ), allow(dead_code))]
         pub(crate) fn spawn_mandatory_blocking<F, R>(&self, func: F) -> JoinHandle<R>
         where
             F: FnOnce() -> R + Send + 'static,

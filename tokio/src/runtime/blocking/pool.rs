@@ -112,7 +112,10 @@ where
 }
 
 cfg_fs! {
-    #[cfg_attr(test, allow(dead_code))]
+    #[cfg_attr(any(
+        all(loom, not(test)), // the function is covered by loom tests
+        test
+    ), allow(dead_code))]
     /// Runs the provided function on an executor dedicated to blocking operations.
     pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> JoinHandle<R>
     where
