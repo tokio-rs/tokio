@@ -353,12 +353,12 @@ impl<T> Receiver<T> {
     /// <details><summary>Potential deadlock example</summary>
     ///
     /// ```text
-    /// // Task 1 (on thread A)    |  // Task 2 (on thread B)
-    /// let _ref1 = rx.borrow();   |
-    ///                            |  // will block
-    ///                            |  let _ = tx.send(());
-    /// // may deadlock            |
-    /// let _ref2 = rx.borrow();   |
+    /// // Task 1 (on thread A)                |  // Task 2 (on thread B)
+    /// let _ref1 = rx1.borrow_and_update();   |
+    ///                                        |  // will block
+    ///                                        |  let _ = tx.send(());
+    /// // may deadlock                        |
+    /// let _ref2 = rx2.borrow_and_update();   |
     /// ```
     /// </details>
     ///
