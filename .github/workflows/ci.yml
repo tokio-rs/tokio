@@ -79,6 +79,13 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
 
   test-parking_lot:
+    # The parking_lot crate has a feature called send_guard which changes when
+    # some of its types are Send. Tokio has some measures in place to prevent
+    # this from affecting when Tokio types are Send, and this test exists to
+    # ensure that those measures are working.
+    #
+    # This relies on the potentially affected Tokio type being listed in
+    # `tokio/tokio/tests/async_send_sync.rs`.
     name: compile tests with parking lot send guards
     runs-on: ubuntu-latest
     steps:
