@@ -8,6 +8,12 @@ use std::ops::{Deref, DerefMut};
 use std::sync::LockResult;
 use std::time::Duration;
 
+// All types in this file are marked with PhantomData to ensure that
+// parking_lot's send_guard feature does not leak through and affect when Tokio
+// types are Send.
+//
+// See <https://github.com/tokio-rs/tokio/pull/4359> for more info.
+
 // Types that do not need wrapping
 pub(crate) use parking_lot::WaitTimeoutResult;
 
