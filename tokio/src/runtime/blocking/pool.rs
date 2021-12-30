@@ -102,6 +102,8 @@ impl Task {
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
 /// Runs the provided function on an executor dedicated to blocking operations.
+/// Tasks will be scheduled as non-mandatory, meaning they may not get executed
+/// in case of runtime shutdown.
 pub(crate) fn spawn_blocking<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
@@ -117,6 +119,8 @@ cfg_fs! {
         test
     ), allow(dead_code))]
     /// Runs the provided function on an executor dedicated to blocking operations.
+    /// Tasks will be scheduled as mandatory, meaning they are guaranteed to run
+    /// unless a shutdown is already taking place.
     pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
