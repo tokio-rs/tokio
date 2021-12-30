@@ -204,7 +204,6 @@ pub(crate) struct LocalNotified<S: 'static> {
 /// This type holds two ref-counts.
 pub(crate) struct UnownedTask<S: 'static> {
     raw: RawTask,
-    is_mandatory: bool,
     _p: PhantomData<S>,
 }
 
@@ -265,8 +264,7 @@ cfg_rt! {
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.
-    pub(crate) fn unowned<T, S>(task: T, scheduler: S,
-                                is_mandatory: bool) -> (UnownedTask<S>, JoinHandle<T::Output>)
+    pub(crate) fn unowned<T, S>(task: T, scheduler: S) -> (UnownedTask<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Send + Future + 'static,
@@ -278,7 +276,6 @@ cfg_rt! {
         // This is valid because an UnownedTask holds two ref-counts.
         let unowned = UnownedTask {
             raw: task.raw,
-            is_mandatory,
             _p: PhantomData,
         };
         std::mem::forget(task);
@@ -386,10 +383,6 @@ impl<S: Schedule> UnownedTask<S> {
 
     pub(crate) fn shutdown(self) {
         self.into_task().shutdown()
-    }
-
-    pub(crate) fn is_mandatory(&self) -> bool {
-        self.is_mandatory
     }
 }
 

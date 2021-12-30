@@ -70,7 +70,16 @@ struct Shared {
     worker_thread_index: usize,
 }
 
-type Task = task::UnownedTask<NoopSchedule>;
+pub(crate) struct Task {
+    task: task::UnownedTask<NoopSchedule>,
+    is_mandatory: bool,
+}
+
+impl Task {
+    pub(crate) fn new(task: task::UnownedTask<NoopSchedule>, is_mandatory: bool) -> Task {
+        Task { task, is_mandatory }
+    }
+}
 
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
@@ -190,7 +199,7 @@ impl Spawner {
 
             if shared.shutdown {
                 // Shutdown the task
-                task.shutdown();
+                task.task.shutdown();
 
                 // no need to even push this task; it would never get picked up
                 return Err(());
@@ -274,7 +283,7 @@ impl Inner {
             // BUSY
             while let Some(task) = shared.queue.pop_front() {
                 drop(shared);
-                task.run();
+                task.task.run();
 
                 shared = self.shared.lock();
             }
@@ -316,10 +325,10 @@ impl Inner {
                 while let Some(task) = shared.queue.pop_front() {
                     drop(shared);
 
-                    if task.is_mandatory() {
-                        task.run();
+                    if task.is_mandatory {
+                        task.task.run();
                     } else {
-                        task.shutdown();
+                        task.task.shutdown();
                     }
 
                     shared = self.shared.lock();

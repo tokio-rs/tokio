@@ -242,8 +242,10 @@ impl Handle {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
 
-        let (task, handle) = task::unowned(fut, NoopSchedule, is_mandatory);
-        let _ = self.blocking_spawner.spawn(task, self);
+        let (task, handle) = task::unowned(fut, NoopSchedule);
+        let _ = self
+            .blocking_spawner
+            .spawn(blocking::Task::new(task, is_mandatory), self);
         handle
     }
 
