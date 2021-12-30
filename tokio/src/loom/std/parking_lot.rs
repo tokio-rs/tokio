@@ -21,13 +21,22 @@ pub(crate) struct RwLock<T>(PhantomData<std::sync::RwLock<T>>, parking_lot::RwLo
 pub(crate) struct Condvar(PhantomData<std::sync::Condvar>, parking_lot::Condvar);
 
 #[derive(Debug)]
-pub(crate) struct MutexGuard<'a, T: ?Sized>(PhantomData<std::sync::MutexGuard<'a, T>>, parking_lot::MutexGuard<'a, T>);
+pub(crate) struct MutexGuard<'a, T: ?Sized>(
+    PhantomData<std::sync::MutexGuard<'a, T>>,
+    parking_lot::MutexGuard<'a, T>,
+);
 
 #[derive(Debug)]
-pub(crate) struct RwLockReadGuard<'a, T: ?Sized>(PhantomData<std::sync::RwLockReadGuard<'a, T>>, parking_lot::RwLockReadGuard<'a, T>);
+pub(crate) struct RwLockReadGuard<'a, T: ?Sized>(
+    PhantomData<std::sync::RwLockReadGuard<'a, T>>,
+    parking_lot::RwLockReadGuard<'a, T>,
+);
 
 #[derive(Debug)]
-pub(crate) struct RwLockWriteGuard<'a, T: ?Sized>(PhantomData<std::sync::RwLockWriteGuard<'a, T>>, parking_lot::RwLockWriteGuard<'a, T>);
+pub(crate) struct RwLockWriteGuard<'a, T: ?Sized>(
+    PhantomData<std::sync::RwLockWriteGuard<'a, T>>,
+    parking_lot::RwLockWriteGuard<'a, T>,
+);
 
 impl<T> Mutex<T> {
     #[inline]
@@ -49,7 +58,9 @@ impl<T> Mutex<T> {
 
     #[inline]
     pub(crate) fn try_lock(&self) -> Option<MutexGuard<'_, T>> {
-        self.1.try_lock().map(|guard| MutexGuard(PhantomData, guard))
+        self.1
+            .try_lock()
+            .map(|guard| MutexGuard(PhantomData, guard))
     }
 
     #[inline]
