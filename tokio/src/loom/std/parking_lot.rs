@@ -3,6 +3,7 @@
 //!
 //! This can be extended to additional types/methods as required.
 
+use std::fmt;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::LockResult;
@@ -162,4 +163,22 @@ impl Condvar {
 
     // Note: Additional methods `wait_timeout_ms`, `wait_timeout_until`,
     // `wait_until` can be provided here as needed.
+}
+
+impl<'a, T: ?Sized + fmt::Display> fmt::Display for MutexGuard<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.1, f)
+    }
+}
+
+impl<'a, T: ?Sized + fmt::Display> fmt::Display for RwLockReadGuard<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.1, f)
+    }
+}
+
+impl<'a, T: ?Sized + fmt::Display> fmt::Display for RwLockWriteGuard<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.1, f)
+    }
 }
