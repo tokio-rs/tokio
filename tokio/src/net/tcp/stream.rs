@@ -1090,7 +1090,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        let socket = self.to_socket();
+        let socket = self.as_socket();
         socket.linger()
     }
 
@@ -1116,11 +1116,11 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        let socket = self.to_socket();
+        let socket = self.as_socket();
         socket.set_linger(dur)
     }
 
-    fn to_socket(&self) -> socket2::SockRef<'_> {
+    fn as_socket(&self) -> socket2::SockRef<'_> {
         socket2::SockRef::from(self)
     }
 

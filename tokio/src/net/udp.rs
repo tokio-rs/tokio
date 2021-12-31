@@ -1528,7 +1528,7 @@ impl UdpSocket {
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
-        self.to_socket().tos()
+        self.as_socket().tos()
     }
 
     /// Sets the value for the `IP_TOS` option on this socket.
@@ -1555,10 +1555,10 @@ impl UdpSocket {
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
-        self.to_socket().set_tos(tos)
+        self.as_socket().set_tos(tos)
     }
 
-    fn to_socket(&self) -> socket2::SockRef<'_> {
+    fn as_socket(&self) -> socket2::SockRef<'_> {
         socket2::SockRef::from(self)
     }
 
