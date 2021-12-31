@@ -257,7 +257,7 @@ impl UdpSocket {
     ///
     /// On most operating systems, this sets the `SO_SNDBUF` socket option.
     pub fn set_send_buffer_size(&self, size: u32) -> io::Result<()> {
-        self.to_socket().set_send_buffer_size(size as usize)
+        self.as_socket().set_send_buffer_size(size as usize)
     }
 
     /// Returns the size of the UDP send buffer for this socket.
@@ -284,14 +284,14 @@ impl UdpSocket {
     ///
     /// [`set_send_buffer_size`]: Self::set_send_buffer_size
     pub fn send_buffer_size(&self) -> io::Result<u32> {
-        self.to_socket().send_buffer_size().map(|n| n as u32)
+        self.as_socket().send_buffer_size().map(|n| n as u32)
     }
 
     /// Sets the size of the UDP receive buffer on this socket.
     ///
     /// On most operating systems, this sets the `SO_RCVBUF` socket option.
     pub fn set_recv_buffer_size(&self, size: u32) -> io::Result<()> {
-        self.to_socket().set_recv_buffer_size(size as usize)
+        self.as_socket().set_recv_buffer_size(size as usize)
     }
 
     /// Returns the size of the UDP receive buffer for this socket.
@@ -318,10 +318,10 @@ impl UdpSocket {
     ///
     /// [`set_recv_buffer_size`]: Self::set_recv_buffer_size
     pub fn recv_buffer_size(&self) -> io::Result<u32> {
-        self.to_socket().recv_buffer_size().map(|n| n as u32)
+        self.as_socket().recv_buffer_size().map(|n| n as u32)
     }
 
-    fn to_socket(&self) -> socket2::SockRef<'_> {
+    fn as_socket(&self) -> socket2::SockRef<'_> {
         socket2::SockRef::from(self)
     }
 
