@@ -214,7 +214,7 @@ pub trait StreamExt: Stream {
     /// the underlying stream will not be polled again.
     ///
     /// Note that this function consumes the stream passed into it and returns a
-    /// wrapped version of it, similar to the existing `map_while` method in the
+    /// wrapped version of it, similar to the [`Iterator::map_while`] method in the
     /// standard library.
     ///
     /// # Examples
