@@ -378,7 +378,7 @@ impl TcpSocket {
     ///
     /// [`set_linger`]: TcpSocket::set_linger
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        self.inner.get_linger()
+        self.inner.linger()
     }
 
     /// Gets the local address of this socket.
