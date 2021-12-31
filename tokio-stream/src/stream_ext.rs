@@ -28,6 +28,9 @@ use fuse::Fuse;
 mod map;
 use map::Map;
 
+mod map_while;
+use map_while::MapWhile;
+
 mod merge;
 use merge::Merge;
 
@@ -199,6 +202,48 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Map::new(self, f)
+    }
+
+    /// Map this stream's items to a different type for as long as determined by
+    /// the provided closure. A stream of the target type will be returned,
+    /// which will yield elements until the closure returns `None`.
+    ///
+    /// The provided closure is executed over all elements of this stream as
+    /// they are made available, until it returns `None`. It is executed inline
+    /// with calls to [`poll_next`](Stream::poll_next). Once `None` is returned,
+    /// the underlying stream will not be polled again.
+    ///
+    /// Note that this function consumes the stream passed into it and returns a
+    /// wrapped version of it, similar to the [`Iterator::map_while`] method in the
+    /// standard library.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// let stream = stream::iter(1..=10);
+    /// let mut stream = stream.map_while(|x| {
+    ///     if x < 4 {
+    ///         Some(x + 3)
+    ///     } else {
+    ///         None
+    ///     }
+    /// });
+    /// assert_eq!(stream.next().await, Some(4));
+    /// assert_eq!(stream.next().await, Some(5));
+    /// assert_eq!(stream.next().await, Some(6));
+    /// assert_eq!(stream.next().await, None);
+    /// # }
+    /// ```
+    fn map_while<T, F>(self, f: F) -> MapWhile<Self, F>
+    where
+        F: FnMut(Self::Item) -> Option<T>,
+        Self: Sized,
+    {
+        MapWhile::new(self, f)
     }
 
     /// Maps this stream's items asynchronously to a different type, returning a
