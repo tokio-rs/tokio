@@ -1520,15 +1520,12 @@ impl UdpSocket {
     )))]
     #[cfg_attr(
         docsrs,
-        doc(cfg(all(
-            unix,
-            not(any(
-                target_os = "fuchsia",
-                target_os = "redox",
-                target_os = "solaris",
-                target_os = "illumos",
-            ))
-        )))
+        doc(cfg(not(any(
+            target_os = "fuchsia",
+            target_os = "redox",
+            target_os = "solaris",
+            target_os = "illumos",
+        ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
         self.to_socket().tos()
@@ -1550,15 +1547,12 @@ impl UdpSocket {
     )))]
     #[cfg_attr(
         docsrs,
-        doc(cfg(all(
-            unix,
-            not(any(
-                target_os = "fuchsia",
-                target_os = "redox",
-                target_os = "solaris",
-                target_os = "illumos",
-            ))
-        )))
+        doc(cfg(not(any(
+            target_os = "fuchsia",
+            target_os = "redox",
+            target_os = "solaris",
+            target_os = "illumos",
+        ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
         self.to_socket().set_tos(tos)
