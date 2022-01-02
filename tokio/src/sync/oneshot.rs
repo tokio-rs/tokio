@@ -1033,7 +1033,7 @@ impl<T> Receiver<T> {
     ///     let (tx, rx) = oneshot::channel::<u8>();
     ///
     ///     let sync_code = thread::spawn(move || {
-    ///         assert_eq!(Some(10), rx.blocking_recv());
+    ///         assert_eq!(Ok(10), rx.blocking_recv());
     ///     });
     ///
     ///     let _ = tx.send(10);
@@ -1041,8 +1041,8 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     #[cfg(feature = "sync")]
-    pub fn blocking_recv(self) -> Option<T> {
-        crate::future::block_on(self).ok()
+    pub fn blocking_recv(self) -> Result<T, RecvError> {
+        crate::future::block_on(self)
     }
 }
 
