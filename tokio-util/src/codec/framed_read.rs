@@ -108,6 +108,11 @@ impl<T, D> FramedRead<T, D> {
         &mut self.inner.codec
     }
 
+    /// Returns a mutable reference to the underlying decoder.
+    pub fn decoder_pin_mut(self: Pin<&mut Self>) -> &mut D {
+        self.project().inner.project().codec
+    }
+
     /// Returns a reference to the read buffer.
     pub fn read_buffer(&self) -> &BytesMut {
         &self.inner.state.buffer
