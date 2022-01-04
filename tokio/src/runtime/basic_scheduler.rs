@@ -6,6 +6,7 @@ use crate::runtime::context::EnterGuard;
 use crate::runtime::stats::{RuntimeStats, WorkerStatsBatcher};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::Callback;
+use crate::runtime::driver::Driver;
 use crate::sync::notify::Notify;
 use crate::util::{waker_ref, Wake, WakerRef};
 
@@ -19,10 +20,10 @@ use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
 
 /// Executes tasks on the current thread
-pub(crate) struct BasicScheduler<P: Park> {
+pub(crate) struct BasicScheduler {
     /// Inner state guarded by a mutex that is shared
     /// between all `block_on` calls.
-    inner: Mutex<Option<Inner<P>>>,
+    inner: Mutex<Option<Inner>>,
 
     /// Notifier for waking up other threads to steal the
     /// parker.
@@ -39,7 +40,7 @@ pub(crate) struct BasicScheduler<P: Park> {
 }
 
 /// The inner scheduler that owns the task queue and the main parker P.
-struct Inner<P: Park> {
+struct Inner {
     /// Scheduler run queue
     ///
     /// When the scheduler is executed, the queue is removed from `self` and
@@ -55,7 +56,7 @@ struct Inner<P: Park> {
     tick: u8,
 
     /// Thread park handle
-    park: P,
+    park: Driver,
 
     /// Callback for a worker parking itself
     before_park: Option<Callback>,
@@ -133,12 +134,12 @@ const REMOTE_FIRST_INTERVAL: u8 = 31;
 // Tracks the current BasicScheduler.
 scoped_thread_local!(static CURRENT: Context);
 
-impl<P: Park> BasicScheduler<P> {
+impl BasicScheduler {
     pub(crate) fn new(
-        park: P,
+        park: Driver,
         before_park: Option<Callback>,
         after_unpark: Option<Callback>,
-    ) -> BasicScheduler<P> {
+    ) -> BasicScheduler {
         let unpark = Box::new(park.unpark());
 
         let spawner = Spawner {
@@ -210,7 +211,7 @@ impl<P: Park> BasicScheduler<P> {
         }
     }
 
-    fn take_inner(&self) -> Option<InnerGuard<'_, P>> {
+    fn take_inner(&self) -> Option<InnerGuard<'_>> {
         let inner = self.inner.lock().take()?;
 
         Some(InnerGuard {
@@ -224,7 +225,7 @@ impl<P: Park> BasicScheduler<P> {
     }
 }
 
-impl<P: Park> Inner<P> {
+impl Inner {
     /// Blocks on the provided future and drives the runtime's driver.
     fn block_on<F: Future>(&mut self, future: F) -> F::Output {
         enter(self, |scheduler, context| {
@@ -313,19 +314,18 @@ impl<P: Park> Inner<P> {
 
 /// Enters the scheduler context. This sets the queue and other necessary
 /// scheduler state in the thread-local.
-fn enter<F, R, P>(scheduler: &mut Inner<P>, f: F) -> R
+fn enter<F, R>(scheduler: &mut Inner, f: F) -> R
 where
-    F: FnOnce(&mut Inner<P>, &Context) -> R,
-    P: Park,
+    F: FnOnce(&mut Inner, &Context) -> R,
 {
     // Ensures the run queue is placed back in the `BasicScheduler` instance
     // once `block_on` returns.`
-    struct Guard<'a, P: Park> {
+    struct Guard<'a> {
         context: Option<Context>,
-        scheduler: &'a mut Inner<P>,
+        scheduler: &'a mut Inner,
     }
 
-    impl<P: Park> Drop for Guard<'_, P> {
+    impl Drop for Guard<'_> {
         fn drop(&mut self) {
             let Context { tasks, .. } = self.context.take().expect("context missing");
             self.scheduler.tasks = Some(tasks.into_inner());
@@ -349,7 +349,7 @@ where
     CURRENT.set(context, || f(scheduler, context))
 }
 
-impl<P: Park> Drop for BasicScheduler<P> {
+impl Drop for BasicScheduler {
     fn drop(&mut self) {
         // Avoid a double panic if we are currently panicking and
         // the lock may be poisoned.
@@ -392,7 +392,7 @@ impl<P: Park> Drop for BasicScheduler<P> {
     }
 }
 
-impl<P: Park> fmt::Debug for BasicScheduler<P> {
+impl fmt::Debug for BasicScheduler {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("BasicScheduler").finish()
     }
@@ -489,12 +489,12 @@ impl Wake for Shared {
 /// Used to ensure we always place the Inner value
 /// back into its slot in `BasicScheduler`, even if the
 /// future panics.
-struct InnerGuard<'a, P: Park> {
-    inner: Option<Inner<P>>,
-    basic_scheduler: &'a BasicScheduler<P>,
+struct InnerGuard<'a> {
+    inner: Option<Inner>,
+    basic_scheduler: &'a BasicScheduler,
 }
 
-impl<P: Park> InnerGuard<'_, P> {
+impl InnerGuard<'_> {
     fn block_on<F: Future>(&mut self, future: F) -> F::Output {
         // The only time inner gets set to `None` is if we have dropped
         // already so this unwrap is safe.
@@ -502,7 +502,7 @@ impl<P: Park> InnerGuard<'_, P> {
     }
 }
 
-impl<P: Park> Drop for InnerGuard<'_, P> {
+impl Drop for InnerGuard<'_> {
     fn drop(&mut self) {
         if let Some(scheduler) = self.inner.take() {
             let mut lock = self.basic_scheduler.inner.lock();
