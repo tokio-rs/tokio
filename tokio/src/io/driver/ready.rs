@@ -7,6 +7,7 @@ const READABLE: usize = 0b0_01;
 const WRITABLE: usize = 0b0_10;
 const READ_CLOSED: usize = 0b0_0100;
 const WRITE_CLOSED: usize = 0b0_1000;
+const ERROR: usize = 0b1_0000;
 
 /// Describes the readiness state of an I/O resources.
 ///
@@ -30,6 +31,9 @@ impl Ready {
 
     /// Returns a `Ready` representing write closed readiness.
     pub const WRITE_CLOSED: Ready = Ready(WRITE_CLOSED);
+
+    /// Returns a `Ready` representing error readiness
+    pub const ERROR: Ready = Ready(ERROR);
 
     /// Returns a `Ready` representing readiness for all operations.
     pub const ALL: Ready = Ready(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED);
@@ -63,6 +67,10 @@ impl Ready {
 
         if event.is_write_closed() {
             ready |= Ready::WRITE_CLOSED;
+        }
+
+        if event.is_error() {
+            ready |= Ready::ERROR;
         }
 
         ready
@@ -142,6 +150,21 @@ impl Ready {
     /// ```
     pub fn is_write_closed(self) -> bool {
         self.contains(Ready::WRITE_CLOSED)
+    }
+
+    /// Returns `true` if the value includes write-closed `readiness`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::Ready;
+    ///
+    /// assert!(!Ready::EMPTY.is_write_closed());
+    /// assert!(!Ready::WRITABLE.is_write_closed());
+    /// assert!(Ready::WRITE_CLOSED.is_write_closed());
+    /// ```
+    pub fn is_error(self) -> bool {
+        self.contains(Ready::ERROR)
     }
 
     /// Returns true if `self` is a superset of `other`.
@@ -245,6 +268,7 @@ impl fmt::Debug for Ready {
             .field("is_writable", &self.is_writable())
             .field("is_read_closed", &self.is_read_closed())
             .field("is_write_closed", &self.is_write_closed())
+            .field("is_error", &self.is_error())
             .finish()
     }
 }

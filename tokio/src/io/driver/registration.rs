@@ -242,7 +242,7 @@ cfg_io_readiness! {
                     )));
                 }
 
-                Pin::new(&mut fut).poll(cx).map(Ok)
+                Pin::new(&mut fut).poll(cx)
             }).await
         }
 

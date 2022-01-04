@@ -60,7 +60,13 @@ cfg_io_readiness! {
         /// The interest this waiter is waiting on.
         interest: Interest,
 
-        is_ready: bool,
+        // TODO: the Readiness object can figure out this information by reading
+        // the ScheduledIO `readiness` value (and in fact it does in its future
+        // impl, before putting the waiter in the waitlist.). Why do we need
+        // this extra field here? Is it because once we have locked the waitlist
+        // (which we have to do anyway) it's cheaper to read this value than to
+        // atomically read the `readiness` of the ScheduledIO?
+        wakeup_type: Option<WakeupType>,
 
         /// Should never be `!Unpin`.
         _p: PhantomPinned,
@@ -80,6 +86,12 @@ cfg_io_readiness! {
         Init,
         Waiting,
         Done,
+    }
+
+    #[derive(Debug)]
+    enum WakeupType {
+        Ready,
+        PollError
     }
 }
 
@@ -220,7 +232,8 @@ impl ScheduledIo {
         waiters.is_shutdown |= shutdown;
 
         // check for AsyncRead slot
-        if ready.is_readable() {
+        if ready.is_readable() || ready.is_error() {
+            // TODO: figure out what to do for the AsyncRead and AsyncWrite slots
             if let Some(waker) = waiters.reader.take() {
                 wakers.push(waker);
             }
@@ -235,15 +248,23 @@ impl ScheduledIo {
 
         #[cfg(feature = "net")]
         'outer: loop {
-            let mut iter = waiters.list.drain_filter(|w| ready.satisfies(w.interest));
-
+            let is_error = ready.is_error();
+            // should we wakeup all waiters in case of error? I guess that
+            // depends on the semantics of EPOLLERR but I don't know yet
+            let mut iter = waiters
+                .list
+                .drain_filter(|w| ready.satisfies(w.interest) || is_error);
             while wakers.can_push() {
                 match iter.next() {
                     Some(waiter) => {
                         let waiter = unsafe { &mut *waiter.as_ptr() };
 
                         if let Some(waker) = waiter.waker.take() {
-                            waiter.is_ready = true;
+                            waiter.wakeup_type = if is_error {
+                                Some(WakeupType::PollError)
+                            } else {
+                                Some(WakeupType::Ready)
+                            };
                             wakers.push(waker);
                         }
                     }
@@ -263,7 +284,6 @@ impl ScheduledIo {
 
         // Release the lock before notifying
         drop(waiters);
-
         wakers.wake_all();
     }
 
@@ -364,7 +384,7 @@ unsafe impl Sync for ScheduledIo {}
 cfg_io_readiness! {
     impl ScheduledIo {
         /// An async version of `poll_readiness` which uses a linked list of wakers.
-        pub(crate) async fn readiness(&self, interest: Interest) -> ReadyEvent {
+        pub(crate) async fn readiness(&self, interest: Interest) -> std::io::Result<ReadyEvent> {
             self.readiness_fut(interest).await
         }
 
@@ -379,7 +399,7 @@ cfg_io_readiness! {
                 waiter: UnsafeCell::new(Waiter {
                     pointers: linked_list::Pointers::new(),
                     waker: None,
-                    is_ready: false,
+                    wakeup_type: None,
                     interest,
                     _p: PhantomPinned,
                 }),
@@ -407,7 +427,7 @@ cfg_io_readiness! {
     // ===== impl Readiness =====
 
     impl Future for Readiness<'_> {
-        type Output = ReadyEvent;
+        type Output = std::io::Result<ReadyEvent>;
 
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             use std::sync::atomic::Ordering::SeqCst;
@@ -416,13 +436,19 @@ cfg_io_readiness! {
                 let me = self.get_unchecked_mut();
                 (&me.scheduled_io, &mut me.state, &me.waiter)
             };
-
             loop {
                 match *state {
                     State::Init => {
                         // Optimistically check existing readiness
                         let curr = scheduled_io.readiness.load(SeqCst);
                         let ready = Ready::from_usize(READINESS.unpack(curr));
+
+                        // the information is read via the `curr` in the scheduled io
+                        if ready.is_error() {
+                            return Poll::Ready(Err(
+                                std::io::Error::new(std::io::ErrorKind::Other, "Polling error")
+                            ));
+                        }
 
                         // Safety: `waiter.interest` never changes
                         let interest = unsafe { (*waiter.get()).interest };
@@ -432,7 +458,7 @@ cfg_io_readiness! {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { tick, ready });
+                            return Poll::Ready(Ok(ReadyEvent { tick, ready }));
                         }
 
                         // Wasn't ready, take the lock (and check again while locked).
@@ -451,7 +477,7 @@ cfg_io_readiness! {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { tick, ready });
+                            return Poll::Ready(Ok(ReadyEvent { tick, ready }));
                         }
 
                         // Not ready even after locked, insert into list...
@@ -480,18 +506,28 @@ cfg_io_readiness! {
                         // Safety: called while locked
                         let w = unsafe { &mut *waiter.get() };
 
-                        if w.is_ready {
-                            // Our waker has been notified.
-                            *state = State::Done;
-                        } else {
-                            // Update the waker, if necessary.
-                            if !w.waker.as_ref().unwrap().will_wake(cx.waker()) {
-                                w.waker = Some(cx.waker().clone());
+                        match w.wakeup_type {
+                            Some(WakeupType::Ready) => {
+                                // Our waker has been notified.
+                                *state = State::Done;
+                            },
+                            Some(WakeupType::PollError) => {
+                                return Poll::Ready(Err(
+                                    std::io::Error::new(
+                                        std::io::ErrorKind::Other,
+                                        "Polling error"
+                                    )
+                                ));
+                            },
+                            None => {
+                                // Update the waker, if necessary.
+                                if !w.waker.as_ref().unwrap().will_wake(cx.waker()) {
+                                    w.waker = Some(cx.waker().clone());
+                                }
+
+                                return Poll::Pending;
                             }
-
-                            return Poll::Pending;
                         }
-
                         // Explicit drop of the lock to indicate the scope that the
                         // lock is held. Because holding the lock is required to
                         // ensure safe access to fields not held within the lock, it
@@ -503,12 +539,16 @@ cfg_io_readiness! {
                         let tick = TICK.unpack(scheduled_io.readiness.load(Acquire)) as u8;
 
                         // Safety: State::Done means it is no longer shared
+                        // TODO: I'm not sure why this safety claim is true. What about
+                        // it being `Done` prevents it from being shared? As far as I can tell
+                        // the `wake0` method in the scheduledio doesn't care about this being
+                        // Done?
                         let w = unsafe { &mut *waiter.get() };
 
-                        return Poll::Ready(ReadyEvent {
+                        return Poll::Ready(Ok(ReadyEvent {
                             tick,
                             ready: Ready::from_interest(w.interest),
-                        });
+                        }));
                     }
                 }
             }
