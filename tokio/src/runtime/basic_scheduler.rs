@@ -222,13 +222,14 @@ impl Context {
     /// thread-local context.
     fn run_task<R>(&self, mut core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
         core.stats.incr_poll_count();
-        self.enter(core, || crate::coop::budget(|| f()))
+        self.enter(core, || crate::coop::budget(f))
     }
 
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
         let mut park = core.park.take().expect("park missing");
 
         if let Some(f) = &self.spawner.shared.before_park {
+            #[allow(clippy::redundant_closure)]
             let (c, _) = self.enter(core, || f());
             core = c;
         }
@@ -249,6 +250,7 @@ impl Context {
         }
 
         if let Some(f) = &self.spawner.shared.after_unpark {
+            #[allow(clippy::redundant_closure)]
             let (c, _) = self.enter(core, || f());
             core = c;
         }
