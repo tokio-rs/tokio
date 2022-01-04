@@ -21,9 +21,8 @@ use std::time::Duration;
 
 /// Executes tasks on the current thread
 pub(crate) struct BasicScheduler {
-    /// Inner state guarded by a mutex that is shared
-    /// between all `block_on` calls.
-    inner: Mutex<Option<Inner>>,
+    /// Core scheduler data is acquired by a thread entering `block_on`.
+    core: Mutex<Option<Core>>,
 
     /// Notifier for waking up other threads to steal the
     /// parker.
@@ -39,8 +38,8 @@ pub(crate) struct BasicScheduler {
     context_guard: Option<EnterGuard>,
 }
 
-/// The inner scheduler that owns the task queue and the main parker P.
-struct Inner {
+/// Core data
+struct Core {
     /// Scheduler run queue
     ///
     /// When the scheduler is executed, the queue is removed from `self` and
@@ -152,7 +151,7 @@ impl BasicScheduler {
             }),
         };
 
-        let inner = Mutex::new(Some(Inner {
+        let core = Mutex::new(Some(Core {
             tasks: Some(Tasks {
                 queue: VecDeque::with_capacity(INITIAL_CAPACITY),
             }),
@@ -165,7 +164,7 @@ impl BasicScheduler {
         }));
 
         BasicScheduler {
-            inner,
+            core,
             notify: Notify::new(),
             spawner,
             context_guard: None,
@@ -183,8 +182,8 @@ impl BasicScheduler {
         // otherwise, lets select on a notification that the parker is available
         // or the future is complete.
         loop {
-            if let Some(inner) = &mut self.take_inner() {
-                return inner.block_on(future);
+            if let Some(core) = &mut self.take_core() {
+                return core.block_on(future);
             } else {
                 let mut enter = crate::runtime::enter(false);
 
@@ -211,11 +210,11 @@ impl BasicScheduler {
         }
     }
 
-    fn take_inner(&self) -> Option<InnerGuard<'_>> {
-        let inner = self.inner.lock().take()?;
+    fn take_core(&self) -> Option<CoreGuard<'_>> {
+        let core = self.core.lock().take()?;
 
-        Some(InnerGuard {
-            inner: Some(inner),
+        Some(CoreGuard {
+            core: Some(core),
             basic_scheduler: self,
         })
     }
@@ -225,7 +224,7 @@ impl BasicScheduler {
     }
 }
 
-impl Inner {
+impl Core {
     /// Blocks on the provided future and drives the runtime's driver.
     fn block_on<F: Future>(&mut self, future: F) -> F::Output {
         enter(self, |scheduler, context| {
@@ -314,15 +313,15 @@ impl Inner {
 
 /// Enters the scheduler context. This sets the queue and other necessary
 /// scheduler state in the thread-local.
-fn enter<F, R>(scheduler: &mut Inner, f: F) -> R
+fn enter<F, R>(scheduler: &mut Core, f: F) -> R
 where
-    F: FnOnce(&mut Inner, &Context) -> R,
+    F: FnOnce(&mut Core, &Context) -> R,
 {
     // Ensures the run queue is placed back in the `BasicScheduler` instance
     // once `block_on` returns.`
     struct Guard<'a> {
         context: Option<Context>,
-        scheduler: &'a mut Inner,
+        scheduler: &'a mut Core,
     }
 
     impl Drop for Guard<'_> {
@@ -354,13 +353,13 @@ impl Drop for BasicScheduler {
         // Avoid a double panic if we are currently panicking and
         // the lock may be poisoned.
 
-        let mut inner = match self.inner.lock().take() {
-            Some(inner) => inner,
+        let mut core = match self.core.lock().take() {
+            Some(core) => core,
             None if std::thread::panicking() => return,
-            None => panic!("Oh no! We never placed the Inner state back, this is a bug!"),
+            None => panic!("Oh no! We never placed the Core back, this is a bug!"),
         };
 
-        enter(&mut inner, |scheduler, context| {
+        enter(&mut core, |scheduler, context| {
             // Drain the OwnedTasks collection. This call also closes the
             // collection, ensuring that no tasks are ever pushed after this
             // call returns.
@@ -484,28 +483,27 @@ impl Wake for Shared {
     }
 }
 
-// ===== InnerGuard =====
+// ===== CoreGuard =====
 
-/// Used to ensure we always place the Inner value
-/// back into its slot in `BasicScheduler`, even if the
-/// future panics.
-struct InnerGuard<'a> {
-    inner: Option<Inner>,
+/// Used to ensure we always place the `Core` value back into its slot in
+/// `BasicScheduler`, even if the future panics.
+struct CoreGuard<'a> {
+    core: Option<Core>,
     basic_scheduler: &'a BasicScheduler,
 }
 
-impl InnerGuard<'_> {
+impl CoreGuard<'_> {
     fn block_on<F: Future>(&mut self, future: F) -> F::Output {
-        // The only time inner gets set to `None` is if we have dropped
+        // The only time core gets set to `None` is if we have dropped
         // already so this unwrap is safe.
-        self.inner.as_mut().unwrap().block_on(future)
+        self.core.as_mut().unwrap().block_on(future)
     }
 }
 
-impl Drop for InnerGuard<'_> {
+impl Drop for CoreGuard<'_> {
     fn drop(&mut self) {
-        if let Some(scheduler) = self.inner.take() {
-            let mut lock = self.basic_scheduler.inner.lock();
+        if let Some(scheduler) = self.core.take() {
+            let mut lock = self.basic_scheduler.core.lock();
 
             // Replace old scheduler back into the state to allow
             // other threads to pick it up and drive it.
