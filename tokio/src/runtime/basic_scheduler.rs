@@ -60,6 +60,7 @@ struct Core {
 
     /// Callback for a worker parking itself
     before_park: Option<Callback>,
+
     /// Callback for a worker unparking itself
     after_unpark: Option<Callback>,
 
@@ -101,7 +102,7 @@ struct Shared {
     owned: OwnedTasks<Arc<Shared>>,
 
     /// Unpark the blocked thread.
-    unpark: Box<dyn Unpark>,
+    unpark: <Driver as Park>::Unpark,
 
     /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
@@ -140,13 +141,13 @@ impl BasicScheduler {
         before_park: Option<Callback>,
         after_unpark: Option<Callback>,
     ) -> BasicScheduler {
-        let unpark = Box::new(park.unpark());
+        let unpark = park.unpark();
 
         let spawner = Spawner {
             shared: Arc::new(Shared {
                 queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
                 owned: OwnedTasks::new(),
-                unpark: unpark as Box<dyn Unpark>,
+                unpark,
                 woken: AtomicBool::new(false),
                 stats: RuntimeStats::new(1),
             }),
