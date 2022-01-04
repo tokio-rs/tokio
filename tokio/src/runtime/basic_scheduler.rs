@@ -9,6 +9,7 @@ use crate::runtime::Callback;
 use crate::runtime::driver::Driver;
 use crate::sync::notify::Notify;
 use crate::util::{waker_ref, Wake, WakerRef};
+use crate::util::atomic_cell::AtomicCell;
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -22,7 +23,7 @@ use std::time::Duration;
 /// Executes tasks on the current thread
 pub(crate) struct BasicScheduler {
     /// Core scheduler data is acquired by a thread entering `block_on`.
-    core: Mutex<Option<Core>>,
+    core: AtomicCell<Core>,
 
     /// Notifier for waking up other threads to steal the
     /// parker.
@@ -151,7 +152,7 @@ impl BasicScheduler {
             }),
         };
 
-        let core = Mutex::new(Some(Core {
+        let core = AtomicCell::new(Some(Box::new(Core {
             tasks: Some(Tasks {
                 queue: VecDeque::with_capacity(INITIAL_CAPACITY),
             }),
@@ -161,7 +162,7 @@ impl BasicScheduler {
             before_park,
             after_unpark,
             stats: WorkerStatsBatcher::new(0),
-        }));
+        })));
 
         BasicScheduler {
             core,
@@ -211,7 +212,7 @@ impl BasicScheduler {
     }
 
     fn take_core(&self) -> Option<CoreGuard<'_>> {
-        let core = self.core.lock().take()?;
+        let core = self.core.take()?;
 
         Some(CoreGuard {
             core: Some(core),
@@ -353,7 +354,7 @@ impl Drop for BasicScheduler {
         // Avoid a double panic if we are currently panicking and
         // the lock may be poisoned.
 
-        let mut core = match self.core.lock().take() {
+        let mut core = match self.core.take() {
             Some(core) => core,
             None if std::thread::panicking() => return,
             None => panic!("Oh no! We never placed the Core back, this is a bug!"),
@@ -488,7 +489,7 @@ impl Wake for Shared {
 /// Used to ensure we always place the `Core` value back into its slot in
 /// `BasicScheduler`, even if the future panics.
 struct CoreGuard<'a> {
-    core: Option<Core>,
+    core: Option<Box<Core>>,
     basic_scheduler: &'a BasicScheduler,
 }
 
@@ -503,11 +504,9 @@ impl CoreGuard<'_> {
 impl Drop for CoreGuard<'_> {
     fn drop(&mut self) {
         if let Some(scheduler) = self.core.take() {
-            let mut lock = self.basic_scheduler.core.lock();
-
             // Replace old scheduler back into the state to allow
             // other threads to pick it up and drive it.
-            lock.replace(scheduler);
+            self.basic_scheduler.core.set(scheduler);
 
             // Wake up other possible threads that could steal
             // the dedicated parker P.
