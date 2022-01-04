@@ -68,8 +68,8 @@ use crate::runtime::stats::{RuntimeStats, WorkerStatsBatcher};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::Idle;
 use crate::runtime::{queue, task, Callback};
-use crate::util::FastRand;
 use crate::util::atomic_cell::AtomicCell;
+use crate::util::FastRand;
 
 use std::cell::RefCell;
 use std::time::Duration;
