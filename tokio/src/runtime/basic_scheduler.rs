@@ -26,7 +26,7 @@ pub(crate) struct BasicScheduler {
     core: AtomicCell<Core>,
 
     /// Notifier for waking up other threads to steal the
-    /// parker.
+    /// driver.
     notify: Notify,
 
     /// Sendable task spawner
@@ -39,7 +39,8 @@ pub(crate) struct BasicScheduler {
     context_guard: Option<EnterGuard>,
 }
 
-/// Core data
+/// Data required for executing the scheduler. The struct is passed around to
+/// function that perform scheduling work and acts as a capability token.
 struct Core {
     /// Scheduler run queue
     tasks: VecDeque<task::Notified<Arc<Shared>>>,
@@ -50,10 +51,10 @@ struct Core {
     /// Current tick
     tick: u8,
 
-    /// Thread park handle
+    /// Runtime driver
     ///
-    /// The parker is removed before starting to park
-    park: Option<Driver>,
+    /// The driver is removed before starting to park the thread
+    driver: Option<Driver>,
 
     /// Stats batcher
     stats: WorkerStatsBatcher,
@@ -127,11 +128,11 @@ scoped_thread_local!(static CURRENT: Context);
 
 impl BasicScheduler {
     pub(crate) fn new(
-        park: Driver,
+        driver: Driver,
         before_park: Option<Callback>,
         after_unpark: Option<Callback>,
     ) -> BasicScheduler {
-        let unpark = park.unpark();
+        let unpark = driver.unpark();
 
         let spawner = Spawner {
             shared: Arc::new(Shared {
@@ -149,7 +150,7 @@ impl BasicScheduler {
             tasks: VecDeque::with_capacity(INITIAL_CAPACITY),
             spawner: spawner.clone(),
             tick: 0,
-            park: Some(park),
+            driver: Some(driver),
             stats: WorkerStatsBatcher::new(0),
         })));
 
@@ -168,9 +169,9 @@ impl BasicScheduler {
     pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
         pin!(future);
 
-        // Attempt to steal the dedicated parker and block_on the future if we can there,
-        // otherwise, lets select on a notification that the parker is available
-        // or the future is complete.
+        // Attempt to steal the scheduler core and block_on the future if we can
+        // there, otherwise, lets select on a notification that the core is
+        // available or the future is complete.
         loop {
             if let Some(core) = self.take_core() {
                 return core.block_on(future);
@@ -226,7 +227,7 @@ impl Context {
     }
 
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
-        let mut park = core.park.take().expect("park missing");
+        let mut driver = core.driver.take().expect("driver missing");
 
         if let Some(f) = &self.spawner.shared.before_park {
             #[allow(clippy::redundant_closure)]
@@ -242,7 +243,7 @@ impl Context {
             core.stats.submit(&core.spawner.shared.stats);
 
             let (c, _) = self.enter(core, || {
-                park.park().expect("failed to park");
+                driver.park().expect("failed to park");
             });
 
             core = c;
@@ -255,20 +256,20 @@ impl Context {
             core = c;
         }
 
-        core.park = Some(park);
+        core.driver = Some(driver);
         core
     }
 
     fn park_yield(&self, mut core: Box<Core>) -> Box<Core> {
-        let mut park = core.park.take().expect("park missing");
+        let mut driver = core.driver.take().expect("driver missing");
 
         core.stats.submit(&core.spawner.shared.stats);
         let (mut core, _) = self.enter(core, || {
-            park.park_timeout(Duration::from_millis(0))
+            driver.park_timeout(Duration::from_millis(0))
                 .expect("failed to park");
         });
 
-        core.park = Some(park);
+        core.driver = Some(driver);
         core
     }
 
@@ -498,8 +499,8 @@ impl CoreGuard<'_> {
                     }
                 }
 
-                // Yield to the park, this drives the timer and pulls any pending
-                // I/O events.
+                // Yield to the driver, this drives the timer and pulls any
+                // pending I/O events.
                 core = context.park_yield(core);
             }
         })
@@ -530,8 +531,7 @@ impl Drop for CoreGuard<'_> {
             // other threads to pick it up and drive it.
             self.basic_scheduler.core.set(core);
 
-            // Wake up other possible threads that could steal
-            // the dedicated parker P.
+            // Wake up other possible threads that could steal the driver.
             self.basic_scheduler.notify.notify_one()
         }
     }
