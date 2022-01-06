@@ -40,7 +40,7 @@ pub(crate) struct BasicScheduler {
 }
 
 /// Data required for executing the scheduler. The struct is passed around to
-/// function that perform scheduling work and acts as a capability token.
+/// a function that will perform the scheduling work and acts as a capability token.
 struct Core {
     /// Scheduler run queue
     tasks: VecDeque<task::Notified<Arc<Shared>>>,
