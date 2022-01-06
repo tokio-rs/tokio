@@ -107,7 +107,8 @@ struct Context {
     /// Handle to the spawner
     spawner: Spawner,
 
-    /// Local queue
+    /// Scheduler core, enabling the holder of `Context` to execute the
+    /// scheduler.
     core: RefCell<Option<Box<Core>>>,
 }
 
@@ -226,10 +227,14 @@ impl Context {
         self.enter(core, || crate::coop::budget(f))
     }
 
+    /// Blocks the current thread until an event is received by the driver,
+    /// including I/O events, timer events, ...
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
         let mut driver = core.driver.take().expect("driver missing");
 
         if let Some(f) = &self.spawner.shared.before_park {
+            // Incorrect lint, the closures are actually different types so `f`
+            // cannot be passed as an argument to `enter`.
             #[allow(clippy::redundant_closure)]
             let (c, _) = self.enter(core, || f());
             core = c;
@@ -251,6 +256,8 @@ impl Context {
         }
 
         if let Some(f) = &self.spawner.shared.after_unpark {
+            // Incorrect lint, the closures are actually different types so `f`
+            // cannot be passed as an argument to `enter`.
             #[allow(clippy::redundant_closure)]
             let (c, _) = self.enter(core, || f());
             core = c;
@@ -260,12 +267,14 @@ impl Context {
         core
     }
 
+    /// Checks the driver for new events without blocking the thread.
     fn park_yield(&self, mut core: Box<Core>) -> Box<Core> {
         let mut driver = core.driver.take().expect("driver missing");
 
         core.stats.submit(&core.spawner.shared.stats);
         let (mut core, _) = self.enter(core, || {
-            driver.park_timeout(Duration::from_millis(0))
+            driver
+                .park_timeout(Duration::from_millis(0))
                 .expect("failed to park");
         });
 
@@ -308,8 +317,7 @@ impl Drop for BasicScheduler {
             // Drain local queue
             // We already shut down every task, so we just need to drop the task.
             while let Some(task) = core.tasks.pop_front() {
-                let (c, _) = context.enter(core, || drop(task));
-                core = c;
+                drop(task);
             }
 
             // Drain remote queue and set it to None
