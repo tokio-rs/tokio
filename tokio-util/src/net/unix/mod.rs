@@ -27,37 +27,28 @@ impl From<tokio::net::unix::SocketAddr> for ListenAddr {
 
 /// A trait for a listener: `TcpListener` and `UnixListener`.
 pub trait Listener: Send + Unpin {
+    /// The stream's type of this listener.
+    type Io: tokio::io::AsyncRead + tokio::io::AsyncWrite;
+
     /// Accepts a new incoming connection from this listener.
     fn accept<'a>(
         &'a self,
-    ) -> Pin<
-        Box<
-            dyn Future<
-                    Output = Result<(Box<dyn AsyncReadWrite + Send + Unpin + 'static>, ListenAddr)>,
-                > + Send
-                + 'a,
-        >,
-    >;
+    ) -> Pin<Box<dyn Future<Output = Result<(Self::Io, ListenAddr)>> + Send + 'a>>;
 
     /// Returns the local address that this listener is bound to.
     fn local_addr(&self) -> Result<ListenAddr>;
 }
 
 impl Listener for tokio::net::TcpListener {
+    type Io = tokio::net::TcpStream;
+
     fn accept<'a>(
         &'a self,
-    ) -> Pin<
-        Box<
-            dyn Future<
-                    Output = Result<(Box<dyn AsyncReadWrite + Send + Unpin + 'static>, ListenAddr)>,
-                > + Send
-                + 'a,
-        >,
-    > {
+    ) -> Pin<Box<dyn Future<Output = Result<(Self::Io, ListenAddr)>> + Send + 'a>> {
         let accept = self.accept();
         Box::pin(async {
             let (stream, addr) = accept.await?;
-            Ok((Box::new(stream) as Box<_>, addr.into()))
+            Ok((stream, addr.into()))
         })
     }
 
@@ -67,42 +58,19 @@ impl Listener for tokio::net::TcpListener {
 }
 
 impl Listener for tokio::net::UnixListener {
+    type Io = tokio::net::UnixStream;
+
     fn accept<'a>(
         &'a self,
-    ) -> Pin<
-        Box<
-            dyn Future<
-                    Output = Result<(Box<dyn AsyncReadWrite + Send + Unpin + 'static>, ListenAddr)>,
-                > + Send
-                + 'a,
-        >,
-    > {
+    ) -> Pin<Box<dyn Future<Output = Result<(Self::Io, ListenAddr)>> + Send + 'a>> {
         let accept = self.accept();
         Box::pin(async {
             let (stream, addr) = accept.await?;
-            Ok((Box::new(stream) as Box<_>, addr.into()))
+            Ok((stream, addr.into()))
         })
     }
 
     fn local_addr(&self) -> Result<ListenAddr> {
         self.local_addr().map(Into::into)
-    }
-}
-
-/// A trait that combines `tokio::io::AsyncRead` and `tokio::io::AsyncWrite`.
-pub trait AsyncReadWrite: tokio::io::AsyncRead + tokio::io::AsyncWrite {
-    /// Sets the value of the `TCP_NODELAY` option on this socket if this is a TCP socket.
-    fn set_nodelay(&self, nodelay: bool) -> Result<()>;
-}
-
-impl AsyncReadWrite for tokio::net::TcpStream {
-    fn set_nodelay(&self, nodelay: bool) -> Result<()> {
-        self.set_nodelay(nodelay)
-    }
-}
-
-impl AsyncReadWrite for tokio::net::UnixStream {
-    fn set_nodelay(&self, _nodelay: bool) -> Result<()> {
-        Ok(())
     }
 }
