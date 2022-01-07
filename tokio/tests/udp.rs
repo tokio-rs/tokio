@@ -2,9 +2,9 @@
 #![cfg(feature = "full")]
 
 use futures::future::poll_fn;
-use std::{io, panic};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::{io, panic};
 use tokio::{io::ReadBuf, net::UdpSocket};
 use tokio_test::assert_ok;
 
@@ -503,5 +503,6 @@ async fn udp_socket_is_unwind_safe() {
 
     assert!(panic::catch_unwind(|| async {
         sock.connect(peer_addr).await.unwrap();
-    }).is_ok());
+    })
+    .is_ok());
 }
