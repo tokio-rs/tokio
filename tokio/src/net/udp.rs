@@ -5,7 +5,6 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::task::{Context, Poll};
 
 cfg_io_util! {
@@ -1704,10 +1703,6 @@ impl TryFrom<std::net::UdpSocket> for UdpSocket {
         Self::from_std(stream)
     }
 }
-
-impl UnwindSafe for UdpSocket {}
-
-impl RefUnwindSafe for UdpSocket {}
 
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
