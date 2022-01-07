@@ -129,7 +129,7 @@ impl UdpSocket {
     /// the `addr` provided.
     ///
     /// **Note**: To dynamically allocate a local port, pass an address with the port as "0". (Ex: "0.0.0.0:0"). 
-    //  This will let the underlying system choose a port for you.
+    /// This will let the underlying system choose a port for you.
     ///
     /// # Example
     ///
