@@ -128,6 +128,9 @@ impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to
     /// the `addr` provided.
     ///
+    /// **Note**: To dynamically allocate a local port, pass an address with the port as "0" or omitted. (Ex: "0.0.0.0:0" or "0.0.0.0"). 
+    //  This will let the underlying system choose a port for you
+    ///
     /// # Example
     ///
     /// ```no_run
