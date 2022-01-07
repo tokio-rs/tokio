@@ -15,6 +15,7 @@ mod scheduled_io;
 use scheduled_io::ScheduledIo;
 
 use crate::park::{Park, Unpark};
+use crate::runtime::stats::IoDriverStats;
 use crate::util::slab::{self, Slab};
 use crate::{loom::sync::Mutex, util::bit};
 
@@ -74,6 +75,8 @@ pub(super) struct Inner {
 
     /// Used to wake up the reactor from a call to `turn`.
     waker: mio::Waker,
+
+    stats: IoDriverStats,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
@@ -112,7 +115,7 @@ fn _assert_kinds() {
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub(crate) fn new() -> io::Result<Driver> {
+    pub(crate) fn new(stats: IoDriverStats) -> io::Result<Driver> {
         let poll = mio::Poll::new()?;
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
         let registry = poll.registry().try_clone()?;
@@ -130,6 +133,7 @@ impl Driver {
                 registry,
                 io_dispatch: allocator,
                 waker,
+                stats,
             }),
         })
     }
@@ -153,7 +157,8 @@ impl Driver {
         self.tick = self.tick.wrapping_add(1);
 
         if self.tick == COMPACT_INTERVAL {
-            self.resources.as_mut().unwrap().compact()
+            self.resources.as_mut().unwrap().compact();
+            self.inner.stats.incr_compact_count();
         }
 
         let mut events = self.events.take().expect("i/o driver event store missing");
@@ -191,6 +196,14 @@ impl Driver {
         };
 
         let res = io.set_readiness(Some(token.0), Tick::Set(self.tick), |curr| curr | ready);
+
+        if ready.is_readable() {
+            self.inner.stats.incr_read_ready_count();
+        }
+
+        if ready.is_writable() {
+            self.inner.stats.incr_write_ready_count();
+        }
 
         if res.is_err() {
             // token no longer valid!
@@ -335,12 +348,18 @@ impl Inner {
         self.registry
             .register(source, mio::Token(token), interest.to_mio())?;
 
+        self.stats.incr_fd_count();
+
         Ok(shared)
     }
 
     /// Deregisters an I/O resource from the reactor.
     pub(super) fn deregister_source(&self, source: &mut impl mio::event::Source) -> io::Result<()> {
-        self.registry.deregister(source)
+        self.registry.deregister(source)?;
+
+        self.stats.dec_fd_count();
+
+        Ok(())
     }
 }
 

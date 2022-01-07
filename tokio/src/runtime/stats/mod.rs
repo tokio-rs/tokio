@@ -12,7 +12,7 @@ cfg_stats! {
     mod stats;
 
     pub use self::stats::{RuntimeStats, WorkerStats};
-    pub(crate) use self::stats::WorkerStatsBatcher;
+    pub(crate) use self::stats::{WorkerStatsBatcher, IoDriverStats};
 }
 
 cfg_not_stats! {

@@ -2,6 +2,7 @@
 use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
 use std::convert::TryFrom;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// This type contains methods to retrieve stats from a Tokio runtime.
@@ -14,6 +15,7 @@ use std::time::{Duration, Instant};
 #[derive(Debug)]
 pub struct RuntimeStats {
     workers: Box<[WorkerStats]>,
+    driver: IoDriverStats,
 }
 
 /// This type contains methods to retrieve stats from a worker thread on a Tokio runtime.
@@ -46,6 +48,7 @@ impl RuntimeStats {
 
         Self {
             workers: workers.into_boxed_slice(),
+            driver: IoDriverStats::default(),
         }
     }
 
@@ -130,5 +133,41 @@ impl WorkerStatsBatcher {
 
     pub(crate) fn incr_poll_count(&mut self) {
         self.poll_count += 1;
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub(crate) struct IoDriverStats {
+    inner: Arc<IoDriverStatsInner>,
+}
+
+#[derive(Debug, Default)]
+#[repr(align(128))]
+struct IoDriverStatsInner {
+    read_ready_count: AtomicU64,
+    write_ready_count: AtomicU64,
+    fd_count: AtomicU64,
+    compact_count: AtomicU64,
+}
+
+impl IoDriverStats {
+    pub(crate) fn incr_read_ready_count(&self) {
+        self.inner.read_ready_count.fetch_add(1, Relaxed);
+    }
+
+    pub(crate) fn incr_write_ready_count(&self) {
+        self.inner.write_ready_count.fetch_add(1, Relaxed);
+    }
+
+    pub(crate) fn incr_fd_count(&self) {
+        self.inner.fd_count.fetch_add(1, Relaxed);
+    }
+
+    pub(crate) fn dec_fd_count(&self) {
+        self.inner.fd_count.fetch_sub(1, Relaxed);
+    }
+
+    pub(crate) fn incr_compact_count(&self) {
+        self.inner.compact_count.fetch_add(1, Relaxed);
     }
 }
