@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use futures::future::poll_fn;
-use std::io;
+use std::{io, panic};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::{io::ReadBuf, net::UdpSocket};
@@ -493,4 +493,15 @@ async fn peer_addr() {
     let sock = UdpSocket::bind(addr).await.unwrap();
     sock.connect(peer_addr).await.unwrap();
     assert_eq!(sock.peer_addr().unwrap().ip(), peer_addr.ip());
+}
+
+#[tokio::test]
+async fn udp_socket_is_unwind_safe() {
+    let addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
+    let peer_addr = "127.0.0.1:11100".parse::<SocketAddr>().unwrap();
+    let sock = UdpSocket::bind(addr).await.unwrap();
+
+    assert!(panic::catch_unwind(|| async {
+        sock.connect(peer_addr).await.unwrap();
+    }).is_ok());
 }
