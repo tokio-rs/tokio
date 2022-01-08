@@ -212,15 +212,3 @@ impl<E: Source> Drop for PollEvented<E> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn assert_unwind_safe() {
-        is_unwind_safe::<PollEvented<mio::net::UdpSocket>>();
-    }
-
-    fn is_unwind_safe<T: UnwindSafe + RefUnwindSafe>() {}
-}
