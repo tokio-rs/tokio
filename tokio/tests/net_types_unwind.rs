@@ -22,8 +22,11 @@ fn unix_net_types_are_unwind_safe() {
 #[test]
 #[cfg(windows)]
 fn windows_net_types_are_unwind_safe() {
-    is_unwind_safe::<tokio::net::NamedPipeClient>();
-    is_unwind_safe::<tokio::net::NamedPipeServer>();
+    use tokio::net::windows::named_pipe::NamedPipeClient;
+    use tokio::net::windows::named_pipe::NamedPipeServer;
+
+    is_unwind_safe::<NamedPipeClient>();
+    is_unwind_safe::<NamedPipeServer>();
 }
 
 fn is_unwind_safe<T: UnwindSafe + RefUnwindSafe>() {}
