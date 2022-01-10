@@ -1130,18 +1130,25 @@ impl Child {
     pub async fn wait_with_output(mut self) -> io::Result<Output> {
         use crate::future::try_join3;
 
-        async fn read_to_end<A: AsyncRead + Unpin>(io: Option<A>) -> io::Result<Vec<u8>> {
+        async fn read_to_end<A: AsyncRead + Unpin>(io: &mut Option<A>) -> io::Result<Vec<u8>> {
             let mut vec = Vec::new();
-            if let Some(mut io) = io {
-                crate::io::util::read_to_end(&mut io, &mut vec).await?;
+            if let Some(io) = io.as_mut() {
+                crate::io::util::read_to_end(io, &mut vec).await?;
             }
             Ok(vec)
         }
 
-        let stdout_fut = read_to_end(self.stdout.take());
-        let stderr_fut = read_to_end(self.stderr.take());
+        let mut stdout_pipe = self.stdout.take();
+        let mut stderr_pipe = self.stderr.take();
+
+        let stdout_fut = read_to_end(&mut stdout_pipe);
+        let stderr_fut = read_to_end(&mut stderr_pipe);
 
         let (status, stdout, stderr) = try_join3(self.wait(), stdout_fut, stderr_fut).await?;
+
+        // Drop happens after `try_join` due to <https://github.com/tokio-rs/tokio/issues/4309>
+        drop(stdout_pipe);
+        drop(stderr_pipe);
 
         Ok(Output {
             status,
