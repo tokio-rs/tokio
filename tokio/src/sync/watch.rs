@@ -91,6 +91,23 @@ pub struct Sender<T> {
 /// Outstanding borrows hold a read lock on the inner value. This means that
 /// long lived borrows could cause the produce half to block. It is recommended
 /// to keep the borrow as short lived as possible.
+///
+/// The priority policy of the lock is dependent on the underlying lock
+/// implementation, and this type does not guarantee that any particular policy
+/// will be used. In particular, a producer which is waiting to acquire the lock
+/// in `send` might or might not block concurrent calls to `borrow`, e.g.:
+///
+/// <details><summary>Potential deadlock example</summary>
+///
+/// ```text
+/// // Task 1 (on thread A)    |  // Task 2 (on thread B)
+/// let _ref1 = rx.borrow();   |
+///                            |  // will block
+///                            |  let _ = tx.send(());
+/// // may deadlock            |
+/// let _ref2 = rx.borrow();   |
+/// ```
+/// </details>
 #[derive(Debug)]
 pub struct Ref<'a, T> {
     inner: RwLockReadGuard<'a, T>,
@@ -285,6 +302,23 @@ impl<T> Receiver<T> {
     /// could cause the send half to block. It is recommended to keep the borrow
     /// as short lived as possible.
     ///
+    /// The priority policy of the lock is dependent on the underlying lock
+    /// implementation, and this type does not guarantee that any particular policy
+    /// will be used. In particular, a producer which is waiting to acquire the lock
+    /// in `send` might or might not block concurrent calls to `borrow`, e.g.:
+    ///
+    /// <details><summary>Potential deadlock example</summary>
+    ///
+    /// ```text
+    /// // Task 1 (on thread A)    |  // Task 2 (on thread B)
+    /// let _ref1 = rx.borrow();   |
+    ///                            |  // will block
+    ///                            |  let _ = tx.send(());
+    /// // may deadlock            |
+    /// let _ref2 = rx.borrow();   |
+    /// ```
+    /// </details>
+    ///
     /// [`changed`]: Receiver::changed
     ///
     /// # Examples
@@ -310,6 +344,23 @@ impl<T> Receiver<T> {
     /// Outstanding borrows hold a read lock. This means that long lived borrows
     /// could cause the send half to block. It is recommended to keep the borrow
     /// as short lived as possible.
+    ///
+    /// The priority policy of the lock is dependent on the underlying lock
+    /// implementation, and this type does not guarantee that any particular policy
+    /// will be used. In particular, a producer which is waiting to acquire the lock
+    /// in `send` might or might not block concurrent calls to `borrow`, e.g.:
+    ///
+    /// <details><summary>Potential deadlock example</summary>
+    ///
+    /// ```text
+    /// // Task 1 (on thread A)                |  // Task 2 (on thread B)
+    /// let _ref1 = rx1.borrow_and_update();   |
+    ///                                        |  // will block
+    ///                                        |  let _ = tx.send(());
+    /// // may deadlock                        |
+    /// let _ref2 = rx2.borrow_and_update();   |
+    /// ```
+    /// </details>
     ///
     /// [`changed`]: Receiver::changed
     pub fn borrow_and_update(&mut self) -> Ref<'_, T> {
