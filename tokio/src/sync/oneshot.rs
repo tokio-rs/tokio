@@ -1014,6 +1014,36 @@ impl<T> Receiver<T> {
         self.inner = None;
         result
     }
+
+    /// Blocking receive to call outside of asynchronous contexts.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called within an asynchronous execution
+    /// context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::thread;
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = oneshot::channel::<u8>();
+    ///
+    ///     let sync_code = thread::spawn(move || {
+    ///         assert_eq!(Ok(10), rx.blocking_recv());
+    ///     });
+    ///
+    ///     let _ = tx.send(10);
+    ///     sync_code.join().unwrap();
+    /// }
+    /// ```
+    #[cfg(feature = "sync")]
+    pub fn blocking_recv(self) -> Result<T, RecvError> {
+        crate::future::block_on(self)
+    }
 }
 
 impl<T> Drop for Receiver<T> {
