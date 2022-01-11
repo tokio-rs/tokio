@@ -25,7 +25,7 @@ cfg_not_rt! {
     }
 
     cfg_fs! {
-        pub(crate) fn spawn_mandatory_blocking<F, R>(_f: F) -> JoinHandle<R>
+        pub(crate) fn spawn_mandatory_blocking<F, R>(_f: F) -> Option<JoinHandle<R>>
         where
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
