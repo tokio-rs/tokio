@@ -12,6 +12,10 @@ env:
   nightly: nightly-2021-11-23
   minrust: 1.46
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # Depends on all action sthat are required for a "successful" CI run.
   tests-pass:
@@ -31,6 +35,7 @@ jobs:
       - valgrind
       - loom-compile
       - check-readme
+      - test-hyper
     steps:
       - run: exit 0
 
@@ -355,3 +360,34 @@ jobs:
       - name: Verify that Tokio version is up to date in README
         working-directory: tokio
         run: grep -q "$(sed '/^version = /!d' Cargo.toml | head -n1)" README.md
+
+  test-hyper:
+    name: Test hyper
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+      - uses: Swatinem/rust-cache@v1
+      - name: Test hyper
+        run: |
+          set -x
+          git clone https://github.com/hyperium/hyper.git
+          cd hyper
+          # checkout the latest release because HEAD maybe contains breakage.
+          tag=$(git describe --abbrev=0 --tags)
+          git checkout "${tag}"
+          echo '[workspace]' >>Cargo.toml
+          echo '[patch.crates-io]' >>Cargo.toml
+          echo 'tokio = { path = "../tokio" }' >>Cargo.toml
+          echo 'tokio-util = { path = "../tokio-util" }' >>Cargo.toml
+          echo 'tokio-stream = { path = "../tokio-stream" }' >>Cargo.toml
+          echo 'tokio-test = { path = "../tokio-test" }' >>Cargo.toml
+          git diff
+          cargo test --features full
