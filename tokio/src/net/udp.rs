@@ -257,78 +257,6 @@ impl UdpSocket {
         }
     }
 
-    /// Sets the size of the UDP send buffer on this socket.
-    ///
-    /// On most operating systems, this sets the `SO_SNDBUF` socket option.
-    pub fn set_send_buffer_size(&self, size: u32) -> io::Result<()> {
-        self.as_socket().set_send_buffer_size(size as usize)
-    }
-
-    /// Returns the size of the UDP send buffer for this socket.
-    ///
-    /// On most operating systems, this is the value of the `SO_SNDBUF` socket
-    /// option.
-    ///
-    /// Note that if [`set_send_buffer_size`] has been called on this socket
-    /// previously, the value returned by this function may not be the same as
-    /// the argument provided to `set_send_buffer_size`. This is for the
-    /// following reasons:
-    ///
-    /// * Most operating systems have minimum and maximum allowed sizes for the
-    ///   send buffer, and will clamp the provided value if it is below the
-    ///   minimum or above the maximum. The minimum and maximum buffer sizes are
-    ///   OS-dependent.
-    /// * Linux will double the buffer size to account for internal bookkeeping
-    ///   data, and returns the doubled value from `getsockopt(2)`. As per `man
-    ///   7 socket`:
-    ///   > Sets or gets the maximum socket send buffer in bytes. The
-    ///   > kernel doubles this value (to allow space for bookkeeping
-    ///   > overhead) when it is set using `setsockopt(2)`, and this doubled
-    ///   > value is returned by `getsockopt(2)`.
-    ///
-    /// [`set_send_buffer_size`]: Self::set_send_buffer_size
-    pub fn send_buffer_size(&self) -> io::Result<u32> {
-        self.as_socket().send_buffer_size().map(|n| n as u32)
-    }
-
-    /// Sets the size of the UDP receive buffer on this socket.
-    ///
-    /// On most operating systems, this sets the `SO_RCVBUF` socket option.
-    pub fn set_recv_buffer_size(&self, size: u32) -> io::Result<()> {
-        self.as_socket().set_recv_buffer_size(size as usize)
-    }
-
-    /// Returns the size of the UDP receive buffer for this socket.
-    ///
-    /// On most operating systems, this is the value of the `SO_RCVBUF` socket
-    /// option.
-    ///
-    /// Note that if [`set_recv_buffer_size`] has been called on this socket
-    /// previously, the value returned by this function may not be the same as
-    /// the argument provided to `set_send_buffer_size`. This is for the
-    /// following reasons:
-    ///
-    /// * Most operating systems have minimum and maximum allowed sizes for the
-    ///   receive buffer, and will clamp the provided value if it is below the
-    ///   minimum or above the maximum. The minimum and maximum buffer sizes are
-    ///   OS-dependent.
-    /// * Linux will double the buffer size to account for internal bookkeeping
-    ///   data, and returns the doubled value from `getsockopt(2)`. As per `man
-    ///   7 socket`:
-    ///   > Sets or gets the maximum socket send buffer in bytes. The
-    ///   > kernel doubles this value (to allow space for bookkeeping
-    ///   > overhead) when it is set using `setsockopt(2)`, and this doubled
-    ///   > value is returned by `getsockopt(2)`.
-    ///
-    /// [`set_recv_buffer_size`]: Self::set_recv_buffer_size
-    pub fn recv_buffer_size(&self) -> io::Result<u32> {
-        self.as_socket().recv_buffer_size().map(|n| n as u32)
-    }
-
-    fn as_socket(&self) -> socket2::SockRef<'_> {
-        socket2::SockRef::from(self)
-    }
-
     /// Returns the local address that this socket is bound to.
     ///
     /// # Example
@@ -348,29 +276,6 @@ impl UdpSocket {
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.local_addr()
-    }
-
-    /// Returns the socket address of the remote peer this socket was connected
-    /// to.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use tokio::net::UdpSocket;
-    /// # use std::{io, net::SocketAddr};
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> io::Result<()> {
-    /// let addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
-    /// let peer_addr = "127.0.0.1:11100".parse::<SocketAddr>().unwrap();
-    /// let sock = UdpSocket::bind(addr).await?;
-    /// sock.connect(peer_addr).await?;
-    /// assert_eq!(sock.peer_addr()?.ip(), peer_addr.ip());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.io.peer_addr()
     }
 
     /// Connects the UDP socket setting the default destination for send() and
@@ -1577,61 +1482,6 @@ impl UdpSocket {
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.set_ttl(ttl)
-    }
-
-    /// Gets the value of the `IP_TOS` option for this socket.
-    ///
-    /// For more information about this option, see [`set_tos`].
-    ///
-    /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
-    /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
-    ///
-    /// [`set_tos`]: Self::set_tos
-    // https://docs.rs/socket2/0.4.2/src/socket2/socket.rs.html#1178
-    #[cfg(not(any(
-        target_os = "fuchsia",
-        target_os = "redox",
-        target_os = "solaris",
-        target_os = "illumos",
-    )))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(not(any(
-            target_os = "fuchsia",
-            target_os = "redox",
-            target_os = "solaris",
-            target_os = "illumos",
-        ))))
-    )]
-    pub fn tos(&self) -> io::Result<u32> {
-        self.as_socket().tos()
-    }
-
-    /// Sets the value for the `IP_TOS` option on this socket.
-    ///
-    /// This value sets the time-to-live field that is used in every packet sent
-    /// from this socket.
-    ///
-    /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
-    /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
-    // https://docs.rs/socket2/0.4.2/src/socket2/socket.rs.html#1178
-    #[cfg(not(any(
-        target_os = "fuchsia",
-        target_os = "redox",
-        target_os = "solaris",
-        target_os = "illumos",
-    )))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(not(any(
-            target_os = "fuchsia",
-            target_os = "redox",
-            target_os = "solaris",
-            target_os = "illumos",
-        ))))
-    )]
-    pub fn set_tos(&self, tos: u32) -> io::Result<()> {
-        self.as_socket().set_tos(tos)
     }
 
     /// Executes an operation of the `IP_ADD_MEMBERSHIP` type.
