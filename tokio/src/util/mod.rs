@@ -3,9 +3,6 @@ cfg_io_driver! {
     pub(crate) mod slab;
 }
 
-#[cfg(feature = "rt")]
-pub(crate) mod atomic_cell;
-
 #[cfg(any(
     // io driver uses `WakeList` directly
     feature = "net",
