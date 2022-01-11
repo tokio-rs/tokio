@@ -120,13 +120,7 @@ impl TcpSocket {
     /// }
     /// ```
     pub fn new_v4() -> io::Result<TcpSocket> {
-        let inner = socket2::Socket::new(
-            socket2::Domain::IPV4,
-            socket2::Type::STREAM,
-            Some(socket2::Protocol::TCP),
-        )?;
-        inner.set_nonblocking(true)?;
-        Ok(TcpSocket { inner })
+        Self::new(socket2::Domain::IPV4)
     }
 
     /// Creates a new socket configured for IPv6.
@@ -159,11 +153,35 @@ impl TcpSocket {
     /// }
     /// ```
     pub fn new_v6() -> io::Result<TcpSocket> {
-        let inner = socket2::Socket::new(
-            socket2::Domain::IPV6,
-            socket2::Type::STREAM,
-            Some(socket2::Protocol::TCP),
-        )?;
+        Self::new(socket2::Domain::IPV6)
+    }
+
+    fn new(domain: socket2::Domain) -> io::Result<TcpSocket> {
+        let sock_ty = socket2::Type::STREAM;
+        #[cfg(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "fuchsia",
+            target_os = "illumos",
+            target_os = "linux",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        let sock_ty = sock_ty.nonblocking();
+        let inner = socket2::Socket::new(domain, sock_ty, Some(socket2::Protocol::TCP))?;
+        // Some platform doesn't support setting nonblocking mode at creation.
+        // https://docs.rs/socket2/latest/socket2/struct.Type.html#method.nonblocking
+        #[cfg(not(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "fuchsia",
+            target_os = "illumos",
+            target_os = "linux",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        )))]
         inner.set_nonblocking(true)?;
         Ok(TcpSocket { inner })
     }
