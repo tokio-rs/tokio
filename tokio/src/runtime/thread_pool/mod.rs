@@ -1,5 +1,8 @@
 //! Threadpool
 
+mod atomic_cell;
+use atomic_cell::AtomicCell;
+
 mod idle;
 use self::idle::Idle;
 
