@@ -383,7 +383,7 @@ jobs:
           git clone https://github.com/hyperium/hyper.git
           cd hyper
           # checkout the latest release because HEAD maybe contains breakage.
-          tag=$(curl -fsSL https://api.github.com/repos/hyperium/hyper/releases/latest | jq -r '.tag_name')
+          tag=$(git describe --abbrev=0 --tags)
           git checkout "${tag}"
           echo '[workspace]' >>Cargo.toml
           echo '[patch.crates-io]' >>Cargo.toml
