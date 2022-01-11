@@ -365,7 +365,6 @@ jobs:
       matrix:
         cmd:
           - test
-          - ubuntu-latest
           - bench
     steps:
       - uses: actions/checkout@v2
@@ -382,6 +381,7 @@ jobs:
           # checkout the latest release because master maybe contains breakage.
           tag=$(curl -fsSL https://api.github.com/repos/hyperium/hyper/releases/latest | jq -r '.tag_name')
           git checkout "${tag}"
+          echo "" >>Cargo.toml
           echo "[workspace]" >>Cargo.toml
           echo "[patch.crates-io]" >>Cargo.toml
           echo "tokio = { path = "../tokio" }" >>Cargo.toml
