@@ -511,7 +511,7 @@ impl Context {
         core.park = Some(park);
 
         // If there are tasks available to steal, notify a worker
-        if core.run_queue.is_stealable() {
+        if !core.is_searching && core.run_queue.is_stealable() {
             self.worker.shared.notify_parked();
         }
 
@@ -620,8 +620,7 @@ impl Core {
         // If a task is in the lifo slot, then we must unpark regardless of
         // being notified
         if self.lifo_slot.is_some() {
-            worker.shared.idle.unpark_worker_by_id(worker.index);
-            self.is_searching = true;
+            self.is_searching = !worker.shared.idle.unpark_worker_by_id(worker.index);
             return true;
         }
 
