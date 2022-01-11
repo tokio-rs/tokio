@@ -12,6 +12,10 @@ env:
   nightly: nightly-2021-11-23
   minrust: 1.46
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # Depends on all action sthat are required for a "successful" CI run.
   tests-pass:
