@@ -359,7 +359,13 @@ jobs:
 
   test-hyper:
     name: Test hyper
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -383,4 +389,3 @@ jobs:
           echo 'tokio-test = { path = "../tokio-test" }' >>Cargo.toml
           git diff
           cargo test --features full
-          cargo bench --features full
