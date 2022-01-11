@@ -406,12 +406,13 @@ impl Schedule for Arc<Shared> {
     fn schedule(&self, task: task::Notified<Self>) {
         CURRENT.with(|maybe_cx| match maybe_cx {
             Some(cx) if Arc::ptr_eq(self, &cx.spawner.shared) => {
-                cx.core
-                    .borrow_mut()
-                    .as_mut()
-                    .expect("core missing")
-                    .tasks
-                    .push_back(task);
+                let mut core = cx.core.borrow_mut();
+
+                // If `None`, the runtime is shutting down, so there is no need
+                // to schedule the task.
+                if let Some(core) = core.as_mut() {
+                    core.tasks.push_back(task);
+                }
             }
             _ => {
                 // If the queue is None, then the runtime has shut down. We
