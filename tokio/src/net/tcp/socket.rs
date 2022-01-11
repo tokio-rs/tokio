@@ -409,11 +409,6 @@ impl TcpSocket {
             .map(|addr| addr.as_socket().unwrap())
     }
 
-    /// Returns the value of the `SO_ERROR` option.
-    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.inner.take_error()
-    }
-
     /// Binds the socket to the given address.
     ///
     /// This calls the `bind(2)` operating-system function. Behavior is
