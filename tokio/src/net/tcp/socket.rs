@@ -541,8 +541,8 @@ impl TcpSocket {
             #[cfg(unix)]
             Err(e) if e.raw_os_error() != Some(libc::EINPROGRESS) => return Err(e),
             // https://github.com/tokio-rs/mio/blob/d400ddfc97212b4a2844d741b095dab2c6d15543/src/sys/windows/tcp.rs#L49
-            #[cfg(not(unix))]
-            Err(e) if err.kind() != io::ErrorKind::WouldBlock => return Err(e),
+            #[cfg(windows)]
+            Err(e) if e.kind() != io::ErrorKind::WouldBlock => return Err(e),
             _ => {}
         }
 
