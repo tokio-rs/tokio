@@ -381,11 +381,11 @@ jobs:
           # checkout the latest release because master maybe contains breakage.
           tag=$(curl -fsSL https://api.github.com/repos/hyperium/hyper/releases/latest | jq -r '.tag_name')
           git checkout "${tag}"
-          echo "" >>Cargo.toml
-          echo "[workspace]" >>Cargo.toml
-          echo "[patch.crates-io]" >>Cargo.toml
-          echo "tokio = { path = "../tokio" }" >>Cargo.toml
-          echo "tokio-util = { path = "../tokio-util" }" >>Cargo.toml
-          echo "tokio-stream = { path = "../tokio-stream" }" >>Cargo.toml
-          echo "tokio-test = { path = "../tokio-test" }" >>Cargo.toml
+          echo '[workspace]' >>Cargo.toml
+          echo '[patch.crates-io]' >>Cargo.toml
+          echo 'tokio = { path = "../tokio" }' >>Cargo.toml
+          echo 'tokio-util = { path = "../tokio-util" }' >>Cargo.toml
+          echo 'tokio-stream = { path = "../tokio-stream" }' >>Cargo.toml
+          echo 'tokio-test = { path = "../tokio-test" }' >>Cargo.toml
+          git diff
           cargo ${{ matrix.cmd }} --features full --no-fail-fast
