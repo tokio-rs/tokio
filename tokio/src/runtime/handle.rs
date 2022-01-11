@@ -267,7 +267,7 @@ impl Handle {
         let spawned = self
             .blocking_spawner
             .spawn(blocking::Task::new(task, is_mandatory), self);
-        (handle, !spawned.is_err())
+        (handle, spawned.is_ok())
     }
 
     /// Runs a future to completion on this `Handle`'s associated `Runtime`.

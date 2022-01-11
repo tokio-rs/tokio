@@ -658,10 +658,9 @@ impl AsyncWrite for File {
 
                         (Operation::Write(res), buf)
                     })
-                    .ok_or(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "runtime was shutting down",
-                    ))?;
+                    .ok_or_else(|| {
+                        std::io::Error::new(std::io::ErrorKind::Other, "runtime was shutting down")
+                    })?;
 
                     inner.state = Busy(blocking_task_join_handle);
 
