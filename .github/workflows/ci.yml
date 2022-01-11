@@ -31,6 +31,7 @@ jobs:
       - valgrind
       - loom-compile
       - check-readme
+      - test-hyper
     steps:
       - run: exit 0
 
@@ -355,3 +356,36 @@ jobs:
       - name: Verify that Tokio version is up to date in README
         working-directory: tokio
         run: grep -q "$(sed '/^version = /!d' Cargo.toml | head -n1)" README.md
+
+  test-hyper:
+    name: Test hyper
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cmd:
+          - test
+          - ubuntu-latest
+          - bench
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.nightly }}
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - name: Test hyper
+        run: |
+          set -x
+          git clone https://github.com/hyperium/hyper.git
+          cd hyper
+          # checkout the latest release because master maybe contains breakage.
+          tag=$(curl -fsSL https://api.github.com/repos/hyperium/hyper/releases/latest | jq -r '.tag_name')
+          git checkout "${tag}"
+          echo "[workspace]" >>Cargo.toml
+          echo "[patch.crates-io]" >>Cargo.toml
+          echo "tokio = { path = "../tokio" }" >>Cargo.toml
+          echo "tokio-util = { path = "../tokio-util" }" >>Cargo.toml
+          echo "tokio-stream = { path = "../tokio-stream" }" >>Cargo.toml
+          echo "tokio-test = { path = "../tokio-test" }" >>Cargo.toml
+          cargo ${{ matrix.cmd }} --features full --no-fail-fast

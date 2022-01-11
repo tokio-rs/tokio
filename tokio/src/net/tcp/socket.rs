@@ -125,6 +125,7 @@ impl TcpSocket {
             socket2::Type::STREAM,
             Some(socket2::Protocol::TCP),
         )?;
+        inner.set_nonblocking(true)?;
         Ok(TcpSocket { inner })
     }
 
@@ -163,6 +164,7 @@ impl TcpSocket {
             socket2::Type::STREAM,
             Some(socket2::Protocol::TCP),
         )?;
+        inner.set_nonblocking(true)?;
         Ok(TcpSocket { inner })
     }
 
@@ -534,7 +536,14 @@ impl TcpSocket {
     /// }
     /// ```
     pub async fn connect(self, addr: SocketAddr) -> io::Result<TcpStream> {
-        self.inner.connect(&addr.into())?;
+        match self.inner.connect(&addr.into()) {
+            // https://github.com/tokio-rs/mio/blob/d400ddfc97212b4a2844d741b095dab2c6d15543/src/sys/unix/tcp.rs#L31
+            #[cfg(unix)]
+            Err(e) if e.raw_os_error() != Some(libc::EINPROGRESS) => return Err(e),
+            #[cfg(not(unix))]
+            Err(e) => return Err(e),
+            _ => {}
+        }
 
         #[cfg(windows)]
         let mio = unsafe { mio::net::TcpStream::from_raw_socket(self.inner.into_raw_socket()) };
