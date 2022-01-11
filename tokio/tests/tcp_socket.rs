@@ -88,6 +88,11 @@ fn assert_non_blocking(socket: &TcpSocket) {
         let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFL) };
         assert!(flags & libc::O_NONBLOCK != 0, "O_NONBLOCK not set");
     }
+    #[cfg(windows)]
+    {
+        // There is no way to assert this in windows.
+        let _ = socket;
+    }
 }
 fn assert_close_on_exec(socket: &TcpSocket) {
     #[cfg(unix)]
@@ -95,5 +100,10 @@ fn assert_close_on_exec(socket: &TcpSocket) {
         use std::os::unix::io::AsRawFd;
         let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFD) };
         assert!(flags & libc::FD_CLOEXEC != 0, "FD_CLOEXEC not set");
+    }
+    #[cfg(windows)]
+    {
+        // This flag is not present in windows.
+        let _ = socket;
     }
 }
