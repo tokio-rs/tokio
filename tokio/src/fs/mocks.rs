@@ -105,7 +105,7 @@ where
     JoinHandle { rx }
 }
 
-pub(super) fn spawn_mandatory_blocking<F, R>(f: F) -> JoinHandle<R>
+pub(super) fn spawn_mandatory_blocking<F, R>(f: F) -> Option<JoinHandle<R>>
 where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
@@ -117,7 +117,7 @@ where
 
     QUEUE.with(|cell| cell.borrow_mut().push_back(task));
 
-    JoinHandle { rx }
+    Some(JoinHandle { rx })
 }
 
 impl<T> Future for JoinHandle<T> {

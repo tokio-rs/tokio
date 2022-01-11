@@ -118,10 +118,11 @@ cfg_fs! {
         all(loom, not(test)), // the function is covered by loom tests
         test
     ), allow(dead_code))]
-    /// Runs the provided function on an executor dedicated to blocking operations.
-    /// Tasks will be scheduled as mandatory, meaning they are guaranteed to run
-    /// unless a shutdown is already taking place.
-    pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> JoinHandle<R>
+    /// Runs the provided function on an executor dedicated to blocking
+    /// operations. Tasks will be scheduled as mandatory, meaning they are
+    /// guaranteed to run unless a shutdown is already taking place. In case a
+    /// shutdown is already taking place, `None` will be returned.
+    pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> Option<JoinHandle<R>>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -223,7 +224,9 @@ impl Spawner {
             let mut shared = self.inner.shared.lock();
 
             if shared.shutdown {
-                // Shutdown the task
+                // Shutdown the task: it's fine to shutdown this task (even if
+                // mandatory) because it was scheduled after the shutdown of the
+                // runtime began.
                 task.task.shutdown();
 
                 // no need to even push this task; it would never get picked up

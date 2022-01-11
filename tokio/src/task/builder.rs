@@ -108,6 +108,8 @@ impl<'a> Builder<'a> {
         Output: Send + 'static,
     {
         use crate::runtime::Mandatory;
-        context::current().spawn_blocking_inner(function, Mandatory::NonMandatory, self.name)
+        let (join_handle, _was_spawned) =
+            context::current().spawn_blocking_inner(function, Mandatory::NonMandatory, self.name);
+        join_handle
     }
 }

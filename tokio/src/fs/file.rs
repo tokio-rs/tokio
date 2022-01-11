@@ -649,7 +649,7 @@ impl AsyncWrite for File {
                     let n = buf.copy_from(src);
                     let std = me.std.clone();
 
-                    inner.state = Busy(spawn_mandatory_blocking(move || {
+                    let blocking_task_join_handle = spawn_mandatory_blocking(move || {
                         let res = if let Some(seek) = seek {
                             (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
                         } else {
@@ -657,7 +657,13 @@ impl AsyncWrite for File {
                         };
 
                         (Operation::Write(res), buf)
-                    }));
+                    })
+                    .ok_or(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "runtime was shutting down",
+                    ))?;
+
+                    inner.state = Busy(blocking_task_join_handle);
 
                     return Ready(Ok(n));
                 }

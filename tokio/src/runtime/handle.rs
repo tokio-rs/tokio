@@ -189,11 +189,14 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
-            self.spawn_blocking_inner(Box::new(func), blocking::Mandatory::NonMandatory, None)
-        } else {
-            self.spawn_blocking_inner(func, blocking::Mandatory::NonMandatory, None)
-        }
+        let (join_handle, _was_spawned) =
+            if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+                self.spawn_blocking_inner(Box::new(func), blocking::Mandatory::NonMandatory, None)
+            } else {
+                self.spawn_blocking_inner(func, blocking::Mandatory::NonMandatory, None)
+            };
+
+        join_handle
     }
 
     cfg_fs! {
@@ -202,12 +205,12 @@ impl Handle {
             all(loom, not(test)), // the function is covered by loom tests
             test
         ), allow(dead_code))]
-        pub(crate) fn spawn_mandatory_blocking<F, R>(&self, func: F) -> JoinHandle<R>
+        pub(crate) fn spawn_mandatory_blocking<F, R>(&self, func: F) -> Option<JoinHandle<R>>
         where
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+            let (join_handle, was_spawned) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
                 self.spawn_blocking_inner(
                     Box::new(func),
                     blocking::Mandatory::Mandatory,
@@ -219,6 +222,12 @@ impl Handle {
                     blocking::Mandatory::Mandatory,
                     None
                 )
+            };
+
+            if was_spawned {
+                Some(join_handle)
+            } else {
+                None
             }
         }
     }
@@ -229,7 +238,7 @@ impl Handle {
         func: F,
         is_mandatory: blocking::Mandatory,
         name: Option<&str>,
-    ) -> JoinHandle<R>
+    ) -> (JoinHandle<R>, bool)
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -255,10 +264,10 @@ impl Handle {
         let _ = name;
 
         let (task, handle) = task::unowned(fut, NoopSchedule);
-        let _ = self
+        let spawned = self
             .blocking_spawner
             .spawn(blocking::Task::new(task, is_mandatory), self);
-        handle
+        (handle, !spawned.is_err())
     }
 
     /// Runs a future to completion on this `Handle`'s associated `Runtime`.
