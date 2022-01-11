@@ -34,20 +34,22 @@ fn assert_at_most_num_polls(rt: Arc<Runtime>, at_most_polls: usize) {
 #[test]
 fn block_on_num_polls() {
     loom::model(|| {
-        // we expect at most 3 number of polls because there are
-        // three points at which we poll the future. At any of these
-        // points it can be ready:
+        // we expect at most 4 number of polls because there are three points at
+        // which we poll the future and an opportunity for a false-positive.. At
+        // any of these points it can be ready:
         //
-        // - when we fail to steal the parker and we block on a
-        //   notification that it is available.
+        // - when we fail to steal the parker and we block on a notification
+        //   that it is available.
         //
         // - when we steal the parker and we schedule the future
         //
-        // - when the future is woken up and we have ran the max
-        //   number of tasks for the current tick or there are no
-        //   more tasks to run.
+        // - when the future is woken up and we have ran the max number of tasks
+        //   for the current tick or there are no more tasks to run.
         //
-        let at_most = 3;
+        // - a thread is notified that the parker is available but a third
+        //   thread acquires it before the notified thread can.
+        //
+        let at_most = 4;
 
         let rt1 = Arc::new(Builder::new_current_thread().build().unwrap());
         let rt2 = rt1.clone();

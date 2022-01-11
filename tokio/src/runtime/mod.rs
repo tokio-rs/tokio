@@ -283,7 +283,7 @@ cfg_rt! {
     #[derive(Debug)]
     enum Kind {
         /// Execute all tasks on the current-thread.
-        CurrentThread(BasicScheduler<driver::Driver>),
+        CurrentThread(BasicScheduler),
 
         /// Execute tasks across multiple threads.
         #[cfg(feature = "rt-multi-thread")]
