@@ -166,18 +166,17 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.nightly }}
+          components: miri
           override: true
       - uses: Swatinem/rust-cache@v1
-      - name: Install Miri
-        run: |
-          set -e
-          rustup component add miri
-          cargo miri setup
-          rm -rf tokio/tests
-
       - name: miri
-        run: cargo miri test --features rt,rt-multi-thread,sync task
+        # Many of tests in tokio/tests and doctests use #[tokio::test] or
+        # #[tokio::main] that calls epoll_create1 that Miri does not support.
+        run: cargo miri test --features full --lib --no-fail-fast
         working-directory: tokio
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-tag-raw-pointers
+
   san:
     name: san
     runs-on: ubuntu-latest
