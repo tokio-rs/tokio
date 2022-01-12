@@ -175,7 +175,7 @@ jobs:
         run: cargo miri test --features full --lib --no-fail-fast
         working-directory: tokio
         env:
-          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-tag-raw-pointers
+          MIRIFLAGS: -Zmiri-disable-isolation # -Zmiri-tag-raw-pointers
 
   san:
     name: san
