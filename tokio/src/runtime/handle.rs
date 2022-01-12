@@ -1,6 +1,6 @@
 use crate::runtime::blocking::{BlockingTask, NoopSchedule};
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{blocking, context, driver, Spawner};
+use crate::runtime::{blocking, context, driver, Spawner, RuntimeMetrics};
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
 use std::future::Future;
@@ -126,11 +126,11 @@ impl Handle {
         context::try_current()
     }
 
-    cfg_stats! {
+    cfg_metrics! {
         /// Returns a view that lets you get information about how the runtime
         /// is performing.
-        pub fn stats(&self) -> &crate::runtime::stats::RuntimeStats {
-            self.spawner.stats()
+        pub fn metrics(&self) -> &RuntimeMetrics {
+            self.spawner.metrics()
         }
     }
 

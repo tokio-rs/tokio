@@ -1,6 +1,6 @@
 use crate::future::Future;
+use crate::runtime::RuntimeMetrics;
 use crate::runtime::basic_scheduler;
-use crate::runtime::stats::RuntimeStats;
 use crate::task::JoinHandle;
 
 cfg_rt_multi_thread! {
@@ -35,13 +35,16 @@ impl Spawner {
             Spawner::ThreadPool(spawner) => spawner.spawn(future),
         }
     }
+}
 
-    #[cfg_attr(not(all(tokio_unstable, feature = "stats")), allow(dead_code))]
-    pub(crate) fn stats(&self) -> &RuntimeStats {
-        match self {
-            Spawner::Basic(spawner) => spawner.stats(),
-            #[cfg(feature = "rt-multi-thread")]
-            Spawner::ThreadPool(spawner) => spawner.stats(),
+cfg_metrics! {
+    impl Spawner {
+        pub(crate) fn metrics(&self) -> &RuntimeMetrics {
+            match self {
+                Spawner::Basic(spawner) => spawner.metrics(),
+                #[cfg(feature = "rt-multi-thread")]
+                Spawner::ThreadPool(spawner) => spawner.metrics(),
+            }
         }
     }
 }

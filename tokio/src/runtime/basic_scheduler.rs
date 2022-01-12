@@ -4,7 +4,7 @@ use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::Driver;
-use crate::runtime::stats::{RuntimeStats, WorkerStatsBatcher};
+use crate::runtime::{RuntimeMetrics, MetricsBatch};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::Callback;
 use crate::sync::notify::Notify;
@@ -56,8 +56,8 @@ struct Core {
     /// The driver is removed before starting to park the thread
     driver: Option<Driver>,
 
-    /// Stats batcher
-    stats: WorkerStatsBatcher,
+    /// Metrics batch
+    metrics: MetricsBatch,
 }
 
 #[derive(Clone)]
@@ -98,8 +98,8 @@ struct Shared {
     /// Callback for a worker unparking itself
     after_unpark: Option<Callback>,
 
-    /// Keeps track of various runtime stats.
-    stats: RuntimeStats,
+    /// Keeps track of various runtime metrics.
+    metrics: RuntimeMetrics,
 }
 
 /// Thread-local context.
@@ -143,7 +143,7 @@ impl BasicScheduler {
                 woken: AtomicBool::new(false),
                 before_park,
                 after_unpark,
-                stats: RuntimeStats::new(1),
+                metrics: RuntimeMetrics::new(1),
             }),
         };
 
@@ -152,7 +152,7 @@ impl BasicScheduler {
             spawner: spawner.clone(),
             tick: 0,
             driver: Some(driver),
-            stats: WorkerStatsBatcher::new(0),
+            metrics: MetricsBatch::new(0),
         })));
 
         BasicScheduler {
@@ -223,7 +223,7 @@ impl Context {
     /// Execute the closure with the given scheduler core stored in the
     /// thread-local context.
     fn run_task<R>(&self, mut core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
-        core.stats.incr_poll_count();
+        core.metrics.incr_poll_count();
         self.enter(core, || crate::coop::budget(f))
     }
 
@@ -244,15 +244,15 @@ impl Context {
         // instead of parking the thread
         if core.tasks.is_empty() {
             // Park until the thread is signaled
-            core.stats.about_to_park();
-            core.stats.submit(&core.spawner.shared.stats);
+            core.metrics.about_to_park();
+            core.metrics.submit(&core.spawner.shared.metrics);
 
             let (c, _) = self.enter(core, || {
                 driver.park().expect("failed to park");
             });
 
             core = c;
-            core.stats.returned_from_park();
+            core.metrics.returned_from_park();
         }
 
         if let Some(f) = &self.spawner.shared.after_unpark {
@@ -271,7 +271,7 @@ impl Context {
     fn park_yield(&self, mut core: Box<Core>) -> Box<Core> {
         let mut driver = core.driver.take().expect("driver missing");
 
-        core.stats.submit(&core.spawner.shared.stats);
+        core.metrics.submit(&core.spawner.shared.metrics);
         let (mut core, _) = self.enter(core, || {
             driver
                 .park_timeout(Duration::from_millis(0))
@@ -366,8 +366,8 @@ impl Spawner {
         handle
     }
 
-    pub(crate) fn stats(&self) -> &RuntimeStats {
-        &self.shared.stats
+    pub(crate) fn metrics(&self) -> &RuntimeMetrics {
+        &self.shared.metrics
     }
 
     fn pop(&self) -> Option<RemoteMsg> {
@@ -411,13 +411,13 @@ impl Schedule for Arc<Shared> {
                 // If `None`, the runtime is shutting down, so there is no need
                 // to schedule the task.
                 if let Some(core) = core.as_mut() {
-                    core.stats.inc_local_schedule_count();
+                    core.metrics.inc_local_schedule_count();
                     core.tasks.push_back(task);
                 }
             }
             _ => {
                 // Track that a task was scheduled from **outside** of the runtime.
-                self.stats.inc_remote_schedule_count();
+                self.metrics.inc_remote_schedule_count();
 
                 // If the queue is None, then the runtime has shut down. We
                 // don't need to do anything with the notification in that case.

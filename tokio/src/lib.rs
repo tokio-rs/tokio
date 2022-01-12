@@ -346,7 +346,6 @@
 //! `RUSTFLAGS="--cfg tokio_unstable"`.
 //!
 //! - `tracing`: Enables tracing events.
-//! - `stats`: Enables runtime stats collection. ([RFC](https://github.com/tokio-rs/tokio/pull/3845))
 //!
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 

@@ -64,10 +64,9 @@ use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
-use crate::runtime::stats::{RuntimeStats, WorkerStatsBatcher};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::Idle;
-use crate::runtime::{queue, task, Callback};
+use crate::runtime::{queue, task, Callback, RuntimeMetrics, MetricsBatch};
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::FastRand;
 
@@ -114,8 +113,8 @@ struct Core {
     /// borrow checker happy.
     park: Option<Parker>,
 
-    /// Batching stats so they can be submitted to RuntimeStats.
-    stats: WorkerStatsBatcher,
+    /// Batching metrics so they can be submitted to RuntimeMetrics.
+    metrics: MetricsBatch,
 
     /// Fast random number generator.
     rand: FastRand,
@@ -148,8 +147,8 @@ pub(super) struct Shared {
     /// Callback for a worker unparking itself
     after_unpark: Option<Callback>,
 
-    /// Collects stats from the runtime.
-    stats: RuntimeStats,
+    /// Collects metrics from the runtime.
+    metrics: RuntimeMetrics,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -210,7 +209,7 @@ pub(super) fn create(
             is_searching: false,
             is_shutdown: false,
             park: Some(park),
-            stats: WorkerStatsBatcher::new(i),
+            metrics: MetricsBatch::new(i),
             rand: FastRand::new(seed()),
         }));
 
@@ -225,7 +224,7 @@ pub(super) fn create(
         shutdown_cores: Mutex::new(vec![]),
         before_park,
         after_unpark,
-        stats: RuntimeStats::new(size),
+        metrics: RuntimeMetrics::new(size),
     });
 
     let mut launch = Launch(vec![]);
@@ -413,7 +412,7 @@ impl Context {
         core.transition_from_searching(&self.worker);
 
         // Make the core available to the runtime context
-        core.stats.incr_poll_count();
+        core.metrics.incr_poll_count();
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
@@ -438,7 +437,7 @@ impl Context {
 
                 if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
-                    core.stats.incr_poll_count();
+                    core.metrics.incr_poll_count();
                     *self.core.borrow_mut() = Some(core);
                     let task = self.worker.shared.owned.assert_owner(task);
                     task.run();
@@ -446,7 +445,7 @@ impl Context {
                     // Not enough budget left to run the LIFO task, push it to
                     // the back of the queue and return.
                     core.run_queue
-                        .push_back(task, self.worker.inject(), &mut core.stats);
+                        .push_back(task, self.worker.inject(), &mut core.metrics);
                     return Ok(core);
                 }
             }
@@ -473,9 +472,9 @@ impl Context {
 
         if core.transition_to_parked(&self.worker) {
             while !core.is_shutdown {
-                core.stats.about_to_park();
+                core.metrics.about_to_park();
                 core = self.park_timeout(core, None);
-                core.stats.returned_from_park();
+                core.metrics.returned_from_park();
 
                 // Run regularly scheduled maintenance
                 core.maintenance(&self.worker);
@@ -558,11 +557,11 @@ impl Core {
             }
 
             let target = &worker.shared.remotes[i];
-            let target_stats = worker.shared.stats.worker(i);
+            let target_metrics = worker.shared.metrics.worker(i);
             if let Some(task) =
                 target
                     .steal
-                    .steal_into(&mut self.run_queue, &mut self.stats, target_stats)
+                    .steal_into(&mut self.run_queue, &mut self.metrics, target_metrics)
             {
                 return Some(task);
             }
@@ -638,7 +637,7 @@ impl Core {
 
     /// Runs maintenance work such as checking the pool's state.
     fn maintenance(&mut self, worker: &Worker) {
-        self.stats.submit(&worker.shared.stats);
+        self.metrics.submit(&worker.shared.metrics);
 
         if !self.is_shutdown {
             // Check if the scheduler has been shutdown
@@ -652,7 +651,7 @@ impl Core {
         // Signal to all tasks to shut down.
         worker.shared.owned.close_and_shutdown_all();
 
-        self.stats.submit(&worker.shared.stats);
+        self.metrics.submit(&worker.shared.metrics);
     }
 
     /// Shuts down the core.
@@ -703,8 +702,8 @@ impl Shared {
         handle
     }
 
-    pub(crate) fn stats(&self) -> &RuntimeStats {
-        &self.stats
+    pub(crate) fn metrics(&self) -> &RuntimeMetrics {
+        &self.metrics
     }
 
     pub(super) fn schedule(&self, task: Notified, is_yield: bool) {
@@ -727,7 +726,7 @@ impl Shared {
     }
 
     fn schedule_local(&self, core: &mut Core, task: Notified, is_yield: bool) {
-        core.stats.inc_local_schedule_count();
+        core.metrics.inc_local_schedule_count();
 
         // Spawning from the worker thread. If scheduling a "yield" then the
         // task must always be pushed to the back of the queue, enabling other
@@ -735,7 +734,7 @@ impl Shared {
         // flexibility and the task may go to the front of the queue.
         let should_notify = if is_yield {
             core.run_queue
-                .push_back(task, &self.inject, &mut core.stats);
+                .push_back(task, &self.inject, &mut core.metrics);
             true
         } else {
             // Push to the LIFO slot
@@ -744,7 +743,7 @@ impl Shared {
 
             if let Some(prev) = prev {
                 core.run_queue
-                    .push_back(prev, &self.inject, &mut core.stats);
+                    .push_back(prev, &self.inject, &mut core.metrics);
             }
 
             core.lifo_slot = Some(task);

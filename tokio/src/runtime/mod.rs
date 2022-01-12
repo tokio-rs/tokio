@@ -181,11 +181,16 @@ pub(crate) mod enter;
 
 pub(crate) mod task;
 
-cfg_stats! {
-    pub mod stats;
+cfg_metrics! {
+    mod metrics;
+    pub use metrics::{RuntimeMetrics, WorkerMetrics};
+
+    pub(crate) use metrics::MetricsBatch;
 }
-cfg_not_stats! {
-    pub(crate) mod stats;
+
+cfg_not_metrics! {
+    pub(crate) mod metrics;
+    pub(crate) use metrics::{RuntimeMetrics, WorkerMetrics, MetricsBatch};
 }
 
 cfg_rt! {
