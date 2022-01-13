@@ -621,6 +621,10 @@ impl Core {
         // If a task is in the lifo slot, then we must unpark regardless of
         // being notified
         if self.lifo_slot.is_some() {
+            // When a worker wakes, it should only transition to the "searching"
+            // state when the wake originates from another worker *or* a new task
+            // is pushed. We do *not* want the worker to transition to "searching"
+            // when it wakes when the I/O driver receives new events.
             self.is_searching = !worker.shared.idle.unpark_worker_by_id(worker.index);
             return true;
         }
