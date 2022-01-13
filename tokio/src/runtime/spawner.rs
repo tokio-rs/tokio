@@ -40,6 +40,14 @@ cfg_metrics! {
     use crate::runtime::{SchedulerMetrics, WorkerMetrics};
 
     impl Spawner {
+        pub(crate) fn num_workers(&self) -> usize {
+            match self {
+                Spawner::Basic(_) => 1,
+                #[cfg(feature = "rt-multi-thread")]
+                Spawner::ThreadPool(spawner) => spawner.num_workers(),
+            }
+        }
+
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             match self {
                 Spawner::Basic(spawner) => spawner.scheduler_metrics(),
@@ -53,6 +61,14 @@ cfg_metrics! {
                 Spawner::Basic(spawner) => spawner.worker_metrics(worker),
                 #[cfg(feature = "rt-multi-thread")]
                 Spawner::ThreadPool(spawner) => spawner.worker_metrics(worker),
+            }
+        }
+
+        pub(crate) fn remote_queue_depth(&self) -> usize {
+            match self {
+                Spawner::Basic(spawner) => spawner.remote_queue_depth(),
+                #[cfg(feature = "rt-multi-thread")]
+                Spawner::ThreadPool(spawner) => spawner.remote_queue_depth(),
             }
         }
 

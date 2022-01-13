@@ -420,8 +420,17 @@ cfg_metrics! {
             &self.shared.scheduler_metrics
         }
 
+        pub(crate) fn remote_queue_depth(&self) -> usize {
+            // TODO: avoid having to lock. The multi-threaded injection queue
+            // could probably be used here.
+            self.shared.queue.lock()
+                .as_ref()
+                .map(|queue| queue.len())
+                .unwrap_or(0)
+        }
+
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
-            assert_eq!(1, worker);
+            assert_eq!(0, worker);
             &self.shared.worker_metrics
         }
     }

@@ -107,12 +107,20 @@ cfg_metrics! {
     use crate::runtime::{SchedulerMetrics, WorkerMetrics};
 
     impl Spawner {
+        pub(crate) fn num_workers(&self) -> usize {
+            self.shared.worker_metrics.len()
+        }
+
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             &self.shared.scheduler_metrics
         }
 
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             &self.shared.worker_metrics[worker]
+        }
+
+        pub(crate) fn remote_queue_depth(&self) -> usize {
+            self.shared.remote_queue_depth()
         }
 
         pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {

@@ -16,7 +16,7 @@ impl RuntimeMetrics {
 
     /// Returns the number of worker threads used by the runtime.
     pub fn num_workers(&self) -> usize {
-        todo!();
+        self.handle.spawner.num_workers()
     }
 
     /// Returns the number of tasks scheduled from **outside** of the runtime.
@@ -98,6 +98,11 @@ impl RuntimeMetrics {
             .worker_metrics(worker)
             .overflow_count
             .load(Relaxed)
+    }
+
+    /// TODO
+    pub fn remote_queue_depth(&self) -> usize {
+        self.handle.spawner.remote_queue_depth()
     }
 
     /// Returns the number of tasks currently in the worker's local queue
