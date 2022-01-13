@@ -562,11 +562,10 @@ impl Core {
             }
 
             let target = &worker.shared.remotes[i];
-            let target_metrics = &worker.shared.worker_metrics[i];
             if let Some(task) =
                 target
                     .steal
-                    .steal_into(&mut self.run_queue, &mut self.metrics, target_metrics)
+                    .steal_into(&mut self.run_queue, &mut self.metrics)
             {
                 return Some(task);
             }

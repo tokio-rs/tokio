@@ -4,7 +4,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicU16, AtomicU32};
 use crate::loom::sync::Arc;
 use crate::runtime::task::{self, Inject};
-use crate::runtime::{MetricsBatch, WorkerMetrics};
+use crate::runtime::MetricsBatch;
 
 use std::mem::MaybeUninit;
 use std::ptr;
@@ -311,7 +311,6 @@ impl<T> Steal<T> {
         &self,
         dst: &mut Local<T>,
         dst_metrics: &mut MetricsBatch,
-        src_metrics: &WorkerMetrics,
     ) -> Option<task::Notified<T>> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
@@ -338,7 +337,6 @@ impl<T> Steal<T> {
         }
 
         dst_metrics.incr_steal_count(n);
-        src_metrics.incr_stolen_count(n);
 
         // We are returning a task here
         n -= 1;

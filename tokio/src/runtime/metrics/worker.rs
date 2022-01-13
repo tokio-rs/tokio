@@ -23,9 +23,6 @@ pub(crate) struct WorkerMetrics {
     /// Number of tasks the worker polled.
     pub(super) poll_count: AtomicU64,
 
-    /// Number of tasks stolen from the current worker.
-    pub(super) stolen_count: AtomicU64,
-
     /// Amount of time the worker spent doing work vs. parking.
     pub(super) busy_duration_total: AtomicU64,
 
@@ -47,16 +44,11 @@ impl WorkerMetrics {
             noop_count: AtomicU64::new(0),
             steal_count: AtomicU64::new(0),
             poll_count: AtomicU64::new(0),
-            stolen_count: AtomicU64::new(0),
             overflow_count: AtomicU64::new(0),
             busy_duration_total: AtomicU64::new(0),
             local_schedule_count: AtomicU64::new(0),
             queue_depth: AtomicUsize::new(0),
         }
-    }
-
-    pub(crate) fn incr_stolen_count(&self, n: u16) {
-        self.stolen_count.fetch_add(n as _, Relaxed);
     }
 
     pub(crate) fn queue_depth(&self) -> usize {

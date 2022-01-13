@@ -61,15 +61,6 @@ impl RuntimeMetrics {
             .load(Relaxed)
     }
 
-    /// Returns the number of tasks that were stolen from this worker.
-    pub fn worker_stolen_count(&self, worker: usize) -> u64 {
-        self.handle
-            .spawner
-            .worker_metrics(worker)
-            .stolen_count
-            .load(Relaxed)
-    }
-
     /// Returns the number of times this worker has polled a task.
     pub fn worker_poll_count(&self, worker: usize) -> u64 {
         self.handle
