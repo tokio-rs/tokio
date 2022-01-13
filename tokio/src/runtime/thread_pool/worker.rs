@@ -510,7 +510,8 @@ impl Context {
         // Place `park` back in `core`
         core.park = Some(park);
 
-        // If there are tasks available to steal, notify a worker
+        // If there are tasks available to steal, but this worker is not
+        // looking for tasks to steal, notify another worker.
         if !core.is_searching && core.run_queue.is_stealable() {
             self.worker.shared.notify_parked();
         }
