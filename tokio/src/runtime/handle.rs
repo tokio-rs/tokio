@@ -1,6 +1,6 @@
 use crate::runtime::blocking::{BlockingTask, NoopSchedule};
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{blocking, context, driver, RuntimeMetrics, Spawner};
+use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
 use std::future::Future;
@@ -124,14 +124,6 @@ impl Handle {
     /// Contrary to `current`, this never panics
     pub fn try_current() -> Result<Self, TryCurrentError> {
         context::try_current()
-    }
-
-    cfg_metrics! {
-        /// Returns a view that lets you get information about how the runtime
-        /// is performing.
-        pub fn metrics(&self) -> RuntimeMetrics {
-            RuntimeMetrics::new(self.clone())
-        }
     }
 
     /// Spawns a future onto the Tokio runtime.
@@ -324,6 +316,18 @@ impl Handle {
 
     pub(crate) fn shutdown(mut self) {
         self.spawner.shutdown();
+    }
+}
+
+cfg_metrics! {
+    use crate::runtime::RuntimeMetrics;
+
+    impl Handle {
+        /// Returns a view that lets you get information about how the runtime
+        /// is performing.
+        pub fn metrics(&self) -> RuntimeMetrics {
+            RuntimeMetrics::new(self.clone())
+        }
     }
 }
 

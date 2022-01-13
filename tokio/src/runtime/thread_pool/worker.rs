@@ -562,10 +562,9 @@ impl Core {
             }
 
             let target = &worker.shared.remotes[i];
-            if let Some(task) =
-                target
-                    .steal
-                    .steal_into(&mut self.run_queue, &mut self.metrics)
+            if let Some(task) = target
+                .steal
+                .steal_into(&mut self.run_queue, &mut self.metrics)
             {
                 return Some(task);
             }
@@ -723,6 +722,7 @@ impl Shared {
 
             // Otherwise, use the inject queue.
             self.inject.push(task);
+            self.scheduler_metrics.inc_remote_schedule_count();
             self.notify_parked();
         })
     }

@@ -4,7 +4,7 @@ use std::sync::atomic::Ordering::Relaxed;
 use std::time::Duration;
 
 /// TODO: dox
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RuntimeMetrics {
     handle: Handle,
 }
