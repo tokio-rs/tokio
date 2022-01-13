@@ -66,7 +66,7 @@ use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::Idle;
-use crate::runtime::{queue, task, Callback, SchedulerMetrics, MetricsBatch};
+use crate::runtime::{queue, task, Callback, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::FastRand;
 
@@ -148,7 +148,9 @@ pub(super) struct Shared {
     after_unpark: Option<Callback>,
 
     /// Collects metrics from the runtime.
-    metrics: SchedulerMetrics,
+    pub(super) scheduler_metrics: SchedulerMetrics,
+
+    pub(super) worker_metrics: Box<[WorkerMetrics]>,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -194,9 +196,10 @@ pub(super) fn create(
 ) -> (Arc<Shared>, Launch) {
     let mut cores = vec![];
     let mut remotes = vec![];
+    let mut worker_metrics = vec![];
 
     // Create the local queues
-    for i in 0..size {
+    for _ in 0..size {
         let (steal, run_queue) = queue::local();
 
         let park = park.clone();
@@ -209,11 +212,12 @@ pub(super) fn create(
             is_searching: false,
             is_shutdown: false,
             park: Some(park),
-            metrics: MetricsBatch::new(i),
+            metrics: MetricsBatch::new(),
             rand: FastRand::new(seed()),
         }));
 
         remotes.push(Remote { steal, unpark });
+        worker_metrics.push(WorkerMetrics::new());
     }
 
     let shared = Arc::new(Shared {
@@ -224,7 +228,8 @@ pub(super) fn create(
         shutdown_cores: Mutex::new(vec![]),
         before_park,
         after_unpark,
-        metrics: SchedulerMetrics::new(size),
+        scheduler_metrics: SchedulerMetrics::new(),
+        worker_metrics: worker_metrics.into_boxed_slice(),
     });
 
     let mut launch = Launch(vec![]);
@@ -557,7 +562,7 @@ impl Core {
             }
 
             let target = &worker.shared.remotes[i];
-            let target_metrics = worker.shared.metrics.worker(i);
+            let target_metrics = &worker.shared.worker_metrics[i];
             if let Some(task) =
                 target
                     .steal
@@ -637,7 +642,8 @@ impl Core {
 
     /// Runs maintenance work such as checking the pool's state.
     fn maintenance(&mut self, worker: &Worker) {
-        self.metrics.submit(&worker.shared.metrics);
+        self.metrics
+            .submit(&worker.shared.worker_metrics[worker.index]);
 
         if !self.is_shutdown {
             // Check if the scheduler has been shutdown
@@ -651,7 +657,8 @@ impl Core {
         // Signal to all tasks to shut down.
         worker.shared.owned.close_and_shutdown_all();
 
-        self.metrics.submit(&worker.shared.metrics);
+        self.metrics
+            .submit(&worker.shared.worker_metrics[worker.index]);
     }
 
     /// Shuts down the core.
@@ -700,10 +707,6 @@ impl Shared {
         }
 
         handle
-    }
-
-    pub(crate) fn metrics(&self) -> &SchedulerMetrics {
-        &self.metrics
     }
 
     pub(super) fn schedule(&self, task: Notified, is_yield: bool) {

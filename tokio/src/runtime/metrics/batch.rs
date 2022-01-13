@@ -1,13 +1,10 @@
-use crate::runtime::SchedulerMetrics;
+use crate::runtime::WorkerMetrics;
 
 use std::convert::TryFrom;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::Instant;
 
 pub(crate) struct MetricsBatch {
-    /// Identifies the worker within the runtime.
-    my_index: usize,
-
     /// Number of times the worker parked
     park_count: u64,
 
@@ -37,9 +34,8 @@ pub(crate) struct MetricsBatch {
 }
 
 impl MetricsBatch {
-    pub(crate) fn new(my_index: usize) -> MetricsBatch {
+    pub(crate) fn new() -> MetricsBatch {
         MetricsBatch {
-            my_index,
             park_count: 0,
             noop_count: 0,
             steal_count: 0,
@@ -52,9 +48,7 @@ impl MetricsBatch {
         }
     }
 
-    pub(crate) fn submit(&mut self, to: &SchedulerMetrics) {
-        let worker = to.worker(self.my_index);
-
+    pub(crate) fn submit(&mut self, worker: &WorkerMetrics) {
         worker.park_count.store(self.park_count, Relaxed);
         worker.noop_count.store(self.noop_count, Relaxed);
         worker.steal_count.store(self.steal_count, Relaxed);

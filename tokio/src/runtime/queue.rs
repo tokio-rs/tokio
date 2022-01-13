@@ -3,8 +3,8 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicU16, AtomicU32};
 use crate::loom::sync::Arc;
-use crate::runtime::{WorkerMetrics, MetricsBatch};
 use crate::runtime::task::{self, Inject};
+use crate::runtime::{MetricsBatch, WorkerMetrics};
 
 use std::mem::MaybeUninit;
 use std::ptr;

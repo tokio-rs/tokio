@@ -4,9 +4,9 @@ use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::Driver;
-use crate::runtime::{SchedulerMetrics, MetricsBatch};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::Callback;
+use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::{waker_ref, Wake, WakerRef};
@@ -99,7 +99,10 @@ struct Shared {
     after_unpark: Option<Callback>,
 
     /// Keeps track of various runtime metrics.
-    metrics: SchedulerMetrics,
+    scheduler_metrics: SchedulerMetrics,
+
+    /// This scheduler only has one worker
+    worker_metrics: WorkerMetrics,
 }
 
 /// Thread-local context.
@@ -143,7 +146,8 @@ impl BasicScheduler {
                 woken: AtomicBool::new(false),
                 before_park,
                 after_unpark,
-                metrics: SchedulerMetrics::new(1),
+                scheduler_metrics: SchedulerMetrics::new(),
+                worker_metrics: WorkerMetrics::new(),
             }),
         };
 
@@ -152,7 +156,7 @@ impl BasicScheduler {
             spawner: spawner.clone(),
             tick: 0,
             driver: Some(driver),
-            metrics: MetricsBatch::new(0),
+            metrics: MetricsBatch::new(),
         })));
 
         BasicScheduler {
@@ -245,7 +249,7 @@ impl Context {
         if core.tasks.is_empty() {
             // Park until the thread is signaled
             core.metrics.about_to_park();
-            core.metrics.submit(&core.spawner.shared.metrics);
+            core.metrics.submit(&core.spawner.shared.worker_metrics);
 
             let (c, _) = self.enter(core, || {
                 driver.park().expect("failed to park");
@@ -271,7 +275,7 @@ impl Context {
     fn park_yield(&self, mut core: Box<Core>) -> Box<Core> {
         let mut driver = core.driver.take().expect("driver missing");
 
-        core.metrics.submit(&core.spawner.shared.metrics);
+        core.metrics.submit(&core.spawner.shared.worker_metrics);
         let (mut core, _) = self.enter(core, || {
             driver
                 .park_timeout(Duration::from_millis(0))
@@ -366,10 +370,6 @@ impl Spawner {
         handle
     }
 
-    pub(crate) fn metrics(&self) -> &SchedulerMetrics {
-        &self.shared.metrics
-    }
-
     fn pop(&self) -> Option<RemoteMsg> {
         match self.shared.queue.lock().as_mut() {
             Some(queue) => queue.pop_front(),
@@ -387,6 +387,19 @@ impl Spawner {
     // reset woken to false and return original value
     pub(crate) fn reset_woken(&self) -> bool {
         self.shared.woken.swap(false, AcqRel)
+    }
+}
+
+cfg_metrics! {
+    impl Spawner {
+        pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
+            &self.shared.scheduler_metrics
+        }
+
+        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+            assert_eq!(1, worker);
+            &self.shared.worker_metrics
+        }
     }
 }
 
@@ -417,7 +430,7 @@ impl Schedule for Arc<Shared> {
             }
             _ => {
                 // Track that a task was scheduled from **outside** of the runtime.
-                self.metrics.inc_remote_schedule_count();
+                self.scheduler_metrics.inc_remote_schedule_count();
 
                 // If the queue is None, then the runtime has shut down. We
                 // don't need to do anything with the notification in that case.

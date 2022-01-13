@@ -183,9 +183,9 @@ pub(crate) mod task;
 
 cfg_metrics! {
     mod metrics;
-    pub use metrics::{SchedulerMetrics, WorkerMetrics};
+    pub use metrics::RuntimeMetrics;
 
-    pub(crate) use metrics::MetricsBatch;
+    pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 }
 
 cfg_not_metrics! {

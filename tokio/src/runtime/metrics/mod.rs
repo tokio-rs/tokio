@@ -12,13 +12,15 @@ cfg_metrics! {
     mod batch;
     pub(crate) use batch::MetricsBatch;
 
-    mod scheduler;
+    mod runtime;
     #[allow(unreachable_pub)] // rust-lang/rust#57411
-    pub use scheduler::SchedulerMetrics;
+    pub use runtime::RuntimeMetrics;
+
+    mod scheduler;
+    pub(crate) use scheduler::SchedulerMetrics;
 
     mod worker;
-    #[allow(unreachable_pub)] // rust-lang/rust#57411
-    pub use worker::WorkerMetrics;
+    pub(crate) use worker::WorkerMetrics;
 }
 
 cfg_not_metrics! {
