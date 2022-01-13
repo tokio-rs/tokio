@@ -20,7 +20,7 @@ pub trait Listener: Send + Unpin {
     fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>>;
 
     /// Accepts a new incoming connection from this listener.
-    fn accept<'a>(&'a self) -> ListenerAcceptFut<'a, Self>
+    fn accept(&self) -> ListenerAcceptFut<'_, Self>
     where
         Self: Sized + Unpin,
     {
