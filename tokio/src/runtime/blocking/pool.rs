@@ -244,7 +244,7 @@ impl Spawner {
                 rt.blocking_spawner.inner.run(id);
                 drop(shutdown_tx);
             })
-            .unwrap()
+            .expect("OS can't spawn a new worker thread")
     }
 }
 

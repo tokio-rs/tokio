@@ -169,6 +169,35 @@ fn drop_tasks_in_context() {
 }
 
 #[test]
+#[should_panic(expected = "boom")]
+fn wake_in_drop_after_panic() {
+    let (tx, rx) = oneshot::channel::<()>();
+
+    struct WakeOnDrop(Option<oneshot::Sender<()>>);
+
+    impl Drop for WakeOnDrop {
+        fn drop(&mut self) {
+            self.0.take().unwrap().send(()).unwrap();
+        }
+    }
+
+    let rt = rt();
+
+    rt.spawn(async move {
+        let _wake_on_drop = WakeOnDrop(Some(tx));
+        // wait forever
+        futures::future::pending::<()>().await;
+    });
+
+    let _join = rt.spawn(async move { rx.await });
+
+    rt.block_on(async {
+        tokio::task::yield_now().await;
+        panic!("boom");
+    });
+}
+
+#[test]
 #[should_panic(
     expected = "A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers."
 )]
