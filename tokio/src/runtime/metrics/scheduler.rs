@@ -9,7 +9,7 @@ use crate::runtime::metrics::WorkerMetrics;
 ///
 /// [unstable]: crate#unstable-features
 #[derive(Debug)]
-pub struct RuntimeMetrics {
+pub struct SchedulerMetrics {
     /// Number of tasks that are scheduled from outside the runtime.
     remote_schedule_count: AtomicU64,
 
@@ -17,11 +17,11 @@ pub struct RuntimeMetrics {
     workers: Box<[WorkerMetrics]>,
 }
 
-impl RuntimeMetrics {
-    pub(crate) fn new(worker_threads: usize) -> RuntimeMetrics {
-        let mut workers = Vec::with_capacity(worker_threads);
+impl SchedulerMetrics {
+    pub(crate) fn new(num_workers: usize) -> SchedulerMetrics {
+        let mut workers = Vec::with_capacity(num_workers);
 
-        for _ in 0..worker_threads {
+        for _ in 0..num_workers {
             workers.push(WorkerMetrics {
                 park_count: AtomicU64::new(0),
                 noop_count: AtomicU64::new(0),
@@ -34,7 +34,7 @@ impl RuntimeMetrics {
             });
         }
 
-        RuntimeMetrics {
+        SchedulerMetrics {
             remote_schedule_count: AtomicU64::new(0),
             workers: workers.into_boxed_slice(),
         }

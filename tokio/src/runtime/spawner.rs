@@ -1,5 +1,5 @@
 use crate::future::Future;
-use crate::runtime::RuntimeMetrics;
+use crate::runtime::SchedulerMetrics;
 use crate::runtime::basic_scheduler;
 use crate::task::JoinHandle;
 
@@ -39,7 +39,7 @@ impl Spawner {
 
 cfg_metrics! {
     impl Spawner {
-        pub(crate) fn metrics(&self) -> &RuntimeMetrics {
+        pub(crate) fn metrics(&self) -> &SchedulerMetrics {
             match self {
                 Spawner::Basic(spawner) => spawner.metrics(),
                 #[cfg(feature = "rt-multi-thread")]

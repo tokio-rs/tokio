@@ -12,9 +12,9 @@ cfg_metrics! {
     mod batch;
     pub(crate) use batch::MetricsBatch;
 
-    mod runtime;
+    mod scheduler;
     #[allow(unreachable_pub)] // rust-lang/rust#57411
-    pub use runtime::RuntimeMetrics;
+    pub use scheduler::SchedulerMetrics;
 
     mod worker;
     #[allow(unreachable_pub)] // rust-lang/rust#57411
@@ -24,5 +24,5 @@ cfg_metrics! {
 cfg_not_metrics! {
     mod mock;
 
-    pub(crate) use mock::{RuntimeMetrics, WorkerMetrics, MetricsBatch};
+    pub(crate) use mock::{SchedulerMetrics, WorkerMetrics, MetricsBatch};
 }

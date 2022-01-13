@@ -1,4 +1,4 @@
-use crate::runtime::RuntimeMetrics;
+use crate::runtime::SchedulerMetrics;
 
 use std::convert::TryFrom;
 use std::sync::atomic::Ordering::Relaxed;
@@ -52,7 +52,7 @@ impl MetricsBatch {
         }
     }
 
-    pub(crate) fn submit(&mut self, to: &RuntimeMetrics) {
+    pub(crate) fn submit(&mut self, to: &SchedulerMetrics) {
         let worker = to.worker(self.my_index);
 
         worker.park_count.store(self.park_count, Relaxed);

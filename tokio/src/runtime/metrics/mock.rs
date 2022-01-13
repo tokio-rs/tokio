@@ -1,12 +1,12 @@
 //! This file contains mocks of the types in src/runtime/metrics
 
-pub(crate) struct RuntimeMetrics {}
+pub(crate) struct SchedulerMetrics {}
 
 pub(crate) struct WorkerMetrics {}
 
 pub(crate) struct MetricsBatch {}
 
-impl RuntimeMetrics {
+impl SchedulerMetrics {
     pub(crate) fn new(_worker_threads: usize) -> Self {
         Self {}
     }

@@ -4,7 +4,7 @@ use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::Driver;
-use crate::runtime::{RuntimeMetrics, MetricsBatch};
+use crate::runtime::{SchedulerMetrics, MetricsBatch};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::Callback;
 use crate::sync::notify::Notify;
@@ -99,7 +99,7 @@ struct Shared {
     after_unpark: Option<Callback>,
 
     /// Keeps track of various runtime metrics.
-    metrics: RuntimeMetrics,
+    metrics: SchedulerMetrics,
 }
 
 /// Thread-local context.
@@ -143,7 +143,7 @@ impl BasicScheduler {
                 woken: AtomicBool::new(false),
                 before_park,
                 after_unpark,
-                metrics: RuntimeMetrics::new(1),
+                metrics: SchedulerMetrics::new(1),
             }),
         };
 
@@ -366,7 +366,7 @@ impl Spawner {
         handle
     }
 
-    pub(crate) fn metrics(&self) -> &RuntimeMetrics {
+    pub(crate) fn metrics(&self) -> &SchedulerMetrics {
         &self.shared.metrics
     }
 

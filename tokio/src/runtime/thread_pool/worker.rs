@@ -66,7 +66,7 @@ use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::Idle;
-use crate::runtime::{queue, task, Callback, RuntimeMetrics, MetricsBatch};
+use crate::runtime::{queue, task, Callback, SchedulerMetrics, MetricsBatch};
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::FastRand;
 
@@ -148,7 +148,7 @@ pub(super) struct Shared {
     after_unpark: Option<Callback>,
 
     /// Collects metrics from the runtime.
-    metrics: RuntimeMetrics,
+    metrics: SchedulerMetrics,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -224,7 +224,7 @@ pub(super) fn create(
         shutdown_cores: Mutex::new(vec![]),
         before_park,
         after_unpark,
-        metrics: RuntimeMetrics::new(size),
+        metrics: SchedulerMetrics::new(size),
     });
 
     let mut launch = Launch(vec![]);
@@ -702,7 +702,7 @@ impl Shared {
         handle
     }
 
-    pub(crate) fn metrics(&self) -> &RuntimeMetrics {
+    pub(crate) fn metrics(&self) -> &SchedulerMetrics {
         &self.metrics
     }
 

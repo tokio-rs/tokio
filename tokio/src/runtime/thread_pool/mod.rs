@@ -10,7 +10,7 @@ pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
 use crate::runtime::task::JoinHandle;
-use crate::runtime::{Callback, Parker, RuntimeMetrics};
+use crate::runtime::{Callback, Parker, SchedulerMetrics};
 
 use std::fmt;
 use std::future::Future;
@@ -102,7 +102,7 @@ impl Spawner {
         self.shared.close();
     }
 
-    pub(crate) fn metrics(&self) -> &RuntimeMetrics {
+    pub(crate) fn metrics(&self) -> &SchedulerMetrics {
         self.shared.metrics()
     }
 }
