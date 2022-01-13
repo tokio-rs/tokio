@@ -1,5 +1,5 @@
-use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::{AtomicU64, AtomicUsize};
 
 /// Retreive runtime worker metrics.
 ///
@@ -34,6 +34,10 @@ pub(crate) struct WorkerMetrics {
 
     /// Number of tasks moved from the local queue to the global queue to free space.
     pub(super) overflow_count: AtomicU64,
+
+    /// Number of tasks currently in the local queue. Used only by the
+    /// current-thread scheduler.
+    pub(super) queue_depth: AtomicUsize,
 }
 
 impl WorkerMetrics {
@@ -47,10 +51,19 @@ impl WorkerMetrics {
             overflow_count: AtomicU64::new(0),
             busy_duration_total: AtomicU64::new(0),
             local_schedule_count: AtomicU64::new(0),
+            queue_depth: AtomicUsize::new(0),
         }
     }
 
     pub(crate) fn incr_stolen_count(&self, n: u16) {
         self.stolen_count.fetch_add(n as _, Relaxed);
+    }
+
+    pub(crate) fn queue_depth(&self) -> usize {
+        self.queue_depth.load(Relaxed)
+    }
+
+    pub(crate) fn set_queue_depth(&self, len: usize) {
+        self.queue_depth.store(len, Relaxed);
     }
 }

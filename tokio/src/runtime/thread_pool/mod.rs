@@ -112,6 +112,10 @@ cfg_metrics! {
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             &self.shared.worker_metrics[worker]
         }
+
+        pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
+            self.shared.worker_local_queue_depth(worker)
+        }
     }
 }
 

@@ -303,7 +303,7 @@ impl<T> Local<T> {
 
 impl<T> Steal<T> {
     pub(super) fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.0.len() == 0
     }
 
     /// Steals half the tasks from self and place them into `dst`.
@@ -459,6 +459,14 @@ impl<T> Steal<T> {
     }
 }
 
+cfg_metrics! {
+    impl<T> Steal<T> {
+        pub(crate) fn len(&self) -> usize {
+            self.0.len() as _
+        }
+    }
+}
+
 impl<T> Clone for Steal<T> {
     fn clone(&self) -> Steal<T> {
         Steal(self.0.clone())
@@ -474,11 +482,15 @@ impl<T> Drop for Local<T> {
 }
 
 impl<T> Inner<T> {
-    fn is_empty(&self) -> bool {
+    fn len(&self) -> u16 {
         let (_, head) = unpack(self.head.load(Acquire));
         let tail = self.tail.load(Acquire);
 
-        head == tail
+        tail.wrapping_sub(head)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 

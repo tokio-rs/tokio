@@ -21,6 +21,7 @@ impl SchedulerMetrics {
 
 impl WorkerMetrics {
     pub(crate) fn incr_stolen_count(&self, _n: u16) {}
+    pub(crate) fn set_queue_depth(&self, len: usize) {}
 }
 
 impl MetricsBatch {

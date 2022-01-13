@@ -54,5 +54,13 @@ cfg_metrics! {
                 Spawner::ThreadPool(spawner) => spawner.worker_metrics(worker),
             }
         }
+
+        pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
+            match self {
+                Spawner::Basic(spawner) => spawner.worker_metrics(worker).queue_depth(),
+                #[cfg(feature = "rt-multi-thread")]
+                Spawner::ThreadPool(spawner) => spawner.worker_local_queue_depth(worker),
+            }
+        }
     }
 }
