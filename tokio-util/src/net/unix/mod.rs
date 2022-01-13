@@ -4,6 +4,7 @@ use crate::either::Either;
 use std::future::Future;
 use std::io::Result;
 use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A trait for a listener: `TcpListener` and `UnixListener`.
 pub trait Listener: Send + Unpin {
@@ -12,10 +13,16 @@ pub trait Listener: Send + Unpin {
     /// The socket address type of this listener.
     type Addr;
 
+    /// Polls to accept a new incoming connection to this listener.
+    fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>>;
+
     /// Accepts a new incoming connection from this listener.
-    fn accept<'a>(
-        &'a self,
-    ) -> Pin<Box<dyn Future<Output = Result<(Self::Io, Self::Addr)>> + Send + 'a>>;
+    fn accept<'a>(&'a mut self) -> ListenerAcceptFut<'a, Self>
+    where
+        Self: Sized + Unpin,
+    {
+        ListenerAcceptFut::new(self)
+    }
 
     /// Returns the local address that this listener is bound to.
     fn local_addr(&self) -> Result<Self::Addr>;
@@ -25,14 +32,8 @@ impl Listener for tokio::net::TcpListener {
     type Io = tokio::net::TcpStream;
     type Addr = std::net::SocketAddr;
 
-    fn accept<'a>(
-        &'a self,
-    ) -> Pin<Box<dyn Future<Output = Result<(Self::Io, Self::Addr)>> + Send + 'a>> {
-        let accept = self.accept();
-        Box::pin(async {
-            let (stream, addr) = accept.await?;
-            Ok((stream, addr.into()))
-        })
+    fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>> {
+        Self::poll_accept(self, cx)
     }
 
     fn local_addr(&self) -> Result<Self::Addr> {
@@ -44,14 +45,8 @@ impl Listener for tokio::net::UnixListener {
     type Io = tokio::net::UnixStream;
     type Addr = tokio::net::unix::SocketAddr;
 
-    fn accept<'a>(
-        &'a self,
-    ) -> Pin<Box<dyn Future<Output = Result<(Self::Io, Self::Addr)>> + Send + 'a>> {
-        let accept = self.accept();
-        Box::pin(async {
-            let (stream, addr) = accept.await?;
-            Ok((stream, addr.into()))
-        })
+    fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>> {
+        Self::poll_accept(self, cx)
     }
 
     fn local_addr(&self) -> Result<Self::Addr> {
@@ -67,24 +62,14 @@ where
     type Io = Either<<L as Listener>::Io, <R as Listener>::Io>;
     type Addr = Either<<L as Listener>::Addr, <R as Listener>::Addr>;
 
-    fn accept<'a>(
-        &'a self,
-    ) -> Pin<Box<dyn Future<Output = Result<(Self::Io, Self::Addr)>> + Send + 'a>> {
+    fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>> {
         match self {
-            Either::Left(listener) => {
-                let fut = listener.accept();
-                Box::pin(async move {
-                    let (stream, addr) = fut.await?;
-                    Ok((Either::Left(stream), Either::Left(addr)))
-                })
-            }
-            Either::Right(listener) => {
-                let fut = listener.accept();
-                Box::pin(async move {
-                    let (stream, addr) = fut.await?;
-                    Ok((Either::Right(stream), Either::Right(addr)))
-                })
-            }
+            Either::Left(listener) => listener
+                .poll_accept(cx)
+                .map(|res| res.map(|(stream, addr)| (Either::Left(stream), Either::Left(addr)))),
+            Either::Right(listener) => listener
+                .poll_accept(cx)
+                .map(|res| res.map(|(stream, addr)| (Either::Right(stream), Either::Right(addr)))),
         }
     }
 
@@ -99,5 +84,31 @@ where
                 Ok(Either::Right(addr))
             }
         }
+    }
+}
+
+/// Future for accepting a new connection from a listener.
+#[derive(Debug)]
+pub struct ListenerAcceptFut<'a, L> {
+    listener: &'a L,
+}
+
+impl<'a, L> ListenerAcceptFut<'a, L>
+where
+    L: Listener,
+{
+    fn new(listener: &'a L) -> Self {
+        Self { listener }
+    }
+}
+
+impl<'a, L> Future for ListenerAcceptFut<'a, L>
+where
+    L: Listener,
+{
+    type Output = Result<(L::Io, L::Addr)>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.listener.poll_accept(cx)
     }
 }
