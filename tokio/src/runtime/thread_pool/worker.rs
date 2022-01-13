@@ -511,8 +511,9 @@ impl Context {
         // Place `park` back in `core`
         core.park = Some(park);
 
-        // If there are tasks available to steal, notify a worker
-        if core.run_queue.is_stealable() {
+        // If there are tasks available to steal, but this worker is not
+        // looking for tasks to steal, notify another worker.
+        if !core.is_searching && core.run_queue.is_stealable() {
             self.worker.shared.notify_parked();
         }
 
@@ -621,8 +622,11 @@ impl Core {
         // If a task is in the lifo slot, then we must unpark regardless of
         // being notified
         if self.lifo_slot.is_some() {
-            worker.shared.idle.unpark_worker_by_id(worker.index);
-            self.is_searching = true;
+            // When a worker wakes, it should only transition to the "searching"
+            // state when the wake originates from another worker *or* a new task
+            // is pushed. We do *not* want the worker to transition to "searching"
+            // when it wakes when the I/O driver receives new events.
+            self.is_searching = !worker.shared.idle.unpark_worker_by_id(worker.index);
             return true;
         }
 
