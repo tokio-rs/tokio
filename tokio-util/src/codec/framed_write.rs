@@ -88,6 +88,11 @@ impl<T, E> FramedWrite<T, E> {
         &mut self.inner.codec
     }
 
+    /// Returns a mutable reference to the underlying encoder.
+    pub fn encoder_pin_mut(self: Pin<&mut Self>) -> &mut E {
+        self.project().inner.project().codec
+    }
+
     /// Returns a reference to the write buffer.
     pub fn write_buffer(&self) -> &BytesMut {
         &self.inner.state.buffer

@@ -3,16 +3,15 @@ name = "tokio"
 # When releasing to crates.io:
 # - Remove path dependencies
 # - Update doc url
-#   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.0.x" git tag.
-version = "1.14.0"
+version = "1.15.0"
 edition = "2018"
+rust-version = "1.46"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/1.14.0/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -87,7 +86,7 @@ test-util = ["rt", "sync", "time"]
 time = []
 
 [dependencies]
-tokio-macros = { version = "1.6.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "1.7.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.0"
 
@@ -110,7 +109,7 @@ signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.42" }
-nix = { version = "0.22.0" }
+nix = { version = "0.23" }
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"
@@ -137,12 +136,13 @@ mio-aio = { version = "0.6.0", features = ["tokio"] }
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.5", features = ["futures", "checkpoint"] }
 
-[build-dependencies]
-autocfg = "1" # Needed for conditionally enabling `track-caller`
-
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+# enable unstable features in the documentation
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
+# it's necessary to _also_ pass `--cfg tokio_unstable` to rustc, or else
+# dependencies will not be enabled, and the docs build will fail.
+rustc-args = ["--cfg", "tokio_unstable"]
 
 [package.metadata.playground]
 features = ["full", "test-util"]

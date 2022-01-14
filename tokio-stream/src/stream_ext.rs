@@ -1,3 +1,4 @@
+use core::future::Future;
 use futures_core::Stream;
 
 mod all;
@@ -27,6 +28,9 @@ use fuse::Fuse;
 mod map;
 use map::Map;
 
+mod map_while;
+use map_while::MapWhile;
+
 mod merge;
 use merge::Merge;
 
@@ -39,14 +43,17 @@ use skip::Skip;
 mod skip_while;
 use skip_while::SkipWhile;
 
-mod try_next;
-use try_next::TryNext;
-
 mod take;
 use take::Take;
 
 mod take_while;
 use take_while::TakeWhile;
+
+mod then;
+use then::Then;
+
+mod try_next;
+use try_next::TryNext;
 
 cfg_time! {
     mod timeout;
@@ -195,6 +202,93 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Map::new(self, f)
+    }
+
+    /// Map this stream's items to a different type for as long as determined by
+    /// the provided closure. A stream of the target type will be returned,
+    /// which will yield elements until the closure returns `None`.
+    ///
+    /// The provided closure is executed over all elements of this stream as
+    /// they are made available, until it returns `None`. It is executed inline
+    /// with calls to [`poll_next`](Stream::poll_next). Once `None` is returned,
+    /// the underlying stream will not be polled again.
+    ///
+    /// Note that this function consumes the stream passed into it and returns a
+    /// wrapped version of it, similar to the [`Iterator::map_while`] method in the
+    /// standard library.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// let stream = stream::iter(1..=10);
+    /// let mut stream = stream.map_while(|x| {
+    ///     if x < 4 {
+    ///         Some(x + 3)
+    ///     } else {
+    ///         None
+    ///     }
+    /// });
+    /// assert_eq!(stream.next().await, Some(4));
+    /// assert_eq!(stream.next().await, Some(5));
+    /// assert_eq!(stream.next().await, Some(6));
+    /// assert_eq!(stream.next().await, None);
+    /// # }
+    /// ```
+    fn map_while<T, F>(self, f: F) -> MapWhile<Self, F>
+    where
+        F: FnMut(Self::Item) -> Option<T>,
+        Self: Sized,
+    {
+        MapWhile::new(self, f)
+    }
+
+    /// Maps this stream's items asynchronously to a different type, returning a
+    /// new stream of the resulting type.
+    ///
+    /// The provided closure is executed over all elements of this stream as
+    /// they are made available, and the returned future is executed. Only one
+    /// future is executed at the time.
+    ///
+    /// Note that this function consumes the stream passed into it and returns a
+    /// wrapped version of it, similar to the existing `then` methods in the
+    /// standard library.
+    ///
+    /// Be aware that if the future is not `Unpin`, then neither is the `Stream`
+    /// returned by this method. To handle this, you can use `tokio::pin!` as in
+    /// the example below or put the stream in a `Box` with `Box::pin(stream)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// async fn do_async_work(value: i32) -> i32 {
+    ///     value + 3
+    /// }
+    ///
+    /// let stream = stream::iter(1..=3);
+    /// let stream = stream.then(do_async_work);
+    ///
+    /// tokio::pin!(stream);
+    ///
+    /// assert_eq!(stream.next().await, Some(4));
+    /// assert_eq!(stream.next().await, Some(5));
+    /// assert_eq!(stream.next().await, Some(6));
+    /// # }
+    /// ```
+    fn then<F, Fut>(self, f: F) -> Then<Self, Fut, F>
+    where
+        F: FnMut(Self::Item) -> Fut,
+        Fut: Future,
+        Self: Sized,
+    {
+        Then::new(self, f)
     }
 
     /// Combine two streams into one by interleaving the output of both as it

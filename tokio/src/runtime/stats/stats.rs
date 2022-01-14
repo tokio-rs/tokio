@@ -5,12 +5,24 @@ use std::convert::TryFrom;
 use std::time::{Duration, Instant};
 
 /// This type contains methods to retrieve stats from a Tokio runtime.
+///
+/// **Note**: This is an [unstable API][unstable]. The public API of this type
+/// may break in 1.x releases. See [the documentation on unstable
+/// features][unstable] for details.
+///
+/// [unstable]: crate#unstable-features
 #[derive(Debug)]
 pub struct RuntimeStats {
     workers: Box<[WorkerStats]>,
 }
 
 /// This type contains methods to retrieve stats from a worker thread on a Tokio runtime.
+///
+/// **Note**: This is an [unstable API][unstable]. The public API of this type
+/// may break in 1.x releases. See [the documentation on unstable
+/// features][unstable] for details.
+///
+/// [unstable]: crate#unstable-features
 #[derive(Debug)]
 #[repr(align(128))]
 pub struct WorkerStats {

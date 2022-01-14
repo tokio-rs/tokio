@@ -204,6 +204,15 @@ impl<T, U> Framed<T, U> {
         &mut self.inner.codec
     }
 
+    /// Returns a mutable reference to the underlying codec wrapped by
+    /// `Framed`.
+    ///
+    /// Note that care should be taken to not tamper with the underlying codec
+    /// as it may corrupt the stream of frames otherwise being worked with.
+    pub fn codec_pin_mut(self: Pin<&mut Self>) -> &mut U {
+        self.project().inner.project().codec
+    }
+
     /// Returns a reference to the read buffer.
     pub fn read_buffer(&self) -> &BytesMut {
         &self.inner.state.read.buffer

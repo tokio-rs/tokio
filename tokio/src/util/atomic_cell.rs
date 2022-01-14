@@ -3,7 +3,7 @@ use crate::loom::sync::atomic::AtomicPtr;
 use std::ptr;
 use std::sync::atomic::Ordering::AcqRel;
 
-pub(super) struct AtomicCell<T> {
+pub(crate) struct AtomicCell<T> {
     data: AtomicPtr<T>,
 }
 
@@ -11,22 +11,22 @@ unsafe impl<T: Send> Send for AtomicCell<T> {}
 unsafe impl<T: Send> Sync for AtomicCell<T> {}
 
 impl<T> AtomicCell<T> {
-    pub(super) fn new(data: Option<Box<T>>) -> AtomicCell<T> {
+    pub(crate) fn new(data: Option<Box<T>>) -> AtomicCell<T> {
         AtomicCell {
             data: AtomicPtr::new(to_raw(data)),
         }
     }
 
-    pub(super) fn swap(&self, val: Option<Box<T>>) -> Option<Box<T>> {
+    pub(crate) fn swap(&self, val: Option<Box<T>>) -> Option<Box<T>> {
         let old = self.data.swap(to_raw(val), AcqRel);
         from_raw(old)
     }
 
-    pub(super) fn set(&self, val: Box<T>) {
+    pub(crate) fn set(&self, val: Box<T>) {
         let _ = self.swap(Some(val));
     }
 
-    pub(super) fn take(&self) -> Option<Box<T>> {
+    pub(crate) fn take(&self) -> Option<Box<T>> {
         self.swap(None)
     }
 }

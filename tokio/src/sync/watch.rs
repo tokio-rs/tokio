@@ -91,6 +91,23 @@ pub struct Sender<T> {
 /// Outstanding borrows hold a read lock on the inner value. This means that
 /// long lived borrows could cause the produce half to block. It is recommended
 /// to keep the borrow as short lived as possible.
+///
+/// The priority policy of the lock is dependent on the underlying lock
+/// implementation, and this type does not guarantee that any particular policy
+/// will be used. In particular, a producer which is waiting to acquire the lock
+/// in `send` might or might not block concurrent calls to `borrow`, e.g.:
+///
+/// <details><summary>Potential deadlock example</summary>
+///
+/// ```text
+/// // Task 1 (on thread A)    |  // Task 2 (on thread B)
+/// let _ref1 = rx.borrow();   |
+///                            |  // will block
+///                            |  let _ = tx.send(());
+/// // may deadlock            |
+/// let _ref2 = rx.borrow();   |
+/// ```
+/// </details>
 #[derive(Debug)]
 pub struct Ref<'a, T> {
     inner: RwLockReadGuard<'a, T>,
@@ -285,6 +302,23 @@ impl<T> Receiver<T> {
     /// could cause the send half to block. It is recommended to keep the borrow
     /// as short lived as possible.
     ///
+    /// The priority policy of the lock is dependent on the underlying lock
+    /// implementation, and this type does not guarantee that any particular policy
+    /// will be used. In particular, a producer which is waiting to acquire the lock
+    /// in `send` might or might not block concurrent calls to `borrow`, e.g.:
+    ///
+    /// <details><summary>Potential deadlock example</summary>
+    ///
+    /// ```text
+    /// // Task 1 (on thread A)    |  // Task 2 (on thread B)
+    /// let _ref1 = rx.borrow();   |
+    ///                            |  // will block
+    ///                            |  let _ = tx.send(());
+    /// // may deadlock            |
+    /// let _ref2 = rx.borrow();   |
+    /// ```
+    /// </details>
+    ///
     /// [`changed`]: Receiver::changed
     ///
     /// # Examples
@@ -311,11 +345,70 @@ impl<T> Receiver<T> {
     /// could cause the send half to block. It is recommended to keep the borrow
     /// as short lived as possible.
     ///
+    /// The priority policy of the lock is dependent on the underlying lock
+    /// implementation, and this type does not guarantee that any particular policy
+    /// will be used. In particular, a producer which is waiting to acquire the lock
+    /// in `send` might or might not block concurrent calls to `borrow`, e.g.:
+    ///
+    /// <details><summary>Potential deadlock example</summary>
+    ///
+    /// ```text
+    /// // Task 1 (on thread A)                |  // Task 2 (on thread B)
+    /// let _ref1 = rx1.borrow_and_update();   |
+    ///                                        |  // will block
+    ///                                        |  let _ = tx.send(());
+    /// // may deadlock                        |
+    /// let _ref2 = rx2.borrow_and_update();   |
+    /// ```
+    /// </details>
+    ///
     /// [`changed`]: Receiver::changed
     pub fn borrow_and_update(&mut self) -> Ref<'_, T> {
         let inner = self.shared.value.read().unwrap();
         self.version = self.shared.state.load().version();
         Ref { inner }
+    }
+
+    /// Checks if this channel contains a message that this receiver has not yet
+    /// seen. The new value is not marked as seen.
+    ///
+    /// Although this method is called `has_changed`, it does not check new
+    /// messages for equality, so this call will return true even if the new
+    /// message is equal to the old message.
+    ///
+    /// Returns an error if the channel has been closed.
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = watch::channel("hello");
+    ///
+    ///     tx.send("goodbye").unwrap();
+    ///
+    ///     assert!(rx.has_changed().unwrap());
+    ///     assert_eq!(*rx.borrow_and_update(), "goodbye");
+    ///
+    ///     // The value has been marked as seen
+    ///     assert!(!rx.has_changed().unwrap());
+    ///
+    ///     drop(tx);
+    ///     // The `tx` handle has been dropped
+    ///     assert!(rx.has_changed().is_err());
+    /// }
+    /// ```
+    pub fn has_changed(&self) -> Result<bool, error::RecvError> {
+        // Load the version from the state
+        let state = self.shared.state.load();
+        if state.is_closed() {
+            // The sender has dropped.
+            return Err(error::RecvError(()));
+        }
+        let new_version = state.version();
+
+        Ok(self.version != new_version)
     }
 
     /// Waits for a change notification, then marks the newest value as seen.

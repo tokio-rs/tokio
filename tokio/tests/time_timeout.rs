@@ -135,3 +135,16 @@ async fn deadline_future_elapses() {
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
+
+#[tokio::test]
+async fn timeout_is_not_exhausted_by_future() {
+    let fut = timeout(ms(1), async {
+        let mut buffer = [0u8; 1];
+        loop {
+            use tokio::io::AsyncReadExt;
+            let _ = tokio::io::empty().read(&mut buffer).await;
+        }
+    });
+
+    assert!(fut.await.is_err());
+}

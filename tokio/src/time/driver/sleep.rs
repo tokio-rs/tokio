@@ -1,3 +1,5 @@
+#[cfg(all(tokio_unstable, feature = "tracing"))]
+use crate::time::driver::ClockTime;
 use crate::time::driver::{Handle, TimerEntry};
 use crate::time::{error::Error, Duration, Instant};
 use crate::util::trace;
@@ -7,10 +9,6 @@ use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
 use std::task::{self, Poll};
-
-cfg_trace! {
-    use crate::time::driver::ClockTime;
-}
 
 /// Waits until `deadline` is reached.
 ///
@@ -41,11 +39,28 @@ cfg_trace! {
 ///
 /// See the documentation for the [`Sleep`] type for more examples.
 ///
+/// # Panics
+///
+/// This function panics if there is no current timer set.
+///
+/// It can be triggered when [`Builder::enable_time`] or
+/// [`Builder::enable_all`] are not included in the builder.
+///
+/// It can also panic whenever a timer is created outside of a
+/// Tokio runtime. That is why `rt.block_on(sleep(...))` will panic,
+/// since the function is executed outside of the runtime.
+/// Whereas `rt.block_on(async {sleep(...).await})` doesn't panic.
+/// And this is because wrapping the function on an async makes it lazy,
+/// and so gets executed inside the runtime successfully without
+/// panicking.
+///
 /// [`Sleep`]: struct@crate::time::Sleep
 /// [`interval`]: crate::time::interval()
+/// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
+/// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_until"))]
-#[cfg_attr(tokio_track_caller, track_caller)]
+#[track_caller]
 pub fn sleep_until(deadline: Instant) -> Sleep {
     return Sleep::new_timeout(deadline, trace::caller_location());
 }
@@ -84,12 +99,29 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 ///
 /// See the documentation for the [`Sleep`] type for more examples.
 ///
+/// # Panics
+///
+/// This function panics if there is no current timer set.
+///
+/// It can be triggered when [`Builder::enable_time`] or
+/// [`Builder::enable_all`] are not included in the builder.
+///
+/// It can also panic whenever a timer is created outside of a
+/// Tokio runtime. That is why `rt.block_on(sleep(...))` will panic,
+/// since the function is executed outside of the runtime.
+/// Whereas `rt.block_on(async {sleep(...).await})` doesn't panic.
+/// And this is because wrapping the function on an async makes it lazy,
+/// and so gets executed inside the runtime successfully without
+/// panicking.
+///
 /// [`Sleep`]: struct@crate::time::Sleep
 /// [`interval`]: crate::time::interval()
+/// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
+/// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_for"))]
 #[cfg_attr(docsrs, doc(alias = "wait"))]
-#[cfg_attr(tokio_track_caller, track_caller)]
+#[track_caller]
 pub fn sleep(duration: Duration) -> Sleep {
     let location = trace::caller_location();
 
@@ -204,8 +236,7 @@ cfg_trace! {
     #[derive(Debug)]
     struct Inner {
         deadline: Instant,
-        resource_span: tracing::Span,
-        async_op_span: tracing::Span,
+        ctx: trace::AsyncOpTracingCtx,
         time_source: ClockTime,
     }
 }
@@ -232,10 +263,7 @@ impl Sleep {
             let deadline_tick = time_source.deadline_to_tick(deadline);
             let duration = deadline_tick.checked_sub(time_source.now()).unwrap_or(0);
 
-            #[cfg(tokio_track_caller)]
-            let location = location.expect("should have location if tracking caller");
-
-            #[cfg(tokio_track_caller)]
+            let location = location.expect("should have location if tracing");
             let resource_span = tracing::trace_span!(
                 "runtime.resource",
                 concrete_type = "Sleep",
@@ -245,25 +273,29 @@ impl Sleep {
                 loc.col = location.column(),
             );
 
-            #[cfg(not(tokio_track_caller))]
-            let resource_span =
-                tracing::trace_span!("runtime.resource", concrete_type = "Sleep", kind = "timer");
+            let async_op_span = resource_span.in_scope(|| {
+                tracing::trace!(
+                    target: "runtime::resource::state_update",
+                    duration = duration,
+                    duration.unit = "ms",
+                    duration.op = "override",
+                );
 
-            let async_op_span =
-                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout");
+                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout")
+            });
 
-            tracing::trace!(
-                target: "runtime::resource::state_update",
-                parent: resource_span.id(),
-                duration = duration,
-                duration.unit = "ms",
-                duration.op = "override",
-            );
+            let async_op_poll_span =
+                async_op_span.in_scope(|| tracing::trace_span!("runtime.resource.async_op.poll"));
+
+            let ctx = trace::AsyncOpTracingCtx {
+                async_op_span,
+                async_op_poll_span,
+                resource_span,
+            };
 
             Inner {
                 deadline,
-                resource_span,
-                async_op_span,
+                ctx,
                 time_source,
             }
         };
@@ -330,54 +362,52 @@ impl Sleep {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
-            me.inner.async_op_span =
+            let _resource_enter = me.inner.ctx.resource_span.enter();
+            me.inner.ctx.async_op_span =
                 tracing::trace_span!("runtime.resource.async_op", source = "Sleep::reset");
+            let _async_op_enter = me.inner.ctx.async_op_span.enter();
+
+            me.inner.ctx.async_op_poll_span =
+                tracing::trace_span!("runtime.resource.async_op.poll");
+
+            let duration = {
+                let now = me.inner.time_source.now();
+                let deadline_tick = me.inner.time_source.deadline_to_tick(deadline);
+                deadline_tick.checked_sub(now).unwrap_or(0)
+            };
 
             tracing::trace!(
                 target: "runtime::resource::state_update",
-                parent: me.inner.resource_span.id(),
-                duration = {
-                    let now = me.inner.time_source.now();
-                    let deadline_tick = me.inner.time_source.deadline_to_tick(deadline);
-                    deadline_tick.checked_sub(now).unwrap_or(0)
-                },
+                duration = duration,
                 duration.unit = "ms",
                 duration.op = "override",
             );
         }
     }
 
-    cfg_not_trace! {
-        fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
-            let me = self.project();
+    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+        let me = self.project();
 
-            // Keep track of task budget
-            let coop = ready!(crate::coop::poll_proceed(cx));
+        // Keep track of task budget
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let coop = ready!(trace_poll_op!(
+            "poll_elapsed",
+            crate::coop::poll_proceed(cx),
+        ));
 
-            me.entry.poll_elapsed(cx).map(move |r| {
-                coop.made_progress();
-                r
-            })
-        }
-    }
+        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        let coop = ready!(crate::coop::poll_proceed(cx));
 
-    cfg_trace! {
-        fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
-            let me = self.project();
-            // Keep track of task budget
-            let coop = ready!(trace_poll_op!(
-                "poll_elapsed",
-                crate::coop::poll_proceed(cx),
-                me.inner.resource_span.id(),
-            ));
+        let result = me.entry.poll_elapsed(cx).map(move |r| {
+            coop.made_progress();
+            r
+        });
 
-            let result =  me.entry.poll_elapsed(cx).map(move |r| {
-                coop.made_progress();
-                r
-            });
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return trace_poll_op!("poll_elapsed", result);
 
-            trace_poll_op!("poll_elapsed", result, me.inner.resource_span.id())
-        }
+        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        return result;
     }
 }
 
@@ -395,8 +425,11 @@ impl Future for Sleep {
     // really do much better if we passed the error onwards.
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let _span = self.inner.async_op_span.clone().entered();
-
+        let _res_span = self.inner.ctx.resource_span.clone().entered();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _ao_span = self.inner.ctx.async_op_span.clone().entered();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _ao_poll_span = self.inner.ctx.async_op_poll_span.clone().entered();
         match ready!(self.as_mut().poll_elapsed(cx)) {
             Ok(()) => Poll::Ready(()),
             Err(e) => panic!("timer error: {}", e),

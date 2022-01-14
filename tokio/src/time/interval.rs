@@ -1,6 +1,8 @@
 use crate::future::poll_fn;
 use crate::time::{sleep_until, Duration, Instant, Sleep};
+use crate::util::trace;
 
+use std::panic::Location;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{convert::TryInto, future::Future};
@@ -68,10 +70,10 @@ use std::{convert::TryInto, future::Future};
 ///
 /// [`sleep`]: crate::time::sleep()
 /// [`.tick().await`]: Interval::tick
+#[track_caller]
 pub fn interval(period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
-
-    interval_at(Instant::now(), period)
+    internal_interval_at(Instant::now(), period, trace::caller_location())
 }
 
 /// Creates new [`Interval`] that yields with interval of `period` with the
@@ -103,13 +105,44 @@ pub fn interval(period: Duration) -> Interval {
 ///     // approximately 70ms have elapsed.
 /// }
 /// ```
+#[track_caller]
 pub fn interval_at(start: Instant, period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
+    internal_interval_at(start, period, trace::caller_location())
+}
+
+#[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
+fn internal_interval_at(
+    start: Instant,
+    period: Duration,
+    location: Option<&'static Location<'static>>,
+) -> Interval {
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    let resource_span = {
+        let location = location.expect("should have location if tracing");
+
+        tracing::trace_span!(
+            "runtime.resource",
+            concrete_type = "Interval",
+            kind = "timer",
+            loc.file = location.file(),
+            loc.line = location.line(),
+            loc.col = location.column(),
+        )
+    };
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    let delay = resource_span.in_scope(|| Box::pin(sleep_until(start)));
+
+    #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+    let delay = Box::pin(sleep_until(start));
 
     Interval {
-        delay: Box::pin(sleep_until(start)),
+        delay,
         period,
         missed_tick_behavior: Default::default(),
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        resource_span,
     }
 }
 
@@ -124,7 +157,7 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     // ticks every 2 seconds
+///     // ticks every 2 milliseconds
 ///     let mut interval = time::interval(Duration::from_millis(2));
 ///     for _ in 0..5 {
 ///         interval.tick().await;
@@ -362,6 +395,9 @@ pub struct Interval {
 
     /// The strategy `Interval` should use when a tick is missed.
     missed_tick_behavior: MissedTickBehavior,
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
 }
 
 impl Interval {
@@ -391,7 +427,20 @@ impl Interval {
     /// }
     /// ```
     pub async fn tick(&mut self) -> Instant {
-        poll_fn(|cx| self.poll_tick(cx)).await
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = self.resource_span.clone();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let instant = trace::async_op(
+            || poll_fn(|cx| self.poll_tick(cx)),
+            resource_span,
+            "Interval::tick",
+            "poll_tick",
+            false,
+        );
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let instant = poll_fn(|cx| self.poll_tick(cx));
+
+        instant.await
     }
 
     /// Polls for the next instant in the interval to be reached.
@@ -433,6 +482,36 @@ impl Interval {
 
         // Return the time when we were scheduled to tick
         Poll::Ready(timeout)
+    }
+
+    /// Resets the interval to complete one period after the current time.
+    ///
+    /// This method ignores [`MissedTickBehavior`] strategy.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::time;
+    ///
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut interval = time::interval(Duration::from_millis(100));
+    ///
+    ///     interval.tick().await;
+    ///
+    ///     time::sleep(Duration::from_millis(50)).await;
+    ///     interval.reset();
+    ///
+    ///     interval.tick().await;
+    ///     interval.tick().await;
+    ///
+    ///     // approximately 250ms have elapsed.
+    /// }
+    /// ```
+    pub fn reset(&mut self) {
+        self.delay.as_mut().reset(Instant::now() + self.period);
     }
 
     /// Returns the [`MissedTickBehavior`] strategy currently being used.
