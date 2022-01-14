@@ -38,6 +38,6 @@ impl MetricsBatch {
 cfg_rt_multi_thread! {
     impl MetricsBatch {
         pub(crate) fn incr_steal_count(&mut self, _by: u16) {}
-        pub(crate) fn incr_overflow_count(&mut self, _by: u16) {}
+        pub(crate) fn incr_overflow_count(&mut self) {}
     }
 }

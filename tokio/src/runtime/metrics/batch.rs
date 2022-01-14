@@ -98,8 +98,8 @@ cfg_rt_multi_thread! {
             self.steal_count += by as u64;
         }
 
-        pub(crate) fn incr_overflow_count(&mut self, by: u16) {
-            self.overflow_count += by as u64;
+        pub(crate) fn incr_overflow_count(&mut self) {
+            self.overflow_count += 1;
         }
     }
 }

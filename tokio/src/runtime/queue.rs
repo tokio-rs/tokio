@@ -122,7 +122,6 @@ impl<T> Local<T> {
                 // Concurrently stealing, this will free up capacity, so only
                 // push the task onto the inject queue
                 inject.push(task);
-                metrics.incr_overflow_count(1);
                 return;
             } else {
                 // Push the current task and half of the queue into the
@@ -254,7 +253,7 @@ impl<T> Local<T> {
         inject.push_batch(batch_iter.chain(std::iter::once(task)));
 
         // Add 1 to factor in the task currently being scheduled.
-        metrics.incr_overflow_count(NUM_TASKS_TAKEN + 1);
+        metrics.incr_overflow_count();
 
         Ok(())
     }

@@ -12,29 +12,29 @@ use std::sync::atomic::{AtomicU64, AtomicUsize};
 #[repr(align(128))]
 pub(crate) struct WorkerMetrics {
     ///  Number of times the worker parked.
-    pub(super) park_count: AtomicU64,
+    pub(crate) park_count: AtomicU64,
 
     /// Number of times the worker woke then parked again without doing work.
-    pub(super) noop_count: AtomicU64,
+    pub(crate) noop_count: AtomicU64,
 
     /// Number of times the worker attempted to steal.
-    pub(super) steal_count: AtomicU64,
+    pub(crate) steal_count: AtomicU64,
 
     /// Number of tasks the worker polled.
-    pub(super) poll_count: AtomicU64,
+    pub(crate) poll_count: AtomicU64,
 
     /// Amount of time the worker spent doing work vs. parking.
-    pub(super) busy_duration_total: AtomicU64,
+    pub(crate) busy_duration_total: AtomicU64,
 
     /// Number of tasks scheduled for execution on the worker's local queue.
-    pub(super) local_schedule_count: AtomicU64,
+    pub(crate) local_schedule_count: AtomicU64,
 
     /// Number of tasks moved from the local queue to the global queue to free space.
-    pub(super) overflow_count: AtomicU64,
+    pub(crate) overflow_count: AtomicU64,
 
     /// Number of tasks currently in the local queue. Used only by the
     /// current-thread scheduler.
-    pub(super) queue_depth: AtomicUsize,
+    pub(crate) queue_depth: AtomicUsize,
 }
 
 impl WorkerMetrics {
