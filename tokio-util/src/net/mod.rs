@@ -10,7 +10,7 @@ use std::task::{Context, Poll};
 pub mod unix;
 
 /// A trait for a listener: `TcpListener` and `UnixListener`.
-pub trait Listener: Send + Unpin {
+pub trait Listener {
     /// The stream's type of this listener.
     type Io: tokio::io::AsyncRead + tokio::io::AsyncWrite;
     /// The socket address type of this listener.
