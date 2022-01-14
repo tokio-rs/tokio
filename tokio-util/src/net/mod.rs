@@ -17,10 +17,10 @@ pub trait Listener {
     type Addr;
 
     /// Polls to accept a new incoming connection to this listener.
-    fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>>;
+    fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>>;
 
     /// Accepts a new incoming connection from this listener.
-    fn accept(&self) -> ListenerAcceptFut<'_, Self>
+    fn accept(&mut self) -> ListenerAcceptFut<'_, Self>
     where
         Self: Sized + Unpin,
     {
@@ -35,7 +35,7 @@ impl Listener for tokio::net::TcpListener {
     type Io = tokio::net::TcpStream;
     type Addr = std::net::SocketAddr;
 
-    fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>> {
+    fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>> {
         Self::poll_accept(self, cx)
     }
 
@@ -47,14 +47,14 @@ impl Listener for tokio::net::TcpListener {
 /// Future for accepting a new connection from a listener.
 #[derive(Debug)]
 pub struct ListenerAcceptFut<'a, L> {
-    listener: &'a L,
+    listener: &'a mut L,
 }
 
 impl<'a, L> ListenerAcceptFut<'a, L>
 where
     L: Listener,
 {
-    fn new(listener: &'a L) -> Self {
+    fn new(listener: &'a mut L) -> Self {
         Self { listener }
     }
 }
@@ -65,7 +65,7 @@ where
 {
     type Output = Result<(L::Io, L::Addr)>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         self.listener.poll_accept(cx)
     }
 }
@@ -78,7 +78,7 @@ where
     type Io = Either<<L as Listener>::Io, <R as Listener>::Io>;
     type Addr = Either<<L as Listener>::Addr, <R as Listener>::Addr>;
 
-    fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>> {
+    fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>> {
         match self {
             Either::Left(listener) => listener
                 .poll_accept(cx)
