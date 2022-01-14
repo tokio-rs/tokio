@@ -22,7 +22,7 @@ pub trait Listener {
     /// Accepts a new incoming connection from this listener.
     fn accept(&mut self) -> ListenerAcceptFut<'_, Self>
     where
-        Self: Sized + Unpin,
+        Self: Sized,
     {
         ListenerAcceptFut::new(self)
     }
