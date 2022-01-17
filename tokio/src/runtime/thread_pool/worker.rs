@@ -59,7 +59,7 @@
 use crate::coop;
 use crate::future::Future;
 use crate::loom::rand::seed;
-use crate::loom::sync::{Arc, Mutex};
+use crate::loom::sync::{Arc, Mutex, Weak};
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
@@ -72,7 +72,8 @@ use crate::util::atomic_cell::AtomicCell;
 use crate::util::FastRand;
 
 use std::cell::RefCell;
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::time::{Duration, Instant};
 
 /// A scheduler worker
 pub(super) struct Worker {
@@ -81,6 +82,12 @@ pub(super) struct Worker {
 
     /// Index holding this worker's remote state
     index: usize,
+
+    /// The MSB is used to indicate whether the current Core can be preempted,
+    /// 0 means yes. The remaining bits represent the generation, which is
+    /// incremented by 1 whenever the Core is preempted by a new thread.
+    /// Only the thread marked non-preemptive can access the Core.
+    age: AtomicU64,
 
     /// Used to hand-off a worker's core to another thread.
     core: AtomicCell<Core>,
@@ -150,6 +157,8 @@ pub(super) struct Shared {
 
     /// Collects stats from the runtime.
     stats: RuntimeStats,
+
+    created: Instant,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -157,14 +166,30 @@ struct Remote {
     /// Steals tasks from this worker.
     steal: queue::Steal<Arc<Shared>>,
 
+    /// The last access time of queue.
+    last_access_ms: AtomicU64,
+
     /// Unparks the associated worker thread
     unpark: Unparker,
+}
+
+impl Remote {
+    fn touch_by(&self, worker: &Worker) {
+        let now = Instant::now();
+        let dur = now.duration_since(worker.shared.created);
+        let dur = dur.as_millis() as u64;
+        self.last_access_ms.fetch_max(dur, Relaxed);
+        return;
+    }
 }
 
 /// Thread-local context
 struct Context {
     /// Worker
     worker: Arc<Worker>,
+
+    /// a copy of Worker::age.
+    age: u64,
 
     /// Core data
     core: RefCell<Option<Box<Core>>>,
@@ -195,6 +220,7 @@ pub(super) fn create(
 ) -> (Arc<Shared>, Launch) {
     let mut cores = vec![];
     let mut remotes = vec![];
+    let now = Instant::now();
 
     // Create the local queues
     for i in 0..size {
@@ -214,7 +240,11 @@ pub(super) fn create(
             rand: FastRand::new(seed()),
         }));
 
-        remotes.push(Remote { steal, unpark });
+        remotes.push(Remote {
+            steal,
+            last_access_ms: AtomicU64::new(0),
+            unpark,
+        });
     }
 
     let shared = Arc::new(Shared {
@@ -226,6 +256,7 @@ pub(super) fn create(
         before_park,
         after_unpark,
         stats: RuntimeStats::new(size),
+        created: now,
     });
 
     let mut launch = Launch(vec![]);
@@ -234,6 +265,7 @@ pub(super) fn create(
         launch.0.push(Arc::new(Worker {
             shared: shared.clone(),
             index,
+            age: AtomicU64::new(0),
             core: AtomicCell::new(Some(core)),
         }));
     }
@@ -251,12 +283,7 @@ where
     impl Drop for Reset {
         fn drop(&mut self) {
             CURRENT.with(|maybe_cx| {
-                if let Some(cx) = maybe_cx {
-                    let core = cx.worker.core.take();
-                    let mut cx_core = cx.core.borrow_mut();
-                    assert!(cx_core.is_none());
-                    *cx_core = core;
-
+                if maybe_cx.is_some() {
                     // Reset the task budget as we are re-entering the
                     // runtime.
                     coop::set(self.0);
@@ -298,31 +325,6 @@ where
                 return;
             }
         }
-
-        let cx = maybe_cx.expect("no .is_some() == false cases above should lead here");
-
-        // Get the worker core. If none is set, then blocking is fine!
-        let core = match cx.core.borrow_mut().take() {
-            Some(core) => core,
-            None => return,
-        };
-
-        // The parker should be set here
-        assert!(core.park.is_some());
-
-        // In order to block, the core must be sent to another thread for
-        // execution.
-        //
-        // First, move the core back into the worker's shared core slot.
-        cx.worker.core.set(core);
-
-        // Next, clone the worker handle and send it to a new thread for
-        // processing.
-        //
-        // Once the blocking task is done executing, we will attempt to
-        // steal the core back.
-        let worker = cx.worker.clone();
-        runtime::spawn_blocking(move || run(worker));
     });
 
     if had_entered {
@@ -343,9 +345,71 @@ where
 const GLOBAL_POLL_INTERVAL: u8 = 61;
 
 impl Launch {
-    pub(crate) fn launch(mut self) {
+    pub(crate) fn launch(mut self, force_preempt: Duration) {
+        let mut workers = Vec::with_capacity(self.0.len());
+        for worker in &self.0 {
+            workers.push(Arc::downgrade(worker));
+        }
         for worker in self.0.drain(..) {
             runtime::spawn_blocking(move || run(worker));
+        }
+        runtime::spawn_blocking(move || sysmon(workers, force_preempt));
+    }
+}
+
+fn sysmon_worker(worker: Arc<Worker>, force_preempt: Duration, now: Instant) -> Duration {
+    if !worker.is_preemptable() {
+        return force_preempt;
+    }
+    if worker.rq_is_empty() {
+        // lifo_slot?
+        return force_preempt;
+    }
+    let last_access = Duration::from_millis(worker.last_access_ms());
+    let now = now.duration_since(worker.shared.created);
+    if let Some(diff) = now.checked_sub(last_access) {
+        if diff < force_preempt {
+            return force_preempt - diff;
+        }
+    } else {
+        return force_preempt;
+    }
+
+    worker.touch();
+    // TODO: Use spawn_blocking_auto_discard() to discard this run if the blocking pool is busy.
+    runtime::spawn_blocking(move || run(worker));
+    return force_preempt;
+}
+
+fn sysmon(workers: Vec<Weak<Worker>>, force_preempt: Duration) {
+    const MIN_FORCE_PREEMPT: Duration = Duration::from_millis(10);
+    let force_preempt = if force_preempt < MIN_FORCE_PREEMPT {
+        MIN_FORCE_PREEMPT
+    } else {
+        force_preempt
+    };
+
+    const MIN_DELAY: Duration = Duration::from_micros(20); // see golang sysmon()
+    let mut delay = force_preempt;
+    loop {
+        if delay < MIN_DELAY {
+            delay = MIN_DELAY;
+        }
+        std::thread::sleep(delay);
+        delay = force_preempt;
+
+        let now = Instant::now();
+        // Should we control the maximum number of threads created in an iteration?
+        // TODO: use rbtree for workers,
+        for workref in &workers {
+            if let Some(w) = workref.upgrade() {
+                let work_delay = sysmon_worker(w, force_preempt, now);
+                if delay > work_delay {
+                    delay = work_delay;
+                }
+            } else {
+                return;
+            }
         }
     }
 }
@@ -353,15 +417,10 @@ impl Launch {
 fn run(worker: Arc<Worker>) {
     // Acquire a core. If this fails, then another thread is running this
     // worker and there is nothing further to do.
-    let core = match worker.core.take() {
-        Some(core) => core,
+    let (cx, core) = match Context::preempt_core(worker) {
+        // TODO: Add stats.
         None => return,
-    };
-
-    // Set the worker context.
-    let cx = Context {
-        worker,
-        core: RefCell::new(None),
+        Some((cx, core)) => (cx, core),
     };
 
     let _enter = crate::runtime::enter(true);
@@ -374,6 +433,55 @@ fn run(worker: Arc<Worker>) {
 }
 
 impl Context {
+    fn preempt_core(worker: Arc<Worker>) -> Option<(Context, Box<Core>)> {
+        let newage = {
+            // AtomicCell will be responsible for synchronizing the Core, so we only need Relaxed here
+            let mut age = worker.age.load(Relaxed);
+            loop {
+                if (age >> 63) != 0 {
+                    return None;
+                }
+                // mark non-preemptive and inc the generation.
+                let newage = age + ((1 << 63) + 1);
+                match worker
+                    .age
+                    .compare_exchange_weak(age, newage, Relaxed, Relaxed)
+                {
+                    Ok(_) => break newage,
+                    Err(curage) => age = curage,
+                }
+            }
+        };
+        let core = worker.core.take().expect("core missing");
+        let cx = Context {
+            worker,
+            age: newage,
+            core: RefCell::new(None),
+        };
+        return Some((cx, core));
+    }
+
+    fn try_preempt_core(&self) -> Option<Box<Core>> {
+        let age = self.age & ((1 << 63) - 1);
+        let res = self
+            .worker
+            .age
+            .compare_exchange(age, self.age, Relaxed, Relaxed);
+        if res.is_err() {
+            return None;
+        }
+        let core = self.worker.core.take().expect("core missing");
+        return Some(core);
+    }
+
+    fn preempt_enable(&self, core: Box<Core>) {
+        self.worker.core.set(core);
+        debug_assert_eq!(self.age, self.worker.age.load(Relaxed));
+        let age = self.age & ((1 << 63) - 1);
+        self.worker.age.store(age, Relaxed);
+        return;
+    }
+
     fn run(&self, mut core: Box<Core>) -> RunResult {
         while !core.is_shutdown {
             // Increment the tick
@@ -414,10 +522,11 @@ impl Context {
 
         // Make the core available to the runtime context
         core.stats.incr_poll_count();
-        *self.core.borrow_mut() = Some(core);
 
         // Run the task
         coop::budget(|| {
+            self.worker.touch();
+            self.preempt_enable(core);
             task.run();
 
             // As long as there is budget remaining and a task exists in the
@@ -425,7 +534,7 @@ impl Context {
             loop {
                 // Check if we still have the core. If not, the core was stolen
                 // by another worker.
-                let mut core = match self.core.borrow_mut().take() {
+                let mut core = match self.try_preempt_core() {
                     Some(core) => core,
                     None => return Err(()),
                 };
@@ -439,7 +548,8 @@ impl Context {
                 if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
                     core.stats.incr_poll_count();
-                    *self.core.borrow_mut() = Some(core);
+                    self.worker.touch();
+                    self.preempt_enable(core);
                     let task = self.worker.shared.owned.assert_owner(task);
                     task.run();
                 } else {
@@ -564,6 +674,7 @@ impl Core {
                 .steal
                 .steal_into(&mut self.run_queue, &mut self.stats)
             {
+                target.touch_by(worker);
                 return Some(task);
             }
         }
@@ -675,6 +786,26 @@ impl Worker {
     fn inject(&self) -> &Inject<Arc<Shared>> {
         &self.shared.inject
     }
+
+    fn remote(&self) -> &Remote {
+        &self.shared.remotes[self.index]
+    }
+
+    fn touch(&self) {
+        self.remote().touch_by(self)
+    }
+
+    fn last_access_ms(&self) -> u64 {
+        self.remote().last_access_ms.load(Relaxed)
+    }
+
+    fn is_preemptable(&self) -> bool {
+        (self.age.load(Relaxed) >> 63) == 0
+    }
+
+    fn rq_is_empty(&self) -> bool {
+        self.remote().steal.is_empty()
+    }
 }
 
 impl task::Schedule for Arc<Shared> {
@@ -718,6 +849,11 @@ impl Shared {
                     // And the current thread still holds a core
                     if let Some(core) = cx.core.borrow_mut().as_mut() {
                         self.schedule_local(core, task, is_yield);
+                        return;
+                    }
+                    if let Some(mut core) = cx.try_preempt_core() {
+                        self.schedule_local(&mut core, task, is_yield);
+                        cx.preempt_enable(core);
                         return;
                     }
                 }

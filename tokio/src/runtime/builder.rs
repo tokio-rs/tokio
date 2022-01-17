@@ -58,6 +58,9 @@ pub struct Builder {
     /// Cap on thread usage.
     max_blocking_threads: usize,
 
+    /// the max unactive time of rq.
+    force_preempt: Duration,
+
     /// Name fn used for threads spawned by the runtime.
     pub(super) thread_name: ThreadNameFn,
 
@@ -138,6 +141,8 @@ impl Builder {
             // Do not set a stack size by default
             thread_stack_size: None,
 
+            // forcePreemptNS in golang,
+            force_preempt: Duration::from_millis(10),
             // No worker thread callbacks
             after_start: None,
             before_stop: None,
@@ -274,6 +279,12 @@ impl Builder {
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
         let val = val.into();
         self.thread_name = std::sync::Arc::new(move || val.clone());
+        self
+    }
+
+    /// Sets the maximum wait time before creating a new worker thread for runqueue.
+    pub fn force_preempt(&mut self, d: Duration) -> &mut Self {
+        self.force_preempt = d;
         self
     }
 
@@ -673,7 +684,7 @@ cfg_rt_multi_thread! {
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads + 1 /* sysmon */);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Create the runtime handle
@@ -688,7 +699,7 @@ cfg_rt_multi_thread! {
 
             // Spawn the thread pool workers
             let _enter = crate::runtime::context::enter(handle.clone());
-            launch.launch();
+            launch.launch(self.force_preempt);
 
             Ok(Runtime {
                 kind: Kind::ThreadPool(scheduler),
