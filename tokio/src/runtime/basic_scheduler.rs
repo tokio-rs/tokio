@@ -512,7 +512,9 @@ impl CoreGuard<'_> {
 
             'outer: loop {
                 if core.spawner.reset_woken() {
-                    let (c, res) = context.run_task(core, || future.as_mut().poll(&mut cx));
+                    let (c, res) = context.enter(core, || {
+                        crate::coop::budget(|| future.as_mut().poll(&mut cx))
+                    });
 
                     core = c;
 

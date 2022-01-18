@@ -126,7 +126,6 @@ rt_test! {
                 n += 1;
 
                 assert!(park_count >= noop_count);
-                assert!(noop_count > 0);
 
                 assert_eq!(0, metrics.worker_steal_count(i));
                 assert_eq!(0, metrics.worker_local_schedule_count(i));
