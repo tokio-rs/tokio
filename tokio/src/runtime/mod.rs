@@ -602,4 +602,13 @@ cfg_rt! {
             }
         }
     }
+
+    cfg_metrics! {
+        impl Runtime {
+            /// TODO
+            pub fn metrics(&self) -> RuntimeMetrics {
+                self.handle.metrics()
+            }
+        }
+    }
 }

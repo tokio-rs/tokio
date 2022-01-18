@@ -263,6 +263,9 @@ impl Drop for BasicScheduler {
 
             assert!(context.spawner.shared.owned.is_empty());
 
+            // Submit metrics
+            core.metrics.submit(&core.spawner.shared.worker_metrics);
+
             (core, ())
         });
     }

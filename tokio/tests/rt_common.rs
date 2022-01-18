@@ -46,6 +46,15 @@ macro_rules! rt_test {
     }
 }
 
+macro_rules! cfg_metrics {
+    ($($t:tt)*) => {
+        #[cfg(tokio_unstable)]
+        {
+            $( $t )*
+        }
+    }
+}
+
 #[test]
 fn send_sync_bound() {
     use tokio::runtime::Runtime;
@@ -99,6 +108,35 @@ rt_test! {
         });
 
         assert_eq!(out, "ZOMG");
+
+        cfg_metrics! {{
+            let metrics = rt.metrics();
+
+            let mut n = 0;
+
+            for i in 0..metrics.num_workers() {
+                super::wait_for(|| metrics.worker_park_count(i) > 0);
+                let park_count = metrics.worker_park_count(i);
+                let noop_count = metrics.worker_noop_count(i);
+
+                if park_count == 0 {
+                    continue;
+                }
+
+                n += 1;
+
+                assert!(park_count >= noop_count);
+                assert!(noop_count > 0);
+
+                assert_eq!(0, metrics.worker_steal_count(i));
+                assert_eq!(0, metrics.worker_local_schedule_count(i));
+                assert_eq!(0, metrics.worker_overflow_count(i));
+                assert_eq!(0, metrics.remote_queue_depth());
+                assert_eq!(0, metrics.worker_local_queue_depth(i));
+            }
+
+            assert!(n > 0);
+        }}
     }
 
     #[test]
@@ -1105,5 +1143,20 @@ rt_test! {
                 t.await.unwrap();
             }
         });
+    }
+}
+
+#[cfg_attr(not(tokio_unstable), allow(foo))]
+#[track_caller]
+fn wait_for(mut f: impl FnMut() -> bool) {
+    use std::thread;
+    use std::time::Duration;
+
+    for i in 1..18 {
+        if f() {
+            return;
+        }
+
+        thread::sleep(Duration::from_micros(1 << i));
     }
 }
