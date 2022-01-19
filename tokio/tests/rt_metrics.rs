@@ -220,7 +220,9 @@ fn worker_local_schedule_count() {
         // Move to the runtime
         tokio::spawn(async {
             tokio::spawn(async {}).await.unwrap();
-        }).await.unwrap();
+        })
+        .await
+        .unwrap();
     });
     drop(rt);
 
@@ -261,7 +263,9 @@ fn worker_overflow_count() {
             }
 
             tx2.send(()).unwrap();
-        }).await.unwrap();
+        })
+        .await
+        .unwrap();
     });
     drop(rt);
 
@@ -282,7 +286,9 @@ fn remote_queue_depth() {
 
     thread::spawn(move || {
         handle.spawn(async {});
-    }).join().unwrap();
+    })
+    .join()
+    .unwrap();
 
     assert_eq!(1, metrics.remote_queue_depth());
 
@@ -299,7 +305,9 @@ fn remote_queue_depth() {
 
     thread::spawn(move || {
         handle.spawn(async {});
-    }).join().unwrap();
+    })
+    .join()
+    .unwrap();
 
     let n = metrics.remote_queue_depth();
     assert!(1 <= n, "{}", n);
@@ -310,8 +318,56 @@ fn remote_queue_depth() {
 }
 
 #[test]
-#[ignore]
-fn worker_local_queue_depth() {}
+fn worker_local_queue_depth() {
+    const N: usize = 100;
+
+    let rt = basic();
+    let metrics = rt.metrics();
+    rt.block_on(async {
+        for _ in 0..N {
+            tokio::spawn(async {});
+        }
+
+        assert_eq!(N, metrics.worker_local_queue_depth(0));
+    });
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+    rt.block_on(async move {
+        // Move to the runtime
+        tokio::spawn(async move {
+            let (tx1, rx1) = std::sync::mpsc::channel();
+            let (tx2, rx2) = std::sync::mpsc::channel();
+
+            // First, we need to block the other worker until all tasks have
+            // been spawned.
+            tokio::spawn(async move {
+                tx1.send(()).unwrap();
+                rx2.recv().unwrap();
+            });
+
+            // Bump the next-run spawn
+            tokio::spawn(async {});
+
+            rx1.recv().unwrap();
+
+            // Spawn some tasks
+            for _ in 0..100 {
+                tokio::spawn(async {});
+            }
+
+            let n: usize = (0..metrics.num_workers())
+                .map(|i| metrics.worker_local_queue_depth(i))
+                .sum();
+
+            assert_eq!(n, N);
+
+            tx2.send(()).unwrap();
+        })
+        .await
+        .unwrap();
+    });
+}
 
 fn basic() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
