@@ -1145,7 +1145,7 @@ rt_test! {
     }
 }
 
-#[cfg_attr(not(tokio_unstable), allow(foo))]
+#[cfg_attr(not(tokio_unstable), allow(dead_code))]
 #[track_caller]
 fn wait_for(mut f: impl FnMut() -> bool) {
     use std::thread;
