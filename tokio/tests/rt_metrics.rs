@@ -213,15 +213,101 @@ fn worker_local_schedule_count() {
 
     assert_eq!(1, metrics.worker_local_schedule_count(0));
     assert_eq!(0, metrics.remote_schedule_count());
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+    rt.block_on(async {
+        // Move to the runtime
+        tokio::spawn(async {
+            tokio::spawn(async {}).await.unwrap();
+        }).await.unwrap();
+    });
+    drop(rt);
+
+    let n: u64 = (0..metrics.num_workers())
+        .map(|i| metrics.worker_local_schedule_count(i))
+        .sum();
+
+    assert_eq!(2, n);
+    assert_eq!(1, metrics.remote_schedule_count());
 }
 
 #[test]
-#[ignore]
-fn worker_overflow_count() {}
+fn worker_overflow_count() {
+    // Only applies to the threaded worker
+    let rt = threaded();
+    let metrics = rt.metrics();
+    rt.block_on(async {
+        // Move to the runtime
+        tokio::spawn(async {
+            let (tx1, rx1) = std::sync::mpsc::channel();
+            let (tx2, rx2) = std::sync::mpsc::channel();
+
+            // First, we need to block the other worker until all tasks have
+            // been spawned.
+            tokio::spawn(async move {
+                tx1.send(()).unwrap();
+                rx2.recv().unwrap();
+            });
+
+            // Bump the next-run spawn
+            tokio::spawn(async {});
+
+            rx1.recv().unwrap();
+
+            // Spawn many tasks
+            for _ in 0..300 {
+                tokio::spawn(async {});
+            }
+
+            tx2.send(()).unwrap();
+        }).await.unwrap();
+    });
+    drop(rt);
+
+    let n: u64 = (0..metrics.num_workers())
+        .map(|i| metrics.worker_overflow_count(i))
+        .sum();
+
+    assert_eq!(1, n);
+}
 
 #[test]
-#[ignore]
-fn remote_queue_depth() {}
+fn remote_queue_depth() {
+    use std::thread;
+
+    let rt = basic();
+    let handle = rt.handle().clone();
+    let metrics = rt.metrics();
+
+    thread::spawn(move || {
+        handle.spawn(async {});
+    }).join().unwrap();
+
+    assert_eq!(1, metrics.remote_queue_depth());
+
+    let rt = threaded();
+    let handle = rt.handle().clone();
+    let metrics = rt.metrics();
+
+    // First we need to block the runtime workers
+    let (tx1, rx1) = std::sync::mpsc::channel();
+    let (tx2, rx2) = std::sync::mpsc::channel();
+
+    rt.spawn(async move { rx1.recv().unwrap() });
+    rt.spawn(async move { rx2.recv().unwrap() });
+
+    thread::spawn(move || {
+        handle.spawn(async {});
+    }).join().unwrap();
+
+    let n = metrics.remote_queue_depth();
+    assert!(1 <= n, "{}", n);
+    assert!(3 >= n, "{}", n);
+
+    tx1.send(()).unwrap();
+    tx2.send(()).unwrap();
+}
 
 #[test]
 #[ignore]
