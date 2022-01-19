@@ -77,7 +77,7 @@ fn worker_noop_count() {
         time::sleep(Duration::from_millis(1)).await;
     });
     drop(rt);
-    assert_eq!(2, metrics.worker_noop_count(0));
+    assert!(2 <= metrics.worker_noop_count(0));
 
     let rt = threaded();
     let metrics = rt.metrics();
