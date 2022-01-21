@@ -423,7 +423,7 @@ cfg_metrics! {
             &self.shared.scheduler_metrics
         }
 
-        pub(crate) fn remote_queue_depth(&self) -> usize {
+        pub(crate) fn injection_queue_depth(&self) -> usize {
             // TODO: avoid having to lock. The multi-threaded injection queue
             // could probably be used here.
             self.shared.queue.lock()

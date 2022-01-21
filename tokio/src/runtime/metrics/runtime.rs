@@ -401,12 +401,12 @@ impl RuntimeMetrics {
     /// async fn main() {
     ///     let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.remote_queue_depth();
+    ///     let n = metrics.injection_queue_depth();
     ///     println!("{} tasks currently pending in the runtime's injection queue", n);
     /// }
     /// ```
-    pub fn remote_queue_depth(&self) -> usize {
-        self.handle.spawner.remote_queue_depth()
+    pub fn injection_queue_depth(&self) -> usize {
+        self.handle.spawner.injection_queue_depth()
     }
 
     /// Returns the number of tasks currently scheduled in the given worker's

@@ -64,11 +64,11 @@ cfg_metrics! {
             }
         }
 
-        pub(crate) fn remote_queue_depth(&self) -> usize {
+        pub(crate) fn injection_queue_depth(&self) -> usize {
             match self {
-                Spawner::Basic(spawner) => spawner.remote_queue_depth(),
+                Spawner::Basic(spawner) => spawner.injection_queue_depth(),
                 #[cfg(feature = "rt-multi-thread")]
-                Spawner::ThreadPool(spawner) => spawner.remote_queue_depth(),
+                Spawner::ThreadPool(spawner) => spawner.injection_queue_depth(),
             }
         }
 

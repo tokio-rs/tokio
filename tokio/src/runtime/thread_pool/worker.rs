@@ -833,7 +833,7 @@ impl Shared {
 
 cfg_metrics! {
     impl Shared {
-        pub(super) fn remote_queue_depth(&self) -> usize {
+        pub(super) fn injection_queue_depth(&self) -> usize {
             self.inject.len()
         }
 

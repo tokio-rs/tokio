@@ -277,7 +277,7 @@ fn worker_overflow_count() {
 }
 
 #[test]
-fn remote_queue_depth() {
+fn injection_queue_depth() {
     use std::thread;
 
     let rt = basic();
@@ -290,7 +290,7 @@ fn remote_queue_depth() {
     .join()
     .unwrap();
 
-    assert_eq!(1, metrics.remote_queue_depth());
+    assert_eq!(1, metrics.injection_queue_depth());
 
     let rt = threaded();
     let handle = rt.handle().clone();
@@ -309,7 +309,7 @@ fn remote_queue_depth() {
     .join()
     .unwrap();
 
-    let n = metrics.remote_queue_depth();
+    let n = metrics.injection_queue_depth();
     assert!(1 <= n, "{}", n);
     assert!(3 >= n, "{}", n);
 

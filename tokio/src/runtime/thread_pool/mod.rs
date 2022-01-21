@@ -119,8 +119,8 @@ cfg_metrics! {
             &self.shared.worker_metrics[worker]
         }
 
-        pub(crate) fn remote_queue_depth(&self) -> usize {
-            self.shared.remote_queue_depth()
+        pub(crate) fn injection_queue_depth(&self) -> usize {
+            self.shared.injection_queue_depth()
         }
 
         pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
