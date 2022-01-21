@@ -302,7 +302,7 @@ impl<T> Local<T> {
 
 impl<T> Steal<T> {
     pub(super) fn is_empty(&self) -> bool {
-        self.0.len() == 0
+        self.0.is_empty()
     }
 
     /// Steals half the tasks from self and place them into `dst`.
