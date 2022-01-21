@@ -5,13 +5,13 @@ use std::sync::atomic::Ordering::Relaxed;
 use std::time::Instant;
 
 pub(crate) struct MetricsBatch {
-    /// Number of times the worker parked
+    /// Number of times the worker parked.
     park_count: u64,
 
     /// Number of times the worker woke w/o doing work.
     noop_count: u64,
 
-    /// Number of times stolen
+    /// Number of times stolen.
     steal_count: u64,
 
     /// Number of tasks that were polled by the worker.

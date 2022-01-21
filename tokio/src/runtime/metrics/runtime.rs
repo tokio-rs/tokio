@@ -163,7 +163,7 @@ impl RuntimeMetrics {
     /// Returns the number of times the given worker thread stole tasks from
     /// another worker thread.
     ///
-    /// This metric only applies to the **multi-threaded** runtime.
+    /// This metric only applies to the **multi-threaded** runtime and will always return `0` when using the current thread runtime.
     ///
     /// The worker steal count starts at zero when the runtime is created and
     /// increases by one each time the worker has processed its scheduled queue
@@ -194,7 +194,7 @@ impl RuntimeMetrics {
     ///     let metrics = Handle::current().metrics();
     ///
     ///     let n = metrics.worker_noop_count(0);
-    ///     println!("worker 0 had {} no-op unparks", n);
+    ///     println!("worker 0 has stolen tasks {} times", n);
     /// }
     /// ```
     pub fn worker_steal_count(&self, worker: usize) -> u64 {
@@ -207,7 +207,7 @@ impl RuntimeMetrics {
 
     /// Returns the number of tasks the given worker thread has polled.
     ///
-    /// The worker steal count starts at zero when the runtime is created and
+    /// The worker poll count starts at zero when the runtime is created and
     /// increases by one each time the worker polls a scheduled task.
     ///
     /// The counter is monotonically increasing. It is never decremented or
@@ -415,7 +415,8 @@ impl RuntimeMetrics {
     /// Tasks that are spawned or notified from within a runtime thread are
     /// scheduled using that worker's local queue. This metric returns the
     /// **current** number of tasks pending in the worker's local queue. As
-    /// such, the returned value may increase or decrease as new tasks are scheduled and processed.
+    /// such, the returned value may increase or decrease as new tasks are
+    /// scheduled and processed.
     ///
     /// # Arguments
     ///

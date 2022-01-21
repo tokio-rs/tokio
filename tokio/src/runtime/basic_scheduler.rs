@@ -101,7 +101,7 @@ struct Shared {
     /// Keeps track of various runtime metrics.
     scheduler_metrics: SchedulerMetrics,
 
-    /// This scheduler only has one worker
+    /// This scheduler only has one worker.
     worker_metrics: WorkerMetrics,
 }
 
