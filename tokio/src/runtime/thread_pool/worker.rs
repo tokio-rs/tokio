@@ -64,10 +64,9 @@ use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
-use crate::runtime::stats::{RuntimeStats, WorkerStatsBatcher};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::Idle;
-use crate::runtime::{queue, task, Callback};
+use crate::runtime::{queue, task, Callback, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::FastRand;
 
@@ -114,8 +113,8 @@ struct Core {
     /// borrow checker happy.
     park: Option<Parker>,
 
-    /// Batching stats so they can be submitted to RuntimeStats.
-    stats: WorkerStatsBatcher,
+    /// Batching metrics so they can be submitted to RuntimeMetrics.
+    metrics: MetricsBatch,
 
     /// Fast random number generator.
     rand: FastRand,
@@ -148,8 +147,10 @@ pub(super) struct Shared {
     /// Callback for a worker unparking itself
     after_unpark: Option<Callback>,
 
-    /// Collects stats from the runtime.
-    stats: RuntimeStats,
+    /// Collects metrics from the runtime.
+    pub(super) scheduler_metrics: SchedulerMetrics,
+
+    pub(super) worker_metrics: Box<[WorkerMetrics]>,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -195,9 +196,10 @@ pub(super) fn create(
 ) -> (Arc<Shared>, Launch) {
     let mut cores = vec![];
     let mut remotes = vec![];
+    let mut worker_metrics = vec![];
 
     // Create the local queues
-    for i in 0..size {
+    for _ in 0..size {
         let (steal, run_queue) = queue::local();
 
         let park = park.clone();
@@ -210,11 +212,12 @@ pub(super) fn create(
             is_searching: false,
             is_shutdown: false,
             park: Some(park),
-            stats: WorkerStatsBatcher::new(i),
+            metrics: MetricsBatch::new(),
             rand: FastRand::new(seed()),
         }));
 
         remotes.push(Remote { steal, unpark });
+        worker_metrics.push(WorkerMetrics::new());
     }
 
     let shared = Arc::new(Shared {
@@ -225,7 +228,8 @@ pub(super) fn create(
         shutdown_cores: Mutex::new(vec![]),
         before_park,
         after_unpark,
-        stats: RuntimeStats::new(size),
+        scheduler_metrics: SchedulerMetrics::new(),
+        worker_metrics: worker_metrics.into_boxed_slice(),
     });
 
     let mut launch = Launch(vec![]);
@@ -413,7 +417,7 @@ impl Context {
         core.transition_from_searching(&self.worker);
 
         // Make the core available to the runtime context
-        core.stats.incr_poll_count();
+        core.metrics.incr_poll_count();
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
@@ -438,14 +442,15 @@ impl Context {
 
                 if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
-                    core.stats.incr_poll_count();
+                    core.metrics.incr_poll_count();
                     *self.core.borrow_mut() = Some(core);
                     let task = self.worker.shared.owned.assert_owner(task);
                     task.run();
                 } else {
                     // Not enough budget left to run the LIFO task, push it to
                     // the back of the queue and return.
-                    core.run_queue.push_back(task, self.worker.inject());
+                    core.run_queue
+                        .push_back(task, self.worker.inject(), &mut core.metrics);
                     return Ok(core);
                 }
             }
@@ -472,7 +477,9 @@ impl Context {
 
         if core.transition_to_parked(&self.worker) {
             while !core.is_shutdown {
+                core.metrics.about_to_park();
                 core = self.park_timeout(core, None);
+                core.metrics.returned_from_park();
 
                 // Run regularly scheduled maintenance
                 core.maintenance(&self.worker);
@@ -492,8 +499,6 @@ impl Context {
     fn park_timeout(&self, mut core: Box<Core>, duration: Option<Duration>) -> Box<Core> {
         // Take the parker out of core
         let mut park = core.park.take().expect("park missing");
-
-        core.stats.about_to_park();
 
         // Store `core` in context
         *self.core.borrow_mut() = Some(core);
@@ -516,8 +521,6 @@ impl Context {
         if !core.is_searching && core.run_queue.is_stealable() {
             self.worker.shared.notify_parked();
         }
-
-        core.stats.returned_from_park();
 
         core
     }
@@ -562,7 +565,7 @@ impl Core {
             let target = &worker.shared.remotes[i];
             if let Some(task) = target
                 .steal
-                .steal_into(&mut self.run_queue, &mut self.stats)
+                .steal_into(&mut self.run_queue, &mut self.metrics)
             {
                 return Some(task);
             }
@@ -641,7 +644,8 @@ impl Core {
 
     /// Runs maintenance work such as checking the pool's state.
     fn maintenance(&mut self, worker: &Worker) {
-        self.stats.submit(&worker.shared.stats);
+        self.metrics
+            .submit(&worker.shared.worker_metrics[worker.index]);
 
         if !self.is_shutdown {
             // Check if the scheduler has been shutdown
@@ -655,7 +659,8 @@ impl Core {
         // Signal to all tasks to shut down.
         worker.shared.owned.close_and_shutdown_all();
 
-        self.stats.submit(&worker.shared.stats);
+        self.metrics
+            .submit(&worker.shared.worker_metrics[worker.index]);
     }
 
     /// Shuts down the core.
@@ -706,10 +711,6 @@ impl Shared {
         handle
     }
 
-    pub(crate) fn stats(&self) -> &RuntimeStats {
-        &self.stats
-    }
-
     pub(super) fn schedule(&self, task: Notified, is_yield: bool) {
         CURRENT.with(|maybe_cx| {
             if let Some(cx) = maybe_cx {
@@ -725,17 +726,21 @@ impl Shared {
 
             // Otherwise, use the inject queue.
             self.inject.push(task);
+            self.scheduler_metrics.inc_remote_schedule_count();
             self.notify_parked();
         })
     }
 
     fn schedule_local(&self, core: &mut Core, task: Notified, is_yield: bool) {
+        core.metrics.inc_local_schedule_count();
+
         // Spawning from the worker thread. If scheduling a "yield" then the
         // task must always be pushed to the back of the queue, enabling other
         // tasks to be executed. If **not** a yield, then there is more
         // flexibility and the task may go to the front of the queue.
         let should_notify = if is_yield {
-            core.run_queue.push_back(task, &self.inject);
+            core.run_queue
+                .push_back(task, &self.inject, &mut core.metrics);
             true
         } else {
             // Push to the LIFO slot
@@ -743,7 +748,8 @@ impl Shared {
             let ret = prev.is_some();
 
             if let Some(prev) = prev {
-                core.run_queue.push_back(prev, &self.inject);
+                core.run_queue
+                    .push_back(prev, &self.inject, &mut core.metrics);
             }
 
             core.lifo_slot = Some(task);
@@ -826,5 +832,17 @@ impl Shared {
 
     fn ptr_eq(&self, other: &Shared) -> bool {
         std::ptr::eq(self, other)
+    }
+}
+
+cfg_metrics! {
+    impl Shared {
+        pub(super) fn injection_queue_depth(&self) -> usize {
+            self.inject.len()
+        }
+
+        pub(super) fn worker_local_queue_depth(&self, worker: usize) -> usize {
+            self.remotes[worker].steal.len()
+        }
     }
 }

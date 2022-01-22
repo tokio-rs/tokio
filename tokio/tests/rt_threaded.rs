@@ -15,6 +15,15 @@ use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{mpsc, Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 
+macro_rules! cfg_metrics {
+    ($($t:tt)*) => {
+        #[cfg(tokio_unstable)]
+        {
+            $( $t )*
+        }
+    }
+}
+
 #[test]
 fn single_thread() {
     // No panic when starting a runtime w/ a single thread
@@ -52,6 +61,38 @@ fn many_oneshot_futures() {
 
         // Wait for the pool to shutdown
         drop(rt);
+    }
+}
+
+#[test]
+fn spawn_two() {
+    let rt = rt();
+
+    let out = rt.block_on(async {
+        let (tx, rx) = oneshot::channel();
+
+        tokio::spawn(async move {
+            tokio::spawn(async move {
+                tx.send("ZOMG").unwrap();
+            });
+        });
+
+        assert_ok!(rx.await)
+    });
+
+    assert_eq!(out, "ZOMG");
+
+    cfg_metrics! {
+        let metrics = rt.metrics();
+        drop(rt);
+        assert_eq!(1, metrics.remote_schedule_count());
+
+        let mut local = 0;
+        for i in 0..metrics.num_workers() {
+            local += metrics.worker_local_schedule_count(i);
+        }
+
+        assert_eq!(1, local);
     }
 }
 
