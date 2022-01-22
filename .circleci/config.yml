@@ -1,6 +1,6 @@
 version: 2.1        
 jobs:
-  test:
+  test-arm:
     machine:
       image: ubuntu-2004:202101-01
     resource_class: arm.medium
@@ -19,4 +19,4 @@ jobs:
 workflows:
   ci:
     jobs:
-      - test
+      - test-arm
