@@ -5,6 +5,7 @@ jobs:
       image: ubuntu-2004:202101-01
     resource_class: arm.medium
     steps:
+      - checkout
       - run:
           name: Install Rust
           command: |
@@ -12,7 +13,6 @@ jobs:
             chmod +x rustup.sh
             ./rustup.sh -y
             source "$HOME"/.cargo/env
-      - checkout
       - run: cargo test --all-features --workspace
 
 workflows:
