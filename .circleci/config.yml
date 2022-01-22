@@ -13,7 +13,8 @@ jobs:
             chmod +x rustup.sh
             ./rustup.sh -y
             source "$HOME"/.cargo/env
-      - run: cargo test --all-features --workspace
+      # Only run Tokio tests
+      - run: cargo test --all-features -p tokio
 
 workflows:
   ci:
