@@ -1,0 +1,21 @@
+version: 2.1
+jobs:
+  test:
+    machine:
+      image: ubuntu-2004:202101-01
+    resource_class: arm.medium
+    steps:
+      - run:
+          name: Install Rust
+          command: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup.sh
+            chmod +x rustup.sh
+            ./rustup.sh -y
+            source "$HOME"/.cargo/env
+      - checkout
+      - run: cargo test --all-features --workspace
+
+workflows:
+  ci:
+    jobs:
+      - test
