@@ -212,7 +212,7 @@ impl<T> IdleNotifiedSet<T> {
                 }));
 
                 let prev = entry.pointers.get_prev();
-                node = prev.map(|prev| unsafe { prev.as_ref() });
+                node = prev.map(|prev| unsafe { &*prev.as_ptr() });
             }
         }
 
