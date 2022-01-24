@@ -138,13 +138,13 @@ async fn task_set_coop() {
     let mut coop_count = 0;
     loop {
         match set.join_one().now_or_never() {
-            Some(Ok(Some(()))) => {},
+            Some(Ok(Some(()))) => {}
             Some(Err(err)) => panic!("failed: {}", err),
             None => {
                 coop_count += 1;
                 tokio::task::yield_now().await;
                 continue;
-            },
+            }
             Some(Ok(None)) => break,
         }
 
