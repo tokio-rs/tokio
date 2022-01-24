@@ -199,6 +199,49 @@ impl<T> IdleNotifiedSet<T> {
         }
     }
 
+    /// Call a function on every element in this list.
+    pub(crate) fn for_each<F: FnMut(&mut T)>(&mut self, mut func: F) {
+        fn get_ptrs<T>(list: &mut LinkedList<T>, ptrs: &mut Vec<*mut T>) {
+            let mut node = list.last();
+
+            while let Some(entry) = node {
+                ptrs.push(entry.value.with_mut(|ptr| {
+                    let ptr: *mut ManuallyDrop<T> = ptr;
+                    let ptr: *mut T = ptr.cast();
+                    ptr
+                }));
+
+                let prev = entry.pointers.get_prev();
+                node = prev.map(|prev| unsafe { prev.as_ref() });
+            }
+        }
+
+        // Atomically get a raw pointer to the value of every entry.
+        //
+        // Since this only locks the mutex once, its not possible for a value to
+        // get moved from the idle list to the notified list during the
+        // operation, which would otherwise result in some value being listed
+        // twice.
+        let mut ptrs = Vec::with_capacity(self.len());
+        {
+            let mut lock = self.lists.inner.lock();
+
+            get_ptrs(&mut lock.idle, &mut ptrs);
+            get_ptrs(&mut lock.notified, &mut ptrs);
+        }
+        debug_assert_eq!(ptrs.len(), ptrs.capacity());
+
+        for ptr in ptrs {
+            // Safety: When we grabbed the pointers, the entries were in one of
+            // the two lists. This means that their value was valid at the time,
+            // and it must still be valid because we are the IdleNotifiedSet,
+            // and only we can remove an entry from the two lists. (It's
+            // possible that an entry is moved from one list to the other during
+            // this loop, but that is ok.)
+            func(unsafe { &mut *ptr });
+        }
+    }
+
     /// Remove all entries in both lists, applying some function to each element.
     ///
     /// The closure is called on all elements even if it panics. Having it panic

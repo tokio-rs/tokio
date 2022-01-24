@@ -219,6 +219,7 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
 
 #[cfg(any(
     feature = "fs",
+    feature = "rt",
     all(unix, feature = "process"),
     feature = "signal",
     feature = "sync",
@@ -296,7 +297,7 @@ impl<T> Pointers<T> {
         }
     }
 
-    fn get_prev(&self) -> Option<NonNull<T>> {
+    pub(crate) fn get_prev(&self) -> Option<NonNull<T>> {
         // SAFETY: prev is the first field in PointersInner, which is #[repr(C)].
         unsafe {
             let inner = self.inner.get();
@@ -304,7 +305,7 @@ impl<T> Pointers<T> {
             ptr::read(prev)
         }
     }
-    fn get_next(&self) -> Option<NonNull<T>> {
+    pub(crate) fn get_next(&self) -> Option<NonNull<T>> {
         // SAFETY: next is the second field in PointersInner, which is #[repr(C)].
         unsafe {
             let inner = self.inner.get();

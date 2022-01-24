@@ -7,7 +7,8 @@ use crate::runtime::Handle;
 use crate::task::{JoinError, JoinHandle, LocalSet};
 use crate::util::IdleNotifiedSet;
 
-/// A collection of tasks spawned on a Tokio runtime.
+/// A collection of tasks spawned on a Tokio runtime. A `TaskSet` is not ordered, and the tasks
+/// will be returned in the order they completed.
 ///
 /// All of the tasks must have the same return type `T`.
 ///
@@ -130,6 +131,22 @@ impl<T: 'static> TaskSet<T> {
     /// removed from this `TaskSet`.
     pub async fn join_one(&mut self) -> Result<Option<T>, JoinError> {
         crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
+    }
+
+    /// Abort all tasks on this `TaskSet`.
+    ///
+    /// This does not remove the tasks from the `TaskSet`. To wait for the tasks to complete
+    /// cancellation, you should call `join_one` in a loop until the `TaskSet` is empty.
+    pub fn abort_all(&mut self) {
+        self.inner.for_each(|jh| jh.abort());
+    }
+
+    /// Remove all tasks from this `TaskSet` without aborting them.
+    ///
+    /// The tasks removed by this call will continue to run in the background even if the `TaskSet`
+    /// is dropped.
+    pub fn detach_all(&mut self) {
+        self.inner.drain(drop);
     }
 
     /// Poll for one of the tasks in the set to complete.

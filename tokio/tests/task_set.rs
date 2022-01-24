@@ -17,6 +17,13 @@ fn rt() -> tokio::runtime::Runtime {
 async fn test_with_sleep() {
     let mut set = TaskSet::new();
 
+    for i in 0..10 {
+        set.spawn(async move { i });
+        assert_eq!(set.len(), 1 + i);
+    }
+    set.detach_all();
+    assert_eq!(set.len(), 0);
+
     assert!(matches!(set.join_one().await, Ok(None)));
 
     for i in 0..10 {
@@ -152,4 +159,34 @@ async fn task_set_coop() {
     }
     assert!(coop_count >= 1);
     assert_eq!(count, TASK_NUM);
+}
+
+#[tokio::test(start_paused = true)]
+async fn abort_all() {
+    let mut set: TaskSet<()> = TaskSet::new();
+
+    for _ in 0..5 {
+        set.spawn(futures::future::pending());
+    }
+    for _ in 0..5 {
+        set.spawn(async {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        });
+    }
+
+    // The task set will now have 5 pending tasks and 5 ready tasks.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    set.abort_all();
+    assert_eq!(set.len(), 10);
+
+    let mut count = 0;
+    while let Some(res) = set.join_one().await.transpose() {
+        if let Err(err) = res {
+            assert!(err.is_cancelled());
+        }
+        count += 1;
+    }
+    assert_eq!(count, 10);
+    assert_eq!(set.len(), 0);
 }
