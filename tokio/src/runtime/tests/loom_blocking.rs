@@ -49,7 +49,7 @@ fn spawn_mandatory_blocking_should_run_even_when_shutting_down_from_other_thread
     use crate::runtime::tests::loom_oneshot;
     loom::model(|| {
         let rt = runtime::Builder::new_current_thread().build().unwrap();
-        let _enter = rt.enter();
+        let handle = rt.handle().clone();
 
         // Drop the runtime in a different thread
         {
@@ -58,6 +58,7 @@ fn spawn_mandatory_blocking_should_run_even_when_shutting_down_from_other_thread
             });
         }
 
+        let _enter = handle.enter();
         let (tx, rx) = loom_oneshot::channel();
         let handle = runtime::spawn_mandatory_blocking(move || {
             let _ = tx.send(());
