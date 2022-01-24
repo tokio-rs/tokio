@@ -39,7 +39,7 @@ use crate::util::IdleNotifiedSet;
 /// }
 /// ```
 pub struct TaskSet<T> {
-    inner: IdleNotifiedSet<Option<JoinHandle<T>>>,
+    inner: IdleNotifiedSet<JoinHandle<T>>,
 }
 
 impl<T> TaskSet<T> {
@@ -57,11 +57,11 @@ impl<T> TaskSet<T> {
 
     /// Returns whether the `TaskSet` is empty.
     pub fn is_empty(&self) -> bool {
-        self.inner.len() == 0
+        self.inner.is_empty()
     }
 }
 
-impl<T: Send + 'static> TaskSet<T> {
+impl<T: 'static> TaskSet<T> {
     /// Spawn the provided task on the task set.
     ///
     /// # Panics
@@ -71,6 +71,7 @@ impl<T: Send + 'static> TaskSet<T> {
     where
         F: Future<Output = T>,
         F: Send + 'static,
+        T: Send,
     {
         self.insert(crate::spawn(task));
     }
@@ -80,6 +81,7 @@ impl<T: Send + 'static> TaskSet<T> {
     where
         F: Future<Output = T>,
         F: Send + 'static,
+        T: Send,
     {
         self.insert(handle.spawn(task));
     }
@@ -111,13 +113,10 @@ impl<T: Send + 'static> TaskSet<T> {
     }
 
     fn insert(&mut self, jh: JoinHandle<T>) {
-        let entry = self.inner.insert_idle(Some(jh));
+        let mut entry = self.inner.insert_idle(jh);
 
         // Set the waker that is notified when the task completes.
-        self.inner.with_entry_value(&entry, |jh| {
-            let jh = jh.as_mut().unwrap();
-            entry.with_context(|ctx| jh.set_join_waker(ctx.waker()))
-        });
+        entry.with_value_and_context(|jh, ctx| jh.set_join_waker(ctx.waker()));
     }
 
     /// Wait until one of the tasks in the set completes and returns its output.
@@ -147,67 +146,49 @@ impl<T: Send + 'static> TaskSet<T> {
     ///
     /// This function returns:
     ///
-    ///  * `Poll::Pending` if the `TaskSet` is not empty and all tasks are currently running.
-    ///  * `Poll::Ready(Some(Ok(value)))` if one of the tasks in this `TaskSet` has completed. The
+    ///  * `Poll::Pending` if the `TaskSet` is not empty but there is no task whose output is
+    ///     available right now.
+    ///  * `Poll::Ready(Ok(Some(value)))` if one of the tasks in this `TaskSet` has completed. The
     ///    `value` is the return value of one of the tasks that completed.
-    ///  * `Poll::Ready(Some(Err(err)))` if one of the tasks in this `TaskSet` has panicked or been
+    ///  * `Poll::Ready(Err(err))` if one of the tasks in this `TaskSet` has panicked or been
     ///     aborted.
-    ///  * `Poll::Ready(None)` if the `TaskSet` is empty.
+    ///  * `Poll::Ready(Ok(None))` if the `TaskSet` is empty.
+    ///
+    /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
+    /// This can happen if the coop budget is reached.
     pub fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<T>, JoinError>> {
-        loop {
-            // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
-            // the `notified` list if the waker is notified in the `poll` call below.
-            let entry = match self.inner.pop_notified(cx.waker()) {
-                Some(entry) => entry,
-                None => {
-                    if self.is_empty() {
-                        return Poll::Ready(Ok(None));
-                    } else {
-                        // The waker was set by `pop_notified`.
-                        return Poll::Pending;
-                    }
-                }
-            };
-
-            let res = self.inner.with_entry_value(&entry, |jh| {
-                jh.as_mut()
-                    .map(|jh| entry.with_context(|ctx| Pin::new(jh).poll(ctx)))
-            });
-
-            match res {
-                Some(Poll::Ready(Ok(res))) => {
-                    self.inner.with_entry_value(&entry, |jh| jh.take());
-                    self.inner.remove(&entry);
-                    return Poll::Ready(Ok(Some(res)));
-                }
-                Some(Poll::Ready(Err(err))) => {
-                    self.inner.with_entry_value(&entry, |jh| jh.take());
-                    self.inner.remove(&entry);
-                    return Poll::Ready(Err(err));
-                }
-                Some(Poll::Pending) => { /* go around loop */ }
-                None => {
-                    // The JoinHandle is missing in this task. Remove the entry
-                    // and try again.
-                    self.inner.remove(&entry);
+        // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
+        // the `notified` list if the waker is notified in the `poll` call below.
+        let mut entry = match self.inner.pop_notified(cx.waker()) {
+            Some(entry) => entry,
+            None => {
+                if self.is_empty() {
+                    return Poll::Ready(Ok(None));
+                } else {
+                    // The waker was set by `pop_notified`.
+                    return Poll::Pending;
                 }
             }
+        };
+
+        let res = entry.with_value_and_context(|jh, ctx| Pin::new(jh).poll(ctx));
+
+        if let Poll::Ready(res) = res {
+            entry.remove();
+            Poll::Ready(Some(res).transpose())
+        } else {
+            // A JoinHandle generally wont emit a wakeup without being ready unless
+            // the coop limit has been reached. We yield to the executor in this
+            // case.
+            cx.waker().wake_by_ref();
+            Poll::Pending
         }
     }
 }
 
 impl<T> Drop for TaskSet<T> {
     fn drop(&mut self) {
-        self.inner.drain(|join_handle| {
-            // We avoid ref-cycles between our custom waker and the task by destroying the
-            // JoinHandle here.
-            //
-            // Note that JoinHandle::abort can't panic, so we don't risk a panic leaving
-            // ref-cycles.
-            if let Some(join_handle) = join_handle.take() {
-                join_handle.abort();
-            }
-        });
+        self.inner.drain(|join_handle| join_handle.abort());
     }
 }
 
