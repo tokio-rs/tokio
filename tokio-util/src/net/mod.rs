@@ -46,6 +46,7 @@ impl Listener for tokio::net::TcpListener {
 
 /// Future for accepting a new connection from a listener.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ListenerAcceptFut<'a, L> {
     listener: &'a mut L,
 }
