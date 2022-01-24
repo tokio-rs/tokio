@@ -126,14 +126,6 @@ impl Handle {
         context::try_current()
     }
 
-    cfg_stats! {
-        /// Returns a view that lets you get information about how the runtime
-        /// is performing.
-        pub fn stats(&self) -> &crate::runtime::stats::RuntimeStats {
-            self.spawner.stats()
-        }
-    }
-
     /// Spawns a future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
@@ -324,6 +316,18 @@ impl Handle {
 
     pub(crate) fn shutdown(mut self) {
         self.spawner.shutdown();
+    }
+}
+
+cfg_metrics! {
+    use crate::runtime::RuntimeMetrics;
+
+    impl Handle {
+        /// Returns a view that lets you get information about how the runtime
+        /// is performing.
+        pub fn metrics(&self) -> RuntimeMetrics {
+            RuntimeMetrics::new(self.clone())
+        }
     }
 }
 

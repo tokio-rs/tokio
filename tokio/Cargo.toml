@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.0.x" git tag.
-version = "1.14.0"
+version = "1.15.0"
 edition = "2018"
 rust-version = "1.46"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -46,7 +46,6 @@ io-util = ["memchr", "bytes"]
 # stdin, stdout, stderr
 io-std = []
 macros = ["tokio-macros"]
-stats = []
 net = [
   "libc",
   "mio/os-poll",
@@ -85,8 +84,13 @@ sync = []
 test-util = ["rt", "sync", "time"]
 time = []
 
+# Technically, removing this is a breaking change even though it only ever did
+# anything with the unstable flag on. It is probably safe to get rid of it after
+# a few releases.
+stats = []
+
 [dependencies]
-tokio-macros = { version = "1.6.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "1.7.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.0"
 
@@ -138,7 +142,11 @@ loom = { version = "0.5.2", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+# enable unstable features in the documentation
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
+# it's necessary to _also_ pass `--cfg tokio_unstable` to rustc, or else
+# dependencies will not be enabled, and the docs build will fail.
+rustc-args = ["--cfg", "tokio_unstable"]
 
 [package.metadata.playground]
 features = ["full", "test-util"]

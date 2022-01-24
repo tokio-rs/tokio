@@ -1,0 +1,22 @@
+version: 2.1        
+jobs:
+  test-arm:
+    machine:
+      image: ubuntu-2004:202101-01
+    resource_class: arm.medium
+    steps:
+      - checkout
+      - run:
+          name: Install Rust
+          command: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup.sh
+            chmod +x rustup.sh
+            ./rustup.sh -y
+            source "$HOME"/.cargo/env
+      # Only run Tokio tests
+      - run: cargo test --all-features -p tokio
+
+workflows:
+  ci:
+    jobs:
+      - test-arm

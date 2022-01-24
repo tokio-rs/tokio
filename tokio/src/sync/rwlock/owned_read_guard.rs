@@ -15,6 +15,8 @@ use std::sync::Arc;
 /// [`read_owned`]: method@crate::sync::RwLock::read_owned
 /// [`RwLock`]: struct@crate::sync::RwLock
 pub struct OwnedRwLockReadGuard<T: ?Sized, U: ?Sized = T> {
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(super) resource_span: tracing::Span,
     // ManuallyDrop allows us to destructure into this field without running the destructor.
     pub(super) lock: ManuallyDrop<Arc<RwLock<T>>>,
     pub(super) data: *const U,
@@ -56,12 +58,17 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
     {
         let data = f(&*this) as *const V;
         let lock = unsafe { ManuallyDrop::take(&mut this.lock) };
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = this.resource_span.clone();
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
+
         OwnedRwLockReadGuard {
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
         }
     }
 
@@ -105,12 +112,17 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
             None => return Err(this),
         };
         let lock = unsafe { ManuallyDrop::take(&mut this.lock) };
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = this.resource_span.clone();
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
+
         Ok(OwnedRwLockReadGuard {
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
         })
     }
 }
@@ -145,5 +157,14 @@ impl<T: ?Sized, U: ?Sized> Drop for OwnedRwLockReadGuard<T, U> {
     fn drop(&mut self) {
         self.lock.s.release(1);
         unsafe { ManuallyDrop::drop(&mut self.lock) };
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            current_readers = 1,
+            current_readers.op = "sub",
+            )
+        });
     }
 }
