@@ -3,6 +3,7 @@ use crate::runtime::task::RawTask;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -149,6 +150,9 @@ cfg_rt! {
 
 unsafe impl<T: Send> Send for JoinHandle<T> {}
 unsafe impl<T: Send> Sync for JoinHandle<T> {}
+
+impl<T> UnwindSafe for JoinHandle<T> {}
+impl<T> RefUnwindSafe for JoinHandle<T> {}
 
 impl<T> JoinHandle<T> {
     pub(super) fn new(raw: RawTask) -> JoinHandle<T> {
