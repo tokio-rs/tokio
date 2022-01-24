@@ -132,7 +132,7 @@ async fn task_set_coop() {
     //
     // Since this is a `current_thread` runtime, there's no race condition
     // between the last permit being added and the task completing.
-    SEM.acquire_many(TASK_NUM).await.unwrap();
+    let _ = SEM.acquire_many(TASK_NUM).await.unwrap();
 
     let mut count = 0;
     let mut coop_count = 0;
