@@ -5,6 +5,14 @@ use tokio::sync::oneshot;
 use tokio::task::TaskSet;
 use tokio::time::Duration;
 
+use futures::future::FutureExt;
+
+fn rt() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap()
+}
+
 #[tokio::test(start_paused = true)]
 async fn test_with_sleep() {
     let mut set = TaskSet::new();
@@ -91,12 +99,6 @@ async fn alternating() {
     }
 }
 
-fn rt() -> tokio::runtime::Runtime {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-}
-
 #[test]
 fn runtime_gone() {
     let mut set = TaskSet::new();
@@ -107,4 +109,47 @@ fn runtime_gone() {
     }
 
     assert!(rt().block_on(set.join_one()).unwrap_err().is_cancelled());
+}
+
+// This ensures that `join_one` works correctly when the coop budget is
+// exhausted.
+#[tokio::test(flavor = "current_thread")]
+async fn task_set_coop() {
+    // Large enough to trigger coop.
+    const TASK_NUM: u32 = 1000;
+
+    static SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(0);
+
+    let mut set = TaskSet::new();
+
+    for _ in 0..TASK_NUM {
+        set.spawn(async {
+            SEM.add_permits(1);
+        });
+    }
+
+    // Wait for all tasks to complete.
+    //
+    // Since this is a `current_thread` runtime, there's no race condition
+    // between the last permit being added and the task completing.
+    SEM.acquire_many(TASK_NUM).await.unwrap();
+
+    let mut count = 0;
+    let mut coop_count = 0;
+    loop {
+        match set.join_one().now_or_never() {
+            Some(Ok(Some(()))) => {},
+            Some(Err(err)) => panic!("failed: {}", err),
+            None => {
+                coop_count += 1;
+                tokio::task::yield_now().await;
+                continue;
+            },
+            Some(Ok(None)) => break,
+        }
+
+        count += 1;
+    }
+    assert!(coop_count >= 1);
+    assert_eq!(count, TASK_NUM);
 }
