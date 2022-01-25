@@ -71,26 +71,36 @@ where
     }
 }
 
-impl<L, R> Listener for Either<L, R>
+impl<L, R> Either<L, R>
 where
     L: Listener,
     R: Listener,
 {
-    type Io = Either<<L as Listener>::Io, <R as Listener>::Io>;
-    type Addr = Either<<L as Listener>::Addr, <R as Listener>::Addr>;
-
-    fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>> {
+    /// Polls to accept a new incoming connection to this listener.
+    pub fn poll_accept(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<Either<(L::Io, L::Addr), (R::Io, R::Addr)>>> {
         match self {
             Either::Left(listener) => listener
                 .poll_accept(cx)
-                .map(|res| res.map(|(stream, addr)| (Either::Left(stream), Either::Left(addr)))),
+                .map(|res| res.map(|(stream, addr)| Either::Left((stream, addr)))),
             Either::Right(listener) => listener
                 .poll_accept(cx)
-                .map(|res| res.map(|(stream, addr)| (Either::Right(stream), Either::Right(addr)))),
+                .map(|res| res.map(|(stream, addr)| Either::Right((stream, addr)))),
         }
     }
 
-    fn local_addr(&self) -> Result<Self::Addr> {
+    /// Accepts a new incoming connection from this listener.
+    pub fn accept(&mut self) -> EitherListenerAcceptFut<'_, L, R>
+    where
+        Self: Sized,
+    {
+        EitherListenerAcceptFut::new(self)
+    }
+
+    /// Returns the local address that this listener is bound to.
+    pub fn local_addr(&self) -> Result<Either<L::Addr, R::Addr>> {
         match self {
             Either::Left(listener) => {
                 let addr = listener.local_addr()?;
@@ -101,5 +111,33 @@ where
                 Ok(Either::Right(addr))
             }
         }
+    }
+}
+
+/// Future for accepting a new connection from a listener.
+#[derive(Debug)]
+pub struct EitherListenerAcceptFut<'a, L, R> {
+    listener: &'a mut Either<L, R>,
+}
+
+impl<'a, L, R> EitherListenerAcceptFut<'a, L, R>
+where
+    L: Listener,
+    R: Listener,
+{
+    fn new(listener: &'a mut Either<L, R>) -> Self {
+        Self { listener }
+    }
+}
+
+impl<'a, L, R> Future for EitherListenerAcceptFut<'a, L, R>
+where
+    L: Listener,
+    R: Listener,
+{
+    type Output = Result<Either<(L::Io, L::Addr), (R::Io, R::Addr)>>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.listener.poll_accept(cx)
     }
 }
