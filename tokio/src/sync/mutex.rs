@@ -374,10 +374,11 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// This function panics if called within an asynchronous execution context.
     ///
-    ///   - Consider using [`spawn_blocking()`][crate::runtime::Handle::spawn_blocking]
-    ///     (or [`block_in_place()`][crate::task::block_in_place]) to call, when
-    ///     within an asynchronrous execution context, any function that may
-    ///     call one of these `blocking_` operations.
+    ///   - If you find yourself in an asynchronous execution context and needing
+    ///     to call some (synchronous) function which performs one of these
+    ///     `blocking_` operations, then consider wrapping that call inside
+    ///     [`spawn_blocking()`][crate::runtime::Handle::spawn_blocking]
+    ///     (or [`block_in_place()`][crate::task::block_in_place]).
     ///
     /// # Examples
     ///
