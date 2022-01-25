@@ -67,27 +67,21 @@ where
     L: Listener,
     R: Listener,
 {
-    /// Polls to accept a new incoming connection to this listener.
-    pub fn poll_accept(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<Either<(L::Io, L::Addr), (R::Io, R::Addr)>>> {
-        match self {
-            Either::Left(listener) => listener
-                .poll_accept(cx)
-                .map(|res| res.map(|(stream, addr)| Either::Left((stream, addr)))),
-            Either::Right(listener) => listener
-                .poll_accept(cx)
-                .map(|res| res.map(|(stream, addr)| Either::Right((stream, addr)))),
-        }
-    }
-
     /// Accepts a new incoming connection from this listener.
-    pub fn accept(&mut self) -> EitherListenerAcceptFut<'_, L, R>
+    pub async fn accept(&mut self) -> Result<Either<(L::Io, L::Addr), (R::Io, R::Addr)>>
     where
         Self: Sized,
     {
-        EitherListenerAcceptFut { listener: self }
+        match self {
+            Either::Left(listener) => {
+                let (stream, addr) = listener.accept().await?;
+                Ok(Either::Left((stream, addr)))
+            }
+            Either::Right(listener) => {
+                let (stream, addr) = listener.accept().await?;
+                Ok(Either::Right((stream, addr)))
+            }
+        }
     }
 
     /// Returns the local address that this listener is bound to.
@@ -102,23 +96,5 @@ where
                 Ok(Either::Right(addr))
             }
         }
-    }
-}
-
-/// Future for accepting a new connection from a listener.
-#[derive(Debug)]
-pub struct EitherListenerAcceptFut<'a, L, R> {
-    listener: &'a mut Either<L, R>,
-}
-
-impl<'a, L, R> Future for EitherListenerAcceptFut<'a, L, R>
-where
-    L: Listener,
-    R: Listener,
-{
-    type Output = Result<Either<(L::Io, L::Addr), (R::Io, R::Addr)>>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.listener.poll_accept(cx)
     }
 }
