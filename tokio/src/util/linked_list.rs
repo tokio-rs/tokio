@@ -614,6 +614,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     proptest::proptest! {
         #[test]
         fn fuzz_linked_list(ops: Vec<usize>) {

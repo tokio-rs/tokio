@@ -347,6 +347,7 @@ impl<S: Schedule> LocalNotified<S> {
 impl<S: Schedule> UnownedTask<S> {
     // Used in test of the inject queue.
     #[cfg(test)]
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     pub(super) fn into_notified(self) -> Notified<S> {
         Notified(self.into_task())
     }

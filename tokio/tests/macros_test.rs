@@ -1,3 +1,5 @@
+#![cfg(feature = "full")]
+
 use tokio::test;
 
 #[test]
