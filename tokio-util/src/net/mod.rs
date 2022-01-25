@@ -68,10 +68,7 @@ where
     R: Listener,
 {
     /// Accepts a new incoming connection from this listener.
-    pub async fn accept(&mut self) -> Result<Either<(L::Io, L::Addr), (R::Io, R::Addr)>>
-    where
-        Self: Sized,
-    {
+    pub async fn accept(&mut self) -> Result<Either<(L::Io, L::Addr), (R::Io, R::Addr)>> {
         match self {
             Either::Left(listener) => {
                 let (stream, addr) = listener.accept().await?;
