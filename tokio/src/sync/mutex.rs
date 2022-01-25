@@ -364,11 +364,20 @@ impl<T: ?Sized> Mutex<T> {
         }
     }
 
-    /// Blocking lock this mutex. When the lock has been acquired, function returns a
+    /// Blockingly locks this `Mutex`. When the lock has been acquired, function returns a
     /// [`MutexGuard`].
     ///
     /// This method is intended for use cases where you
     /// need to use this mutex in asynchronous code as well as in synchronous code.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called within an asynchronous execution context.
+    ///
+    ///   - Consider using [`spawn_blocking()`][crate::runtime::Handle::spawn_blocking]
+    ///     (or [`block_in_place()`][crate::task::block_in_place]) to call, when
+    ///     within an asynchronrous execution context, any function that may
+    ///     call one of these `blocking_` operations.
     ///
     /// # Examples
     ///
@@ -379,16 +388,24 @@ impl<T: ?Sized> Mutex<T> {
     /// #[tokio::main]
     /// async fn main() {
     ///     let mutex =  Arc::new(Mutex::new(1));
+    ///     let lock = mutex.lock().await;
     ///
     ///     let mutex1 = Arc::clone(&mutex);
-    ///     let sync_code = tokio::task::spawn_blocking(move || {
+    ///     let blocking_task = tokio::task::spawn_blocking(move || {
+    ///         // This shall block until the `lock` is released.
     ///         let mut n = mutex1.blocking_lock();
     ///         *n = 2;
     ///     });
     ///
-    ///     sync_code.await.unwrap();
+    ///     assert_eq!(*lock, 1);
+    ///     // Release the lock.
+    ///     drop(lock);
     ///
-    ///     let n = mutex.lock().await;
+    ///     // Await the completion of the blocking task.
+    ///     blocking_task.await.unwrap();
+    ///
+    ///     // Assert uncontended.
+    ///     let n = mutex.try_lock().unwrap();
     ///     assert_eq!(*n, 2);
     /// }
     ///
