@@ -24,7 +24,7 @@ pub trait Listener {
     where
         Self: Sized,
     {
-        ListenerAcceptFut::new(self)
+        ListenerAcceptFut { listener: self }
     }
 
     /// Returns the local address that this listener is bound to.
@@ -49,15 +49,6 @@ impl Listener for tokio::net::TcpListener {
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ListenerAcceptFut<'a, L> {
     listener: &'a mut L,
-}
-
-impl<'a, L> ListenerAcceptFut<'a, L>
-where
-    L: Listener,
-{
-    fn new(listener: &'a mut L) -> Self {
-        Self { listener }
-    }
 }
 
 impl<'a, L> Future for ListenerAcceptFut<'a, L>
@@ -96,7 +87,7 @@ where
     where
         Self: Sized,
     {
-        EitherListenerAcceptFut::new(self)
+        EitherListenerAcceptFut { listener: self }
     }
 
     /// Returns the local address that this listener is bound to.
@@ -118,16 +109,6 @@ where
 #[derive(Debug)]
 pub struct EitherListenerAcceptFut<'a, L, R> {
     listener: &'a mut Either<L, R>,
-}
-
-impl<'a, L, R> EitherListenerAcceptFut<'a, L, R>
-where
-    L: Listener,
-    R: Listener,
-{
-    fn new(listener: &'a mut Either<L, R>) -> Self {
-        Self { listener }
-    }
 }
 
 impl<'a, L, R> Future for EitherListenerAcceptFut<'a, L, R>
