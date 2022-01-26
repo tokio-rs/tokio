@@ -64,7 +64,9 @@ fn abort_all_during_completion() {
                     Ok(Some(())) => complete_happened.store(true, SeqCst),
                     Err(err) if err.is_cancelled() => cancel_happened.store(true, SeqCst),
                     Err(err) => panic!("fail: {}", err),
-                    Ok(None) => unreachable!("Aborting the task does not remove it from the TaskSet."),
+                    Ok(None) => {
+                        unreachable!("Aborting the task does not remove it from the TaskSet.")
+                    }
                 }
 
                 assert!(matches!(set.join_one().await, Ok(None)));
