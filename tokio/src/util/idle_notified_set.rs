@@ -88,6 +88,9 @@ enum List {
 /// move it out from this entry to prevent it from getting leaked. (Since the
 /// two linked lists are emptied in the destructor of `IdleNotifiedSet`, the
 /// value should not be leaked.)
+///
+/// This type is #[repr(C)] because its `linked_list::Link` implementation uses
+/// that `pointers` is the first field.
 #[repr(C)]
 struct ListEntry<T> {
     /// The linked list pointers of the list this entry is in.
@@ -158,7 +161,7 @@ impl<T> IdleNotifiedSet<T> {
             lock.idle.push_front(entry.clone());
         }
 
-        // Safety: We just put the entry in the idle list, so it is one of the lists.
+        // Safety: We just put the entry in the idle list, so it is in one of the lists.
         EntryInOneOfTheLists { entry, set: self }
     }
 
@@ -192,7 +195,7 @@ impl<T> IdleNotifiedSet<T> {
                 });
                 drop(lock);
 
-                // Safety: We just put the entry in the idle list, so it is one of the lists.
+                // Safety: We just put the entry in the idle list, so it is in one of the lists.
                 Some(EntryInOneOfTheLists { entry, set: self })
             }
             None => None,

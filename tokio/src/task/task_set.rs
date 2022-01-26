@@ -7,8 +7,11 @@ use crate::runtime::Handle;
 use crate::task::{JoinError, JoinHandle, LocalSet};
 use crate::util::IdleNotifiedSet;
 
-/// A collection of tasks spawned on a Tokio runtime. A `TaskSet` is not ordered, and the tasks
-/// will be returned in the order they completed.
+/// A collection of tasks spawned on a Tokio runtime.
+///
+/// A `TaskSet` can be used to await the completion of some or all of the tasks
+/// in the set. The set is not ordered, and the tasks will be returned in the
+/// order they complete.
 ///
 /// All of the tasks must have the same return type `T`.
 ///
@@ -120,7 +123,7 @@ impl<T: 'static> TaskSet<T> {
         entry.with_value_and_context(|jh, ctx| jh.set_join_waker(ctx.waker()));
     }
 
-    /// Wait until one of the tasks in the set completes and returns its output.
+    /// Waits until one of the tasks in the set completes and returns its output.
     ///
     /// Returns `None` if the set is empty.
     ///
@@ -133,7 +136,22 @@ impl<T: 'static> TaskSet<T> {
         crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
     }
 
-    /// Abort all tasks on this `TaskSet`.
+    /// Aborts all tasks and waits for them to finish shutting down.
+    ///
+    /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_one`] in
+    /// a loop until it returns `Ok(None)`.
+    ///
+    /// This method ignores any panics in the tasks shutting down. When this call returns, the
+    /// `JoinSet` will be empty.
+    ///
+    /// [`abort_all`]: fn@Self::abort_all
+    /// [`join_one`]: fn@Self::join_one
+    pub async fn shutdown(&mut self) {
+        self.abort_all();
+        while self.join_one().await.transpose().is_some() {}
+    }
+
+    /// Aborts all tasks on this `TaskSet`.
     ///
     /// This does not remove the tasks from the `TaskSet`. To wait for the tasks to complete
     /// cancellation, you should call `join_one` in a loop until the `TaskSet` is empty.
@@ -141,7 +159,7 @@ impl<T: 'static> TaskSet<T> {
         self.inner.for_each(|jh| jh.abort());
     }
 
-    /// Remove all tasks from this `TaskSet` without aborting them.
+    /// Removes all tasks from this `TaskSet` without aborting them.
     ///
     /// The tasks removed by this call will continue to run in the background even if the `TaskSet`
     /// is dropped.
@@ -149,17 +167,17 @@ impl<T: 'static> TaskSet<T> {
         self.inner.drain(drop);
     }
 
-    /// Poll for one of the tasks in the set to complete.
+    /// Polls for one of the tasks in the set to complete.
     ///
-    /// If this returns `Poll::Ready(Some(_))`, then the task that completed is removed from the
-    /// set.
+    /// If this returns `Poll::Ready(Ok(Some(_)))` or `Poll::Ready(Err(_))`, then the task that
+    /// completed is removed from the set.
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided `Context` is scheduled
     /// to receive a wakeup when a task in the `TaskSet` completes. Note that on multiple calls to
     /// `poll_join_one`, only the `Waker` from the `Context` passed to the most recent call is
     /// scheduled to receive a wakeup.
     ///
-    /// # Return value
+    /// # Returns
     ///
     /// This function returns:
     ///
@@ -172,8 +190,10 @@ impl<T: 'static> TaskSet<T> {
     ///  * `Poll::Ready(Ok(None))` if the `TaskSet` is empty.
     ///
     /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
-    /// This can happen if the coop budget is reached.
-    pub fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<T>, JoinError>> {
+    /// This can happen if the [coop budget] is reached.
+    ///
+    /// [coop budget]: crate::task#cooperative-scheduling
+    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<T>, JoinError>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
         let mut entry = match self.inner.pop_notified(cx.waker()) {
@@ -194,7 +214,7 @@ impl<T: 'static> TaskSet<T> {
             entry.remove();
             Poll::Ready(Some(res).transpose())
         } else {
-            // A JoinHandle generally wont emit a wakeup without being ready unless
+            // A JoinHandle generally won't emit a wakeup without being ready unless
             // the coop limit has been reached. We yield to the executor in this
             // case.
             cx.waker().wake_by_ref();

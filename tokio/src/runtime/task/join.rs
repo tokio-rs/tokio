@@ -205,6 +205,7 @@ impl<T> JoinHandle<T> {
     pub(crate) fn set_join_waker(&mut self, waker: &Waker) {
         if let Some(raw) = self.raw {
             if raw.try_set_join_waker(waker) {
+                // In this case the task has already completed. We wake the waker immediately.
                 waker.wake_by_ref();
             }
         }

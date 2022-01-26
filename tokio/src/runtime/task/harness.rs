@@ -164,7 +164,9 @@ where
         }
     }
 
-    /// Try to set the waker notified when the task is complete.
+    /// Try to set the waker notified when the task is complete. Returns true if
+    /// the task has already completed. If this call returns false, then the
+    /// waker will not be notified.
     pub(super) fn try_set_join_waker(self, waker: &Waker) -> bool {
         can_read_output(self.header(), self.trailer(), waker)
     }

@@ -19,8 +19,9 @@ pub(super) struct Vtable {
     /// Reads the task output, if complete.
     pub(super) try_read_output: unsafe fn(NonNull<Header>, *mut (), &Waker),
 
-    /// Try to set the join waker. Returns whether the task was already
-    /// complete.
+    /// Try to set the waker notified when the task is complete. Returns true if
+    /// the task has already completed. If this call returns false, then the
+    /// waker will not be notified.
     pub(super) try_set_join_waker: unsafe fn(NonNull<Header>, &Waker) -> bool,
 
     /// The join handle has been dropped.
