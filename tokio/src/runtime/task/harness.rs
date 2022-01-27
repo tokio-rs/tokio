@@ -175,8 +175,8 @@ where
             // by a Waker on any arbitrary thread.
             //
             // Panics are delivered to the user via the `JoinHandle`. Given that
-            // they are dropping it, we assume they are not interested in it,
-            // and swallow it.
+            // they are dropping the `JoinHandle`, we assume they are not
+            // interested in the panic and swallow it.
             let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 self.core().stage.drop_future_or_output();
             }));
