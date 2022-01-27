@@ -2,7 +2,7 @@ use crate::runtime::Builder;
 use crate::task::JoinSet;
 
 #[test]
-fn test_task_set() {
+fn test_join_set() {
     loom::model(|| {
         let rt = Builder::new_multi_thread()
             .worker_threads(1)

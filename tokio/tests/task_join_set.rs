@@ -121,7 +121,7 @@ fn runtime_gone() {
 // This ensures that `join_one` works correctly when the coop budget is
 // exhausted.
 #[tokio::test(flavor = "current_thread")]
-async fn task_set_coop() {
+async fn join_set_coop() {
     // Large enough to trigger coop.
     const TASK_NUM: u32 = 1000;
 
