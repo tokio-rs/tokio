@@ -420,7 +420,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     ///     // Drop the guard after the spawned task finishes.
     ///     drop(n);
-    ///}
+    /// }
     /// ```
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -457,6 +457,58 @@ impl<T: ?Sized> RwLock<T> {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: self.resource_span.clone(),
         }
+    }
+
+    /// Blockingly locks this `RwLock` with shared read access.
+    ///
+    /// This method is intended for use cases where you
+    /// need to use this rwlock in asynchronous code as well as in synchronous code.
+    ///
+    /// Returns an RAII guard which will drop the read access of this `RwLock` when dropped.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called within an asynchronous execution context.
+    ///
+    ///   - If you find yourself in an asynchronous execution context and needing
+    ///     to call some (synchronous) function which performs one of these
+    ///     `blocking_` operations, then consider wrapping that call inside
+    ///     [`spawn_blocking()`][crate::runtime::Handle::spawn_blocking]
+    ///     (or [`block_in_place()`][crate::task::block_in_place]).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::RwLock;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let rwlock = Arc::new(RwLock::new(1));
+    ///     let mut write_lock = rwlock.write().await;
+    ///
+    ///     let blocking_task = tokio::task::spawn_blocking({
+    ///         let rwlock = Arc::clone(&rwlock);
+    ///         move || {
+    ///             // This shall block until the `write_lock` is released.
+    ///             let read_lock = rwlock.blocking_read();
+    ///             assert_eq!(*read_lock, 0);
+    ///         }
+    ///     });
+    ///
+    ///     *write_lock -= 1;
+    ///     drop(write_lock); // release the lock.
+    ///
+    ///     // Await the completion of the blocking task.
+    ///     blocking_task.await.unwrap();
+    ///
+    ///     // Assert uncontended.
+    ///     assert!(rwlock.try_write().is_ok());
+    /// }
+    /// ```
+    #[cfg(feature = "sync")]
+    pub fn blocking_read(&self) -> RwLockReadGuard<'_, T> {
+        crate::future::block_on(self.read())
     }
 
     /// Locks this `RwLock` with shared read access, causing the current task
@@ -737,6 +789,60 @@ impl<T: ?Sized> RwLock<T> {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: self.resource_span.clone(),
         }
+    }
+
+    /// Blockingly locks this `RwLock` with exclusive write access.
+    ///
+    /// This method is intended for use cases where you
+    /// need to use this rwlock in asynchronous code as well as in synchronous code.
+    ///
+    /// Returns an RAII guard which will drop the write access of this `RwLock` when dropped.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called within an asynchronous execution context.
+    ///
+    ///   - If you find yourself in an asynchronous execution context and needing
+    ///     to call some (synchronous) function which performs one of these
+    ///     `blocking_` operations, then consider wrapping that call inside
+    ///     [`spawn_blocking()`][crate::runtime::Handle::spawn_blocking]
+    ///     (or [`block_in_place()`][crate::task::block_in_place]).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::{sync::RwLock};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let rwlock =  Arc::new(RwLock::new(1));
+    ///     let read_lock = rwlock.read().await;
+    ///
+    ///     let blocking_task = tokio::task::spawn_blocking({
+    ///         let rwlock = Arc::clone(&rwlock);
+    ///         move || {
+    ///             // This shall block until the `read_lock` is released.
+    ///             let mut write_lock = rwlock.blocking_write();
+    ///             *write_lock = 2;
+    ///         }
+    ///     });
+    ///
+    ///     assert_eq!(*read_lock, 1);
+    ///     // Release the last outstanding read lock.
+    ///     drop(read_lock);
+    ///
+    ///     // Await the completion of the blocking task.
+    ///     blocking_task.await.unwrap();
+    ///
+    ///     // Assert uncontended.
+    ///     let read_lock = rwlock.try_read().unwrap();
+    ///     assert_eq!(*read_lock, 2);
+    /// }
+    /// ```
+    #[cfg(feature = "sync")]
+    pub fn blocking_write(&self) -> RwLockWriteGuard<'_, T> {
+        crate::future::block_on(self.write())
     }
 
     /// Locks this `RwLock` with exclusive write access, causing the current
