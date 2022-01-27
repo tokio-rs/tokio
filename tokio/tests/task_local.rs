@@ -1,3 +1,5 @@
+#![cfg(feature = "full")]
+
 tokio::task_local! {
     static REQ_ID: u32;
     pub static FOO: bool;
