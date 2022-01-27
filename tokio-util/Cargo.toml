@@ -30,7 +30,7 @@ codec = []
 time = ["tokio/time","slab"]
 io = []
 io-util = ["io", "tokio/rt", "tokio/io-util"]
-rt = ["tokio/rt"]
+rt = ["tokio/rt", "tokio/sync", "futures-util"]
 
 __docs_rs = ["futures-util"]
 
