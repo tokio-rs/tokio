@@ -50,6 +50,22 @@ impl Decoder for U32Decoder {
     }
 }
 
+struct U64Decoder;
+
+impl Decoder for U64Decoder {
+    type Item = u64;
+    type Error = io::Error;
+
+    fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<u64>> {
+        if buf.len() < 8 {
+            return Ok(None);
+        }
+
+        let n = buf.split_to(8).get_u64();
+        Ok(Some(n))
+    }
+}
+
 #[test]
 fn read_multi_frame_in_packet() {
     let mut task = task::spawn(());
@@ -80,6 +96,24 @@ fn read_multi_frame_across_packets() {
         assert_read!(pin!(framed).poll_next(cx), 0);
         assert_read!(pin!(framed).poll_next(cx), 1);
         assert_read!(pin!(framed).poll_next(cx), 2);
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+    });
+}
+
+#[test]
+fn read_multi_frame_in_packet_after_codec_changed() {
+    let mut task = task::spawn(());
+    let mock = mock! {
+        Ok(b"\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x08".to_vec()),
+    };
+    let mut framed = FramedRead::new(mock, U32Decoder);
+
+    task.enter(|cx, _| {
+        assert_read!(pin!(framed).poll_next(cx), 0x04);
+
+        let mut framed = framed.map_decoder(|_| U64Decoder);
+        assert_read!(pin!(framed).poll_next(cx), 0x08);
+
         assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
     });
 }
