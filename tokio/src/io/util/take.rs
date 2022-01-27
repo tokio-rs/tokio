@@ -84,9 +84,14 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
             return Poll::Ready(Ok(()));
         }
 
+        let buf_ptr = buf.filled().as_ptr();
+
         let me = self.project();
         let mut b = buf.take(*me.limit_ as usize);
+
         ready!(me.inner.poll_read(cx, &mut b))?;
+        assert_eq!(b.filled().as_ptr(), buf_ptr);
+
         let n = b.filled().len();
 
         // We need to update the original ReadBuf
