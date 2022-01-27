@@ -1,3 +1,65 @@
+# 1.16.0 (January 27, 2022)
+
+Fixes a soundness bug in `io::Take` ([#4428]). The unsoundness is exposed when
+leaking memory in the given `AsyncRead` implementation and then overwriting the
+supplied buffer:
+
+```rust
+impl AsyncRead for Buggy {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>
+    ) -> Poll<Result<()>> {
+      let new_buf = vec![0; 5].leak();
+      *buf = ReadBuf::new(new_buf);
+      buf.put_slice(b"hello");
+      Poll::Ready(Ok(()))
+    }
+}
+```
+
+Also, this release includes improvements to the multi-threaded scheduler that
+can increase throughput by up to 20% in some cases ([#4383]).
+
+### Fixed
+
+- io: **soundness** don't expose uninitialized memory when using `io::Take` in edge case ([#4428])
+- fs: ensure `File::write` results in a `write` syscall when the runtime shuts down ([#4316])
+- process: drop pipe after child exits in `wait_with_output` ([#4315])
+- rt: improve error message when spawning a thread fails ([#4398])
+- rt: reduce false-positive thread wakups in the multi-threaded scheduler ([#4383])
+- sync: don't inherit `Send` from `parking_lot::*Guard` ([#4359])
+
+### Added
+
+- net: `TcpSocket::linger()` and `set_linger()` ([#4324])
+- net: impl `UnwindSafe` for socket types ([#4384])
+- rt: impl `UnwindSafe` for `JoinHandle` ([#4418])
+- sync: `watch::Receiver::has_changed()` ([#4342])
+- sync: `oneshot::Receiver::blocking_recv()` ([#4334])
+- sync: `RwLock` blocking operations ([#4425])
+
+### Unstable
+
+The following changes only apply when building with `--cfg tokio_unstable`
+
+- rt: **breaking change** overhaul runtime metrics API ([#4373])
+
+[#4428]: https://github.com/tokio-rs/tokio/pull/4428
+[#4316]: https://github.com/tokio-rs/tokio/pull/4316
+[#4315]: https://github.com/tokio-rs/tokio/pull/4315
+[#4398]: https://github.com/tokio-rs/tokio/pull/4398
+[#4383]: https://github.com/tokio-rs/tokio/pull/4383
+[#4359]: https://github.com/tokio-rs/tokio/pull/4359
+[#4324]: https://github.com/tokio-rs/tokio/pull/4324
+[#4384]: https://github.com/tokio-rs/tokio/pull/4384
+[#4418]: https://github.com/tokio-rs/tokio/pull/4418
+[#4342]: https://github.com/tokio-rs/tokio/pull/4342
+[#4334]: https://github.com/tokio-rs/tokio/pull/4334
+[#4425]: https://github.com/tokio-rs/tokio/pull/4425
+[#4373]: https://github.com/tokio-rs/tokio/pull/4373
+
 # 1.15.0 (December 15, 2021)
 
 ### Fixed
