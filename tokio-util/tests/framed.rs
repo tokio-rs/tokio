@@ -14,7 +14,7 @@ const INITIAL_CAPACITY: usize = 8 * 1024;
 /// Encode and decode u32 values.
 #[derive(Default)]
 struct U32Codec {
-    read_bytes: usize
+    read_bytes: usize,
 }
 
 impl Decoder for U32Codec {
@@ -46,7 +46,7 @@ impl Encoder<u32> for U32Codec {
 /// Encode and decode u64 values.
 #[derive(Default)]
 struct U64Codec {
-    read_bytes: usize
+    read_bytes: usize,
 }
 
 impl Decoder for U64Codec {
@@ -120,7 +120,9 @@ async fn can_read_from_existing_buf_after_codec_changed() {
     assert_eq!(num, 42);
     assert_eq!(framed.codec().read_bytes, 4);
 
-    let mut framed = framed.map_codec(|codec| U64Codec { read_bytes: codec.read_bytes });
+    let mut framed = framed.map_codec(|codec| U64Codec {
+        read_bytes: codec.read_bytes,
+    });
     let num = assert_ok!(framed.next().await.unwrap());
 
     assert_eq!(num, 84);

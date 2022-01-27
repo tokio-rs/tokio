@@ -91,17 +91,21 @@ impl<T, E> FramedWrite<T, E> {
     /// Maps the encoder `E` to `C`, preserving the write buffer
     /// wrapped by `Framed`.
     pub fn map_encoder<C, F>(self, map: F) -> FramedWrite<T, C>
-    where 
-        F: FnOnce(E) -> C
+    where
+        F: FnOnce(E) -> C,
     {
         // This could be potentially simplified once rust-lang/rust#86555 hits stable
-        let FramedImpl { inner, state, codec } = self.inner;
+        let FramedImpl {
+            inner,
+            state,
+            codec,
+        } = self.inner;
         FramedWrite {
             inner: FramedImpl {
                 inner,
                 state,
-                codec: map(codec)
-            }
+                codec: map(codec),
+            },
         }
     }
 
