@@ -25,7 +25,7 @@ can increase throughput by up to 20% in some cases ([#4383]).
 ### Fixed
 
 - io: **soundness** don't expose uninitialized memory when using `io::Take` in edge case ([#4428])
-- fs: ensure `File::write` reaches the disk when the runtime shuts down ([#4316])
+- fs: ensure `File::write` results in a `write` syscall when the runtime shuts down ([#4316])
 - process: drop pipe after child exits in `wait_with_output` ([#4315])
 - rt: improve error message when spawning a thread fails ([#4398])
 - rt: reduce false-positive thread wakups in the multi-threaded scheduler ([#4383])
