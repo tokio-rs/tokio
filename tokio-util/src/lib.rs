@@ -30,6 +30,7 @@ cfg_codec! {
 
 cfg_net! {
     pub mod udp;
+    pub mod net;
 }
 
 cfg_compat! {
