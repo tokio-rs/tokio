@@ -1,3 +1,32 @@
+# 1.8.5 (January 27, 2022)
+
+This release backports a bug fix from 1.16.0
+
+Fixes a soundness bug in `io::Take` ([#4428]). The unsoundness is exposed when
+leaking memory in the given `AsyncRead` implementation and then overwriting the
+supplied buffer:
+
+```rust
+impl AsyncRead for Buggy {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>
+    ) -> Poll<Result<()>> {
+      let new_buf = vec![0; 5].leak();
+      *buf = ReadBuf::new(new_buf);
+      buf.put_slice(b"hello");
+      Poll::Ready(Ok(()))
+    }
+}
+```
+
+### Fixed
+
+- io: **soundness** don't expose uninitialized memory when using `io::Take` in edge case ([#4428])
+
+[#4428]: https://github.com/tokio-rs/tokio/pull/4428
+
 # 1.8.4 (November 15, 2021)
 
 This release backports a bug fix from 1.13.1.
