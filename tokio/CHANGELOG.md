@@ -38,7 +38,7 @@ can increase throughput by up to 20% in some cases ([#4383]).
 - rt: impl `UnwindSafe` for `JoinHandle` ([#4418])
 - sync: `watch::Receiver::has_changed()` ([#4342])
 - sync: `oneshot::Receiver::blocking_recv()` ([#4334])
-- `RwLock` blocking operations ([#4425])
+- sync: `RwLock` blocking operations ([#4425])
 
 ### Unstable
 
