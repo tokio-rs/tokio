@@ -173,6 +173,10 @@ where
             // the scheduler or `JoinHandle`. i.e. if the output remains in the
             // task structure until the task is deallocated, it may be dropped
             // by a Waker on any arbitrary thread.
+            //
+            // Panics are delivered to the user via the `JoinHandle`. Given that
+            // they are dropping it, we assume they are not interested in it,
+            // and swallow it.
             let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 self.core().stage.drop_future_or_output();
             }));
