@@ -46,6 +46,20 @@ The following changes only apply when building with `--cfg tokio_unstable`
 
 - rt: **breaking change** overhaul runtime metrics API ([#4373])
 
+[#4428]: https://github.com/tokio-rs/tokio/pull/4428
+[#4316]: https://github.com/tokio-rs/tokio/pull/4316
+[#4315]: https://github.com/tokio-rs/tokio/pull/4315
+[#4398]: https://github.com/tokio-rs/tokio/pull/4398
+[#4383]: https://github.com/tokio-rs/tokio/pull/4383
+[#4359]: https://github.com/tokio-rs/tokio/pull/4359
+[#4324]: https://github.com/tokio-rs/tokio/pull/4324
+[#4384]: https://github.com/tokio-rs/tokio/pull/4384
+[#4418]: https://github.com/tokio-rs/tokio/pull/4418
+[#4342]: https://github.com/tokio-rs/tokio/pull/4342
+[#4334]: https://github.com/tokio-rs/tokio/pull/4334
+[#4425]: https://github.com/tokio-rs/tokio/pull/4425
+[#4373]: https://github.com/tokio-rs/tokio/pull/4373
+
 # 1.15.0 (December 15, 2021)
 
 ### Fixed
