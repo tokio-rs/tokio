@@ -301,7 +301,7 @@ cfg_rt! {
     pub use unconstrained::{unconstrained, Unconstrained};
 
     mod task_set;
-    pub use task_set::TaskSet;
+    pub use task_set::JoinSet;
 
     cfg_trace! {
         mod builder;

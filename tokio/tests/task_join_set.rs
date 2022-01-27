@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use tokio::sync::oneshot;
-use tokio::task::TaskSet;
+use tokio::task::JoinSet;
 use tokio::time::Duration;
 
 use futures::future::FutureExt;
@@ -15,7 +15,7 @@ fn rt() -> tokio::runtime::Runtime {
 
 #[tokio::test(start_paused = true)]
 async fn test_with_sleep() {
-    let mut set = TaskSet::new();
+    let mut set = JoinSet::new();
 
     for i in 0..10 {
         set.spawn(async move { i });
@@ -65,7 +65,7 @@ async fn test_with_sleep() {
 
 #[tokio::test]
 async fn test_abort_on_drop() {
-    let mut set = TaskSet::new();
+    let mut set = JoinSet::new();
 
     let mut recvs = Vec::new();
 
@@ -90,7 +90,7 @@ async fn test_abort_on_drop() {
 
 #[tokio::test]
 async fn alternating() {
-    let mut set = TaskSet::new();
+    let mut set = JoinSet::new();
 
     assert_eq!(set.len(), 0);
     set.spawn(async {});
@@ -108,7 +108,7 @@ async fn alternating() {
 
 #[test]
 fn runtime_gone() {
-    let mut set = TaskSet::new();
+    let mut set = JoinSet::new();
     {
         let rt = rt();
         set.spawn_on(async { 1 }, rt.handle());
@@ -127,7 +127,7 @@ async fn task_set_coop() {
 
     static SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(0);
 
-    let mut set = TaskSet::new();
+    let mut set = JoinSet::new();
 
     for _ in 0..TASK_NUM {
         set.spawn(async {
@@ -163,7 +163,7 @@ async fn task_set_coop() {
 
 #[tokio::test(start_paused = true)]
 async fn abort_all() {
-    let mut set: TaskSet<()> = TaskSet::new();
+    let mut set: JoinSet<()> = JoinSet::new();
 
     for _ in 0..5 {
         set.spawn(futures::future::pending());
@@ -174,7 +174,7 @@ async fn abort_all() {
         });
     }
 
-    // The task set will now have 5 pending tasks and 5 ready tasks.
+    // The join set will now have 5 pending tasks and 5 ready tasks.
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     set.abort_all();

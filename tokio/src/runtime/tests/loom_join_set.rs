@@ -1,5 +1,5 @@
 use crate::runtime::Builder;
-use crate::task::TaskSet;
+use crate::task::JoinSet;
 
 #[test]
 fn test_task_set() {
@@ -8,7 +8,7 @@ fn test_task_set() {
             .worker_threads(1)
             .build()
             .unwrap();
-        let mut set = TaskSet::new();
+        let mut set = JoinSet::new();
 
         rt.block_on(async {
             assert_eq!(set.len(), 0);
@@ -54,7 +54,7 @@ fn abort_all_during_completion() {
                 .build()
                 .unwrap();
 
-            let mut set = TaskSet::new();
+            let mut set = JoinSet::new();
 
             rt.block_on(async {
                 set.spawn(async { () });
@@ -65,7 +65,7 @@ fn abort_all_during_completion() {
                     Err(err) if err.is_cancelled() => cancel_happened.store(true, SeqCst),
                     Err(err) => panic!("fail: {}", err),
                     Ok(None) => {
-                        unreachable!("Aborting the task does not remove it from the TaskSet.")
+                        unreachable!("Aborting the task does not remove it from the JoinSet.")
                     }
                 }
 
