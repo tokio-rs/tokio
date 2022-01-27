@@ -198,14 +198,12 @@ impl<T: 'static> JoinSet<T> {
         // the `notified` list if the waker is notified in the `poll` call below.
         let mut entry = match self.inner.pop_notified(cx.waker()) {
             Some(entry) => entry,
-            None => {
-                if self.is_empty() {
-                    return Poll::Ready(Ok(None));
-                } else {
-                    // The waker was set by `pop_notified`.
-                    return Poll::Pending;
-                }
-            }
+            None => if self.is_empty() {
+                return Poll::Ready(Ok(None));
+            } else {
+                // The waker was set by `pop_notified`.
+                return Poll::Pending;
+            },
         };
 
         let res = entry.with_value_and_context(|jh, ctx| Pin::new(jh).poll(ctx));

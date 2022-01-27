@@ -1,6 +1,6 @@
 //! This module defines an `IdleNotifiedSet`, which is a collection of elements.
 //! Each element is intended to correspond to a task, and the collection will
-//! keep track of which tasks have notified their waker, and which have not.
+//! keep track of which tasks have had their waker notified, and which have not.
 //!
 //! Each entry in the set holds some user-specified value. The value's type is
 //! specified using the `T` parameter. It will usually be a `JoinHandle` or
@@ -40,9 +40,7 @@ pub(crate) struct EntryInOneOfTheLists<'a, T> {
     set: &'a mut IdleNotifiedSet<T>,
 }
 
-struct Lists<T> {
-    inner: Mutex<ListsInner<T>>,
-}
+type Lists<T> = Mutex<ListsInner<T>>;
 
 /// The linked lists hold strong references to the ListEntry items, and the
 /// ListEntry items also hold a strong reference back to the Lists object, but
@@ -89,8 +87,8 @@ enum List {
 /// two linked lists are emptied in the destructor of `IdleNotifiedSet`, the
 /// value should not be leaked.)
 ///
-/// This type is #[repr(C)] because its `linked_list::Link` implementation uses
-/// that `pointers` is the first field.
+/// This type is `#[repr(C)]` because its `linked_list::Link` implementation
+/// requires that `pointers` is the first field.
 #[repr(C)]
 struct ListEntry<T> {
     /// The linked list pointers of the list this entry is in.
@@ -122,13 +120,11 @@ unsafe impl<T> Sync for ListEntry<T> {}
 impl<T> IdleNotifiedSet<T> {
     /// Create a new IdleNotifiedSet.
     pub(crate) fn new() -> Self {
-        let lists = Lists {
-            inner: Mutex::new(ListsInner {
-                notified: LinkedList::new(),
-                idle: LinkedList::new(),
-                waker: None,
-            }),
-        };
+        let lists = Mutex::new(ListsInner {
+            notified: LinkedList::new(),
+            idle: LinkedList::new(),
+            waker: None,
+        });
 
         IdleNotifiedSet {
             lists: Arc::new(lists),
@@ -157,7 +153,7 @@ impl<T> IdleNotifiedSet<T> {
         });
 
         {
-            let mut lock = self.lists.inner.lock();
+            let mut lock = self.lists.lock();
             lock.idle.push_front(entry.clone());
         }
 
@@ -175,7 +171,7 @@ impl<T> IdleNotifiedSet<T> {
             return None;
         }
 
-        let mut lock = self.lists.inner.lock();
+        let mut lock = self.lists.lock();
 
         let should_update_waker = match lock.waker.as_mut() {
             Some(cur_waker) => !waker.will_wake(cur_waker),
@@ -185,21 +181,20 @@ impl<T> IdleNotifiedSet<T> {
             lock.waker = Some(waker.clone());
         }
 
-        // Pop the entry.
-        match lock.notified.pop_back() {
-            Some(entry) => {
-                // Safety: We are holding the lock.
-                lock.idle.push_front(entry.clone());
-                entry.my_list.with_mut(|ptr| unsafe {
-                    *ptr = List::Idle;
-                });
-                drop(lock);
+        // Pop the entry, returning None if empty.
+        let entry = lock.notified.pop_back()?;
 
-                // Safety: We just put the entry in the idle list, so it is in one of the lists.
-                Some(EntryInOneOfTheLists { entry, set: self })
-            }
-            None => None,
-        }
+        lock.idle.push_front(entry.clone());
+
+        // Safety: We are holding the lock.
+        entry.my_list.with_mut(|ptr| unsafe {
+            *ptr = List::Idle;
+        });
+
+        drop(lock);
+
+        // Safety: We just put the entry in the idle list, so it is in one of the lists.
+        Some(EntryInOneOfTheLists { entry, set: self })
     }
 
     /// Call a function on every element in this list.
@@ -221,13 +216,13 @@ impl<T> IdleNotifiedSet<T> {
 
         // Atomically get a raw pointer to the value of every entry.
         //
-        // Since this only locks the mutex once, its not possible for a value to
-        // get moved from the idle list to the notified list during the
+        // Since this only locks the mutex once, it is not possible for a value
+        // to get moved from the idle list to the notified list during the
         // operation, which would otherwise result in some value being listed
         // twice.
         let mut ptrs = Vec::with_capacity(self.len());
         {
-            let mut lock = self.lists.inner.lock();
+            let mut lock = self.lists.lock();
 
             get_ptrs(&mut lock.idle, &mut ptrs);
             get_ptrs(&mut lock.notified, &mut ptrs);
@@ -258,7 +253,7 @@ impl<T> IdleNotifiedSet<T> {
 
         // The LinkedList is not cleared on panic, so we use a bomb to clear it.
         //
-        // This value has the invariant that eny entry in its `all_entries` list
+        // This value has the invariant that any entry in its `all_entries` list
         // has `my_list` set to `Neither` and that the value has not yet been
         // dropped.
         struct AllEntries<T, F: FnMut(T)> {
@@ -295,7 +290,7 @@ impl<T> IdleNotifiedSet<T> {
         // Atomically move all entries to the new linked list in the AllEntries
         // object.
         {
-            let mut lock = self.lists.inner.lock();
+            let mut lock = self.lists.lock();
             unsafe {
                 // Safety: We are holding the lock and `all_entries` is a new
                 // LinkedList.
@@ -313,6 +308,8 @@ impl<T> IdleNotifiedSet<T> {
     }
 }
 
+/// # Safety
+///
 /// The mutex for the entries must be held, and the target list must be such
 /// that setting `my_list` to `Neither` is ok.
 unsafe fn move_to_new_list<T>(from: &mut LinkedList<T>, to: &mut LinkedList<T>) {
@@ -334,7 +331,7 @@ impl<'a, T> EntryInOneOfTheLists<'a, T> {
         self.set.length -= 1;
 
         {
-            let mut lock = self.set.lists.inner.lock();
+            let mut lock = self.set.lists.lock();
 
             // Safety: We are holding the lock so there is no race, and we will
             // remove the entry afterwards to uphold invariants.
@@ -347,6 +344,7 @@ impl<'a, T> EntryInOneOfTheLists<'a, T> {
             let list = match old_my_list {
                 List::Idle => &mut lock.idle,
                 List::Notified => &mut lock.notified,
+                // An entry in one of the lists is in one of the lists.
                 List::Neither => unreachable!(),
             };
 
@@ -391,8 +389,8 @@ impl<T> Drop for IdleNotifiedSet<T> {
         self.drain(drop);
 
         #[cfg(debug_assertions)]
-        {
-            let lock = self.lists.inner.lock();
+        if !std::thread::panicking() {
+            let lock = self.lists.lock();
             assert!(lock.idle.is_empty());
             assert!(lock.notified.is_empty());
         }
@@ -401,7 +399,7 @@ impl<T> Drop for IdleNotifiedSet<T> {
 
 impl<T: 'static> Wake for ListEntry<T> {
     fn wake_by_ref(me: &Arc<Self>) {
-        let mut lock = me.parent.inner.lock();
+        let mut lock = me.parent.lock();
 
         // Safety: We are holding the lock and we will update the lists to
         // maintain invariants.
