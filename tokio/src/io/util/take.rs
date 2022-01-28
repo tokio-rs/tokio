@@ -84,11 +84,10 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
             return Poll::Ready(Ok(()));
         }
 
-        let buf_ptr = buf.filled().as_ptr();
-
         let me = self.project();
         let mut b = buf.take(*me.limit_ as usize);
 
+        let buf_ptr = b.filled().as_ptr();
         ready!(me.inner.poll_read(cx, &mut b))?;
         assert_eq!(b.filled().as_ptr(), buf_ptr);
 
