@@ -1,3 +1,10 @@
+# 1.16.1 (January 28, 2022)
+
+This release fixes a bug in [#4428] with the change [#4437].
+
+[#4428]: https://github.com/tokio-rs/tokio/pull/4428
+[#4437]: https://github.com/tokio-rs/tokio/pull/4437
+
 # 1.16.0 (January 27, 2022)
 
 Fixes a soundness bug in `io::Take` ([#4428]). The unsoundness is exposed when
