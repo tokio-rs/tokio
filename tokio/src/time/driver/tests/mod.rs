@@ -28,7 +28,9 @@ fn block_on<T>(f: impl std::future::Future<Output = T>) -> T {
 
     #[cfg(not(loom))]
     {
-        let rt = crate::runtime::Builder::new_current_thread().build().unwrap();
+        let rt = crate::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
         rt.block_on(f)
     }
 }
@@ -185,6 +187,7 @@ fn reset_future() {
     })
 }
 
+#[cfg(not(loom))]
 fn normal_or_miri<T>(normal: T, miri: T) -> T {
     if cfg!(miri) {
         miri
