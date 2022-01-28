@@ -202,7 +202,10 @@ mod tests {
                 registry.broadcast();
 
                 // Yield so the previous broadcast can get received
-                crate::time::sleep(std::time::Duration::from_millis(10)).await;
+                //crate::time::sleep(std::time::Duration::from_millis(10)).await;
+                for _ in 0..100 {
+                    crate::task::yield_now().await;
+                }
 
                 // Send subsequent signal
                 registry.record_event(0);
