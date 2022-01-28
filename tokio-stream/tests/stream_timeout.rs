@@ -1,4 +1,4 @@
-#![cfg(feature = "full")]
+#![cfg(feature = "io-util")]
 
 use tokio::time::{self, sleep, Duration};
 use tokio_stream::{self, StreamExt};

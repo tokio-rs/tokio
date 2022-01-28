@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(feature = "time")]
 
 use tokio::time;
 use tokio_stream::StreamExt;
