@@ -63,6 +63,7 @@ fn notify_simple() {
 }
 
 #[test]
+#[cfg(not(target_arch = "wasm32"))]
 fn watch_test() {
     let rt = crate::runtime::Builder::new_current_thread().build().unwrap();
 
