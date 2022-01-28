@@ -1,36 +1,44 @@
+#![cfg(feature = "macros")]
 #![allow(clippy::blacklisted_name)]
+
 use tokio::sync::oneshot;
 use tokio_test::{assert_pending, assert_ready, task};
 
-#[tokio::test]
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
+
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::test as maybe_tokio_test;
+
+#[maybe_tokio_test]
 async fn sync_one_lit_expr_comma() {
     let foo = tokio::try_join!(async { ok(1) },);
 
     assert_eq!(foo, Ok((1,)));
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn sync_one_lit_expr_no_comma() {
     let foo = tokio::try_join!(async { ok(1) });
 
     assert_eq!(foo, Ok((1,)));
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn sync_two_lit_expr_comma() {
     let foo = tokio::try_join!(async { ok(1) }, async { ok(2) },);
 
     assert_eq!(foo, Ok((1, 2)));
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn sync_two_lit_expr_no_comma() {
     let foo = tokio::try_join!(async { ok(1) }, async { ok(2) });
 
     assert_eq!(foo, Ok((1, 2)));
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn two_await() {
     let (tx1, rx1) = oneshot::channel::<&str>();
     let (tx2, rx2) = oneshot::channel::<u32>();
@@ -51,7 +59,7 @@ async fn two_await() {
     assert_eq!(Ok(("hello", 123)), res);
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn err_abort_early() {
     let (tx1, rx1) = oneshot::channel::<&str>();
     let (tx2, rx2) = oneshot::channel::<u32>();

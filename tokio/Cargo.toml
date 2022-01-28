@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.0.x" git tag.
-version = "1.15.0"
+version = "1.16.1"
 edition = "2018"
 rust-version = "1.46"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -46,7 +46,6 @@ io-util = ["memchr", "bytes"]
 # stdin, stdout, stderr
 io-std = []
 macros = ["tokio-macros"]
-stats = []
 net = [
   "libc",
   "mio/os-poll",
@@ -84,6 +83,11 @@ signal = [
 sync = []
 test-util = ["rt", "sync", "time"]
 time = []
+
+# Technically, removing this is a breaking change even though it only ever did
+# anything with the unstable flag on. It is probably safe to get rid of it after
+# a few releases.
+stats = []
 
 [dependencies]
 tokio-macros = { version = "1.7.0", path = "../tokio-macros", optional = true }
@@ -124,11 +128,16 @@ tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
 mockall = "0.10.2"
-proptest = "1"
-rand = "0.8.0"
 tempfile = "3.1.0"
 async-stream = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+proptest = "1"
+rand = "0.8.0"
 socket2 = "0.4"
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]
 mio-aio = { version = "0.6.0", features = ["tokio"] }

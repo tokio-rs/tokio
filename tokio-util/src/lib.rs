@@ -30,6 +30,7 @@ cfg_codec! {
 
 cfg_net! {
     pub mod udp;
+    pub mod net;
 }
 
 cfg_compat! {
@@ -42,6 +43,7 @@ cfg_io! {
 
 cfg_rt! {
     pub mod context;
+    pub mod task;
 }
 
 cfg_time! {

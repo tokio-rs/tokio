@@ -174,20 +174,22 @@ macro_rules! cfg_macros {
     }
 }
 
-macro_rules! cfg_stats {
+macro_rules! cfg_metrics {
     ($($item:item)*) => {
         $(
-            #[cfg(all(tokio_unstable, feature = "stats"))]
-            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "stats"))))]
+            // For now, metrics is always enabled. When stabilized, it might
+            // have a dedicated feature flag.
+            #[cfg(tokio_unstable)]
+            #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
             $item
         )*
     }
 }
 
-macro_rules! cfg_not_stats {
+macro_rules! cfg_not_metrics {
     ($($item:item)*) => {
         $(
-            #[cfg(not(all(tokio_unstable, feature = "stats")))]
+            #[cfg(not(tokio_unstable))]
             $item
         )*
     }

@@ -107,6 +107,9 @@ impl<'a> Builder<'a> {
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
-        context::current().spawn_blocking_inner(function, self.name)
+        use crate::runtime::Mandatory;
+        let (join_handle, _was_spawned) =
+            context::current().spawn_blocking_inner(function, Mandatory::NonMandatory, self.name);
+        join_handle
     }
 }

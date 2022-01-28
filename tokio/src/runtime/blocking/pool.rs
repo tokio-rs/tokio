@@ -70,11 +70,40 @@ struct Shared {
     worker_thread_index: usize,
 }
 
-type Task = task::UnownedTask<NoopSchedule>;
+pub(crate) struct Task {
+    task: task::UnownedTask<NoopSchedule>,
+    mandatory: Mandatory,
+}
+
+#[derive(PartialEq, Eq)]
+pub(crate) enum Mandatory {
+    #[cfg_attr(not(fs), allow(dead_code))]
+    Mandatory,
+    NonMandatory,
+}
+
+impl Task {
+    pub(crate) fn new(task: task::UnownedTask<NoopSchedule>, mandatory: Mandatory) -> Task {
+        Task { task, mandatory }
+    }
+
+    fn run(self) {
+        self.task.run();
+    }
+
+    fn shutdown_or_run_if_mandatory(self) {
+        match self.mandatory {
+            Mandatory::NonMandatory => self.task.shutdown(),
+            Mandatory::Mandatory => self.task.run(),
+        }
+    }
+}
 
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
 /// Runs the provided function on an executor dedicated to blocking operations.
+/// Tasks will be scheduled as non-mandatory, meaning they may not get executed
+/// in case of runtime shutdown.
 pub(crate) fn spawn_blocking<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
@@ -82,6 +111,25 @@ where
 {
     let rt = context::current();
     rt.spawn_blocking(func)
+}
+
+cfg_fs! {
+    #[cfg_attr(any(
+        all(loom, not(test)), // the function is covered by loom tests
+        test
+    ), allow(dead_code))]
+    /// Runs the provided function on an executor dedicated to blocking
+    /// operations. Tasks will be scheduled as mandatory, meaning they are
+    /// guaranteed to run unless a shutdown is already taking place. In case a
+    /// shutdown is already taking place, `None` will be returned.
+    pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> Option<JoinHandle<R>>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let rt = context::current();
+        rt.spawn_mandatory_blocking(func)
+    }
 }
 
 // ===== impl BlockingPool =====
@@ -176,8 +224,10 @@ impl Spawner {
             let mut shared = self.inner.shared.lock();
 
             if shared.shutdown {
-                // Shutdown the task
-                task.shutdown();
+                // Shutdown the task: it's fine to shutdown this task (even if
+                // mandatory) because it was scheduled after the shutdown of the
+                // runtime began.
+                task.task.shutdown();
 
                 // no need to even push this task; it would never get picked up
                 return Err(());
@@ -244,7 +294,7 @@ impl Spawner {
                 rt.blocking_spawner.inner.run(id);
                 drop(shutdown_tx);
             })
-            .unwrap()
+            .expect("OS can't spawn a new worker thread")
     }
 }
 
@@ -302,7 +352,8 @@ impl Inner {
                 // Drain the queue
                 while let Some(task) = shared.queue.pop_front() {
                     drop(shared);
-                    task.shutdown();
+
+                    task.shutdown_or_run_if_mandatory();
 
                     shared = self.shared.lock();
                 }

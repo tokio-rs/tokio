@@ -4,6 +4,11 @@
 use std::panic::{RefUnwindSafe, UnwindSafe};
 
 #[test]
+fn join_handle_is_unwind_safe() {
+    is_unwind_safe::<tokio::task::JoinHandle<()>>();
+}
+
+#[test]
 fn net_types_are_unwind_safe() {
     is_unwind_safe::<tokio::net::TcpListener>();
     is_unwind_safe::<tokio::net::TcpSocket>();
