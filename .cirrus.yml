@@ -10,10 +10,11 @@ task:
   env:
     LOOM_MAX_PREEMPTIONS: 2
     RUSTFLAGS: -Dwarnings
+    RUST_TOOLCHAIN: 1.56.0
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain stable
+    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_TOOLCHAIN
     - . $HOME/.cargo/env
     - rustup target add i686-unknown-freebsd
     - |
