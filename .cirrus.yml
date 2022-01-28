@@ -1,6 +1,8 @@
 freebsd_instance:
   image: freebsd-12-2-release-amd64
 env:
+  RUST_STABLE: stable
+  RUST_NIGHTLY: nightly-2022-01-12
   RUSTFLAGS: -D warnings
 
 # Test FreeBSD in a full VM on cirrus-ci.com.  Test the i686 target too, in the
@@ -12,7 +14,7 @@ task:
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain stable
+    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
     - . $HOME/.cargo/env
     - |
       echo "~~~~ rustc --version ~~~~"
@@ -29,7 +31,7 @@ task:
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2022-01-12
+    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
     - . $HOME/.cargo/env
     - |
       echo "~~~~ rustc --version ~~~~"
@@ -43,7 +45,7 @@ task:
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain stable
+    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
     - . $HOME/.cargo/env
     - rustup target add i686-unknown-freebsd
     - |
