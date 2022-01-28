@@ -352,6 +352,7 @@ mod tests {
     use std::pin::Pin;
 
     #[derive(Debug)]
+    #[repr(C)]
     struct Entry {
         pointers: Pointers<Entry>,
         val: i32,
@@ -369,8 +370,8 @@ mod tests {
             Pin::new_unchecked(&*ptr.as_ptr())
         }
 
-        unsafe fn pointers(mut target: NonNull<Entry>) -> NonNull<Pointers<Entry>> {
-            NonNull::from(&mut target.as_mut().pointers)
+        unsafe fn pointers(target: NonNull<Entry>) -> NonNull<Pointers<Entry>> {
+            target.cast()
         }
     }
 

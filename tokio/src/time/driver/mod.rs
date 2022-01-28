@@ -525,4 +525,5 @@ impl fmt::Debug for Inner {
 }
 
 #[cfg(test)]
+#[cfg(not(miri))]
 mod tests;
