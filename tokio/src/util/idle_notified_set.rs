@@ -70,6 +70,8 @@ enum List {
 
 /// An entry in the list.
 ///
+/// # Safety
+///
 /// The `my_list` field must only be accessed while holding the mutex in
 /// `parent`. It is an invariant that the value of `my_list` corresponds to
 /// which linked list in the `parent` holds this entry. Once this field takes
