@@ -46,14 +46,16 @@ impl<T: Send + 'static> PollSender<T> {
 
     /// Start sending a new item.
     ///
-    /// This method panics if a send is currently in progress. To ensure that no
-    /// send is in progress, call `poll_send_done` first until it returns
-    /// `Poll::Ready`.
-    ///
     /// If this method returns an error, that indicates that the channel is
     /// closed. Note that this method is not guaranteed to return an error if
     /// the channel is closed, but in that case the error would be reported by
     /// the first call to `poll_send_done`.
+    ///
+    /// # Panics
+    /// This method panics if a send is currently in progress. To ensure that no
+    /// send is in progress, call `poll_send_done` first until it returns
+    /// `Poll::Ready`.
+    #[track_caller]
     pub fn start_send(&mut self, value: T) -> Result<(), SendError<T>> {
         if self.is_sending {
             panic!("start_send called while not ready.");
@@ -199,6 +201,7 @@ impl<T: Send + 'static> Sink<T> for PollSender<T> {
     /// This is equivalent to calling [`start_send`].
     ///
     /// [`start_send`]: PollSender::start_send
+    #[track_caller]
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         Pin::into_inner(self).start_send(item)
     }

@@ -88,6 +88,7 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// # Panic
     ///
     /// This will panic if called outside the context of a Tokio runtime.
+    #[track_caller]
     pub fn new(src: T) -> Self {
         Self::new_with_handle(src, tokio::runtime::Handle::current())
     }

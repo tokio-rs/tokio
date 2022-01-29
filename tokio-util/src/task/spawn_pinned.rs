@@ -21,6 +21,7 @@ impl LocalPoolHandle {
     ///
     /// # Panics
     /// Panics if the pool size is less than one.
+    #[track_caller]
     pub fn new(pool_size: usize) -> LocalPoolHandle {
         assert!(pool_size > 0);
 

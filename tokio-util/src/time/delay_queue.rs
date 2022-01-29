@@ -187,6 +187,7 @@ impl<T> SlabStorage<T> {
     }
 
     // Inserts data into the inner slab and re-maps keys if necessary
+    #[track_caller]
     pub(crate) fn insert(&mut self, val: Data<T>) -> Key {
         let mut key = KeyInternal::new(self.inner.insert(val));
         let key_contained = self.key_map.contains_key(&key.into());
@@ -305,6 +306,7 @@ impl<T> SlabStorage<T> {
         self.compact_called = false;
     }
 
+    #[track_caller]
     pub(crate) fn reserve(&mut self, additional: usize) {
         self.inner.reserve(additional);
 
@@ -346,6 +348,7 @@ where
 impl<T> Index<Key> for SlabStorage<T> {
     type Output = Data<T>;
 
+    #[track_caller]
     fn index(&self, key: Key) -> &Self::Output {
         let remapped_key = self.remap_key(&key);
 
@@ -357,6 +360,7 @@ impl<T> Index<Key> for SlabStorage<T> {
 }
 
 impl<T> IndexMut<Key> for SlabStorage<T> {
+    #[track_caller]
     fn index_mut(&mut self, key: Key) -> &mut Data<T> {
         let remapped_key = self.remap_key(&key);
 
@@ -533,6 +537,7 @@ impl<T> DelayQueue<T> {
     /// [`reset`]: method@Self::reset
     /// [`Key`]: struct@Key
     /// [type]: #
+    #[track_caller]
     pub fn insert_at(&mut self, value: T, when: Instant) -> Key {
         assert!(self.slab.len() < MAX_ENTRIES, "max entries exceeded");
 
@@ -656,10 +661,12 @@ impl<T> DelayQueue<T> {
     /// [`reset`]: method@Self::reset
     /// [`Key`]: struct@Key
     /// [type]: #
+    #[track_caller]
     pub fn insert(&mut self, value: T, timeout: Duration) -> Key {
         self.insert_at(value, Instant::now() + timeout)
     }
 
+    #[track_caller]
     fn insert_idx(&mut self, when: u64, key: Key) {
         use self::wheel::{InsertError, Stack};
 
@@ -681,6 +688,7 @@ impl<T> DelayQueue<T> {
     /// # Panics
     ///
     /// Panics if the key is not contained in the expired queue or the wheel.
+    #[track_caller]
     fn remove_key(&mut self, key: &Key) {
         use crate::time::wheel::Stack;
 
@@ -720,6 +728,7 @@ impl<T> DelayQueue<T> {
     /// assert_eq!(*item.get_ref(), "foo");
     /// # }
     /// ```
+    #[track_caller]
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
         let prev_deadline = self.next_deadline();
 
@@ -776,6 +785,7 @@ impl<T> DelayQueue<T> {
     /// // "foo" is now scheduled to be returned in 10 seconds
     /// # }
     /// ```
+    #[track_caller]
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
         self.remove_key(key);
 
@@ -880,6 +890,7 @@ impl<T> DelayQueue<T> {
     /// // "foo"is now scheduled to be returned in 10 seconds
     /// # }
     /// ```
+    #[track_caller]
     pub fn reset(&mut self, key: &Key, timeout: Duration) {
         self.reset_at(key, Instant::now() + timeout);
     }
@@ -985,6 +996,7 @@ impl<T> DelayQueue<T> {
     /// assert!(delay_queue.capacity() >= 11);
     /// # }
     /// ```
+    #[track_caller]
     pub fn reserve(&mut self, additional: usize) {
         self.slab.reserve(additional);
     }
@@ -1124,6 +1136,7 @@ impl<T> wheel::Stack for Stack<T> {
         }
     }
 
+    #[track_caller]
     fn remove(&mut self, item: &Self::Borrowed, store: &mut Self::Store) {
         let key = *item;
         assert!(store.contains(item));

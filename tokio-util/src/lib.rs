@@ -104,6 +104,7 @@ mod util {
     /// # }
     /// ```
     #[cfg_attr(not(feature = "io"), allow(unreachable_pub))]
+    #[track_caller]
     pub fn poll_read_buf<T: AsyncRead, B: BufMut>(
         io: Pin<&mut T>,
         cx: &mut Context<'_>,
