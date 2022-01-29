@@ -15,7 +15,7 @@ fn poll_acquire_one_available() {
 }
 
 #[test]
-fn poll_acquire_many_available() {
+fn poll_acquire_permits_available() {
     let s = Semaphore::new(100);
     assert_eq!(s.available_permits(), 100);
 
@@ -40,7 +40,7 @@ fn try_acquire_one_available() {
 }
 
 #[test]
-fn try_acquire_many_available() {
+fn try_acquire_permits_available() {
     let s = Semaphore::new(100);
     assert_eq!(s.available_permits(), 100);
 
@@ -76,7 +76,7 @@ fn poll_acquire_one_unavailable() {
 }
 
 #[test]
-fn poll_acquire_many_unavailable() {
+fn poll_acquire_permits_unavailable() {
     let s = Semaphore::new(5);
 
     // Acquire the first permit
@@ -132,7 +132,7 @@ fn try_acquire_one_unavailable() {
 }
 
 #[test]
-fn try_acquire_many_unavailable() {
+fn try_acquire_permits_unavailable() {
     let s = Semaphore::new(5);
 
     // Acquire the first permit

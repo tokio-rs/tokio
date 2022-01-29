@@ -17,8 +17,8 @@ use std::sync::Arc;
 /// dropped. At this point, the freed permit is assigned to the caller.
 ///
 /// This `Semaphore` is fair, which means that permits are given out in the order
-/// they were requested. This fairness is also applied when `acquire_many` gets
-/// involved, so if a call to `acquire_many` at the front of the queue requests
+/// they were requested. This fairness is also applied when `acquire_permits` gets
+/// involved, so if a call to `acquire_permits` at the front of the queue requests
 /// more permits than currently available, this can prevent a call to `acquire`
 /// from completing, even if the semaphore has enough permits complete the call
 /// to `acquire`.
@@ -38,7 +38,7 @@ use std::sync::Arc;
 ///     let semaphore = Semaphore::new(3);
 ///
 ///     let a_permit = semaphore.acquire().await.unwrap();
-///     let two_permits = semaphore.acquire_many(2).await.unwrap();
+///     let two_permits = semaphore.acquire_permits(2).await.unwrap();
 ///
 ///     assert_eq!(semaphore.available_permits(), 0);
 ///
@@ -92,7 +92,7 @@ pub struct Semaphore {
 #[derive(Debug)]
 pub struct SemaphorePermit<'a> {
     sem: &'a Semaphore,
-    permits: u32,
+    permits: usize,
 }
 
 /// An owned permit from the semaphore.
@@ -104,7 +104,7 @@ pub struct SemaphorePermit<'a> {
 #[derive(Debug)]
 pub struct OwnedSemaphorePermit {
     sem: Arc<Semaphore>,
-    permits: u32,
+    permits: usize,
 }
 
 #[test]
@@ -273,11 +273,43 @@ impl Semaphore {
     /// [`AcquireError`]: crate::sync::AcquireError
     /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
     pub async fn acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, AcquireError> {
+        self.acquire_permits(n as usize).await
+    }
+
+    /// Acquires `n` permits from the semaphore.
+    ///
+    /// If the semaphore has been closed, this returns an [`AcquireError`].
+    /// Otherwise, this returns a [`SemaphorePermit`] representing the
+    /// acquired permits.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute permits in the order they
+    /// were requested. Cancelling a call to `acquire_permits` makes you lose your
+    /// place in the queue.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Semaphore;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let semaphore = Semaphore::new(5);
+    ///
+    ///     let permit = semaphore.acquire_permits(3).await.unwrap();
+    ///     assert_eq!(semaphore.available_permits(), 2);
+    /// }
+    /// ```
+    ///
+    /// [`AcquireError`]: crate::sync::AcquireError
+    /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
+    pub async fn acquire_permits(&self, n: usize) -> Result<SemaphorePermit<'_>, AcquireError> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         trace::async_op(
             || self.ll_sem.acquire(n),
             self.resource_span.clone(),
-            "Semaphore::acquire_many",
+            "Semaphore::acquire_permits",
             "poll",
             true,
         )
@@ -356,6 +388,35 @@ impl Semaphore {
     /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
     /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
     pub fn try_acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, TryAcquireError> {
+        self.try_acquire_permits(n as usize)
+    }
+
+    /// Tries to acquire `n` permits from the semaphore.
+    ///
+    /// If the semaphore has been closed, this returns a [`TryAcquireError::Closed`]
+    /// and a [`TryAcquireError::NoPermits`] if there are not enough permits left.
+    /// Otherwise, this returns a [`SemaphorePermit`] representing the acquired permits.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::{Semaphore, TryAcquireError};
+    ///
+    /// # fn main() {
+    /// let semaphore = Semaphore::new(4);
+    ///
+    /// let permit_1 = semaphore.try_acquire_permits(3).unwrap();
+    /// assert_eq!(semaphore.available_permits(), 1);
+    ///
+    /// let permit_2 = semaphore.try_acquire_permits(2);
+    /// assert_eq!(permit_2.err(), Some(TryAcquireError::NoPermits));
+    /// # }
+    /// ```
+    ///
+    /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
+    /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
+    /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
+    pub fn try_acquire_permits(&self, n: usize) -> Result<SemaphorePermit<'_>, TryAcquireError> {
         match self.ll_sem.try_acquire(n) {
             Ok(_) => Ok(SemaphorePermit {
                 sem: self,
@@ -472,11 +533,60 @@ impl Semaphore {
         self: Arc<Self>,
         n: u32,
     ) -> Result<OwnedSemaphorePermit, AcquireError> {
+        self.acquire_permits_owned(n as usize).await
+    }
+
+    /// Acquires `n` permits from the semaphore.
+    ///
+    /// The semaphore must be wrapped in an [`Arc`] to call this method.
+    /// If the semaphore has been closed, this returns an [`AcquireError`].
+    /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
+    /// acquired permit.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute permits in the order they
+    /// were requested. Cancelling a call to `acquire_permits_owned` makes you lose
+    /// your place in the queue.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let semaphore = Arc::new(Semaphore::new(10));
+    ///     let mut join_handles = Vec::new();
+    ///
+    ///     for _ in 0..5 {
+    ///         let permit = semaphore.clone().acquire_permits_owned(2).await.unwrap();
+    ///         join_handles.push(tokio::spawn(async move {
+    ///             // perform task...
+    ///             // explicitly own `permit` in the task
+    ///             drop(permit);
+    ///         }));
+    ///     }
+    ///
+    ///     for handle in join_handles {
+    ///         handle.await.unwrap();
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// [`Arc`]: std::sync::Arc
+    /// [`AcquireError`]: crate::sync::AcquireError
+    /// [`OwnedSemaphorePermit`]: crate::sync::OwnedSemaphorePermit
+    pub async fn acquire_permits_owned(
+        self: Arc<Self>,
+        n: usize,
+    ) -> Result<OwnedSemaphorePermit, AcquireError> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = trace::async_op(
             || self.ll_sem.acquire(n),
             self.resource_span.clone(),
-            "Semaphore::acquire_many_owned",
+            "Semaphore::acquire_permits_owned",
             "poll",
             true,
         );
@@ -565,6 +675,42 @@ impl Semaphore {
         self: Arc<Self>,
         n: u32,
     ) -> Result<OwnedSemaphorePermit, TryAcquireError> {
+        self.try_acquire_permits_owned(n as usize)
+    }
+
+    /// Tries to acquire `n` permits from the semaphore.
+    ///
+    /// The semaphore must be wrapped in an [`Arc`] to call this method. If
+    /// the semaphore has been closed, this returns a [`TryAcquireError::Closed`]
+    /// and a [`TryAcquireError::NoPermits`] if there are no permits left.
+    /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
+    /// acquired permit.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::{Semaphore, TryAcquireError};
+    ///
+    /// # fn main() {
+    /// let semaphore = Arc::new(Semaphore::new(4));
+    ///
+    /// let permit_1 = Arc::clone(&semaphore).try_acquire_permits_owned(3).unwrap();
+    /// assert_eq!(semaphore.available_permits(), 1);
+    ///
+    /// let permit_2 = semaphore.try_acquire_permits_owned(2);
+    /// assert_eq!(permit_2.err(), Some(TryAcquireError::NoPermits));
+    /// # }
+    /// ```
+    ///
+    /// [`Arc`]: std::sync::Arc
+    /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
+    /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
+    /// [`OwnedSemaphorePermit`]: crate::sync::OwnedSemaphorePermit
+    pub fn try_acquire_permits_owned(
+        self: Arc<Self>,
+        n: usize,
+    ) -> Result<OwnedSemaphorePermit, TryAcquireError> {
         match self.ll_sem.try_acquire(n) {
             Ok(_) => Ok(OwnedSemaphorePermit {
                 sem: self,
@@ -591,7 +737,7 @@ impl Semaphore {
     ///     let semaphore2 = semaphore.clone();
     ///
     ///     tokio::spawn(async move {
-    ///         let permit = semaphore.acquire_many(2).await;
+    ///         let permit = semaphore.acquire_permits(2).await;
     ///         assert!(permit.is_err());
     ///         println!("waiter received error");
     ///     });

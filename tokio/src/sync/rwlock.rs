@@ -756,7 +756,7 @@ impl<T: ?Sized> RwLock<T> {
     pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = trace::async_op(
-            || self.s.acquire(self.mr),
+            || self.s.acquire(self.mr as usize),
             self.resource_span.clone(),
             "RwLock::write",
             "poll",
@@ -764,7 +764,7 @@ impl<T: ?Sized> RwLock<T> {
         );
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = self.s.acquire(self.mr);
+        let inner = self.s.acquire(self.mr as usize);
 
         inner.await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
@@ -883,7 +883,7 @@ impl<T: ?Sized> RwLock<T> {
     pub async fn write_owned(self: Arc<Self>) -> OwnedRwLockWriteGuard<T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = trace::async_op(
-            || self.s.acquire(self.mr),
+            || self.s.acquire(self.mr as usize),
             self.resource_span.clone(),
             "RwLock::write_owned",
             "poll",
@@ -891,7 +891,7 @@ impl<T: ?Sized> RwLock<T> {
         );
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = self.s.acquire(self.mr);
+        let inner = self.s.acquire(self.mr as usize);
 
         inner.await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
@@ -945,7 +945,7 @@ impl<T: ?Sized> RwLock<T> {
     /// }
     /// ```
     pub fn try_write(&self) -> Result<RwLockWriteGuard<'_, T>, TryLockError> {
-        match self.s.try_acquire(self.mr) {
+        match self.s.try_acquire(self.mr as usize) {
             Ok(permit) => permit,
             Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
             Err(TryAcquireError::Closed) => unreachable!(),
@@ -1001,7 +1001,7 @@ impl<T: ?Sized> RwLock<T> {
     /// }
     /// ```
     pub fn try_write_owned(self: Arc<Self>) -> Result<OwnedRwLockWriteGuard<T>, TryLockError> {
-        match self.s.try_acquire(self.mr) {
+        match self.s.try_acquire(self.mr as usize) {
             Ok(permit) => permit,
             Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
             Err(TryAcquireError::Closed) => unreachable!(),
