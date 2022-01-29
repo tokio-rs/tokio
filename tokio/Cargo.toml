@@ -49,10 +49,9 @@ macros = ["tokio-macros"]
 net = [
   "libc",
   "mio/os-poll",
-  "mio/os-util",
-  "mio/tcp",
-  "mio/udp",
-  "mio/uds",
+  "mio/os-ext",
+  "mio/net",
+  "socket2",
   "winapi/namedpipeapi",
 ]
 process = [
@@ -60,8 +59,8 @@ process = [
   "once_cell",
   "libc",
   "mio/os-poll",
-  "mio/os-util",
-  "mio/uds",
+  "mio/os-ext",
+  "mio/net",
   "signal-hook-registry",
   "winapi/threadpoollegacyapiset",
 ]
@@ -75,8 +74,8 @@ signal = [
   "once_cell",
   "libc",
   "mio/os-poll",
-  "mio/uds",
-  "mio/os-util",
+  "mio/net",
+  "mio/os-ext",
   "signal-hook-registry",
   "winapi/consoleapi",
 ]
@@ -98,7 +97,8 @@ pin-project-lite = "0.2.0"
 bytes = { version = "1.0.0", optional = true }
 once_cell = { version = "1.5.2", optional = true }
 memchr = { version = "2.2", optional = true }
-mio = { version = "0.7.11", optional = true }
+mio = { version = "0.8.0", optional = true }
+socket2 = { version = "0.4.4", optional = true, features = [ "all" ] }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.12.0", optional = true }
 
