@@ -1,5 +1,3 @@
-freebsd_instance:
-  image: freebsd-12-2-release-amd64
 env:
   RUST_STABLE: stable
   RUST_NIGHTLY: nightly-2022-01-12
@@ -11,6 +9,8 @@ env:
 # the system's binaries, so the environment shouldn't matter.
 task:
   name: FreeBSD 64-bit
+  freebsd_instance:
+    image: freebsd-12-2-release-amd64
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -25,6 +25,8 @@ task:
 
 task:
   name: FreeBSD docs
+  freebsd_instance:
+    image: freebsd-12-2-release-amd64
   env:
     RUSTFLAGS: --cfg docsrs
     RUSTDOCFLAGS: --cfg docsrs -Dwarnings
@@ -42,6 +44,8 @@ task:
 
 task:
   name: FreeBSD 32-bit
+  freebsd_instance:
+    image: freebsd-12-2-release-amd64
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -54,3 +58,19 @@ task:
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --all-features --target i686-unknown-freebsd
+
+task:
+  name: ARM
+  arm_container:
+    image: ubuntu-2004:202101-01
+  setup_script:
+    - pkg install -y bash curl
+    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
+    - . $HOME/.cargo/env
+    - |
+      echo "~~~~ rustc --version ~~~~"
+      rustc --version
+  test_script:
+    - . $HOME/.cargo/env
+    - cargo test --all --all-features
