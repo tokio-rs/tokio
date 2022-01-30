@@ -10,6 +10,8 @@ name: Loom
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
+  # Change to specific Rust release to pin
+  rust_stable: stable
 
 jobs:
   loom:
@@ -28,8 +30,11 @@ jobs:
           - time::driver
     steps:
       - uses: actions/checkout@v2
-      - name: Install Rust
-        run: rustup update stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: ${{ env.rust_stable }}
+            override: true
       - uses: Swatinem/rust-cache@v1
       - name: loom ${{ matrix.scope }}
         run: cargo test --lib --release --features full -- --nocapture $SCOPE
