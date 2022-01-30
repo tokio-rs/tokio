@@ -65,7 +65,7 @@ task:
     image: ubuntu:20.04
   setup_script:
     - apt-get update
-    - apt-get install -y bash curl
+    - apt-get install -y build-essential bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
     - . $HOME/.cargo/env
