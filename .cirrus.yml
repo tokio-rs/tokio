@@ -62,7 +62,7 @@ task:
 task:
   name: ARM
   arm_container:
-    image: ubuntu-2004:202101-01
+    image: ubuntu:20.04
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
