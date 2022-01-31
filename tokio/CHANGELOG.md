@@ -76,7 +76,7 @@ The following changes only apply when building with `--cfg tokio_unstable`
 
 ### Changed
 
-- update minimum supported Rust version to 1.49.
+- update minimum supported Rust version to 1.46.
 
 ### Added
 
