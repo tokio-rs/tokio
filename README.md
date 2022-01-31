@@ -163,9 +163,9 @@ several other libraries, including:
 
 ## Supported Rust Versions
 
-Tokio is built against the latest stable release. The minimum supported version
-is 1.46.  The current Tokio version is not guaranteed to build on Rust versions
-earlier than the minimum supported version.
+Tokio will keep a rolling MSRV (minimum supported rust version) policy of **at
+least** 6 months. When increasing the MSRV, the new Rust version must have been
+released at least six months ago. The current MSRV is 1.49.0.
 
 ## Release schedule
 
