@@ -64,10 +64,10 @@ task:
   arm_container:
     image: ubuntu:20.04
   setup_script:
-    - sysctl net.ipv6.conf.all.disable_ipv6=0
-    - ifconfig -a
+    - sudo sysctl net.ipv6.conf.all.disable_ipv6=0
     - apt-get update
-    - apt-get install -y build-essential bash curl
+    - apt-get install -y build-essential bash curl net-tools
+    - ifconfig -a
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
     - . $HOME/.cargo/env
