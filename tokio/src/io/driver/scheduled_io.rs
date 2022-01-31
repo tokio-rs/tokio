@@ -5,6 +5,7 @@ use crate::util::bit;
 use crate::util::slab::Entry;
 use crate::util::WakeList;
 
+use std::io;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::{Context, Poll, Waker};
 
@@ -233,7 +234,6 @@ impl ScheduledIo {
 
         // check for AsyncRead slot
         if ready.is_readable() || ready.is_error() {
-            // TODO: figure out what to do for the AsyncRead and AsyncWrite slots
             if let Some(waker) = waiters.reader.take() {
                 wakers.push(waker);
             }
@@ -249,8 +249,6 @@ impl ScheduledIo {
         #[cfg(feature = "net")]
         'outer: loop {
             let is_error = ready.is_error();
-            // should we wakeup all waiters in case of error? I guess that
-            // depends on the semantics of EPOLLERR but I don't know yet
             let mut iter = waiters
                 .list
                 .drain_filter(|w| ready.satisfies(w.interest) || is_error);
@@ -305,10 +303,21 @@ impl ScheduledIo {
         &self,
         cx: &mut Context<'_>,
         direction: Direction,
-    ) -> Poll<ReadyEvent> {
+    ) -> Poll<io::Result<ReadyEvent>> {
         let curr = self.readiness.load(Acquire);
 
-        let ready = direction.mask() & Ready::from_usize(READINESS.unpack(curr));
+        let ready = Ready::from_usize(READINESS.unpack(curr));
+        if ready.is_error() {
+            // TODO: perhaps we want to do something different if direction == Write,
+            // because ready.is_error() implies ready.is_write_closed(), which was
+            // already handled in this function
+            return Poll::Ready(Err(std::io::Error::new(
+                io::ErrorKind::Other,
+                "Polling error",
+            )));
+        }
+
+        let ready = direction.mask() & ready;
 
         if ready.is_empty() {
             // Update the task info
@@ -334,25 +343,36 @@ impl ScheduledIo {
             // Try again, in case the readiness was changed while we were
             // taking the waiters lock
             let curr = self.readiness.load(Acquire);
-            let ready = direction.mask() & Ready::from_usize(READINESS.unpack(curr));
+
+            let ready = Ready::from_usize(READINESS.unpack(curr));
+            if ready.is_error() {
+                // TODO: think about the relation between `waiters.is_shutdown`
+                // and this
+                return Poll::Ready(Err(std::io::Error::new(
+                    io::ErrorKind::Other,
+                    "Polling error",
+                )));
+            }
+
+            let ready = direction.mask() & ready;
             if waiters.is_shutdown {
-                Poll::Ready(ReadyEvent {
+                Poll::Ready(Ok(ReadyEvent {
                     tick: TICK.unpack(curr) as u8,
                     ready: direction.mask(),
-                })
+                }))
             } else if ready.is_empty() {
                 Poll::Pending
             } else {
-                Poll::Ready(ReadyEvent {
+                Poll::Ready(Ok(ReadyEvent {
                     tick: TICK.unpack(curr) as u8,
                     ready,
-                })
+                }))
             }
         } else {
-            Poll::Ready(ReadyEvent {
+            Poll::Ready(Ok(ReadyEvent {
                 tick: TICK.unpack(curr) as u8,
                 ready,
-            })
+            }))
         }
     }
 

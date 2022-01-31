@@ -155,7 +155,8 @@ impl Registration {
     ) -> Poll<io::Result<ReadyEvent>> {
         // Keep track of task budget
         let coop = ready!(crate::coop::poll_proceed(cx));
-        let ev = ready!(self.shared.poll_readiness(cx, direction));
+        // TODO: should this "coop.made_progress()" though?
+        let ev = ready!(self.shared.poll_readiness(cx, direction))?;
 
         if self.handle.inner().is_none() {
             return Poll::Ready(Err(gone()));
