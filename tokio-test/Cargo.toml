@@ -6,7 +6,7 @@ name = "tokio-test"
 # - Create "tokio-test-0.4.x" git tag.
 version = "0.4.2"
 edition = "2018"
-rust-version = "1.46"
+rust-version = "1.49"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
