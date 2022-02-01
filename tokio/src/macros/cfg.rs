@@ -425,7 +425,8 @@ macro_rules! cfg_has_atomic_u64 {
                     target_arch = "arm",
                     target_arch = "mips",
                     target_arch = "powerpc",
-                    target_arch = "riscv32"
+                    target_arch = "riscv32",
+                    target_arch = "xtensa"
                     )))]
             $item
         )*
@@ -439,7 +440,8 @@ macro_rules! cfg_not_has_atomic_u64 {
                     target_arch = "arm",
                     target_arch = "mips",
                     target_arch = "powerpc",
-                    target_arch = "riscv32"
+                    target_arch = "riscv32",
+                    target_arch = "xtensa"
                     ))]
             $item
         )*
