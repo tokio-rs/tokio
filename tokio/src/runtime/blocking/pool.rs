@@ -220,54 +220,48 @@ impl fmt::Debug for BlockingPool {
 
 impl Spawner {
     pub(crate) fn spawn(&self, task: Task, rt: &Handle) -> Result<(), ()> {
-        let shutdown_tx = {
-            let mut shared = self.inner.shared.lock();
+        let mut shared = self.inner.shared.lock();
 
-            if shared.shutdown {
-                // Shutdown the task: it's fine to shutdown this task (even if
-                // mandatory) because it was scheduled after the shutdown of the
-                // runtime began.
-                task.task.shutdown();
+        if shared.shutdown {
+            // Shutdown the task: it's fine to shutdown this task (even if
+            // mandatory) because it was scheduled after the shutdown of the
+            // runtime began.
+            task.task.shutdown();
 
-                // no need to even push this task; it would never get picked up
-                return Err(());
-            }
+            // no need to even push this task; it would never get picked up
+            return Err(());
+        }
 
-            shared.queue.push_back(task);
+        shared.queue.push_back(task);
 
-            if shared.num_idle == 0 {
-                // No threads are able to process the task.
+        if shared.num_idle == 0 {
+            // No threads are able to process the task.
 
-                if shared.num_th == self.inner.thread_cap {
-                    // At max number of threads
-                    None
-                } else {
-                    shared.num_th += 1;
-                    assert!(shared.shutdown_tx.is_some());
-                    shared.shutdown_tx.clone()
-                }
+            if shared.num_th == self.inner.thread_cap {
+                // At max number of threads
             } else {
-                // Notify an idle worker thread. The notification counter
-                // is used to count the needed amount of notifications
-                // exactly. Thread libraries may generate spurious
-                // wakeups, this counter is used to keep us in a
-                // consistent state.
-                shared.num_idle -= 1;
-                shared.num_notify += 1;
-                self.inner.condvar.notify_one();
-                None
+                shared.num_th += 1;
+                assert!(shared.shutdown_tx.is_some());
+                let shutdown_tx = shared.shutdown_tx.clone();
+
+                if let Some(shutdown_tx) = shutdown_tx {
+                    let id = shared.worker_thread_index;
+                    shared.worker_thread_index += 1;
+
+                    let handle = self.spawn_thread(shutdown_tx, rt, id);
+
+                    shared.worker_threads.insert(id, handle);
+                }
             }
-        };
-
-        if let Some(shutdown_tx) = shutdown_tx {
-            let mut shared = self.inner.shared.lock();
-
-            let id = shared.worker_thread_index;
-            shared.worker_thread_index += 1;
-
-            let handle = self.spawn_thread(shutdown_tx, rt, id);
-
-            shared.worker_threads.insert(id, handle);
+        } else {
+            // Notify an idle worker thread. The notification counter
+            // is used to count the needed amount of notifications
+            // exactly. Thread libraries may generate spurious
+            // wakeups, this counter is used to keep us in a
+            // consistent state.
+            shared.num_idle -= 1;
+            shared.num_notify += 1;
+            self.inner.condvar.notify_one();
         }
 
         Ok(())

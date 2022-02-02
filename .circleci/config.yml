@@ -4,6 +4,9 @@ jobs:
     machine:
       image: ubuntu-2004:202101-01
     resource_class: arm.medium
+    environment:
+      # Change to pin rust versino
+      RUST_STABLE: stable
     steps:
       - checkout
       - run:
@@ -11,7 +14,7 @@ jobs:
           command: |
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup.sh
             chmod +x rustup.sh
-            ./rustup.sh -y
+            ./rustup.sh -y --default-toolchain $RUST_STABLE
             source "$HOME"/.cargo/env
       # Only run Tokio tests
       - run: cargo test --all-features -p tokio

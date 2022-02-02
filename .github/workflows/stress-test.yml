@@ -5,6 +5,12 @@ on:
     branches:
       - master
 
+env:
+  RUSTFLAGS: -Dwarnings
+  RUST_BACKTRACE: 1
+  # Change to specific Rust release to pin
+  rust_stable: stable
+
 jobs:
   stess-test:
     name: Stress Test
@@ -15,8 +21,11 @@ jobs:
           - simple_echo_tcp
     steps:
       - uses: actions/checkout@v2
-      - name: Install Rust
-        run: rustup update stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: ${{ env.rust_stable }}
+            override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install Valgrind
         run: |

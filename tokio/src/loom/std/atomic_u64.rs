@@ -34,6 +34,13 @@ cfg_not_has_atomic_u64! {
             *self.inner.lock() = val;
         }
 
+        pub(crate) fn fetch_add(&self, val: u64, _: Ordering) -> u64 {
+            let mut lock = self.inner.lock();
+            let prev = *lock;
+            *lock = prev + val;
+            prev
+        }
+
         pub(crate) fn fetch_or(&self, val: u64, _: Ordering) -> u64 {
             let mut lock = self.inner.lock();
             let prev = *lock;

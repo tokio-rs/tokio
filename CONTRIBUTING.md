@@ -173,6 +173,12 @@ LOOM_MAX_PREEMPTIONS=1 RUSTFLAGS="--cfg loom" \
     cargo test --lib --release --features full -- --test-threads=1 --nocapture
 ```
 
+You can run miri tests with
+```
+MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tag-raw-pointers" PROPTEST_CASES=10 \
+    cargo +nightly miri test --features full --lib
+```
+
 ### Tests
 
 If the change being proposed alters code (as opposed to only documentation for

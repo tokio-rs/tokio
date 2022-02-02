@@ -5,7 +5,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, Waker};
 
 cfg_rt! {
     /// An owned permission to join on a task (await its termination).
@@ -198,6 +198,16 @@ impl<T> JoinHandle<T> {
     pub fn abort(&self) {
         if let Some(raw) = self.raw {
             raw.remote_abort();
+        }
+    }
+
+    /// Set the waker that is notified when the task completes.
+    pub(crate) fn set_join_waker(&mut self, waker: &Waker) {
+        if let Some(raw) = self.raw {
+            if raw.try_set_join_waker(waker) {
+                // In this case the task has already completed. We wake the waker immediately.
+                waker.wake_by_ref();
+            }
         }
     }
 }
