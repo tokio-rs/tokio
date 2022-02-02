@@ -53,6 +53,11 @@ pub struct Builder {
     // Sequence of actions for the Mock to take
     actions: VecDeque<Action>,
 }
+#[derive(Debug, Clone, Default)]
+pub struct StreamBuilder {
+    // Sequence of actions for the Mock to take
+    actions: VecDeque<Action>,
+}
 
 #[derive(Debug, Clone)]
 enum Action {
@@ -143,6 +148,81 @@ impl Builder {
     }
 }
 
+
+impl StreamBuilder  {
+    /// Return a new, empty `Builder.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// call next value ?
+    pub fn poll_next(&mut self, buf: &[u8]) {
+        /// TODO
+    }
+
+    /// Sequence a `read` operation.
+    ///
+    /// The next operation in the mock's script will be to expect a `read` call
+    /// and return `buf`.
+    pub fn read(&mut self, buf: &[u8]) -> &mut Self {
+        self.actions.push_back(Action::Read(buf.into()));
+        self
+    }
+
+    /// Sequence a `read` operation that produces an error.
+    ///
+    /// The next operation in the mock's script will be to expect a `read` call
+    /// and return `error`.
+    pub fn read_error(&mut self, error: io::Error) -> &mut Self {
+        let error = Some(error.into());
+        self.actions.push_back(Action::ReadError(error));
+        self
+    }
+
+    /// Sequence a `write` operation.
+    ///
+    /// The next operation in the mock's script will be to expect a `write`
+    /// call.
+    pub fn write(&mut self, buf: &[u8]) -> &mut Self {
+        self.actions.push_back(Action::Write(buf.into()));
+        self
+    }
+
+    /// Sequence a `write` operation that produces an error.
+    ///
+    /// The next operation in the mock's script will be to expect a `write`
+    /// call that provides `error`.
+    pub fn write_error(&mut self, error: io::Error) -> &mut Self {
+        let error = Some(error.into());
+        self.actions.push_back(Action::WriteError(error));
+        self
+    }
+
+    /// Sequence a wait.
+    ///
+    /// The next operation in the mock's script will be to wait without doing so
+    /// for `duration` amount of time.
+    pub fn wait(&mut self, duration: Duration) -> &mut Self {
+        let duration = cmp::max(duration, Duration::from_millis(1));
+        self.actions.push_back(Action::Wait(duration));
+        self
+    }
+
+    /// Build a `Mock` value according to the defined script.
+    pub fn build(&mut self) -> Mock {
+        let (mock, _) = self.build_with_handle();
+        mock
+    }
+
+    /// Build a `Mock` value paired with a handle
+    pub fn build_with_handle(&mut self) -> (Mock, Handle) {
+        let (inner, handle) = Inner::new(self.actions.clone());
+
+        let mock = Mock { inner };
+
+        (mock, handle)
+    }
+}
 impl Handle {
     /// Sequence a `read` operation.
     ///
