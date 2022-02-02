@@ -84,3 +84,20 @@ async fn mock_panics_write_data_left() {
     use tokio_test::io::Builder;
     Builder::new().write(b"write").build();
 }
+
+#[tokio::test]
+async fn stream_read(){
+
+    let mut mock = Builder::new().read(b"hello ").read(b"world!").build();
+    // let res =  mock.poll_next(); or something like this ?
+    assert_eq!(res, b"hello ");
+}
+
+#[tokio::test]
+async fn stream_write(){
+    let unit: u8 = 1;
+    let mut mock  = Builder::new().write(b"hello ").write(b"world!").build();
+    //  let mut task = get task ?
+    //  mock.poll_write(task, unit ).assert(b"hello " or something like this ?
+    //
+}
