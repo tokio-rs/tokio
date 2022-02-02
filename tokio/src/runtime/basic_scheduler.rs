@@ -511,13 +511,9 @@ impl CoreGuard<'_> {
                     core.tick = core.tick.wrapping_add(1);
 
                     let entry = if tick % REMOTE_FIRST_INTERVAL == 0 {
-                        core.spawner
-                            .pop()
-                            .or_else(|| core.tasks.pop_front())
+                        core.spawner.pop().or_else(|| core.tasks.pop_front())
                     } else {
-                        core.tasks
-                            .pop_front()
-                            .or_else(|| core.spawner.pop())
+                        core.tasks.pop_front().or_else(|| core.spawner.pop())
                     };
 
                     let task = match entry {
