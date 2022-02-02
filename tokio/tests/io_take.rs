@@ -17,6 +17,23 @@ async fn take() {
     assert_eq!(&buf, &b"hell\0\0"[..]);
 }
 
+#[tokio::test]
+async fn issue_4435() {
+    let mut buf = [0; 8];
+    let rd: &[u8] = b"hello world";
+
+    let rd = rd.take(4);
+    tokio::pin!(rd);
+
+    let mut read_buf = ReadBuf::new(&mut buf);
+    read_buf.put_slice(b"AB");
+
+    futures::future::poll_fn(|cx| rd.as_mut().poll_read(cx, &mut read_buf))
+        .await
+        .unwrap();
+    assert_eq!(&buf, &b"ABhell\0\0"[..]);
+}
+
 struct BadReader;
 
 impl AsyncRead for BadReader {
