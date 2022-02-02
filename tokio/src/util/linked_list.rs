@@ -57,6 +57,13 @@ pub(crate) unsafe trait Link {
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle;
 
     /// Return the pointers for a node
+    ///
+    /// # Safety
+    ///
+    /// The resulting pointer should have the same tag in the stacked-borrows
+    /// stack as the argument. In particular, the method may not create an
+    /// intermediate reference in the process of creating the resulting raw
+    /// pointer.
     unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>>;
 }
 

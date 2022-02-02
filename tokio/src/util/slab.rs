@@ -158,7 +158,9 @@ struct Slot<T> {
     /// Next entry in the free list.
     next: u32,
 
-    /// Makes miri happy. Could probably also be fixed by replacing `slots` with a raw-pointer
+    /// Makes miri happy by making mutable references not take exclusive access.
+    ///
+    /// Could probably also be fixed by replacing `slots` with a raw-pointer
     /// based equivalent.
     _pin: std::marker::PhantomPinned,
 }

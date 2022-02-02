@@ -202,6 +202,9 @@ mod tests {
                 registry.broadcast();
 
                 // Yield so the previous broadcast can get received
+                //
+                // This yields many times since the block_on task is only polled every 61
+                // ticks.
                 for _ in 0..100 {
                     crate::task::yield_now().await;
                 }
