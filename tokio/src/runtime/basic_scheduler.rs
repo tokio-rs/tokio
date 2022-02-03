@@ -64,23 +64,10 @@ pub(crate) struct Spawner {
     shared: Arc<Shared>,
 }
 
-/// A remote scheduler entry.
-///
-/// These are filled in by remote threads sending instructions to the scheduler.
-enum RemoteMsg {
-    /// A remote thread wants to spawn a task.
-    Schedule(task::Notified<Arc<Shared>>),
-}
-
-// Safety: Used correctly, the task header is "thread safe". Ultimately the task
-// is owned by the current thread executor, for which this instruction is being
-// sent.
-unsafe impl Send for RemoteMsg {}
-
 /// Scheduler state shared between threads.
 struct Shared {
     /// Remote run queue. None if the `Runtime` has been dropped.
-    queue: Mutex<Option<VecDeque<RemoteMsg>>>,
+    queue: Mutex<Option<VecDeque<task::Notified<Arc<Shared>>>>>,
 
     /// Collection of all active tasks spawned onto this executor.
     owned: OwnedTasks<Arc<Shared>>,
@@ -251,12 +238,8 @@ impl Drop for BasicScheduler {
             // Using `Option::take` to replace the shared queue with `None`.
             // We already shut down every task, so we just need to drop the task.
             if let Some(remote_queue) = remote_queue {
-                for entry in remote_queue {
-                    match entry {
-                        RemoteMsg::Schedule(task) => {
-                            drop(task);
-                        }
-                    }
+                for task in remote_queue {
+                    drop(task);
                 }
             }
 
@@ -396,7 +379,7 @@ impl Spawner {
         handle
     }
 
-    fn pop(&self) -> Option<RemoteMsg> {
+    fn pop(&self) -> Option<task::Notified<Arc<Shared>>> {
         match self.shared.queue.lock().as_mut() {
             Some(queue) => queue.pop_front(),
             None => None,
@@ -470,7 +453,7 @@ impl Schedule for Arc<Shared> {
                 // don't need to do anything with the notification in that case.
                 let mut guard = self.queue.lock();
                 if let Some(queue) = guard.as_mut() {
-                    queue.push_back(RemoteMsg::Schedule(task));
+                    queue.push_back(task);
                     drop(guard);
                     self.unpark.unpark();
                 }
@@ -528,17 +511,12 @@ impl CoreGuard<'_> {
                     core.tick = core.tick.wrapping_add(1);
 
                     let entry = if tick % REMOTE_FIRST_INTERVAL == 0 {
-                        core.spawner
-                            .pop()
-                            .or_else(|| core.tasks.pop_front().map(RemoteMsg::Schedule))
+                        core.spawner.pop().or_else(|| core.tasks.pop_front())
                     } else {
-                        core.tasks
-                            .pop_front()
-                            .map(RemoteMsg::Schedule)
-                            .or_else(|| core.spawner.pop())
+                        core.tasks.pop_front().or_else(|| core.spawner.pop())
                     };
 
-                    let entry = match entry {
+                    let task = match entry {
                         Some(entry) => entry,
                         None => {
                             core = context.park(core);
@@ -548,17 +526,13 @@ impl CoreGuard<'_> {
                         }
                     };
 
-                    match entry {
-                        RemoteMsg::Schedule(task) => {
-                            let task = context.spawner.shared.owned.assert_owner(task);
+                    let task = context.spawner.shared.owned.assert_owner(task);
 
-                            let (c, _) = context.run_task(core, || {
-                                task.run();
-                            });
+                    let (c, _) = context.run_task(core, || {
+                        task.run();
+                    });
 
-                            core = c;
-                        }
-                    }
+                    core = c;
                 }
 
                 // Yield to the driver, this drives the timer and pulls any
