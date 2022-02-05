@@ -72,7 +72,9 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 ///
 /// No work is performed while awaiting on the sleep future to complete. `Sleep`
 /// operates at millisecond granularity and should not be used for tasks that
-/// require high-resolution timers.
+/// require high-resolution timers. The implementation is platform specific
+/// such that the actual resolution may be greater than 1 millisecond and vary
+/// between platforms.
 ///
 /// To run something regularly on a schedule, see [`interval`].
 ///
