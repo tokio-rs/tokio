@@ -319,61 +319,55 @@ impl ScheduledIo {
 
         let ready = direction.mask() & ready;
 
-        if ready.is_empty() {
-            // Update the task info
-            let mut waiters = self.waiters.lock();
-            let slot = match direction {
-                Direction::Read => &mut waiters.reader,
-                Direction::Write => &mut waiters.writer,
-            };
-
-            // Avoid cloning the waker if one is already stored that matches the
-            // current task.
-            match slot {
-                Some(existing) => {
-                    if !existing.will_wake(cx.waker()) {
-                        *existing = cx.waker().clone();
-                    }
-                }
-                None => {
-                    *slot = Some(cx.waker().clone());
-                }
-            }
-
-            // Try again, in case the readiness was changed while we were
-            // taking the waiters lock
-            let curr = self.readiness.load(Acquire);
-
-            let ready = Ready::from_usize(READINESS.unpack(curr));
-            if direction != Direction::Write && ready.is_error() {
-                return Poll::Ready(Err(std::io::Error::new(
-                    io::ErrorKind::Other,
-                    "Polling error",
-                )));
-            }
-
-            let ready = direction.mask() & ready;
-            if waiters.is_shutdown {
-                // TODO: why does this return a `ReadyEvent`? Why
-                // not make it return an error? It would have to be a
-                // custom error though...
-                Poll::Ready(Ok(ReadyEvent {
-                    tick: TICK.unpack(curr) as u8,
-                    ready: direction.mask(),
-                }))
-            } else if ready.is_empty() {
-                Poll::Pending
-            } else {
-                Poll::Ready(Ok(ReadyEvent {
-                    tick: TICK.unpack(curr) as u8,
-                    ready,
-                }))
-            }
-        } else {
-            Poll::Ready(Ok(ReadyEvent {
+        if !ready.is_empty() {
+            return Poll::Ready(Ok(ReadyEvent {
                 tick: TICK.unpack(curr) as u8,
                 ready,
+            }));
+        }
+
+        // Update the task info
+        let mut waiters = self.waiters.lock();
+        let slot = match direction {
+            Direction::Read => &mut waiters.reader,
+            Direction::Write => &mut waiters.writer,
+        };
+
+        // Avoid cloning the waker if one is already stored that matches the
+        // current task.
+        match slot {
+            Some(existing) => {
+                if !existing.will_wake(cx.waker()) {
+                    *existing = cx.waker().clone();
+                }
+            }
+            None => {
+                *slot = Some(cx.waker().clone());
+            }
+        }
+
+        // Try again, in case the readiness was changed while we were
+        // taking the waiters lock
+        let curr = self.readiness.load(Acquire);
+
+        let ready = Ready::from_usize(READINESS.unpack(curr));
+        if direction != Direction::Write && ready.is_error() {
+            return Poll::Ready(Err(std::io::Error::new(
+                io::ErrorKind::Other,
+                "Polling error",
+            )));
+        }
+
+        let ready = direction.mask() & ready;
+        if waiters.is_shutdown || !ready.is_empty() {
+            // TODO: why return a `ReadyEvent` in shutdown? Why not make it
+            // return an error? It would have to be a custom error though...
+            Poll::Ready(Ok(ReadyEvent {
+                tick: TICK.unpack(curr) as u8,
+                ready: direction.mask(),
             }))
+        } else {
+            Poll::Pending
         }
     }
 
