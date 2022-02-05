@@ -23,6 +23,7 @@ httparse = "1.0"
 httpdate = "1.0"
 once_cell = "1.5.2"
 rand = "0.8.3"
+nix = "0.23"
 
 [target.'cfg(windows)'.dev-dependencies.winapi]
 version = "0.3.8"
@@ -91,3 +92,11 @@ path = "named-pipe-ready.rs"
 [[example]]
 name = "named-pipe-multi-client"
 path = "named-pipe-multi-client.rs"
+
+[[example]]
+name = "fuse"
+path = "fuse.rs"
+
+[[example]]
+name = "fuse2"
+path = "fuse2.rs"

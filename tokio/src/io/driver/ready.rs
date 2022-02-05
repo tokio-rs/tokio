@@ -36,7 +36,7 @@ impl Ready {
     pub const ERROR: Ready = Ready(ERROR);
 
     /// Returns a `Ready` representing readiness for all operations.
-    pub const ALL: Ready = Ready(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED);
+    pub const ALL: Ready = Ready(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED | ERROR);
 
     // Must remain crate-private to avoid adding a public dependency on Mio.
     pub(crate) fn from_mio(event: &mio::event::Event) -> Ready {
