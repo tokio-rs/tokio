@@ -307,10 +307,10 @@ impl ScheduledIo {
         let curr = self.readiness.load(Acquire);
 
         let ready = Ready::from_usize(READINESS.unpack(curr));
-        if ready.is_error() {
-            // TODO: perhaps we want to do something different if direction == Write,
-            // because ready.is_error() implies ready.is_write_closed(), which was
-            // already handled in this function
+
+        if direction != Direction::Write && ready.is_error() {
+            // We only respond to errors for reads because in mio, an error
+            // also implies `is_write_closed`, and will therefore awake the writer.
             return Poll::Ready(Err(std::io::Error::new(
                 io::ErrorKind::Other,
                 "Polling error",
@@ -345,9 +345,7 @@ impl ScheduledIo {
             let curr = self.readiness.load(Acquire);
 
             let ready = Ready::from_usize(READINESS.unpack(curr));
-            if ready.is_error() {
-                // TODO: think about the relation between `waiters.is_shutdown`
-                // and this
+            if direction != Direction::Write && ready.is_error() {
                 return Poll::Ready(Err(std::io::Error::new(
                     io::ErrorKind::Other,
                     "Polling error",
@@ -356,6 +354,9 @@ impl ScheduledIo {
 
             let ready = direction.mask() & ready;
             if waiters.is_shutdown {
+                // TODO: why does this return a `ReadyEvent`? Why
+                // not make it return an error? It would have to be a
+                // custom error though...
                 Poll::Ready(Ok(ReadyEvent {
                     tick: TICK.unpack(curr) as u8,
                     ready: direction.mask(),
