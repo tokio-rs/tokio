@@ -119,7 +119,7 @@
 //!     let mut child = cmd.spawn().expect("failed to spawn command");
 //!
 //!     // These are the animals we want to sort
-//!     let animals: [&str; 5] = ["dog", "bird", "frog", "cat", "fish"];
+//!     let animals: &[&str] = &["dog", "bird", "frog", "cat", "fish"];
 //!
 //!     let mut stdin = child
 //!         .stdin
