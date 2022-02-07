@@ -42,9 +42,9 @@ impl<'a, R: AsyncBufRead + ?Sized + Unpin> Future for FillBuf<'a, R> {
                 // checker, this can be simplified.
                 //
                 // The safety of this transmute relies on the fact that the
-                // value of `reader` is `None` when we return in this branch,
-                // since otherwise the caller could poll us again after
-                // completion and access the mutable reference while the
+                // value of `reader` is `None` when we return in this branch.
+                // Otherwise the caller could poll us again after
+                // completion, and access the mutable reference while the
                 // returned immutable reference still exists.
                 let slice = std::mem::transmute::<&[u8], &'a [u8]>(slice);
                 Poll::Ready(Ok(slice))
