@@ -185,6 +185,7 @@ impl AsyncRead for Pipe {
         cx: &mut task::Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
+        ready!(poll_proceed_and_make_progress(cx));
         if self.buffer.has_remaining() {
             let max = self.buffer.remaining().min(buf.remaining());
             buf.put_slice(&self.buffer[..max]);
@@ -212,6 +213,7 @@ impl AsyncWrite for Pipe {
         cx: &mut task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
+        ready!(poll_proceed_and_make_progress(cx));
         if self.is_closed {
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
@@ -239,5 +241,19 @@ impl AsyncWrite for Pipe {
     ) -> Poll<std::io::Result<()>> {
         self.close_write();
         Poll::Ready(Ok(()))
+    }
+}
+
+cfg_coop! {
+    fn poll_proceed_and_make_progress(cx: &mut task::Context<'_>) -> Poll<()> {
+        let coop = ready!(crate::coop::poll_proceed(cx));
+        coop.made_progress();
+        Poll::Ready(())
+    }
+}
+
+cfg_not_coop! {
+    fn poll_proceed_and_make_progress(_: &mut Context<'_>) -> Poll<()> {
+        Poll::Ready(())
     }
 }
