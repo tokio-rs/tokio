@@ -2,6 +2,7 @@
 
 mod idle;
 use self::idle::Idle;
+pub(in crate::runtime) use self::worker::Shared;
 
 mod worker;
 pub(crate) use worker::Launch;
@@ -9,11 +10,13 @@ pub(crate) use worker::Launch;
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
-use crate::runtime::task::JoinHandle;
+use crate::runtime::task::{JoinHandle, UninitTask};
 use crate::runtime::{Callback, Parker};
 
 use std::fmt;
 use std::future::Future;
+
+type Scheduler = super::Scheduler<Arc<Shared>>;
 
 /// Work-stealing based thread pool for executing futures.
 pub(crate) struct ThreadPool {
@@ -89,13 +92,16 @@ impl Drop for ThreadPool {
 // ==== impl Spawner =====
 
 impl Spawner {
-    /// Spawns a future onto the thread pool
-    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    /// Spawns a task onto the thread pool
+    pub(crate) fn spawn<F>(
+        &self,
+        task: UninitTask<F, super::Scheduler<()>>,
+    ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        worker::Shared::bind_new_task(&self.shared, future)
+        worker::Shared::bind_new_task(&self.shared, task.transmute())
     }
 
     pub(crate) fn shutdown(&mut self) {

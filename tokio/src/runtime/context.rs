@@ -69,9 +69,14 @@ cfg_time! {
 }
 
 cfg_rt! {
-    pub(crate) fn spawn_handle() -> Option<crate::runtime::Spawner> {
+    pub(crate) fn spawn_task<T>(task: super::task::UninitTask<T, super::Scheduler>) -> crate::task::JoinHandle<T::Output>
+    where
+        T: crate::future::Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
         match CONTEXT.try_with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.spawner.clone())) {
-            Ok(spawner) => spawner,
+            Ok(Some(spawner)) => spawner.spawn(task),
+            Ok(None) => panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR),
             Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
         }
     }

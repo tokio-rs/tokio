@@ -1,6 +1,6 @@
 //! Runs `!Send` futures on the current thread.
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
+use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task, UninitTask};
 use crate::sync::AtomicWaker;
 use crate::util::VecDequeCell;
 
@@ -300,11 +300,12 @@ cfg_rt! {
           F::Output: 'static
     {
         let future = crate::util::trace::task(future, "local", name);
+        let task = UninitTask::new(future);
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
 
-            let (handle, notified) = cx.owned.bind(future, cx.shared.clone());
+            let (handle, notified) = cx.owned.bind(task, cx.shared.clone());
 
             if let Some(notified) = notified {
                 cx.shared.schedule(notified);
@@ -384,8 +385,8 @@ impl LocalSet {
         F::Output: 'static,
     {
         let future = crate::util::trace::task(future, "local", None);
-
-        let (handle, notified) = self.context.owned.bind(future, self.context.shared.clone());
+        let task = UninitTask::new(future);
+        let (handle, notified) = self.context.owned.bind(task, self.context.shared.clone());
 
         if let Some(notified) = notified {
             self.context.shared.schedule(notified);

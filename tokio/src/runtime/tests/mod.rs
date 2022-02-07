@@ -11,9 +11,11 @@ mod unowned_wrapper {
         T::Output: Send + 'static,
     {
         use tracing::Instrument;
+
         let span = tracing::trace_span!("test_span");
         let task = task.instrument(span);
-        let (task, handle) = crate::runtime::task::unowned(task, NoopSchedule);
+        let task = crate::runtime::task::UninitTask::new(task);
+        let (task, handle) = task.init_unowned(NoopSchedule);
         (task.into_notified(), handle)
     }
 
@@ -23,7 +25,8 @@ mod unowned_wrapper {
         T: std::future::Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (task, handle) = crate::runtime::task::unowned(task, NoopSchedule);
+        let task = crate::runtime::task::UninitTask::new(task);
+        let (task, handle) = task.init_unowned(NoopSchedule);
         (task.into_notified(), handle)
     }
 }

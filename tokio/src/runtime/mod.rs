@@ -223,6 +223,9 @@ cfg_rt! {
 
     mod spawner;
     use self::spawner::Spawner;
+
+    mod scheduler;
+    pub(crate) use self::scheduler::Scheduler;
 }
 
 cfg_rt_multi_thread! {

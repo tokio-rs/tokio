@@ -1,4 +1,4 @@
-use crate::{task::JoinHandle, util::error::CONTEXT_MISSING_ERROR};
+use crate::task::JoinHandle;
 
 use std::future::Future;
 
@@ -137,13 +137,15 @@ cfg_rt! {
     }
 
     #[track_caller]
+    #[inline]
     pub(super) fn spawn_inner<T>(future: T, name: Option<&str>) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let spawn_handle = crate::runtime::context::spawn_handle().expect(CONTEXT_MISSING_ERROR);
         let task = crate::util::trace::task(future, "task", name);
-        spawn_handle.spawn(task)
+        let task = crate::runtime::task::UninitTask::new(task);
+
+        crate::runtime::context::spawn_task(task)
     }
 }

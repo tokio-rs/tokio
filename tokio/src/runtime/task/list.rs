@@ -9,7 +9,7 @@
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::Mutex;
-use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
+use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task, UninitTask};
 use crate::util::linked_list::{Link, LinkedList};
 
 use std::marker::PhantomData;
@@ -82,7 +82,7 @@ impl<S: 'static> OwnedTasks<S> {
     /// OwnedTasks has been closed.
     pub(crate) fn bind<T>(
         &self,
-        task: T,
+        task: UninitTask<T, S>,
         scheduler: S,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
@@ -90,7 +90,7 @@ impl<S: 'static> OwnedTasks<S> {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler);
+        let (task, notified, join) = task.init_task(scheduler);
 
         unsafe {
             // safety: We just created the task, so we have exclusive access
@@ -185,7 +185,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
 
     pub(crate) fn bind<T>(
         &self,
-        task: T,
+        task: UninitTask<T, S>,
         scheduler: S,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
@@ -193,7 +193,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler);
+        let (task, notified, join) = task.init_task(scheduler);
 
         unsafe {
             // safety: We just created the task, so we have exclusive access

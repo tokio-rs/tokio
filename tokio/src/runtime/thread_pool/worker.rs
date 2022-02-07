@@ -64,7 +64,7 @@ use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
-use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
+use crate::runtime::task::{Inject, JoinHandle, OwnedTasks, UninitTask};
 use crate::runtime::thread_pool::Idle;
 use crate::runtime::{queue, task, Callback, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
@@ -72,6 +72,8 @@ use crate::util::FastRand;
 
 use std::cell::RefCell;
 use std::time::Duration;
+
+use super::Scheduler;
 
 /// A scheduler worker
 pub(super) struct Worker {
@@ -98,7 +100,7 @@ struct Core {
     lifo_slot: Option<Notified>,
 
     /// The worker-local run queue.
-    run_queue: queue::Local<Arc<Shared>>,
+    run_queue: queue::Local<Scheduler>,
 
     /// True if the worker is currently searching for more work. Searching
     /// involves attempting to steal from other workers.
@@ -121,19 +123,19 @@ struct Core {
 }
 
 /// State shared across all workers
-pub(super) struct Shared {
+pub(in crate::runtime) struct Shared {
     /// Per-worker remote state. All other workers have access to this and is
     /// how they communicate between each other.
     remotes: Box<[Remote]>,
 
     /// Submits work to the scheduler while **not** currently on a worker thread.
-    inject: Inject<Arc<Shared>>,
+    inject: Inject<Scheduler>,
 
     /// Coordinates idle workers
     idle: Idle,
 
     /// Collection of all active tasks spawned onto this executor.
-    owned: OwnedTasks<Arc<Shared>>,
+    owned: OwnedTasks<Scheduler>,
 
     /// Cores that have observed the shutdown signal
     ///
@@ -156,7 +158,7 @@ pub(super) struct Shared {
 /// Used to communicate with a worker from other threads.
 struct Remote {
     /// Steals tasks from this worker.
-    steal: queue::Steal<Arc<Shared>>,
+    steal: queue::Steal<Scheduler>,
 
     /// Unparks the associated worker thread
     unpark: Unparker,
@@ -180,10 +182,10 @@ pub(crate) struct Launch(Vec<Arc<Worker>>);
 type RunResult = Result<Box<Core>, ()>;
 
 /// A task handle
-type Task = task::Task<Arc<Shared>>;
+type Task = task::Task<Scheduler>;
 
 /// A notified task handle
-type Notified = task::Notified<Arc<Shared>>;
+type Notified = task::Notified<Scheduler>;
 
 // Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
@@ -677,32 +679,36 @@ impl Core {
 
 impl Worker {
     /// Returns a reference to the scheduler's injection queue.
-    fn inject(&self) -> &Inject<Arc<Shared>> {
+    fn inject(&self) -> &Inject<Scheduler> {
         &self.shared.inject
     }
 }
 
-impl task::Schedule for Arc<Shared> {
-    fn release(&self, task: &Task) -> Option<Task> {
-        self.owned.remove(task)
+impl task::Schedule for Scheduler {
+    fn release(&self, task: &Task) -> Option<task::Task<Self>> {
+        self.as_ref().owned.remove(task)
     }
 
     fn schedule(&self, task: Notified) {
-        (**self).schedule(task, false);
+        (**self.as_ref()).schedule(task, false);
     }
 
     fn yield_now(&self, task: Notified) {
-        (**self).schedule(task, true);
+        (**self.as_ref()).schedule(task, true);
     }
 }
 
 impl Shared {
-    pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T) -> JoinHandle<T::Output>
+    pub(super) fn bind_new_task<T>(
+        me: &Arc<Self>,
+        task: UninitTask<T, Scheduler>,
+    ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (handle, notified) = me.owned.bind(future, me.clone());
+        let scheduler = Scheduler::new(me.clone());
+        let (handle, notified) = me.owned.bind(task, scheduler);
 
         if let Some(notified) = notified {
             me.schedule(notified, false);

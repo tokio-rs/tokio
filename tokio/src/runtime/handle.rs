@@ -1,5 +1,5 @@
 use crate::runtime::blocking::{BlockingTask, NoopSchedule};
-use crate::runtime::task::{self, JoinHandle};
+use crate::runtime::task::{JoinHandle, UninitTask};
 use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
@@ -161,7 +161,8 @@ impl Handle {
     {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", None);
-        self.spawner.spawn(future)
+        let task = UninitTask::new(future);
+        self.spawner.spawn(task)
     }
 
     /// Runs the provided function on an executor dedicated to blocking.
@@ -263,7 +264,7 @@ impl Handle {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
 
-        let (task, handle) = task::unowned(fut, NoopSchedule);
+        let (task, handle) = UninitTask::new(fut).init_unowned(NoopSchedule);
         let spawned = self
             .blocking_spawner
             .spawn(blocking::Task::new(task, is_mandatory), self);

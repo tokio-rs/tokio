@@ -136,8 +136,8 @@
 //! at that point.
 
 mod core;
-use self::core::Cell;
 use self::core::Header;
+use self::core::UninitCell;
 
 mod error;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
@@ -182,6 +182,16 @@ pub(crate) struct Task<S: 'static> {
 
 unsafe impl<S> Send for Task<S> {}
 unsafe impl<S> Sync for Task<S> {}
+
+/// A uninitialized task, which only contains a valid future.
+///
+/// UninitTask can be constructed without getting the scheduler handle,
+/// and bind to a scheduler lately. This makes it possible to quickly
+/// sending the future to the task cell. Compiler can optimize out
+/// data copy during spawn tasks easily.
+pub(crate) struct UninitTask<F: Future, S> {
+    inner: Box<UninitCell<F, S>>,
+}
 
 /// A task was notified.
 #[repr(transparent)]
@@ -232,21 +242,37 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     }
 }
 
-cfg_rt! {
-    /// This is the constructor for a new task. Three references to the task are
-    /// created. The first task reference is usually put into an OwnedTasks
+impl<F: Future, S> UninitTask<F, S> {
+    /// Creates a new uninitialized task.
+    #[inline(always)]
+    pub(crate) fn new(future: F) -> UninitTask<F, S> {
+        UninitTask {
+            inner: UninitCell::new(future),
+        }
+    }
+}
+
+impl<F: Future, S: Schedule> UninitTask<F, S> {
+    /// Initializes the task by binding it to a scheduler.
+    fn init(mut self, scheduler: S) -> RawTask {
+        self.inner.init(scheduler, State::new());
+        let ptr = Box::into_raw(self.inner);
+        let ptr = unsafe { NonNull::new_unchecked(ptr as *mut _) };
+
+        unsafe { RawTask::from_raw(ptr) }
+    }
+
+    /// Initializes a new task. Three references to the task are created.
+    /// The first task reference is usually put into an OwnedTasks
     /// immediately. The Notified is sent to the scheduler as an ordinary
     /// notification.
-    fn new_task<T, S>(
-        task: T,
-        scheduler: S
-    ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
+    pub(crate) fn init_task(self, scheduler: S) -> (Task<S>, Notified<S>, JoinHandle<F::Output>)
     where
         S: Schedule,
-        T: Future + 'static,
-        T::Output: 'static,
+        F: Future + 'static,
+        F::Output: 'static,
     {
-        let raw = RawTask::new::<T, S>(task, scheduler);
+        let raw = self.init(scheduler);
         let task = Task {
             raw,
             _p: PhantomData,
@@ -260,17 +286,17 @@ cfg_rt! {
         (task, notified, join)
     }
 
-    /// Creates a new task with an associated join handle. This method is used
+    /// Initlializes a new task with an associated join handle. This method is used
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.
-    pub(crate) fn unowned<T, S>(task: T, scheduler: S) -> (UnownedTask<S>, JoinHandle<T::Output>)
+    pub(crate) fn init_unowned(self, scheduler: S) -> (UnownedTask<S>, JoinHandle<F::Output>)
     where
         S: Schedule,
-        T: Send + Future + 'static,
-        T::Output: Send + 'static,
+        F: Send + Future + 'static,
+        F::Output: Send + 'static,
     {
-        let (task, notified, join) = new_task(task, scheduler);
+        let (task, notified, join) = self.init_task(scheduler);
 
         // This transfers the ref-count of task and notified into an UnownedTask.
         // This is valid because an UnownedTask holds two ref-counts.

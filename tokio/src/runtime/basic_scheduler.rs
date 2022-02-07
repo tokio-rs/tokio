@@ -4,7 +4,7 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::Driver;
-use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task, UninitTask};
 use crate::runtime::Callback;
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
@@ -18,6 +18,8 @@ use std::future::Future;
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
+
+type Scheduler = super::Scheduler<Arc<Shared>>;
 
 /// Executes tasks on the current thread
 pub(crate) struct BasicScheduler {
@@ -42,7 +44,7 @@ pub(crate) struct BasicScheduler {
 /// a function that will perform the scheduling work and acts as a capability token.
 struct Core {
     /// Scheduler run queue
-    tasks: VecDeque<task::Notified<Arc<Shared>>>,
+    tasks: VecDeque<task::Notified<Scheduler>>,
 
     /// Sendable task spawner
     spawner: Spawner,
@@ -69,7 +71,7 @@ pub(crate) struct Spawner {
 /// These are filled in by remote threads sending instructions to the scheduler.
 enum RemoteMsg {
     /// A remote thread wants to spawn a task.
-    Schedule(task::Notified<Arc<Shared>>),
+    Schedule(task::Notified<Scheduler>),
 }
 
 // Safety: Used correctly, the task header is "thread safe". Ultimately the task
@@ -78,12 +80,12 @@ enum RemoteMsg {
 unsafe impl Send for RemoteMsg {}
 
 /// Scheduler state shared between threads.
-struct Shared {
+pub(in crate::runtime) struct Shared {
     /// Remote run queue. None if the `Runtime` has been dropped.
     queue: Mutex<Option<VecDeque<RemoteMsg>>>,
 
     /// Collection of all active tasks spawned onto this executor.
-    owned: OwnedTasks<Arc<Shared>>,
+    owned: OwnedTasks<Scheduler>,
 
     /// Unpark the blocked thread.
     unpark: <Driver as Park>::Unpark,
@@ -279,7 +281,7 @@ impl fmt::Debug for BasicScheduler {
 // ===== impl Core =====
 
 impl Core {
-    fn pop_task(&mut self) -> Option<task::Notified<Arc<Shared>>> {
+    fn pop_task(&mut self) -> Option<task::Notified<Scheduler>> {
         let ret = self.tasks.pop_front();
         self.spawner
             .shared
@@ -288,7 +290,7 @@ impl Core {
         ret
     }
 
-    fn push_task(&mut self, task: task::Notified<Arc<Shared>>) {
+    fn push_task(&mut self, task: task::Notified<Scheduler>) {
         self.tasks.push_back(task);
         self.metrics.inc_local_schedule_count();
         self.spawner
@@ -382,15 +384,20 @@ impl Context {
 
 impl Spawner {
     /// Spawns a future onto the basic scheduler
-    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(
+        &self,
+        task: UninitTask<F, super::Scheduler<()>>,
+    ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (handle, notified) = self.shared.owned.bind(future, self.shared.clone());
+        let scheduler = Scheduler::new(self.shared.clone());
+        let task = task.transmute();
+        let (handle, notified) = self.shared.owned.bind(task, scheduler);
 
         if let Some(notified) = notified {
-            self.shared.schedule(notified);
+            Shared::schedule(&self.shared, notified);
         }
 
         handle
@@ -444,16 +451,28 @@ impl fmt::Debug for Spawner {
     }
 }
 
-// ===== impl Shared =====
+// ===== impl Schedule =====
 
-impl Schedule for Arc<Shared> {
+impl Schedule for Scheduler {
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
-        self.owned.remove(task)
+        self.as_ref().release(task)
     }
 
     fn schedule(&self, task: task::Notified<Self>) {
+        Shared::schedule(self.as_ref(), task)
+    }
+}
+
+// ===== impl Shared =====
+
+impl Shared {
+    fn release(&self, task: &Task<Scheduler>) -> Option<Task<Scheduler>> {
+        self.owned.remove(task)
+    }
+
+    fn schedule(arc_self: &Arc<Self>, task: task::Notified<Scheduler>) {
         CURRENT.with(|maybe_cx| match maybe_cx {
-            Some(cx) if Arc::ptr_eq(self, &cx.spawner.shared) => {
+            Some(cx) if Arc::ptr_eq(arc_self, &cx.spawner.shared) => {
                 let mut core = cx.core.borrow_mut();
 
                 // If `None`, the runtime is shutting down, so there is no need
@@ -464,15 +483,15 @@ impl Schedule for Arc<Shared> {
             }
             _ => {
                 // Track that a task was scheduled from **outside** of the runtime.
-                self.scheduler_metrics.inc_remote_schedule_count();
+                arc_self.scheduler_metrics.inc_remote_schedule_count();
 
                 // If the queue is None, then the runtime has shut down. We
                 // don't need to do anything with the notification in that case.
-                let mut guard = self.queue.lock();
+                let mut guard = arc_self.queue.lock();
                 if let Some(queue) = guard.as_mut() {
                     queue.push_back(RemoteMsg::Schedule(task));
                     drop(guard);
-                    self.unpark.unpark();
+                    arc_self.unpark.unpark();
                 }
             }
         });

@@ -1,5 +1,5 @@
 use crate::runtime::blocking::NoopSchedule;
-use crate::runtime::task::{self, unowned, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task, UninitTask, UnownedTask};
 use crate::util::TryLock;
 
 use std::collections::VecDeque;
@@ -42,6 +42,15 @@ impl Drop for AssertDrop {
     fn drop(&mut self) {
         self.is_dropped.store(true, Ordering::SeqCst);
     }
+}
+
+fn unowned<F, S>(future: F, scheduler: S) -> (UnownedTask<S>, JoinHandle<F::Output>)
+where
+    S: Schedule,
+    F: Send + Future + 'static,
+    F::Output: Send + 'static,
+{
+    UninitTask::new(future).init_unowned(scheduler)
 }
 
 // A Notified does not shut down on drop, but it is dropped once the ref-count
@@ -228,7 +237,8 @@ impl Runtime {
         T: 'static + Send + Future,
         T::Output: 'static + Send,
     {
-        let (handle, notified) = self.0.owned.bind(future, self.clone());
+        let task = UninitTask::new(future);
+        let (handle, notified) = self.0.owned.bind(task, self.clone());
 
         if let Some(notified) = notified {
             self.schedule(notified);

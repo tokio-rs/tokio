@@ -16,6 +16,7 @@ use crate::runtime::task::state::State;
 use crate::runtime::task::Schedule;
 use crate::util::linked_list;
 
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
@@ -36,6 +37,26 @@ pub(super) struct Cell<T: Future, S> {
     pub(super) trailer: Trailer,
 }
 
+/// Uninitialized task cell. Only the holds a valid future.
+///
+/// `UninitCell<T, S>` should have same layout as `Cell<T, S>`, so it can
+/// be initialized and transmute into a `Cell<T, S>` lately.
+///
+/// If `S1` and `S2` have same layout, the layout of `UninitCell<T, S1>`
+/// and `UninitCell<T, S2>` should be same. This allows trick used in
+/// [`crate::runtime::Scheduler`].
+#[repr(C)]
+pub(super) struct UninitCell<T: Future, S> {
+    /// Uninitialized header.
+    header: MaybeUninit<Header>,
+
+    /// Initialized future and uninitialized scheduler.
+    core: Core<T, MaybeUninit<S>>,
+
+    /// Uninitialized trailer,
+    trailer: MaybeUninit<Trailer>,
+}
+
 pub(super) struct CoreStage<T: Future> {
     stage: UnsafeCell<Stage<T>>,
 }
@@ -43,6 +64,10 @@ pub(super) struct CoreStage<T: Future> {
 /// The core of the task.
 ///
 /// Holds the future or output, depending on the stage of execution.
+///
+/// `#[repr(C)]` guarantee `Core<T, S1>` has same layout as `Core<T, S2>`
+/// if `S1` and `S2` have same layout.
+#[repr(C)]
 pub(super) struct Core<T: Future, S> {
     /// Scheduler used to drive this future.
     pub(super) scheduler: S,
@@ -99,14 +124,34 @@ pub(super) enum Stage<T: Future> {
     Consumed,
 }
 
-impl<T: Future, S: Schedule> Cell<T, S> {
-    /// Allocates a new task cell, containing the header, trailer, and core
-    /// structures.
-    pub(super) fn new(future: T, scheduler: S, state: State) -> Box<Cell<T, S>> {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let id = future.id();
-        Box::new(Cell {
-            header: Header {
+impl<T: Future, S> UninitCell<T, S> {
+    /// Allocates a new uninitialized task cell with a valid future.
+    #[inline(always)]
+    pub(super) fn new(future: T) -> Box<UninitCell<T, S>> {
+        Box::new(UninitCell {
+            header: MaybeUninit::uninit(),
+            core: Core {
+                scheduler: MaybeUninit::uninit(),
+                stage: CoreStage {
+                    stage: UnsafeCell::new(Stage::Running(future)),
+                },
+            },
+            trailer: MaybeUninit::uninit(),
+        })
+    }
+
+    /// Initializes the header, trailer, and core structures of the task cell.
+    pub(super) fn init(&mut self, scheduler: S, state: State)
+    where
+        S: Schedule,
+    {
+        unsafe {
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            let id = self.core.stage.stage.with(|stage| match &*stage {
+                Stage::Running(future) => future.id(),
+                _ => unreachable!(),
+            });
+            self.header.as_mut_ptr().write(Header {
                 state,
                 owned: UnsafeCell::new(linked_list::Pointers::new()),
                 queue_next: UnsafeCell::new(None),
@@ -114,17 +159,12 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 owner_id: UnsafeCell::new(0),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 id,
-            },
-            core: Core {
-                scheduler,
-                stage: CoreStage {
-                    stage: UnsafeCell::new(Stage::Running(future)),
-                },
-            },
-            trailer: Trailer {
+            });
+            self.core.scheduler.as_mut_ptr().write(scheduler);
+            self.trailer.as_mut_ptr().write(Trailer {
                 waker: UnsafeCell::new(None),
-            },
-        })
+            });
+        }
     }
 }
 
