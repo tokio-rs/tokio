@@ -22,13 +22,12 @@ use tokio::io::{ReadBuf};
 use tokio::sync::mpsc;
 use tokio::time::{Duration, Instant, Sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-
-use futures_core::{Stream};
+use futures_core::{Stream, TryStream};
 use std::collections::VecDeque;
 use std::fmt;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{self, Poll, Waker};
+use std::task::{self, Context, Poll, Waker};
 use std::{cmp, io};
 
 /// An I/O object that follows a predefined script.
@@ -47,11 +46,6 @@ pub struct Handle {
 }
 
 /// Builds `Mock` instances.
-#[derive(Debug, Clone, Default)]
-pub struct Builder {
-    // Sequence of actions for the Mock to take
-    actions: VecDeque<Action>,
-}
 #[derive(Debug, Clone, Default)]
 pub struct StreamBuilder {
     // Sequence of actions for the Mock to take
@@ -212,79 +206,6 @@ impl Inner {
         Pin::new(&mut self.rx).poll_next(cx)
     }
 
-    fn read(&mut self, dst: &mut ReadBuf<'_>) -> io::Result<()> {
-        match self.action() {
-            Some(&mut Action::Read(ref mut data)) => {
-                // Figure out how much to copy
-                let n = cmp::min(dst.remaining(), data.len());
-
-                // Copy the data into the `dst` slice
-                dst.put_slice(&data[..n]);
-
-                // Drain the data from the source
-                data.drain(..n);
-
-                Ok(())
-            }
-            Some(&mut Action::ReadError(ref mut err)) => {
-                // As the
-                let err = err.take().expect("Should have been removed from actions.");
-                let err = Arc::try_unwrap(err).expect("There are no other references.");
-                Err(err)
-            }
-            Some(_) => {
-                // Either waiting or expecting a write
-                Err(io::ErrorKind::WouldBlock.into())
-            }
-            None => Ok(()),
-        }
-    }
-
-    fn write(&mut self, mut src: &[u8]) -> io::Result<usize> {
-        let mut ret = 0;
-
-        if self.actions.is_empty() {
-            return Err(io::ErrorKind::BrokenPipe.into());
-        }
-
-        if let Some(&mut Action::Wait(..)) = self.action() {
-            return Err(io::ErrorKind::WouldBlock.into());
-        }
-
-        if let Some(&mut Action::WriteError(ref mut err)) = self.action() {
-            let err = err.take().expect("Should have been removed from actions.");
-            let err = Arc::try_unwrap(err).expect("There are no other references.");
-            return Err(err);
-        }
-
-        for i in 0..self.actions.len() {
-            match self.actions[i] {
-                Action::Write(ref mut expect) => {
-                    let n = cmp::min(src.len(), expect.len());
-
-                    assert_eq!(&src[..n], &expect[..n]);
-
-                    // Drop data that was matched
-                    expect.drain(..n);
-                    src = &src[n..];
-
-                    ret += n;
-
-                    if src.is_empty() {
-                        return Ok(ret);
-                    }
-                }
-                Action::Wait(..) | Action::WriteError(..) => {
-                    break;
-                }
-                _ => {}
-            }
-
-        }
-
-        Ok(ret)
-    }
-
     fn remaining_wait(&mut self) -> Option<Duration> {
         match self.action() {
             Some(&mut Action::Wait(dur)) => Some(dur),
@@ -348,6 +269,17 @@ impl Mock {
             _ => {}
         }
     }
+}
+
+impl Stream for Mock {
+    type Item = String;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // TODO
+        // Pop item from array ? while looping ? like in AsyncRead /AsyncWrite ?
+        Poll::Pending
+    }
+
 }
 
 /// Ensures that Mock isn't dropped with data "inside".
