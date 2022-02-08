@@ -18,7 +18,7 @@
 //! [`AsyncRead`]: tokio::io::AsyncRead
 //! [`AsyncWrite`]: tokio::io::AsyncWrite
 
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::io::{ReadBuf};
 use tokio::sync::mpsc;
 use tokio::time::{self, Duration, Instant, Sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -78,7 +78,7 @@ struct Inner {
     rx: UnboundedReceiverStream<Action>,
 }
 
-impl Builder {
+impl StreamBuilder {
     /// Return a new, empty `Builder.
     pub fn new() -> Self {
         Self::default()
@@ -147,6 +147,8 @@ impl Builder {
         (mock, handle)
     }
 }
+
+
 
 impl Handle {
     /// Sequence a `read` operation.
@@ -279,7 +281,6 @@ impl Inner {
                 _ => {}
             }
 
-            // TODO: remove write
         }
 
         Ok(ret)
@@ -350,111 +351,6 @@ impl Mock {
     }
 }
 
-impl AsyncRead for Mock {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        loop {
-            if let Some(ref mut sleep) = self.inner.sleep {
-                ready!(Pin::new(sleep).poll(cx));
-            }
-
-            // If a sleep is set, it has already fired
-            self.inner.sleep = None;
-
-            // Capture 'filled' to monitor if it changed
-            let filled = buf.filled().len();
-
-            match self.inner.read(buf) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    if let Some(rem) = self.inner.remaining_wait() {
-                        let until = Instant::now() + rem;
-                        self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
-                    } else {
-                        self.inner.read_wait = Some(cx.waker().clone());
-                        return Poll::Pending;
-                    }
-                }
-                Ok(()) => {
-                    if buf.filled().len() == filled {
-                        match ready!(self.inner.poll_action(cx)) {
-                            Some(action) => {
-                                self.inner.actions.push_back(action);
-                                continue;
-                            }
-                            None => {
-                                return Poll::Ready(Ok(()));
-                            }
-                        }
-                    } else {
-                        return Poll::Ready(Ok(()));
-                    }
-                }
-                Err(e) => return Poll::Ready(Err(e)),
-            }
-        }
-    }
-}
-
-impl AsyncWrite for Mock {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        loop {
-            if let Some(ref mut sleep) = self.inner.sleep {
-                ready!(Pin::new(sleep).poll(cx));
-            }
-
-            // If a sleep is set, it has already fired
-            self.inner.sleep = None;
-
-            match self.inner.write(buf) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    if let Some(rem) = self.inner.remaining_wait() {
-                        let until = Instant::now() + rem;
-                        self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
-                    } else {
-                        panic!("unexpected WouldBlock");
-                    }
-                }
-                Ok(0) => {
-                    // TODO: Is this correct?
-                    if !self.inner.actions.is_empty() {
-                        return Poll::Pending;
-                    }
-
-                    // TODO: Extract
-                    match ready!(self.inner.poll_action(cx)) {
-                        Some(action) => {
-                            self.inner.actions.push_back(action);
-                            continue;
-                        }
-                        None => {
-                            panic!("unexpected write");
-                        }
-                    }
-                }
-                ret => {
-                    self.maybe_wakeup_reader();
-                    return Poll::Ready(ret);
-                }
-            }
-        }
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-}
-
 /// Ensures that Mock isn't dropped with data "inside".
 impl Drop for Mock {
     fn drop(&mut self) {
@@ -470,27 +366,6 @@ impl Drop for Mock {
         })
     }
 }
-/*
-/// Returns `true` if called from the context of a futures-rs Task
-fn is_task_ctx() -> bool {
-    use std::panic;
-
-    // Save the existing panic hook
-    let h = panic::take_hook();
-
-    // Install a new one that does nothing
-    panic::set_hook(Box::new(|_| {}));
-
-    // Attempt to call the fn
-    let r = panic::catch_unwind(|| task::current()).is_ok();
-
-    // Re-install the old one
-    panic::set_hook(h);
-
-    // Return the result
-    r
-}
-*/
 
 impl fmt::Debug for Inner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

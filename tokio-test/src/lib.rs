@@ -12,6 +12,7 @@
 //! Tokio and Futures based testing utilities
 
 pub mod io;
+pub mod io_stream;
 
 mod macros;
 pub mod task;
