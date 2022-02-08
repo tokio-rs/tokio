@@ -20,13 +20,12 @@
 
 use tokio::io::{ReadBuf};
 use tokio::sync::mpsc;
-use tokio::time::{self, Duration, Instant, Sleep};
+use tokio::time::{Duration, Instant, Sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use futures_core::{ready, Stream};
 use std::collections::VecDeque;
 use std::fmt;
-use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{self, Poll, Waker};
