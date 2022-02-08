@@ -3,7 +3,7 @@
 #![cfg(feature = "full")]
 
 use tokio::time::{self, sleep, sleep_until, Duration, Instant};
-use tokio_test::{assert_pending, assert_ready, task};
+use tokio_test::{assert_pending, assert_ready, assert_ready_ok, task};
 use tokio_util::time::DelayQueue;
 
 macro_rules! poll {
