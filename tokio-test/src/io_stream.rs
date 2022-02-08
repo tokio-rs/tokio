@@ -23,7 +23,7 @@ use tokio::sync::mpsc;
 use tokio::time::{Duration, Instant, Sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use futures_core::{ready, Stream};
+use futures_core::{Stream};
 use std::collections::VecDeque;
 use std::fmt;
 use std::pin::Pin;
