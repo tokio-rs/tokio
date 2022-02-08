@@ -1,5 +1,5 @@
-use std::sync::atomic::Ordering::Relaxed;
-use std::sync::atomic::{AtomicU64, AtomicUsize};
+use crate::loom::sync::atomic::Ordering::Relaxed;
+use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
 
 /// Retreive runtime worker metrics.
 ///
