@@ -99,7 +99,6 @@ macro_rules! cfg_io_driver_impl {
                 feature = "process",
                 all(unix, feature = "signal"),
             ))]
-            #[cfg_attr(docsrs, doc(cfg(all())))]
             $item
         )*
     }
@@ -175,20 +174,22 @@ macro_rules! cfg_macros {
     }
 }
 
-macro_rules! cfg_stats {
+macro_rules! cfg_metrics {
     ($($item:item)*) => {
         $(
-            #[cfg(all(tokio_unstable, feature = "stats"))]
-            #[cfg_attr(docsrs, doc(cfg(feature = "stats")))]
+            // For now, metrics is only disabled in loom tests.
+            // When stabilized, it might have a dedicated feature flag.
+            #[cfg(all(tokio_unstable, not(loom)))]
+            #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
             $item
         )*
     }
 }
 
-macro_rules! cfg_not_stats {
+macro_rules! cfg_not_metrics {
     ($($item:item)*) => {
         $(
-            #[cfg(not(all(tokio_unstable, feature = "stats")))]
+            #[cfg(not(all(tokio_unstable, not(loom))))]
             $item
         )*
     }
@@ -366,10 +367,10 @@ macro_rules! cfg_trace {
     ($($item:item)*) => {
         $(
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
+            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
             $item
         )*
-    }
+    };
 }
 
 macro_rules! cfg_not_trace {

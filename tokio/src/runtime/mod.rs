@@ -174,6 +174,7 @@
 
 // At the top due to macros
 #[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
 #[macro_use]
 mod tests;
 
@@ -181,11 +182,16 @@ pub(crate) mod enter;
 
 pub(crate) mod task;
 
-cfg_stats! {
-    pub mod stats;
+cfg_metrics! {
+    mod metrics;
+    pub use metrics::RuntimeMetrics;
+
+    pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 }
-cfg_not_stats! {
-    pub(crate) mod stats;
+
+cfg_not_metrics! {
+    pub(crate) mod metrics;
+    pub(crate) use metrics::{SchedulerMetrics, WorkerMetrics, MetricsBatch};
 }
 
 cfg_rt! {
@@ -195,6 +201,14 @@ cfg_rt! {
     mod blocking;
     use blocking::BlockingPool;
     pub(crate) use blocking::spawn_blocking;
+
+    cfg_trace! {
+        pub(crate) use blocking::Mandatory;
+    }
+
+    cfg_fs! {
+        pub(crate) use blocking::spawn_mandatory_blocking;
+    }
 
     mod builder;
     pub use self::builder::Builder;
@@ -283,7 +297,7 @@ cfg_rt! {
     #[derive(Debug)]
     enum Kind {
         /// Execute all tasks on the current-thread.
-        CurrentThread(BasicScheduler<driver::Driver>),
+        CurrentThread(BasicScheduler),
 
         /// Execute tasks across multiple threads.
         #[cfg(feature = "rt-multi-thread")]
@@ -375,7 +389,7 @@ cfg_rt! {
         /// });
         /// # }
         /// ```
-        #[cfg_attr(tokio_track_caller, track_caller)]
+        #[track_caller]
         pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
@@ -400,7 +414,7 @@ cfg_rt! {
         ///     println!("now running on a worker thread");
         /// });
         /// # }
-        #[cfg_attr(tokio_track_caller, track_caller)]
+        #[track_caller]
         pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
         where
             F: FnOnce() -> R + Send + 'static,
@@ -450,7 +464,7 @@ cfg_rt! {
         /// ```
         ///
         /// [handle]: fn@Handle::block_on
-        #[cfg_attr(tokio_track_caller, track_caller)]
+        #[track_caller]
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             let future = crate::util::trace::task(future, "block_on", None);
@@ -582,7 +596,7 @@ cfg_rt! {
                     match self::context::try_enter(self.handle.clone()) {
                         Some(guard) => basic.set_context_guard(guard),
                         None => {
-                            // The context thread-local has alread been destroyed.
+                            // The context thread-local has already been destroyed.
                             //
                             // We don't set the guard in this case. Calls to tokio::spawn in task
                             // destructors would fail regardless if this happens.
@@ -594,6 +608,15 @@ cfg_rt! {
                     // The threaded scheduler drops its tasks on its worker threads, which is
                     // already in the runtime's context.
                 },
+            }
+        }
+    }
+
+    cfg_metrics! {
+        impl Runtime {
+            /// TODO
+            pub fn metrics(&self) -> RuntimeMetrics {
+                self.handle.metrics()
             }
         }
     }

@@ -58,6 +58,22 @@
 //! [crossbeam][crossbeam-unbounded].  Similarly, for sending a message _from sync
 //! to async_, you should use an unbounded Tokio `mpsc` channel.
 //!
+//! Please be aware that the above remarks were written with the `mpsc` channel
+//! in mind, but they can also be generalized to other kinds of channels. In
+//! general, any channel method that isn't marked async can be called anywhere,
+//! including outside of the runtime. For example, sending a message on a
+//! oneshot channel from outside the runtime is perfectly fine.
+//!
+//! # Multiple runtimes
+//!
+//! The mpsc channel does not care about which runtime you use it in, and can be
+//! used to send messages from one runtime to another. It can also be used in
+//! non-Tokio runtimes.
+//!
+//! There is one exception to the above: the [`send_timeout`] must be used from
+//! within a Tokio runtime, however it is still not tied to one specific Tokio
+//! runtime, and the sender may be moved from one Tokio runtime to another.
+//!
 //! [`Sender`]: crate::sync::mpsc::Sender
 //! [`Receiver`]: crate::sync::mpsc::Receiver
 //! [bounded-send]: crate::sync::mpsc::Sender::send()
@@ -69,6 +85,7 @@
 //! [`Handle::block_on`]: crate::runtime::Handle::block_on()
 //! [std-unbounded]: std::sync::mpsc::channel
 //! [crossbeam-unbounded]: https://docs.rs/crossbeam/*/crossbeam/channel/fn.unbounded.html
+//! [`send_timeout`]: crate::sync::mpsc::Sender::send_timeout
 
 pub(super) mod block;
 

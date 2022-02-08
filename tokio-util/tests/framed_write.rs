@@ -39,6 +39,19 @@ impl Encoder<u32> for U32Encoder {
     }
 }
 
+struct U64Encoder;
+
+impl Encoder<u64> for U64Encoder {
+    type Error = io::Error;
+
+    fn encode(&mut self, item: u64, dst: &mut BytesMut) -> io::Result<()> {
+        // Reserve space
+        dst.reserve(8);
+        dst.put_u64(item);
+        Ok(())
+    }
+}
+
 #[test]
 fn write_multi_frame_in_packet() {
     let mut task = task::spawn(());
@@ -54,6 +67,32 @@ fn write_multi_frame_in_packet() {
         assert!(pin!(framed).start_send(1).is_ok());
         assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
         assert!(pin!(framed).start_send(2).is_ok());
+
+        // Nothing written yet
+        assert_eq!(1, framed.get_ref().calls.len());
+
+        // Flush the writes
+        assert!(assert_ready!(pin!(framed).poll_flush(cx)).is_ok());
+
+        assert_eq!(0, framed.get_ref().calls.len());
+    });
+}
+
+#[test]
+fn write_multi_frame_after_codec_changed() {
+    let mut task = task::spawn(());
+    let mock = mock! {
+        Ok(b"\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x08".to_vec()),
+    };
+    let mut framed = FramedWrite::new(mock, U32Encoder);
+
+    task.enter(|cx, _| {
+        assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
+        assert!(pin!(framed).start_send(0x04).is_ok());
+
+        let mut framed = framed.map_encoder(|_| U64Encoder);
+        assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
+        assert!(pin!(framed).start_send(0x08).is_ok());
 
         // Nothing written yet
         assert_eq!(1, framed.get_ref().calls.len());

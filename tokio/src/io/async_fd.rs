@@ -81,6 +81,7 @@ use std::{task::Context, task::Poll};
 ///
 /// impl AsyncTcpStream {
 ///     pub fn new(tcp: TcpStream) -> io::Result<Self> {
+///         tcp.set_nonblocking(true)?;
 ///         Ok(Self {
 ///             inner: AsyncFd::new(tcp)?,
 ///         })
@@ -525,7 +526,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     #[cfg_attr(docsrs, doc(alias = "with_io"))]
     pub fn try_io<R>(
         &mut self,
-        f: impl FnOnce(&AsyncFd<Inner>) -> io::Result<R>,
+        f: impl FnOnce(&'a AsyncFd<Inner>) -> io::Result<R>,
     ) -> Result<io::Result<R>, TryIoError> {
         let result = f(self.async_fd);
 
@@ -542,12 +543,12 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     }
 
     /// Returns a shared reference to the inner [`AsyncFd`].
-    pub fn get_ref(&self) -> &AsyncFd<Inner> {
+    pub fn get_ref(&self) -> &'a AsyncFd<Inner> {
         self.async_fd
     }
 
     /// Returns a shared reference to the backing object of the inner [`AsyncFd`].
-    pub fn get_inner(&self) -> &Inner {
+    pub fn get_inner(&self) -> &'a Inner {
         self.get_ref().get_ref()
     }
 }
@@ -598,7 +599,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
         &mut self,
         f: impl FnOnce(&mut AsyncFd<Inner>) -> io::Result<R>,
     ) -> Result<io::Result<R>, TryIoError> {
-        let result = f(&mut self.async_fd);
+        let result = f(self.async_fd);
 
         if let Err(e) = result.as_ref() {
             if e.kind() == io::ErrorKind::WouldBlock {

@@ -2,6 +2,9 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_test::wasm_bindgen_test as test;
+
 use tokio::sync::broadcast;
 use tokio_test::task;
 use tokio_test::{
@@ -273,12 +276,14 @@ fn send_no_rx() {
 
 #[test]
 #[should_panic]
+#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
 fn zero_capacity() {
     broadcast::channel::<()>(0);
 }
 
 #[test]
 #[should_panic]
+#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
 fn capacity_too_big() {
     use std::usize;
 
@@ -286,6 +291,7 @@ fn capacity_too_big() {
 }
 
 #[test]
+#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
 fn panic_in_clone() {
     use std::panic::{self, AssertUnwindSafe};
 

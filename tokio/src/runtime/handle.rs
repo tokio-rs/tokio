@@ -26,7 +26,11 @@ pub struct Handle {
 
     /// Handles to the signal drivers
     #[cfg_attr(
-        not(any(feature = "signal", all(unix, feature = "process"))),
+        any(
+            loom,
+            not(all(unix, feature = "signal")),
+            not(all(unix, feature = "process")),
+        ),
         allow(dead_code)
     )]
     pub(super) signal_handle: driver::SignalHandle,
@@ -122,14 +126,6 @@ impl Handle {
         context::try_current()
     }
 
-    cfg_stats! {
-        /// Returns a view that lets you get information about how the runtime
-        /// is performing.
-        pub fn stats(&self) -> &crate::runtime::stats::RuntimeStats {
-            self.spawner.stats()
-        }
-    }
-
     /// Spawns a future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
@@ -157,7 +153,7 @@ impl Handle {
     /// });
     /// # }
     /// ```
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
@@ -187,21 +183,62 @@ impl Handle {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
-            self.spawn_blocking_inner(Box::new(func), None)
-        } else {
-            self.spawn_blocking_inner(func, None)
+        let (join_handle, _was_spawned) =
+            if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+                self.spawn_blocking_inner(Box::new(func), blocking::Mandatory::NonMandatory, None)
+            } else {
+                self.spawn_blocking_inner(func, blocking::Mandatory::NonMandatory, None)
+            };
+
+        join_handle
+    }
+
+    cfg_fs! {
+        #[track_caller]
+        #[cfg_attr(any(
+            all(loom, not(test)), // the function is covered by loom tests
+            test
+        ), allow(dead_code))]
+        pub(crate) fn spawn_mandatory_blocking<F, R>(&self, func: F) -> Option<JoinHandle<R>>
+        where
+            F: FnOnce() -> R + Send + 'static,
+            R: Send + 'static,
+        {
+            let (join_handle, was_spawned) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+                self.spawn_blocking_inner(
+                    Box::new(func),
+                    blocking::Mandatory::Mandatory,
+                    None
+                )
+            } else {
+                self.spawn_blocking_inner(
+                    func,
+                    blocking::Mandatory::Mandatory,
+                    None
+                )
+            };
+
+            if was_spawned {
+                Some(join_handle)
+            } else {
+                None
+            }
         }
     }
 
-    #[cfg_attr(tokio_track_caller, track_caller)]
-    pub(crate) fn spawn_blocking_inner<F, R>(&self, func: F, name: Option<&str>) -> JoinHandle<R>
+    #[track_caller]
+    pub(crate) fn spawn_blocking_inner<F, R>(
+        &self,
+        func: F,
+        is_mandatory: blocking::Mandatory,
+        name: Option<&str>,
+    ) -> (JoinHandle<R>, bool)
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -211,9 +248,7 @@ impl Handle {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let fut = {
             use tracing::Instrument;
-            #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
-            #[cfg(tokio_track_caller)]
             let span = tracing::trace_span!(
                 target: "tokio::task::blocking",
                 "runtime.spawn",
@@ -222,14 +257,6 @@ impl Handle {
                 "fn" = %std::any::type_name::<F>(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
             );
-            #[cfg(not(tokio_track_caller))]
-            let span = tracing::trace_span!(
-                target: "tokio::task::blocking",
-                "runtime.spawn",
-                kind = %"blocking",
-                task.name = %name.unwrap_or_default(),
-                "fn" = %std::any::type_name::<F>(),
-            );
             fut.instrument(span)
         };
 
@@ -237,8 +264,10 @@ impl Handle {
         let _ = name;
 
         let (task, handle) = task::unowned(fut, NoopSchedule);
-        let _ = self.blocking_spawner.spawn(task, self);
-        handle
+        let spawned = self
+            .blocking_spawner
+            .spawn(blocking::Task::new(task, is_mandatory), self);
+        (handle, spawned.is_ok())
     }
 
     /// Runs a future to completion on this `Handle`'s associated `Runtime`.
@@ -311,7 +340,7 @@ impl Handle {
     /// [`tokio::fs`]: crate::fs
     /// [`tokio::net`]: crate::net
     /// [`tokio::time`]: crate::time
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "block_on", None);
@@ -330,6 +359,18 @@ impl Handle {
 
     pub(crate) fn shutdown(mut self) {
         self.spawner.shutdown();
+    }
+}
+
+cfg_metrics! {
+    use crate::runtime::RuntimeMetrics;
+
+    impl Handle {
+        /// Returns a view that lets you get information about how the runtime
+        /// is performing.
+        pub fn metrics(&self) -> RuntimeMetrics {
+            RuntimeMetrics::new(self.clone())
+        }
     }
 }
 

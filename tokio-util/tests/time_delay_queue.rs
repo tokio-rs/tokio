@@ -109,6 +109,7 @@ async fn multi_delay_at_start() {
 
     let start = Instant::now();
     for elapsed in 0..1200 {
+        println!("elapsed: {:?}", elapsed);
         let elapsed = elapsed + 1;
         tokio::time::sleep_until(start + ms(elapsed)).await;
 
@@ -128,10 +129,12 @@ async fn multi_delay_at_start() {
             assert_pending!(poll!(queue));
         }
     }
+    println!("finished multi_delay_start");
 }
 
 #[tokio::test]
 async fn insert_in_past_fires_immediately() {
+    println!("running insert_in_past_fires_immediately");
     time::pause();
 
     let mut queue = task::spawn(DelayQueue::new());
@@ -142,6 +145,7 @@ async fn insert_in_past_fires_immediately() {
     queue.insert_at("foo", now);
 
     assert_ready!(poll!(queue));
+    println!("finished insert_in_past_fires_immediately");
 }
 
 #[tokio::test]
@@ -638,6 +642,175 @@ async fn delay_queue_poll_expired_when_empty() {
 
     delay_queue.remove(&key);
     assert!(assert_ready!(poll!(delay_queue)).is_none());
+}
+
+#[tokio::test(start_paused = true)]
+async fn compact_expire_empty() {
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    queue.insert_at("foo1", now + ms(10));
+    queue.insert_at("foo2", now + ms(10));
+
+    sleep(ms(10)).await;
+
+    let mut res = vec![];
+    while res.len() < 2 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    queue.compact();
+
+    assert_eq!(queue.len(), 0);
+    assert_eq!(queue.capacity(), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn compact_remove_empty() {
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    let key1 = queue.insert_at("foo1", now + ms(10));
+    let key2 = queue.insert_at("foo2", now + ms(10));
+
+    queue.remove(&key1);
+    queue.remove(&key2);
+
+    queue.compact();
+
+    assert_eq!(queue.len(), 0);
+    assert_eq!(queue.capacity(), 0);
+}
+
+#[tokio::test(start_paused = true)]
+// Trigger a re-mapping of keys in the slab due to a `compact` call and
+// test removal of re-mapped keys
+async fn compact_remove_remapped_keys() {
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    queue.insert_at("foo1", now + ms(10));
+    queue.insert_at("foo2", now + ms(10));
+
+    // should be assigned indices 3 and 4
+    let key3 = queue.insert_at("foo3", now + ms(20));
+    let key4 = queue.insert_at("foo4", now + ms(20));
+
+    sleep(ms(10)).await;
+
+    let mut res = vec![];
+    while res.len() < 2 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    // items corresponding to `foo3` and `foo4` will be assigned
+    // new indices here
+    queue.compact();
+
+    queue.insert_at("foo5", now + ms(10));
+
+    // test removal of re-mapped keys
+    let expired3 = queue.remove(&key3);
+    let expired4 = queue.remove(&key4);
+
+    assert_eq!(expired3.into_inner(), "foo3");
+    assert_eq!(expired4.into_inner(), "foo4");
+
+    queue.compact();
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue.capacity(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn compact_change_deadline() {
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let mut now = Instant::now();
+
+    queue.insert_at("foo1", now + ms(10));
+    queue.insert_at("foo2", now + ms(10));
+
+    // should be assigned indices 3 and 4
+    queue.insert_at("foo3", now + ms(20));
+    let key4 = queue.insert_at("foo4", now + ms(20));
+
+    sleep(ms(10)).await;
+
+    let mut res = vec![];
+    while res.len() < 2 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    // items corresponding to `foo3` and `foo4` should be assigned
+    // new indices
+    queue.compact();
+
+    now = Instant::now();
+
+    queue.insert_at("foo5", now + ms(10));
+    let key6 = queue.insert_at("foo6", now + ms(10));
+
+    queue.reset_at(&key4, now + ms(20));
+    queue.reset_at(&key6, now + ms(20));
+
+    // foo3 and foo5 will expire
+    sleep(ms(10)).await;
+
+    while res.len() < 4 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    sleep(ms(10)).await;
+
+    while res.len() < 6 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+    }
+
+    let entry = assert_ready!(poll!(queue));
+    assert!(entry.is_none());
+}
+
+#[tokio::test(start_paused = true)]
+async fn remove_after_compact() {
+    let now = Instant::now();
+    let mut queue = DelayQueue::new();
+
+    let foo_key = queue.insert_at("foo", now + ms(10));
+    queue.insert_at("bar", now + ms(20));
+    queue.remove(&foo_key);
+    queue.compact();
+
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        queue.remove(&foo_key);
+    }));
+    assert!(panic.is_err());
+}
+
+#[tokio::test(start_paused = true)]
+async fn remove_after_compact_poll() {
+    let now = Instant::now();
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let foo_key = queue.insert_at("foo", now + ms(10));
+    queue.insert_at("bar", now + ms(20));
+
+    sleep(ms(10)).await;
+    assert_eq!(assert_ready_ok!(poll!(queue)).key(), foo_key);
+
+    queue.compact();
+
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        queue.remove(&foo_key);
+    }));
+    assert!(panic.is_err());
 }
 
 fn ms(n: u64) -> Duration {
