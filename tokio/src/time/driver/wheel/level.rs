@@ -143,8 +143,7 @@ impl Level {
         let level_range = level_range(self.level);
         let slot_range = slot_range(self.level);
 
-        // TODO: This can probably be simplified w/ power of 2 math
-        let level_start = now - (now % level_range);
+        let level_start = now & !(level_range - 1);
         let mut deadline = level_start + slot as u64 * slot_range;
 
         if deadline <= now {
