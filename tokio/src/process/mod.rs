@@ -127,6 +127,11 @@
 //!         .expect("child did not have a handle to stdin");
 //!
 //!     // Write our animals to the child process
+//!     // Note that the behavior of `sort` is to buffer _all input_ before writing any output.
+//!     // In the general sense, it is recommended to write to the child in a separate task as
+//!     // awaiting its exit (or output) to avoid deadlocks (for example, the child tries to write
+//!     // some output but gets stuck waiting on the parent to read from it, meanwhile the parent
+//!     // is stuck waiting to write its input completely before reading the output).
 //!     stdin
 //!         .write(animals.join("\n").as_bytes())
 //!         .await
