@@ -18,11 +18,11 @@
 //! [`AsyncRead`]: tokio::io::AsyncRead
 //! [`AsyncWrite`]: tokio::io::AsyncWrite
 
-use tokio::io::{ReadBuf};
+
 use tokio::sync::mpsc;
 use tokio::time::{Duration, Instant, Sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use futures_core::{Stream, TryStream};
+use futures_core::{Stream};
 use std::collections::VecDeque;
 use std::fmt;
 use std::pin::Pin;
@@ -274,9 +274,9 @@ impl Mock {
 impl Stream for Mock {
     type Item = String;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // TODO
-        // Pop item from array ? while looping ? like in AsyncRead /AsyncWrite ?
+        // Pop item from array who could i iterate self? or do a  while loop like in AsyncRead /AsyncWrite ?
         Poll::Pending
     }
 
