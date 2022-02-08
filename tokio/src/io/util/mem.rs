@@ -245,7 +245,7 @@ impl AsyncRead for Pipe {
 
     cfg_not_coop! {
         fn poll_read(
-            mut self: Pin<&mut Self>,
+            self: Pin<&mut Self>,
             cx: &mut task::Context<'_>,
             buf: &mut ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
@@ -273,7 +273,7 @@ impl AsyncWrite for Pipe {
 
     cfg_not_coop! {
         fn poll_write(
-            mut self: Pin<&mut Self>,
+            self: Pin<&mut Self>,
             cx: &mut task::Context<'_>,
             buf: &[u8],
         ) -> Poll<std::io::Result<usize>> {

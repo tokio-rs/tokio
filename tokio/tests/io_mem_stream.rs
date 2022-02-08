@@ -111,9 +111,9 @@ async fn duplex_is_cooperative() {
         _ = async {
             loop {
                 let buf = [3u8; 4096];
-                let _ = tx.write_all(&buf).await;
+                tx.write_all(&buf).await.unwrap();
                 let mut buf = [0u8; 4096];
-                let _ = rx.read(&mut buf).await;
+                rx.read(&mut buf).await.unwrap();
             }
         } => {},
         _ = tokio::task::yield_now() => {}
