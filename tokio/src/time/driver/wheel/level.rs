@@ -143,6 +143,8 @@ impl Level {
         let level_range = level_range(self.level);
         let slot_range = slot_range(self.level);
 
+        // Compute the start date of the current level by masking the low bits
+        // of `now` (`level_range` is a power of 2).
         let level_start = now & !(level_range - 1);
         let mut deadline = level_start + slot as u64 * slot_range;
 
