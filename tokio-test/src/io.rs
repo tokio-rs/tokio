@@ -53,11 +53,6 @@ pub struct Builder {
     // Sequence of actions for the Mock to take
     actions: VecDeque<Action>,
 }
-#[derive(Debug, Clone, Default)]
-pub struct StreamBuilder {
-    // Sequence of actions for the Mock to take
-    actions: VecDeque<Action>,
-}
 
 #[derive(Debug, Clone)]
 enum Action {
