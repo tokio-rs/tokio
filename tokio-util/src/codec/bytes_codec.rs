@@ -74,3 +74,13 @@ impl Encoder<Bytes> for BytesCodec {
         Ok(())
     }
 }
+
+impl Encoder<BytesMut> for BytesCodec {
+    type Error = io::Error;
+
+    fn encode(&mut self, data: BytesMut, buf: &mut BytesMut) -> Result<(), io::Error> {
+        buf.reserve(data.len());
+        buf.put(data);
+        Ok(())
+    }
+}
