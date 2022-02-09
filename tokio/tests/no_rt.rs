@@ -1,3 +1,5 @@
+#![cfg(feature = "full")]
+
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tokio::time::{timeout, Duration};

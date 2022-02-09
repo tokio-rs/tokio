@@ -139,6 +139,14 @@ correctly, use this command:
 RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 ```
 
+To build documentation including Tokio's unstable features, it is necessary to
+pass `--cfg tokio_unstable` to both RustDoc *and* rustc. To build the
+documentation for unstable features, use this command:
+
+```
+RUSTDOCFLAGS="--cfg docsrs --cfg tokio_unstable" RUSTFLAGS="--cfg tokio_unstable" cargo +nightly doc --all-features
+```
+
 There is currently a [bug in cargo] that means documentation cannot be built
 from the root of the workspace. If you `cd` into the `tokio` subdirectory the
 command shown above will work.
@@ -163,6 +171,12 @@ You can run loom tests with
 cd tokio # tokio crate in workspace
 LOOM_MAX_PREEMPTIONS=1 RUSTFLAGS="--cfg loom" \
     cargo test --lib --release --features full -- --test-threads=1 --nocapture
+```
+
+You can run miri tests with
+```
+MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tag-raw-pointers" PROPTEST_CASES=10 \
+    cargo +nightly miri test --features full --lib
 ```
 
 ### Tests

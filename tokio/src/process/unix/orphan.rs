@@ -280,6 +280,7 @@ pub(crate) mod test {
         drop(signal_guard);
     }
 
+    #[cfg_attr(miri, ignore)] // Miri does not support epoll.
     #[test]
     fn does_not_register_signal_if_queue_empty() {
         let signal_driver = IoDriver::new().and_then(SignalDriver::new).unwrap();

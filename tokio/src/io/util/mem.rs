@@ -177,10 +177,8 @@ impl Pipe {
             waker.wake();
         }
     }
-}
 
-impl AsyncRead for Pipe {
-    fn poll_read(
+    fn poll_read_internal(
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
         buf: &mut ReadBuf<'_>,
@@ -204,10 +202,8 @@ impl AsyncRead for Pipe {
             Poll::Pending
         }
     }
-}
 
-impl AsyncWrite for Pipe {
-    fn poll_write(
+    fn poll_write_internal(
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
         buf: &[u8],
@@ -227,6 +223,62 @@ impl AsyncWrite for Pipe {
             waker.wake();
         }
         Poll::Ready(Ok(len))
+    }
+}
+
+impl AsyncRead for Pipe {
+    cfg_coop! {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            cx: &mut task::Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            let coop = ready!(crate::coop::poll_proceed(cx));
+
+            let ret = self.poll_read_internal(cx, buf);
+            if ret.is_ready() {
+                coop.made_progress();
+            }
+            ret
+        }
+    }
+
+    cfg_not_coop! {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            cx: &mut task::Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            self.poll_read_internal(cx, buf)
+        }
+    }
+}
+
+impl AsyncWrite for Pipe {
+    cfg_coop! {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            cx: &mut task::Context<'_>,
+            buf: &[u8],
+        ) -> Poll<std::io::Result<usize>> {
+            let coop = ready!(crate::coop::poll_proceed(cx));
+
+            let ret = self.poll_write_internal(cx, buf);
+            if ret.is_ready() {
+                coop.made_progress();
+            }
+            ret
+        }
+    }
+
+    cfg_not_coop! {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            cx: &mut task::Context<'_>,
+            buf: &[u8],
+        ) -> Poll<std::io::Result<usize>> {
+            self.poll_write_internal(cx, buf)
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut task::Context<'_>) -> Poll<std::io::Result<()>> {

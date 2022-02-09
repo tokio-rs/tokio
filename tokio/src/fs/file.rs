@@ -20,15 +20,15 @@ use std::task::Poll;
 use std::task::Poll::*;
 
 #[cfg(test)]
-use super::mocks::spawn_blocking;
-#[cfg(test)]
 use super::mocks::JoinHandle;
 #[cfg(test)]
 use super::mocks::MockFile as StdFile;
-#[cfg(not(test))]
-use crate::blocking::spawn_blocking;
+#[cfg(test)]
+use super::mocks::{spawn_blocking, spawn_mandatory_blocking};
 #[cfg(not(test))]
 use crate::blocking::JoinHandle;
+#[cfg(not(test))]
+use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
 #[cfg(not(test))]
 use std::fs::File as StdFile;
 
@@ -649,7 +649,7 @@ impl AsyncWrite for File {
                     let n = buf.copy_from(src);
                     let std = me.std.clone();
 
-                    inner.state = Busy(spawn_blocking(move || {
+                    let blocking_task_join_handle = spawn_mandatory_blocking(move || {
                         let res = if let Some(seek) = seek {
                             (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
                         } else {
@@ -657,7 +657,12 @@ impl AsyncWrite for File {
                         };
 
                         (Operation::Write(res), buf)
-                    }));
+                    })
+                    .ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::Other, "background task failed")
+                    })?;
+
+                    inner.state = Busy(blocking_task_join_handle);
 
                     return Ready(Ok(n));
                 }

@@ -19,6 +19,11 @@ pub(super) struct Vtable {
     /// Reads the task output, if complete.
     pub(super) try_read_output: unsafe fn(NonNull<Header>, *mut (), &Waker),
 
+    /// Try to set the waker notified when the task is complete. Returns true if
+    /// the task has already completed. If this call returns false, then the
+    /// waker will not be notified.
+    pub(super) try_set_join_waker: unsafe fn(NonNull<Header>, &Waker) -> bool,
+
     /// The join handle has been dropped.
     pub(super) drop_join_handle_slow: unsafe fn(NonNull<Header>),
 
@@ -35,6 +40,7 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
         poll: poll::<T, S>,
         dealloc: dealloc::<T, S>,
         try_read_output: try_read_output::<T, S>,
+        try_set_join_waker: try_set_join_waker::<T, S>,
         drop_join_handle_slow: drop_join_handle_slow::<T, S>,
         remote_abort: remote_abort::<T, S>,
         shutdown: shutdown::<T, S>,
@@ -55,6 +61,10 @@ impl RawTask {
 
     pub(super) unsafe fn from_raw(ptr: NonNull<Header>) -> RawTask {
         RawTask { ptr }
+    }
+
+    pub(super) fn header_ptr(&self) -> NonNull<Header> {
+        self.ptr
     }
 
     /// Returns a reference to the task's meta structure.
@@ -82,6 +92,11 @@ impl RawTask {
     pub(super) unsafe fn try_read_output(self, dst: *mut (), waker: &Waker) {
         let vtable = self.header().vtable;
         (vtable.try_read_output)(self.ptr, dst, waker);
+    }
+
+    pub(super) fn try_set_join_waker(self, waker: &Waker) -> bool {
+        let vtable = self.header().vtable;
+        unsafe { (vtable.try_set_join_waker)(self.ptr, waker) }
     }
 
     pub(super) fn drop_join_handle_slow(self) {
@@ -127,6 +142,11 @@ unsafe fn try_read_output<T: Future, S: Schedule>(
 
     let harness = Harness::<T, S>::from_raw(ptr);
     harness.try_read_output(out, waker);
+}
+
+unsafe fn try_set_join_waker<T: Future, S: Schedule>(ptr: NonNull<Header>, waker: &Waker) -> bool {
+    let harness = Harness::<T, S>::from_raw(ptr);
+    harness.try_set_join_waker(waker)
 }
 
 unsafe fn drop_join_handle_slow<T: Future, S: Schedule>(ptr: NonNull<Header>) {

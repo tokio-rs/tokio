@@ -3,6 +3,9 @@ cfg_io_driver! {
     pub(crate) mod slab;
 }
 
+#[cfg(feature = "rt")]
+pub(crate) mod atomic_cell;
+
 #[cfg(any(
     // io driver uses `WakeList` directly
     feature = "net",
@@ -41,6 +44,9 @@ pub(crate) mod linked_list;
 mod rand;
 
 cfg_rt! {
+    mod idle_notified_set;
+    pub(crate) use idle_notified_set::IdleNotifiedSet;
+
     mod wake;
     pub(crate) use wake::WakerRef;
     pub(crate) use wake::{waker_ref, Wake};

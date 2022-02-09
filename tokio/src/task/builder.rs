@@ -4,6 +4,10 @@ use std::future::Future;
 
 /// Factory which is used to configure the properties of a new task.
 ///
+/// **Note**: This is an [unstable API][unstable]. The public API of this type
+/// may break in 1.x releases. See [the documentation on unstable
+/// features][unstable] for details.
+///
 /// Methods can be chained in order to configure it.
 ///
 /// Currently, there is only one configuration option:
@@ -45,7 +49,13 @@ use std::future::Future;
 ///     }
 /// }
 /// ```
+/// [unstable API]: crate#unstable-features
+/// [`name`]: Builder::name
+/// [`spawn_local`]: Builder::spawn_local
+/// [`spawn`]: Builder::spawn
+/// [`spawn_blocking`]: Builder::spawn_blocking
 #[derive(Default, Debug)]
+#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 pub struct Builder<'a> {
     name: Option<&'a str>,
 }
@@ -97,6 +107,9 @@ impl<'a> Builder<'a> {
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
-        context::current().spawn_blocking_inner(function, self.name)
+        use crate::runtime::Mandatory;
+        let (join_handle, _was_spawned) =
+            context::current().spawn_blocking_inner(function, Mandatory::NonMandatory, self.name);
+        join_handle
     }
 }

@@ -174,6 +174,7 @@
 
 // At the top due to macros
 #[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
 #[macro_use]
 mod tests;
 
@@ -181,11 +182,16 @@ pub(crate) mod enter;
 
 pub(crate) mod task;
 
-cfg_stats! {
-    pub mod stats;
+cfg_metrics! {
+    mod metrics;
+    pub use metrics::RuntimeMetrics;
+
+    pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 }
-cfg_not_stats! {
-    pub(crate) mod stats;
+
+cfg_not_metrics! {
+    pub(crate) mod metrics;
+    pub(crate) use metrics::{SchedulerMetrics, WorkerMetrics, MetricsBatch};
 }
 
 cfg_rt! {
@@ -195,6 +201,14 @@ cfg_rt! {
     mod blocking;
     use blocking::BlockingPool;
     pub(crate) use blocking::spawn_blocking;
+
+    cfg_trace! {
+        pub(crate) use blocking::Mandatory;
+    }
+
+    cfg_fs! {
+        pub(crate) use blocking::spawn_mandatory_blocking;
+    }
 
     mod builder;
     pub use self::builder::Builder;
@@ -283,7 +297,7 @@ cfg_rt! {
     #[derive(Debug)]
     enum Kind {
         /// Execute all tasks on the current-thread.
-        CurrentThread(BasicScheduler<driver::Driver>),
+        CurrentThread(BasicScheduler),
 
         /// Execute tasks across multiple threads.
         #[cfg(feature = "rt-multi-thread")]
@@ -594,6 +608,15 @@ cfg_rt! {
                     // The threaded scheduler drops its tasks on its worker threads, which is
                     // already in the runtime's context.
                 },
+            }
+        }
+    }
+
+    cfg_metrics! {
+        impl Runtime {
+            /// TODO
+            pub fn metrics(&self) -> RuntimeMetrics {
+                self.handle.metrics()
             }
         }
     }

@@ -1,10 +1,10 @@
-#![cfg(feature = "full")]
+#![cfg(all(feature = "time", feature = "sync", feature = "io-util"))]
 
 use tokio::time::{self, sleep, Duration};
 use tokio_stream::{self, StreamExt};
 use tokio_test::*;
 
-use futures::StreamExt as _;
+use futures::stream;
 
 async fn maybe_sleep(idx: i32) -> i32 {
     if idx % 2 == 0 {

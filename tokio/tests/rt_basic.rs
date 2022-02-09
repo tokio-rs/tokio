@@ -16,6 +16,15 @@ mod support {
     pub(crate) mod mpsc_stream;
 }
 
+macro_rules! cfg_metrics {
+    ($($t:tt)*) => {
+        #[cfg(tokio_unstable)]
+        {
+            $( $t )*
+        }
+    }
+}
+
 #[test]
 fn spawned_task_does_not_progress_without_block_on() {
     let (tx, mut rx) = oneshot::channel();
@@ -166,6 +175,102 @@ fn drop_tasks_in_context() {
     drop(rt);
 
     assert!(SUCCESS.load(Ordering::SeqCst));
+}
+
+#[test]
+#[should_panic(expected = "boom")]
+fn wake_in_drop_after_panic() {
+    let (tx, rx) = oneshot::channel::<()>();
+
+    struct WakeOnDrop(Option<oneshot::Sender<()>>);
+
+    impl Drop for WakeOnDrop {
+        fn drop(&mut self) {
+            self.0.take().unwrap().send(()).unwrap();
+        }
+    }
+
+    let rt = rt();
+
+    rt.spawn(async move {
+        let _wake_on_drop = WakeOnDrop(Some(tx));
+        // wait forever
+        futures::future::pending::<()>().await;
+    });
+
+    let _join = rt.spawn(async move { rx.await });
+
+    rt.block_on(async {
+        tokio::task::yield_now().await;
+        panic!("boom");
+    });
+}
+
+#[test]
+fn spawn_two() {
+    let rt = rt();
+
+    let out = rt.block_on(async {
+        let (tx, rx) = oneshot::channel();
+
+        tokio::spawn(async move {
+            tokio::spawn(async move {
+                tx.send("ZOMG").unwrap();
+            });
+        });
+
+        assert_ok!(rx.await)
+    });
+
+    assert_eq!(out, "ZOMG");
+
+    cfg_metrics! {
+        let metrics = rt.metrics();
+        drop(rt);
+        assert_eq!(0, metrics.remote_schedule_count());
+
+        let mut local = 0;
+        for i in 0..metrics.num_workers() {
+            local += metrics.worker_local_schedule_count(i);
+        }
+
+        assert_eq!(2, local);
+    }
+}
+
+#[test]
+fn spawn_remote() {
+    let rt = rt();
+
+    let out = rt.block_on(async {
+        let (tx, rx) = oneshot::channel();
+
+        let handle = tokio::spawn(async move {
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(10));
+                tx.send("ZOMG").unwrap();
+            });
+
+            rx.await.unwrap()
+        });
+
+        handle.await.unwrap()
+    });
+
+    assert_eq!(out, "ZOMG");
+
+    cfg_metrics! {
+        let metrics = rt.metrics();
+        drop(rt);
+        assert_eq!(1, metrics.remote_schedule_count());
+
+        let mut local = 0;
+        for i in 0..metrics.num_workers() {
+            local += metrics.worker_local_schedule_count(i);
+        }
+
+        assert_eq!(1, local);
+    }
 }
 
 #[test]

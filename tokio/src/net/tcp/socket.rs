@@ -8,6 +8,7 @@ use std::net::SocketAddr;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::time::Duration;
 
 cfg_net! {
     /// A TCP socket that has not yet been converted to a `TcpStream` or
@@ -347,6 +348,28 @@ impl TcpSocket {
     /// [`set_recv_buffer_size`]: #method.set_recv_buffer_size
     pub fn recv_buffer_size(&self) -> io::Result<u32> {
         self.inner.get_recv_buffer_size()
+    }
+
+    /// Sets the linger duration of this socket by setting the SO_LINGER option.
+    ///
+    /// This option controls the action taken when a stream has unsent messages and the stream is
+    /// closed. If SO_LINGER is set, the system shall block the process until it can transmit the
+    /// data or until the time expires.
+    ///
+    /// If SO_LINGER is not specified, and the socket is closed, the system handles the call in a
+    /// way that allows the process to continue as quickly as possible.
+    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
+        self.inner.set_linger(dur)
+    }
+
+    /// Reads the linger duration for this socket by getting the `SO_LINGER`
+    /// option.
+    ///
+    /// For more information about this option, see [`set_linger`].
+    ///
+    /// [`set_linger`]: TcpSocket::set_linger
+    pub fn linger(&self) -> io::Result<Option<Duration>> {
+        self.inner.get_linger()
     }
 
     /// Gets the local address of this socket.

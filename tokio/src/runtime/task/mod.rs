@@ -313,7 +313,7 @@ cfg_rt_multi_thread! {
 
     impl<S: 'static> Task<S> {
         fn into_raw(self) -> NonNull<Header> {
-            let ret = self.header().into();
+            let ret = self.raw.header_ptr();
             mem::forget(self);
             ret
         }
@@ -347,6 +347,7 @@ impl<S: Schedule> LocalNotified<S> {
 impl<S: Schedule> UnownedTask<S> {
     // Used in test of the inject queue.
     #[cfg(test)]
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     pub(super) fn into_notified(self) -> Notified<S> {
         Notified(self.into_task())
     }
@@ -426,7 +427,7 @@ unsafe impl<S> linked_list::Link for Task<S> {
     type Target = Header;
 
     fn as_raw(handle: &Task<S>) -> NonNull<Header> {
-        handle.header().into()
+        handle.raw.header_ptr()
     }
 
     unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {

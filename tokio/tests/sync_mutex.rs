@@ -1,13 +1,19 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(feature = "sync")]
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_test::wasm_bindgen_test as test;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
+
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::test as maybe_tokio_test;
 
 use tokio::sync::Mutex;
-use tokio::time::{interval, timeout};
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
 use std::sync::Arc;
-use std::time::Duration;
 
 #[test]
 fn straight_execution() {
@@ -82,10 +88,14 @@ fn lock() {
 }
 */
 
-#[tokio::test]
 /// Ensure a mutex is unlocked if a future holding the lock
 /// is aborted prematurely.
+#[tokio::test]
+#[cfg(feature = "full")]
 async fn aborted_future_1() {
+    use std::time::Duration;
+    use tokio::time::{interval, timeout};
+
     let m1: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
     {
         let m2 = m1.clone();
@@ -108,10 +118,14 @@ async fn aborted_future_1() {
     .expect("Mutex is locked");
 }
 
-#[tokio::test]
 /// This test is similar to `aborted_future_1` but this time the
 /// aborted future is waiting for the lock.
+#[tokio::test]
+#[cfg(feature = "full")]
 async fn aborted_future_2() {
+    use std::time::Duration;
+    use tokio::time::timeout;
+
     let m1: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
     {
         // Lock mutex
@@ -147,14 +161,14 @@ fn try_lock() {
     assert!(g3.is_ok());
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn debug_format() {
     let s = "debug";
     let m = Mutex::new(s.to_string());
     assert_eq!(format!("{:?}", s), format!("{:?}", m.lock().await));
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn mutex_debug() {
     let s = "data";
     let m = Mutex::new(s.to_string());

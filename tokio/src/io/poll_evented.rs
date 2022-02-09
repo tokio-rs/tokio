@@ -4,6 +4,7 @@ use mio::event::Source;
 use std::fmt;
 use std::io;
 use std::ops::Deref;
+use std::panic::{RefUnwindSafe, UnwindSafe};
 
 cfg_io_driver! {
     /// Associates an I/O resource that implements the [`std::io::Read`] and/or
@@ -184,6 +185,10 @@ feature! {
         }
     }
 }
+
+impl<E: Source> UnwindSafe for PollEvented<E> {}
+
+impl<E: Source> RefUnwindSafe for PollEvented<E> {}
 
 impl<E: Source> Deref for PollEvented<E> {
     type Target = E;
