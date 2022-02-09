@@ -251,17 +251,17 @@ impl Spawner {
                             shared.num_th += 1;
                             shared.worker_thread_index += 1;
                             shared.worker_threads.insert(id, handle);
-                        },
-                        Err(err) if is_temporary_os_thread_error(error) && shared.num_th > 0 => {
+                        }
+                        Err(ref e) if is_temporary_os_thread_error(e) && shared.num_th > 0 => {
                             // OS temporarily failed to spawn a new thread.
                             // The task will be picked up eventually by a currently
                             // busy thread.
-                        },
+                        }
                         Err(e) => {
                             // The OS refused to spawn the thread and there is no thread
                             // to pick up the task that has just been pushed to the queue.
                             panic!("OS can't spawn worker thread: {}", e)
-                        },
+                        }
                     }
                 }
             }
@@ -284,7 +284,7 @@ impl Spawner {
         shutdown_tx: shutdown::Sender,
         rt: &Handle,
         id: usize,
-    ) -> Option<thread::JoinHandle<()>> {
+    ) -> Result<thread::JoinHandle<()>, std::io::Error> {
         let mut builder = thread::Builder::new().name((self.inner.thread_name)());
 
         if let Some(stack_size) = self.inner.stack_size {
@@ -293,22 +293,12 @@ impl Spawner {
 
         let rt = rt.clone();
 
-        builder
-            .spawn(move || {
-                // Only the reference should be moved into the closure
-                let _enter = crate::runtime::context::enter(rt.clone());
-                rt.blocking_spawner.inner.run(id);
-                drop(shutdown_tx);
-            })
-            .map(Some)
-            .or_else(|error| {
-                if is_temporary_os_thread_error(&error) {
-                    Ok(None)
-                } else {
-                    Err(error)
-                }
-            })
-            .expect("OS can't spawn a new worker thread")
+        builder.spawn(move || {
+            // Only the reference should be moved into the closure
+            let _enter = crate::runtime::context::enter(rt.clone());
+            rt.blocking_spawner.inner.run(id);
+            drop(shutdown_tx);
+        })
     }
 }
 
