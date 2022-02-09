@@ -157,6 +157,12 @@ struct Slot<T> {
 
     /// Next entry in the free list.
     next: u32,
+
+    /// Makes miri happy by making mutable references not take exclusive access.
+    ///
+    /// Could probably also be fixed by replacing `slots` with a raw-pointer
+    /// based equivalent.
+    _pin: std::marker::PhantomPinned,
 }
 
 /// Value paired with a reference to the page.
@@ -409,7 +415,7 @@ impl<T: Entry> Page<T> {
             slot.value.with(|ptr| unsafe { (*ptr).value.reset() });
 
             // Return a reference to the slot
-            Some((me.addr(idx), slot.gen_ref(me)))
+            Some((me.addr(idx), locked.gen_ref(idx, me)))
         } else if me.len == locked.slots.len() {
             // The page is full
             None
@@ -428,9 +434,10 @@ impl<T: Entry> Page<T> {
             locked.slots.push(Slot {
                 value: UnsafeCell::new(Value {
                     value: Default::default(),
-                    page: &**me as *const _,
+                    page: Arc::as_ptr(me),
                 }),
                 next: 0,
+                _pin: std::marker::PhantomPinned,
             });
 
             // Increment the head to indicate the free stack is empty
@@ -443,7 +450,7 @@ impl<T: Entry> Page<T> {
 
             debug_assert_eq!(locked.slots.len(), locked.head);
 
-            Some((me.addr(idx), locked.slots[idx].gen_ref(me)))
+            Some((me.addr(idx), locked.gen_ref(idx, me)))
         }
     }
 }
@@ -558,18 +565,15 @@ impl<T> Slots<T> {
 
         idx
     }
-}
 
-impl<T: Entry> Slot<T> {
-    /// Generates a `Ref` for the slot. This involves bumping the page's ref count.
-    fn gen_ref(&self, page: &Arc<Page<T>>) -> Ref<T> {
-        // The ref holds a ref on the page. The `Arc` is forgotten here and is
-        // resurrected in `release` when the `Ref` is dropped. By avoiding to
-        // hold on to an explicit `Arc` value, the struct size of `Ref` is
-        // reduced.
+    /// Generates a `Ref` for the slot at the given index. This involves bumping the page's ref count.
+    fn gen_ref(&self, idx: usize, page: &Arc<Page<T>>) -> Ref<T> {
+        assert!(idx < self.slots.len());
         mem::forget(page.clone());
-        let slot = self as *const Slot<T>;
-        let value = slot as *const Value<T>;
+
+        let vec_ptr = self.slots.as_ptr();
+        let slot: *const Slot<T> = unsafe { vec_ptr.add(idx) };
+        let value: *const Value<T> = slot as *const Value<T>;
 
         Ref { value }
     }
@@ -691,11 +695,13 @@ mod test {
 
     #[test]
     fn insert_many() {
+        const MANY: usize = normal_or_miri(10_000, 50);
+
         let mut slab = Slab::<Foo>::new();
         let alloc = slab.allocator();
         let mut entries = vec![];
 
-        for i in 0..10_000 {
+        for i in 0..MANY {
             let (addr, val) = alloc.allocate().unwrap();
             val.id.store(i, SeqCst);
             entries.push((addr, val));
@@ -708,15 +714,15 @@ mod test {
 
         entries.clear();
 
-        for i in 0..10_000 {
+        for i in 0..MANY {
             let (addr, val) = alloc.allocate().unwrap();
-            val.id.store(10_000 - i, SeqCst);
+            val.id.store(MANY - i, SeqCst);
             entries.push((addr, val));
         }
 
         for (i, (addr, v)) in entries.iter().enumerate() {
-            assert_eq!(10_000 - i, v.id.load(SeqCst));
-            assert_eq!(10_000 - i, slab.get(*addr).unwrap().id.load(SeqCst));
+            assert_eq!(MANY - i, v.id.load(SeqCst));
+            assert_eq!(MANY - i, slab.get(*addr).unwrap().id.load(SeqCst));
         }
     }
 
@@ -726,7 +732,7 @@ mod test {
         let alloc = slab.allocator();
         let mut entries = vec![];
 
-        for i in 0..10_000 {
+        for i in 0..normal_or_miri(10_000, 100) {
             let (addr, val) = alloc.allocate().unwrap();
             val.id.store(i, SeqCst);
             entries.push((addr, val));
@@ -734,7 +740,7 @@ mod test {
 
         for _ in 0..10 {
             // Drop 1000 in reverse
-            for _ in 0..1_000 {
+            for _ in 0..normal_or_miri(1_000, 10) {
                 entries.pop();
             }
 
@@ -753,7 +759,7 @@ mod test {
         let mut entries1 = vec![];
         let mut entries2 = vec![];
 
-        for i in 0..10_000 {
+        for i in 0..normal_or_miri(10_000, 100) {
             let (addr, val) = alloc.allocate().unwrap();
             val.id.store(i, SeqCst);
 
@@ -771,6 +777,14 @@ mod test {
         }
     }
 
+    const fn normal_or_miri(normal: usize, miri: usize) -> usize {
+        if cfg!(miri) {
+            miri
+        } else {
+            normal
+        }
+    }
+
     #[test]
     fn compact_all() {
         let mut slab = Slab::<Foo>::new();
@@ -780,7 +794,7 @@ mod test {
         for _ in 0..2 {
             entries.clear();
 
-            for i in 0..10_000 {
+            for i in 0..normal_or_miri(10_000, 100) {
                 let (addr, val) = alloc.allocate().unwrap();
                 val.id.store(i, SeqCst);
 
@@ -808,7 +822,7 @@ mod test {
         let alloc = slab.allocator();
         let mut entries = vec![];
 
-        for _ in 0..5 {
+        for _ in 0..normal_or_miri(5, 2) {
             entries.clear();
 
             // Allocate a few pages + 1

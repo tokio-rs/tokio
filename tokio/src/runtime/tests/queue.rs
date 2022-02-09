@@ -101,13 +101,21 @@ fn steal_batch() {
     assert!(local1.pop().is_none());
 }
 
+const fn normal_or_miri(normal: usize, miri: usize) -> usize {
+    if cfg!(miri) {
+        miri
+    } else {
+        normal
+    }
+}
+
 #[test]
 fn stress1() {
     const NUM_ITER: usize = 1;
-    const NUM_STEAL: usize = 1_000;
-    const NUM_LOCAL: usize = 1_000;
-    const NUM_PUSH: usize = 500;
-    const NUM_POP: usize = 250;
+    const NUM_STEAL: usize = normal_or_miri(1_000, 10);
+    const NUM_LOCAL: usize = normal_or_miri(1_000, 10);
+    const NUM_PUSH: usize = normal_or_miri(500, 10);
+    const NUM_POP: usize = normal_or_miri(250, 10);
 
     let mut metrics = MetricsBatch::new();
 
@@ -169,8 +177,8 @@ fn stress1() {
 #[test]
 fn stress2() {
     const NUM_ITER: usize = 1;
-    const NUM_TASKS: usize = 1_000_000;
-    const NUM_STEAL: usize = 1_000;
+    const NUM_TASKS: usize = normal_or_miri(1_000_000, 50);
+    const NUM_STEAL: usize = normal_or_miri(1_000, 10);
 
     let mut metrics = MetricsBatch::new();
 

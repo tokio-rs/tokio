@@ -63,6 +63,10 @@ impl RawTask {
         RawTask { ptr }
     }
 
+    pub(super) fn header_ptr(&self) -> NonNull<Header> {
+        self.ptr
+    }
+
     /// Returns a reference to the task's meta structure.
     ///
     /// Safe as `Header` is `Sync`.

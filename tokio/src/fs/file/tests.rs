@@ -228,6 +228,7 @@ fn flush_while_idle() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // takes a really long time with miri
 fn read_with_buffer_larger_than_max() {
     // Chunks
     let chunk_a = 16 * 1024;
@@ -299,6 +300,7 @@ fn read_with_buffer_larger_than_max() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // takes a really long time with miri
 fn write_with_buffer_larger_than_max() {
     // Chunks
     let chunk_a = 16 * 1024;

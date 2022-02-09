@@ -130,6 +130,7 @@ enum NotificationType {
 }
 
 #[derive(Debug)]
+#[repr(C)] // required by `linked_list::Link` impl
 struct Waiter {
     /// Intrusive linked-list pointers.
     pointers: linked_list::Pointers<Waiter>,
@@ -731,8 +732,8 @@ unsafe impl linked_list::Link for Waiter {
         ptr
     }
 
-    unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
-        NonNull::from(&mut target.as_mut().pointers)
+    unsafe fn pointers(target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
+        target.cast()
     }
 }
 

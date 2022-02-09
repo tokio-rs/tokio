@@ -188,11 +188,13 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: miri
-        run: |
-          set -e
-          rm -rf tests
-          cargo miri test --features rt,rt-multi-thread,sync task
+        # Many of tests in tokio/tests and doctests use #[tokio::test] or
+        # #[tokio::main] that calls epoll_create1 that Miri does not support.
+        run: cargo miri test --features full --lib --no-fail-fast
         working-directory: tokio
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-tag-raw-pointers
+          PROPTEST_CASES: 10
 
   san:
     name: san
