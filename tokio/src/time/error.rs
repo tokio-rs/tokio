@@ -40,7 +40,7 @@ impl From<Kind> for Error {
     }
 }
 
-/// Error returned by `Timeout`.
+/// Errors returned by `Timeout`.
 #[derive(Debug, PartialEq)]
 pub struct Elapsed(());
 
@@ -72,7 +72,7 @@ impl Error {
         matches!(self.0, Kind::AtCapacity)
     }
 
-    /// Create an error representing a misconfigured timer.
+    /// Creates an error representing a misconfigured timer.
     pub fn invalid() -> Error {
         Error(Invalid)
     }

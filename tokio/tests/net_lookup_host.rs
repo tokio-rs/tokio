@@ -1,3 +1,5 @@
+#![cfg(feature = "full")]
+
 use tokio::net;
 use tokio_test::assert_ok;
 

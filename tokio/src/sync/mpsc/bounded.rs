@@ -1,6 +1,6 @@
 use crate::sync::batch_semaphore::{self as semaphore, TryAcquireError};
 use crate::sync::mpsc::chan;
-use crate::sync::mpsc::error::{SendError, TrySendError};
+use crate::sync::mpsc::error::{SendError, TryRecvError, TrySendError};
 
 cfg_time! {
     use crate::sync::mpsc::error::SendTimeoutError;
@@ -10,19 +10,19 @@ cfg_time! {
 use std::fmt;
 use std::task::{Context, Poll};
 
-/// Send values to the associated `Receiver`.
+/// Sends values to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`](channel) function.
 ///
-/// To use the `Sender` in a poll function, you can use the [`PollSender`]
-/// utility.
+/// To convert the `Sender` into a `Sink` or use it in a poll function, you can
+/// use the [`PollSender`] utility.
 ///
 /// [`PollSender`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSender.html
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
 
-/// Permit to send one value into the channel.
+/// Permits to send one value into the channel.
 ///
 /// `Permit` values are returned by [`Sender::reserve()`] and [`Sender::try_reserve()`]
 /// and are used to guarantee channel capacity before generating a message to send.
@@ -49,7 +49,7 @@ pub struct OwnedPermit<T> {
     chan: Option<chan::Tx<T, Semaphore>>,
 }
 
-/// Receive values from the associated `Sender`.
+/// Receives values from the associated `Sender`.
 ///
 /// Instances are created by the [`channel`](channel) function.
 ///
@@ -57,7 +57,7 @@ pub struct OwnedPermit<T> {
 ///
 /// [`ReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReceiverStream.html
 pub struct Receiver<T> {
-    /// The channel receiver
+    /// The channel receiver.
     chan: chan::Rx<T, Semaphore>,
 }
 
@@ -65,7 +65,7 @@ pub struct Receiver<T> {
 /// with backpressure.
 ///
 /// The channel will buffer up to the provided number of messages.  Once the
-/// buffer is full, attempts to `send` new messages will wait until a message is
+/// buffer is full, attempts to send new messages will wait until a message is
 /// received from the channel. The provided buffer capacity must be at least 1.
 ///
 /// All data sent on `Sender` will become available on `Receiver` in the same
@@ -76,7 +76,7 @@ pub struct Receiver<T> {
 ///
 /// If the `Receiver` is disconnected while trying to `send`, the `send` method
 /// will return a `SendError`. Similarly, if `Sender` is disconnected while
-/// trying to `recv`, the `recv` method will return a `RecvError`.
+/// trying to `recv`, the `recv` method will return `None`.
 ///
 /// # Panics
 ///
@@ -134,11 +134,16 @@ impl<T> Receiver<T> {
     ///
     /// If there are no messages in the channel's buffer, but the channel has
     /// not yet been closed, this method will sleep until a message is sent or
-    /// the channel is closed.
+    /// the channel is closed.  Note that if [`close`] is called, but there are
+    /// still outstanding [`Permits`] from before it was closed, the channel is
+    /// not considered closed by `recv` until the permits are released.
     ///
-    /// Note that if [`close`] is called, but there are still outstanding
-    /// [`Permits`] from before it was closed, the channel is not considered
-    /// closed by `recv` until the permits are released.
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
     ///
     /// [`close`]: Self::close
     /// [`Permits`]: struct@crate::sync::mpsc::Permit
@@ -180,6 +185,50 @@ impl<T> Receiver<T> {
     pub async fn recv(&mut self) -> Option<T> {
         use crate::future::poll_fn;
         poll_fn(|cx| self.chan.recv(cx)).await
+    }
+
+    /// Tries to receive the next value for this receiver.
+    ///
+    /// This method returns the [`Empty`] error if the channel is currently
+    /// empty, but there are still outstanding [senders] or [permits].
+    ///
+    /// This method returns the [`Disconnected`] error if the channel is
+    /// currently empty, and there are no outstanding [senders] or [permits].
+    ///
+    /// Unlike the [`poll_recv`] method, this method will never return an
+    /// [`Empty`] error spuriously.
+    ///
+    /// [`Empty`]: crate::sync::mpsc::error::TryRecvError::Empty
+    /// [`Disconnected`]: crate::sync::mpsc::error::TryRecvError::Disconnected
+    /// [`poll_recv`]: Self::poll_recv
+    /// [senders]: crate::sync::mpsc::Sender
+    /// [permits]: crate::sync::mpsc::Permit
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    /// use tokio::sync::mpsc::error::TryRecvError;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(100);
+    ///
+    ///     tx.send("hello").await.unwrap();
+    ///
+    ///     assert_eq!(Ok("hello"), rx.try_recv());
+    ///     assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    ///
+    ///     tx.send("hello").await.unwrap();
+    ///     // Drop the last sender, closing the channel.
+    ///     drop(tx);
+    ///
+    ///     assert_eq!(Ok("hello"), rx.try_recv());
+    ///     assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+    /// }
+    /// ```
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        self.chan.try_recv()
     }
 
     /// Blocking receive to call outside of asynchronous contexts.
@@ -286,7 +335,7 @@ impl<T> Receiver<T> {
     /// This method returns:
     ///
     ///  * `Poll::Pending` if no messages are available but the channel is not
-    ///    closed.
+    ///    closed, or if a spurious failure happens.
     ///  * `Poll::Ready(Some(message))` if a message is available.
     ///  * `Poll::Ready(None)` if the channel has been closed and all messages
     ///    sent before it was closed have been received.
@@ -296,6 +345,12 @@ impl<T> Receiver<T> {
     /// receiver, or when the channel is closed.  Note that on multiple calls to
     /// `poll_recv`, only the `Waker` from the `Context` passed to the most
     /// recent call is scheduled to receive a wakeup.
+    ///
+    /// If this method returns `Poll::Pending` due to a spurious failure, then
+    /// the `Waker` will be notified when the situation causing the spurious
+    /// failure has been resolved. Note that receiving such a wakeup does not
+    /// guarantee that the next call will succeed — it could fail with another
+    /// spurious failure.
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
@@ -334,6 +389,16 @@ impl<T> Sender<T> {
     ///
     /// [`close`]: Receiver::close
     /// [`Receiver`]: Receiver
+    ///
+    /// # Cancel safety
+    ///
+    /// If `send` is used as the event in a [`tokio::select!`](crate::select)
+    /// statement and some other branch completes first, then it is guaranteed
+    /// that the message was not sent.
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// complete in the order they were requested.  Cancelling a call to
+    /// `send` makes you lose your place in the queue.
     ///
     /// # Examples
     ///
@@ -375,6 +440,11 @@ impl<T> Sender<T> {
     ///
     /// This allows the producers to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once the channel is closed, it stays closed
+    /// forever and all future calls to `closed` will return immediately.
     ///
     /// # Examples
     ///
@@ -493,6 +563,11 @@ impl<T> Sender<T> {
     /// [`close`]: Receiver::close
     /// [`Receiver`]: Receiver
     ///
+    /// # Panics
+    ///
+    /// This function panics if it is called outside the context of a Tokio
+    /// runtime [with time enabled](crate::runtime::Builder::enable_time).
+    ///
     /// # Examples
     ///
     /// In the following example, each call to `send_timeout` will block until the
@@ -602,7 +677,7 @@ impl<T> Sender<T> {
         self.chan.is_closed()
     }
 
-    /// Wait for channel capacity. Once capacity to send one message is
+    /// Waits for channel capacity. Once capacity to send one message is
     /// available, it is reserved for the caller.
     ///
     /// If the channel is full, the function waits for the number of unreceived
@@ -616,6 +691,12 @@ impl<T> Sender<T> {
     ///
     /// [`Permit`]: Permit
     /// [`send`]: Permit::send
+    ///
+    /// # Cancel safety
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// complete in the order they were requested.  Cancelling a call to
+    /// `reserve` makes you lose your place in the queue.
     ///
     /// # Examples
     ///
@@ -645,7 +726,7 @@ impl<T> Sender<T> {
         Ok(Permit { chan: &self.chan })
     }
 
-    /// Wait for channel capacity, moving the `Sender` and returning an owned
+    /// Waits for channel capacity, moving the `Sender` and returning an owned
     /// permit. Once capacity to send one message is available, it is reserved
     /// for the caller.
     ///
@@ -665,6 +746,12 @@ impl<T> Sender<T> {
     ///
     /// Dropping the [`OwnedPermit`] without sending a message releases the
     /// capacity back to the channel.
+    ///
+    /// # Cancel safety
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// complete in the order they were requested.  Cancelling a call to
+    /// `reserve_owned` makes you lose your place in the queue.
     ///
     /// # Examples
     /// Sending a message using an [`OwnedPermit`]:
@@ -733,7 +820,7 @@ impl<T> Sender<T> {
         }
     }
 
-    /// Try to acquire a slot in the channel without waiting for the slot to become
+    /// Tries to acquire a slot in the channel without waiting for the slot to become
     /// available.
     ///
     /// If the channel is full this function will return [`TrySendError`], otherwise
@@ -779,13 +866,14 @@ impl<T> Sender<T> {
     pub fn try_reserve(&self) -> Result<Permit<'_, T>, TrySendError<()>> {
         match self.chan.semaphore().0.try_acquire(1) {
             Ok(_) => {}
-            Err(_) => return Err(TrySendError::Full(())),
+            Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
+            Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),
         }
 
         Ok(Permit { chan: &self.chan })
     }
 
-    /// Try to acquire a slot in the channel without waiting for the slot to become
+    /// Tries to acquire a slot in the channel without waiting for the slot to become
     /// available, returning an owned permit.
     ///
     /// This moves the sender _by value_, and returns an owned permit that can
@@ -843,7 +931,8 @@ impl<T> Sender<T> {
     pub fn try_reserve_owned(self) -> Result<OwnedPermit<T>, TrySendError<Self>> {
         match self.chan.semaphore().0.try_acquire(1) {
             Ok(_) => {}
-            Err(_) => return Err(TrySendError::Full(self)),
+            Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(self)),
+            Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(self)),
         }
 
         Ok(OwnedPermit {
@@ -887,7 +976,7 @@ impl<T> Sender<T> {
     ///     let permit = tx.reserve().await.unwrap();
     ///     assert_eq!(tx.capacity(), 4);
     ///
-    ///     // Sending and receiving a value increases the caapcity by one.
+    ///     // Sending and receiving a value increases the capacity by one.
     ///     permit.send(());
     ///     rx.recv().await.unwrap();
     ///     assert_eq!(tx.capacity(), 5);
@@ -1033,7 +1122,7 @@ impl<T> OwnedPermit<T> {
         Sender { chan }
     }
 
-    /// Release the reserved capacity *without* sending a message, returning the
+    /// Releases the reserved capacity *without* sending a message, returning the
     /// [`Sender`].
     ///
     /// # Examples

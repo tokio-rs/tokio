@@ -1,9 +1,6 @@
-cfg_rt! {
-    use crate::runtime::basic_scheduler;
-    use crate::task::JoinHandle;
-
-    use std::future::Future;
-}
+use crate::future::Future;
+use crate::runtime::basic_scheduler;
+use crate::task::JoinHandle;
 
 cfg_rt_multi_thread! {
     use crate::runtime::thread_pool;
@@ -11,7 +8,6 @@ cfg_rt_multi_thread! {
 
 #[derive(Debug, Clone)]
 pub(crate) enum Spawner {
-    #[cfg(feature = "rt")]
     Basic(basic_scheduler::Spawner),
     #[cfg(feature = "rt-multi-thread")]
     ThreadPool(thread_pool::Spawner),
@@ -26,20 +22,61 @@ impl Spawner {
             }
         }
     }
+
+    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        match self {
+            Spawner::Basic(spawner) => spawner.spawn(future),
+            #[cfg(feature = "rt-multi-thread")]
+            Spawner::ThreadPool(spawner) => spawner.spawn(future),
+        }
+    }
 }
 
-cfg_rt! {
+cfg_metrics! {
+    use crate::runtime::{SchedulerMetrics, WorkerMetrics};
+
     impl Spawner {
-        pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
-        where
-            F: Future + Send + 'static,
-            F::Output: Send + 'static,
-        {
+        pub(crate) fn num_workers(&self) -> usize {
             match self {
-                #[cfg(feature = "rt")]
-                Spawner::Basic(spawner) => spawner.spawn(future),
+                Spawner::Basic(_) => 1,
                 #[cfg(feature = "rt-multi-thread")]
-                Spawner::ThreadPool(spawner) => spawner.spawn(future),
+                Spawner::ThreadPool(spawner) => spawner.num_workers(),
+            }
+        }
+
+        pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
+            match self {
+                Spawner::Basic(spawner) => spawner.scheduler_metrics(),
+                #[cfg(feature = "rt-multi-thread")]
+                Spawner::ThreadPool(spawner) => spawner.scheduler_metrics(),
+            }
+        }
+
+        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+            match self {
+                Spawner::Basic(spawner) => spawner.worker_metrics(worker),
+                #[cfg(feature = "rt-multi-thread")]
+                Spawner::ThreadPool(spawner) => spawner.worker_metrics(worker),
+            }
+        }
+
+        pub(crate) fn injection_queue_depth(&self) -> usize {
+            match self {
+                Spawner::Basic(spawner) => spawner.injection_queue_depth(),
+                #[cfg(feature = "rt-multi-thread")]
+                Spawner::ThreadPool(spawner) => spawner.injection_queue_depth(),
+            }
+        }
+
+        pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
+            match self {
+                Spawner::Basic(spawner) => spawner.worker_metrics(worker).queue_depth(),
+                #[cfg(feature = "rt-multi-thread")]
+                Spawner::ThreadPool(spawner) => spawner.worker_local_queue_depth(worker),
             }
         }
     }

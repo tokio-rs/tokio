@@ -3,16 +3,15 @@ name = "tokio"
 # When releasing to crates.io:
 # - Remove path dependencies
 # - Update doc url
-#   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.0.x" git tag.
-version = "1.5.0"
+version = "1.16.1"
 edition = "2018"
+rust-version = "1.49"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/1.5.0/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -42,7 +41,7 @@ full = [
   "time",
 ]
 
-fs = ["libc"]
+fs = []
 io-util = ["memchr", "bytes"]
 # stdin, stdout, stderr
 io-std = []
@@ -54,6 +53,7 @@ net = [
   "mio/tcp",
   "mio/udp",
   "mio/uds",
+  "winapi/namedpipeapi",
 ]
 process = [
   "bytes",
@@ -81,11 +81,16 @@ signal = [
   "winapi/consoleapi",
 ]
 sync = []
-test-util = []
+test-util = ["rt", "sync", "time"]
 time = []
 
+# Technically, removing this is a breaking change even though it only ever did
+# anything with the unstable flag on. It is probably safe to get rid of it after
+# a few releases.
+stats = []
+
 [dependencies]
-tokio-macros = { version = "1.1.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "1.7.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.0"
 
@@ -95,44 +100,58 @@ once_cell = { version = "1.5.2", optional = true }
 memchr = { version = "2.2", optional = true }
 mio = { version = "0.7.6", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
-parking_lot = { version = "0.11.0", optional = true }
+parking_lot = { version = "0.12.0", optional = true }
 
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
 [target.'cfg(tokio_unstable)'.dependencies]
-tracing = { version = "0.1.21", default-features = false, features = ["std"], optional = true } # Not in full
+tracing = { version = "0.1.25", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.87", optional = true }
+libc = { version = "0.2.42", optional = true }
 signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
-libc = { version = "0.2.87" }
-nix = { version = "0.19.0" }
+libc = { version = "0.2.42" }
+nix = { version = "0.23" }
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"
 default-features = false
 optional = true
 
+[target.'cfg(windows)'.dev-dependencies.ntapi]
+version = "0.3.6"
+
 [dev-dependencies]
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
-proptest = "1"
-rand = "0.8.0"
+mockall = "0.10.2"
 tempfile = "3.1.0"
 async-stream = "0.3"
 
-[target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.5", features = ["futures", "checkpoint"] }
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+proptest = "1"
+rand = "0.8.0"
+socket2 = "0.4"
 
-[build-dependencies]
-autocfg = "1" # Needed for conditionally enabling `track-caller`
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3.0"
+
+[target.'cfg(target_os = "freebsd")'.dev-dependencies]
+mio-aio = { version = "0.6.0", features = ["tokio"] }
+
+[target.'cfg(loom)'.dev-dependencies]
+loom = { version = "0.5.2", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+# enable unstable features in the documentation
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
+# it's necessary to _also_ pass `--cfg tokio_unstable` to rustc, or else
+# dependencies will not be enabled, and the docs build will fail.
+rustc-args = ["--cfg", "tokio_unstable"]
 
 [package.metadata.playground]
 features = ["full", "test-util"]

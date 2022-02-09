@@ -224,7 +224,6 @@ mod test {
         assert!(grim.poll_unpin(&mut context).is_pending());
         assert_eq!(1, grim.signal.total_polls);
         assert_eq!(1, grim.total_waits);
-        assert_eq!(0, grim.orphan_queue.total_reaps.get());
         assert!(grim.orphan_queue.all_enqueued.borrow().is_empty());
 
         // Not yet exited, couldn't register interest the first time
@@ -232,7 +231,6 @@ mod test {
         assert!(grim.poll_unpin(&mut context).is_pending());
         assert_eq!(3, grim.signal.total_polls);
         assert_eq!(3, grim.total_waits);
-        assert_eq!(0, grim.orphan_queue.total_reaps.get());
         assert!(grim.orphan_queue.all_enqueued.borrow().is_empty());
 
         // Exited
@@ -245,7 +243,6 @@ mod test {
         }
         assert_eq!(4, grim.signal.total_polls);
         assert_eq!(4, grim.total_waits);
-        assert_eq!(0, grim.orphan_queue.total_reaps.get());
         assert!(grim.orphan_queue.all_enqueued.borrow().is_empty());
     }
 
@@ -260,7 +257,6 @@ mod test {
 
         grim.kill().unwrap();
         assert_eq!(1, grim.total_kills);
-        assert_eq!(0, grim.orphan_queue.total_reaps.get());
         assert!(grim.orphan_queue.all_enqueued.borrow().is_empty());
     }
 
@@ -276,7 +272,6 @@ mod test {
 
             drop(grim);
 
-            assert_eq!(0, queue.total_reaps.get());
             assert!(queue.all_enqueued.borrow().is_empty());
         }
 
@@ -294,7 +289,6 @@ mod test {
             let grim = Reaper::new(&mut mock, &queue, MockStream::new(vec![]));
             drop(grim);
 
-            assert_eq!(0, queue.total_reaps.get());
             assert_eq!(1, queue.all_enqueued.borrow().len());
         }
 

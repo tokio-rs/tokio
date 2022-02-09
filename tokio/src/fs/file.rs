@@ -3,7 +3,7 @@
 //! [`File`]: File
 
 use self::State::*;
-use crate::fs::{asyncify, sys};
+use crate::fs::asyncify;
 use crate::io::blocking::Buf;
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
@@ -18,6 +18,19 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 use std::task::Poll::*;
+
+#[cfg(test)]
+use super::mocks::JoinHandle;
+#[cfg(test)]
+use super::mocks::MockFile as StdFile;
+#[cfg(test)]
+use super::mocks::{spawn_blocking, spawn_mandatory_blocking};
+#[cfg(not(test))]
+use crate::blocking::JoinHandle;
+#[cfg(not(test))]
+use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
+#[cfg(not(test))]
+use std::fs::File as StdFile;
 
 /// A reference to an open file on the filesystem.
 ///
@@ -61,7 +74,7 @@ use std::task::Poll::*;
 /// # }
 /// ```
 ///
-/// Read the contents of a file into a buffer
+/// Read the contents of a file into a buffer:
 ///
 /// ```no_run
 /// use tokio::fs::File;
@@ -78,7 +91,7 @@ use std::task::Poll::*;
 /// # }
 /// ```
 pub struct File {
-    std: Arc<sys::File>,
+    std: Arc<StdFile>,
     inner: Mutex<Inner>,
 }
 
@@ -96,7 +109,7 @@ struct Inner {
 #[derive(Debug)]
 enum State {
     Idle(Option<Buf>),
-    Busy(sys::Blocking<(Operation, Buf)>),
+    Busy(JoinHandle<(Operation, Buf)>),
 }
 
 #[derive(Debug)]
@@ -142,7 +155,7 @@ impl File {
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn open(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
-        let std = asyncify(|| sys::File::open(path)).await?;
+        let std = asyncify(|| StdFile::open(path)).await?;
 
         Ok(File::from_std(std))
     }
@@ -182,7 +195,7 @@ impl File {
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn create(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
-        let std_file = asyncify(move || sys::File::create(path)).await?;
+        let std_file = asyncify(move || StdFile::create(path)).await?;
         Ok(File::from_std(std_file))
     }
 
@@ -199,7 +212,7 @@ impl File {
     /// let std_file = std::fs::File::open("foo.txt").unwrap();
     /// let file = tokio::fs::File::from_std(std_file);
     /// ```
-    pub fn from_std(std: sys::File) -> File {
+    pub fn from_std(std: StdFile) -> File {
         File {
             std: Arc::new(std),
             inner: Mutex::new(Inner {
@@ -323,7 +336,7 @@ impl File {
 
         let std = self.std.clone();
 
-        inner.state = Busy(sys::run(move || {
+        inner.state = Busy(spawn_blocking(move || {
             let res = if let Some(seek) = seek {
                 (&*std).seek(seek).and_then(|_| std.set_len(size))
             } else {
@@ -370,7 +383,7 @@ impl File {
         asyncify(move || std.metadata()).await
     }
 
-    /// Create a new `File` instance that shares the same underlying file handle
+    /// Creates a new `File` instance that shares the same underlying file handle
     /// as the existing `File` instance. Reads, writes, and seeks will affect both
     /// File instances simultaneously.
     ///
@@ -409,7 +422,7 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn into_std(mut self) -> sys::File {
+    pub async fn into_std(mut self) -> StdFile {
         self.inner.get_mut().complete_inflight().await;
         Arc::try_unwrap(self.std).expect("Arc::try_unwrap failed")
     }
@@ -434,7 +447,7 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn try_into_std(mut self) -> Result<sys::File, Self> {
+    pub fn try_into_std(mut self) -> Result<StdFile, Self> {
         match Arc::try_unwrap(self.std) {
             Ok(file) => Ok(file),
             Err(std_file_arc) => {
@@ -491,22 +504,18 @@ impl AsyncRead for File {
         loop {
             match inner.state {
                 Idle(ref mut buf_cell) => {
-                    let buf = buf_cell.as_mut().unwrap();
+                    let mut buf = buf_cell.take().unwrap();
 
                     if !buf.is_empty() {
                         buf.copy_to(dst);
+                        *buf_cell = Some(buf);
                         return Ready(Ok(()));
                     }
 
-                    if let Some(x) = try_nonblocking_read(me.std.as_ref(), dst) {
-                        return Ready(x);
-                    }
-
-                    let mut buf = buf_cell.take().unwrap();
                     buf.ensure_capacity_for(dst);
                     let std = me.std.clone();
 
-                    inner.state = Busy(sys::run(move || {
+                    inner.state = Busy(spawn_blocking(move || {
                         let res = buf.read_from(&mut &*std);
                         (Operation::Read(res), buf)
                     }));
@@ -573,7 +582,7 @@ impl AsyncSeek for File {
 
                     let std = me.std.clone();
 
-                    inner.state = Busy(sys::run(move || {
+                    inner.state = Busy(spawn_blocking(move || {
                         let res = (&*std).seek(pos);
                         (Operation::Seek(res), buf)
                     }));
@@ -640,7 +649,7 @@ impl AsyncWrite for File {
                     let n = buf.copy_from(src);
                     let std = me.std.clone();
 
-                    inner.state = Busy(sys::run(move || {
+                    let blocking_task_join_handle = spawn_mandatory_blocking(move || {
                         let res = if let Some(seek) = seek {
                             (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
                         } else {
@@ -648,7 +657,12 @@ impl AsyncWrite for File {
                         };
 
                         (Operation::Write(res), buf)
-                    }));
+                    })
+                    .ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::Other, "background task failed")
+                    })?;
+
+                    inner.state = Busy(blocking_task_join_handle);
 
                     return Ready(Ok(n));
                 }
@@ -689,8 +703,8 @@ impl AsyncWrite for File {
     }
 }
 
-impl From<sys::File> for File {
-    fn from(std: sys::File) -> Self {
+impl From<StdFile> for File {
+    fn from(std: StdFile) -> Self {
         Self::from_std(std)
     }
 }
@@ -713,7 +727,7 @@ impl std::os::unix::io::AsRawFd for File {
 #[cfg(unix)]
 impl std::os::unix::io::FromRawFd for File {
     unsafe fn from_raw_fd(fd: std::os::unix::io::RawFd) -> Self {
-        sys::File::from_raw_fd(fd).into()
+        StdFile::from_raw_fd(fd).into()
     }
 }
 
@@ -727,7 +741,7 @@ impl std::os::windows::io::AsRawHandle for File {
 #[cfg(windows)]
 impl std::os::windows::io::FromRawHandle for File {
     unsafe fn from_raw_handle(handle: std::os::windows::io::RawHandle) -> Self {
-        sys::File::from_raw_handle(handle).into()
+        StdFile::from_raw_handle(handle).into()
     }
 }
 
@@ -761,185 +775,5 @@ impl Inner {
     }
 }
 
-#[cfg(all(target_os = "linux", not(test)))]
-pub(crate) fn try_nonblocking_read(
-    file: &crate::fs::sys::File,
-    dst: &mut ReadBuf<'_>,
-) -> Option<std::io::Result<()>> {
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    static NONBLOCKING_READ_SUPPORTED: AtomicBool = AtomicBool::new(true);
-    if !NONBLOCKING_READ_SUPPORTED.load(Ordering::Relaxed) {
-        return None;
-    }
-    let out = preadv2::preadv2_safe(file, dst, -1, preadv2::RWF_NOWAIT);
-    if let Err(err) = &out {
-        match err.raw_os_error() {
-            Some(libc::ENOSYS) => {
-                NONBLOCKING_READ_SUPPORTED.store(false, Ordering::Relaxed);
-                return None;
-            }
-            Some(libc::ENOTSUP) | Some(libc::EAGAIN) => return None,
-            _ => {}
-        }
-    }
-    Some(out)
-}
-
-#[cfg(any(not(target_os = "linux"), test))]
-pub(crate) fn try_nonblocking_read(
-    _file: &crate::fs::sys::File,
-    _dst: &mut ReadBuf<'_>,
-) -> Option<std::io::Result<()>> {
-    None
-}
-
-#[cfg(target_os = "linux")]
-mod preadv2 {
-    use libc::{c_int, c_long, c_void, iovec, off_t, ssize_t};
-    use std::os::unix::prelude::AsRawFd;
-
-    use crate::io::ReadBuf;
-
-    pub(crate) fn preadv2_safe(
-        file: &std::fs::File,
-        dst: &mut ReadBuf<'_>,
-        offset: off_t,
-        flags: c_int,
-    ) -> std::io::Result<()> {
-        unsafe {
-            /* We have to defend against buffer overflows manually here.  The slice API makes
-             * this fairly straightforward. */
-            let unfilled = dst.unfilled_mut();
-            let mut iov = iovec {
-                iov_base: unfilled.as_mut_ptr() as *mut c_void,
-                iov_len: unfilled.len(),
-            };
-            /* We take a File object rather than an fd as reading from a sensitive fd may confuse
-             * other unsafe code that assumes that only they have access to that fd. */
-            let bytes_read = preadv2(
-                file.as_raw_fd(),
-                &mut iov as *mut iovec as *const iovec,
-                1,
-                offset,
-                flags,
-            );
-            if bytes_read < 0 {
-                Err(std::io::Error::last_os_error())
-            } else {
-                /* preadv2 returns the number of bytes read, e.g. the number of bytes that have
-                 * written into `unfilled`. So it's safe to assume that the data is now
-                 * initialised */
-                dst.assume_init(bytes_read as usize);
-                dst.advance(bytes_read as usize);
-                Ok(())
-            }
-        }
-    }
-
-    #[cfg(test)]
-    mod test {
-        use super::*;
-
-        #[test]
-        fn test_preadv2_safe() {
-            use std::io::{Seek, Write};
-            use std::mem::MaybeUninit;
-            use tempfile::tempdir;
-
-            let tmp = tempdir().unwrap();
-            let filename = tmp.path().join("file");
-            const MESSAGE: &[u8] = b"Hello this is a test";
-            {
-                let mut f = std::fs::File::create(&filename).unwrap();
-                f.write_all(MESSAGE).unwrap();
-            }
-            let f = std::fs::File::open(&filename).unwrap();
-
-            let mut buf = [MaybeUninit::<u8>::new(0); 50];
-            let mut br = ReadBuf::uninit(&mut buf);
-
-            // Basic use:
-            preadv2_safe(&f, &mut br, 0, 0).unwrap();
-            assert_eq!(br.initialized().len(), MESSAGE.len());
-            assert_eq!(br.filled(), MESSAGE);
-
-            // Here we check that offset works, but also that appending to a non-empty buffer
-            // behaves correctly WRT initialisation.
-            preadv2_safe(&f, &mut br, 5, 0).unwrap();
-            assert_eq!(br.initialized().len(), MESSAGE.len() * 2 - 5);
-            assert_eq!(br.filled(), b"Hello this is a test this is a test".as_ref());
-
-            // offset of -1 means use the current cursor.  This has not been advanced by the
-            // previous reads because we specified an offset there.
-            preadv2_safe(&f, &mut br, -1, 0).unwrap();
-            assert_eq!(br.remaining(), 0);
-            assert_eq!(
-                br.filled(),
-                b"Hello this is a test this is a testHello this is a".as_ref()
-            );
-
-            // but the offset should have been advanced by that read
-            br.clear();
-            preadv2_safe(&f, &mut br, -1, 0).unwrap();
-            assert_eq!(br.filled(), b" test");
-
-            // This should be in cache, so RWF_NOWAIT should work, but it not being in cache
-            // (EAGAIN) or not supported by the underlying filesystem (ENOTSUP) is fine too.
-            br.clear();
-            match preadv2_safe(&f, &mut br, 0, RWF_NOWAIT) {
-                Ok(()) => assert_eq!(br.filled(), MESSAGE),
-                Err(e) => assert!(matches!(
-                    e.raw_os_error(),
-                    Some(libc::ENOTSUP) | Some(libc::EAGAIN)
-                )),
-            }
-
-            // Test handling large offsets
-            {
-                // I hope the underlying filesystem supports sparse files
-                let mut w = std::fs::OpenOptions::new()
-                    .write(true)
-                    .open(&filename)
-                    .unwrap();
-                w.set_len(0x1_0000_0000).unwrap();
-                w.seek(std::io::SeekFrom::Start(0x1_0000_0000)).unwrap();
-                w.write_all(b"This is a Large File").unwrap();
-            }
-
-            br.clear();
-            preadv2_safe(&f, &mut br, 0x1_0000_0008, 0).unwrap();
-            assert_eq!(br.filled(), b"a Large File");
-        }
-    }
-
-    fn pos_to_lohi(offset: off_t) -> (c_long, c_long) {
-        // 64-bit offset is split over high and low 32-bits on 32-bit architectures.
-        // 64-bit architectures still have high and low arguments, but only the low
-        // one is inspected.  See pos_from_hilo in linux/fs/read_write.c.
-        const HALF_LONG_BITS: usize = core::mem::size_of::<c_long>() * 8 / 2;
-        (
-            offset as c_long,
-            // We want to shift this off_t value by size_of::<c_long>(). We can't do
-            // it in one shift because if they're both 64-bits we'd be doing u64 >> 64
-            // which is implementation defined.  Instead do it in two halves:
-            ((offset >> HALF_LONG_BITS) >> HALF_LONG_BITS) as c_long,
-        )
-    }
-
-    pub(crate) const RWF_NOWAIT: c_int = 0x00000008;
-    unsafe fn preadv2(
-        fd: c_int,
-        iov: *const iovec,
-        iovcnt: c_int,
-        offset: off_t,
-        flags: c_int,
-    ) -> ssize_t {
-        // Call via libc::syscall rather than libc::preadv2.  preadv2 is only supported by glibc
-        // and only since v2.26.  By using syscall we don't need to worry about compatiblity with
-        // old glibc versions and it will work on Android and musl too.  The downside is that you
-        // can't use `LD_PRELOAD` tricks any more to intercept these calls.
-        let (lo, hi) = pos_to_lohi(offset);
-        libc::syscall(libc::SYS_preadv2, fd, iov, iovcnt, lo, hi, flags) as ssize_t
-    }
-}
+#[cfg(test)]
+mod tests;

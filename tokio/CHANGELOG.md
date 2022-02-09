@@ -1,3 +1,554 @@
+# 1.16.1 (January 28, 2022)
+
+This release fixes a bug in [#4428] with the change [#4437].
+
+[#4428]: https://github.com/tokio-rs/tokio/pull/4428
+[#4437]: https://github.com/tokio-rs/tokio/pull/4437
+
+# 1.16.0 (January 27, 2022)
+
+Fixes a soundness bug in `io::Take` ([#4428]). The unsoundness is exposed when
+leaking memory in the given `AsyncRead` implementation and then overwriting the
+supplied buffer:
+
+```rust
+impl AsyncRead for Buggy {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>
+    ) -> Poll<Result<()>> {
+      let new_buf = vec![0; 5].leak();
+      *buf = ReadBuf::new(new_buf);
+      buf.put_slice(b"hello");
+      Poll::Ready(Ok(()))
+    }
+}
+```
+
+Also, this release includes improvements to the multi-threaded scheduler that
+can increase throughput by up to 20% in some cases ([#4383]).
+
+### Fixed
+
+- io: **soundness** don't expose uninitialized memory when using `io::Take` in edge case ([#4428])
+- fs: ensure `File::write` results in a `write` syscall when the runtime shuts down ([#4316])
+- process: drop pipe after child exits in `wait_with_output` ([#4315])
+- rt: improve error message when spawning a thread fails ([#4398])
+- rt: reduce false-positive thread wakups in the multi-threaded scheduler ([#4383])
+- sync: don't inherit `Send` from `parking_lot::*Guard` ([#4359])
+
+### Added
+
+- net: `TcpSocket::linger()` and `set_linger()` ([#4324])
+- net: impl `UnwindSafe` for socket types ([#4384])
+- rt: impl `UnwindSafe` for `JoinHandle` ([#4418])
+- sync: `watch::Receiver::has_changed()` ([#4342])
+- sync: `oneshot::Receiver::blocking_recv()` ([#4334])
+- sync: `RwLock` blocking operations ([#4425])
+
+### Unstable
+
+The following changes only apply when building with `--cfg tokio_unstable`
+
+- rt: **breaking change** overhaul runtime metrics API ([#4373])
+
+[#4428]: https://github.com/tokio-rs/tokio/pull/4428
+[#4316]: https://github.com/tokio-rs/tokio/pull/4316
+[#4315]: https://github.com/tokio-rs/tokio/pull/4315
+[#4398]: https://github.com/tokio-rs/tokio/pull/4398
+[#4383]: https://github.com/tokio-rs/tokio/pull/4383
+[#4359]: https://github.com/tokio-rs/tokio/pull/4359
+[#4324]: https://github.com/tokio-rs/tokio/pull/4324
+[#4384]: https://github.com/tokio-rs/tokio/pull/4384
+[#4418]: https://github.com/tokio-rs/tokio/pull/4418
+[#4342]: https://github.com/tokio-rs/tokio/pull/4342
+[#4334]: https://github.com/tokio-rs/tokio/pull/4334
+[#4425]: https://github.com/tokio-rs/tokio/pull/4425
+[#4373]: https://github.com/tokio-rs/tokio/pull/4373
+
+# 1.15.0 (December 15, 2021)
+
+### Fixed
+
+- io: add cooperative yielding support to `io::empty()` ([#4300])
+- time: make timeout robust against budget-depleting tasks ([#4314])
+
+### Changed
+
+- update minimum supported Rust version to 1.46.
+
+### Added
+
+- time: add `Interval::reset()` ([#4248])
+- io: add explicit lifetimes to `AsyncFdReadyGuard` ([#4267])
+- process: add `Command::as_std()` ([#4295])
+
+### Added (unstable)
+
+- tracing: instrument `tokio::sync` types ([#4302])
+
+[#4302]: https://github.com/tokio-rs/tokio/pull/4302
+[#4300]: https://github.com/tokio-rs/tokio/pull/4300
+[#4295]: https://github.com/tokio-rs/tokio/pull/4295
+[#4267]: https://github.com/tokio-rs/tokio/pull/4267
+[#4248]: https://github.com/tokio-rs/tokio/pull/4248
+[#4314]: https://github.com/tokio-rs/tokio/pull/4314
+
+# 1.14.0 (November 15, 2021)
+
+### Fixed
+
+- macros: fix compiler errors when using `mut` patterns in `select!` ([#4211])
+- sync: fix a data race between `oneshot::Sender::send` and awaiting a
+  `oneshot::Receiver` when the oneshot has been closed ([#4226])
+- sync: make `AtomicWaker` panic safe ([#3689])
+- runtime: fix basic scheduler dropping tasks outside a runtime context
+  ([#4213])
+
+### Added
+
+- stats: add `RuntimeStats::busy_duration_total` ([#4179], [#4223])
+
+### Changed
+
+- io: updated `copy` buffer size to match `std::io::copy` ([#4209])
+
+### Documented
+
+-  io: rename buffer to file in doc-test ([#4230])
+-  sync: fix Notify example ([#4212])
+
+[#4211]: https://github.com/tokio-rs/tokio/pull/4211
+[#4226]: https://github.com/tokio-rs/tokio/pull/4226
+[#3689]: https://github.com/tokio-rs/tokio/pull/3689
+[#4213]: https://github.com/tokio-rs/tokio/pull/4213
+[#4179]: https://github.com/tokio-rs/tokio/pull/4179
+[#4223]: https://github.com/tokio-rs/tokio/pull/4223
+[#4209]: https://github.com/tokio-rs/tokio/pull/4209
+[#4230]: https://github.com/tokio-rs/tokio/pull/4230
+[#4212]: https://github.com/tokio-rs/tokio/pull/4212
+
+# 1.13.1 (November 15, 2021)
+
+### Fixed
+
+- sync: fix a data race between `oneshot::Sender::send` and awaiting a
+  `oneshot::Receiver` when the oneshot has been closed ([#4226])
+
+[#4226]: https://github.com/tokio-rs/tokio/pull/4226
+
+# 1.13.0 (October 29, 2021)
+
+### Fixed
+
+- sync: fix `Notify` to clone the waker before locking its waiter list ([#4129])
+- tokio: add riscv32 to non atomic64 architectures ([#4185])
+
+### Added
+
+- net: add `poll_{recv,send}_ready` methods to `udp` and `uds_datagram` ([#4131])
+- net: add `try_*`, `readable`, `writable`, `ready`, and `peer_addr` methods to split halves ([#4120])
+- sync: add `blocking_lock` to `Mutex` ([#4130])
+- sync: add `watch::Sender::send_replace` ([#3962], [#4195])
+- sync: expand `Debug` for `Mutex<T>` impl to unsized `T` ([#4134])
+- tracing: instrument time::Sleep ([#4072])
+- tracing: use structured location fields for spawned tasks ([#4128])
+
+### Changed
+
+- io: add assert in `copy_bidirectional` that `poll_write` is sensible ([#4125])
+- macros: use qualified syntax when polling in `select!` ([#4192])
+- runtime: handle `block_on` wakeups better ([#4157])
+- task: allocate callback on heap immediately in debug mode ([#4203])
+- tokio: assert platform-minimum requirements at build time ([#3797])
+
+### Documented
+
+- docs: conversion of doc comments to indicative mood ([#4174])
+- docs: add returning on the first error example for `try_join!` ([#4133])
+- docs: fixing broken links in `tokio/src/lib.rs` ([#4132])
+- signal: add example with background listener ([#4171])
+- sync: add more oneshot examples ([#4153])
+- time: document `Interval::tick` cancel safety ([#4152])
+
+[#3797]: https://github.com/tokio-rs/tokio/pull/3797
+[#3962]: https://github.com/tokio-rs/tokio/pull/3962
+[#4072]: https://github.com/tokio-rs/tokio/pull/4072
+[#4120]: https://github.com/tokio-rs/tokio/pull/4120
+[#4125]: https://github.com/tokio-rs/tokio/pull/4125
+[#4128]: https://github.com/tokio-rs/tokio/pull/4128
+[#4129]: https://github.com/tokio-rs/tokio/pull/4129
+[#4130]: https://github.com/tokio-rs/tokio/pull/4130
+[#4131]: https://github.com/tokio-rs/tokio/pull/4131
+[#4132]: https://github.com/tokio-rs/tokio/pull/4132
+[#4133]: https://github.com/tokio-rs/tokio/pull/4133
+[#4134]: https://github.com/tokio-rs/tokio/pull/4134
+[#4152]: https://github.com/tokio-rs/tokio/pull/4152
+[#4153]: https://github.com/tokio-rs/tokio/pull/4153
+[#4157]: https://github.com/tokio-rs/tokio/pull/4157
+[#4171]: https://github.com/tokio-rs/tokio/pull/4171
+[#4174]: https://github.com/tokio-rs/tokio/pull/4174
+[#4185]: https://github.com/tokio-rs/tokio/pull/4185
+[#4192]: https://github.com/tokio-rs/tokio/pull/4192
+[#4195]: https://github.com/tokio-rs/tokio/pull/4195
+[#4203]: https://github.com/tokio-rs/tokio/pull/4203
+
+# 1.12.0 (September 21, 2021)
+
+### Fixed
+
+- mpsc: ensure `try_reserve` error is consistent with `try_send` ([#4119])
+- mpsc: use `spin_loop_hint` instead of `yield_now` ([#4115])
+- sync: make `SendError` field public ([#4097])
+
+### Added
+
+- io: add POSIX AIO on FreeBSD ([#4054])
+- io: add convenience method `AsyncSeekExt::rewind` ([#4107])
+- runtime: add tracing span for `block_on` futures ([#4094])
+- runtime: callback when a worker parks and unparks ([#4070])
+- sync: implement `try_recv` for mpsc channels ([#4113])
+
+### Documented
+
+- docs: clarify CPU-bound tasks on Tokio ([#4105])
+- mpsc: document spurious failures on `poll_recv` ([#4117])
+- mpsc: document that `PollSender` impls `Sink` ([#4110])
+- task: document non-guarantees of `yield_now` ([#4091])
+- time: document paused time details better ([#4061], [#4103])
+
+[#4027]: https://github.com/tokio-rs/tokio/pull/4027
+[#4054]: https://github.com/tokio-rs/tokio/pull/4054
+[#4061]: https://github.com/tokio-rs/tokio/pull/4061
+[#4070]: https://github.com/tokio-rs/tokio/pull/4070
+[#4091]: https://github.com/tokio-rs/tokio/pull/4091
+[#4094]: https://github.com/tokio-rs/tokio/pull/4094
+[#4097]: https://github.com/tokio-rs/tokio/pull/4097
+[#4103]: https://github.com/tokio-rs/tokio/pull/4103
+[#4105]: https://github.com/tokio-rs/tokio/pull/4105
+[#4107]: https://github.com/tokio-rs/tokio/pull/4107
+[#4110]: https://github.com/tokio-rs/tokio/pull/4110
+[#4113]: https://github.com/tokio-rs/tokio/pull/4113
+[#4115]: https://github.com/tokio-rs/tokio/pull/4115
+[#4117]: https://github.com/tokio-rs/tokio/pull/4117
+[#4119]: https://github.com/tokio-rs/tokio/pull/4119
+
+# 1.11.0 (August 31, 2021)
+
+### Fixed
+
+ - time: don't panic when Instant is not monotonic ([#4044])
+ - io: fix panic in `fill_buf` by not calling `poll_fill_buf` twice ([#4084])
+
+### Added
+
+ - watch: add `watch::Sender::subscribe` ([#3800])
+ - process: add `from_std` to `ChildStd*` ([#4045])
+ - stats: initial work on runtime stats ([#4043])
+
+### Changed
+
+ - tracing: change span naming to new console convention ([#4042])
+ - io: speed-up waking by using uninitialized array ([#4055], [#4071], [#4075])
+
+### Documented
+
+ - time: make Sleep examples easier to find ([#4040])
+
+[#3800]: https://github.com/tokio-rs/tokio/pull/3800
+[#4040]: https://github.com/tokio-rs/tokio/pull/4040
+[#4042]: https://github.com/tokio-rs/tokio/pull/4042
+[#4043]: https://github.com/tokio-rs/tokio/pull/4043
+[#4044]: https://github.com/tokio-rs/tokio/pull/4044
+[#4045]: https://github.com/tokio-rs/tokio/pull/4045
+[#4055]: https://github.com/tokio-rs/tokio/pull/4055
+[#4071]: https://github.com/tokio-rs/tokio/pull/4071
+[#4075]: https://github.com/tokio-rs/tokio/pull/4075
+[#4084]: https://github.com/tokio-rs/tokio/pull/4084
+
+# 1.10.1 (August 24, 2021)
+
+### Fixed
+
+ - runtime: fix leak in UnownedTask ([#4063])
+
+[#4063]: https://github.com/tokio-rs/tokio/pull/4063
+
+# 1.10.0 (August 12, 2021)
+
+### Added
+
+ - io: add `(read|write)_f(32|64)[_le]` methods ([#4022])
+ - io: add `fill_buf` and `consume` to `AsyncBufReadExt` ([#3991])
+ - process: add `Child::raw_handle()` on windows ([#3998])
+
+### Fixed
+
+ - doc: fix non-doc builds with `--cfg docsrs` ([#4020])
+ - io: flush eagerly in `io::copy` ([#4001])
+ - runtime: a debug assert was sometimes triggered during shutdown ([#4005])
+ - sync: use `spin_loop_hint` instead of `yield_now` in mpsc ([#4037])
+ - tokio: the test-util feature depends on rt, sync, and time ([#4036])
+
+### Changes
+
+ - runtime: reorganize parts of the runtime ([#3979], [#4005])
+ - signal: make windows docs for signal module show up on unix builds ([#3770])
+ - task: quickly send task to heap on debug mode ([#4009])
+
+### Documented
+
+ - io: document cancellation safety of `AsyncBufReadExt` ([#3997])
+ - sync: document when `watch::send` fails ([#4021])
+
+[#3770]: https://github.com/tokio-rs/tokio/pull/3770
+[#3979]: https://github.com/tokio-rs/tokio/pull/3979
+[#3991]: https://github.com/tokio-rs/tokio/pull/3991
+[#3997]: https://github.com/tokio-rs/tokio/pull/3997
+[#3998]: https://github.com/tokio-rs/tokio/pull/3998
+[#4001]: https://github.com/tokio-rs/tokio/pull/4001
+[#4005]: https://github.com/tokio-rs/tokio/pull/4005
+[#4009]: https://github.com/tokio-rs/tokio/pull/4009
+[#4020]: https://github.com/tokio-rs/tokio/pull/4020
+[#4021]: https://github.com/tokio-rs/tokio/pull/4021
+[#4022]: https://github.com/tokio-rs/tokio/pull/4022
+[#4036]: https://github.com/tokio-rs/tokio/pull/4036
+[#4037]: https://github.com/tokio-rs/tokio/pull/4037
+
+# 1.9.0 (July 22, 2021)
+
+### Added
+
+ - net: allow customized I/O operations for `TcpStream` ([#3888])
+ - sync: add getter for the mutex from a guard ([#3928])
+ - task: expose nameable future for `TaskLocal::scope` ([#3273])
+
+### Fixed
+
+ - Fix leak if output of future panics on drop ([#3967])
+ - Fix leak in `LocalSet` ([#3978])
+
+### Changes
+
+ - runtime: reorganize parts of the runtime ([#3909], [#3939], [#3950], [#3955], [#3980])
+ - sync: clean up `OnceCell` ([#3945])
+ - task: remove mutex in `JoinError` ([#3959])
+
+[#3273]: https://github.com/tokio-rs/tokio/pull/3273
+[#3888]: https://github.com/tokio-rs/tokio/pull/3888
+[#3909]: https://github.com/tokio-rs/tokio/pull/3909
+[#3928]: https://github.com/tokio-rs/tokio/pull/3928
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
+[#3939]: https://github.com/tokio-rs/tokio/pull/3939
+[#3945]: https://github.com/tokio-rs/tokio/pull/3945
+[#3950]: https://github.com/tokio-rs/tokio/pull/3950
+[#3955]: https://github.com/tokio-rs/tokio/pull/3955
+[#3959]: https://github.com/tokio-rs/tokio/pull/3959
+[#3967]: https://github.com/tokio-rs/tokio/pull/3967
+[#3978]: https://github.com/tokio-rs/tokio/pull/3978
+[#3980]: https://github.com/tokio-rs/tokio/pull/3980
+
+# 1.8.3 (July 26, 2021)
+
+This release backports two fixes from 1.9.0
+
+### Fixed
+
+ - Fix leak if output of future panics on drop ([#3967])
+ - Fix leak in `LocalSet` ([#3978])
+
+[#3967]: https://github.com/tokio-rs/tokio/pull/3967
+[#3978]: https://github.com/tokio-rs/tokio/pull/3978
+
+# 1.8.2 (July 19, 2021)
+
+Fixes a missed edge case from 1.8.1.
+
+### Fixed
+
+- runtime: drop canceled future on next poll (#3965)
+
+# 1.8.1 (July 6, 2021)
+
+Forward ports 1.5.1 fixes.
+
+### Fixed
+
+- runtime: remotely abort tasks on `JoinHandle::abort` ([#3934])
+
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
+
+# 1.8.0 (July 2, 2021)
+
+### Added
+
+- io: add `get_{ref,mut}` methods to `AsyncFdReadyGuard` and `AsyncFdReadyMutGuard` ([#3807])
+- io: efficient implementation of vectored writes for `BufWriter` ([#3163])
+- net: add ready/try methods to `NamedPipe{Client,Server}` ([#3866], [#3899])
+- sync: add `watch::Receiver::borrow_and_update` ([#3813])
+- sync: implement `From<T>` for `OnceCell<T>` ([#3877])
+- time: allow users to specify Interval behaviour when delayed ([#3721])
+
+### Added (unstable)
+
+- rt: add `tokio::task::Builder` ([#3881])
+
+### Fixed
+
+- net: handle HUP event with `UnixStream` ([#3898])
+
+### Documented
+
+- doc: document cancellation safety ([#3900])
+- time: add wait alias to sleep ([#3897])
+- time: document auto-advancing behaviour of runtime ([#3763])
+
+[#3163]: https://github.com/tokio-rs/tokio/pull/3163
+[#3721]: https://github.com/tokio-rs/tokio/pull/3721
+[#3763]: https://github.com/tokio-rs/tokio/pull/3763
+[#3807]: https://github.com/tokio-rs/tokio/pull/3807
+[#3813]: https://github.com/tokio-rs/tokio/pull/3813
+[#3866]: https://github.com/tokio-rs/tokio/pull/3866
+[#3877]: https://github.com/tokio-rs/tokio/pull/3877
+[#3881]: https://github.com/tokio-rs/tokio/pull/3881
+[#3897]: https://github.com/tokio-rs/tokio/pull/3897
+[#3898]: https://github.com/tokio-rs/tokio/pull/3898
+[#3899]: https://github.com/tokio-rs/tokio/pull/3899
+[#3900]: https://github.com/tokio-rs/tokio/pull/3900
+
+# 1.7.2 (July 6, 2021)
+
+Forward ports 1.5.1 fixes.
+
+### Fixed
+
+- runtime: remotely abort tasks on `JoinHandle::abort` ([#3934])
+
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
+
+# 1.7.1 (June 18, 2021)
+
+### Fixed
+
+- runtime: fix early task shutdown during runtime shutdown ([#3870])
+
+[#3870]: https://github.com/tokio-rs/tokio/pull/3870
+
+# 1.7.0 (June 15, 2021)
+
+### Added
+
+- net: add named pipes on windows ([#3760])
+- net: add `TcpSocket` from `std::net::TcpStream` conversion ([#3838])
+- sync: add `receiver_count` to `watch::Sender` ([#3729])
+- sync: export `sync::notify::Notified` future publicly ([#3840])
+- tracing: instrument task wakers ([#3836])
+
+### Fixed
+
+- macros: suppress `clippy::default_numeric_fallback` lint in generated code ([#3831])
+- runtime: immediately drop new tasks when runtime is shut down ([#3752])
+- sync: deprecate unused `mpsc::RecvError` type ([#3833])
+
+### Documented
+
+- io: clarify EOF condition for `AsyncReadExt::read_buf` ([#3850])
+- io: clarify limits on return values of `AsyncWrite::poll_write` ([#3820])
+- sync: add examples to Semaphore ([#3808])
+
+[#3729]: https://github.com/tokio-rs/tokio/pull/3729
+[#3752]: https://github.com/tokio-rs/tokio/pull/3752
+[#3760]: https://github.com/tokio-rs/tokio/pull/3760
+[#3808]: https://github.com/tokio-rs/tokio/pull/3808
+[#3820]: https://github.com/tokio-rs/tokio/pull/3820
+[#3831]: https://github.com/tokio-rs/tokio/pull/3831
+[#3833]: https://github.com/tokio-rs/tokio/pull/3833
+[#3836]: https://github.com/tokio-rs/tokio/pull/3836
+[#3838]: https://github.com/tokio-rs/tokio/pull/3838
+[#3840]: https://github.com/tokio-rs/tokio/pull/3840
+[#3850]: https://github.com/tokio-rs/tokio/pull/3850
+
+# 1.6.3 (July 6, 2021)
+
+Forward ports 1.5.1 fixes.
+
+### Fixed
+
+- runtime: remotely abort tasks on `JoinHandle::abort` ([#3934])
+
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
+
+# 1.6.2 (June 14, 2021)
+
+### Fixes
+
+- test: sub-ms `time:advance` regression introduced in 1.6 ([#3852])
+
+[#3852]: https://github.com/tokio-rs/tokio/pull/3852
+
+# 1.6.1 (May 28, 2021)
+
+This release reverts [#3518] because it doesn't work on some kernels due to
+a kernel bug. ([#3803])
+
+[#3518]: https://github.com/tokio-rs/tokio/issues/3518
+[#3803]: https://github.com/tokio-rs/tokio/issues/3803
+
+# 1.6.0 (May 14, 2021)
+
+### Added
+
+- fs: try doing a non-blocking read before punting to the threadpool ([#3518])
+- io: add `write_all_buf` to `AsyncWriteExt` ([#3737])
+- io: implement `AsyncSeek` for `BufReader`, `BufWriter`, and `BufStream` ([#3491])
+- net: support non-blocking vectored I/O ([#3761])
+- sync: add `mpsc::Sender::{reserve_owned, try_reserve_owned}` ([#3704])
+- sync: add a `MutexGuard::map` method that returns a `MappedMutexGuard` ([#2472])
+- time: add getter for Interval's period ([#3705])
+
+### Fixed
+
+- io: wake pending writers on `DuplexStream` close ([#3756])
+- process: avoid redundant effort to reap orphan processes ([#3743])
+- signal: use `std::os::raw::c_int` instead of `libc::c_int` on public API ([#3774])
+- sync: preserve permit state in `notify_waiters` ([#3660])
+- task: update `JoinHandle` panic message ([#3727])
+- time: prevent `time::advance` from going too far ([#3712])
+
+### Documented
+
+- net: hide `net::unix::datagram` module from docs ([#3775])
+- process: updated example ([#3748])
+- sync: `Barrier` doc should use task, not thread ([#3780])
+- task: update documentation on `block_in_place` ([#3753])
+
+[#2472]: https://github.com/tokio-rs/tokio/pull/2472
+[#3491]: https://github.com/tokio-rs/tokio/pull/3491
+[#3518]: https://github.com/tokio-rs/tokio/pull/3518
+[#3660]: https://github.com/tokio-rs/tokio/pull/3660
+[#3704]: https://github.com/tokio-rs/tokio/pull/3704
+[#3705]: https://github.com/tokio-rs/tokio/pull/3705
+[#3712]: https://github.com/tokio-rs/tokio/pull/3712
+[#3727]: https://github.com/tokio-rs/tokio/pull/3727
+[#3737]: https://github.com/tokio-rs/tokio/pull/3737
+[#3743]: https://github.com/tokio-rs/tokio/pull/3743
+[#3748]: https://github.com/tokio-rs/tokio/pull/3748
+[#3753]: https://github.com/tokio-rs/tokio/pull/3753
+[#3756]: https://github.com/tokio-rs/tokio/pull/3756
+[#3761]: https://github.com/tokio-rs/tokio/pull/3761
+[#3774]: https://github.com/tokio-rs/tokio/pull/3774
+[#3775]: https://github.com/tokio-rs/tokio/pull/3775
+[#3780]: https://github.com/tokio-rs/tokio/pull/3780
+
+# 1.5.1 (July 6, 2021)
+
+### Fixed
+
+- runtime: remotely abort tasks on `JoinHandle::abort` ([#3934])
+
+[#3934]: https://github.com/tokio-rs/tokio/pull/3934
+
 # 1.5.0 (April 12, 2021)
 
 ### Added

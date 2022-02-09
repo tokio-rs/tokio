@@ -1,4 +1,4 @@
-/// Wait on multiple concurrent branches, returning when **all** branches
+/// Waits on multiple concurrent branches, returning when **all** branches
 /// complete with `Ok(_)` or on the first `Err(_)`.
 ///
 /// The `try_join!` macro must be used inside of async functions, closures, and
@@ -56,6 +56,45 @@
 ///          Err(err) => {
 ///             println!("processing failed; error = {}", err);
 ///          }
+///     }
+/// }
+/// ```
+///
+/// Using `try_join!` with spawned tasks.
+///
+/// ```
+/// use tokio::task::JoinHandle;
+///
+/// async fn do_stuff_async() -> Result<(), &'static str> {
+///     // async work
+/// # Err("failed")
+/// }
+///
+/// async fn more_async_work() -> Result<(), &'static str> {
+///     // more here
+/// # Ok(())
+/// }
+///
+/// async fn flatten<T>(handle: JoinHandle<Result<T, &'static str>>) -> Result<T, &'static str> {
+///     match handle.await {
+///         Ok(Ok(result)) => Ok(result),
+///         Ok(Err(err)) => Err(err),
+///         Err(err) => Err("handling failed"),
+///     }
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let handle1 = tokio::spawn(do_stuff_async());
+///     let handle2 = tokio::spawn(more_async_work());
+///     match tokio::try_join!(flatten(handle1), flatten(handle2)) {
+///         Ok(val) => {
+///             // do something with the values
+///         }
+///         Err(err) => {
+///             println!("Failed with {}.", err);
+///             # assert_eq!(err, "failed");
+///         }
 ///     }
 /// }
 /// ```

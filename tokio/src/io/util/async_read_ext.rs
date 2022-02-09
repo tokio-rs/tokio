@@ -2,6 +2,7 @@ use crate::io::util::chain::{chain, Chain};
 use crate::io::util::read::{read, Read};
 use crate::io::util::read_buf::{read_buf, ReadBuf};
 use crate::io::util::read_exact::{read_exact, ReadExact};
+use crate::io::util::read_int::{ReadF32, ReadF32Le, ReadF64, ReadF64Le};
 use crate::io::util::read_int::{
     ReadI128, ReadI128Le, ReadI16, ReadI16Le, ReadI32, ReadI32Le, ReadI64, ReadI64Le, ReadI8,
 };
@@ -105,8 +106,10 @@ cfg_io_util! {
         /// async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
         /// ```
         ///
-        /// This function does not provide any guarantees about whether it
-        /// completes immediately or asynchronously
+        /// This method does not provide any guarantees about whether it
+        /// completes immediately or asynchronously.
+        ///
+        /// # Return
         ///
         /// If the return value of this method is `Ok(n)`, then it must be
         /// guaranteed that `0 <= n <= buf.len()`. A nonzero `n` value indicates
@@ -135,6 +138,12 @@ cfg_io_util! {
         /// If this function encounters any form of I/O or other error, an error
         /// variant will be returned. If an error is returned then it must be
         /// guaranteed that no bytes were read.
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is cancel safe. If you use it as the event in a
+        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// completes first, then it is guaranteed that no data was read.
         ///
         /// # Examples
         ///
@@ -175,20 +184,31 @@ cfg_io_util! {
         /// Usually, only a single `read` syscall is issued, even if there is
         /// more space in the supplied buffer.
         ///
-        /// This function does not provide any guarantees about whether it
-        /// completes immediately or asynchronously
+        /// This method does not provide any guarantees about whether it
+        /// completes immediately or asynchronously.
         ///
         /// # Return
         ///
-        /// On a successful read, the number of read bytes is returned. If the
-        /// supplied buffer is not empty and the function returns `Ok(0)` then
-        /// the source has reached an "end-of-file" event.
+        /// A nonzero `n` value indicates that the buffer `buf` has been filled
+        /// in with `n` bytes of data from this source. If `n` is `0`, then it
+        /// can indicate one of two scenarios:
+        ///
+        /// 1. This reader has reached its "end of file" and will likely no longer
+        ///    be able to produce bytes. Note that this does not mean that the
+        ///    reader will *always* no longer be able to produce bytes.
+        /// 2. The buffer specified had a remaining capacity of zero.
         ///
         /// # Errors
         ///
         /// If this function encounters any form of I/O or other error, an error
         /// variant will be returned. If an error is returned then it must be
         /// guaranteed that no bytes were read.
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is cancel safe. If you use it as the event in a
+        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// completes first, then it is guaranteed that no data was read.
         ///
         /// # Examples
         ///
@@ -253,6 +273,13 @@ cfg_io_util! {
         /// If this operation returns an error, it is unspecified how many bytes
         /// it has read, but it will never read more than would be necessary to
         /// completely fill the buffer.
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is not cancellation safe. If the method is used as the
+        /// event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then some data may already have been
+        /// read into `buf`.
         ///
         /// # Examples
         ///
@@ -579,7 +606,7 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut reader = Cursor::new(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
             ///
-            ///     assert_eq!(i64::min_value(), reader.read_i64().await?);
+            ///     assert_eq!(i64::MIN, reader.read_i64().await?);
             ///     Ok(())
             /// }
             /// ```
@@ -659,11 +686,87 @@ cfg_io_util! {
             ///         0, 0, 0, 0, 0, 0, 0, 0
             ///     ]);
             ///
-            ///     assert_eq!(i128::min_value(), reader.read_i128().await?);
+            ///     assert_eq!(i128::MIN, reader.read_i128().await?);
             ///     Ok(())
             /// }
             /// ```
             fn read_i128(&mut self) -> ReadI128;
+
+            /// Reads an 32-bit floating point type in big-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_f32(&mut self) -> io::Result<f32>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read 32-bit floating point type from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0xff, 0x7f, 0xff, 0xff]);
+            ///
+            ///     assert_eq!(f32::MIN, reader.read_f32().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_f32(&mut self) -> ReadF32;
+
+            /// Reads an 64-bit floating point type in big-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_f64(&mut self) -> io::Result<f64>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read 64-bit floating point type from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![
+            ///         0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+            ///     ]);
+            ///
+            ///     assert_eq!(f64::MIN, reader.read_f64().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_f64(&mut self) -> ReadF64;
 
             /// Reads an unsigned 16-bit integer in little-endian order from the
             /// underlying reader.
@@ -971,6 +1074,82 @@ cfg_io_util! {
             /// }
             /// ```
             fn read_i128_le(&mut self) -> ReadI128Le;
+
+            /// Reads an 32-bit floating point type in little-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_f32_le(&mut self) -> io::Result<f32>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read 32-bit floating point type from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0xff, 0xff, 0x7f, 0xff]);
+            ///
+            ///     assert_eq!(f32::MIN, reader.read_f32_le().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_f32_le(&mut self) -> ReadF32Le;
+
+            /// Reads an 64-bit floating point type in little-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_f64_le(&mut self) -> io::Result<f64>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read 64-bit floating point type from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![
+            ///         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0xff
+            ///     ]);
+            ///
+            ///     assert_eq!(f64::MIN, reader.read_f64_le().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_f64_le(&mut self) -> ReadF64Le;
         }
 
         /// Reads all bytes until EOF in this source, placing them into `buf`.

@@ -13,10 +13,9 @@ use std::{
     task::{Context, Waker},
 };
 
-use nix::errno::Errno;
 use nix::unistd::{close, read, write};
 
-use futures::{poll, FutureExt};
+use futures::poll;
 
 use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
 use tokio_test::{assert_err, assert_pending};
@@ -56,10 +55,6 @@ impl TestWaker {
     }
 }
 
-fn is_blocking(e: &nix::Error) -> bool {
-    Some(Errno::EAGAIN) == e.as_errno()
-}
-
 #[derive(Debug)]
 struct FileDescriptor {
     fd: RawFd,
@@ -73,11 +68,7 @@ impl AsRawFd for FileDescriptor {
 
 impl Read for &FileDescriptor {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match read(self.fd, buf) {
-            Ok(n) => Ok(n),
-            Err(e) if is_blocking(&e) => Err(ErrorKind::WouldBlock.into()),
-            Err(e) => Err(io::Error::new(ErrorKind::Other, e)),
-        }
+        read(self.fd, buf).map_err(io::Error::from)
     }
 }
 
@@ -89,11 +80,7 @@ impl Read for FileDescriptor {
 
 impl Write for &FileDescriptor {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match write(self.fd, buf) {
-            Ok(n) => Ok(n),
-            Err(e) if is_blocking(&e) => Err(ErrorKind::WouldBlock.into()),
-            Err(e) => Err(io::Error::new(ErrorKind::Other, e)),
-        }
+        write(self.fd, buf).map_err(io::Error::from)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -176,10 +163,11 @@ async fn initially_writable() {
     afd_a.writable().await.unwrap().clear_ready();
     afd_b.writable().await.unwrap().clear_ready();
 
-    futures::select_biased! {
-        _ = tokio::time::sleep(Duration::from_millis(10)).fuse() => {},
-        _ = afd_a.readable().fuse() => panic!("Unexpected readable state"),
-        _ = afd_b.readable().fuse() => panic!("Unexpected readable state"),
+    tokio::select! {
+        biased;
+        _ = tokio::time::sleep(Duration::from_millis(10)) => {},
+        _ = afd_a.readable() => panic!("Unexpected readable state"),
+        _ = afd_b.readable() => panic!("Unexpected readable state"),
     }
 }
 
@@ -366,12 +354,13 @@ async fn multiple_waiters() {
                 futures::future::pending::<()>().await;
             };
 
-            futures::select_biased! {
-                guard = afd_a.readable().fuse() => {
+            tokio::select! {
+                biased;
+                guard = afd_a.readable() => {
                     tokio::task::yield_now().await;
                     guard.unwrap().clear_ready()
                 },
-                _ = notify_barrier.fuse() => unreachable!(),
+                _ = notify_barrier => unreachable!(),
             }
 
             std::mem::drop(afd_a);

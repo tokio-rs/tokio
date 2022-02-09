@@ -88,7 +88,7 @@ impl UnixListener {
         Ok(UnixListener { io })
     }
 
-    /// Turn a [`tokio::net::UnixListener`] into a [`std::os::unix::net::UnixListener`].
+    /// Turns a [`tokio::net::UnixListener`] into a [`std::os::unix::net::UnixListener`].
     ///
     /// The returned [`std::os::unix::net::UnixListener`] will have nonblocking mode
     /// set as `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.
@@ -128,6 +128,13 @@ impl UnixListener {
     }
 
     /// Accepts a new incoming connection to this listener.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If the method is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that no new connections were
+    /// accepted by this method.
     pub async fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
         let (mio, addr) = self
             .io

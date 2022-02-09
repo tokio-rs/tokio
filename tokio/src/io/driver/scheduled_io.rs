@@ -3,6 +3,7 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::bit;
 use crate::util::slab::Entry;
+use crate::util::WakeList;
 
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::{Context, Poll, Waker};
@@ -35,16 +36,16 @@ cfg_io_readiness! {
 #[derive(Debug, Default)]
 struct Waiters {
     #[cfg(feature = "net")]
-    /// List of all current waiters
+    /// List of all current waiters.
     list: WaitList,
 
-    /// Waker used for AsyncRead
+    /// Waker used for AsyncRead.
     reader: Option<Waker>,
 
-    /// Waker used for AsyncWrite
+    /// Waker used for AsyncWrite.
     writer: Option<Waker>,
 
-    /// True if this ScheduledIo has been killed due to IO driver shutdown
+    /// True if this ScheduledIo has been killed due to IO driver shutdown.
     is_shutdown: bool,
 }
 
@@ -53,19 +54,19 @@ cfg_io_readiness! {
     struct Waiter {
         pointers: linked_list::Pointers<Waiter>,
 
-        /// The waker for this task
+        /// The waker for this task.
         waker: Option<Waker>,
 
-        /// The interest this waiter is waiting on
+        /// The interest this waiter is waiting on.
         interest: Interest,
 
         is_ready: bool,
 
-        /// Should never be `!Unpin`
+        /// Should never be `!Unpin`.
         _p: PhantomPinned,
     }
 
-    /// Future returned by `readiness()`
+    /// Future returned by `readiness()`.
     struct Readiness<'a> {
         scheduled_io: &'a ScheduledIo,
 
@@ -84,9 +85,9 @@ cfg_io_readiness! {
 
 // The `ScheduledIo::readiness` (`AtomicUsize`) is packed full of goodness.
 //
-// | reserved | generation |  driver tick | readinesss |
-// |----------+------------+--------------+------------|
-// |   1 bit  |   7 bits   +    8 bits    +   16 bits  |
+// | reserved | generation |  driver tick | readiness |
+// |----------+------------+--------------+-----------|
+// |   1 bit  |   7 bits   +    8 bits    +   16 bits |
 
 const READINESS: bit::Pack = bit::Pack::least_significant(16);
 
@@ -212,10 +213,7 @@ impl ScheduledIo {
     }
 
     fn wake0(&self, ready: Ready, shutdown: bool) {
-        const NUM_WAKERS: usize = 32;
-
-        let mut wakers: [Option<Waker>; NUM_WAKERS] = Default::default();
-        let mut curr = 0;
+        let mut wakers = WakeList::new();
 
         let mut waiters = self.waiters.lock();
 
@@ -224,16 +222,14 @@ impl ScheduledIo {
         // check for AsyncRead slot
         if ready.is_readable() {
             if let Some(waker) = waiters.reader.take() {
-                wakers[curr] = Some(waker);
-                curr += 1;
+                wakers.push(waker);
             }
         }
 
         // check for AsyncWrite slot
         if ready.is_writable() {
             if let Some(waker) = waiters.writer.take() {
-                wakers[curr] = Some(waker);
-                curr += 1;
+                wakers.push(waker);
             }
         }
 
@@ -241,15 +237,14 @@ impl ScheduledIo {
         'outer: loop {
             let mut iter = waiters.list.drain_filter(|w| ready.satisfies(w.interest));
 
-            while curr < NUM_WAKERS {
+            while wakers.can_push() {
                 match iter.next() {
                     Some(waiter) => {
                         let waiter = unsafe { &mut *waiter.as_ptr() };
 
                         if let Some(waker) = waiter.waker.take() {
                             waiter.is_ready = true;
-                            wakers[curr] = Some(waker);
-                            curr += 1;
+                            wakers.push(waker);
                         }
                     }
                     None => {
@@ -260,11 +255,7 @@ impl ScheduledIo {
 
             drop(waiters);
 
-            for waker in wakers.iter_mut().take(curr) {
-                waker.take().unwrap().wake();
-            }
-
-            curr = 0;
+            wakers.wake_all();
 
             // Acquire the lock again.
             waiters = self.waiters.lock();
@@ -273,9 +264,7 @@ impl ScheduledIo {
         // Release the lock before notifying
         drop(waiters);
 
-        for waker in wakers.iter_mut().take(curr) {
-            waker.take().unwrap().wake();
-        }
+        wakers.wake_all();
     }
 
     pub(super) fn ready_event(&self, interest: Interest) -> ReadyEvent {
@@ -287,7 +276,7 @@ impl ScheduledIo {
         }
     }
 
-    /// Poll version of checking readiness for a certain direction.
+    /// Polls for readiness events in a given direction.
     ///
     /// These are to support `AsyncRead` and `AsyncWrite` polling methods,
     /// which cannot use the `async fn` version. This uses reserved reader
@@ -374,7 +363,7 @@ unsafe impl Sync for ScheduledIo {}
 
 cfg_io_readiness! {
     impl ScheduledIo {
-        /// An async version of `poll_readiness` which uses a linked list of wakers
+        /// An async version of `poll_readiness` which uses a linked list of wakers.
         pub(crate) async fn readiness(&self, interest: Interest) -> ReadyEvent {
             self.readiness_fut(interest).await
         }

@@ -1,9 +1,5 @@
-// This lint claims ugly casting is somehow safer than transmute, but there's
-// no evidence that is the case. Shush.
-#![allow(clippy::transmute_ptr_to_ptr)]
-
 use std::fmt;
-use std::mem::{self, MaybeUninit};
+use std::mem::MaybeUninit;
 
 /// A wrapper around a byte buffer that is incrementally filled and initialized.
 ///
@@ -35,7 +31,7 @@ impl<'a> ReadBuf<'a> {
     #[inline]
     pub fn new(buf: &'a mut [u8]) -> ReadBuf<'a> {
         let initialized = buf.len();
-        let buf = unsafe { mem::transmute::<&mut [u8], &mut [MaybeUninit<u8>]>(buf) };
+        let buf = unsafe { slice_to_uninit_mut(buf) };
         ReadBuf {
             buf,
             filled: 0,
@@ -45,7 +41,7 @@ impl<'a> ReadBuf<'a> {
 
     /// Creates a new `ReadBuf` from a fully uninitialized buffer.
     ///
-    /// Use `assume_init` if part of the buffer is known to be already inintialized.
+    /// Use `assume_init` if part of the buffer is known to be already initialized.
     #[inline]
     pub fn uninit(buf: &'a mut [MaybeUninit<u8>]) -> ReadBuf<'a> {
         ReadBuf {
@@ -67,8 +63,7 @@ impl<'a> ReadBuf<'a> {
         let slice = &self.buf[..self.filled];
         // safety: filled describes how far into the buffer that the
         // user has filled with bytes, so it's been initialized.
-        // TODO: This could use `MaybeUninit::slice_get_ref` when it is stable.
-        unsafe { mem::transmute::<&[MaybeUninit<u8>], &[u8]>(slice) }
+        unsafe { slice_assume_init(slice) }
     }
 
     /// Returns a mutable reference to the filled portion of the buffer.
@@ -77,15 +72,14 @@ impl<'a> ReadBuf<'a> {
         let slice = &mut self.buf[..self.filled];
         // safety: filled describes how far into the buffer that the
         // user has filled with bytes, so it's been initialized.
-        // TODO: This could use `MaybeUninit::slice_get_mut` when it is stable.
-        unsafe { mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(slice) }
+        unsafe { slice_assume_init_mut(slice) }
     }
 
     /// Returns a new `ReadBuf` comprised of the unfilled section up to `n`.
     #[inline]
     pub fn take(&mut self, n: usize) -> ReadBuf<'_> {
         let max = std::cmp::min(self.remaining(), n);
-        // Saftey: We don't set any of the `unfilled_mut` with `MaybeUninit::uninit`.
+        // Safety: We don't set any of the `unfilled_mut` with `MaybeUninit::uninit`.
         unsafe { ReadBuf::uninit(&mut self.unfilled_mut()[..max]) }
     }
 
@@ -97,8 +91,7 @@ impl<'a> ReadBuf<'a> {
         let slice = &self.buf[..self.initialized];
         // safety: initialized describes how far into the buffer that the
         // user has at some point initialized with bytes.
-        // TODO: This could use `MaybeUninit::slice_get_ref` when it is stable.
-        unsafe { mem::transmute::<&[MaybeUninit<u8>], &[u8]>(slice) }
+        unsafe { slice_assume_init(slice) }
     }
 
     /// Returns a mutable reference to the initialized portion of the buffer.
@@ -109,15 +102,14 @@ impl<'a> ReadBuf<'a> {
         let slice = &mut self.buf[..self.initialized];
         // safety: initialized describes how far into the buffer that the
         // user has at some point initialized with bytes.
-        // TODO: This could use `MaybeUninit::slice_get_mut` when it is stable.
-        unsafe { mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(slice) }
+        unsafe { slice_assume_init_mut(slice) }
     }
 
     /// Returns a mutable reference to the entire buffer, without ensuring that it has been fully
     /// initialized.
     ///
     /// The elements between 0 and `self.filled().len()` are filled, and those between 0 and
-    /// `self.initialized().len()` are initialized (and so can be transmuted to a `&mut [u8]`).
+    /// `self.initialized().len()` are initialized (and so can be converted to a `&mut [u8]`).
     ///
     /// The caller of this method must ensure that these invariants are upheld. For example, if the
     /// caller initializes some of the uninitialized section of the buffer, it must call
@@ -178,7 +170,7 @@ impl<'a> ReadBuf<'a> {
         let slice = &mut self.buf[self.filled..end];
         // safety: just above, we checked that the end of the buf has
         // been initialized to some value.
-        unsafe { mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(slice) }
+        unsafe { slice_assume_init_mut(slice) }
     }
 
     /// Returns the number of bytes at the end of the slice that have not yet been filled.
@@ -217,7 +209,7 @@ impl<'a> ReadBuf<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if the filled region of the buffer would become larger than the intialized region.
+    /// Panics if the filled region of the buffer would become larger than the initialized region.
     #[inline]
     pub fn set_filled(&mut self, n: usize) {
         assert!(
@@ -282,4 +274,18 @@ impl fmt::Debug for ReadBuf<'_> {
             .field("capacity", &self.capacity())
             .finish()
     }
+}
+
+unsafe fn slice_to_uninit_mut(slice: &mut [u8]) -> &mut [MaybeUninit<u8>] {
+    &mut *(slice as *mut [u8] as *mut [MaybeUninit<u8>])
+}
+
+// TODO: This could use `MaybeUninit::slice_assume_init` when it is stable.
+unsafe fn slice_assume_init(slice: &[MaybeUninit<u8>]) -> &[u8] {
+    &*(slice as *const [MaybeUninit<u8>] as *const [u8])
+}
+
+// TODO: This could use `MaybeUninit::slice_assume_init_mut` when it is stable.
+unsafe fn slice_assume_init_mut(slice: &mut [MaybeUninit<u8>]) -> &mut [u8] {
+    &mut *(slice as *mut [MaybeUninit<u8>] as *mut [u8])
 }

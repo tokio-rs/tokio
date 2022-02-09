@@ -9,12 +9,13 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![cfg_attr(docsrs, deny(broken_intra_doc_links))]
+#![deny(unused_must_use)]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
 ))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, allow(unused_attributes))]
 
 //! A runtime for writing reliable network applications without compromising speed.
 //!
@@ -159,8 +160,8 @@
 //! [`tokio::runtime`]: crate::runtime
 //! [`Builder`]: crate::runtime::Builder
 //! [`Runtime`]: crate::runtime::Runtime
-//! [rt]: runtime/index.html#basic-scheduler
-//! [rt-multi-thread]: runtime/index.html#threaded-scheduler
+//! [rt]: runtime/index.html#current-thread-scheduler
+//! [rt-multi-thread]: runtime/index.html#multi-thread-scheduler
 //! [rt-features]: runtime/index.html#runtime-scheduler
 //!
 //! ## CPU-bound tasks and blocking code
@@ -203,9 +204,15 @@
 //! ```
 //!
 //! If your code is CPU-bound and you wish to limit the number of threads used
-//! to run it, you should run it on another thread pool such as [rayon]. You
-//! can use an [`oneshot`] channel to send the result back to Tokio when the
-//! rayon task finishes.
+//! to run it, you should use a separate thread pool dedicated to CPU bound tasks.
+//! For example, you could consider using the [rayon] library for CPU-bound
+//! tasks. It is also possible to create an extra Tokio runtime dedicated to
+//! CPU-bound tasks, but if you do this, you should be careful that the extra
+//! runtime runs _only_ CPU-bound tasks, as IO-bound tasks on that runtime
+//! will behave poorly.
+//!
+//! Hint: If using rayon, you can use a [`oneshot`] channel to send the result back
+//! to Tokio when the rayon task finishes.
 //!
 //! [rayon]: https://docs.rs/rayon
 //! [`oneshot`]: crate::sync::oneshot
@@ -300,14 +307,15 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all Tokio public API features listed below except `test-util`.
+//! - `full`: Enables all features listed below except `test-util` and `tracing`.
 //! - `rt`: Enables `tokio::spawn`, the basic (current thread) scheduler,
 //!         and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
-//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`,
-//!          as well as (on Unix-like systems) `AsyncFd`
+//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and
+//!          `UdpSocket`, as well as (on Unix-like systems) `AsyncFd` and (on
+//!          FreeBSD) `PollAio`.
 //! - `time`: Enables `tokio::time` types and allows the schedulers to enable
 //!           the built in timer.
 //! - `process`: Enables `tokio::process` types.
@@ -340,6 +348,19 @@
 //! - `tracing`: Enables tracing events.
 //!
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
+
+// Test that pointer width is compatible. This asserts that e.g. usize is at
+// least 32 bits, which a lot of components in Tokio currently assumes.
+//
+// TODO: improve once we have MSRV access to const eval to make more flexible.
+#[cfg(not(any(
+    target_pointer_width = "32",
+    target_pointer_width = "64",
+    target_pointer_width = "128"
+)))]
+compile_error! {
+    "Tokio requires the platform pointer width to be 32, 64, or 128 bits"
+}
 
 // Includes re-exports used by macros.
 //
@@ -442,6 +463,28 @@ mod util;
 /// ```
 pub mod stream {}
 
+// local re-exports of platform specific things, allowing for decent
+// documentation to be shimmed in on docs.rs
+
+#[cfg(docsrs)]
+pub mod doc;
+
+#[cfg(docsrs)]
+#[allow(unused)]
+pub(crate) use self::doc::os;
+
+#[cfg(not(docsrs))]
+#[allow(unused)]
+pub(crate) use std::os;
+
+#[cfg(docsrs)]
+#[allow(unused)]
+pub(crate) use self::doc::winapi;
+
+#[cfg(all(not(docsrs), windows, feature = "net"))]
+#[allow(unused)]
+pub(crate) use ::winapi;
+
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**
     /// intended to be used as part of the public API and is permitted to
@@ -449,19 +492,30 @@ cfg_macros! {
     #[doc(hidden)]
     pub use tokio_macros::select_priv_declare_output_enum;
 
+    /// Implementation detail of the `select!` macro. This macro is **not**
+    /// intended to be used as part of the public API and is permitted to
+    /// change.
+    #[doc(hidden)]
+    pub use tokio_macros::select_priv_clean_pattern;
+
     cfg_rt! {
         #[cfg(feature = "rt-multi-thread")]
         #[cfg(not(test))] // Work around for rust-lang/rust#62127
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[doc(inline)]
         pub use tokio_macros::main;
 
         #[cfg(feature = "rt-multi-thread")]
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[doc(inline)]
         pub use tokio_macros::test;
 
         cfg_not_rt_multi_thread! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
+            #[doc(inline)]
             pub use tokio_macros::main_rt as main;
+
+            #[doc(inline)]
             pub use tokio_macros::test_rt as test;
         }
     }
@@ -469,7 +523,10 @@ cfg_macros! {
     // Always fail if rt is not enabled.
     cfg_not_rt! {
         #[cfg(not(test))]
+        #[doc(inline)]
         pub use tokio_macros::main_fail as main;
+
+        #[doc(inline)]
         pub use tokio_macros::test_fail as test;
     }
 }

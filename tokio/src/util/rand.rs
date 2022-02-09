@@ -1,12 +1,12 @@
 use std::cell::Cell;
 
-/// Fast random number generate
+/// Fast random number generate.
 ///
 /// Implement xorshift64+: 2 32-bit xorshift sequences added together.
 /// Shift triplet `[17,7,16]` was calculated as indicated in Marsaglia's
-/// Xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf
+/// Xorshift paper: <https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf>
 /// This generator passes the SmallCrush suite, part of TestU01 framework:
-/// http://simul.iro.umontreal.ca/testu01/tu01.html
+/// <http://simul.iro.umontreal.ca/testu01/tu01.html>
 #[derive(Debug)]
 pub(crate) struct FastRand {
     one: Cell<u32>,
@@ -14,7 +14,7 @@ pub(crate) struct FastRand {
 }
 
 impl FastRand {
-    /// Initialize a new, thread-local, fast random number generator.
+    /// Initializes a new, thread-local, fast random number generator.
     pub(crate) fn new(seed: u64) -> FastRand {
         let one = (seed >> 32) as u32;
         let mut two = seed as u32;

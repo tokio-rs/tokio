@@ -41,3 +41,70 @@ pub(crate) fn declare_output_enum(input: TokenStream) -> TokenStream {
         pub(super) type Mask = #mask;
     })
 }
+
+pub(crate) fn clean_pattern_macro(input: TokenStream) -> TokenStream {
+    // If this isn't a pattern, we return the token stream as-is. The select!
+    // macro is using it in a location requiring a pattern, so an error will be
+    // emitted there.
+    let mut input: syn::Pat = match syn::parse(input.clone()) {
+        Ok(it) => it,
+        Err(_) => return input,
+    };
+
+    clean_pattern(&mut input);
+    quote::ToTokens::into_token_stream(input).into()
+}
+
+// Removes any occurrences of ref or mut in the provided pattern.
+fn clean_pattern(pat: &mut syn::Pat) {
+    match pat {
+        syn::Pat::Box(_box) => {}
+        syn::Pat::Lit(_literal) => {}
+        syn::Pat::Macro(_macro) => {}
+        syn::Pat::Path(_path) => {}
+        syn::Pat::Range(_range) => {}
+        syn::Pat::Rest(_rest) => {}
+        syn::Pat::Verbatim(_tokens) => {}
+        syn::Pat::Wild(_underscore) => {}
+        syn::Pat::Ident(ident) => {
+            ident.by_ref = None;
+            ident.mutability = None;
+            if let Some((_at, pat)) = &mut ident.subpat {
+                clean_pattern(&mut *pat);
+            }
+        }
+        syn::Pat::Or(or) => {
+            for case in or.cases.iter_mut() {
+                clean_pattern(case);
+            }
+        }
+        syn::Pat::Slice(slice) => {
+            for elem in slice.elems.iter_mut() {
+                clean_pattern(elem);
+            }
+        }
+        syn::Pat::Struct(struct_pat) => {
+            for field in struct_pat.fields.iter_mut() {
+                clean_pattern(&mut field.pat);
+            }
+        }
+        syn::Pat::Tuple(tuple) => {
+            for elem in tuple.elems.iter_mut() {
+                clean_pattern(elem);
+            }
+        }
+        syn::Pat::TupleStruct(tuple) => {
+            for elem in tuple.pat.elems.iter_mut() {
+                clean_pattern(elem);
+            }
+        }
+        syn::Pat::Reference(reference) => {
+            reference.mutability = None;
+            clean_pattern(&mut *reference.pat);
+        }
+        syn::Pat::Type(type_pat) => {
+            clean_pattern(&mut *type_pat.pat);
+        }
+        _ => {}
+    }
+}

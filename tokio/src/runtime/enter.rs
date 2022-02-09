@@ -64,7 +64,7 @@ cfg_rt! {
 // # Warning
 //
 // This is hidden for a reason. Do not use without fully understanding
-// executors. Misuing can easily cause your program to deadlock.
+// executors. Misusing can easily cause your program to deadlock.
 cfg_rt_multi_thread! {
     pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
         // Reset in case the closure panics
@@ -92,7 +92,7 @@ cfg_rt_multi_thread! {
 }
 
 cfg_rt! {
-    /// Disallow blocking in the current runtime context until the guard is dropped.
+    /// Disallows blocking in the current runtime context until the guard is dropped.
     pub(crate) fn disallow_blocking() -> DisallowBlockingGuard {
         let reset = ENTERED.with(|c| {
             if let EnterContext::Entered {

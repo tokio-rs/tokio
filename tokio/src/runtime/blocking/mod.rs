@@ -4,11 +4,17 @@
 //! compilation.
 
 mod pool;
-pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
+pub(crate) use pool::{spawn_blocking, BlockingPool, Mandatory, Spawner, Task};
+
+cfg_fs! {
+    pub(crate) use pool::spawn_mandatory_blocking;
+}
 
 mod schedule;
 mod shutdown;
-pub(crate) mod task;
+mod task;
+pub(crate) use schedule::NoopSchedule;
+pub(crate) use task::BlockingTask;
 
 use crate::runtime::Builder;
 

@@ -1,8 +1,5 @@
 //! Threadpool
 
-mod atomic_cell;
-use atomic_cell::AtomicCell;
-
 mod idle;
 use self::idle::Idle;
 
@@ -12,8 +9,8 @@ pub(crate) use worker::Launch;
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
-use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::Parker;
+use crate::runtime::task::JoinHandle;
+use crate::runtime::{Callback, Parker};
 
 use std::fmt;
 use std::future::Future;
@@ -23,14 +20,14 @@ pub(crate) struct ThreadPool {
     spawner: Spawner,
 }
 
-/// Submit futures to the associated thread pool for execution.
+/// Submits futures to the associated thread pool for execution.
 ///
 /// A `Spawner` instance is a handle to a single thread pool that allows the owner
 /// of the handle to spawn futures onto the thread pool.
 ///
 /// The `Spawner` handle is *only* used for spawning new futures. It does not
 /// impact the lifecycle of the thread pool in any way. The thread pool may
-/// shutdown while there are outstanding `Spawner` instances.
+/// shut down while there are outstanding `Spawner` instances.
 ///
 /// `Spawner` instances are obtained by calling [`ThreadPool::spawner`].
 ///
@@ -43,8 +40,13 @@ pub(crate) struct Spawner {
 // ===== impl ThreadPool =====
 
 impl ThreadPool {
-    pub(crate) fn new(size: usize, parker: Parker) -> (ThreadPool, Launch) {
-        let (shared, launch) = worker::create(size, parker);
+    pub(crate) fn new(
+        size: usize,
+        parker: Parker,
+        before_park: Option<Callback>,
+        after_unpark: Option<Callback>,
+    ) -> (ThreadPool, Launch) {
+        let (shared, launch) = worker::create(size, parker, before_park, after_unpark);
         let spawner = Spawner { shared };
         let thread_pool = ThreadPool { spawner };
 
@@ -90,16 +92,40 @@ impl Spawner {
     /// Spawns a future onto the thread pool
     pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
-        F: Future + Send + 'static,
+        F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (task, handle) = task::joinable(future);
-        self.shared.schedule(task, false);
-        handle
+        worker::Shared::bind_new_task(&self.shared, future)
     }
 
     pub(crate) fn shutdown(&mut self) {
         self.shared.close();
+    }
+}
+
+cfg_metrics! {
+    use crate::runtime::{SchedulerMetrics, WorkerMetrics};
+
+    impl Spawner {
+        pub(crate) fn num_workers(&self) -> usize {
+            self.shared.worker_metrics.len()
+        }
+
+        pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
+            &self.shared.scheduler_metrics
+        }
+
+        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+            &self.shared.worker_metrics[worker]
+        }
+
+        pub(crate) fn injection_queue_depth(&self) -> usize {
+            self.shared.injection_queue_depth()
+        }
+
+        pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
+            self.shared.worker_local_queue_depth(worker)
+        }
     }
 }
 

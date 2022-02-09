@@ -28,7 +28,7 @@ use std::io;
 /// It is up to the Decoder to keep track of a restart after an EOF,
 /// and to decide how to handle such an event by, for example,
 /// allowing frames to cross EOF boundaries, re-emitting opening frames, or
-/// reseting the entire internal state.
+/// resetting the entire internal state.
 ///
 /// [`Framed`]: crate::codec::Framed
 /// [`FramedRead`]: crate::codec::FramedRead

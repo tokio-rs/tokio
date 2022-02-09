@@ -85,11 +85,11 @@ pub(crate) struct Address(usize);
 
 /// An entry in the slab.
 pub(crate) trait Entry: Default {
-    /// Reset the entry's value and track the generation.
+    /// Resets the entry's value and track the generation.
     fn reset(&self);
 }
 
-/// A reference to a value stored in the slab
+/// A reference to a value stored in the slab.
 pub(crate) struct Ref<T> {
     value: *const Value<T>,
 }
@@ -101,9 +101,9 @@ const NUM_PAGES: usize = 19;
 const PAGE_INITIAL_SIZE: usize = 32;
 const PAGE_INDEX_SHIFT: u32 = PAGE_INITIAL_SIZE.trailing_zeros() + 1;
 
-/// A page in the slab
+/// A page in the slab.
 struct Page<T> {
-    /// Slots
+    /// Slots.
     slots: Mutex<Slots<T>>,
 
     // Number of slots currently being used. This is not guaranteed to be up to
@@ -116,7 +116,7 @@ struct Page<T> {
     // The number of slots the page can hold.
     len: usize,
 
-    // Length of all previous pages combined
+    // Length of all previous pages combined.
     prev_len: usize,
 }
 
@@ -128,9 +128,9 @@ struct CachedPage<T> {
     init: usize,
 }
 
-/// Page state
+/// Page state.
 struct Slots<T> {
-    /// Slots
+    /// Slots.
     slots: Vec<Slot<T>>,
 
     head: usize,
@@ -157,11 +157,17 @@ struct Slot<T> {
 
     /// Next entry in the free list.
     next: u32,
+
+    /// Makes miri happy by making mutable references not take exclusive access.
+    ///
+    /// Could probably also be fixed by replacing `slots` with a raw-pointer
+    /// based equivalent.
+    _pin: std::marker::PhantomPinned,
 }
 
-/// Value paired with a reference to the page
+/// Value paired with a reference to the page.
 struct Value<T> {
-    /// Value stored in the value
+    /// Value stored in the value.
     value: T,
 
     /// Pointer to the page containing the slot.
@@ -171,7 +177,7 @@ struct Value<T> {
 }
 
 impl<T> Slab<T> {
-    /// Create a new, empty, slab
+    /// Create a new, empty, slab.
     pub(crate) fn new() -> Slab<T> {
         // Initializing arrays is a bit annoying. Instead of manually writing
         // out an array and every single entry, `Default::default()` is used to
@@ -409,7 +415,7 @@ impl<T: Entry> Page<T> {
             slot.value.with(|ptr| unsafe { (*ptr).value.reset() });
 
             // Return a reference to the slot
-            Some((me.addr(idx), slot.gen_ref(me)))
+            Some((me.addr(idx), locked.gen_ref(idx, me)))
         } else if me.len == locked.slots.len() {
             // The page is full
             None
@@ -428,9 +434,10 @@ impl<T: Entry> Page<T> {
             locked.slots.push(Slot {
                 value: UnsafeCell::new(Value {
                     value: Default::default(),
-                    page: &**me as *const _,
+                    page: Arc::as_ptr(me),
                 }),
                 next: 0,
+                _pin: std::marker::PhantomPinned,
             });
 
             // Increment the head to indicate the free stack is empty
@@ -443,7 +450,7 @@ impl<T: Entry> Page<T> {
 
             debug_assert_eq!(locked.slots.len(), locked.head);
 
-            Some((me.addr(idx), locked.slots[idx].gen_ref(me)))
+            Some((me.addr(idx), locked.gen_ref(idx, me)))
         }
     }
 }
@@ -455,7 +462,7 @@ impl<T> Page<T> {
         addr.0 - self.prev_len
     }
 
-    /// Returns the address for the given slot
+    /// Returns the address for the given slot.
     fn addr(&self, slot: usize) -> Address {
         Address(slot + self.prev_len)
     }
@@ -478,7 +485,7 @@ impl<T> Default for Page<T> {
 }
 
 impl<T> Page<T> {
-    /// Release a slot into the page's free list
+    /// Release a slot into the page's free list.
     fn release(&self, value: *const Value<T>) {
         let mut locked = self.slots.lock();
 
@@ -492,7 +499,7 @@ impl<T> Page<T> {
 }
 
 impl<T> CachedPage<T> {
-    /// Refresh the cache
+    /// Refreshes the cache.
     fn refresh(&mut self, page: &Page<T>) {
         let slots = page.slots.lock();
 
@@ -502,7 +509,7 @@ impl<T> CachedPage<T> {
         }
     }
 
-    // Get a value by index
+    /// Gets a value by index.
     fn get(&self, idx: usize) -> &T {
         assert!(idx < self.init);
 
@@ -558,25 +565,22 @@ impl<T> Slots<T> {
 
         idx
     }
-}
 
-impl<T: Entry> Slot<T> {
-    /// Generates a `Ref` for the slot. This involves bumping the page's ref count.
-    fn gen_ref(&self, page: &Arc<Page<T>>) -> Ref<T> {
-        // The ref holds a ref on the page. The `Arc` is forgotten here and is
-        // resurrected in `release` when the `Ref` is dropped. By avoiding to
-        // hold on to an explicit `Arc` value, the struct size of `Ref` is
-        // reduced.
+    /// Generates a `Ref` for the slot at the given index. This involves bumping the page's ref count.
+    fn gen_ref(&self, idx: usize, page: &Arc<Page<T>>) -> Ref<T> {
+        assert!(idx < self.slots.len());
         mem::forget(page.clone());
-        let slot = self as *const Slot<T>;
-        let value = slot as *const Value<T>;
+
+        let vec_ptr = self.slots.as_ptr();
+        let slot: *const Slot<T> = unsafe { vec_ptr.add(idx) };
+        let value: *const Value<T> = slot as *const Value<T>;
 
         Ref { value }
     }
 }
 
 impl<T> Value<T> {
-    // Release the slot, returning the `Arc<Page<T>>` logically owned by the ref.
+    /// Releases the slot, returning the `Arc<Page<T>>` logically owned by the ref.
     fn release(&self) -> Arc<Page<T>> {
         // Safety: called by `Ref`, which owns an `Arc<Page<T>>` instance.
         let page = unsafe { Arc::from_raw(self.page) };
@@ -691,11 +695,13 @@ mod test {
 
     #[test]
     fn insert_many() {
+        const MANY: usize = normal_or_miri(10_000, 50);
+
         let mut slab = Slab::<Foo>::new();
         let alloc = slab.allocator();
         let mut entries = vec![];
 
-        for i in 0..10_000 {
+        for i in 0..MANY {
             let (addr, val) = alloc.allocate().unwrap();
             val.id.store(i, SeqCst);
             entries.push((addr, val));
@@ -708,15 +714,15 @@ mod test {
 
         entries.clear();
 
-        for i in 0..10_000 {
+        for i in 0..MANY {
             let (addr, val) = alloc.allocate().unwrap();
-            val.id.store(10_000 - i, SeqCst);
+            val.id.store(MANY - i, SeqCst);
             entries.push((addr, val));
         }
 
         for (i, (addr, v)) in entries.iter().enumerate() {
-            assert_eq!(10_000 - i, v.id.load(SeqCst));
-            assert_eq!(10_000 - i, slab.get(*addr).unwrap().id.load(SeqCst));
+            assert_eq!(MANY - i, v.id.load(SeqCst));
+            assert_eq!(MANY - i, slab.get(*addr).unwrap().id.load(SeqCst));
         }
     }
 
@@ -726,7 +732,7 @@ mod test {
         let alloc = slab.allocator();
         let mut entries = vec![];
 
-        for i in 0..10_000 {
+        for i in 0..normal_or_miri(10_000, 100) {
             let (addr, val) = alloc.allocate().unwrap();
             val.id.store(i, SeqCst);
             entries.push((addr, val));
@@ -734,7 +740,7 @@ mod test {
 
         for _ in 0..10 {
             // Drop 1000 in reverse
-            for _ in 0..1_000 {
+            for _ in 0..normal_or_miri(1_000, 10) {
                 entries.pop();
             }
 
@@ -753,7 +759,7 @@ mod test {
         let mut entries1 = vec![];
         let mut entries2 = vec![];
 
-        for i in 0..10_000 {
+        for i in 0..normal_or_miri(10_000, 100) {
             let (addr, val) = alloc.allocate().unwrap();
             val.id.store(i, SeqCst);
 
@@ -771,6 +777,14 @@ mod test {
         }
     }
 
+    const fn normal_or_miri(normal: usize, miri: usize) -> usize {
+        if cfg!(miri) {
+            miri
+        } else {
+            normal
+        }
+    }
+
     #[test]
     fn compact_all() {
         let mut slab = Slab::<Foo>::new();
@@ -780,7 +794,7 @@ mod test {
         for _ in 0..2 {
             entries.clear();
 
-            for i in 0..10_000 {
+            for i in 0..normal_or_miri(10_000, 100) {
                 let (addr, val) = alloc.allocate().unwrap();
                 val.id.store(i, SeqCst);
 
@@ -808,7 +822,7 @@ mod test {
         let alloc = slab.allocator();
         let mut entries = vec![];
 
-        for _ in 0..5 {
+        for _ in 0..normal_or_miri(5, 2) {
             entries.clear();
 
             // Allocate a few pages + 1

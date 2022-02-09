@@ -1,6 +1,6 @@
+use crate::future::Future;
 use crate::runtime::task::{Cell, Harness, Header, Schedule, State};
 
-use std::future::Future;
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
 
@@ -10,19 +10,27 @@ pub(super) struct RawTask {
 }
 
 pub(super) struct Vtable {
-    /// Poll the future
+    /// Polls the future.
     pub(super) poll: unsafe fn(NonNull<Header>),
 
-    /// Deallocate the memory
+    /// Deallocates the memory.
     pub(super) dealloc: unsafe fn(NonNull<Header>),
 
-    /// Read the task output, if complete
+    /// Reads the task output, if complete.
     pub(super) try_read_output: unsafe fn(NonNull<Header>, *mut (), &Waker),
 
-    /// The join handle has been dropped
+    /// Try to set the waker notified when the task is complete. Returns true if
+    /// the task has already completed. If this call returns false, then the
+    /// waker will not be notified.
+    pub(super) try_set_join_waker: unsafe fn(NonNull<Header>, &Waker) -> bool,
+
+    /// The join handle has been dropped.
     pub(super) drop_join_handle_slow: unsafe fn(NonNull<Header>),
 
-    /// Scheduler is being shutdown
+    /// The task is remotely aborted.
+    pub(super) remote_abort: unsafe fn(NonNull<Header>),
+
+    /// Scheduler is being shutdown.
     pub(super) shutdown: unsafe fn(NonNull<Header>),
 }
 
@@ -32,18 +40,20 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
         poll: poll::<T, S>,
         dealloc: dealloc::<T, S>,
         try_read_output: try_read_output::<T, S>,
+        try_set_join_waker: try_set_join_waker::<T, S>,
         drop_join_handle_slow: drop_join_handle_slow::<T, S>,
+        remote_abort: remote_abort::<T, S>,
         shutdown: shutdown::<T, S>,
     }
 }
 
 impl RawTask {
-    pub(super) fn new<T, S>(task: T) -> RawTask
+    pub(super) fn new<T, S>(task: T, scheduler: S) -> RawTask
     where
         T: Future,
         S: Schedule,
     {
-        let ptr = Box::into_raw(Cell::<_, S>::new(task, State::new()));
+        let ptr = Box::into_raw(Cell::<_, S>::new(task, scheduler, State::new()));
         let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
 
         RawTask { ptr }
@@ -51,6 +61,10 @@ impl RawTask {
 
     pub(super) unsafe fn from_raw(ptr: NonNull<Header>) -> RawTask {
         RawTask { ptr }
+    }
+
+    pub(super) fn header_ptr(&self) -> NonNull<Header> {
+        self.ptr
     }
 
     /// Returns a reference to the task's meta structure.
@@ -80,6 +94,11 @@ impl RawTask {
         (vtable.try_read_output)(self.ptr, dst, waker);
     }
 
+    pub(super) fn try_set_join_waker(self, waker: &Waker) -> bool {
+        let vtable = self.header().vtable;
+        unsafe { (vtable.try_set_join_waker)(self.ptr, waker) }
+    }
+
     pub(super) fn drop_join_handle_slow(self) {
         let vtable = self.header().vtable;
         unsafe { (vtable.drop_join_handle_slow)(self.ptr) }
@@ -88,6 +107,11 @@ impl RawTask {
     pub(super) fn shutdown(self) {
         let vtable = self.header().vtable;
         unsafe { (vtable.shutdown)(self.ptr) }
+    }
+
+    pub(super) fn remote_abort(self) {
+        let vtable = self.header().vtable;
+        unsafe { (vtable.remote_abort)(self.ptr) }
     }
 }
 
@@ -120,9 +144,19 @@ unsafe fn try_read_output<T: Future, S: Schedule>(
     harness.try_read_output(out, waker);
 }
 
+unsafe fn try_set_join_waker<T: Future, S: Schedule>(ptr: NonNull<Header>, waker: &Waker) -> bool {
+    let harness = Harness::<T, S>::from_raw(ptr);
+    harness.try_set_join_waker(waker)
+}
+
 unsafe fn drop_join_handle_slow<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     let harness = Harness::<T, S>::from_raw(ptr);
     harness.drop_join_handle_slow()
+}
+
+unsafe fn remote_abort<T: Future, S: Schedule>(ptr: NonNull<Header>) {
+    let harness = Harness::<T, S>::from_raw(ptr);
+    harness.remote_abort()
 }
 
 unsafe fn shutdown<T: Future, S: Schedule>(ptr: NonNull<Header>) {

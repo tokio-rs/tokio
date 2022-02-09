@@ -5,7 +5,6 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![cfg_attr(docsrs, deny(broken_intra_doc_links))]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
@@ -31,6 +30,7 @@ cfg_codec! {
 
 cfg_net! {
     pub mod udp;
+    pub mod net;
 }
 
 cfg_compat! {
@@ -43,6 +43,7 @@ cfg_io! {
 
 cfg_rt! {
     pub mod context;
+    pub mod task;
 }
 
 cfg_time! {

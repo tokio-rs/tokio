@@ -35,7 +35,6 @@ use std::{io, mem::MaybeUninit};
 /// [`Sink`]: futures_sink::Sink
 /// [`split`]: https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html#method.split
 #[must_use = "sinks do nothing unless polled"]
-#[cfg_attr(docsrs, doc(all(feature = "codec", feature = "udp")))]
 #[derive(Debug)]
 pub struct UdpFramed<C, T = UdpSocket> {
     socket: T,
@@ -144,7 +143,7 @@ where
             ..
         } = *self;
 
-        let n = ready!(socket.borrow().poll_send_to(cx, &wr, *out_addr))?;
+        let n = ready!(socket.borrow().poll_send_to(cx, wr, *out_addr))?;
 
         let wrote_all = n == self.wr.len();
         self.wr.clear();

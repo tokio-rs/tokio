@@ -66,17 +66,17 @@ where
         use Poll::Ready;
 
         loop {
-            let mut me = self.as_mut().project();
+            let me = self.as_mut().project();
 
             let item = match ready!(me.stream.poll_next(cx)) {
                 Some(item) => item,
                 None => {
-                    return Ready(U::finalize(sealed::Internal, &mut me.collection));
+                    return Ready(U::finalize(sealed::Internal, me.collection));
                 }
             };
 
-            if !U::extend(sealed::Internal, &mut me.collection, item) {
-                return Ready(U::finalize(sealed::Internal, &mut me.collection));
+            if !U::extend(sealed::Internal, me.collection, item) {
+                return Ready(U::finalize(sealed::Internal, me.collection));
             }
         }
     }
@@ -113,7 +113,7 @@ impl<T: AsRef<str>> sealed::FromStreamPriv<T> for String {
     }
 
     fn finalize(_: sealed::Internal, collection: &mut String) -> String {
-        mem::replace(collection, String::new())
+        mem::take(collection)
     }
 }
 
@@ -132,7 +132,7 @@ impl<T> sealed::FromStreamPriv<T> for Vec<T> {
     }
 
     fn finalize(_: sealed::Internal, collection: &mut Vec<T>) -> Vec<T> {
-        mem::replace(collection, vec![])
+        mem::take(collection)
     }
 }
 

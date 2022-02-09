@@ -135,7 +135,7 @@ rt_test! {
         let contents = Handle::current()
             .block_on(fs::read_to_string("Cargo.toml"))
             .unwrap();
-        assert!(contents.contains("Cargo.toml"));
+        assert!(contents.contains("https://tokio.rs"));
     }
 
     #[test]
@@ -387,6 +387,28 @@ rt_test! {
         let rt = rt();
 
         rt.block_on(async { some_non_async_function() });
+    }
+
+    #[test]
+    fn spawn_after_runtime_dropped() {
+        use futures::future::FutureExt;
+
+        let rt = rt();
+
+        let handle = rt.block_on(async move {
+            Handle::current()
+        });
+
+        let jh1 = handle.spawn(futures::future::pending::<()>());
+
+        drop(rt);
+
+        let jh2 = handle.spawn(futures::future::pending::<()>());
+
+        let err1 = jh1.now_or_never().unwrap().unwrap_err();
+        let err2 = jh2.now_or_never().unwrap().unwrap_err();
+        assert!(err1.is_cancelled());
+        assert!(err2.is_cancelled());
     }
 }
 

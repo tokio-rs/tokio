@@ -13,8 +13,12 @@ use std::{io, path::Path};
 /// buffer based on the file size when available, so it is generally faster than
 /// reading into a vector created with `Vec::new()`.
 ///
+/// This operation is implemented by running the equivalent blocking operation
+/// on a separate thread pool using [`spawn_blocking`].
+///
 /// [`File::open`]: super::File::open
 /// [`read_to_end`]: crate::io::AsyncReadExt::read_to_end
+/// [`spawn_blocking`]: crate::task::spawn_blocking
 ///
 /// # Errors
 ///

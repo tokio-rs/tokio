@@ -5,6 +5,7 @@ use futures::future::poll_fn;
 use std::io;
 use std::sync::Arc;
 use tokio::{io::ReadBuf, net::UdpSocket};
+use tokio_test::assert_ok;
 
 const MSG: &[u8] = b"hello";
 const MSG_LEN: usize = MSG.len();
@@ -424,6 +425,49 @@ async fn try_recv_buf_from() {
 
         loop {
             server.readable().await.unwrap();
+
+            let mut buf = Vec::with_capacity(512);
+
+            match server.try_recv_buf_from(&mut buf) {
+                Ok((n, addr)) => {
+                    assert_eq!(n, 11);
+                    assert_eq!(addr, caddr);
+                    assert_eq!(&buf[0..11], &b"hello world"[..]);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn poll_ready() {
+    // Create listener
+    let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let saddr = server.local_addr().unwrap();
+
+    // Create socket pair
+    let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let caddr = client.local_addr().unwrap();
+
+    for _ in 0..5 {
+        loop {
+            assert_ok!(poll_fn(|cx| client.poll_send_ready(cx)).await);
+
+            match client.try_send_to(b"hello world", saddr) {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+
+        loop {
+            assert_ok!(poll_fn(|cx| server.poll_recv_ready(cx)).await);
 
             let mut buf = Vec::with_capacity(512);
 

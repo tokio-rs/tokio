@@ -1,8 +1,9 @@
+use crate::loom::sync::Mutex;
 use crate::sync::watch;
+#[cfg(all(tokio_unstable, feature = "tracing"))]
+use crate::util::trace;
 
-use std::sync::Mutex;
-
-/// A barrier enables multiple threads to synchronize the beginning of some computation.
+/// A barrier enables multiple tasks to synchronize the beginning of some computation.
 ///
 /// ```
 /// # #[tokio::main]
@@ -42,6 +43,8 @@ pub struct Barrier {
     state: Mutex<BarrierState>,
     wait: watch::Receiver<usize>,
     n: usize,
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
 }
 
 #[derive(Debug)]
@@ -52,10 +55,11 @@ struct BarrierState {
 }
 
 impl Barrier {
-    /// Creates a new barrier that can block a given number of threads.
+    /// Creates a new barrier that can block a given number of tasks.
     ///
-    /// A barrier will block `n`-1 threads which call [`Barrier::wait`] and then wake up all
-    /// threads at once when the `n`th thread calls `wait`.
+    /// A barrier will block `n`-1 tasks which call [`Barrier::wait`] and then wake up all
+    /// tasks at once when the `n`th task calls `wait`.
+    #[track_caller]
     pub fn new(mut n: usize) -> Barrier {
         let (waker, wait) = crate::sync::watch::channel(0);
 
@@ -66,6 +70,32 @@ impl Barrier {
             n = 1;
         }
 
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let resource_span = {
+            let location = std::panic::Location::caller();
+            let resource_span = tracing::trace_span!(
+                "runtime.resource",
+                concrete_type = "Barrier",
+                kind = "Sync",
+                loc.file = location.file(),
+                loc.line = location.line(),
+                loc.col = location.column(),
+            );
+
+            resource_span.in_scope(|| {
+                tracing::trace!(
+                    target: "runtime::resource::state_update",
+                    size = n,
+                );
+
+                tracing::trace!(
+                    target: "runtime::resource::state_update",
+                    arrived = 0,
+                )
+            });
+            resource_span
+        };
+
         Barrier {
             state: Mutex::new(BarrierState {
                 waker,
@@ -74,18 +104,34 @@ impl Barrier {
             }),
             n,
             wait,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: resource_span,
         }
     }
 
     /// Does not resolve until all tasks have rendezvoused here.
     ///
-    /// Barriers are re-usable after all threads have rendezvoused once, and can
+    /// Barriers are re-usable after all tasks have rendezvoused once, and can
     /// be used continuously.
     ///
     /// A single (arbitrary) future will receive a [`BarrierWaitResult`] that returns `true` from
-    /// [`BarrierWaitResult::is_leader`] when returning from this function, and all other threads
+    /// [`BarrierWaitResult::is_leader`] when returning from this function, and all other tasks
     /// will receive a result that will return `false` from `is_leader`.
     pub async fn wait(&self) -> BarrierWaitResult {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        return trace::async_op(
+            || self.wait_internal(),
+            self.resource_span.clone(),
+            "Barrier::wait",
+            "poll",
+            false,
+        )
+        .await;
+
+        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        return self.wait_internal().await;
+    }
+    async fn wait_internal(&self) -> BarrierWaitResult {
         // NOTE: we are taking a _synchronous_ lock here.
         // It is okay to do so because the critical section is fast and never yields, so it cannot
         // deadlock even if another future is concurrently holding the lock.
@@ -94,10 +140,26 @@ impl Barrier {
         // NOTE: the extra scope here is so that the compiler doesn't think `state` is held across
         // a yield point, and thus marks the returned future as !Send.
         let generation = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             let generation = state.generation;
             state.arrived += 1;
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                arrived = 1,
+                arrived.op = "add",
+            );
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            tracing::trace!(
+                target: "runtime::resource::async_op::state_update",
+                arrived = true,
+            );
             if state.arrived == self.n {
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                tracing::trace!(
+                    target: "runtime::resource::async_op::state_update",
+                    is_leader = true,
+                );
                 // we are the leader for this generation
                 // wake everyone, increment the generation, and return
                 state
@@ -129,14 +191,14 @@ impl Barrier {
     }
 }
 
-/// A `BarrierWaitResult` is returned by `wait` when all threads in the `Barrier` have rendezvoused.
+/// A `BarrierWaitResult` is returned by `wait` when all tasks in the `Barrier` have rendezvoused.
 #[derive(Debug, Clone)]
 pub struct BarrierWaitResult(bool);
 
 impl BarrierWaitResult {
-    /// Returns `true` if this thread from wait is the "leader thread".
+    /// Returns `true` if this task from wait is the "leader task".
     ///
-    /// Only one thread will have `true` returned from their result, all other threads will have
+    /// Only one task will have `true` returned from their result, all other tasks will have
     /// `false` returned.
     pub fn is_leader(&self) -> bool {
         self.0

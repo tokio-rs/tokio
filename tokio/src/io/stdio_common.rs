@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 /// if buffer contents seems to be utf8. Otherwise it only trims buffer down to MAX_BUF.
 /// That's why, wrapped writer will always receive well-formed utf-8 bytes.
 /// # Other platforms
-/// passes data to `inner` as is
+/// Passes data to `inner` as is.
 #[derive(Debug)]
 pub(crate) struct SplitByUtf8BoundaryIfWindows<W> {
     inner: W,
@@ -52,10 +52,10 @@ where
 
         buf = &buf[..crate::io::blocking::MAX_BUF];
 
-        // Now there are two possibilites.
+        // Now there are two possibilities.
         // If caller gave is binary buffer, we **should not** shrink it
         // anymore, because excessive shrinking hits performance.
-        // If caller gave as binary buffer, we  **must** additionaly
+        // If caller gave as binary buffer, we  **must** additionally
         // shrink it to strip incomplete char at the end of buffer.
         // that's why check we will perform now is allowed to have
         // false-positive.

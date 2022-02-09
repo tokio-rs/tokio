@@ -202,7 +202,12 @@ mod tests {
                 registry.broadcast();
 
                 // Yield so the previous broadcast can get received
-                crate::time::sleep(std::time::Duration::from_millis(10)).await;
+                //
+                // This yields many times since the block_on task is only polled every 61
+                // ticks.
+                for _ in 0..100 {
+                    crate::task::yield_now().await;
+                }
 
                 // Send subsequent signal
                 registry.record_event(0);
@@ -240,17 +245,17 @@ mod tests {
         let registry = Registry::new(vec![EventInfo::default(), EventInfo::default()]);
 
         registry.record_event(0);
-        assert_eq!(false, registry.broadcast());
+        assert!(!registry.broadcast());
 
         let first = registry.register_listener(0);
         let second = registry.register_listener(1);
 
         registry.record_event(0);
-        assert_eq!(true, registry.broadcast());
+        assert!(registry.broadcast());
 
         drop(first);
         registry.record_event(0);
-        assert_eq!(false, registry.broadcast());
+        assert!(!registry.broadcast());
 
         drop(second);
     }

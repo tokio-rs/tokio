@@ -8,6 +8,7 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::linked_list::{self, LinkedList};
+use crate::util::WakeList;
 
 use std::cell::UnsafeCell;
 use std::future::Future;
@@ -19,7 +20,7 @@ use std::task::{Context, Poll, Waker};
 
 type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
 
-/// Notify a single task to wake up.
+/// Notifies a single task to wake up.
 ///
 /// `Notify` provides a basic mechanism to notify a single task of an event.
 /// `Notify` itself does not carry any data. Instead, it is to be used to signal
@@ -56,13 +57,16 @@ type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
 ///     let notify = Arc::new(Notify::new());
 ///     let notify2 = notify.clone();
 ///
-///     tokio::spawn(async move {
+///     let handle = tokio::spawn(async move {
 ///         notify2.notified().await;
 ///         println!("received notification");
 ///     });
 ///
 ///     println!("sending notification");
 ///     notify.notify_one();
+///
+///     // Wait for task to receive notification.
+///     handle.await.unwrap();
 /// }
 /// ```
 ///
@@ -126,11 +130,12 @@ enum NotificationType {
 }
 
 #[derive(Debug)]
+#[repr(C)] // required by `linked_list::Link` impl
 struct Waiter {
-    /// Intrusive linked-list pointers
+    /// Intrusive linked-list pointers.
     pointers: linked_list::Pointers<Waiter>,
 
-    /// Waiting task's waker
+    /// Waiting task's waker.
     waker: Option<Waker>,
 
     /// `true` if the notification has been assigned to this waiter.
@@ -140,7 +145,7 @@ struct Waiter {
     _p: PhantomPinned,
 }
 
-/// Future returned from `notified()`
+/// Future returned from [`Notify::notified()`]
 #[derive(Debug)]
 pub struct Notified<'a> {
     /// The `Notify` being received on.
@@ -167,13 +172,13 @@ const NOTIFY_WAITERS_SHIFT: usize = 2;
 const STATE_MASK: usize = (1 << NOTIFY_WAITERS_SHIFT) - 1;
 const NOTIFY_WAITERS_CALLS_MASK: usize = !STATE_MASK;
 
-/// Initial "idle" state
+/// Initial "idle" state.
 const EMPTY: usize = 0;
 
 /// One or more threads are currently waiting to be notified.
 const WAITING: usize = 1;
 
-/// Pending notification
+/// Pending notification.
 const NOTIFIED: usize = 2;
 
 fn set_state(data: usize, state: usize) -> usize {
@@ -190,6 +195,10 @@ fn get_num_notify_waiters_calls(data: usize) -> usize {
 
 fn inc_num_notify_waiters_calls(data: usize) -> usize {
     data + (1 << NOTIFY_WAITERS_SHIFT)
+}
+
+fn atomic_inc_num_notify_waiters_calls(data: &AtomicUsize) {
+    data.fetch_add(1 << NOTIFY_WAITERS_SHIFT, SeqCst);
 }
 
 impl Notify {
@@ -242,6 +251,12 @@ impl Notify {
     ///
     /// [`notify_one()`]: Notify::notify_one
     ///
+    /// # Cancel safety
+    ///
+    /// This method uses a queue to fairly distribute notifications in the order
+    /// they were requested. Cancelling a call to `notified` makes you lose your
+    /// place in the queue.
+    ///
     /// # Examples
     ///
     /// ```
@@ -278,7 +293,7 @@ impl Notify {
         }
     }
 
-    /// Notifies a waiting task
+    /// Notifies a waiting task.
     ///
     /// If a task is currently waiting, that task is notified. Otherwise, a
     /// permit is stored in this `Notify` value and the **next** call to
@@ -348,7 +363,7 @@ impl Notify {
         }
     }
 
-    /// Notifies all waiting tasks
+    /// Notifies all waiting tasks.
     ///
     /// If a task is currently waiting, that task is notified. Unlike with
     /// `notify_one()`, no permit is stored to be used by the next call to
@@ -381,10 +396,7 @@ impl Notify {
     /// }
     /// ```
     pub fn notify_waiters(&self) {
-        const NUM_WAKERS: usize = 32;
-
-        let mut wakers: [Option<Waker>; NUM_WAKERS] = Default::default();
-        let mut curr_waker = 0;
+        let mut wakers = WakeList::new();
 
         // There are waiters, the lock must be acquired to notify.
         let mut waiters = self.waiters.lock();
@@ -394,11 +406,9 @@ impl Notify {
         let curr = self.state.load(SeqCst);
 
         if let EMPTY | NOTIFIED = get_state(curr) {
-            // There are no waiting tasks. In this case, no synchronization is
-            // established between `notify` and `notified().await`.
-            // All we need to do is increment the number of times this
-            // method was called.
-            self.state.store(inc_num_notify_waiters_calls(curr), SeqCst);
+            // There are no waiting tasks. All we need to do is increment the
+            // number of times this method was called.
+            atomic_inc_num_notify_waiters_calls(&self.state);
             return;
         }
 
@@ -406,7 +416,7 @@ impl Notify {
         // concurrently change, as holding the lock is required to
         // transition **out** of `WAITING`.
         'outer: loop {
-            while curr_waker < NUM_WAKERS {
+            while wakers.can_push() {
                 match waiters.pop_back() {
                     Some(mut waiter) => {
                         // Safety: `waiters` lock is still held.
@@ -417,8 +427,7 @@ impl Notify {
                         waiter.notified = Some(NotificationType::AllWaiters);
 
                         if let Some(waker) = waiter.waker.take() {
-                            wakers[curr_waker] = Some(waker);
-                            curr_waker += 1;
+                            wakers.push(waker);
                         }
                     }
                     None => {
@@ -429,11 +438,7 @@ impl Notify {
 
             drop(waiters);
 
-            for waker in wakers.iter_mut().take(curr_waker) {
-                waker.take().unwrap().wake();
-            }
-
-            curr_waker = 0;
+            wakers.wake_all();
 
             // Acquire the lock again.
             waiters = self.waiters.lock();
@@ -448,9 +453,7 @@ impl Notify {
         // Release the lock before notifying
         drop(waiters);
 
-        for waker in wakers.iter_mut().take(curr_waker) {
-            waker.take().unwrap().wake();
-        }
+        wakers.wake_all();
     }
 }
 
@@ -520,7 +523,7 @@ impl Notified<'_> {
             is_unpin::<AtomicUsize>();
 
             let me = self.get_unchecked_mut();
-            (&me.notify, &mut me.state, &me.waiter)
+            (me.notify, &mut me.state, &me.waiter)
         }
     }
 }
@@ -551,6 +554,10 @@ impl Future for Notified<'_> {
                         *state = Done;
                         return Poll::Ready(());
                     }
+
+                    // Clone the waker before locking, a waker clone can be
+                    // triggering arbitrary code.
+                    let waker = cx.waker().clone();
 
                     // Acquire the lock and attempt to transition to the waiting
                     // state.
@@ -613,7 +620,7 @@ impl Future for Notified<'_> {
 
                     // Safety: called while locked.
                     unsafe {
-                        (*waiter.get()).waker = Some(cx.waker().clone());
+                        (*waiter.get()).waker = Some(waker);
                     }
 
                     // Insert the waiter into the linked list
@@ -725,8 +732,8 @@ unsafe impl linked_list::Link for Waiter {
         ptr
     }
 
-    unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
-        NonNull::from(&mut target.as_mut().pointers)
+    unsafe fn pointers(target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
+        target.cast()
     }
 }
 

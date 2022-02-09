@@ -8,7 +8,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Read lines from an [`AsyncBufRead`].
+    /// Reads lines from an [`AsyncBufRead`].
     ///
     /// A `Lines` can be turned into a `Stream` with [`LinesStream`].
     ///
@@ -47,6 +47,10 @@ where
 {
     /// Returns the next line in the stream.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancellation safe.
+    ///
     /// # Examples
     ///
     /// ```
@@ -68,12 +72,12 @@ where
         poll_fn(|cx| Pin::new(&mut *self).poll_next_line(cx)).await
     }
 
-    /// Obtain a mutable reference to the underlying reader
+    /// Obtains a mutable reference to the underlying reader.
     pub fn get_mut(&mut self) -> &mut R {
         &mut self.reader
     }
 
-    /// Obtain a reference to the underlying reader
+    /// Obtains a reference to the underlying reader.
     pub fn get_ref(&mut self) -> &R {
         &self.reader
     }
@@ -102,11 +106,9 @@ where
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided
     /// `Context` is scheduled to receive a wakeup when more bytes become
-    /// available on the underlying IO resource.
-    ///
-    /// Note that on multiple calls to `poll_next_line`, only the `Waker` from
-    /// the `Context` passed to the most recent call is scheduled to receive a
-    /// wakeup.
+    /// available on the underlying IO resource.  Note that on multiple calls to
+    /// `poll_next_line`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup.
     pub fn poll_next_line(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,

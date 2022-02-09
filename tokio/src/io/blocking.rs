@@ -16,7 +16,7 @@ use self::State::*;
 pub(crate) struct Blocking<T> {
     inner: Option<T>,
     state: State<T>,
-    /// `true` if the lower IO layer needs flushing
+    /// `true` if the lower IO layer needs flushing.
     need_flush: bool,
 }
 
@@ -175,7 +175,7 @@ where
     }
 }
 
-/// Repeats operations that are interrupted
+/// Repeats operations that are interrupted.
 macro_rules! uninterruptibly {
     ($e:expr) => {{
         loop {

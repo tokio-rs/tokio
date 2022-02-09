@@ -13,7 +13,7 @@ fn timer_with_threaded_runtime() {
     let (tx, rx) = mpsc::channel();
 
     rt.spawn(async move {
-        let when = Instant::now() + Duration::from_millis(100);
+        let when = Instant::now() + Duration::from_millis(10);
 
         sleep_until(when).await;
         assert!(Instant::now() >= when);
@@ -32,7 +32,7 @@ fn timer_with_basic_scheduler() {
     let (tx, rx) = mpsc::channel();
 
     rt.block_on(async move {
-        let when = Instant::now() + Duration::from_millis(100);
+        let when = Instant::now() + Duration::from_millis(10);
 
         sleep_until(when).await;
         assert!(Instant::now() >= when);
@@ -67,7 +67,7 @@ async fn starving() {
         }
     }
 
-    let when = Instant::now() + Duration::from_millis(20);
+    let when = Instant::now() + Duration::from_millis(10);
     let starve = Starve(Box::pin(sleep_until(when)), 0);
 
     starve.await;
@@ -81,7 +81,7 @@ async fn timeout_value() {
     let (_tx, rx) = oneshot::channel::<()>();
 
     let now = Instant::now();
-    let dur = Duration::from_millis(20);
+    let dur = Duration::from_millis(10);
 
     let res = timeout(dur, rx).await;
     assert!(res.is_err());

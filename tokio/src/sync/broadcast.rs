@@ -293,37 +293,37 @@ pub mod error {
 
 use self::error::*;
 
-/// Data shared between senders and receivers
+/// Data shared between senders and receivers.
 struct Shared<T> {
-    /// slots in the channel
+    /// slots in the channel.
     buffer: Box<[RwLock<Slot<T>>]>,
 
-    /// Mask a position -> index
+    /// Mask a position -> index.
     mask: usize,
 
     /// Tail of the queue. Includes the rx wait list.
     tail: Mutex<Tail>,
 
-    /// Number of outstanding Sender handles
+    /// Number of outstanding Sender handles.
     num_tx: AtomicUsize,
 }
 
-/// Next position to write a value
+/// Next position to write a value.
 struct Tail {
-    /// Next position to write to
+    /// Next position to write to.
     pos: u64,
 
-    /// Number of active receivers
+    /// Number of active receivers.
     rx_cnt: usize,
 
-    /// True if the channel is closed
+    /// True if the channel is closed.
     closed: bool,
 
-    /// Receivers waiting for a value
+    /// Receivers waiting for a value.
     waiters: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
 }
 
-/// Slot in the buffer
+/// Slot in the buffer.
 struct Slot<T> {
     /// Remaining number of receivers that are expected to see this value.
     ///
@@ -333,7 +333,7 @@ struct Slot<T> {
     /// acquired.
     rem: AtomicUsize,
 
-    /// Uniquely identifies the `send` stored in the slot
+    /// Uniquely identifies the `send` stored in the slot.
     pos: u64,
 
     /// True signals the channel is closed.
@@ -346,9 +346,9 @@ struct Slot<T> {
     val: UnsafeCell<Option<T>>,
 }
 
-/// An entry in the wait queue
+/// An entry in the wait queue.
 struct Waiter {
-    /// True if queued
+    /// True if queued.
     queued: bool,
 
     /// Task waiting on the broadcast channel.
@@ -365,12 +365,12 @@ struct RecvGuard<'a, T> {
     slot: RwLockReadGuard<'a, Slot<T>>,
 }
 
-/// Receive a value future
+/// Receive a value future.
 struct Recv<'a, T> {
-    /// Receiver being waited on
+    /// Receiver being waited on.
     receiver: &'a mut Receiver<T>,
 
-    /// Entry in the waiter `LinkedList`
+    /// Entry in the waiter `LinkedList`.
     waiter: UnsafeCell<Waiter>,
 }
 
@@ -823,6 +823,13 @@ impl<T: Clone> Receiver<T> {
     /// internal cursor is updated to point to the oldest value still held by
     /// the channel. A subsequent call to [`recv`] will return this value
     /// **unless** it has been since overwritten.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
     ///
     /// [`Receiver`]: crate::sync::broadcast::Receiver
     /// [`recv`]: crate::sync::broadcast::Receiver::recv

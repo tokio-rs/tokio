@@ -14,7 +14,7 @@ pub struct DirBuilder {
     /// Indicates whether to create parent directories if they are missing.
     recursive: bool,
 
-    /// Set the Unix mode for newly created directories.
+    /// Sets the Unix mode for newly created directories.
     #[cfg(unix)]
     pub(super) mode: Option<u32>,
 }

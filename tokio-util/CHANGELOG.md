@@ -1,3 +1,49 @@
+# 0.6.9 (October 29, 2021)
+
+### Added
+
+- codec: implement `Clone` for `LengthDelimitedCodec` ([#4089])
+- io: add `SyncIoBridge`  ([#4146])
+
+### Fixed
+
+- time: update deadline on removal in `DelayQueue` ([#4178])
+- codec: Update stream impl for Framed to return None after Err ([#4166])
+
+[#4089]: https://github.com/tokio-rs/tokio/pull/4089
+[#4146]: https://github.com/tokio-rs/tokio/pull/4146
+[#4166]: https://github.com/tokio-rs/tokio/pull/4166
+[#4178]: https://github.com/tokio-rs/tokio/pull/4178
+
+# 0.6.8 (September 3, 2021)
+
+### Added
+
+- sync: add drop guard for `CancellationToken` ([#3839])
+- compact: added `AsyncSeek` compat ([#4078])
+- time: expose `Key` used in `DelayQueue`'s `Expired` ([#4081])
+- io: add `with_capacity` to `ReaderStream` ([#4086])
+
+### Fixed
+
+- codec: remove unnecessary `doc(cfg(...))` ([#3989])
+
+[#3839]: https://github.com/tokio-rs/tokio/pull/3839
+[#4078]: https://github.com/tokio-rs/tokio/pull/4078
+[#4081]: https://github.com/tokio-rs/tokio/pull/4081
+[#4086]: https://github.com/tokio-rs/tokio/pull/4086
+[#3989]: https://github.com/tokio-rs/tokio/pull/3989
+
+# 0.6.7 (May 14, 2021)
+
+### Added
+
+- udp: make `UdpFramed` take `Borrow<UdpSocket>` ([#3451])
+- compat: implement `AsRawFd`/`AsRawHandle` for `Compat<T>` ([#3765])
+
+[#3451]: https://github.com/tokio-rs/tokio/pull/3451
+[#3765]: https://github.com/tokio-rs/tokio/pull/3765
+
 # 0.6.6 (April 12, 2021)
 
 ### Added

@@ -5,9 +5,9 @@
 //!
 //! # Ground rules
 //!
-//! The heart of the timer implementation here is the `TimerShared` structure,
-//! shared between the `TimerEntry` and the driver. Generally, we permit access
-//! to `TimerShared` ONLY via either 1) a mutable reference to `TimerEntry` or
+//! The heart of the timer implementation here is the [`TimerShared`] structure,
+//! shared between the [`TimerEntry`] and the driver. Generally, we permit access
+//! to [`TimerShared`] ONLY via either 1) a mutable reference to [`TimerEntry`] or
 //! 2) a held driver lock.
 //!
 //! It follows from this that any changes made while holding BOTH 1 and 2 will
@@ -49,8 +49,10 @@
 //! There is of course a race condition between timer reset and timer
 //! expiration. If the driver fails to observe the updated expiration time, it
 //! could trigger expiration of the timer too early. However, because
-//! `mark_pending` performs a compare-and-swap, it will identify this race and
+//! [`mark_pending`][mark_pending] performs a compare-and-swap, it will identify this race and
 //! refuse to mark the timer as pending.
+//!
+//! [mark_pending]: TimerHandle::mark_pending
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicU64;
@@ -68,7 +70,7 @@ use std::{marker::PhantomPinned, pin::Pin, ptr::NonNull};
 
 type TimerResult = Result<(), crate::time::error::Error>;
 
-const STATE_DEREGISTERED: u64 = u64::max_value();
+const STATE_DEREGISTERED: u64 = u64::MAX;
 const STATE_PENDING_FIRE: u64 = STATE_DEREGISTERED - 1;
 const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 
@@ -85,10 +87,10 @@ const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 /// requires only the driver lock.
 pub(super) struct StateCell {
     /// Holds either the scheduled expiration time for this timer, or (if the
-    /// timer has been fired and is unregistered), `u64::max_value()`.
+    /// timer has been fired and is unregistered), `u64::MAX`.
     state: AtomicU64,
     /// If the timer is fired (an Acquire order read on state shows
-    /// `u64::max_value()`), holds the result that should be returned from
+    /// `u64::MAX`), holds the result that should be returned from
     /// polling the timer. Otherwise, the contents are unspecified and reading
     /// without holding the driver lock is undefined behavior.
     result: UnsafeCell<TimerResult>,
@@ -125,7 +127,7 @@ impl StateCell {
     fn when(&self) -> Option<u64> {
         let cur_state = self.state.load(Ordering::Relaxed);
 
-        if cur_state == u64::max_value() {
+        if cur_state == u64::MAX {
             None
         } else {
             Some(cur_state)
@@ -271,7 +273,7 @@ impl StateCell {
     /// ordering, but is conservative - if it returns false, the timer is
     /// definitely _not_ registered.
     pub(super) fn might_be_registered(&self) -> bool {
-        self.state.load(Ordering::Relaxed) != u64::max_value()
+        self.state.load(Ordering::Relaxed) != u64::MAX
     }
 }
 
@@ -324,14 +326,15 @@ pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, Ti
 ///
 /// Note that this structure is located inside the `TimerEntry` structure.
 #[derive(Debug)]
+#[repr(C)] // required by `link_list::Link` impl
 pub(crate) struct TimerShared {
+    /// Data manipulated by the driver thread itself, only.
+    driver_state: CachePadded<TimerSharedPadded>,
+
     /// Current state. This records whether the timer entry is currently under
     /// the ownership of the driver, and if not, its current state (not
     /// complete, fired, error, etc).
     state: StateCell,
-
-    /// Data manipulated by the driver thread itself, only.
-    driver_state: CachePadded<TimerSharedPadded>,
 
     _p: PhantomPinned,
 }
@@ -345,7 +348,7 @@ impl TimerShared {
         }
     }
 
-    /// Gets the cached time-of-expiration value
+    /// Gets the cached time-of-expiration value.
     pub(super) fn cached_when(&self) -> u64 {
         // Cached-when is only accessed under the driver lock, so we can use relaxed
         self.driver_state.0.cached_when.load(Ordering::Relaxed)
@@ -418,7 +421,14 @@ impl TimerShared {
 /// padded. This contains the information that the driver thread accesses most
 /// frequently to minimize contention. In particular, we move it away from the
 /// waker, as the waker is updated on every poll.
+#[repr(C)] // required by `link_list::Link` impl
 struct TimerSharedPadded {
+    /// A link within the doubly-linked list of timers on a particular level and
+    /// slot. Valid only if state is equal to Registered.
+    ///
+    /// Only accessed under the entry lock.
+    pointers: linked_list::Pointers<TimerShared>,
+
     /// The expiration time for which this entry is currently registered.
     /// Generally owned by the driver, but is accessed by the entry when not
     /// registered.
@@ -426,12 +436,6 @@ struct TimerSharedPadded {
 
     /// The true expiration time. Set by the timer future, read by the driver.
     true_when: AtomicU64,
-
-    /// A link within the doubly-linked list of timers on a particular level and
-    /// slot. Valid only if state is equal to Registered.
-    ///
-    /// Only accessed under the entry lock.
-    pointers: StdUnsafeCell<linked_list::Pointers<TimerShared>>,
 }
 
 impl std::fmt::Debug for TimerSharedPadded {
@@ -448,7 +452,7 @@ impl TimerSharedPadded {
         Self {
             cached_when: AtomicU64::new(0),
             true_when: AtomicU64::new(0),
-            pointers: StdUnsafeCell::new(linked_list::Pointers::new()),
+            pointers: linked_list::Pointers::new(),
         }
     }
 }
@@ -472,7 +476,7 @@ unsafe impl linked_list::Link for TimerShared {
     unsafe fn pointers(
         target: NonNull<Self::Target>,
     ) -> NonNull<linked_list::Pointers<Self::Target>> {
-        unsafe { NonNull::new(target.as_ref().driver_state.0.pointers.get()).unwrap() }
+        target.cast()
     }
 }
 
@@ -591,7 +595,7 @@ impl TimerHandle {
         match self.inner.as_ref().state.mark_pending(not_after) {
             Ok(()) => {
                 // mark this as being on the pending queue in cached_when
-                self.inner.as_ref().set_cached_when(u64::max_value());
+                self.inner.as_ref().set_cached_when(u64::MAX);
                 Ok(())
             }
             Err(tick) => {

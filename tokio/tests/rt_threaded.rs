@@ -12,8 +12,17 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::{mpsc, Arc};
-use std::task::{Context, Poll};
+use std::sync::{mpsc, Arc, Mutex};
+use std::task::{Context, Poll, Waker};
+
+macro_rules! cfg_metrics {
+    ($($t:tt)*) => {
+        #[cfg(tokio_unstable)]
+        {
+            $( $t )*
+        }
+    }
+}
 
 #[test]
 fn single_thread() {
@@ -54,6 +63,39 @@ fn many_oneshot_futures() {
         drop(rt);
     }
 }
+
+#[test]
+fn spawn_two() {
+    let rt = rt();
+
+    let out = rt.block_on(async {
+        let (tx, rx) = oneshot::channel();
+
+        tokio::spawn(async move {
+            tokio::spawn(async move {
+                tx.send("ZOMG").unwrap();
+            });
+        });
+
+        assert_ok!(rx.await)
+    });
+
+    assert_eq!(out, "ZOMG");
+
+    cfg_metrics! {
+        let metrics = rt.metrics();
+        drop(rt);
+        assert_eq!(1, metrics.remote_schedule_count());
+
+        let mut local = 0;
+        for i in 0..metrics.num_workers() {
+            local += metrics.worker_local_schedule_count(i);
+        }
+
+        assert_eq!(1, local);
+    }
+}
+
 #[test]
 fn many_multishot_futures() {
     const CHAIN: usize = 200;
@@ -403,6 +445,98 @@ async fn hang_on_shutdown() {
         drop(sync_tx);
     });
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+}
+
+/// Demonstrates tokio-rs/tokio#3869
+#[test]
+fn wake_during_shutdown() {
+    struct Shared {
+        waker: Option<Waker>,
+    }
+
+    struct MyFuture {
+        shared: Arc<Mutex<Shared>>,
+        put_waker: bool,
+    }
+
+    impl MyFuture {
+        fn new() -> (Self, Self) {
+            let shared = Arc::new(Mutex::new(Shared { waker: None }));
+            let f1 = MyFuture {
+                shared: shared.clone(),
+                put_waker: true,
+            };
+            let f2 = MyFuture {
+                shared,
+                put_waker: false,
+            };
+            (f1, f2)
+        }
+    }
+
+    impl Future for MyFuture {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            let me = Pin::into_inner(self);
+            let mut lock = me.shared.lock().unwrap();
+            println!("poll {}", me.put_waker);
+            if me.put_waker {
+                println!("putting");
+                lock.waker = Some(cx.waker().clone());
+            }
+            Poll::Pending
+        }
+    }
+
+    impl Drop for MyFuture {
+        fn drop(&mut self) {
+            println!("drop {} start", self.put_waker);
+            let mut lock = self.shared.lock().unwrap();
+            if !self.put_waker {
+                lock.waker.take().unwrap().wake();
+            }
+            drop(lock);
+            println!("drop {} stop", self.put_waker);
+        }
+    }
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let (f1, f2) = MyFuture::new();
+
+    rt.spawn(f1);
+    rt.spawn(f2);
+
+    rt.block_on(async { tokio::time::sleep(tokio::time::Duration::from_millis(20)).await });
+}
+
+#[should_panic]
+#[tokio::test]
+async fn test_block_in_place1() {
+    tokio::task::block_in_place(|| {});
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_block_in_place2() {
+    tokio::task::block_in_place(|| {});
+}
+
+#[should_panic]
+#[tokio::main(flavor = "current_thread")]
+#[test]
+async fn test_block_in_place3() {
+    tokio::task::block_in_place(|| {});
+}
+
+#[tokio::main]
+#[test]
+async fn test_block_in_place4() {
+    tokio::task::block_in_place(|| {});
 }
 
 fn rt() -> Runtime {

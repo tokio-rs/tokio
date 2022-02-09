@@ -421,7 +421,7 @@ pub struct LengthDelimitedCodecError {
 /// See [module level] documentation for more detail.
 ///
 /// [module level]: index.html
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LengthDelimitedCodec {
     // Configuration values
     builder: Builder,
@@ -486,7 +486,7 @@ impl LengthDelimitedCodec {
             // Skip the required bytes
             src.advance(self.builder.length_field_offset);
 
-            // match endianess
+            // match endianness
             let n = if self.builder.length_field_is_big_endian {
                 src.get_uint(field_len)
             } else {
@@ -746,7 +746,7 @@ impl Builder {
         }
     }
 
-    /// Sets the max frame length
+    /// Sets the max frame length in bytes
     ///
     /// This configuration option applies to both encoding and decoding. The
     /// default value is 8MB.
@@ -767,7 +767,7 @@ impl Builder {
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// LengthDelimitedCodec::builder()
-    ///     .max_frame_length(8 * 1024)
+    ///     .max_frame_length(8 * 1024 * 1024)
     ///     .new_read(io);
     /// # }
     /// # pub fn main() {}

@@ -4,12 +4,10 @@ use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::shutdown;
-use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
-use crate::util::error::CONTEXT_MISSING_ERROR;
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -26,28 +24,28 @@ pub(crate) struct Spawner {
 }
 
 struct Inner {
-    /// State shared between worker threads
+    /// State shared between worker threads.
     shared: Mutex<Shared>,
 
     /// Pool threads wait on this.
     condvar: Condvar,
 
-    /// Spawned threads use this name
+    /// Spawned threads use this name.
     thread_name: ThreadNameFn,
 
-    /// Spawned thread stack size
+    /// Spawned thread stack size.
     stack_size: Option<usize>,
 
-    /// Call after a thread starts
+    /// Call after a thread starts.
     after_start: Option<Callback>,
 
-    /// Call before a thread stops
+    /// Call before a thread stops.
     before_stop: Option<Callback>,
 
-    // Maximum number of threads
+    // Maximum number of threads.
     thread_cap: usize,
 
-    // Customizable wait timeout
+    // Customizable wait timeout.
     keep_alive: Duration,
 }
 
@@ -61,41 +59,77 @@ struct Shared {
     /// Prior to shutdown, we clean up JoinHandles by having each timed-out
     /// thread join on the previous timed-out thread. This is not strictly
     /// necessary but helps avoid Valgrind false positives, see
-    /// https://github.com/tokio-rs/tokio/commit/646fbae76535e397ef79dbcaacb945d4c829f666
+    /// <https://github.com/tokio-rs/tokio/commit/646fbae76535e397ef79dbcaacb945d4c829f666>
     /// for more information.
     last_exiting_thread: Option<thread::JoinHandle<()>>,
     /// This holds the JoinHandles for all running threads; on shutdown, the thread
     /// calling shutdown handles joining on these.
     worker_threads: HashMap<usize, thread::JoinHandle<()>>,
     /// This is a counter used to iterate worker_threads in a consistent order (for loom's
-    /// benefit)
+    /// benefit).
     worker_thread_index: usize,
 }
 
-type Task = task::Notified<NoopSchedule>;
+pub(crate) struct Task {
+    task: task::UnownedTask<NoopSchedule>,
+    mandatory: Mandatory,
+}
+
+#[derive(PartialEq, Eq)]
+pub(crate) enum Mandatory {
+    #[cfg_attr(not(fs), allow(dead_code))]
+    Mandatory,
+    NonMandatory,
+}
+
+impl Task {
+    pub(crate) fn new(task: task::UnownedTask<NoopSchedule>, mandatory: Mandatory) -> Task {
+        Task { task, mandatory }
+    }
+
+    fn run(self) {
+        self.task.run();
+    }
+
+    fn shutdown_or_run_if_mandatory(self) {
+        match self.mandatory {
+            Mandatory::NonMandatory => self.task.shutdown(),
+            Mandatory::Mandatory => self.task.run(),
+        }
+    }
+}
 
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
-/// Run the provided function on an executor dedicated to blocking operations.
+/// Runs the provided function on an executor dedicated to blocking operations.
+/// Tasks will be scheduled as non-mandatory, meaning they may not get executed
+/// in case of runtime shutdown.
 pub(crate) fn spawn_blocking<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let rt = context::current().expect(CONTEXT_MISSING_ERROR);
+    let rt = context::current();
     rt.spawn_blocking(func)
 }
 
-#[allow(dead_code)]
-pub(crate) fn try_spawn_blocking<F, R>(func: F) -> Result<(), ()>
-where
-    F: FnOnce() -> R + Send + 'static,
-    R: Send + 'static,
-{
-    let rt = context::current().expect(CONTEXT_MISSING_ERROR);
-
-    let (task, _handle) = task::joinable(BlockingTask::new(func));
-    rt.blocking_spawner.spawn(task, &rt)
+cfg_fs! {
+    #[cfg_attr(any(
+        all(loom, not(test)), // the function is covered by loom tests
+        test
+    ), allow(dead_code))]
+    /// Runs the provided function on an executor dedicated to blocking
+    /// operations. Tasks will be scheduled as mandatory, meaning they are
+    /// guaranteed to run unless a shutdown is already taking place. In case a
+    /// shutdown is already taking place, `None` will be returned.
+    pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> Option<JoinHandle<R>>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let rt = context::current();
+        rt.spawn_mandatory_blocking(func)
+    }
 }
 
 // ===== impl BlockingPool =====
@@ -186,52 +220,48 @@ impl fmt::Debug for BlockingPool {
 
 impl Spawner {
     pub(crate) fn spawn(&self, task: Task, rt: &Handle) -> Result<(), ()> {
-        let shutdown_tx = {
-            let mut shared = self.inner.shared.lock();
+        let mut shared = self.inner.shared.lock();
 
-            if shared.shutdown {
-                // Shutdown the task
-                task.shutdown();
+        if shared.shutdown {
+            // Shutdown the task: it's fine to shutdown this task (even if
+            // mandatory) because it was scheduled after the shutdown of the
+            // runtime began.
+            task.task.shutdown();
 
-                // no need to even push this task; it would never get picked up
-                return Err(());
-            }
+            // no need to even push this task; it would never get picked up
+            return Err(());
+        }
 
-            shared.queue.push_back(task);
+        shared.queue.push_back(task);
 
-            if shared.num_idle == 0 {
-                // No threads are able to process the task.
+        if shared.num_idle == 0 {
+            // No threads are able to process the task.
 
-                if shared.num_th == self.inner.thread_cap {
-                    // At max number of threads
-                    None
-                } else {
-                    shared.num_th += 1;
-                    assert!(shared.shutdown_tx.is_some());
-                    shared.shutdown_tx.clone()
-                }
+            if shared.num_th == self.inner.thread_cap {
+                // At max number of threads
             } else {
-                // Notify an idle worker thread. The notification counter
-                // is used to count the needed amount of notifications
-                // exactly. Thread libraries may generate spurious
-                // wakeups, this counter is used to keep us in a
-                // consistent state.
-                shared.num_idle -= 1;
-                shared.num_notify += 1;
-                self.inner.condvar.notify_one();
-                None
+                shared.num_th += 1;
+                assert!(shared.shutdown_tx.is_some());
+                let shutdown_tx = shared.shutdown_tx.clone();
+
+                if let Some(shutdown_tx) = shutdown_tx {
+                    let id = shared.worker_thread_index;
+                    shared.worker_thread_index += 1;
+
+                    let handle = self.spawn_thread(shutdown_tx, rt, id);
+
+                    shared.worker_threads.insert(id, handle);
+                }
             }
-        };
-
-        if let Some(shutdown_tx) = shutdown_tx {
-            let mut shared = self.inner.shared.lock();
-
-            let id = shared.worker_thread_index;
-            shared.worker_thread_index += 1;
-
-            let handle = self.spawn_thread(shutdown_tx, rt, id);
-
-            shared.worker_threads.insert(id, handle);
+        } else {
+            // Notify an idle worker thread. The notification counter
+            // is used to count the needed amount of notifications
+            // exactly. Thread libraries may generate spurious
+            // wakeups, this counter is used to keep us in a
+            // consistent state.
+            shared.num_idle -= 1;
+            shared.num_notify += 1;
+            self.inner.condvar.notify_one();
         }
 
         Ok(())
@@ -258,7 +288,7 @@ impl Spawner {
                 rt.blocking_spawner.inner.run(id);
                 drop(shutdown_tx);
             })
-            .unwrap()
+            .expect("OS can't spawn a new worker thread")
     }
 }
 
@@ -316,7 +346,8 @@ impl Inner {
                 // Drain the queue
                 while let Some(task) = shared.queue.pop_front() {
                     drop(shared);
-                    task.shutdown();
+
+                    task.shutdown_or_run_if_mandatory();
 
                     shared = self.shared.lock();
                 }

@@ -1,4 +1,4 @@
-//! Channel error types
+//! Channel error types.
 
 use std::error::Error;
 use std::fmt;
@@ -19,7 +19,7 @@ impl<T: fmt::Debug> std::error::Error for SendError<T> {}
 
 /// This enumeration is the list of the possible error outcomes for the
 /// [try_send](super::Sender::try_send) method.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum TrySendError<T> {
     /// The data could not be sent on the channel because the channel is
     /// currently full and sending would require blocking.
@@ -51,24 +51,52 @@ impl<T> From<SendError<T>> for TrySendError<T> {
     }
 }
 
+// ===== TryRecvError =====
+
+/// Error returned by `try_recv`.
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum TryRecvError {
+    /// This **channel** is currently empty, but the **Sender**(s) have not yet
+    /// disconnected, so data may yet become available.
+    Empty,
+    /// The **channel**'s sending half has become disconnected, and there will
+    /// never be any more data received on it.
+    Disconnected,
+}
+
+impl fmt::Display for TryRecvError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            TryRecvError::Empty => "receiving on an empty channel".fmt(fmt),
+            TryRecvError::Disconnected => "receiving on a closed channel".fmt(fmt),
+        }
+    }
+}
+
+impl Error for TryRecvError {}
+
 // ===== RecvError =====
 
 /// Error returned by `Receiver`.
 #[derive(Debug)]
+#[doc(hidden)]
+#[deprecated(note = "This type is unused because recv returns an Option.")]
 pub struct RecvError(());
 
+#[allow(deprecated)]
 impl fmt::Display for RecvError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "channel closed")
     }
 }
 
+#[allow(deprecated)]
 impl Error for RecvError {}
 
 cfg_time! {
     // ===== SendTimeoutError =====
 
-    #[derive(Debug)]
+    #[derive(Debug, Eq, PartialEq)]
     /// Error returned by [`Sender::send_timeout`](super::Sender::send_timeout)].
     pub enum SendTimeoutError<T> {
         /// The data could not be sent on the channel because the channel is
