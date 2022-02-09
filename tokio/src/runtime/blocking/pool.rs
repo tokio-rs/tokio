@@ -246,18 +246,22 @@ impl Spawner {
                 if let Some(shutdown_tx) = shutdown_tx {
                     let id = shared.worker_thread_index;
 
-                    if let Some(handle) = self.spawn_thread(shutdown_tx, rt, id) {
-                        shared.num_th += 1;
-                        shared.worker_thread_index += 1;
-                        shared.worker_threads.insert(id, handle);
-                    } else if shared.num_th == 0 {
-                        // The OS refused to spawn the thread and there is no thread
-                        // to pick up the task that has just been pushed to the queue.
-                        panic!("Could not spawn any thread");
-                    } else {
-                        // OS temporarily failed to spawn a new thread.
-                        // The task will be picked up eventually by a currently
-                        // busy thread.
+                    match self.spawn_thread(shutdown_tx, rt, id) {
+                        Ok(handle) => {
+                            shared.num_th += 1;
+                            shared.worker_thread_index += 1;
+                            shared.worker_threads.insert(id, handle);
+                        },
+                        Err(err) if is_temporary_os_thread_error(error) && shared.num_th > 0 => {
+                            // OS temporarily failed to spawn a new thread.
+                            // The task will be picked up eventually by a currently
+                            // busy thread.
+                        },
+                        Err(e) => {
+                            // The OS refused to spawn the thread and there is no thread
+                            // to pick up the task that has just been pushed to the queue.
+                            panic!("OS can't spawn worker thread: {}", e)
+                        },
                     }
                 }
             }
