@@ -93,7 +93,10 @@ async fn mock_panics_write_data_left() {
 
 #[tokio::test]
 async fn stream_read(){
-    let mut mock = StreamBuilder::new().read(b"hello ").read(b"world!").build();
+
+    let mut mock = StreamBuilder::new()
+        .read_stream(String::from("hello "))
+        .read_stream(String::from("world!")).build();
     let res =  mock.next().await.expect("hello ");
     assert_eq!(res, "hello ");
 }

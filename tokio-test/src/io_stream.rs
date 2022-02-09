@@ -85,6 +85,15 @@ impl StreamBuilder {
         self
     }
 
+    /// Sequence a `read` operation.
+    ///
+    /// The next operation in the mock's script will be to expect a `read` call
+    /// and return `buf`.
+    pub fn read_stream(&mut self, string: String) -> &mut Self {
+        self.actions.push_back(Action::Read(string.into()));
+        self
+    }
+
     /// Sequence a `read` operation that produces an error.
     ///
     /// The next operation in the mock's script will be to expect a `read` call
@@ -211,75 +220,10 @@ impl Inner {
         Pin::new(&mut self.rx).poll_next(cx)
     }
 
-    fn remaining_wait(&mut self) -> Option<Duration> {
-        match self.action() {
-            Some(&mut Action::Wait(dur)) => Some(dur),
-            _ => None,
-        }
-    }
-
-    fn action(&mut self) -> Option<&mut Action> {
-        loop {
-            if self.actions.is_empty() {
-                return None;
-            }
-
-            match self.actions[0] {
-                Action::Read(ref mut data) => {
-                    if !data.is_empty() {
-                        break;
-                    }
-                }
-                Action::Write(ref mut data) => {
-                    if !data.is_empty() {
-                        break;
-                    }
-                }
-                Action::Next(ref mut data) => {
-                    if !data.is_empty() {
-                        break;
-                    }
-                }
-                Action::Wait(ref mut dur) => {
-                    if let Some(until) = self.waiting {
-                        let now = Instant::now();
-
-                        if now < until {
-                            break;
-                        }
-                    } else {
-                        self.waiting = Some(Instant::now() + *dur);
-                        break;
-                    }
-                }
-                Action::ReadError(ref mut error) | Action::WriteError(ref mut error) => {
-                    if error.is_some() {
-                        break;
-                    }
-                }
-            }
-
-            let _action = self.actions.pop_front();
-        }
-
-        self.actions.front_mut()
-    }
 }
 
 // ===== impl Inner =====
 
-impl Mock {
-    fn maybe_wakeup_reader(&mut self) {
-        match self.inner.action() {
-            Some(&mut Action::Read(_)) | Some(&mut Action::ReadError(_)) | None => {
-                if let Some(waker) = self.inner.read_wait.take() {
-                    waker.wake();
-                }
-            }
-            _ => {}
-        }
-    }
-}
 
 impl Stream for Mock {
     type Item = String;
