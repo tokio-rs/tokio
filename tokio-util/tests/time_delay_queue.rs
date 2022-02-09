@@ -3,7 +3,7 @@
 #![cfg(feature = "full")]
 
 use tokio::time::{self, sleep, sleep_until, Duration, Instant};
-use tokio_test::{assert_ok, assert_pending, assert_ready, task};
+use tokio_test::{assert_pending, assert_ready, task};
 use tokio_util::time::DelayQueue;
 
 macro_rules! poll {
@@ -12,12 +12,12 @@ macro_rules! poll {
     };
 }
 
-macro_rules! assert_ready_ok {
+macro_rules! assert_ready_some {
     ($e:expr) => {{
-        assert_ok!(match assert_ready!($e) {
+        match assert_ready!($e) {
             Some(v) => v,
             None => panic!("None"),
-        })
+        }
     }};
 }
 
@@ -31,7 +31,7 @@ async fn single_immediate_delay() {
     // Advance time by 1ms to handle thee rounding
     sleep(ms(1)).await;
 
-    assert_ready_ok!(poll!(queue));
+    assert_ready_some!(poll!(queue));
 
     let entry = assert_ready!(poll!(queue));
     assert!(entry.is_none())
@@ -52,7 +52,7 @@ async fn multi_immediate_delays() {
     let mut res = vec![];
 
     while res.len() < 3 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
@@ -83,7 +83,7 @@ async fn single_short_delay() {
 
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue));
+    let entry = assert_ready_some!(poll!(queue));
     assert_eq!(*entry.get_ref(), "foo");
 
     let entry = assert_ready!(poll!(queue));
@@ -193,7 +193,7 @@ async fn reset_entry() {
 
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue));
+    let entry = assert_ready_some!(poll!(queue));
     assert_eq!(*entry.get_ref(), "foo");
 
     let entry = assert_ready!(poll!(queue));
@@ -271,7 +271,7 @@ async fn repeatedly_reset_entry_inserted_as_expired() {
 
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "foo");
 
     let entry = assert_ready!(poll!(queue));
@@ -311,7 +311,7 @@ async fn remove_at_timer_wheel_threshold() {
 
     sleep(ms(80)).await;
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
 
     match entry {
         "foo" => {
@@ -348,7 +348,7 @@ async fn expires_before_last_insert() {
 
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "bar");
 }
 
@@ -375,14 +375,14 @@ async fn multi_reset() {
 
     sleep(ms(50)).await;
 
-    let entry = assert_ready_ok!(poll!(queue));
+    let entry = assert_ready_some!(poll!(queue));
     assert_eq!(*entry.get_ref(), "two");
 
     assert_pending!(poll!(queue));
 
     sleep(ms(50)).await;
 
-    let entry = assert_ready_ok!(poll!(queue));
+    let entry = assert_ready_some!(poll!(queue));
     assert_eq!(*entry.get_ref(), "one");
 
     let entry = assert_ready!(poll!(queue));
@@ -408,7 +408,7 @@ async fn expire_first_key_when_reset_to_expire_earlier() {
 
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "one");
 }
 
@@ -431,7 +431,7 @@ async fn expire_second_key_when_reset_to_expire_earlier() {
 
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "two");
 }
 
@@ -453,7 +453,7 @@ async fn reset_first_expiring_item_to_expire_later() {
 
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "two");
 }
 
@@ -479,7 +479,7 @@ async fn insert_before_first_after_poll() {
 
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "two");
 }
 
@@ -504,7 +504,7 @@ async fn insert_after_ready_poll() {
     let mut res = vec![];
 
     while res.len() < 3 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
         queue.insert_at("foo", now + ms(500));
     }
@@ -549,7 +549,7 @@ async fn reset_later_after_slot_starts() {
     sleep(ms(1)).await;
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "foo");
 }
 
@@ -568,7 +568,7 @@ async fn reset_inserted_expired() {
 
     sleep(ms(200)).await;
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "foo");
 
     assert_eq!(queue.len(), 0);
@@ -607,7 +607,7 @@ async fn reset_earlier_after_slot_starts() {
     sleep(ms(1)).await;
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "foo");
 }
 
@@ -630,7 +630,7 @@ async fn insert_in_past_after_poll_fires_immediately() {
 
     assert!(queue.is_woken());
 
-    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "bar");
 }
 
@@ -657,7 +657,7 @@ async fn compact_expire_empty() {
 
     let mut res = vec![];
     while res.len() < 2 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
@@ -704,7 +704,7 @@ async fn compact_remove_remapped_keys() {
 
     let mut res = vec![];
     while res.len() < 2 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
@@ -743,7 +743,7 @@ async fn compact_change_deadline() {
 
     let mut res = vec![];
     while res.len() < 2 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
@@ -763,14 +763,14 @@ async fn compact_change_deadline() {
     sleep(ms(10)).await;
 
     while res.len() < 4 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
     sleep(ms(10)).await;
 
     while res.len() < 6 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
@@ -803,7 +803,7 @@ async fn remove_after_compact_poll() {
     queue.insert_at("bar", now + ms(20));
 
     sleep(ms(10)).await;
-    assert_eq!(assert_ready_ok!(poll!(queue)).key(), foo_key);
+    assert_eq!(assert_ready_some!(poll!(queue)).key(), foo_key);
 
     queue.compact();
 
