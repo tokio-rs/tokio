@@ -1,7 +1,12 @@
 #![warn(rust_2018_idioms)]
 
 use std::io;
+use std::pin::Pin;
+use std::task::{Context, Waker, Poll};
+use futures_core::Stream;
+use futures_util::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::sync::futures;
 use tokio_test::io::Builder;
 use tokio_test::io_stream::StreamBuilder;
 
@@ -88,10 +93,9 @@ async fn mock_panics_write_data_left() {
 
 #[tokio::test]
 async fn stream_read(){
-
     let mut mock = StreamBuilder::new().read(b"hello ").read(b"world!").build();
-    // let res =  mock.poll_next(); or something like this ?
-    assert_eq!(res, b"hello ");
+    let res =  mock.next().await.expect("hello ");
+    assert_eq!(res, "hello ");
 }
 
 #[tokio::test]

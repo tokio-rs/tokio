@@ -1,14 +1,11 @@
 #![cfg(not(loom))]
 
-//! A mock type implementing [`AsyncRead`] and [`AsyncWrite`].
+//! A mock type implementing [`poll_next`].
 //!
 //!
 //! # Overview
 //!
-//! Provides a type that implements [`AsyncRead`] + [`AsyncWrite`] that can be configured
-//! to handle an arbitrary sequence of read and write operations. This is useful
-//! for writing unit tests for networking services as using an actual network
-//! type is fairly non deterministic.
+//!  TODO
 //!
 //! # Usage
 //!
@@ -22,7 +19,8 @@
 use tokio::sync::mpsc;
 use tokio::time::{Duration, Instant, Sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use futures_core::{Stream};
+use futures_core::{ready, Stream};
+use std::future::Future;
 use std::collections::VecDeque;
 use std::fmt;
 use std::pin::Pin;
@@ -57,6 +55,7 @@ enum Action {
     Read(Vec<u8>),
     Write(Vec<u8>),
     Wait(Duration),
+    Next(String),
     // Wrapped in Arc so that Builder can be cloned and Send.
     // Mock is not cloned as does not need to check Rc for ref counts.
     ReadError(Option<Arc<io::Error>>),
@@ -122,6 +121,12 @@ impl StreamBuilder {
     pub fn wait(&mut self, duration: Duration) -> &mut Self {
         let duration = cmp::max(duration, Duration::from_millis(1));
         self.actions.push_back(Action::Wait(duration));
+        self
+    }
+    /// calls next value within stream.
+    ///
+    pub fn next(&mut self) -> &mut Self {
+        self.actions.pop_front();
         self
     }
 
@@ -230,6 +235,11 @@ impl Inner {
                         break;
                     }
                 }
+                Action::Next(ref mut data) => {
+                    if !data.is_empty() {
+                        break;
+                    }
+                }
                 Action::Wait(ref mut dur) => {
                     if let Some(until) = self.waiting {
                         let now = Instant::now();
@@ -274,10 +284,26 @@ impl Mock {
 impl Stream for Mock {
     type Item = String;
 
-    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // TODO
-        // Pop item from array who could i iterate self? or do a  while loop like in AsyncRead /AsyncWrite ?
-        Poll::Pending
+    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+
+        loop {
+            if let Some(ref mut sleep) = self.inner.sleep {
+                ready!(Pin::new(sleep).poll(_cx));
+            }
+
+            // If a sleep is set, it has already fired
+            self.inner.sleep = None;
+            match ready!(self.inner.poll_action(_cx))  {
+                None => {
+                    return Poll::Pending;
+                }
+                Some(action) => {
+                    self.inner.actions.push_back(action);
+                    continue;
+                }
+            }
+        }
+
     }
 
 }
