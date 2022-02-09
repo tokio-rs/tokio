@@ -1,12 +1,12 @@
 #![warn(rust_2018_idioms)]
 
 use std::io;
-use std::pin::Pin;
-use std::task::{Context, Waker, Poll};
-use futures_core::Stream;
+
+
+
 use futures_util::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::futures;
+
 use tokio_test::io::Builder;
 use tokio_test::io_stream::StreamBuilder;
 
@@ -100,8 +100,8 @@ async fn stream_read(){
 
 #[tokio::test]
 async fn stream_write(){
-    let unit: u8 = 1;
-    let mut mock  = StreamBuilder::new().write(b"hello ").write(b"world!").build();
+    let _unit: u8 = 1;
+    let _mock  = StreamBuilder::new().write(b"hello ").write(b"world!").build();
     //  let mut task = get task ?
     //  mock.poll_write(task, unit ).assert(b"hello " or something like this ?
     //
