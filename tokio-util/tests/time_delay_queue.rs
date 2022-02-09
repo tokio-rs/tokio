@@ -3,7 +3,7 @@
 #![cfg(feature = "full")]
 
 use tokio::time::{self, sleep, sleep_until, Duration, Instant};
-use tokio_test::{assert_pending, assert_ready, assert_ready_ok, task};
+use tokio_test::{assert_pending, assert_ready, task};
 use tokio_util::time::DelayQueue;
 
 macro_rules! poll {
@@ -657,7 +657,7 @@ async fn compact_expire_empty() {
 
     let mut res = vec![];
     while res.len() < 2 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
@@ -704,7 +704,7 @@ async fn compact_remove_remapped_keys() {
 
     let mut res = vec![];
     while res.len() < 2 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
@@ -743,7 +743,7 @@ async fn compact_change_deadline() {
 
     let mut res = vec![];
     while res.len() < 2 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
@@ -763,14 +763,14 @@ async fn compact_change_deadline() {
     sleep(ms(10)).await;
 
     while res.len() < 4 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
     sleep(ms(10)).await;
 
     while res.len() < 6 {
-        let entry = assert_ready_ok!(poll!(queue));
+        let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
     }
 
@@ -803,7 +803,7 @@ async fn remove_after_compact_poll() {
     queue.insert_at("bar", now + ms(20));
 
     sleep(ms(10)).await;
-    assert_eq!(assert_ready_ok!(poll!(queue)).key(), foo_key);
+    assert_eq!(assert_ready_some!(poll!(queue)).key(), foo_key);
 
     queue.compact();
 
