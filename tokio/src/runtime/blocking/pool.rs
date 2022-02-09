@@ -240,17 +240,25 @@ impl Spawner {
             if shared.num_th == self.inner.thread_cap {
                 // At max number of threads
             } else {
-                shared.num_th += 1;
                 assert!(shared.shutdown_tx.is_some());
                 let shutdown_tx = shared.shutdown_tx.clone();
 
                 if let Some(shutdown_tx) = shutdown_tx {
                     let id = shared.worker_thread_index;
-                    shared.worker_thread_index += 1;
 
-                    let handle = self.spawn_thread(shutdown_tx, rt, id);
-
-                    shared.worker_threads.insert(id, handle);
+                    if let Some(handle) = self.spawn_thread(shutdown_tx, rt, id) {
+                        shared.num_th += 1;
+                        shared.worker_thread_index += 1;
+                        shared.worker_threads.insert(id, handle);
+                    } else if shared.num_th == 0 {
+                        // The OS refused to spawn the thread and there is no thread
+                        // to pick up the task that has just been pushed to the queue.
+                        panic!("Could not spawn any thread");
+                    } else {
+                        // OS temporarily failed to spawn a new thread.
+                        // The task will be picked up eventually by a currently
+                        // busy thread.
+                    }
                 }
             }
         } else {
@@ -272,7 +280,7 @@ impl Spawner {
         shutdown_tx: shutdown::Sender,
         rt: &Handle,
         id: usize,
-    ) -> thread::JoinHandle<()> {
+    ) -> Option<thread::JoinHandle<()>> {
         let mut builder = thread::Builder::new().name((self.inner.thread_name)());
 
         if let Some(stack_size) = self.inner.stack_size {
@@ -288,8 +296,26 @@ impl Spawner {
                 rt.blocking_spawner.inner.run(id);
                 drop(shutdown_tx);
             })
+            .map(Some)
+            .or_else(|error| {
+                if is_temporary_os_thread_error(&error) {
+                    Ok(None)
+                } else {
+                    Err(error)
+                }
+            })
             .expect("OS can't spawn a new worker thread")
     }
+}
+
+// Tells whether the error when spawning a thread is temporary.
+#[inline]
+fn is_temporary_os_thread_error(error: &std::io::Error) -> bool {
+    // Most probably OS specific, only tested on linux.
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::OutOfMemory
+    )
 }
 
 impl Inner {
