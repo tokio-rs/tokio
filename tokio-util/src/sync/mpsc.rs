@@ -44,7 +44,7 @@ enum State<T> {
 pub struct PollSender<T> {
     sender: Option<Sender<T>>,
     state: State<T>,
-    acquire: ReusableBoxFuture<Result<OwnedPermit<T>, PollSendError<T>>>,
+    acquire: ReusableBoxFuture<'static, Result<OwnedPermit<T>, PollSendError<T>>>,
 }
 
 // Creates a future for acquiring a permit from the underlying channel.  This is used to ensure
