@@ -7,7 +7,7 @@
 use crate::time::wheel::{self, Wheel};
 
 use futures_core::ready;
-use tokio::time::{error::Error, sleep_until, Duration, Instant, Sleep};
+use tokio::time::{sleep_until, Duration, Instant, Sleep};
 
 use core::ops::{Index, IndexMut};
 use slab::Slab;
@@ -72,7 +72,6 @@ use std::task::{self, Poll, Waker};
 /// Using `DelayQueue` to manage cache entries.
 ///
 /// ```rust,no_run
-/// use tokio::time::error::Error;
 /// use tokio_util::time::{DelayQueue, delay_queue};
 ///
 /// use futures::ready;
@@ -108,13 +107,12 @@ use std::task::{self, Poll, Waker};
 ///         }
 ///     }
 ///
-///     fn poll_purge(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
-///         while let Some(res) = ready!(self.expirations.poll_expired(cx)) {
-///             let entry = res?;
+///     fn poll_purge(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+///         while let Some(entry) = ready!(self.expirations.poll_expired(cx)) {
 ///             self.entries.remove(entry.get_ref());
 ///         }
 ///
-///         Poll::Ready(Ok(()))
+///         Poll::Ready(())
 ///     }
 /// }
 /// ```
@@ -577,10 +575,7 @@ impl<T> DelayQueue<T> {
     /// Attempts to pull out the next value of the delay queue, registering the
     /// current task for wakeup if the value is not yet available, and returning
     /// `None` if the queue is exhausted.
-    pub fn poll_expired(
-        &mut self,
-        cx: &mut task::Context<'_>,
-    ) -> Poll<Option<Result<Expired<T>, Error>>> {
+    pub fn poll_expired(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Expired<T>>> {
         if !self
             .waker
             .as_ref()
@@ -591,18 +586,16 @@ impl<T> DelayQueue<T> {
         }
 
         let item = ready!(self.poll_idx(cx));
-        Poll::Ready(item.map(|result| {
-            result.map(|key| {
-                let data = self.slab.remove(&key);
-                debug_assert!(data.next.is_none());
-                debug_assert!(data.prev.is_none());
+        Poll::Ready(item.map(|key| {
+            let data = self.slab.remove(&key);
+            debug_assert!(data.next.is_none());
+            debug_assert!(data.prev.is_none());
 
-                Expired {
-                    key,
-                    data: data.inner,
-                    deadline: self.start + Duration::from_millis(data.when),
-                }
-            })
+            Expired {
+                key,
+                data: data.inner,
+                deadline: self.start + Duration::from_millis(data.when),
+            }
         }))
     }
 
@@ -1017,13 +1010,13 @@ impl<T> DelayQueue<T> {
     /// should be returned.
     ///
     /// A slot should be returned when the associated deadline has been reached.
-    fn poll_idx(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Result<Key, Error>>> {
+    fn poll_idx(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Key>> {
         use self::wheel::Stack;
 
         let expired = self.expired.pop(&mut self.slab);
 
         if expired.is_some() {
-            return Poll::Ready(expired.map(Ok));
+            return Poll::Ready(expired);
         }
 
         loop {
@@ -1043,7 +1036,7 @@ impl<T> DelayQueue<T> {
             self.delay = self.next_deadline().map(|when| Box::pin(sleep_until(when)));
 
             if let Some(idx) = wheel_idx {
-                return Poll::Ready(Some(Ok(idx)));
+                return Poll::Ready(Some(idx));
             }
 
             if self.delay.is_none() {
@@ -1075,7 +1068,7 @@ impl<T> Default for DelayQueue<T> {
 impl<T> futures_core::Stream for DelayQueue<T> {
     // DelayQueue seems much more specific, where a user may care that it
     // has reached capacity, so return those errors instead of panicking.
-    type Item = Result<Expired<T>, Error>;
+    type Item = Expired<T>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
         DelayQueue::poll_expired(self.get_mut(), cx)

@@ -27,7 +27,12 @@ fn block_on<T>(f: impl std::future::Future<Output = T>) -> T {
     return loom::future::block_on(f);
 
     #[cfg(not(loom))]
-    return futures::executor::block_on(f);
+    {
+        let rt = crate::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        rt.block_on(f)
+    }
 }
 
 fn model(f: impl Fn() + Send + Sync + 'static) {
@@ -182,6 +187,15 @@ fn reset_future() {
     })
 }
 
+#[cfg(not(loom))]
+fn normal_or_miri<T>(normal: T, miri: T) -> T {
+    if cfg!(miri) {
+        miri
+    } else {
+        normal
+    }
+}
+
 #[test]
 #[cfg(not(loom))]
 fn poll_process_levels() {
@@ -195,7 +209,7 @@ fn poll_process_levels() {
 
     let mut entries = vec![];
 
-    for i in 0..1024 {
+    for i in 0..normal_or_miri(1024, 64) {
         let mut entry = Box::pin(TimerEntry::new(
             &handle,
             clock.now() + Duration::from_millis(i),
@@ -208,7 +222,7 @@ fn poll_process_levels() {
         entries.push(entry);
     }
 
-    for t in 1..1024 {
+    for t in 1..normal_or_miri(1024, 64) {
         handle.process_at_time(t as u64);
         for (deadline, future) in entries.iter_mut().enumerate() {
             let mut context = Context::from_waker(noop_waker_ref());

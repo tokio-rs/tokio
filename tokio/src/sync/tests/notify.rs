@@ -45,3 +45,37 @@ fn notify_clones_waker_before_lock() {
     // The result doesn't matter, we're just testing that we don't deadlock.
     let _ = future.poll(&mut cx);
 }
+
+#[test]
+fn notify_simple() {
+    let notify = Notify::new();
+
+    let mut fut1 = tokio_test::task::spawn(notify.notified());
+    assert!(fut1.poll().is_pending());
+
+    let mut fut2 = tokio_test::task::spawn(notify.notified());
+    assert!(fut2.poll().is_pending());
+
+    notify.notify_waiters();
+
+    assert!(fut1.poll().is_ready());
+    assert!(fut2.poll().is_ready());
+}
+
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn watch_test() {
+    let rt = crate::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let (tx, mut rx) = crate::sync::watch::channel(());
+
+        crate::spawn(async move {
+            let _ = tx.send(());
+        });
+
+        let _ = rx.changed().await;
+    });
+}

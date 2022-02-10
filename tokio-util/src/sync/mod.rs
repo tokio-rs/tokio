@@ -6,7 +6,7 @@ pub use cancellation_token::{guard::DropGuard, CancellationToken, WaitForCancell
 mod intrusive_double_linked_list;
 
 mod mpsc;
-pub use mpsc::PollSender;
+pub use mpsc::{PollSendError, PollSender};
 
 mod poll_semaphore;
 pub use poll_semaphore::PollSemaphore;
