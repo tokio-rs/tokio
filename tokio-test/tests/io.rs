@@ -1,7 +1,8 @@
 #![warn(rust_2018_idioms)]
 
+use std::future::Future;
 use std::io;
-
+use futures_core::{Stream, TryStream};
 
 
 use futures_util::StreamExt;
@@ -93,12 +94,12 @@ async fn mock_panics_write_data_left() {
 
 #[tokio::test]
 async fn stream_read(){
-
     let mut mock = StreamBuilder::new()
         .read_stream(String::from("hello "))
-        .read_stream(String::from("world!")).build();
-    let res =  mock.next().await.expect("hello ");
-    assert_eq!(res, "hello ");
+        .build();
+    let txt =  String::from("hello ");
+    let res =  mock.next().await;
+    assert_eq!(res, Some(txt));
 }
 
 #[tokio::test]

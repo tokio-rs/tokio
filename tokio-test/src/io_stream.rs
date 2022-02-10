@@ -90,7 +90,7 @@ impl StreamBuilder {
     /// The next operation in the mock's script will be to expect a `read` call
     /// and return `buf`.
     pub fn read_stream(&mut self, string: String) -> &mut Self {
-        self.actions.push_back(Action::Read(string.into()));
+        self.actions.push_back(Action::Next(string));
         self
     }
 
@@ -134,10 +134,6 @@ impl StreamBuilder {
     }
     /// calls next value within stream.
     ///
-    pub fn next(&mut self) -> &mut Self {
-        self.actions.pop_front();
-        self
-    }
 
     /// Build a `Mock` value according to the defined script.
     pub fn build(&mut self) -> Mock {
@@ -185,6 +181,14 @@ impl Handle {
         self.tx.send(Action::Write(buf.into())).unwrap();
         self
     }
+    /// Sequence a `write` operation.
+    ///
+    /// The next operation in the mock's script will be to expect a `write`
+    /// call.
+    pub fn read_stream(&mut self, string: String) -> &mut Self {
+        self.tx.send(Action::Next(string)).unwrap();
+        self
+    }
 
     /// Sequence a `write` operation error.
     ///
@@ -220,6 +224,52 @@ impl Inner {
         Pin::new(&mut self.rx).poll_next(cx)
     }
 
+    fn action(&mut self) -> Option<&mut Action> {
+        loop {
+            if self.actions.is_empty() {
+                return None;
+            }
+
+            match self.actions[0] {
+                Action::Read(ref mut data) => {
+                    if !data.is_empty() {
+                        break;
+                    }
+                }
+                Action::Write(ref mut data) => {
+                    if !data.is_empty() {
+                        break;
+                    }
+                }
+                Action::Next(ref mut data) => {
+                    if !data.is_empty() {
+                        break;
+                    }
+                }
+                Action::Wait(ref mut dur) => {
+                    if let Some(until) = self.waiting {
+                        let now = Instant::now();
+
+                        if now < until {
+                            break;
+                        }
+                    } else {
+                        self.waiting = Some(Instant::now() + *dur);
+                        break;
+                    }
+                }
+                Action::ReadError(ref mut error) | Action::WriteError(ref mut error) => {
+                    if error.is_some() {
+                        break;
+                    }
+                }
+            }
+
+            let _action = self.actions.pop_front();
+        }
+
+        self.actions.front_mut()
+    }
 }
 
 // ===== impl Inner =====
@@ -235,15 +285,16 @@ impl Stream for Mock {
                 ready!(Pin::new(sleep).poll(_cx));
             }
 
+
             // If a sleep is set, it has already fired
             self.inner.sleep = None;
             match ready!(self.inner.poll_action(_cx))  {
-                None => {
-                    return Poll::Pending;
-                }
                 Some(action) => {
                     self.inner.actions.push_back(action);
                     continue;
+                }
+                None => {
+                    return Poll::Ready(None);
                 }
             }
         }
