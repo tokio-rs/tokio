@@ -305,11 +305,7 @@ impl Spawner {
 // Tells whether the error when spawning a thread is temporary.
 #[inline]
 fn is_temporary_os_thread_error(error: &std::io::Error) -> bool {
-    // Most probably OS specific, only tested on linux.
-    matches!(
-        error.kind(),
-        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::OutOfMemory
-    )
+    matches!(error.kind(), std::io::ErrorKind::WouldBlock)
 }
 
 impl Inner {
