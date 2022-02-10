@@ -14,7 +14,7 @@
 
 - sync: add lifetime parameter to `ReusableBoxFuture` ([#3762])
 - sync: refactored `PollSender<T>` to fix a subtly broken `Sink<T>` implementation ([#4214])
-- util: remove error case from the infallible `DelayQueue::poll_elapsed` ([#4241])
+- time: remove error case from the infallible `DelayQueue::poll_elapsed` ([#4241])
 
 [#3370]: https://github.com/tokio-rs/tokio/pull/3370
 [#4170]: https://github.com/tokio-rs/tokio/pull/4170
