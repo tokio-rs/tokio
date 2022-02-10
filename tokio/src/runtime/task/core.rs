@@ -239,12 +239,17 @@ impl<T: Future> CoreStage<T> {
     ///
     /// The caller must ensure it is safe to mutate the `stage` field.
     pub(super) fn take_output(&self) -> super::Result<T::Output> {
-        use std::mem;
+        use std::mem::ManuallyDrop;
 
-        self.stage.with_mut(|ptr| {
-            // Safety:: the caller ensures mutual exclusion to the field.
-            match mem::replace(unsafe { &mut *ptr }, Stage::Consumed) {
-                Stage::Finished(output) => output,
+        self.stage.with_mut(|ptr| unsafe {
+            // Safety: the caller ensures mutual exclusion to the field.
+            match &mut *ptr {
+                Stage::Finished(output) => {
+                    let output = std::ptr::read(output as *const _);
+                    let ptr = ptr as *mut ManuallyDrop<Stage<T>>;
+                    *ptr = ManuallyDrop::new(Stage::Consumed);
+                    output
+                }
                 _ => panic!("JoinHandle polled after completion"),
             }
         })
