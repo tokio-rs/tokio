@@ -7,7 +7,6 @@ edition = "2018"
 [dependencies]
 tokio = { version = "1.5.0", path = "../tokio", features = ["full"] }
 bencher = "0.1.5"
-quanta = "0.9"
 
 [dev-dependencies]
 tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
