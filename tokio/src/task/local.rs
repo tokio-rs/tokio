@@ -287,6 +287,7 @@ cfg_rt! {
     /// }
     /// ```
     #[track_caller]
+    #[inline]
     pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -301,6 +302,14 @@ cfg_rt! {
     {
         let future = crate::util::trace::task(future, "local", name);
         let task = UninitTask::new(future);
+
+        spawn_local_task(task)
+    }
+
+    fn spawn_local_task<F>(task: UninitTask<F, Arc<Shared>>) -> JoinHandle<F::Output>
+    where F: crate::future::Future + 'static,
+          F::Output: 'static
+    {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
@@ -379,13 +388,32 @@ impl LocalSet {
     /// ```
     /// [`spawn_local`]: fn@spawn_local
     #[track_caller]
+    #[inline]
     pub fn spawn_local<F>(&self, future: F) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        self.spawn_local_inner(future)
+    }
+
+    #[inline]
+    pub(super) fn spawn_local_inner<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,
     {
         let future = crate::util::trace::task(future, "local", None);
         let task = UninitTask::new(future);
+
+        self.spawn_local_task(task)
+    }
+
+    fn spawn_local_task<F>(&self, task: UninitTask<F, Arc<Shared>>) -> JoinHandle<F::Output>
+    where
+        F: crate::future::Future + 'static,
+        F::Output: 'static,
+    {
         let (handle, notified) = self.context.owned.bind(task, self.context.shared.clone());
 
         if let Some(notified) = notified {

@@ -76,6 +76,7 @@ impl<'a> Builder<'a> {
     /// See [`task::spawn`](crate::task::spawn) for
     /// more details.
     #[track_caller]
+    #[inline]
     pub fn spawn<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
     where
         Fut: Future + Send + 'static,
@@ -89,6 +90,7 @@ impl<'a> Builder<'a> {
     /// See [`task::spawn_local`](crate::task::spawn_local)
     /// for more details.
     #[track_caller]
+    #[inline]
     pub fn spawn_local<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
     where
         Fut: Future + 'static,

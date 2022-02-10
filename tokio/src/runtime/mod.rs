@@ -393,6 +393,7 @@ cfg_rt! {
         /// # }
         /// ```
         #[track_caller]
+        #[inline]
         pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,

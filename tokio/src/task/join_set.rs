@@ -71,6 +71,7 @@ impl<T: 'static> JoinSet<T> {
     /// # Panics
     ///
     /// This method panics if called outside of a Tokio runtime.
+    #[inline]
     pub fn spawn<F>(&mut self, task: F)
     where
         F: Future<Output = T>,
@@ -81,6 +82,7 @@ impl<T: 'static> JoinSet<T> {
     }
 
     /// Spawn the provided task on the provided runtime and store it in this `JoinSet`.
+    #[inline]
     pub fn spawn_on<F>(&mut self, task: F, handle: &Handle)
     where
         F: Future<Output = T>,
@@ -97,6 +99,7 @@ impl<T: 'static> JoinSet<T> {
     /// This method panics if it is called outside of a `LocalSet`.
     ///
     /// [`LocalSet`]: crate::task::LocalSet
+    #[inline]
     pub fn spawn_local<F>(&mut self, task: F)
     where
         F: Future<Output = T>,
@@ -108,6 +111,7 @@ impl<T: 'static> JoinSet<T> {
     /// Spawn the provided task on the provided [`LocalSet`] and store it in this `JoinSet`.
     ///
     /// [`LocalSet`]: crate::task::LocalSet
+    #[inline]
     pub fn spawn_local_on<F>(&mut self, task: F, local_set: &LocalSet)
     where
         F: Future<Output = T>,
