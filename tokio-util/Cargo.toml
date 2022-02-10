@@ -15,7 +15,6 @@ description = """
 Additional utilities for working with Tokio.
 """
 categories = ["asynchronous"]
-publish = false
 
 [features]
 # No features on by default
