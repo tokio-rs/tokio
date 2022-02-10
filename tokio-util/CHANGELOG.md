@@ -6,14 +6,14 @@
 - time: add `shrink_to_fit` and `compact` methods to `DelayQueue` ([#4170])
 - codec: improve `Builder::max_frame_length` docs ([#4352])
 - codec: add mutable reference getters for codecs to pinned `Framed` ([#4372])
-- net: add generic trait to combine UnixListener and TcpListener ([#4385])
+- net: add generic trait to combine `UnixListener` and `TcpListener` ([#4385])
 - codec: implement `Framed::map_codec` ([#4427])
-- codec: implement Encoder<BytesMut> for BytesCodec ([#4465])
+- codec: implement `Encoder<BytesMut>` for `BytesCodec` ([#4465])
 
 ### Changed
 
 - sync: refactored `PollSender<T>` to fix a subtly broken `Sink<T>` implementation ([#4214])
-- util: remove error case from the infallible DelayQueue::poll_elapsed ([#4241])
+- util: remove error case from the infallible `DelayQueue::poll_elapsed` ([#4241])
 
 [#3370]: https://github.com/tokio-rs/tokio/pull/3370
 [#4170]: https://github.com/tokio-rs/tokio/pull/4170
