@@ -989,6 +989,10 @@ rt_test! {
         tx.send(()).unwrap();
     }
 
+
+    // Should be above initial coop budget, currently 128.
+    const COOP_NUM_TASKS: usize = 1000;
+
     #[test]
     fn coop() {
         use std::task::Poll::Ready;
@@ -996,13 +1000,19 @@ rt_test! {
         let rt = rt();
 
         rt.block_on(async {
+            let (tx, mut rx) = tokio::sync::mpsc::channel(COOP_NUM_TASKS);
+
             // Create a bunch of tasks
-            let mut tasks = (0..1_000).map(|_| {
-                tokio::spawn(async { })
+            let mut tasks = (0..COOP_NUM_TASKS).map(|_| {
+                let tx = tx.clone();
+                tokio::spawn(async move{
+                    tx.send(()).await.expect("send");
+                })
             }).collect::<Vec<_>>();
 
-            // Hope that all the tasks complete...
-            time::sleep(Duration::from_millis(100)).await;
+            for _ in 0..COOP_NUM_TASKS {
+                rx.recv().await;
+            }
 
             poll_fn(|cx| {
                 // At least one task should not be ready
@@ -1024,13 +1034,19 @@ rt_test! {
         let rt = rt();
 
         rt.block_on(async {
+            let (tx, mut rx) = tokio::sync::mpsc::channel(COOP_NUM_TASKS);
+
             // Create a bunch of tasks
-            let mut tasks = (0..1_000).map(|_| {
-                tokio::spawn(async { })
+            let mut tasks = (0..COOP_NUM_TASKS).map(|_| {
+                let tx = tx.clone();
+                tokio::spawn(async move{
+                    tx.send(()).await.expect("send");
+                })
             }).collect::<Vec<_>>();
 
-            // Hope that all the tasks complete...
-            time::sleep(Duration::from_millis(100)).await;
+            for _ in 0..COOP_NUM_TASKS {
+                rx.recv().await;
+            }
 
             tokio::task::unconstrained(poll_fn(|cx| {
                 // All the tasks should be ready
