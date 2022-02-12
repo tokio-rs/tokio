@@ -90,7 +90,7 @@ pub(crate) fn enter(new: Handle) -> EnterGuard {
 /// Sets this [`Handle`] as the current active [`Handle`].
 ///
 /// [`Handle`]: Handle
-pub(crate) fn try_enter(new: Handle) -> Option<EnterGuard> {
+pub fn try_enter(new: Handle) -> Option<EnterGuard> {
     CONTEXT
         .try_with(|ctx| {
             let old = ctx.borrow_mut().replace(new);
