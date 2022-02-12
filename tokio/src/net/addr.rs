@@ -1,5 +1,4 @@
-use crate::future;
-
+use std::future;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
@@ -56,7 +55,7 @@ impl sealed::ToSocketAddrsPriv for SocketAddr {
 
     fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
         let iter = Some(*self).into_iter();
-        future::ok(iter)
+        future::ready(Ok(iter))
     }
 }
 
@@ -96,7 +95,7 @@ impl sealed::ToSocketAddrsPriv for (IpAddr, u16) {
 
     fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
         let iter = Some(SocketAddr::from(*self)).into_iter();
-        future::ok(iter)
+        future::ready(Ok(iter))
     }
 }
 
@@ -138,7 +137,7 @@ impl sealed::ToSocketAddrsPriv for &[SocketAddr] {
 
     fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
         let iter = self.to_vec().into_iter();
-        future::ok(iter)
+        future::ready(Ok(iter))
     }
 }
 
