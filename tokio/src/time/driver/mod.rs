@@ -129,7 +129,7 @@ impl ClockTime {
             .unwrap_or_else(|| Duration::from_secs(0));
         let ms = dur.as_millis();
 
-        ms.try_into().expect("Duration too far into the future")
+        ms.try_into().unwrap_or(u64::MAX)
     }
 
     pub(self) fn tick_to_duration(&self, t: u64) -> Duration {
