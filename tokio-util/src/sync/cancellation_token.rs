@@ -824,7 +824,7 @@ impl CancellationTokenState {
             let need_waker_update = wait_node
                 .task
                 .as_ref()
-                .map(|waker| waker.will_wake(cx.waker()))
+                .map(|waker| !waker.will_wake(cx.waker()))
                 .unwrap_or(true);
 
             if need_waker_update {
