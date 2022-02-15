@@ -1,4 +1,4 @@
-# 1.16.2 (February 15, 2022)
+# 1.17.0 (February 15, 2022)
 
 This release updates the minimum supported Rust version (MSRV) to 1.49, the
 `mio` dependency to v0.8, and the (optional) `parking_lot` dependency to v0.12.

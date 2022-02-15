@@ -22,7 +22,7 @@ pub mod task;
 /// For more information, see the documentation for
 /// [`tokio::runtime::Runtime::block_on`][runtime-block-on].
 ///
-/// [runtime-block-on]: https://docs.rs/tokio/1.16.2/tokio/runtime/struct.Runtime.html#method.block_on
+/// [runtime-block-on]: https://docs.rs/tokio/1.17.0/tokio/runtime/struct.Runtime.html#method.block_on
 pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
     use tokio::runtime;
 
