@@ -1054,6 +1054,31 @@ rt_test! {
         });
     }
 
+    #[cfg(tokio_unstable)]
+    #[test]
+    fn coop_consume_budget() {
+        let rt = rt();
+
+        rt.block_on(async {
+            poll_fn(|cx| {
+                let counter = Arc::new(std::sync::Mutex::new(0));
+                let counter_clone = Arc::clone(&counter);
+                let mut worker = Box::pin(async move {
+                    // Consume the budget until a yield happens
+                    for _ in 0..1000 {
+                        *counter.lock().unwrap() += 1;
+                        task::consume_budget().await
+                    }
+                });
+                // Assert that the worker was yielded and it didn't manage
+                // to finish the whole work (assuming the total budget of 128)
+                assert!(Pin::new(&mut worker).poll(cx).is_pending());
+                assert!(*counter_clone.lock().unwrap() < 1000);
+                std::task::Poll::Ready(())
+            }).await;
+        });
+    }
+
     // Tests that the "next task" scheduler optimization is not able to starve
     // other tasks.
     #[test]
