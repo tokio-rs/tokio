@@ -109,6 +109,7 @@ pub use timeout::{timeout, timeout_at, Timeout};
 #[cfg(not(loom))]
 mod tests;
 
-// Re-export for convenience
+// Re-export not needed since it's pulling from std
+#[deprecated(note = "Prefer importing std::time::Duration directly")]
 #[doc(no_inline)]
 pub use std::time::Duration;
