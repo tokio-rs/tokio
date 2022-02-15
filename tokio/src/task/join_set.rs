@@ -17,6 +17,10 @@ use crate::util::IdleNotifiedSet;
 ///
 /// When the `JoinSet` is dropped, all tasks in the `JoinSet` are immediately aborted.
 ///
+/// **Note**: This is an [unstable API][unstable]. The public API of this type
+/// may break in 1.x releases. See [the documentation on unstable
+/// features][unstable] for details.
+///
 /// # Examples
 ///
 /// Spawn multiple tasks and wait for them.
@@ -42,6 +46,8 @@ use crate::util::IdleNotifiedSet;
 ///     }
 /// }
 /// ```
+///
+/// [unstable]: crate#unstable-features
 pub struct JoinSet<T> {
     inner: IdleNotifiedSet<JoinHandle<T>>,
 }
