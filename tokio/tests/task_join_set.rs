@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", tokio_unstable))]
 
 use tokio::sync::oneshot;
 use tokio::task::JoinSet;
