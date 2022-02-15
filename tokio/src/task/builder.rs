@@ -49,7 +49,7 @@ use std::future::Future;
 ///     }
 /// }
 /// ```
-/// [unstable API]: crate#unstable-features
+/// [unstable]: crate#unstable-features
 /// [`name`]: Builder::name
 /// [`spawn_local`]: Builder::spawn_local
 /// [`spawn`]: Builder::spawn
