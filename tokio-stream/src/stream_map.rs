@@ -43,8 +43,8 @@ use std::task::{Context, Poll};
 /// [`mpsc`] channel.
 ///
 /// [`StreamExt::merge`]: crate::StreamExt::merge
-/// [`mpsc`]: https://docs.rs/tokio/1.0/tokio/sync/mpsc/index.html
-/// [`pin!`]: https://docs.rs/tokio/1.0/tokio/macro.pin.html
+/// [`mpsc`]: https://docs.rs/tokio/1.16.2/tokio/sync/mpsc/index.html
+/// [`pin!`]: https://docs.rs/tokio/1.16.2/tokio/macro.pin.html
 /// [`Box::pin`]: std::boxed::Box::pin
 ///
 /// # Examples

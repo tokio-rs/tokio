@@ -64,9 +64,9 @@
 //! types when the io feature is enabled.
 //!
 //! [`tokio-util`]: https://docs.rs/tokio-util/0.4/tokio_util/codec/index.html
-//! [`tokio::io`]: https://docs.rs/tokio/1.0/tokio/io/index.html
-//! [`AsyncRead`]: https://docs.rs/tokio/1.0/tokio/io/trait.AsyncRead.html
-//! [`AsyncWrite`]: https://docs.rs/tokio/1.0/tokio/io/trait.AsyncWrite.html
+//! [`tokio::io`]: https://docs.rs/tokio/1.16.2/tokio/io/index.html
+//! [`AsyncRead`]: https://docs.rs/tokio/1.16.2/tokio/io/trait.AsyncRead.html
+//! [`AsyncWrite`]: https://docs.rs/tokio/1.16.2/tokio/io/trait.AsyncWrite.html
 //! [`ReaderStream`]: https://docs.rs/tokio-util/0.4/tokio_util/io/struct.ReaderStream.html
 //! [`StreamReader`]: https://docs.rs/tokio-util/0.4/tokio_util/io/struct.StreamReader.html
 
