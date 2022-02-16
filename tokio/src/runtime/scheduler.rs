@@ -18,9 +18,9 @@ impl SchedulerHandle for ThreadPoolHandle {}
 /// Scheduler handle wrapper which may contains a basic scheduler handle or
 /// thread pool scheduler handle.
 ///
-/// This ensures that task cell layout is same no matter which scheduler the
-/// runtime uses. So we can create a `UninitTask` and send future to task cell
-/// immediately during spawning tasks.
+/// This ensures that the task cell layout is the same, no matter which scheduler
+/// the runtime uses. This way, we can create a `UninitTask` and send the future to
+/// the task cell immediately when spawning tasks.
 #[repr(C)]
 pub(crate) union Scheduler<S = ()> {
     basic: ManuallyDrop<BasicSchedulerHandle>,
@@ -30,7 +30,7 @@ pub(crate) union Scheduler<S = ()> {
 }
 
 impl<F: Future> super::task::UninitTask<F, Scheduler<()>> {
-    /// Transumte type after the scheduler type is determined.
+    /// Transmute type after the scheduler type is determined.
     pub(crate) fn transmute<S: SchedulerHandle>(self) -> super::task::UninitTask<F, Scheduler<S>> {
         unsafe { std::mem::transmute(self) }
     }

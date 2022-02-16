@@ -185,10 +185,10 @@ unsafe impl<S> Sync for Task<S> {}
 
 /// A uninitialized task, which only contains a valid future.
 ///
-/// UninitTask can be constructed without getting the scheduler handle,
-/// and bind to a scheduler lately. This makes it possible to quickly
-/// sending the future to the task cell. Compiler can optimize out
-/// data copy during spawn tasks easily.
+/// An `UninitTask` can be constructed without getting the scheduler handle,
+/// and bind to a scheduler later. This makes it possible to quickly
+/// send the future to the task cell. The compiler can optimize out
+/// the data copy while spawn tasks easily.
 pub(crate) struct UninitTask<F: Future, S> {
     inner: Box<UninitCell<F, S>>,
 }
@@ -286,7 +286,7 @@ impl<F: Future, S: Schedule> UninitTask<F, S> {
         (task, notified, join)
     }
 
-    /// Initlializes a new task with an associated join handle. This method is used
+    /// Initializes a new task with an associated join handle. This method is used
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.

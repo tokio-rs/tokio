@@ -37,13 +37,13 @@ pub(super) struct Cell<T: Future, S> {
     pub(super) trailer: Trailer,
 }
 
-/// Uninitialized task cell. Only the holds a valid future.
+/// Uninitialized task cell. Only holds a valid future.
 ///
-/// `UninitCell<T, S>` should have same layout as `Cell<T, S>`, so it can
-/// be initialized and transmute into a `Cell<T, S>` lately.
+/// `UninitCell<T, S>` should have the same layout as `Cell<T, S>`, so it can
+/// be initialized and transmute into a `Cell<T, S>` later.
 ///
-/// If `S1` and `S2` have same layout, the layout of `UninitCell<T, S1>`
-/// and `UninitCell<T, S2>` should be same. This allows trick used in
+/// If `S1` and `S2` have the same layout, the layout of `UninitCell<T, S1>`
+/// and `UninitCell<T, S2>` should be the same. This allows the trick used in
 /// [`crate::runtime::Scheduler`].
 #[repr(C)]
 pub(super) struct UninitCell<T: Future, S> {
@@ -65,8 +65,8 @@ pub(super) struct CoreStage<T: Future> {
 ///
 /// Holds the future or output, depending on the stage of execution.
 ///
-/// `#[repr(C)]` guarantee `Core<T, S1>` has same layout as `Core<T, S2>`
-/// if `S1` and `S2` have same layout.
+/// `#[repr(C)]` guarantees `Core<T, S1>` has the same layout as `Core<T, S2>`
+/// if `S1` and `S2` have the same layout.
 #[repr(C)]
 pub(super) struct Core<T: Future, S> {
     /// Scheduler used to drive this future.
