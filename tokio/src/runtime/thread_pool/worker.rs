@@ -126,7 +126,9 @@ pub(super) struct Shared {
     /// how they communicate between each other.
     remotes: Box<[Remote]>,
 
-    /// Submits work to the scheduler while **not** currently on a worker thread.
+    /// Global task queue used for:
+    ///  1. Submit work to the scheduler while **not** currently on a worker thread.
+    ///  2. Submit work to the scheduler when a worker run queue is saturated
     inject: Inject<Arc<Shared>>,
 
     /// Coordinates idle workers
@@ -470,6 +472,17 @@ impl Context {
         core
     }
 
+    /// Parks the worker thread while waiting for tasks to execute.
+    ///
+    /// This function checks if indeed there's no more work left to be done before parking.
+    /// Also important to notice that, before parking, the worker thread will try to take
+    /// ownership of the Driver (IO/Time) and dispatch any events that might have fired.
+    /// Whenever a worker thread executes the Driver loop, all waken tasks are scheduled
+    /// in its own local queue until the queue saturates (ntasks > LOCAL_QUEUE_CAPACITY).
+    /// When the local queue is saturated, the overflow tasks are added to the injection queue
+    /// from where other workers can pick them up.
+    /// Also, we rely on the workstealing algorithm to spread the tasks amongst workers
+    /// after all the IOs get dispatched
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
         if let Some(f) = &self.worker.shared.before_park {
             f();
@@ -545,6 +558,11 @@ impl Core {
         self.lifo_slot.take().or_else(|| self.run_queue.pop())
     }
 
+    /// Function responsible for stealing tasks from another worker
+    ///
+    /// Note: Only if less than half the workers are searching for tasks to steal
+    /// a new worker will actually try to steal. The idea is to make sure not all
+    /// workers will be trying to steal at the same time.
     fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
         if !self.transition_to_searching(worker) {
             return None;
