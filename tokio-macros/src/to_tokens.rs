@@ -49,23 +49,29 @@ impl ToTokens for &str {
     }
 }
 
-impl<const N: usize> ToTokens for [char; N] {
-    fn to_tokens(self, stream: &mut TokenStream, span: Span) {
-        let mut it = self.iter();
+macro_rules! joint_punct {
+    ($n:tt) => {
+        impl ToTokens for [char; $n] {
+            fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+                let mut it = self.iter();
 
-        if let Some(last) = it.next_back() {
-            for c in it {
-                let mut punct = Punct::new(*c, Spacing::Joint);
-                punct.set_span(span);
-                stream.push(TokenTree::Punct(punct));
+                if let Some(last) = it.next_back() {
+                    for c in it {
+                        let mut punct = Punct::new(*c, Spacing::Joint);
+                        punct.set_span(span);
+                        stream.push(TokenTree::Punct(punct));
+                    }
+
+                    let mut punct = Punct::new(*last, Spacing::Alone);
+                    punct.set_span(span);
+                    stream.push(TokenTree::Punct(punct));
+                }
             }
-
-            let mut punct = Punct::new(*last, Spacing::Alone);
-            punct.set_span(span);
-            stream.push(TokenTree::Punct(punct));
         }
-    }
+    };
 }
+
+joint_punct!(2);
 
 impl ToTokens for char {
     fn to_tokens(self, stream: &mut TokenStream, span: Span) {
