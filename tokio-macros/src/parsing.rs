@@ -169,7 +169,7 @@ impl<'a> BaseParser<'a> {
     }
 
     /// Convert the current parser into a collection of tokens it has retained.
-    pub(crate) fn into_tokens(self) -> Vec<TokenTree> {
+    pub(crate) fn ininto_tokens(self) -> Vec<TokenTree> {
         self.tokens
     }
 }

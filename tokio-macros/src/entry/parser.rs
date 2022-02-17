@@ -108,10 +108,8 @@ impl<'a> ConfigParser<'a> {
                             ident.span(),
                             "the `flavor` option must only be used once",
                         ));
-                        self.errors.push(Error::new(
-                            existing.clone(),
-                            "first use of the `flavor` here",
-                        ));
+                        self.errors
+                            .push(Error::new(*existing, "first use of the `flavor` here"));
                     }
 
                     config.flavor = Some((ident.span(), flavor));
@@ -222,7 +220,7 @@ impl<'a> ItemParser<'a> {
             }
         }
 
-        let tokens = self.base.into_tokens();
+        let tokens = self.base.ininto_tokens();
 
         ItemOutput::new(tokens, has_async, signature, block, tail_state)
     }

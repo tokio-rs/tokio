@@ -1,8 +1,8 @@
 use proc_macro::{Ident, Spacing, Span, TokenTree};
 
 use crate::{
+    into_tokens::{braced, from_fn, group, parens, IntoTokens},
     parsing::Buf,
-    to_tokens::{braced, from_fn, group, parens, ToTokens},
     token_stream::TokenStream,
 };
 
@@ -56,7 +56,7 @@ pub(crate) fn declare_output_enum(input: proc_macro::TokenStream) -> proc_macro:
     );
 
     let mut stream = TokenStream::default();
-    out.to_tokens(&mut stream, Span::call_site());
+    out.into_tokens(&mut stream, Span::call_site());
     stream.into_token_stream()
 }
 
@@ -64,12 +64,12 @@ pub(crate) fn clean_pattern_macro(input: proc_macro::TokenStream) -> proc_macro:
     let mut buf = Buf::new();
 
     let mut stream = TokenStream::default();
-    clean_pattern(input.into_iter(), &mut buf).to_tokens(&mut stream, Span::call_site());
+    clean_pattern(input.into_iter(), &mut buf).into_tokens(&mut stream, Span::call_site());
     stream.into_token_stream()
 }
 
 /// Clean up a pattern by skipping over any `mut` and `&` tokens.
-fn clean_pattern<'a, I: 'a>(tree: I, buf: &'a mut Buf) -> impl ToTokens + 'a
+fn clean_pattern<'a, I: 'a>(tree: I, buf: &'a mut Buf) -> impl IntoTokens + 'a
 where
     I: Iterator<Item = TokenTree>,
 {

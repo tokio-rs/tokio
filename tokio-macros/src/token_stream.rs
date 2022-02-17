@@ -2,7 +2,7 @@ use core::iter::FromIterator;
 
 use proc_macro::{Delimiter, Group, Span, TokenTree};
 
-use crate::to_tokens::ToTokens;
+use crate::into_tokens::IntoTokens;
 
 /// A checkpoint of the current location in the stream.
 #[repr(transparent)]
@@ -23,9 +23,9 @@ impl TokenStream {
     /// Push the given sequence of tokens.
     pub(crate) fn write<T>(&mut self, span: Span, tt: T)
     where
-        T: ToTokens,
+        T: IntoTokens,
     {
-        tt.to_tokens(self, span);
+        tt.into_tokens(self, span);
     }
 
     /// Get a checkpoint of the current location in the tree.

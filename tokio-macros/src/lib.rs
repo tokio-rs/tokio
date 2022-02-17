@@ -19,9 +19,9 @@ extern crate proc_macro;
 
 mod entry;
 mod error;
+mod into_tokens;
 mod parsing;
 mod select;
-mod to_tokens;
 mod token_stream;
 
 use proc_macro::TokenStream;

@@ -5,44 +5,44 @@ use crate::token_stream::TokenStream;
 /// `::`
 pub(crate) const S: [char; 2] = [':', ':'];
 
-pub(crate) trait ToTokens {
+pub(crate) trait IntoTokens {
     /// Convert into tokens.
-    fn to_tokens(self, stream: &mut TokenStream, span: Span);
+    fn into_tokens(self, stream: &mut TokenStream, span: Span);
 }
 
-impl ToTokens for TokenStream {
-    fn to_tokens(self, stream: &mut TokenStream, _: Span) {
+impl IntoTokens for TokenStream {
+    fn into_tokens(self, stream: &mut TokenStream, _: Span) {
         stream.extend(self);
     }
 }
 
-impl ToTokens for proc_macro::TokenStream {
-    fn to_tokens(self, stream: &mut TokenStream, _: Span) {
+impl IntoTokens for proc_macro::TokenStream {
+    fn into_tokens(self, stream: &mut TokenStream, _: Span) {
         for tt in self {
             stream.push(tt);
         }
     }
 }
 
-impl ToTokens for TokenTree {
-    fn to_tokens(self, stream: &mut TokenStream, _: Span) {
+impl IntoTokens for TokenTree {
+    fn into_tokens(self, stream: &mut TokenStream, _: Span) {
         stream.push(self);
     }
 }
 
-impl<T> ToTokens for Option<T>
+impl<T> IntoTokens for Option<T>
 where
-    T: ToTokens,
+    T: IntoTokens,
 {
-    fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+    fn into_tokens(self, stream: &mut TokenStream, span: Span) {
         if let Some(tt) = self {
-            tt.to_tokens(stream, span);
+            tt.into_tokens(stream, span);
         }
     }
 }
 
-impl ToTokens for &str {
-    fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+impl IntoTokens for &str {
+    fn into_tokens(self, stream: &mut TokenStream, span: Span) {
         let mut ident = Ident::new(self, span);
         ident.set_span(span);
         stream.push(TokenTree::Ident(ident));
@@ -51,8 +51,8 @@ impl ToTokens for &str {
 
 macro_rules! joint_punct {
     ($n:tt) => {
-        impl ToTokens for [char; $n] {
-            fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+        impl IntoTokens for [char; $n] {
+            fn into_tokens(self, stream: &mut TokenStream, span: Span) {
                 let mut it = self.iter();
 
                 if let Some(last) = it.next_back() {
@@ -73,32 +73,32 @@ macro_rules! joint_punct {
 
 joint_punct!(2);
 
-impl ToTokens for char {
-    fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+impl IntoTokens for char {
+    fn into_tokens(self, stream: &mut TokenStream, span: Span) {
         let mut punct = Punct::new(self, Spacing::Alone);
         punct.set_span(span);
         stream.push(TokenTree::Punct(punct));
     }
 }
 
-impl ToTokens for usize {
-    fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+impl IntoTokens for usize {
+    fn into_tokens(self, stream: &mut TokenStream, span: Span) {
         let mut literal = Literal::usize_unsuffixed(self);
         literal.set_span(span);
         stream.push(TokenTree::Literal(literal));
     }
 }
 
-impl ToTokens for () {
-    fn to_tokens(self, _: &mut TokenStream, _: Span) {}
+impl IntoTokens for () {
+    fn into_tokens(self, _: &mut TokenStream, _: Span) {}
 }
 
 macro_rules! tuple {
     ($($gen:ident $var:ident),*) => {
-        impl<$($gen,)*> ToTokens for ($($gen,)*) where $($gen: ToTokens),* {
-            fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+        impl<$($gen,)*> IntoTokens for ($($gen,)*) where $($gen: IntoTokens),* {
+            fn into_tokens(self, stream: &mut TokenStream, span: Span) {
                 let ($($var,)*) = self;
-                $($var.to_tokens(stream, span);)*
+                $($var.into_tokens(stream, span);)*
             }
         }
     }
@@ -116,53 +116,53 @@ tuple!(A a, B b, C c, D d, E e, F f, G g, H h, I i);
 
 struct Group<T>(Delimiter, T);
 
-impl<T> ToTokens for Group<T>
+impl<T> IntoTokens for Group<T>
 where
-    T: ToTokens,
+    T: IntoTokens,
 {
-    fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+    fn into_tokens(self, stream: &mut TokenStream, span: Span) {
         let checkpoint = stream.checkpoint();
-        self.1.to_tokens(stream, span);
+        self.1.into_tokens(stream, span);
         stream.group(span, self.0, checkpoint);
     }
 }
 
 /// Construct a parenthesized group `(<inner>)`.
-pub(crate) fn parens<T>(inner: T) -> impl ToTokens
+pub(crate) fn parens<T>(inner: T) -> impl IntoTokens
 where
-    T: ToTokens,
+    T: IntoTokens,
 {
     Group(Delimiter::Parenthesis, inner)
 }
 
 /// Construct a braced group `{<inner>}`.
-pub(crate) fn braced<T>(inner: T) -> impl ToTokens
+pub(crate) fn braced<T>(inner: T) -> impl IntoTokens
 where
-    T: ToTokens,
+    T: IntoTokens,
 {
     Group(Delimiter::Brace, inner)
 }
 
 /// Construct a bracketed group `[<inner>]`.
-pub(crate) fn bracketed<T>(inner: T) -> impl ToTokens
+pub(crate) fn bracketed<T>(inner: T) -> impl IntoTokens
 where
-    T: ToTokens,
+    T: IntoTokens,
 {
     Group(Delimiter::Bracket, inner)
 }
 
 /// Construct a custom group.
-pub(crate) fn group<T>(delimiter: Delimiter, inner: T) -> impl ToTokens
+pub(crate) fn group<T>(delimiter: Delimiter, inner: T) -> impl IntoTokens
 where
-    T: ToTokens,
+    T: IntoTokens,
 {
     Group(delimiter, inner)
 }
 
 struct StringLiteral<'a>(&'a str);
 
-impl ToTokens for StringLiteral<'_> {
-    fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+impl IntoTokens for StringLiteral<'_> {
+    fn into_tokens(self, stream: &mut TokenStream, span: Span) {
         let mut literal = Literal::string(self.0);
         literal.set_span(span);
         stream.push(TokenTree::Literal(literal));
@@ -170,12 +170,12 @@ impl ToTokens for StringLiteral<'_> {
 }
 
 /// Construct a string literal.
-pub(crate) fn string(s: &str) -> impl ToTokens + '_ {
+pub(crate) fn string(s: &str) -> impl IntoTokens + '_ {
     StringLiteral(s)
 }
 
-impl ToTokens for &[TokenTree] {
-    fn to_tokens(self, stream: &mut TokenStream, _: Span) {
+impl IntoTokens for &[TokenTree] {
+    fn into_tokens(self, stream: &mut TokenStream, _: Span) {
         for tt in self {
             stream.push(tt.clone());
         }
@@ -184,17 +184,17 @@ impl ToTokens for &[TokenTree] {
 
 pub(crate) struct FromFn<T>(T);
 
-impl<T> ToTokens for FromFn<T>
+impl<T> IntoTokens for FromFn<T>
 where
     T: FnOnce(&mut SpannedStream<'_>),
 {
-    fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+    fn into_tokens(self, stream: &mut TokenStream, span: Span) {
         let mut stream = SpannedStream { stream, span };
         (self.0)(&mut stream);
     }
 }
 
-/// Construct a [ToTokens] implementation from a callback function.
+/// Construct a [IntoTokens] implementation from a callback function.
 pub(crate) fn from_fn<T>(f: T) -> FromFn<T>
 where
     T: FnOnce(&mut SpannedStream<'_>),
@@ -226,7 +226,7 @@ impl SpannedStream<'_> {
     }
 
     /// Push the given sequence of tokens.
-    pub(crate) fn write(&mut self, tt: impl ToTokens) {
+    pub(crate) fn write(&mut self, tt: impl IntoTokens) {
         self.stream.write(self.span, tt);
     }
 }

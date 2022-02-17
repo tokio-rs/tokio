@@ -3,7 +3,8 @@ use std::ops;
 use proc_macro::{Delimiter, Span, TokenTree};
 
 use crate::error::Error;
-use crate::to_tokens::{bracketed, from_fn, parens, string, ToTokens, S};
+use crate::into_tokens::{bracketed, from_fn, parens, string, IntoTokens, S};
+use crate::parsing::Buf;
 use crate::token_stream::TokenStream;
 
 #[derive(Default)]
@@ -90,21 +91,16 @@ impl Config {
         }
     }
 
-    pub(crate) fn validate(&self, kind: EntryKind, errors: &mut Vec<Error>) {
-        match (self.flavor(), &self.start_paused) {
-            (RuntimeFlavor::Threaded, Some(tt)) => {
-                if tt.to_string() == "true" {
-                    errors.push(Error::new(tt.span(), format!("the `start_paused` option requires the \"current_thread\" runtime flavor. Use `#[{}(flavor = \"current_thread\")]`", kind.name())));
-                }
+    /// Validate the current configuration.
+    pub(crate) fn validate(&self, kind: EntryKind, errors: &mut Vec<Error>, buf: &mut Buf) {
+        if let (RuntimeFlavor::Threaded, Some(tt)) = (self.flavor(), &self.start_paused) {
+            if buf.display_as_str(tt) == "true" {
+                errors.push(Error::new(tt.span(), format!("the `start_paused` option requires the \"current_thread\" runtime flavor. Use `#[{}(flavor = \"current_thread\")]`", kind.name())));
             }
-            _ => {}
         }
 
-        match (self.flavor(), &self.worker_threads) {
-            (RuntimeFlavor::CurrentThread, Some(tt)) => {
-                errors.push(Error::new(tt.span(), format!("the `worker_threads` option requires the \"multi_thread\" runtime flavor. Use `#[{}(flavor = \"multi_thread\")]`", kind.name())));
-            }
-            _ => {}
+        if let (RuntimeFlavor::CurrentThread, Some(tt)) = (self.flavor(), &self.worker_threads) {
+            errors.push(Error::new(tt.span(), format!("the `worker_threads` option requires the \"multi_thread\" runtime flavor. Use `#[{}(flavor = \"multi_thread\")]`", kind.name())));
         }
     }
 
@@ -181,7 +177,7 @@ impl ItemOutput {
         kind: EntryKind,
         config: Config,
         start: Span,
-    ) -> impl ToTokens + '_ {
+    ) -> impl IntoTokens + '_ {
         from_fn(move |s| {
             if let (Some(signature), Some(block)) = (self.signature.clone(), self.block.clone()) {
                 let block_span = self.tail_state.block.unwrap_or_else(Span::call_site);
@@ -202,7 +198,7 @@ impl ItemOutput {
     }
 
     /// Generate attribute associated with entry kind.
-    fn entry_kind_attribute(&self, kind: EntryKind) -> impl ToTokens {
+    fn entry_kind_attribute(&self, kind: EntryKind) -> impl IntoTokens {
         from_fn(move |s| {
             if let EntryKind::Test = kind {
                 s.write((
@@ -219,7 +215,7 @@ impl ItemOutput {
         config: Config,
         block: ops::Range<usize>,
         start: Span,
-    ) -> impl ToTokens + '_ {
+    ) -> impl IntoTokens + '_ {
         // NB: override the first generated part with the detected start span.
         let rt = ("tokio", S, "runtime", S, "Builder");
 
@@ -269,42 +265,42 @@ impl ItemOutput {
 }
 
 /// Insert the given tokens with a custom span.
-pub(crate) fn with_span<T>(inner: T, span: Span) -> impl ToTokens
+pub(crate) fn with_span<T>(inner: T, span: Span) -> impl IntoTokens
 where
-    T: ToTokens,
+    T: IntoTokens,
 {
     WithSpan(inner, span)
 }
 
 struct WithSpan<T>(T, Span);
 
-impl<T> ToTokens for WithSpan<T>
+impl<T> IntoTokens for WithSpan<T>
 where
-    T: ToTokens,
+    T: IntoTokens,
 {
-    fn to_tokens(self, stream: &mut TokenStream, _: Span) {
-        self.0.to_tokens(stream, self.1);
+    fn into_tokens(self, stream: &mut TokenStream, _: Span) {
+        self.0.into_tokens(stream, self.1);
     }
 }
 
 /// Construct a custom group  with a custom span that is not inherited by its
 /// children.
-fn group_with_span<T>(delimiter: Delimiter, inner: T, span: Span) -> impl ToTokens
+fn group_with_span<T>(delimiter: Delimiter, inner: T, span: Span) -> impl IntoTokens
 where
-    T: ToTokens,
+    T: IntoTokens,
 {
     GroupWithSpan(delimiter, inner, span)
 }
 
 struct GroupWithSpan<T>(Delimiter, T, Span);
 
-impl<T> ToTokens for GroupWithSpan<T>
+impl<T> IntoTokens for GroupWithSpan<T>
 where
-    T: ToTokens,
+    T: IntoTokens,
 {
-    fn to_tokens(self, stream: &mut TokenStream, span: Span) {
+    fn into_tokens(self, stream: &mut TokenStream, span: Span) {
         let checkpoint = stream.checkpoint();
-        self.1.to_tokens(stream, span);
+        self.1.into_tokens(stream, span);
         stream.group(self.2, self.0, checkpoint);
     }
 }
