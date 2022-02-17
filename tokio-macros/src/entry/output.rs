@@ -67,7 +67,7 @@ impl RuntimeFlavor {
 pub(crate) struct Config {
     pub(crate) supports_threading: SupportsThreading,
     /// The default runtime flavor to use if left unspecified.
-    default_flavor: RuntimeFlavor,
+    default_flavor: Option<RuntimeFlavor>,
     /// The runtime flavor to use.
     pub(crate) flavor: Option<(Span, RuntimeFlavor)>,
     /// The number of worker threads to configure.
@@ -81,9 +81,9 @@ impl Config {
         Self {
             supports_threading,
             default_flavor: match (kind, supports_threading) {
-                (EntryKind::Main, SupportsThreading::Supported) => RuntimeFlavor::Threaded,
-                (EntryKind::Main, SupportsThreading::NotSupported) => RuntimeFlavor::CurrentThread,
-                (EntryKind::Test, _) => RuntimeFlavor::CurrentThread,
+                (EntryKind::Main, SupportsThreading::Supported) => Some(RuntimeFlavor::Threaded),
+                (EntryKind::Main, SupportsThreading::NotSupported) => None,
+                (EntryKind::Test, _) => Some(RuntimeFlavor::CurrentThread),
             },
             flavor: None,
             worker_threads: None,
@@ -93,21 +93,29 @@ impl Config {
 
     /// Validate the current configuration.
     pub(crate) fn validate(&self, kind: EntryKind, errors: &mut Vec<Error>, buf: &mut Buf) {
-        if let (RuntimeFlavor::Threaded, Some(tt)) = (self.flavor(), &self.start_paused) {
+        if let (None, SupportsThreading::NotSupported) =
+            (self.default_flavor, self.supports_threading)
+        {
+            errors.push(Error::new(Span::call_site(), "the default runtime flavor is `multi_thread`, but the `rt-multi-thread` feature is disabled"))
+        }
+
+        if let (Some(RuntimeFlavor::Threaded), Some(tt)) = (self.flavor(), &self.start_paused) {
             if buf.display_as_str(tt) == "true" {
                 errors.push(Error::new(tt.span(), format!("the `start_paused` option requires the \"current_thread\" runtime flavor. Use `#[{}(flavor = \"current_thread\")]`", kind.name())));
             }
         }
 
-        if let (RuntimeFlavor::CurrentThread, Some(tt)) = (self.flavor(), &self.worker_threads) {
+        if let (Some(RuntimeFlavor::CurrentThread), Some(tt)) =
+            (self.flavor(), &self.worker_threads)
+        {
             errors.push(Error::new(tt.span(), format!("the `worker_threads` option requires the \"multi_thread\" runtime flavor. Use `#[{}(flavor = \"multi_thread\")]`", kind.name())));
         }
     }
 
     /// Get the runtime flavor to use.
-    fn flavor(&self) -> RuntimeFlavor {
+    fn flavor(&self) -> Option<RuntimeFlavor> {
         match &self.flavor {
-            Some((_, flavor)) => *flavor,
+            Some((_, flavor)) => Some(*flavor),
             None => self.default_flavor,
         }
     }
@@ -179,7 +187,9 @@ impl ItemOutput {
         start: Span,
     ) -> impl IntoTokens + '_ {
         from_fn(move |s| {
-            if let (Some(signature), Some(block)) = (self.signature.clone(), self.block.clone()) {
+            if let (Some(signature), Some(block), Some(flavor)) =
+                (self.signature.clone(), self.block.clone(), config.flavor())
+            {
                 let block_span = self.tail_state.block.unwrap_or_else(Span::call_site);
 
                 s.write((
@@ -187,7 +197,7 @@ impl ItemOutput {
                     &self.tokens[signature],
                     group_with_span(
                         Delimiter::Brace,
-                        self.item_body(config, block, start),
+                        self.item_body(config, block, flavor, start),
                         block_span,
                     ),
                 ))
@@ -214,6 +224,7 @@ impl ItemOutput {
         &self,
         config: Config,
         block: ops::Range<usize>,
+        flavor: RuntimeFlavor,
         start: Span,
     ) -> impl IntoTokens + '_ {
         // NB: override the first generated part with the detected start span.
@@ -222,7 +233,7 @@ impl ItemOutput {
         let rt = from_fn(move |s| {
             s.write(rt);
 
-            match config.flavor() {
+            match flavor {
                 RuntimeFlavor::CurrentThread => {
                     s.write((S, "new_current_thread", parens(())));
                 }

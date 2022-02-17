@@ -323,7 +323,7 @@ pub fn test_rt(args: TokenStream, item_stream: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn main_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
-    error::expand("The #[tokio::main] macro requires rt or rt-multi-thread.")
+    error::expand("the #[tokio::main] macro requires rt or rt-multi-thread")
 }
 
 /// Always fails with the error message below.
@@ -332,7 +332,7 @@ pub fn main_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn test_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
-    error::expand("The #[tokio::test] macro requires rt or rt-multi-thread.")
+    error::expand("the #[tokio::test] macro requires rt or rt-multi-thread")
 }
 
 /// Implementation detail of the `select!` macro. This macro is **not** intended
