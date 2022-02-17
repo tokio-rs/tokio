@@ -431,7 +431,7 @@ macro_rules! select {
         // macro.
         mod util {
             // Generate an enum with one variant per select branch
-            $crate::select_priv_declare_output_enum!( ( $($count)* ) );
+            $crate::select_priv_declare_output_enum!($($count)*);
         }
 
         // `tokio::macros::support` is a public, but doc(hidden) module

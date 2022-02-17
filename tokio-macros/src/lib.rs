@@ -18,7 +18,11 @@
 extern crate proc_macro;
 
 mod entry;
+mod error;
+mod parsing;
 mod select;
+mod to_tokens;
+mod token_stream;
 
 use proc_macro::TokenStream;
 
@@ -176,8 +180,13 @@ use proc_macro::TokenStream;
 /// available as `tokio` in the module where this macro is expanded.
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
-pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    entry::main(args, item, true)
+pub fn main(args: TokenStream, item_stream: TokenStream) -> TokenStream {
+    crate::entry::build(
+        crate::entry::EntryKind::Main,
+        crate::entry::SupportsThreading::Supported,
+        args,
+        item_stream,
+    )
 }
 
 /// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
@@ -221,8 +230,13 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// available as `tokio` in the module where this macro is expanded.
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
-pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
-    entry::main(args, item, false)
+pub fn main_rt(args: TokenStream, item_stream: TokenStream) -> TokenStream {
+    crate::entry::build(
+        crate::entry::EntryKind::Main,
+        crate::entry::SupportsThreading::NotSupported,
+        args,
+        item_stream,
+    )
 }
 
 /// Marks async function to be executed by runtime, suitable to test environment
@@ -267,8 +281,13 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// older version of Tokio, you _must_ make the current version of Tokio
 /// available as `tokio` in the module where this macro is expanded.
 #[proc_macro_attribute]
-pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
-    entry::test(args, item, true)
+pub fn test(args: TokenStream, item_stream: TokenStream) -> TokenStream {
+    crate::entry::build(
+        crate::entry::EntryKind::Test,
+        crate::entry::SupportsThreading::Supported,
+        args,
+        item_stream,
+    )
 }
 
 /// Marks async function to be executed by runtime, suitable to test environment
@@ -289,8 +308,13 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 /// older version of Tokio, you _must_ make the current version of Tokio
 /// available as `tokio` in the module where this macro is expanded.
 #[proc_macro_attribute]
-pub fn test_rt(args: TokenStream, item: TokenStream) -> TokenStream {
-    entry::test(args, item, false)
+pub fn test_rt(args: TokenStream, item_stream: TokenStream) -> TokenStream {
+    crate::entry::build(
+        crate::entry::EntryKind::Test,
+        crate::entry::SupportsThreading::NotSupported,
+        args,
+        item_stream,
+    )
 }
 
 /// Always fails with the error message below.
@@ -299,12 +323,7 @@ pub fn test_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn main_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
-    syn::Error::new(
-        proc_macro2::Span::call_site(),
-        "The #[tokio::main] macro requires rt or rt-multi-thread.",
-    )
-    .to_compile_error()
-    .into()
+    error::expand("The #[tokio::main] macro requires rt or rt-multi-thread.")
 }
 
 /// Always fails with the error message below.
@@ -313,12 +332,7 @@ pub fn main_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn test_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
-    syn::Error::new(
-        proc_macro2::Span::call_site(),
-        "The #[tokio::test] macro requires rt or rt-multi-thread.",
-    )
-    .to_compile_error()
-    .into()
+    error::expand("The #[tokio::test] macro requires rt or rt-multi-thread.")
 }
 
 /// Implementation detail of the `select!` macro. This macro is **not** intended

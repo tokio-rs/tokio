@@ -1,110 +1,105 @@
-use proc_macro::{TokenStream, TokenTree};
-use proc_macro2::Span;
-use quote::quote;
-use syn::Ident;
+use proc_macro::{Ident, Spacing, Span, TokenTree};
 
-pub(crate) fn declare_output_enum(input: TokenStream) -> TokenStream {
-    // passed in is: `(_ _ _)` with one `_` per branch
-    let branches = match input.into_iter().next() {
-        Some(TokenTree::Group(group)) => group.stream().into_iter().count(),
-        _ => panic!("unexpected macro input"),
-    };
+use crate::{
+    parsing::Buf,
+    to_tokens::{braced, from_fn, group, parens, ToTokens},
+    token_stream::TokenStream,
+};
+
+pub(crate) fn declare_output_enum(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    // passed in is: `_ _ _` with one `_` per branch
+    let branches = input.into_iter().count();
 
     let variants = (0..branches)
         .map(|num| Ident::new(&format!("_{}", num), Span::call_site()))
         .collect::<Vec<_>>();
 
     // Use a bitfield to track which futures completed
-    let mask = Ident::new(
-        if branches <= 8 {
-            "u8"
-        } else if branches <= 16 {
-            "u16"
-        } else if branches <= 32 {
-            "u32"
-        } else if branches <= 64 {
-            "u64"
-        } else {
-            panic!("up to 64 branches supported");
-        },
-        Span::call_site(),
-    );
-
-    TokenStream::from(quote! {
-        pub(super) enum Out<#( #variants ),*> {
-            #( #variants(#variants), )*
-            // Include a `Disabled` variant signifying that all select branches
-            // failed to resolve.
-            Disabled,
-        }
-
-        pub(super) type Mask = #mask;
-    })
-}
-
-pub(crate) fn clean_pattern_macro(input: TokenStream) -> TokenStream {
-    // If this isn't a pattern, we return the token stream as-is. The select!
-    // macro is using it in a location requiring a pattern, so an error will be
-    // emitted there.
-    let mut input: syn::Pat = match syn::parse(input.clone()) {
-        Ok(it) => it,
-        Err(_) => return input,
+    let mask = if branches <= 8 {
+        "u8"
+    } else if branches <= 16 {
+        "u16"
+    } else if branches <= 32 {
+        "u32"
+    } else if branches <= 64 {
+        "u64"
+    } else {
+        panic!("up to 64 branches supported");
     };
 
-    clean_pattern(&mut input);
-    quote::ToTokens::into_token_stream(input).into()
+    let generics = from_fn(|s| {
+        for variant in &variants {
+            s.write((TokenTree::Ident(variant.clone()), ','));
+        }
+    });
+
+    let variants = from_fn(|s| {
+        for variant in &variants {
+            s.write((
+                TokenTree::Ident(variant.clone()),
+                parens(TokenTree::Ident(variant.clone())),
+                ',',
+            ));
+        }
+
+        s.write(("Disabled", ','));
+    });
+
+    let out_enum = (
+        ("pub", parens("super"), "enum", "Out", '<', generics, '>'),
+        braced(variants),
+    );
+
+    let out = (
+        out_enum,
+        ("pub", parens("super"), "type", "Mask", '=', mask, ';'),
+    );
+
+    let mut stream = TokenStream::default();
+    out.to_tokens(&mut stream, Span::call_site());
+    stream.into_token_stream()
 }
 
-// Removes any occurrences of ref or mut in the provided pattern.
-fn clean_pattern(pat: &mut syn::Pat) {
-    match pat {
-        syn::Pat::Box(_box) => {}
-        syn::Pat::Lit(_literal) => {}
-        syn::Pat::Macro(_macro) => {}
-        syn::Pat::Path(_path) => {}
-        syn::Pat::Range(_range) => {}
-        syn::Pat::Rest(_rest) => {}
-        syn::Pat::Verbatim(_tokens) => {}
-        syn::Pat::Wild(_underscore) => {}
-        syn::Pat::Ident(ident) => {
-            ident.by_ref = None;
-            ident.mutability = None;
-            if let Some((_at, pat)) = &mut ident.subpat {
-                clean_pattern(&mut *pat);
+pub(crate) fn clean_pattern_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let mut buf = Buf::new();
+
+    let mut stream = TokenStream::default();
+    clean_pattern(input.into_iter(), &mut buf).to_tokens(&mut stream, Span::call_site());
+    stream.into_token_stream()
+}
+
+/// Clean up a pattern by skipping over any `mut` and `&` tokens.
+fn clean_pattern<'a, I: 'a>(tree: I, buf: &'a mut Buf) -> impl ToTokens + 'a
+where
+    I: Iterator<Item = TokenTree>,
+{
+    from_fn(move |s| {
+        for tt in tree {
+            match tt {
+                TokenTree::Group(g) => {
+                    s.write(group(
+                        g.delimiter(),
+                        clean_pattern(g.stream().into_iter(), buf),
+                    ));
+                }
+                TokenTree::Ident(i) => {
+                    if buf.display_as_str(&i) == "mut" {
+                        continue;
+                    }
+
+                    s.push(TokenTree::Ident(i));
+                }
+                TokenTree::Punct(p) => {
+                    if matches!(p.spacing(), Spacing::Alone) && p.as_char() == '&' {
+                        continue;
+                    }
+
+                    s.push(TokenTree::Punct(p));
+                }
+                tt => {
+                    s.push(tt);
+                }
             }
         }
-        syn::Pat::Or(or) => {
-            for case in or.cases.iter_mut() {
-                clean_pattern(case);
-            }
-        }
-        syn::Pat::Slice(slice) => {
-            for elem in slice.elems.iter_mut() {
-                clean_pattern(elem);
-            }
-        }
-        syn::Pat::Struct(struct_pat) => {
-            for field in struct_pat.fields.iter_mut() {
-                clean_pattern(&mut field.pat);
-            }
-        }
-        syn::Pat::Tuple(tuple) => {
-            for elem in tuple.elems.iter_mut() {
-                clean_pattern(elem);
-            }
-        }
-        syn::Pat::TupleStruct(tuple) => {
-            for elem in tuple.pat.elems.iter_mut() {
-                clean_pattern(elem);
-            }
-        }
-        syn::Pat::Reference(reference) => {
-            reference.mutability = None;
-            clean_pattern(&mut *reference.pat);
-        }
-        syn::Pat::Type(type_pat) => {
-            clean_pattern(&mut *type_pat.pat);
-        }
-        _ => {}
-    }
+    })
 }
