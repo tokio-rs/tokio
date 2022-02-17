@@ -813,6 +813,20 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
+    ///
+    /// Unlike [`Builder::length_field_length`], this does not fail at runtime
+    /// and instead produces a compile error:
+    ///
+    /// ```compile_fail
+    /// # use tokio::io::AsyncRead;
+    /// # use tokio_util::codec::LengthDelimitedCodec;
+    /// # fn bind_read<T: AsyncRead>(io: T) {
+    /// LengthDelimitedCodec::builder()
+    ///     .length_field_type::<String>()
+    ///     .new_read(io);
+    /// # }
+    /// # pub fn main() {}
+    /// ```
     pub fn length_field_type<T: builder::LengthFieldType>(&mut self) -> &mut Self {
         self.length_field_length(mem::size_of::<T>())
     }
