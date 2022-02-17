@@ -822,7 +822,7 @@ impl Builder {
     /// # use tokio_util::codec::LengthDelimitedCodec;
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// LengthDelimitedCodec::builder()
-    ///     .length_field_type::<String>()
+    ///     .length_field_type::<u128>()
     ///     .new_read(io);
     /// # }
     /// # pub fn main() {}
