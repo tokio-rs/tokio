@@ -369,6 +369,32 @@ fn worker_local_queue_depth() {
     });
 }
 
+#[test]
+fn io_driver_fd_count() {
+    let rt = basic();
+    let metrics = rt.metrics();
+
+    let stream = tokio::net::TcpStream::connect("google.com:80");
+    let stream = rt.block_on(async move { stream.await.unwrap() });
+
+    assert_eq!(metrics.io_driver_fd_count(), 2);
+
+    drop(stream);
+
+    assert_eq!(metrics.io_driver_fd_count(), 1);
+}
+
+#[test]
+fn io_driver_ready_count() {
+    let rt = basic();
+    let metrics = rt.metrics();
+
+    let stream = tokio::net::TcpStream::connect("google.com:80");
+    let _stream = rt.block_on(async move { stream.await.unwrap() });
+
+    assert_eq!(metrics.io_driver_ready_count(), 3);
+}
+
 fn basic() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()

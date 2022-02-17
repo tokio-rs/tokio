@@ -447,3 +447,61 @@ impl RuntimeMetrics {
         self.handle.spawner.worker_local_queue_depth(worker)
     }
 }
+
+cfg_net! {
+    impl RuntimeMetrics {
+        /// Returns the number of file descriptors currently registered with the
+        /// runtime's I/O driver.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let n = metrics.io_driver_fd_count();
+        ///     println!("{} fds currently registered with the runtime's I/O driver.", n);
+        /// }
+        /// ```
+        pub fn io_driver_fd_count(&self) -> u64 {
+            self.with_io_driver_metrics(|m| m.fd_count.load(Relaxed))
+        }
+
+        /// Returns the number of ready events processed by the runtime's
+        /// I/O driver.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let n = metrics.io_driver_ready_count();
+        ///     println!("{} ready events procssed by the runtime's I/O driver.", n);
+        /// }
+        /// ```
+        pub fn io_driver_ready_count(&self) -> u64 {
+            self.with_io_driver_metrics(|m| m.ready_count.load(Relaxed))
+        }
+
+        fn with_io_driver_metrics<F>(&self, f: F) -> u64
+        where
+            F: Fn(&super::IoDriverMetrics) -> u64,
+        {
+            // TODO: Investigate if this should return 0, most of our metrics always increase
+            // thus this breaks that guarantee.
+            self.handle
+                .io_handle
+                .as_ref()
+                .map(|h| h.with_io_driver_metrics(f))
+                .flatten()
+                .unwrap_or(0)
+        }
+    }
+}

@@ -195,6 +195,12 @@ macro_rules! cfg_not_metrics {
     }
 }
 
+macro_rules! cfg_not_rt_and_metrics {
+    ($($item:item)*) => {
+        $( #[cfg(not(all(feature = "rt", all(tokio_unstable, not(loom)))))] $item )*
+    }
+}
+
 macro_rules! cfg_net {
     ($($item:item)*) => {
         $(
