@@ -369,6 +369,7 @@ fn worker_local_queue_depth() {
     });
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 #[test]
 fn io_driver_fd_count() {
     let rt = basic();
@@ -384,6 +385,7 @@ fn io_driver_fd_count() {
     assert_eq!(metrics.io_driver_fd_count(), 1);
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 #[test]
 fn io_driver_ready_count() {
     let rt = basic();
