@@ -57,11 +57,28 @@ struct Core {
 
     /// Metrics batch
     metrics: MetricsBatch,
+
+    /// True if a task panicked without being handled and the runtime is
+    /// configured to shutdown on unhandled panic.
+    unhandled_panic: bool,
 }
 
 #[derive(Clone)]
 pub(crate) struct Spawner {
     shared: Arc<Shared>,
+}
+
+/// Configuration settings passed in from the runtime builder.
+pub(crate) struct Config {
+    /// Callback for a worker parking itself
+    pub(crate) before_park: Option<Callback>,
+
+    /// Callback for a worker unparking itself
+    pub(crate) after_unpark: Option<Callback>,
+
+    #[cfg(tokio_unstable)]
+    /// How to respond to unhandled task panics.
+    pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
 }
 
 /// Scheduler state shared between threads.
@@ -78,11 +95,8 @@ struct Shared {
     /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
 
-    /// Callback for a worker parking itself
-    before_park: Option<Callback>,
-
-    /// Callback for a worker unparking itself
-    after_unpark: Option<Callback>,
+    /// Scheduler configuration options
+    config: Config,
 
     /// Keeps track of various runtime metrics.
     scheduler_metrics: SchedulerMetrics,
@@ -117,11 +131,7 @@ const REMOTE_FIRST_INTERVAL: u8 = 31;
 scoped_thread_local!(static CURRENT: Context);
 
 impl BasicScheduler {
-    pub(crate) fn new(
-        driver: Driver,
-        before_park: Option<Callback>,
-        after_unpark: Option<Callback>,
-    ) -> BasicScheduler {
+    pub(crate) fn new(driver: Driver, config: Config) -> BasicScheduler {
         let unpark = driver.unpark();
 
         let spawner = Spawner {
@@ -130,8 +140,7 @@ impl BasicScheduler {
                 owned: OwnedTasks::new(),
                 unpark,
                 woken: AtomicBool::new(false),
-                before_park,
-                after_unpark,
+                config,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics: WorkerMetrics::new(),
             }),
@@ -143,6 +152,7 @@ impl BasicScheduler {
             tick: 0,
             driver: Some(driver),
             metrics: MetricsBatch::new(),
+            unhandled_panic: false,
         })));
 
         BasicScheduler {
@@ -157,6 +167,7 @@ impl BasicScheduler {
         &self.spawner
     }
 
+    #[track_caller]
     pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
         pin!(future);
 
@@ -296,7 +307,7 @@ impl Context {
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
         let mut driver = core.driver.take().expect("driver missing");
 
-        if let Some(f) = &self.spawner.shared.before_park {
+        if let Some(f) = &self.spawner.shared.config.before_park {
             // Incorrect lint, the closures are actually different types so `f`
             // cannot be passed as an argument to `enter`.
             #[allow(clippy::redundant_closure)]
@@ -319,7 +330,7 @@ impl Context {
             core.metrics.returned_from_park();
         }
 
-        if let Some(f) = &self.spawner.shared.after_unpark {
+        if let Some(f) = &self.spawner.shared.config.after_unpark {
             // Incorrect lint, the closures are actually different types so `f`
             // cannot be passed as an argument to `enter`.
             #[allow(clippy::redundant_closure)]
@@ -460,6 +471,35 @@ impl Schedule for Arc<Shared> {
             }
         });
     }
+
+    cfg_unstable! {
+        fn unhandled_panic(&self) {
+            use crate::runtime::UnhandledPanic;
+
+            match self.config.unhandled_panic {
+                UnhandledPanic::Ignore => {
+                    // Do nothing
+                }
+                UnhandledPanic::ShutdownRuntime => {
+                    // This hook is only called from within the runtime, so
+                    // `CURRENT` should match with `&self`, i.e. there is no
+                    // opportunity for a nested scheduler to be called.
+                    CURRENT.with(|maybe_cx| match maybe_cx {
+                        Some(cx) if Arc::ptr_eq(self, &cx.spawner.shared) => {
+                            let mut core = cx.core.borrow_mut();
+
+                            // If `None`, the runtime is shutting down, so there is no need to signal shutdown
+                            if let Some(core) = core.as_mut() {
+                                core.unhandled_panic = true;
+                                self.owned.close_and_shutdown_all();
+                            }
+                        }
+                        _ => panic!("runtime core not set in CURRENT thread-local"),
+                    })
+                }
+            }
+        }
+    }
 }
 
 impl Wake for Shared {
@@ -484,8 +524,9 @@ struct CoreGuard<'a> {
 }
 
 impl CoreGuard<'_> {
+    #[track_caller]
     fn block_on<F: Future>(self, future: F) -> F::Output {
-        self.enter(|mut core, context| {
+        let ret = self.enter(|mut core, context| {
             let _enter = crate::runtime::enter(false);
             let waker = context.spawner.waker_ref();
             let mut cx = std::task::Context::from_waker(&waker);
@@ -501,11 +542,16 @@ impl CoreGuard<'_> {
                     core = c;
 
                     if let Ready(v) = res {
-                        return (core, v);
+                        return (core, Some(v));
                     }
                 }
 
                 for _ in 0..MAX_TASKS_PER_TICK {
+                    // Make sure we didn't hit an unhandled_panic
+                    if core.unhandled_panic {
+                        return (core, None);
+                    }
+
                     // Get and increment the current tick
                     let tick = core.tick;
                     core.tick = core.tick.wrapping_add(1);
@@ -539,7 +585,15 @@ impl CoreGuard<'_> {
                 // pending I/O events.
                 core = context.park_yield(core);
             }
-        })
+        });
+
+        match ret {
+            Some(ret) => ret,
+            None => {
+                // `block_on` panicked.
+                panic!("a spawned task panicked and the runtime is configured to shutdown on unhandled panic");
+            }
+        }
     }
 
     /// Enters the scheduler context. This sets the queue and other necessary

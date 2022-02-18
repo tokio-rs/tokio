@@ -100,7 +100,7 @@ where
                 let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<T, S>(&header_ptr);
                 let cx = Context::from_waker(&*waker_ref);
-                let res = poll_future(&self.core().stage, cx);
+                let res = poll_future(&self.core().stage, &self.core().scheduler, cx);
 
                 if res == Poll::Ready(()) {
                     // The future completed. Move on to complete the task.
@@ -450,7 +450,11 @@ fn cancel_task<T: Future>(stage: &CoreStage<T>) {
 
 /// Polls the future. If the future completes, the output is written to the
 /// stage field.
-fn poll_future<T: Future>(core: &CoreStage<T>, cx: Context<'_>) -> Poll<()> {
+fn poll_future<T: Future, S: Schedule>(
+    core: &CoreStage<T>,
+    scheduler: &S,
+    cx: Context<'_>,
+) -> Poll<()> {
     // Poll the future.
     let output = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         struct Guard<'a, T: Future> {
@@ -473,13 +477,20 @@ fn poll_future<T: Future>(core: &CoreStage<T>, cx: Context<'_>) -> Poll<()> {
     let output = match output {
         Ok(Poll::Pending) => return Poll::Pending,
         Ok(Poll::Ready(output)) => Ok(output),
-        Err(panic) => Err(JoinError::panic(panic)),
+        Err(panic) => {
+            scheduler.unhandled_panic();
+            Err(JoinError::panic(panic))
+        }
     };
 
     // Catch and ignore panics if the future panics on drop.
-    let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         core.store_output(output);
     }));
+
+    if res.is_err() {
+        scheduler.unhandled_panic();
+    }
 
     Poll::Ready(())
 }

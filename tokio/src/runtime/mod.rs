@@ -212,6 +212,9 @@ cfg_rt! {
 
     mod builder;
     pub use self::builder::Builder;
+    cfg_unstable! {
+        pub use self::builder::UnhandledPanic;
+    }
 
     pub(crate) mod context;
     pub(crate) mod driver;

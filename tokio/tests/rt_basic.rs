@@ -288,6 +288,91 @@ fn timeout_panics_when_no_time_handle() {
     });
 }
 
+#[cfg(tokio_unstable)]
+mod unstable {
+    use super::*;
+    use tokio::runtime::{Builder, UnhandledPanic};
+
+    #[test]
+    #[should_panic(
+        expected = "a spawned task panicked and the runtime is configured to shutdown on unhandled panic"
+    )]
+    fn shutdown_on_panic() {
+        let rt = Builder::new_current_thread()
+            .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            tokio::spawn(async {
+                panic!("boom");
+            });
+
+            futures::future::pending::<()>().await;
+        })
+    }
+
+    #[test]
+    fn spawns_do_nothing() {
+        use std::sync::Arc;
+
+        let rt = Builder::new_current_thread()
+            .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+            .build()
+            .unwrap();
+
+        let rt1 = Arc::new(rt);
+        let rt2 = rt1.clone();
+
+        let _ = std::thread::spawn(move || {
+            rt2.block_on(async {
+                tokio::spawn(async {
+                    panic!("boom");
+                });
+
+                futures::future::pending::<()>().await;
+            })
+        })
+        .join();
+
+        let task = rt1.spawn(async {});
+        let res = futures::executor::block_on(task);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn shutdown_all_concurrent_block_on() {
+        use std::sync::Arc;
+
+        let rt = Builder::new_current_thread()
+            .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+            .build()
+            .unwrap();
+
+        let rt = Arc::new(rt);
+        let mut ths = vec![];
+
+        for _ in 0..1 {
+            let rt = rt.clone();
+            ths.push(std::thread::spawn(move || {
+                rt.block_on(async {
+                    futures::future::pending::<()>().await;
+                });
+            }));
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        rt.spawn(async {
+            panic!("boom");
+        });
+
+        for th in ths {
+            assert!(th.join().is_err());
+        }
+    }
+}
+
 fn rt() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()

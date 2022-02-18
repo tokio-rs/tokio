@@ -78,6 +78,17 @@ pub struct Builder {
 
     /// Customizable keep alive timeout for BlockingPool
     pub(super) keep_alive: Option<Duration>,
+
+    #[cfg(tokio_unstable)]
+    pub(super) unhandled_panic: UnhandledPanic,
+}
+
+cfg_unstable! {
+    #[derive(Debug, Clone)]
+    pub enum UnhandledPanic {
+        Ignore,
+        ShutdownRuntime,
+    }
 }
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
@@ -145,6 +156,9 @@ impl Builder {
             after_unpark: None,
 
             keep_alive: None,
+
+            #[cfg(tokio_unstable)]
+            unhandled_panic: UnhandledPanic::Ignore,
         }
     }
 
@@ -554,7 +568,15 @@ impl Builder {
         self
     }
 
+    cfg_unstable! {
+        pub fn unhandled_panic(&mut self, behavior: UnhandledPanic) -> &mut Self {
+            self.unhandled_panic = behavior;
+            self
+        }
+    }
+
     fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
+        use crate::runtime::basic_scheduler::Config;
         use crate::runtime::{BasicScheduler, Kind};
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
@@ -563,8 +585,15 @@ impl Builder {
         // there are no futures ready to do something, it'll let the timer or
         // the reactor to generate some new stimuli for the futures to continue
         // in their life.
-        let scheduler =
-            BasicScheduler::new(driver, self.before_park.clone(), self.after_unpark.clone());
+        let scheduler = BasicScheduler::new(
+            driver,
+            Config {
+                before_park: self.before_park.clone(),
+                after_unpark: self.after_unpark.clone(),
+                #[cfg(tokio_unstable)]
+                unhandled_panic: self.unhandled_panic.clone(),
+            },
+        );
         let spawner = Spawner::Basic(scheduler.spawner().clone());
 
         // Blocking pool
