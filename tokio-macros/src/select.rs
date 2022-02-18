@@ -83,7 +83,7 @@ where
                     ));
                 }
                 TokenTree::Ident(i) => {
-                    if buf.display_as_str(&i) == "mut" {
+                    if matches!(buf.display_as_str(&i), "mut" | "ref") {
                         continue;
                     }
 

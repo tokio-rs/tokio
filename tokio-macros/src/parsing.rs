@@ -190,23 +190,19 @@ impl Iterator for StreamIter {
     type Item = TokenTree;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(it) = self.stack.last_mut() {
-            if let Some(tt) = it.next() {
-                match &tt {
+        loop {
+            if let Some(tt) = self.stack.last_mut()?.next() {
+                return match tt {
                     TokenTree::Group(g) if g.delimiter() == Delimiter::None => {
                         self.stack.push(g.stream().into_iter());
                         continue;
                     }
-                    _ => {}
-                }
-
-                return Some(tt);
+                    tt => Some(tt),
+                };
             }
 
             let _ = self.stack.pop();
         }
-
-        None
     }
 }
 
