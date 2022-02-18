@@ -1,6 +1,6 @@
 use core::fmt;
 
-use proc_macro::{Spacing, Span, TokenTree};
+use proc_macro::{Delimiter, Spacing, Span, TokenTree};
 
 const BUF: usize = 2;
 
@@ -81,7 +81,7 @@ impl Buf {
 
 /// Parser base.
 pub(crate) struct BaseParser<'a> {
-    it: proc_macro::token_stream::IntoIter,
+    it: StreamIter,
     tokens: Vec<TokenTree>,
     pub(crate) buf: &'a mut Buf,
 }
@@ -91,7 +91,7 @@ impl<'a> BaseParser<'a> {
         buf.clear();
 
         Self {
-            it: stream.into_iter(),
+            it: StreamIter::new(stream),
             tokens: Vec::new(),
             buf,
         }
@@ -169,8 +169,44 @@ impl<'a> BaseParser<'a> {
     }
 
     /// Convert the current parser into a collection of tokens it has retained.
-    pub(crate) fn ininto_tokens(self) -> Vec<TokenTree> {
+    pub(crate) fn into_tokens(self) -> Vec<TokenTree> {
         self.tokens
+    }
+}
+
+struct StreamIter {
+    stack: Vec<proc_macro::token_stream::IntoIter>,
+}
+
+impl StreamIter {
+    fn new(stream: proc_macro::TokenStream) -> Self {
+        Self {
+            stack: vec![stream.into_iter()],
+        }
+    }
+}
+
+impl Iterator for StreamIter {
+    type Item = TokenTree;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(it) = self.stack.last_mut() {
+            if let Some(tt) = it.next() {
+                match &tt {
+                    TokenTree::Group(g) if g.delimiter() == Delimiter::None => {
+                        self.stack.push(g.stream().into_iter());
+                        continue;
+                    }
+                    _ => {}
+                }
+
+                return Some(tt);
+            }
+
+            let _ = self.stack.pop();
+        }
+
+        None
     }
 }
 

@@ -12,6 +12,9 @@ fn compile_fail_full() {
     t.pass("tests/pass/macros_main_loop.rs");
 
     #[cfg(feature = "full")]
+    t.pass("tests/pass/macros_main_generics.rs");
+
+    #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_invalid_input.rs");
 
     #[cfg(feature = "full")]
@@ -19,6 +22,9 @@ fn compile_fail_full() {
 
     #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_type_mismatch.rs");
+
+    #[cfg(feature = "full")]
+    t.compile_fail("tests/fail/macros_main_generics.rs");
 
     #[cfg(all(feature = "rt", not(feature = "full")))]
     t.compile_fail("tests/fail/macros_core_no_default.rs");

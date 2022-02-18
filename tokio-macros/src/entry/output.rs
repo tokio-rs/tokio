@@ -9,7 +9,6 @@ use crate::token_stream::TokenStream;
 
 #[derive(Default)]
 pub(crate) struct TailState {
-    pub(crate) block: Option<Span>,
     pub(crate) start: Option<Span>,
     pub(crate) end: Option<Span>,
     /// Indicates if last expression is a return.
@@ -124,23 +123,23 @@ impl Config {
 /// The parsed item output.
 pub(crate) struct ItemOutput {
     tokens: Vec<TokenTree>,
-    pub(crate) has_async: bool,
+    async_keyword: Option<usize>,
     signature: Option<ops::Range<usize>>,
-    block: Option<ops::Range<usize>>,
+    block: Option<usize>,
     tail_state: TailState,
 }
 
 impl ItemOutput {
     pub(crate) fn new(
         tokens: Vec<TokenTree>,
-        has_async: bool,
+        async_keyword: Option<usize>,
         signature: Option<ops::Range<usize>>,
-        block: Option<ops::Range<usize>>,
+        block: Option<usize>,
         tail_state: TailState,
     ) -> Self {
         Self {
             tokens,
-            has_async,
+            async_keyword,
             signature,
             block,
             tail_state,
@@ -149,7 +148,7 @@ impl ItemOutput {
 
     /// Validate the parsed item.
     pub(crate) fn validate(&self, kind: EntryKind, errors: &mut Vec<Error>) {
-        if !self.has_async {
+        if self.async_keyword.is_none() {
             let span = self
                 .signature
                 .as_ref()
@@ -165,16 +164,21 @@ impl ItemOutput {
         }
     }
 
+    /// Calculate the block span to use for diagnostics. This will correspond to
+    /// the last tail statement in the block of the function body.
     pub(crate) fn block_spans(&self) -> (Span, Span) {
+        let fallback_span = self
+            .block
+            .and_then(|index| Some(self.tokens.get(index)?.span()));
         let start = self
             .tail_state
             .start
-            .or(self.tail_state.block)
+            .or(fallback_span)
             .unwrap_or_else(Span::call_site);
         let end = self
             .tail_state
             .end
-            .or(self.tail_state.block)
+            .or(fallback_span)
             .unwrap_or_else(Span::call_site);
         (start, end)
     }
@@ -187,24 +191,47 @@ impl ItemOutput {
         start: Span,
     ) -> impl IntoTokens + '_ {
         from_fn(move |s| {
-            if let (Some(signature), Some(block), Some(flavor)) =
-                (self.signature.clone(), self.block.clone(), config.flavor())
-            {
-                let block_span = self.tail_state.block.unwrap_or_else(Span::call_site);
-
-                s.write((
-                    self.entry_kind_attribute(kind),
-                    &self.tokens[signature],
-                    group_with_span(
-                        Delimiter::Brace,
-                        self.item_body(config, block, flavor, start),
-                        block_span,
-                    ),
-                ))
+            if let Some(item) = self.maybe_expand_item(kind, config, start) {
+                s.write(item);
             } else {
                 s.write(&self.tokens[..]);
             }
         })
+    }
+
+    /// Expand item if all prerequsites are available.
+    fn maybe_expand_item(
+        &self,
+        kind: EntryKind,
+        config: Config,
+        start: Span,
+    ) -> Option<impl IntoTokens + '_> {
+        let signature = self.tokens.get(self.signature.as_ref()?.clone())?;
+        let block = self.tokens.get(self.block?)?;
+        let flavor = config.flavor()?;
+
+        Some((
+            self.entry_kind_attribute(kind),
+            from_fn(move |s| {
+                // Optionally filter the async keyword (if it's present). We
+                // still want to be able to produce a signature cause we get
+                // better diagnostics.
+                if let Some(index) = self.async_keyword {
+                    for (n, tt) in signature.iter().enumerate() {
+                        if n != index {
+                            s.write(tt.clone());
+                        }
+                    }
+                } else {
+                    s.write(signature);
+                }
+            }),
+            group_with_span(
+                Delimiter::Brace,
+                self.item_body(config, block, flavor, start),
+                block.span(),
+            ),
+        ))
     }
 
     /// Generate attribute associated with entry kind.
@@ -220,13 +247,13 @@ impl ItemOutput {
     }
 
     /// Expanded item body.
-    fn item_body(
-        &self,
+    fn item_body<'a>(
+        &'a self,
         config: Config,
-        block: ops::Range<usize>,
+        block: &'a TokenTree,
         flavor: RuntimeFlavor,
         start: Span,
-    ) -> impl IntoTokens + '_ {
+    ) -> impl IntoTokens + 'a {
         // NB: override the first generated part with the detected start span.
         let rt = ("tokio", S, "runtime", S, "Builder");
 
@@ -262,13 +289,13 @@ impl ItemOutput {
             if self.tail_state.return_ {
                 s.write((
                     with_span(("return", build, '.', "block_on"), start),
-                    parens(("async", &self.tokens[block])),
+                    parens(("async", block.clone())),
                     ';',
                 ));
             } else {
                 s.write((
                     with_span((build, '.', "block_on"), start),
-                    parens(("async", &self.tokens[block])),
+                    parens(("async", block.clone())),
                 ));
             }
         })

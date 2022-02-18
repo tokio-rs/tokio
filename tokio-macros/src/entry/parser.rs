@@ -1,4 +1,4 @@
-use proc_macro::{Delimiter, Group, Literal, Span, TokenTree};
+use proc_macro::{Delimiter, Group, Literal, Spacing, Span, TokenTree};
 
 use crate::entry::output::{
     Config, EntryKind, ItemOutput, RuntimeFlavor, SupportsThreading, TailState,
@@ -190,39 +190,86 @@ impl<'a> ItemParser<'a> {
         }
     }
 
-    /// Parse and produce the corresponding token stream.
+    /// Parse and produce the corresponding item output.
+    ///
+    /// Note that this mode of parsing is intentionally promiscious and tries
+    /// its best not to produce any errors, because the more tokens we can feed
+    /// to straight to `rustc` the better diagnostics we can expect it to
+    /// produce. If we were to perform strict parsing here instead, we'd have to
+    /// rely on the kinds of errors we can produce ourselves directly here.
     pub(crate) fn parse(mut self) -> ItemOutput {
         let start = self.base.len();
+
         let mut signature = None;
         let mut block = None;
-
-        let mut has_async = false;
-
+        let mut async_keyword = None;
+        let mut generics = None;
         let mut tail_state = TailState::default();
 
         while let Some(tt) = self.base.bump() {
-            match tt {
+            match &tt {
                 TokenTree::Ident(ident) if self.base.buf.display_as_str(&ident) == "async" => {
-                    // NB: intentionally skip over this token.
-                    has_async = true;
+                    if async_keyword.is_none() {
+                        async_keyword = Some(self.base.len());
+                    }
                 }
-                TokenTree::Group(g) if matches!(g.delimiter(), Delimiter::Brace) => {
-                    signature = Some(start..self.base.len());
-                    let start = self.base.len();
-                    tail_state.block = Some(g.span());
-                    self.find_last_stmt_range(&g, &mut tail_state);
-                    self.base.push(TokenTree::Group(g));
-                    block = Some(start..self.base.len());
-                }
-                tt => {
+                // Skip over generics which might contain a block (due to
+                // constant generics). Angle brackets are not treated like a
+                // group, so we have to balance them ourselves in
+                // `skip_angle_brackets`.
+                TokenTree::Punct(p)
+                    if generics.is_none()
+                        && p.as_char() == '<'
+                        && p.spacing() == Spacing::Alone =>
+                {
+                    generics = Some(p.span());
                     self.base.push(tt);
+                    self.skip_angle_brackets();
+                    continue;
                 }
+                // We treat the last encountered braced group as the block of
+                // the function. The preceding span is considered its signature.
+                TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => {
+                    signature = Some(start..self.base.len());
+                    block = Some(self.base.len());
+                    self.find_last_stmt_range(g, &mut tail_state);
+                }
+                _ => {}
             }
+
+            self.base.push(tt);
         }
 
-        let tokens = self.base.ininto_tokens();
+        let tokens = self.base.into_tokens();
 
-        ItemOutput::new(tokens, has_async, signature, block, tail_state)
+        ItemOutput::new(tokens, async_keyword, signature, block, tail_state)
+    }
+
+    /// Since generics are implemented using angle brackets.
+    fn skip_angle_brackets(&mut self) {
+        // NB: one bracket encountered already.
+        let mut level = 1u32;
+
+        while level > 0 {
+            let tt = match self.base.bump() {
+                Some(tt) => tt,
+                None => break,
+            };
+
+            if let TokenTree::Punct(p) = &tt {
+                match p.as_char() {
+                    '<' => {
+                        level += 1;
+                    }
+                    '>' => {
+                        level -= 1;
+                    }
+                    _ => {}
+                }
+            }
+
+            self.base.push(tt);
+        }
     }
 
     /// Find the range of spans that is defined by the last statement in the
