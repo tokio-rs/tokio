@@ -50,7 +50,7 @@ tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
-async-stream = "0.3.0"
+async-stream = "0.3.2"
 futures = "0.3.0"
 futures-test = "0.3.5"
 

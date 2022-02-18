@@ -33,7 +33,7 @@ tokio-util = { version = "0.7.0", path = "../tokio-util", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["full", "test-util"] }
-async-stream = "0.3"
+async-stream = "0.3.2"
 tokio-test = { path = "../tokio-test" }
 futures = { version = "0.3", default-features = false }
 
