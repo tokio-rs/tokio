@@ -2,11 +2,12 @@ use core::fmt;
 
 use proc_macro::{Delimiter, Spacing, Span, TokenTree};
 
-const BUF: usize = 2;
+const BUF: usize = 4;
 
 // Punctuations that we look for.
 pub(crate) const COMMA: [char; 2] = [',', '\0'];
 pub(crate) const EQ: [char; 2] = ['=', '\0'];
+pub(crate) const ROCKET: [char; 2] = ['-', '>'];
 
 pub(crate) struct Buf {
     // Static ring buffer used for processing tokens.
@@ -20,7 +21,7 @@ pub(crate) struct Buf {
 impl Buf {
     pub(crate) fn new() -> Self {
         Self {
-            ring: [None, None],
+            ring: [None, None, None, None],
             string: String::new(),
             head: 0,
             tail: 0,
@@ -29,7 +30,7 @@ impl Buf {
 
     /// Clear the buffer.
     fn clear(&mut self) {
-        self.ring = [None, None];
+        self.ring = [None, None, None, None];
         self.head = 0;
         self.tail = 0;
         self.string.clear();
@@ -128,9 +129,21 @@ impl<'a> BaseParser<'a> {
         }
     }
 
-    /// Process a punctuation.
+    /// Step over the given number of tokens.
+    pub(crate) fn consume(&mut self, n: usize) {
+        for _ in 0..n {
+            if let Some(tt) = self.bump() {
+                self.push(tt);
+            }
+        }
+    }
+
+    /// Peek a punctuation with joint characters.
+    ///
+    /// This processes the next 3 punctuations (if present) to ensure that when
+    /// we encounter a particular punctuation it occurs in isolation.
     pub(crate) fn peek_punct(&mut self) -> Option<Punct> {
-        let mut out = [None; 2];
+        let mut out = [None; 3];
 
         for (n, o) in out.iter_mut().enumerate() {
             match (n, self.nth(n)) {
@@ -148,7 +161,7 @@ impl<'a> BaseParser<'a> {
         }
 
         match out {
-            [Some((span, head)), tail] => Some(Punct {
+            [Some((span, head)), tail, None] => Some(Punct {
                 span,
                 chars: [head, tail.map(|(_, c)| c).unwrap_or('\0')],
             }),
@@ -206,7 +219,7 @@ impl Iterator for StreamIter {
     }
 }
 
-/// A complete punctuation.
+/// A complete punctuation with a maximum up to two characters.
 #[derive(Debug)]
 pub(crate) struct Punct {
     pub(crate) span: Span,

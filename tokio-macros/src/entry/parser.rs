@@ -4,8 +4,10 @@ use crate::entry::output::{
     Config, EntryKind, ItemOutput, RuntimeFlavor, SupportsThreading, TailState,
 };
 use crate::error::Error;
-use crate::parsing::{BaseParser, Buf};
+use crate::parsing::{BaseParser, Buf, ROCKET};
 use crate::parsing::{Punct, COMMA, EQ};
+
+use super::output::ReturnHeuristics;
 
 /// A parser for the arguments provided to an entry macro.
 pub(crate) struct ConfigParser<'a> {
@@ -206,7 +208,22 @@ impl<'a> ItemParser<'a> {
         let mut generics = None;
         let mut tail_state = TailState::default();
 
-        while let Some(tt) = self.base.bump() {
+        // We default to assuming that the return is a unit, until we've spot
+        // a `->` token at which point we try and process it.
+        let mut return_heuristics = ReturnHeuristics::Unit;
+
+        while self.base.nth(0).is_some() {
+            if let Some(p @ Punct { chars: ROCKET, .. }) = self.base.peek_punct() {
+                self.base.consume(p.len());
+                self.parse_return_heuristics(&mut return_heuristics);
+                continue;
+            }
+
+            let tt = match self.base.bump() {
+                Some(tt) => tt,
+                None => break,
+            };
+
             match &tt {
                 TokenTree::Ident(ident) if self.base.buf.display_as_str(&ident) == "async" => {
                     if async_keyword.is_none() {
@@ -242,7 +259,33 @@ impl<'a> ItemParser<'a> {
 
         let tokens = self.base.into_tokens();
 
-        ItemOutput::new(tokens, async_keyword, signature, block, tail_state)
+        ItemOutput::new(
+            tokens,
+            async_keyword,
+            signature,
+            block,
+            tail_state,
+            return_heuristics,
+        )
+    }
+
+    /// Parse out return type heuristics. There is a *very* limited number of
+    /// things we understand here.
+    fn parse_return_heuristics(&mut self, return_heuristics: &mut ReturnHeuristics) {
+        match self.base.nth(0) {
+            Some(TokenTree::Punct(p)) if p.as_char() == '!' => {
+                *return_heuristics = ReturnHeuristics::Never;
+            }
+            Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Parenthesis => {
+                if g.stream().is_empty() {
+                    *return_heuristics = ReturnHeuristics::Unit;
+                }
+            }
+            _ => {
+                // Return type is something we don't understand :(
+                *return_heuristics = ReturnHeuristics::Unknown;
+            }
+        }
     }
 
     /// Since generics are implemented using angle brackets.
@@ -289,7 +332,7 @@ impl<'a> ItemParser<'a> {
                 }
                 tt => {
                     if std::mem::take(&mut update) {
-                        tail_state.return_ = matches!(&tt, TokenTree::Ident(ident) if self.base.buf.display_as_str(ident) == "return");
+                        tail_state.has_return = matches!(&tt, TokenTree::Ident(ident) if self.base.buf.display_as_str(ident) == "return");
                         tail_state.start = Some(span);
                     }
                 }

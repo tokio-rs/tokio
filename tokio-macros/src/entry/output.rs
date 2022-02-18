@@ -7,12 +7,22 @@ use crate::into_tokens::{bracketed, from_fn, parens, string, IntoTokens, S};
 use crate::parsing::Buf;
 use crate::token_stream::TokenStream;
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ReturnHeuristics {
+    /// Unknown how to treat the return type.
+    Unknown,
+    /// Generated function explicitly returns the special `()` unit type.
+    Unit,
+    /// Generated function explicitly returns the special `!` never type.
+    Never,
+}
+
 #[derive(Default)]
 pub(crate) struct TailState {
     pub(crate) start: Option<Span>,
     pub(crate) end: Option<Span>,
     /// Indicates if last expression is a return.
-    pub(crate) return_: bool,
+    pub(crate) has_return: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -126,7 +136,10 @@ pub(crate) struct ItemOutput {
     async_keyword: Option<usize>,
     signature: Option<ops::Range<usize>>,
     block: Option<usize>,
+    /// What's known about the tail statement.
     tail_state: TailState,
+    /// Best effort heuristics to determine the return value of the function being procssed.
+    return_heuristics: ReturnHeuristics,
 }
 
 impl ItemOutput {
@@ -136,6 +149,7 @@ impl ItemOutput {
         signature: Option<ops::Range<usize>>,
         block: Option<usize>,
         tail_state: TailState,
+        return_heuristics: ReturnHeuristics,
     ) -> Self {
         Self {
             tokens,
@@ -143,6 +157,7 @@ impl ItemOutput {
             signature,
             block,
             tail_state,
+            return_heuristics,
         }
     }
 
@@ -285,18 +300,19 @@ impl ItemOutput {
             parens(string("Failed building the Runtime")),
         );
 
+        let statement = (
+            with_span((build, '.', "block_on"), start),
+            parens(("async", block.clone())),
+        );
+
+        let should_return =
+            self.tail_state.has_return || matches!(self.return_heuristics, ReturnHeuristics::Unit);
+
         from_fn(move |s| {
-            if self.tail_state.return_ {
-                s.write((
-                    with_span(("return", build, '.', "block_on"), start),
-                    parens(("async", block.clone())),
-                    ';',
-                ));
+            if should_return {
+                s.write(((with_span("return", start), statement), ';'));
             } else {
-                s.write((
-                    with_span((build, '.', "block_on"), start),
-                    parens(("async", block.clone())),
-                ));
+                s.write(statement);
             }
         })
     }
