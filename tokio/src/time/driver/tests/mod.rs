@@ -46,7 +46,7 @@ fn model(f: impl Fn() + Send + Sync + 'static) {
 #[test]
 fn single_timer() {
     model(|| {
-        let clock = crate::time::clock::Clock::new(true, false);
+        let clock = crate::time::clock::Clock::new(true);
         let time_source = super::ClockTime::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
@@ -77,7 +77,7 @@ fn single_timer() {
 #[test]
 fn drop_timer() {
     model(|| {
-        let clock = crate::time::clock::Clock::new(true, false);
+        let clock = crate::time::clock::Clock::new(true);
         let time_source = super::ClockTime::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
@@ -108,7 +108,7 @@ fn drop_timer() {
 #[test]
 fn change_waker() {
     model(|| {
-        let clock = crate::time::clock::Clock::new(true, false);
+        let clock = crate::time::clock::Clock::new(true);
         let time_source = super::ClockTime::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
@@ -143,7 +143,7 @@ fn reset_future() {
     model(|| {
         let finished_early = Arc::new(AtomicBool::new(false));
 
-        let clock = crate::time::clock::Clock::new(true, false);
+        let clock = crate::time::clock::Clock::new(true);
         let time_source = super::ClockTime::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
@@ -199,7 +199,7 @@ fn normal_or_miri<T>(normal: T, miri: T) -> T {
 #[test]
 #[cfg(not(loom))]
 fn poll_process_levels() {
-    let clock = crate::time::clock::Clock::new(true, false);
+    let clock = crate::time::clock::Clock::new(true);
     clock.pause();
 
     let time_source = super::ClockTime::new(clock.clone());
@@ -240,7 +240,7 @@ fn poll_process_levels() {
 fn poll_process_levels_targeted() {
     let mut context = Context::from_waker(noop_waker_ref());
 
-    let clock = crate::time::clock::Clock::new(true, false);
+    let clock = crate::time::clock::Clock::new(true);
     clock.pause();
 
     let time_source = super::ClockTime::new(clock.clone());

@@ -25,10 +25,38 @@ impl RuntimeFlavor {
     }
 }
 
+#[derive(Clone, Copy)]
+enum StartPaused {
+    No,
+    Paused,
+    PausedNoAdvance,
+}
+
+impl StartPaused {
+    fn from_bool(b: bool) -> Self {
+        if b {
+            StartPaused::Paused
+        } else {
+            StartPaused::No
+        }
+    }
+
+    fn from_str(s: &str) -> Result<StartPaused, String> {
+        match s {
+            "paused" => Ok(StartPaused::Paused),
+            "noadvance" => Ok(StartPaused::PausedNoAdvance),
+            _ => Err(format!(
+                "No such paused mode `{}`. The paused modes are `paused` and `noadvance`.",
+                s
+            )),
+        }
+    }
+}
+
 struct FinalConfig {
     flavor: RuntimeFlavor,
     worker_threads: Option<usize>,
-    start_paused: Option<bool>,
+    start_paused: Option<StartPaused>,
 }
 
 /// Config used in case of the attribute not being able to build a valid config
@@ -43,7 +71,7 @@ struct Configuration {
     default_flavor: RuntimeFlavor,
     flavor: Option<RuntimeFlavor>,
     worker_threads: Option<(usize, Span)>,
-    start_paused: Option<(bool, Span)>,
+    start_paused: Option<(StartPaused, Span)>,
     is_test: bool,
 }
 
@@ -99,7 +127,13 @@ impl Configuration {
             return Err(syn::Error::new(span, "`start_paused` set multiple times."));
         }
 
-        let start_paused = parse_bool(start_paused, span, "start_paused")?;
+        let start_paused = match parse_bool(start_paused.clone(), span, "start_paused") {
+            Ok(b) => StartPaused::from_bool(b),
+            _ => {
+                let s = parse_string(start_paused, span, "start_paused")?;
+                StartPaused::from_str(&s).map_err(|err| syn::Error::new(span, err))?
+            }
+        };
         self.start_paused = Some((start_paused, span));
         Ok(())
     }
@@ -325,7 +359,11 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
         rt = quote! { #rt.worker_threads(#v) };
     }
     if let Some(v) = config.start_paused {
-        rt = quote! { #rt.start_paused(#v) };
+        match v {
+            StartPaused::No => rt = quote! { #rt.start_paused(false) },
+            StartPaused::Paused => rt = quote! { #rt.start_paused(true) },
+            StartPaused::PausedNoAdvance => rt = quote! { #rt.start_paused_no_advance(true) },
+        }
     }
 
     let header = if is_test {

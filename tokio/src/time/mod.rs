@@ -86,7 +86,7 @@
 mod clock;
 pub(crate) use self::clock::Clock;
 #[cfg(feature = "test-util")]
-pub use clock::{advance, pause, resume};
+pub use clock::{advance, pause, pause_no_advance, resume};
 
 pub(crate) mod driver;
 

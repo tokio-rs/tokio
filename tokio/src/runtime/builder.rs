@@ -48,7 +48,7 @@ pub struct Builder {
     enable_time: bool,
 
     /// Whether or not the clock should start paused.
-    start_paused: bool,
+    start_paused: driver::PauseMode,
 
     /// The number of worker threads, used by Runtime.
     ///
@@ -125,7 +125,7 @@ impl Builder {
             enable_time: false,
 
             // The clock starts not-paused
-            start_paused: false,
+            start_paused: driver::PauseMode::Unpaused,
 
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
@@ -652,7 +652,21 @@ cfg_test_util! {
         ///     .unwrap();
         /// ```
         pub fn start_paused(&mut self, start_paused: bool) -> &mut Self {
-            self.start_paused = start_paused;
+            if start_paused {
+                self.start_paused = driver::PauseMode::Paused;
+            } else {
+                self.start_paused = driver::PauseMode::Unpaused;
+            }
+            self
+        }
+
+        /// Controls if the runtime's clock starts paused without auto-advance or advancing.
+        pub fn start_paused_no_advance(&mut self, start_paused_no_advance: bool) -> &mut Self {
+            if start_paused_no_advance {
+                self.start_paused = driver::PauseMode::PausedNoAdvance;
+            } else {
+                self.start_paused = driver::PauseMode::Unpaused;
+            }
             self
         }
     }

@@ -250,7 +250,10 @@ where
         fn park_timeout(&mut self, duration: Duration) -> Result<(), P::Error> {
             let clock = &self.time_source.clock;
 
-            if clock.is_paused() {
+            if clock.is_paused_no_advance() {
+                // As autoadvance is disabled the next timer won't ever be reached
+                self.park.park_timeout(Duration::from_secs(3600))?;
+            } else if clock.is_paused() {
                 self.park.park_timeout(Duration::from_secs(0))?;
 
                 // If the time driver was woken, then the park completed

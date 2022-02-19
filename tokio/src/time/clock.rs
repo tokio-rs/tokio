@@ -17,7 +17,7 @@ cfg_not_test_util! {
     }
 
     impl Clock {
-        pub(crate) fn new(_enable_pausing: bool, _start_paused: bool) -> Clock {
+        pub(crate) fn new(_enable_pausing: bool) -> Clock {
             Clock {}
         }
 
@@ -49,6 +49,31 @@ cfg_test_util! {
         inner: Arc<Mutex<Inner>>,
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    enum Frozen {
+        Thawed(std::time::Instant),
+        #[allow(clippy::enum_variant_names)]
+        Frozen,
+        NoAdvance,
+    }
+
+    impl Frozen {
+        fn thawed(&self) -> Option<&std::time::Instant> {
+            match self {
+                Frozen::Thawed(ref i) => Some(i),
+                _ => None,
+            }
+        }
+
+        fn is_frozen(&self) -> bool {
+            !matches!(self, Frozen::Thawed(_))
+        }
+
+        fn is_frozen_no_advance(&self) -> bool {
+            matches!(self, Frozen::NoAdvance)
+        }
+    }
+
     #[derive(Debug)]
     struct Inner {
         /// True if the ability to pause time is enabled.
@@ -57,8 +82,8 @@ cfg_test_util! {
         /// Instant to use as the clock's base instant.
         base: std::time::Instant,
 
-        /// Instant at which the clock was last unfrozen.
-        unfrozen: Option<std::time::Instant>,
+        /// Instant at which the clock was last thawed or freeze state.
+        frozen: Frozen,
     }
 
     /// Pauses time.
@@ -101,6 +126,12 @@ cfg_test_util! {
         clock.pause();
     }
 
+    /// Pauses time and disabled auto advancing
+    pub fn pause_no_advance() {
+        let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
+        clock.pause_no_advance();
+    }
+
     /// Resumes time.
     ///
     /// Clears the saved `Instant::now()` value. Subsequent calls to
@@ -114,11 +145,11 @@ cfg_test_util! {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         let mut inner = clock.inner.lock();
 
-        if inner.unfrozen.is_some() {
+        if !inner.frozen.is_frozen() {
             panic!("time is not frozen");
         }
 
-        inner.unfrozen = Some(std::time::Instant::now());
+        inner.frozen = Frozen::Thawed(std::time::Instant::now());
     }
 
     /// Advances time.
@@ -171,47 +202,61 @@ cfg_test_util! {
     impl Clock {
         /// Returns a new `Clock` instance that uses the current execution context's
         /// source of time.
-        pub(crate) fn new(enable_pausing: bool, start_paused: bool) -> Clock {
+        pub(crate) fn new(enable_pausing: bool) -> Clock {
             let now = std::time::Instant::now();
 
-            let clock = Clock {
+            Clock {
                 inner: Arc::new(Mutex::new(Inner {
                     enable_pausing,
                     base: now,
-                    unfrozen: Some(now),
+                    frozen: Frozen::Thawed(now),
                 })),
-            };
-
-            if start_paused {
-                clock.pause();
             }
-
-            clock
         }
 
-        pub(crate) fn pause(&self) {
+        fn freeze(&self, frozen: Frozen) {
             let mut inner = self.inner.lock();
 
             if !inner.enable_pausing {
                 drop(inner); // avoid poisoning the lock
-                panic!("`time::pause()` requires the `current_thread` Tokio runtime. \
+                panic!("`time::pause()` or `time::pause_no_advance()` requires the `current_thread` Tokio runtime. \
                         This is the default Runtime used by `#[tokio::test].");
             }
 
-            let elapsed = inner.unfrozen.as_ref().expect("time is already frozen").elapsed();
-            inner.base += elapsed;
-            inner.unfrozen = None;
+            match (&inner.frozen, &frozen) {
+                (Frozen::Thawed(t), _) => {
+                    let elapsed = t.elapsed();
+                    inner.base += elapsed;
+                },
+                (a, b) if a != b => (),
+                _ => panic!("time is already frozen"),
+            }
+
+            inner.frozen = frozen;
+        }
+
+        pub(crate) fn pause(&self) {
+            self.freeze(Frozen::Frozen);
+        }
+
+        pub(crate) fn pause_no_advance(&self) {
+            self.freeze(Frozen::NoAdvance);
         }
 
         pub(crate) fn is_paused(&self) -> bool {
             let inner = self.inner.lock();
-            inner.unfrozen.is_none()
+            inner.frozen.is_frozen()
+        }
+
+        pub(crate) fn is_paused_no_advance(&self) -> bool {
+            let inner = self.inner.lock();
+            inner.frozen.is_frozen_no_advance()
         }
 
         pub(crate) fn advance(&self, duration: Duration) {
             let mut inner = self.inner.lock();
 
-            if inner.unfrozen.is_some() {
+            if !inner.frozen.is_frozen() {
                 panic!("time is not frozen");
             }
 
@@ -223,8 +268,8 @@ cfg_test_util! {
 
             let mut ret = inner.base;
 
-            if let Some(unfrozen) = inner.unfrozen {
-                ret += unfrozen.elapsed();
+            if let Some(thawed) = inner.frozen.thawed() {
+                ret += thawed.elapsed();
             }
 
             Instant::from_std(ret)
