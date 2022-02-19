@@ -337,11 +337,16 @@ impl<'a> ItemParser<'a> {
                     _ if matches!(p.spacing(), Spacing::Joint) => {
                         self.base.push(tt);
 
-                        loop {
-                            self.base.consume(1);
+                        while let Some(tt) = self.base.bump() {
+                            // This ensures that we only continue if we
+                            // encounter a sequence of joined continuations, and
+                            // not something like `'static`.
+                            let do_next =
+                                matches!(&tt, TokenTree::Punct(p) if p.spacing() == Spacing::Joint);
 
-                            if !matches!(self.base.nth(0), Some(TokenTree::Punct(p)) if p.spacing() == Spacing::Joint)
-                            {
+                            self.base.push(tt);
+
+                            if !do_next {
                                 break;
                             }
                         }

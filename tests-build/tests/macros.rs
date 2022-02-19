@@ -6,6 +6,9 @@ fn compile_fail_full() {
     t.pass("tests/pass/forward_args_and_output.rs");
 
     #[cfg(feature = "full")]
+    t.pass("tests/pass/macros_main.rs");
+
+    #[cfg(feature = "full")]
     t.pass("tests/pass/macros_main_return.rs");
 
     #[cfg(feature = "full")]

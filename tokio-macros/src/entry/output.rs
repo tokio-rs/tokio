@@ -1,3 +1,4 @@
+use std::fmt;
 use std::ops;
 
 use proc_macro::{Delimiter, Span, TokenTree};
@@ -32,7 +33,7 @@ impl Default for TailKind {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct Tail {
     /// The start span of the tail.
     pub(crate) start: Option<Span>,
@@ -158,7 +159,6 @@ pub(crate) struct ItemOutput {
     /// What's known about the tail statement.
     tail: Tail,
     /// Best effort heuristics to determine the return value of the function being procssed.
-    #[allow(unused)]
     return_heuristics: ReturnHeuristics,
 }
 
@@ -183,19 +183,23 @@ impl ItemOutput {
 
     /// Validate the parsed item.
     pub(crate) fn validate(&self, kind: EntryKind, errors: &mut Vec<Error>) {
-        if self.async_keyword.is_none() {
-            let span = self
-                .signature
-                .as_ref()
-                .and_then(|s| self.tokens.get(s.clone()))
-                .and_then(|t| t.first())
-                .map(|tt| tt.span())
-                .unwrap_or_else(Span::call_site);
+        let span = self
+            .signature
+            .as_ref()
+            .and_then(|s| self.tokens.get(s.clone()))
+            .and_then(|t| t.first())
+            .map(|tt| tt.span())
+            .unwrap_or_else(Span::call_site);
 
+        if self.async_keyword.is_none() {
             errors.push(Error::new(
                 span,
                 format!("functions marked with `#[{}]` must be `async`", kind.name()),
             ));
+        }
+
+        if self.signature.is_none() || self.block.is_none() {
+            errors.push(Error::new(span, format!("failed to parse function")));
         }
     }
 
@@ -345,6 +349,18 @@ impl ItemOutput {
                 s.write(';');
             }
         })
+    }
+}
+
+impl fmt::Debug for ItemOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ItemOutput")
+            .field("async_keyword", &self.async_keyword)
+            .field("signature", &self.signature)
+            .field("block", &self.block)
+            .field("tail", &self.tail)
+            .field("return_heuristics", &self.return_heuristics)
+            .finish()
     }
 }
 
