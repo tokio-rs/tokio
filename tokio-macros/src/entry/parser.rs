@@ -1,13 +1,11 @@
 use proc_macro::{Delimiter, Group, Literal, Spacing, Span, TokenTree};
 
-use crate::entry::output::{
-    Config, EntryKind, ItemOutput, RuntimeFlavor, SupportsThreading, TailState,
-};
+use crate::entry::output::{Config, EntryKind, ItemOutput, RuntimeFlavor, SupportsThreading, Tail};
 use crate::error::Error;
 use crate::parsing::{BaseParser, Buf, ROCKET};
 use crate::parsing::{Punct, COMMA, EQ};
 
-use super::output::ReturnHeuristics;
+use super::output::{ReturnHeuristics, TailKind};
 
 /// A parser for the arguments provided to an entry macro.
 pub(crate) struct ConfigParser<'a> {
@@ -206,7 +204,7 @@ impl<'a> ItemParser<'a> {
         let mut block = None;
         let mut async_keyword = None;
         let mut generics = None;
-        let mut tail_state = TailState::default();
+        let mut tail = Tail::default();
 
         // We default to assuming that the return is a unit, until we've spot
         // a `->` token at which point we try and process it.
@@ -249,7 +247,7 @@ impl<'a> ItemParser<'a> {
                 TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => {
                     signature = Some(start..self.base.len());
                     block = Some(self.base.len());
-                    self.find_last_stmt_range(g, &mut tail_state);
+                    self.find_last_stmt_range(g, &mut tail);
                 }
                 _ => {}
             }
@@ -264,7 +262,7 @@ impl<'a> ItemParser<'a> {
             async_keyword,
             signature,
             block,
-            tail_state,
+            tail,
             return_heuristics,
         )
     }
@@ -273,9 +271,6 @@ impl<'a> ItemParser<'a> {
     /// things we understand here.
     fn parse_return_heuristics(&mut self, return_heuristics: &mut ReturnHeuristics) {
         match self.base.nth(0) {
-            Some(TokenTree::Punct(p)) if p.as_char() == '!' => {
-                *return_heuristics = ReturnHeuristics::Never;
-            }
             Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Parenthesis => {
                 if g.stream().is_empty() {
                     *return_heuristics = ReturnHeuristics::Unit;
@@ -319,21 +314,30 @@ impl<'a> ItemParser<'a> {
     /// block so that they can be used for the generated expression.
     ///
     /// This in turn improves upon diagnostics when return types do not match.
-    fn find_last_stmt_range(&mut self, g: &Group, tail_state: &mut TailState) {
-        let mut update = true;
+    fn find_last_stmt_range(&mut self, g: &Group, tail: &mut Tail) {
+        let mut new_stmt = true;
 
         for tt in g.stream() {
             let span = tt.span();
-            tail_state.end = Some(span);
+            tail.end = Some(span);
 
             match tt {
                 TokenTree::Punct(p) if p.as_char() == ';' => {
-                    update = true;
+                    new_stmt = true;
+                    tail.has_semi = true;
                 }
                 tt => {
-                    if std::mem::take(&mut update) {
-                        tail_state.has_return = matches!(&tt, TokenTree::Ident(ident) if self.base.buf.display_as_str(ident) == "return");
-                        tail_state.start = Some(span);
+                    tail.has_semi = false;
+
+                    if std::mem::take(&mut new_stmt) {
+                        tail.kind = if matches!(&tt, TokenTree::Ident(ident) if self.base.buf.display_as_str(ident) == "return")
+                        {
+                            TailKind::Return
+                        } else {
+                            TailKind::Unknown
+                        };
+
+                        tail.start = Some(span);
                     }
                 }
             }

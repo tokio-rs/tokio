@@ -13,16 +13,35 @@ pub(crate) enum ReturnHeuristics {
     Unknown,
     /// Generated function explicitly returns the special `()` unit type.
     Unit,
-    /// Generated function explicitly returns the special `!` never type.
-    Never,
+}
+
+/// The kind of the tail expression.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum TailKind {
+    /// Body is empty.
+    Empty,
+    /// Tail is a return statement (prefix `return`).
+    Return,
+    /// Body is non-empty but the tail is not specifically recognized.
+    Unknown,
+}
+
+impl Default for TailKind {
+    fn default() -> Self {
+        TailKind::Empty
+    }
 }
 
 #[derive(Default)]
-pub(crate) struct TailState {
+pub(crate) struct Tail {
+    /// The start span of the tail.
     pub(crate) start: Option<Span>,
+    /// The end span of the tail including a trailing semi.
     pub(crate) end: Option<Span>,
     /// Indicates if last expression is a return.
-    pub(crate) has_return: bool,
+    pub(crate) kind: TailKind,
+    /// If the tail statement has a semi-colon.
+    pub(crate) has_semi: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -137,8 +156,9 @@ pub(crate) struct ItemOutput {
     signature: Option<ops::Range<usize>>,
     block: Option<usize>,
     /// What's known about the tail statement.
-    tail_state: TailState,
+    tail: Tail,
     /// Best effort heuristics to determine the return value of the function being procssed.
+    #[allow(unused)]
     return_heuristics: ReturnHeuristics,
 }
 
@@ -148,7 +168,7 @@ impl ItemOutput {
         async_keyword: Option<usize>,
         signature: Option<ops::Range<usize>>,
         block: Option<usize>,
-        tail_state: TailState,
+        tail: Tail,
         return_heuristics: ReturnHeuristics,
     ) -> Self {
         Self {
@@ -156,7 +176,7 @@ impl ItemOutput {
             async_keyword,
             signature,
             block,
-            tail_state,
+            tail,
             return_heuristics,
         }
     }
@@ -186,12 +206,12 @@ impl ItemOutput {
             .block
             .and_then(|index| Some(self.tokens.get(index)?.span()));
         let start = self
-            .tail_state
+            .tail
             .start
             .or(fallback_span)
             .unwrap_or_else(Span::call_site);
         let end = self
-            .tail_state
+            .tail
             .end
             .or(fallback_span)
             .unwrap_or_else(Span::call_site);
@@ -305,14 +325,24 @@ impl ItemOutput {
             parens(("async", block.clone())),
         );
 
-        let should_return =
-            self.tail_state.has_return || matches!(self.return_heuristics, ReturnHeuristics::Unit);
+        let has_return = self.tail.has_semi && matches!(self.tail.kind, TailKind::Return);
+
+        let has_semi =
+            if !has_return && (self.tail.has_semi || matches!(self.tail.kind, TailKind::Empty)) {
+                matches!(self.return_heuristics, ReturnHeuristics::Unit)
+            } else {
+                false
+            };
 
         from_fn(move |s| {
-            if should_return {
-                s.write(((with_span("return", start), statement), ';'));
-            } else {
-                s.write(statement);
+            if has_return {
+                s.write(with_span("return", start));
+            }
+
+            s.write(statement);
+
+            if has_semi {
+                s.write(';');
             }
         })
     }
