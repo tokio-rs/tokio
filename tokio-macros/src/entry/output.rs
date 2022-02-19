@@ -181,6 +181,19 @@ impl ItemOutput {
         }
     }
 
+    /// Determine the best span to report general errors about processing.
+    ///
+    /// This picks the first token in the signature or the call span (if
+    /// available).
+    fn error_span(&self) -> Span {
+        self.signature
+            .as_ref()
+            .and_then(|s| self.tokens.get(s.clone()))
+            .and_then(|t| t.first())
+            .map(|tt| tt.span())
+            .unwrap_or_else(Span::call_site)
+    }
+
     /// Validate the parsed item.
     pub(crate) fn validate(&self, kind: EntryKind, errors: &mut Vec<Error>) {
         let span = self
@@ -196,10 +209,6 @@ impl ItemOutput {
                 span,
                 format!("functions marked with `#[{}]` must be `async`", kind.name()),
             ));
-        }
-
-        if self.signature.is_none() || self.block.is_none() {
-            errors.push(Error::new(span, format!("failed to parse function")));
         }
     }
 
@@ -223,16 +232,26 @@ impl ItemOutput {
     }
 
     /// Expand into a function item.
-    pub(crate) fn expand_item(
-        &self,
+    pub(crate) fn expand_item<'a>(
+        &'a self,
         kind: EntryKind,
         config: Config,
         start: Span,
+        errors: &'a mut Vec<Error>,
     ) -> impl IntoTokens + '_ {
         from_fn(move |s| {
             if let Some(item) = self.maybe_expand_item(kind, config, start) {
                 s.write(item);
             } else {
+                // Report a general "failed to do the thing" error to ensure
+                // we're never completely silent.
+                //
+                // If this is encountered, it need to be troubleshot regardless.
+                errors.push(Error::new(
+                    self.error_span(),
+                    format!("`#[{}]` failed to process function", kind.name()),
+                ));
+
                 s.write(&self.tokens[..]);
             }
         })

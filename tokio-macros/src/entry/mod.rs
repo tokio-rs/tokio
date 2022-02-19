@@ -32,7 +32,7 @@ pub(crate) fn build(
 
     let (start, end) = item.block_spans();
 
-    item.expand_item(kind, config, start)
+    item.expand_item(kind, config, start, &mut errors)
         .into_tokens(&mut stream, end);
     format_item_errors(errors).into_tokens(&mut stream, end);
 
