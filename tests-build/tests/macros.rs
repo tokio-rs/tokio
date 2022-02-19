@@ -29,6 +29,9 @@ fn compile_fail_full() {
     #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_main_generics.rs");
 
+    #[cfg(feature = "full")]
+    t.compile_fail("tests/fail/macros_main_missing_async.rs");
+
     #[cfg(all(feature = "rt", not(feature = "full")))]
     t.compile_fail("tests/fail/macros_core_no_default.rs");
 

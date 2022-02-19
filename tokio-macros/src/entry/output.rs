@@ -185,7 +185,7 @@ impl ItemOutput {
     ///
     /// This picks the first token in the signature or the call span (if
     /// available).
-    fn error_span(&self) -> Span {
+    pub(crate) fn error_span(&self) -> Span {
         self.signature
             .as_ref()
             .and_then(|s| self.tokens.get(s.clone()))
@@ -232,33 +232,7 @@ impl ItemOutput {
     }
 
     /// Expand into a function item.
-    pub(crate) fn expand_item<'a>(
-        &'a self,
-        kind: EntryKind,
-        config: Config,
-        start: Span,
-        errors: &'a mut Vec<Error>,
-    ) -> impl IntoTokens + '_ {
-        from_fn(move |s| {
-            if let Some(item) = self.maybe_expand_item(kind, config, start) {
-                s.write(item);
-            } else {
-                // Report a general "failed to do the thing" error to ensure
-                // we're never completely silent.
-                //
-                // If this is encountered, it need to be troubleshot regardless.
-                errors.push(Error::new(
-                    self.error_span(),
-                    format!("`#[{}]` failed to process function", kind.name()),
-                ));
-
-                s.write(&self.tokens[..]);
-            }
-        })
-    }
-
-    /// Expand item if all prerequsites are available.
-    fn maybe_expand_item(
+    pub(crate) fn expand_item(
         &self,
         kind: EntryKind,
         config: Config,
@@ -290,6 +264,11 @@ impl ItemOutput {
                 block.span(),
             ),
         ))
+    }
+
+    /// Expand the original tokens as fallback.
+    pub(crate) fn expand_fallback(&self) -> impl IntoTokens + '_ {
+        &self.tokens[..]
     }
 
     /// Generate attribute associated with entry kind.

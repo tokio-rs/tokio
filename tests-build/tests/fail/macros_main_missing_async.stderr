@@ -1,0 +1,5 @@
+error: functions marked with `#[tokio::main]` must be `async`
+ --> tests/fail/macros_main_missing_async.rs:4:1
+  |
+4 | fn test_missing_async() {}
+  | ^^
