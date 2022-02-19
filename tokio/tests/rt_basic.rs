@@ -290,7 +290,6 @@ fn timeout_panics_when_no_time_handle() {
 
 #[cfg(tokio_unstable)]
 mod unstable {
-    use super::*;
     use tokio::runtime::{Builder, UnhandledPanic};
 
     #[test]
@@ -342,7 +341,8 @@ mod unstable {
 
     #[test]
     fn shutdown_all_concurrent_block_on() {
-        use std::sync::Arc;
+        const N: usize = 2;
+        use std::sync::{mpsc, Arc};
 
         let rt = Builder::new_current_thread()
             .unhandled_panic(UnhandledPanic::ShutdownRuntime)
@@ -351,17 +351,22 @@ mod unstable {
 
         let rt = Arc::new(rt);
         let mut ths = vec![];
+        let (tx, rx) = mpsc::channel();
 
-        for _ in 0..1 {
+        for _ in 0..N {
             let rt = rt.clone();
+            let tx = tx.clone();
             ths.push(std::thread::spawn(move || {
                 rt.block_on(async {
+                    tx.send(()).unwrap();
                     futures::future::pending::<()>().await;
                 });
             }));
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        for _ in 0..N {
+            rx.recv().unwrap();
+        }
 
         rt.spawn(async {
             panic!("boom");

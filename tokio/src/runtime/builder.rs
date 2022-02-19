@@ -84,9 +84,78 @@ pub struct Builder {
 }
 
 cfg_unstable! {
+    /// How the runtime should respond to unhandled panics.
+    ///
+    /// Instances of `UnhandledPanic` are passed to `Builder::unhandled_panic`
+    /// to configure the runtime behavior when a spawned task panics.
+    ///
+    /// See [`Builder::unhandled_panic`] for more details.
     #[derive(Debug, Clone)]
+    #[non_exhaustive]
     pub enum UnhandledPanic {
+        /// The runtime should ignore panics on spawned tasks.
+        ///
+        /// The panic is forwarded to the task's `JoinHandle` and all spawned
+        /// tasks continue running normally.
+        ///
+        /// This is the default behavior.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::{self, UnhandledPanic};
+        ///
+        /// # pub fn main() {
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+        ///     .build()
+        ///     .unwrap();
+        ///
+        /// let task1 = rt.spawn(async { panic!("boom"); });
+        /// let task2 = rt.spawn(async {
+        ///     // This task completes normally
+        ///     "done"
+        /// });
+        ///
+        /// rt.block_on(async {
+        ///     // The panic on the first task is forwarded to the `JoinHandle`
+        ///     assert!(task1.await.is_err());
+        ///
+        ///     // The second task completes normally
+        ///     assert!(task2.await.is_ok());
+        /// })
+        /// # }
+        /// ```
         Ignore,
+
+        /// The runtime should immediately shutdown if a spawned task panics.
+        ///
+        /// The runtime will immediately shutdown even if the panicked task's
+        /// [`JoinHandle`] is still available. All further spawned tasks will be
+        /// immediately dropped and call to [`Runtime::block_on`] will panic.
+        ///
+        /// # Examples
+        ///
+        /// ```should_panic
+        /// use tokio::runtime::{self, UnhandledPanic};
+        ///
+        /// # pub fn main() {
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+        ///     .build()
+        ///     .unwrap();
+        ///
+        /// rt.spawn(async { panic!("boom"); });
+        /// rt.spawn(async {
+        ///     // This task never completes.
+        /// });
+        ///
+        /// rt.block_on(async {
+        ///     // Do some work
+        /// # loop { tokio::task::yield_now().await; }
+        /// })
+        /// # }
+        /// ```
         ShutdownRuntime,
     }
 }
@@ -569,6 +638,58 @@ impl Builder {
     }
 
     cfg_unstable! {
+        /// Configure how the runtime responds to an unhandled panic on a
+        /// spawned task.
+        ///
+        /// By default, an unhandled panic (i.e. a panic not caught by
+        /// [`std::panic::catch_unwind`]) has no impact on the runtime's
+        /// execution. The panic is error value is forwarded to the task's
+        /// [`Joinhandle`] and all other spawned tasks continue running.
+        ///
+        /// The `unhandled_panic` option enables configuring this behavior.
+        ///
+        /// * `UnhandledPanic::Ignore` is the default behavior. Panics on
+        ///   spawned tasks have no impact on the runtime's execution.
+        /// * `UnhandledPanic::ShutdownRuntime` will force the runtime to
+        ///   shutdown immediately when a spawned task panics even if that
+        ///   task's `JoinHandle` has not been dropped. All other spawned tasks
+        ///   will immediatetly terminate and further calls to
+        ///   [`Runtime::block_on`] will panic.
+        ///
+        /// # Unstable
+        ///
+        /// This option is currently unstable and its implementation is
+        /// incomplete. The API may change or be removed in the future. See
+        /// tokio-rs/tokio#4516 for more details.
+        ///
+        /// # Examples
+        ///
+        /// The following demonstrates a runtime configured to shutdown on
+        /// panic. The first spawned task panics and results in the runtime
+        /// shutting down. The second spawned task never has a chance to
+        /// execute. The call to `block_on` will panic due to the runtime being
+        /// forcibly shutdown.
+        ///
+        /// ```should_panic
+        /// use tokio::runtime::{self, UnhandledPanic};
+        ///
+        /// # pub fn main() {
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+        ///     .build()
+        ///     .unwrap();
+        ///
+        /// rt.spawn(async { panic!("boom"); });
+        /// rt.spawn(async {
+        ///     // This task never completes.
+        /// });
+        ///
+        /// rt.block_on(async {
+        ///     // Do some work
+        /// # loop { tokio::task::yield_now().await; }
+        /// })
+        /// # }
+        /// ```
         pub fn unhandled_panic(&mut self, behavior: UnhandledPanic) -> &mut Self {
             self.unhandled_panic = behavior;
             self
