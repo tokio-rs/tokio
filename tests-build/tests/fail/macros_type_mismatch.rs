@@ -23,4 +23,10 @@ async fn extra_semicolon() -> Result<(), ()> {
     Ok(());
 }
 
+/// Intentionally try and make return heuristics misfire by introducing a generic return.
+#[tokio::main]
+async fn extra_semicolon_generic<T>() -> Result<(), ()> where T: Fn() -> () {
+    Ok(());
+}
+
 fn main() {}

@@ -7,7 +7,7 @@ const BUF: usize = 4;
 // Punctuations that we look for.
 pub(crate) const COMMA: [char; 2] = [',', '\0'];
 pub(crate) const EQ: [char; 2] = ['=', '\0'];
-pub(crate) const ROCKET: [char; 2] = ['-', '>'];
+pub(crate) const ARROW: [char; 2] = ['-', '>'];
 
 pub(crate) struct Buf {
     // Static ring buffer used for processing tokens.

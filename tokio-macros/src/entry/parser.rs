@@ -2,7 +2,7 @@ use proc_macro::{Delimiter, Group, Literal, Spacing, Span, TokenTree};
 
 use crate::entry::output::{Config, EntryKind, ItemOutput, RuntimeFlavor, SupportsThreading, Tail};
 use crate::error::Error;
-use crate::parsing::{BaseParser, Buf, ROCKET};
+use crate::parsing::{BaseParser, Buf, ARROW};
 use crate::parsing::{Punct, COMMA, EQ};
 
 use super::output::{ReturnHeuristics, TailKind};
@@ -206,15 +206,30 @@ impl<'a> ItemParser<'a> {
         let mut generics = None;
         let mut tail = Tail::default();
 
+        #[derive(Clone, Copy)]
+        enum State {
+            /// Initial state.
+            Initial,
+            /// After `where`.
+            Where,
+        }
+
+        let mut state = State::Initial;
+
         // We default to assuming that the return is a unit, until we've spot
         // a `->` token at which point we try and process it.
         let mut return_heuristics = ReturnHeuristics::Unit;
 
         while self.base.nth(0).is_some() {
-            if let Some(p @ Punct { chars: ROCKET, .. }) = self.base.peek_punct() {
-                self.base.consume(p.len());
-                self.parse_return_heuristics(&mut return_heuristics);
-                continue;
+            match state {
+                State::Initial => {
+                    if let Some(p @ Punct { chars: ARROW, .. }) = self.base.peek_punct() {
+                        self.base.consume(p.len());
+                        self.parse_return_heuristics(&mut return_heuristics);
+                        continue;
+                    }
+                }
+                _ => {}
             }
 
             let tt = match self.base.bump() {
@@ -223,11 +238,17 @@ impl<'a> ItemParser<'a> {
             };
 
             match &tt {
-                TokenTree::Ident(ident) if self.base.buf.display_as_str(&ident) == "async" => {
-                    if async_keyword.is_none() {
-                        async_keyword = Some(self.base.len());
+                TokenTree::Ident(ident) => match self.base.buf.display_as_str(&ident) {
+                    "async" => {
+                        if async_keyword.is_none() {
+                            async_keyword = Some(self.base.len());
+                        }
                     }
-                }
+                    "where" => {
+                        state = State::Where;
+                    }
+                    _ => {}
+                },
                 // Skip over generics which might contain a block (due to
                 // constant generics). Angle brackets are not treated like a
                 // group, so we have to balance them ourselves in
