@@ -21,7 +21,6 @@ async fn join_bracket_in_return() -> Option<fn() -> ()> {
 }
 
 #[tokio::main]
-async fn joint_bracket_in_generic<T: Iterator<Item = Option<fn() -> ()>>>(_: T) {
-}
+async fn joint_bracket_in_generic<T: Iterator<Item = Option<fn() -> ()>>>(_: T) {}
 
 fn main() {}

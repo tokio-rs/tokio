@@ -44,17 +44,18 @@ help: try adding an expression at the end of the block
    |
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:29:5
+  --> tests/fail/macros_type_mismatch.rs:32:5
    |
-28 | async fn extra_semicolon_generic<T>() -> Result<(), ()> where T: Fn() -> () {
+28 | async fn extra_semicolon_generic<T>() -> Result<(), ()>
    |                                          -------------- expected `Result<(), ()>` because of return type
-29 |     Ok(());
+...
+32 |     Ok(());
    |     ^^^^^^^ expected enum `Result`, found `()`
    |
    = note:   expected enum `Result<(), ()>`
            found unit type `()`
 help: try adding an expression at the end of the block
    |
-29 ~     Ok(());;
-30 +     Ok(())
+32 ~     Ok(());;
+33 +     Ok(())
    |
