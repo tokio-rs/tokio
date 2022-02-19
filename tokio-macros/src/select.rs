@@ -68,7 +68,7 @@ pub(crate) fn clean_pattern_macro(input: proc_macro::TokenStream) -> proc_macro:
     stream.into_token_stream()
 }
 
-/// Clean up a pattern by skipping over any `mut` and `&` tokens.
+/// Clean up a pattern by skipping over any `mut`, `ref`, and `&` tokens.
 fn clean_pattern<'a, I: 'a>(tree: I, buf: &'a mut Buf) -> impl IntoTokens + 'a
 where
     I: Iterator<Item = TokenTree>,
