@@ -192,11 +192,11 @@ impl<'a> ItemParser<'a> {
 
     /// Parse and produce the corresponding item output.
     ///
-    /// Note that this mode of parsing is intentionally promiscious and tries
-    /// its best not to produce any errors, because the more tokens we can feed
-    /// to straight to `rustc` the better diagnostics we can expect it to
-    /// produce. If we were to perform strict parsing here instead, we'd have to
-    /// rely on the kinds of errors we can produce ourselves directly here.
+    /// Note that this mode of parsing is intentionally loose and tries its best
+    /// not to produce any errors, because the more tokens we can feed to
+    /// straight to `rustc` the better diagnostics we can expect it to produce.
+    /// If we were to perform strict parsing here instead, we'd have to rely on
+    /// the kinds of errors we can produce ourselves directly here.
     pub(crate) fn parse(mut self) -> ItemOutput {
         let start = self.base.len();
 
@@ -205,6 +205,10 @@ impl<'a> ItemParser<'a> {
         let mut async_keyword = None;
         let mut generics = None;
 
+        // Note: Might want to consider adding more states if we need parsing to
+        // be more constrained, but the principle as stated in the documentation
+        // to the `parse` function follows. We will never be as good as `rustc`
+        // at providing diagnostics, so the less parsing we can do the better.
         #[derive(Clone, Copy)]
         enum State {
             /// Initial state.
@@ -220,15 +224,12 @@ impl<'a> ItemParser<'a> {
         let mut return_heuristics = ReturnHeuristics::Unit;
 
         while self.base.nth(0).is_some() {
-            match state {
-                State::Initial => {
-                    if let Some(p @ Punct { chars: ARROW, .. }) = self.base.peek_punct() {
-                        self.base.consume(p.len());
-                        self.parse_return_heuristics(&mut return_heuristics);
-                        continue;
-                    }
+            if let State::Initial = state {
+                if let Some(p @ Punct { chars: ARROW, .. }) = self.base.peek_punct() {
+                    self.base.consume(p.len());
+                    self.parse_return_heuristics(&mut return_heuristics);
+                    continue;
                 }
-                _ => {}
             }
 
             let tt = match self.base.bump() {
@@ -309,7 +310,8 @@ impl<'a> ItemParser<'a> {
         }
     }
 
-    /// Since generics are implemented using angle brackets.
+    /// Skip over angle bracket "groups". These are not marked as groups in the
+    /// tt, so we have to do some light processing ourselves here instead.
     fn skip_angle_brackets(&mut self) {
         // NB: one bracket encountered already.
         let mut level = 1u32;
@@ -327,6 +329,24 @@ impl<'a> ItemParser<'a> {
                     }
                     '>' => {
                         level -= 1;
+                    }
+                    // Consume any sequence of other joint punctuations tokens
+                    // seen (unless they are prefixed by one of the above). This
+                    // will catch composite punctuations such as `->` despite
+                    // them containing an angle bracket.
+                    _ if matches!(p.spacing(), Spacing::Joint) => {
+                        self.base.push(tt);
+
+                        loop {
+                            self.base.consume(1);
+
+                            if !matches!(self.base.nth(0), Some(TokenTree::Punct(p)) if p.spacing() == Spacing::Joint)
+                            {
+                                break;
+                            }
+                        }
+
+                        continue;
                     }
                     _ => {}
                 }

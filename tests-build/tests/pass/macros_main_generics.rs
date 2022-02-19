@@ -15,4 +15,13 @@ where
 {
 }
 
+#[tokio::main]
+async fn join_bracket_in_return() -> Option<fn() -> ()> {
+    todo!()
+}
+
+#[tokio::main]
+async fn joint_bracket_in_generic<T: Iterator<Item = Option<fn() -> ()>>>(_: T) {
+}
+
 fn main() {}
