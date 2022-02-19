@@ -204,7 +204,6 @@ impl<'a> ItemParser<'a> {
         let mut block = None;
         let mut async_keyword = None;
         let mut generics = None;
-        let mut tail = Tail::default();
 
         #[derive(Clone, Copy)]
         enum State {
@@ -268,7 +267,6 @@ impl<'a> ItemParser<'a> {
                 TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => {
                     signature = Some(start..self.base.len());
                     block = Some(self.base.len());
-                    self.find_last_stmt_range(g, &mut tail);
                 }
                 _ => {}
             }
@@ -276,7 +274,14 @@ impl<'a> ItemParser<'a> {
             self.base.push(tt);
         }
 
-        let tokens = self.base.into_tokens();
+        let (tokens, buf) = self.base.into_tokens_and_buf();
+
+        let mut tail = Tail::default();
+
+        // Only process statement ranges after we've found the block.
+        if let Some(TokenTree::Group(g)) = block.and_then(|index| tokens.get(index)) {
+            find_last_stmt_range(g, &mut tail, buf);
+        }
 
         ItemOutput::new(
             tokens,
@@ -330,36 +335,36 @@ impl<'a> ItemParser<'a> {
             self.base.push(tt);
         }
     }
+}
 
-    /// Find the range of spans that is defined by the last statement in the
-    /// block so that they can be used for the generated expression.
-    ///
-    /// This in turn improves upon diagnostics when return types do not match.
-    fn find_last_stmt_range(&mut self, g: &Group, tail: &mut Tail) {
-        let mut new_stmt = true;
+/// Find the range of spans that is defined by the last statement in the
+/// block so that they can be used for the generated expression.
+///
+/// This in turn improves upon diagnostics when return types do not match.
+fn find_last_stmt_range(g: &Group, tail: &mut Tail, buf: &mut Buf) {
+    let mut new_stmt = true;
 
-        for tt in g.stream() {
-            let span = tt.span();
-            tail.end = Some(span);
+    for tt in g.stream() {
+        let span = tt.span();
+        tail.end = Some(span);
 
-            match tt {
-                TokenTree::Punct(p) if p.as_char() == ';' => {
-                    new_stmt = true;
-                    tail.has_semi = true;
-                }
-                tt => {
-                    tail.has_semi = false;
+        match tt {
+            TokenTree::Punct(p) if p.as_char() == ';' => {
+                new_stmt = true;
+                tail.has_semi = true;
+            }
+            tt => {
+                tail.has_semi = false;
 
-                    if std::mem::take(&mut new_stmt) {
-                        tail.kind = if matches!(&tt, TokenTree::Ident(ident) if self.base.buf.display_as_str(ident) == "return")
-                        {
-                            TailKind::Return
-                        } else {
-                            TailKind::Unknown
-                        };
+                if std::mem::take(&mut new_stmt) {
+                    tail.kind = if matches!(&tt, TokenTree::Ident(ident) if buf.display_as_str(ident) == "return")
+                    {
+                        TailKind::Return
+                    } else {
+                        TailKind::Unknown
+                    };
 
-                        tail.start = Some(span);
-                    }
+                    tail.start = Some(span);
                 }
             }
         }
