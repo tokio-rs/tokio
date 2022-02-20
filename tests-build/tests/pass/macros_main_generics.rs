@@ -23,4 +23,14 @@ async fn join_bracket_in_return() -> Option<fn() -> ()> {
 #[tokio::main]
 async fn joint_bracket_in_generic<T: Iterator<Item = Option<fn() -> ()>>>(_: T) {}
 
+struct GroupsInReturnPosition<const N: usize, const U: usize>;
+
+// Tests both bracket groups `<{inner}>` and braces `{<inner>}` in the return
+// position. The latter which should already be skipped over as part of the
+// angle bracket processing.
+#[tokio::main]
+async fn groups_in_return_position() -> GroupsInReturnPosition<1, { 2 + 1 }> {
+    todo!()
+}
+
 fn main() {}
