@@ -585,38 +585,3 @@ cfg_io_readiness! {
     unsafe impl Send for Readiness<'_> {}
     unsafe impl Sync for Readiness<'_> {}
 }
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    fn unwrap_ready<T>(p: Poll<T>) -> T {
-        match p {
-            Poll::Pending => panic!("Expected a Ready"),
-            Poll::Ready(t) => t,
-        }
-    }
-
-    #[test]
-    fn test_setting_error_awakes_poll_read_readiness() {
-        // GIVEN
-        let scheduled_io: ScheduledIo = Default::default();
-
-        // WHEN: marking an error and polling readiness
-        scheduled_io
-            .set_readiness(None, Tick::Set(0), |_| Ready::ERROR)
-            .unwrap();
-
-        let mut task = tokio_test::task::spawn(async {
-            let readiness =
-                crate::future::poll_fn(|cx| scheduled_io.poll_readiness(cx, Direction::Read)).await;
-
-            readiness
-        });
-
-        // THEN
-        let readiness = unwrap_ready(task.poll());
-        assert_eq!(readiness.unwrap_err().kind(), std::io::ErrorKind::Other);
-    }
-}

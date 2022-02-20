@@ -1,4 +1,5 @@
-#[cfg(target_os = "linux")]
+#![cfg(target_os = "linux")]
+
 use tokio::io::{unix::AsyncFd, Interest};
 use userfaultfd::{Uffd, UffdBuilder};
 
