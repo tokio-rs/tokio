@@ -604,25 +604,19 @@ mod tests {
         let scheduled_io: ScheduledIo = Default::default();
 
         // WHEN: marking an error and polling readiness
-        scheduled_io.set_readiness(
-            None,
-            Tick::Set(0),
-            |_| Ready::ERROR
-        ).unwrap();
+        scheduled_io
+            .set_readiness(None, Tick::Set(0), |_| Ready::ERROR)
+            .unwrap();
 
         let mut task = tokio_test::task::spawn(async {
-            let readiness = crate::future::poll_fn(|cx| {
-                scheduled_io.poll_readiness(cx, Direction::Read)
-            }).await;
+            let readiness =
+                crate::future::poll_fn(|cx| scheduled_io.poll_readiness(cx, Direction::Read)).await;
 
             readiness
         });
 
         // THEN
         let readiness = unwrap_ready(task.poll());
-        assert_eq!(
-            readiness.unwrap_err().kind(),
-            std::io::ErrorKind::Other
-        );
+        assert_eq!(readiness.unwrap_err().kind(), std::io::ErrorKind::Other);
     }
 }
