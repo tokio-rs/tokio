@@ -1,3 +1,10 @@
+# 0.7.1 (February 21, 2022)
+
+### Fixed
+
+- sync: fix waker update condition in `CancellationToken` ([#4497])
+- bumped tokio dependency to 1.6 to satisfy minimum requirements ([#4490])
+
 # 0.7.0 (February 9, 2022)
 
 ### Added
