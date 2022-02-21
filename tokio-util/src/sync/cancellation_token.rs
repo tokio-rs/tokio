@@ -24,7 +24,7 @@ use guard::DropGuard;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use tokio::select;
 /// use tokio_util::sync::CancellationToken;
 ///
@@ -172,7 +172,7 @@ impl CancellationToken {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use tokio::select;
     /// use tokio_util::sync::CancellationToken;
     ///
