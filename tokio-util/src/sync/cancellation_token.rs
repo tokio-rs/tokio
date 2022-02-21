@@ -26,7 +26,7 @@ use guard::DropGuard;
 ///
 /// ```ignore
 /// use tokio::select;
-/// use tokio::scope::CancellationToken;
+/// use tokio_util::sync::CancellationToken;
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -174,7 +174,7 @@ impl CancellationToken {
     ///
     /// ```ignore
     /// use tokio::select;
-    /// use tokio::scope::CancellationToken;
+    /// use tokio_util::sync::CancellationToken;
     ///
     /// #[tokio::main]
     /// async fn main() {
