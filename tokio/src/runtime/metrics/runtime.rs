@@ -467,7 +467,11 @@ cfg_net! {
         /// }
         /// ```
         pub fn io_driver_fd_count(&self) -> u64 {
-            self.with_io_driver_metrics(|m| m.fd_count.load(Relaxed))
+            self.with_io_driver_metrics(|m| {
+                let registered = m.fd_registered_count.load(Relaxed);
+                let deregistered = m.fd_deregistered_count.load(Relaxed);
+                registered.wrapping_sub(deregistered)
+            })
         }
 
         /// Returns the number of ready events processed by the runtime's
