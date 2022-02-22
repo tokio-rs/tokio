@@ -18,7 +18,7 @@ impl IoDriverMetrics {
 
     pub(crate) fn dec_fd_count(&self) {
         let prev = self.fd_deregistered_count.load(Relaxed);
-        let new = prev.wrapping_sub(1);
+        let new = prev.wrapping_add(1);
         self.fd_deregistered_count.store(new, Relaxed);
     }
 
