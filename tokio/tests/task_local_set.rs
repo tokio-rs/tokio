@@ -517,6 +517,29 @@ async fn spawn_wakes_localset() {
     }
 }
 
+#[cfg(tokio_unstable)]
+mod unstable {
+    use tokio::runtime::UnhandledPanic;
+    use tokio::task::LocalSet;
+
+    #[tokio::test]
+    #[should_panic(
+        expected = "a spawned task panicked and the LocalSet is configured to shutdown on unhandled panic"
+    )]
+    async fn shutdown_on_panic() {
+        LocalSet::new()
+            .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+            .run_until(async {
+                tokio::task::spawn_local(async {
+                    panic!("boom");
+                });
+
+                futures::future::pending::<()>().await;
+            })
+            .await;
+    }
+}
+
 fn rt() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
