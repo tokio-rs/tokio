@@ -360,7 +360,7 @@ jobs:
         run: cargo doc --lib --no-deps --all-features --document-private-items
         env:
           RUSTFLAGS: --cfg docsrs
-          RUSTDOCFLAGS: --cfg docsrs -Dwarnings
+          RUSTDOCFLAGS: --cfg docsrs --cfg unstable_tokio -Dwarnings
 
   loom-compile:
     name: build loom tests
