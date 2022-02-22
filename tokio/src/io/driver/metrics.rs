@@ -4,14 +4,26 @@
 //! these need to be available in the case when `net` is enabled but
 //! `rt` is not.
 
-cfg_not_rt_and_metrics! {
-    #[derive(Default)]
-    pub(crate) struct IoDriverMetrics {}
+// cfg_not_rt_and_metrics! {
+//     #[derive(Default)]
+//     pub(crate) struct IoDriverMetrics {}
 
-    impl IoDriverMetrics {
-        pub(crate) fn incr_fd_count(&self) {}
-        pub(crate) fn dec_fd_count(&self) {}
-        pub(crate) fn incr_ready_count_by(&self, _amt: u64) {}
+//     impl IoDriverMetrics {
+//         pub(crate) fn incr_fd_count(&self) {}
+//         pub(crate) fn dec_fd_count(&self) {}
+//         pub(crate) fn incr_ready_count_by(&self, _amt: u64) {}
+//     }
+// }
+cfg_not_rt! {
+    cfg_not_metrics! {
+        #[derive(Default)]
+        pub(crate) struct IoDriverMetrics {}
+
+        impl IoDriverMetrics {
+            pub(crate) fn incr_fd_count(&self) {}
+            pub(crate) fn dec_fd_count(&self) {}
+            pub(crate) fn incr_ready_count_by(&self, _amt: u64) {}
+        }
     }
 }
 
