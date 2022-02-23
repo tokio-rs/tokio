@@ -3,6 +3,7 @@ use std::panic;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use crate::runtime::task::AbortHandle;
 use crate::runtime::Builder;
 use crate::sync::oneshot;
 use crate::task::JoinHandle;
@@ -56,6 +57,12 @@ enum CombiAbort {
     AbortedAfterConsumeOutput = 4,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+enum CombiAbortSource {
+    JoinHandle,
+    AbortHandle,
+}
+
 #[test]
 fn test_combinations() {
     let mut rt = &[
@@ -91,14 +98,29 @@ fn test_combinations() {
         CombiAbort::AbortedAfterConsumeOutput,
     ];
 
+    let abort_src = [CombiAbortSource::JoinHandle, CombiAbortSource::AbortHandle];
+    let ah = [
+        None,
+        Some(CombiJoinHandle::DropImmediately),
+        Some(CombiJoinHandle::DropFirstPoll),
+        Some(CombiJoinHandle::DropAfterNoConsume),
+        Some(CombiJoinHandle::DropAfterConsume),
+    ];
+
     for rt in rt.iter().copied() {
         for ls in ls.iter().copied() {
             for task in task.iter().copied() {
                 for output in output.iter().copied() {
                     for ji in ji.iter().copied() {
                         for jh in jh.iter().copied() {
-                            for abort in abort.iter().copied() {
-                                test_combination(rt, ls, task, output, ji, jh, abort);
+                            for ah in ah.iter().copied() {
+                                for abort_src in abort_src.iter().copied() {
+                                    for abort in abort.iter().copied() {
+                                        test_combination(
+                                            rt, ls, task, output, ji, jh, ah, abort, abort_src,
+                                        );
+                                    }
+                                }
                             }
                         }
                     }
@@ -108,6 +130,7 @@ fn test_combinations() {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn test_combination(
     rt: CombiRuntime,
     ls: CombiLocalSet,
@@ -115,12 +138,26 @@ fn test_combination(
     output: CombiOutput,
     ji: CombiJoinInterest,
     jh: CombiJoinHandle,
+    ah: Option<CombiJoinHandle>,
     abort: CombiAbort,
+    abort_src: CombiAbortSource,
 ) {
-    if (jh as usize) < (abort as usize) {
-        // drop before abort not possible
-        return;
+    match (abort_src, ah) {
+        (CombiAbortSource::JoinHandle, _) if (jh as usize) < (abort as usize) => {
+            // join handle dropped prior to abort
+            return;
+        }
+        (CombiAbortSource::AbortHandle, Some(ah)) if (ah as usize) < (abort as usize) => {
+            // abort handle dropped prior to abort
+            return;
+        }
+        (CombiAbortSource::AbortHandle, None) => {
+            // aborted via abort handle but there is no abort handle
+            return;
+        }
+        _ => {}
     }
+
     if (task == CombiTask::PanicOnDrop) && (output == CombiOutput::PanicOnDrop) {
         // this causes double panic
         return;
@@ -130,7 +167,7 @@ fn test_combination(
         return;
     }
 
-    println!("Runtime {:?}, LocalSet {:?}, Task {:?}, Output {:?}, JoinInterest {:?}, JoinHandle {:?}, Abort {:?}", rt, ls, task, output, ji, jh, abort);
+    println!("Runtime {:?}, LocalSet {:?}, Task {:?}, Output {:?}, JoinInterest {:?}, JoinHandle {:?}, AbortHandle {:?}, Abort {:?} ({:?})", rt, ls, task, output, ji, jh, ah, abort, abort_src);
 
     // A runtime optionally with a LocalSet
     struct Rt {
@@ -282,8 +319,21 @@ fn test_combination(
         );
     }
 
+    let mut abort_handle = if ah.is_some() {
+        handle.as_ref().map(JoinHandle::abort_handle)
+    } else {
+        None
+    };
+
+    let do_abort = |abort_handle: &Option<AbortHandle>, join_handle: Option<&mut JoinHandle<_>>| {
+        match abort_handle {
+            Some(abort_handle) => abort_handle.abort(),
+            None => join_handle.unwrap().abort(),
+        }
+    };
+
     if abort == CombiAbort::AbortedImmediately {
-        handle.as_mut().unwrap().abort();
+        do_abort(&abort_handle, handle.as_mut());
         aborted = true;
     }
     if jh == CombiJoinHandle::DropImmediately {
@@ -301,11 +351,14 @@ fn test_combination(
     }
 
     if abort == CombiAbort::AbortedFirstPoll {
-        handle.as_mut().unwrap().abort();
+        do_abort(&abort_handle, handle.as_mut());
         aborted = true;
     }
     if jh == CombiJoinHandle::DropFirstPoll {
         drop(handle.take().unwrap());
+    }
+    if ah == Some(CombiJoinHandle::DropFirstPoll) {
+        drop(abort_handle.take().unwrap());
     }
 
     // Signal the future that it can return now
@@ -318,23 +371,42 @@ fn test_combination(
 
     if abort == CombiAbort::AbortedAfterFinish {
         // Don't set aborted to true here as the task already finished
-        handle.as_mut().unwrap().abort();
+        do_abort(&abort_handle, handle.as_mut());
     }
     if jh == CombiJoinHandle::DropAfterNoConsume {
-        // The runtime will usually have dropped every ref-count at this point,
-        // in which case dropping the JoinHandle drops the output.
-        //
-        // (But it might race and still hold a ref-count)
-        let panic = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        if ah == Some(CombiJoinHandle::DropAfterNoConsume) {
             drop(handle.take().unwrap());
-        }));
-        if panic.is_err() {
-            assert!(
-                (output == CombiOutput::PanicOnDrop)
-                    && (!matches!(task, CombiTask::PanicOnRun | CombiTask::PanicOnRunAndDrop))
-                    && !aborted,
-                "Dropping JoinHandle shouldn't panic here"
-            );
+            // The runtime will usually have dropped every ref-count at this point,
+            // in which case dropping the AbortHandle drops the output.
+            //
+            // (But it might race and still hold a ref-count)
+            let panic = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                drop(abort_handle.take().unwrap());
+            }));
+            if panic.is_err() {
+                assert!(
+                    (output == CombiOutput::PanicOnDrop)
+                        && (!matches!(task, CombiTask::PanicOnRun | CombiTask::PanicOnRunAndDrop))
+                        && !aborted,
+                    "Dropping AbortHandle shouldn't panic here"
+                );
+            }
+        } else {
+            // The runtime will usually have dropped every ref-count at this point,
+            // in which case dropping the JoinHandle drops the output.
+            //
+            // (But it might race and still hold a ref-count)
+            let panic = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                drop(handle.take().unwrap());
+            }));
+            if panic.is_err() {
+                assert!(
+                    (output == CombiOutput::PanicOnDrop)
+                        && (!matches!(task, CombiTask::PanicOnRun | CombiTask::PanicOnRunAndDrop))
+                        && !aborted,
+                    "Dropping JoinHandle shouldn't panic here"
+                );
+            }
         }
     }
 
@@ -362,11 +434,15 @@ fn test_combination(
             _ => unreachable!(),
         }
 
-        let handle = handle.take().unwrap();
+        let mut handle = handle.take().unwrap();
         if abort == CombiAbort::AbortedAfterConsumeOutput {
-            handle.abort();
+            do_abort(&abort_handle, Some(&mut handle));
         }
         drop(handle);
+
+        if ah == Some(CombiJoinHandle::DropAfterConsume) {
+            drop(abort_handle.take());
+        }
     }
 
     // The output should have been dropped now. Check whether the output
