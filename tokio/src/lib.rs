@@ -339,25 +339,25 @@
 //! _parking_lot_ release in use.
 //!
 //! ### Unstable features
-//! 
+//!
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
-//! 
+//!
 //! - `tracing`: Enables tracing events.
-//! 
+//!
 //! Likewise, some parts of the API are only available with the same flag:
-//! 
+//!
 //! - [`task::JoinSet`]
 //! - [`task::Builder`]
 //!  
 //! This flag enables **unstable** features. The public API of these features
 //! may break in 1.x releases.
-//! 
+//!
 //! To enable these features, the `--cfg tokio_unstable` must be passed to
 //! `rustc` when compiling. This is easiest done using the `RUSTFLAGS` env
 //! variable: `RUSTFLAGS="--cfg tokio_unstable"`.
-//! 
+//!
 //! You can also specify it in your project's `.cargo/config.toml` file:
-//! 
+//!
 //! ```toml
 //! [build]
 //! rustflags = ["--cfg", "tokio_unstable"]
