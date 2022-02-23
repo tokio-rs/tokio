@@ -164,6 +164,7 @@ cfg_rt! {
     // this type is only publicly exposed when `tokio_unstable` is enabled, but
     // it is still defined for testing purposes.
     #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub struct AbortHandle {
         raw: Option<RawTask>,
     }
