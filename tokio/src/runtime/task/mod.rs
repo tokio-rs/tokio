@@ -162,6 +162,7 @@ cfg_unstable! {
     pub use self::join::AbortHandle;
 }
 #[cfg(all(not(tokio_unstable), test))]
+#[allow(unused_imports)]
 pub(crate) use self::join::AbortHandle;
 
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
