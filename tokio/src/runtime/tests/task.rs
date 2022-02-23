@@ -78,7 +78,6 @@ fn create_drop2() {
     handle.assert_dropped();
 }
 
-
 #[test]
 fn drop_abort_handle1() {
     let (ad, handle) = AssertDrop::new();

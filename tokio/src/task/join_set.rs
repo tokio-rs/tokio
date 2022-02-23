@@ -4,7 +4,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use crate::runtime::Handle;
-use crate::task::{JoinError, JoinHandle, LocalSet, AbortHandle};
+use crate::task::{AbortHandle, JoinError, JoinHandle, LocalSet};
 use crate::util::IdleNotifiedSet;
 
 /// A collection of tasks spawned on a Tokio runtime.
