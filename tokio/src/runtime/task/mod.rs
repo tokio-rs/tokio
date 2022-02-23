@@ -156,8 +156,14 @@ cfg_rt_multi_thread! {
 }
 
 mod join;
-#[allow(unused_imports)] // this will be used later
+
+cfg_unstable! {
+    #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+    pub use self::join::AbortHandle;
+}
+#[cfg(all(not(tokio_unstable), test))]
 pub(crate) use self::join::AbortHandle;
+
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
 
