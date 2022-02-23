@@ -146,6 +146,11 @@ cfg_rt! {
         raw: Option<RawTask>,
         _p: PhantomData<T>,
     }
+
+    /// An owned permission to abort a spawned task, _without_ awaiting its completion.
+    pub(crate) struct AbortHandle {
+        raw: Option<RawTask>,
+    }
 }
 
 unsafe impl<T: Send> Send for JoinHandle<T> {}
@@ -210,6 +215,15 @@ impl<T> JoinHandle<T> {
             }
         }
     }
+
+    /// Returns a new `AbortHandle` that can be used to remotely abort this task.
+    pub(crate) fn abort_handle(&self) -> AbortHandle {
+        let raw = self.raw.map(|raw| {
+            raw.ref_inc();
+            raw
+        });
+        AbortHandle { raw }
+    }
 }
 
 impl<T> Unpin for JoinHandle<T> {}
@@ -271,5 +285,29 @@ where
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("JoinHandle").finish()
+    }
+}
+
+// === impl AbortHandle ===
+
+impl AbortHandle {
+    pub(crate) fn abort(&self) {
+        if let Some(raw) = self.raw {
+            raw.remote_abort();
+        }
+    }
+}
+
+impl fmt::Debug for AbortHandle {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("AbortHandle").finish()
+    }
+}
+
+impl Drop for AbortHandle {
+    fn drop(&mut self) {
+        if let Some(raw) = self.raw.take() {
+            raw.drop_abort_handle();
+        }
     }
 }
