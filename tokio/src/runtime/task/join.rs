@@ -291,7 +291,7 @@ where
 // === impl AbortHandle ===
 
 impl AbortHandle {
-    pub(crate) fn abort(&self) {
+    pub(crate) fn abort(self) {
         if let Some(raw) = self.raw {
             raw.remote_abort();
         }

@@ -97,8 +97,6 @@ fn test_combinations() {
         CombiAbort::AbortedAfterFinish,
         CombiAbort::AbortedAfterConsumeOutput,
     ];
-
-    let abort_src = [CombiAbortSource::JoinHandle, CombiAbortSource::AbortHandle];
     let ah = [
         None,
         Some(CombiJoinHandle::DropImmediately),
@@ -113,14 +111,35 @@ fn test_combinations() {
                 for output in output.iter().copied() {
                     for ji in ji.iter().copied() {
                         for jh in jh.iter().copied() {
-                            for ah in ah.iter().copied() {
-                                for abort_src in abort_src.iter().copied() {
-                                    for abort in abort.iter().copied() {
-                                        test_combination(
-                                            rt, ls, task, output, ji, jh, ah, abort, abort_src,
-                                        );
-                                    }
+                            for abort in abort.iter().copied() {
+                                // abort via join handle --- abort  handles
+                                // may be dropped at any point
+                                for ah in ah.iter().copied() {
+                                    test_combination(
+                                        rt,
+                                        ls,
+                                        task,
+                                        output,
+                                        ji,
+                                        jh,
+                                        ah,
+                                        abort,
+                                        CombiAbortSource::JoinHandle,
+                                    );
                                 }
+                                // if aborting via AbortHandle, it will
+                                // never be dropped.
+                                test_combination(
+                                    rt,
+                                    ls,
+                                    task,
+                                    output,
+                                    ji,
+                                    jh,
+                                    None,
+                                    abort,
+                                    CombiAbortSource::AbortHandle,
+                                );
                             }
                         }
                     }
@@ -147,14 +166,12 @@ fn test_combination(
             // join handle dropped prior to abort
             return;
         }
-        (CombiAbortSource::AbortHandle, Some(ah)) if (ah as usize) < (abort as usize) => {
-            // abort handle dropped prior to abort
+        (CombiAbortSource::AbortHandle, Some(_)) => {
+            // abort handle dropped, we can't abort through the
+            // abort handle
             return;
         }
-        (CombiAbortSource::AbortHandle, None) => {
-            // aborted via abort handle but there is no abort handle
-            return;
-        }
+
         _ => {}
     }
 
@@ -319,21 +336,24 @@ fn test_combination(
         );
     }
 
-    let mut abort_handle = if ah.is_some() {
+    // If we are either aborting the task via an abort handle, or dropping via
+    // an abort handle, do that now.
+    let mut abort_handle = if ah.is_some() || abort_src == CombiAbortSource::AbortHandle {
         handle.as_ref().map(JoinHandle::abort_handle)
     } else {
         None
     };
 
-    let do_abort = |abort_handle: &Option<AbortHandle>, join_handle: Option<&mut JoinHandle<_>>| {
-        match abort_handle {
-            Some(abort_handle) => abort_handle.abort(),
-            None => join_handle.unwrap().abort(),
+    let do_abort = |abort_handle: &mut Option<AbortHandle>,
+                    join_handle: Option<&mut JoinHandle<_>>| {
+        match abort_src {
+            CombiAbortSource::AbortHandle => abort_handle.take().unwrap().abort(),
+            CombiAbortSource::JoinHandle => join_handle.unwrap().abort(),
         }
     };
 
     if abort == CombiAbort::AbortedImmediately {
-        do_abort(&abort_handle, handle.as_mut());
+        do_abort(&mut abort_handle, handle.as_mut());
         aborted = true;
     }
     if jh == CombiJoinHandle::DropImmediately {
@@ -351,7 +371,7 @@ fn test_combination(
     }
 
     if abort == CombiAbort::AbortedFirstPoll {
-        do_abort(&abort_handle, handle.as_mut());
+        do_abort(&mut abort_handle, handle.as_mut());
         aborted = true;
     }
     if jh == CombiJoinHandle::DropFirstPoll {
@@ -371,7 +391,7 @@ fn test_combination(
 
     if abort == CombiAbort::AbortedAfterFinish {
         // Don't set aborted to true here as the task already finished
-        do_abort(&abort_handle, handle.as_mut());
+        do_abort(&mut abort_handle, handle.as_mut());
     }
     if jh == CombiJoinHandle::DropAfterNoConsume {
         if ah == Some(CombiJoinHandle::DropAfterNoConsume) {
@@ -436,7 +456,7 @@ fn test_combination(
 
         let mut handle = handle.take().unwrap();
         if abort == CombiAbort::AbortedAfterConsumeOutput {
-            do_abort(&abort_handle, Some(&mut handle));
+            do_abort(&mut abort_handle, Some(&mut handle));
         }
         drop(handle);
 
