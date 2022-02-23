@@ -48,6 +48,7 @@ use crate::util::IdleNotifiedSet;
 /// ```
 ///
 /// [unstable]: crate#unstable-features
+#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinSet<T> {
     inner: IdleNotifiedSet<JoinHandle<T>>,
 }
