@@ -347,6 +347,7 @@
 //! Likewise, some parts of the API are only available with the same flag:
 //! 
 //! - [`task::JoinSet`]
+//! - [`task::Builder`]
 //!  
 //! This flag enables **unstable** features. The public API of these features
 //! may break in 1.x releases.
