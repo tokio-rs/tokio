@@ -213,6 +213,7 @@ fn reopened_after_subscribe() {
 }
 
 #[test]
+#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
 fn send_modify_panic() {
     let (tx, mut rx) = watch::channel("one");
 
