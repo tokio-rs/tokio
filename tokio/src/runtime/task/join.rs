@@ -161,9 +161,7 @@ cfg_rt! {
     /// features][unstable] for details.
     ///
     /// [unstable]: crate#unstable-features
-    // this type is only publicly exposed when `tokio_unstable` is enabled, but
-    // it is still defined for testing purposes.
-    #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+    #[cfg(any(tokio_unstable, test))]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub struct AbortHandle {
         raw: Option<RawTask>,
