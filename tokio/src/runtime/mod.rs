@@ -187,6 +187,10 @@ cfg_metrics! {
     pub use metrics::RuntimeMetrics;
 
     pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
+
+    cfg_net! {
+       pub(crate) use metrics::IoDriverMetrics;
+    }
 }
 
 cfg_not_metrics! {
