@@ -7,7 +7,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use bytes::BytesMut;
 use futures_core::ready;
 use futures_sink::Sink;
-use log::trace;
+use tracing::trace;
 use pin_project_lite::pin_project;
 use std::borrow::{Borrow, BorrowMut};
 use std::io;
