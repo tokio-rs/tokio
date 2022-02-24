@@ -155,15 +155,13 @@ cfg_rt_multi_thread! {
     pub(super) use self::inject::Inject;
 }
 
+#[cfg(all(feature = "rt", any(tokio_unstable, test)))]
+mod abort;
 mod join;
 
-cfg_unstable! {
-    #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-    pub use self::join::AbortHandle;
-}
-#[cfg(all(not(tokio_unstable), test))]
-#[allow(unused_imports)]
-pub(crate) use self::join::AbortHandle;
+#[cfg(all(feature = "rt", any(tokio_unstable, test)))]
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+pub use self::abort::AbortHandle;
 
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
