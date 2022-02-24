@@ -1,6 +1,13 @@
+// Note: we currently use `hashbrown::HashMap` directly, rather than using it
+// via `std::collections::HashMap`, because the `HashMap::drain_filter` API is
+// not yet stable in the standard library
+// (https://github.com/rust-lang/rust/issues/59618). When this API is
+// stabilized on `tokio-util`'s MSRV, we can replace this with
+// `std::collections::HashMap`.
+use hashbrown::HashMap;
 use std::{
     borrow::Borrow,
-    collections::hash_map::{HashMap, RandomState},
+    collections::hash_map::RandomState,
     fmt,
     future::Future,
     hash::{BuildHasher, Hash},
@@ -309,6 +316,18 @@ where
         }
     }
 
+    /// Aborts all tasks with keys matching `predicate`.
+    ///
+    /// `predicate` is a function called with a reference to each key in the
+    /// map. If it returns `true` for a given key, the corresponding task will
+    /// be cancelled.
+    // XXX(eliza): do we want to consider counting the number of tasks aborted?
+    pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
+        self.aborts
+            .drain_filter(|key, _| predicate(key))
+            .for_each(|(_, task)| task.abort());
+    }
+
     /// Returns `true` if this `JoinMap` contains a task for the provided key.
     ///
     /// If the task has completed, but its output hasn't yet been consumed by a
@@ -374,10 +393,7 @@ where
     /// map.try_reserve(10).expect("why is the test harness OOMing on 10 bytes?");
     /// ```
     #[inline]
-    pub fn try_reserve(
-        &mut self,
-        additional: usize,
-    ) -> Result<(), std::collections::TryReserveError> {
+    pub fn try_reserve(&mut self, additional: usize) -> Result<(), hashbrown::TryReserveError> {
         self.aborts.try_reserve(additional)
     }
 
