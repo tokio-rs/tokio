@@ -350,20 +350,31 @@
 //! - [`task::Builder`]
 //!  
 //! This flag enables **unstable** features. The public API of these features
-//! may break in 1.x releases.
+//! may break in 1.x releases. To enable these features, the `--cfg
+//! tokio_unstable` argument must be passed to `rustc` when compiling. This
+//! serves to explicitly opt-in to features which may break semver conventions,
+//! since Cargo [does not yet directly support such opt-ins][unstable features].
 //!
-//! To enable these features, the `--cfg tokio_unstable` must be passed to
-//! `rustc` when compiling. This is easiest done using the `RUSTFLAGS` env
-//! variable: `RUSTFLAGS="--cfg tokio_unstable"`.
-//!
-//! You can also specify it in your project's `.cargo/config.toml` file:
+//! You can specify it in your project's `.cargo/config.toml` file:
 //!
 //! ```toml
 //! [build]
 //! rustflags = ["--cfg", "tokio_unstable"]
 //! ```
-//! This serves to explicitly opt-in to features which may break semver conventions,
-//! since Cargo [does not yet directly support such opt-ins][unstable features].
+//!
+//! Alternatively, you can specify it with an environment variable:
+//!
+//! ```sh
+//! ## Many *nix shells:
+//! export RUSTFLAGS="--cfg tokio_unstable"
+//! cargo build
+//! ```
+//!
+//! ```powershell
+//! ## Windows PowerShell:
+//! $Env:RUSTFLAGS="--cfg tokio_unstable"
+//! cargo build
+//! ```
 //!
 //! [unstable features]: https://internals.rust-lang.org/t/feature-request-unstable-opt-in-non-transitive-crate-features/16193#why-not-a-crate-feature-2
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
