@@ -797,7 +797,7 @@ impl task::Schedule for Arc<Shared> {
                             cx.unhandled_panic.set(true);
                             cx.owned.close_and_shutdown_all();
                         }
-                        _ => panic!("runtime core not set in CURRENT thread-local"),
+                        _ => unreachable!("runtime core not set in CURRENT thread-local"),
                     })
                 }
             }
