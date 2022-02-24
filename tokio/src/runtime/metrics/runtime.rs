@@ -534,3 +534,27 @@ cfg_net! {
         }
     }
 }
+
+cfg_time! {
+    impl RuntimeMetrics {
+        /// Returns the number of timer entries currently tracked by the
+        /// runtime's timer driver.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let n = metrics.time_driver_entry_count();
+        ///     println!("{} timer entries currently tracked by the runtime's time driver.", n);
+        /// }
+        /// ```
+        pub fn time_driver_entry_count(&self) -> u64 {
+            self.handle.time_handle.as_ref().map(|h| h.metrics().entry_count.load(Relaxed)).unwrap_or(0)
+        }
+    }
+}

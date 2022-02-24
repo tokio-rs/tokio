@@ -1,5 +1,5 @@
 use crate::loom::sync::Arc;
-use crate::time::driver::ClockTime;
+use crate::time::driver::{ClockTime, TimerDriverMetrics};
 use std::fmt;
 
 /// Handle to time driver instance.
@@ -29,6 +29,10 @@ impl Handle {
     /// Checks whether the driver has been shutdown.
     pub(super) fn is_shutdown(&self) -> bool {
         self.inner.is_shutdown()
+    }
+
+    pub(crate) fn metrics(&self) -> &TimerDriverMetrics {
+        &self.inner.metrics
     }
 }
 

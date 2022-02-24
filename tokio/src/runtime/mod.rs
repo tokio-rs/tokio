@@ -191,6 +191,10 @@ cfg_metrics! {
     cfg_net! {
        pub(crate) use metrics::IoDriverMetrics;
     }
+
+    cfg_time! {
+        pub(crate) use metrics::TimerDriverMetrics;
+    }
 }
 
 cfg_not_metrics! {

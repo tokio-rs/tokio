@@ -14,6 +14,9 @@ pub(crate) use self::handle::Handle;
 
 mod wheel;
 
+mod metrics;
+pub(self) use metrics::TimerDriverMetrics;
+
 pub(super) mod sleep;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
@@ -148,6 +151,8 @@ struct Inner {
 
     /// True if the driver is being shutdown.
     pub(super) is_shutdown: AtomicBool,
+
+    metrics: TimerDriverMetrics,
 }
 
 /// Time state shared which must be protected by a `Mutex`
@@ -357,6 +362,7 @@ impl Handle {
             let mut lock = self.get().lock();
 
             if entry.as_ref().might_be_registered() {
+                self.metrics().dec_entry_count();
                 lock.wheel.remove(entry);
             }
 
@@ -377,6 +383,7 @@ impl Handle {
             // We may have raced with a firing/deregistration, so check before
             // deregistering.
             if unsafe { entry.as_ref().might_be_registered() } {
+                self.metrics().dec_entry_count();
                 lock.wheel.remove(entry);
             }
 
@@ -393,6 +400,8 @@ impl Handle {
                 // the timer entry.
                 match unsafe { lock.wheel.insert(entry) } {
                     Ok(when) => {
+                        self.metrics().incr_entry_count();
+
                         if lock
                             .next_wake
                             .map(|next_wake| when < next_wake.get())
@@ -504,6 +513,7 @@ impl Inner {
                 wheel: wheel::Wheel::new(),
             }),
             is_shutdown: AtomicBool::new(false),
+            metrics: TimerDriverMetrics::default(),
         }
     }
 

@@ -26,6 +26,11 @@ cfg_metrics! {
         mod io;
         pub(crate) use io::IoDriverMetrics;
     }
+
+    cfg_time! {
+        mod time;
+        pub(crate) use time::TimerDriverMetrics;
+    }
 }
 
 cfg_not_metrics! {

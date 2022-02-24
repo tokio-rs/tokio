@@ -403,6 +403,29 @@ fn io_driver_ready_count() {
     assert_eq!(metrics.io_driver_ready_count(), 2);
 }
 
+#[test]
+fn time_driver_entry_count() {
+    use tokio::time::sleep;
+    use tokio_test::task;
+
+    let rt = basic();
+    let metrics = rt.metrics();
+
+    let _guard = rt.handle().enter();
+
+    assert_eq!(metrics.time_driver_entry_count(), 0);
+
+    let mut fut = task::spawn(sleep(Duration::from_secs(1_000)));
+
+    assert!(fut.poll().is_pending());
+
+    assert_eq!(metrics.time_driver_entry_count(), 1);
+
+    drop(fut);
+
+    assert_eq!(metrics.time_driver_entry_count(), 0);
+}
+
 fn basic() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
