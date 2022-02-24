@@ -46,6 +46,18 @@ impl AbortHandle {
             raw.remote_abort();
         }
     }
+
+    /// Returns `true` if the task this `AbortHandle` corresponds to is still
+    /// active (i.e., it has not completed, panicked, or been cancelled).
+    // the `AbortHandle` type is only publicly exposed when `tokio_unstable` is
+    // enabled, but it is still defined for testing purposes.
+    #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+    pub fn is_active(&self) -> bool {
+        self.raw.map_or(false, |raw| {
+            let state = raw.header().state.load();
+            !(state.is_complete() || state.is_cancelled())
+        })
+    }
 }
 
 unsafe impl Send for AbortHandle {}

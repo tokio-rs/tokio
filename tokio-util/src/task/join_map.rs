@@ -146,9 +146,10 @@ where
         }
     }
 
-    /// Waits until one of the tasks in the set completes and returns its output.
+    /// Waits until one of the tasks in the map completes and returns its
+    /// output, along with the key corresponding to that task.
     ///
-    /// Returns `None` if the set is empty.
+    /// Returns `None` if the map is empty.
     ///
     /// # Cancel Safety
     ///
@@ -161,9 +162,23 @@ where
                 self.aborts.remove(&key);
                 Ok(Some((key, val)))
             }
-            // XXX(eliza): should have a way to clean up "dead" abort handles
-            // when a task panics or is cancelled by a runtime dropping, etc...
-            res => res,
+            Ok(None) => Ok(None),
+            // If a task panics or is aborted, we must clear its `AbortHandle`
+            // out of the map of abort handles, as the `AbortHandle` keeps the
+            // task from being deallocated.
+            Err(e) => {
+                // XXX(eliza): i don't _love_ the `retain` here; it would be
+                // nice if we could just look up the individiual task and remove
+                // *it* from the map. but, we don't have the key in this case.
+                // perhaps we could instead add the ability to compare
+                // `AbortHandle`s and `JoinHandle`s to see if they correspond to
+                // the same task, and change to some kind of map type allowing
+                // inverse lookups...but that would also mean adding `Hash` and `Eq`
+                // commitments to the `JoinHandle`/`AbortHandle` APIs, which i'm not
+                // sure if we want to do...
+                self.aborts.retain(|_, task| task.is_active());
+                Err(e)
+            }
         }
     }
 
@@ -182,6 +197,11 @@ where
         while self.join_one().await.transpose().is_some() {}
     }
 
+    /// Abort the task corresponding to the provided `key`.
+    ///
+    /// If this `JoinMap` contains a task corresponding to `key`, this method
+    /// will abort that task and return `true`. Otherwise, if no task exists for
+    /// `key`, this method returns `false`.
     pub fn abort<Q: ?Sized>(&mut self, key: &Q) -> bool
     where
         Q: Hash + Eq,
@@ -196,12 +216,30 @@ where
         }
     }
 
+    /// Returns `true` if this `JoinMap` contains a task for the provided key.
+    ///
+    /// If the task has completed, but its output hasn't yet been consumed by a
+    /// call to [`join_one`], this method will still return `true`.
     pub fn contains_task<Q: ?Sized>(&mut self, key: &Q) -> bool
     where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
         self.aborts.contains_key(key)
+    }
+
+    /// Returns `true` if this `JoinMap` contains a task for the provided `key`,
+    /// *and* that task has not completed.
+    ///
+    /// Unlike [`contains_task`], if the task has completed, panicked, or has
+    /// been canceled, but its output hasn't yet been consumed by a call to
+    /// [`join_one`], this method will return `false`.
+    pub fn contains_active_task<Q: ?Sized>(&mut self, key: &Q) -> bool
+    where
+        Q: Hash + Eq,
+        K: Borrow<Q>,
+    {
+        self.aborts.get(key).map_or(false, AbortHandle::is_active)
     }
 }
 
