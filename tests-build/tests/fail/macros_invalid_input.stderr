@@ -52,10 +52,10 @@ error: the `worker_threads` option requires the "multi_thread" runtime flavor. U
 33 | #[tokio::test(flavor = "current_thread", worker_threads = 4)]
    |                                                           ^
 
-warning: duplicated attribute
+error: duplicated attribute
   --> tests/fail/macros_invalid_input.rs:37:1
    |
 37 | #[test]
    | ^^^^^^^
    |
-   = note: `#[warn(duplicate_macro_attributes)]` on by default
+   = note: `-D duplicate-macro-attributes` implied by `-D warnings`
