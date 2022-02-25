@@ -1,20 +1,19 @@
-// Note: we currently use `hashbrown::HashMap` directly, rather than using it
-// via `std::collections::HashMap`, because the `HashMap::drain_filter` API is
-// not yet stable in the standard library
-// (https://github.com/rust-lang/rust/issues/59618). When this API is
-// stabilized on `tokio-util`'s MSRV, we can replace this with
-// `std::collections::HashMap`.
-use hashbrown::HashMap;
+use crate::{
+    runtime::Handle,
+    task::{AbortHandle, JoinError, JoinHandle, LocalSet},
+    util::IdleNotifiedSet,
+};
 use std::{
     borrow::Borrow,
-    collections::hash_map::RandomState,
+    collections::{
+        self,
+        hash_map::{HashMap, RandomState},
+    },
     fmt,
     future::Future,
     hash::{BuildHasher, Hash},
-};
-use tokio::{
-    runtime::Handle,
-    task::{AbortHandle, JoinError, JoinSet, LocalSet},
+    pin::Pin,
+    task::{Context, Poll},
 };
 
 /// A collection of tasks spawned on a Tokio runtime, associated with hash map
@@ -45,7 +44,7 @@ use tokio::{
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
     aborts: HashMap<K, AbortHandle, S>,
-    joins: JoinSet<(K, V)>,
+    joins: IdleNotifiedSet<(K, JoinHandle<V>)>,
 }
 
 impl<K, V> JoinMap<K, V> {
@@ -130,7 +129,7 @@ impl<K, V, S> JoinMap<K, V, S> {
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
         Self {
             aborts: HashMap::with_capacity_and_hasher(capacity, hash_builder),
-            joins: JoinSet::new(),
+            joins: IdleNotifiedSet::new(),
         }
     }
 
@@ -184,8 +183,7 @@ where
         K: Send,
         V: Send,
     {
-        let task = self.joins.spawn(mk_task(&key, task));
-        self.insert(key, task)
+        self.insert(key, crate::spawn(task))
     }
 
     /// Spawn the provided task on the provided runtime and store it in this
@@ -200,8 +198,7 @@ where
         K: Send,
         V: Send,
     {
-        let task = self.joins.spawn_on(mk_task(&key, task), handle);
-        self.insert(key, task)
+        self.insert(key, handle.spawn(task));
     }
 
     /// Spawn the provided task on the current [`LocalSet`] and store it in this
@@ -220,8 +217,7 @@ where
         F: Future<Output = V>,
         F: 'static,
     {
-        let task = self.joins.spawn_local(mk_task(&key, task));
-        self.insert(key, task);
+        self.insert(key, crate::task::spawn_local(task));
     }
 
     /// Spawn the provided task on the provided [`LocalSet`] and store it in
@@ -236,11 +232,16 @@ where
         F: Future<Output = V>,
         F: 'static,
     {
-        let task = self.joins.spawn_local_on(mk_task(&key, task), local_set);
-        self.insert(key, task)
+        self.insert(key, local_set.spawn_local(task))
     }
 
-    fn insert(&mut self, key: K, abort: AbortHandle) {
+    fn insert(&mut self, key: K, jh: JoinHandle<V>) {
+        let abort = jh.abort_handle();
+        let mut entry = self.joins.insert_idle((key.clone(), jh));
+
+        // Set the waker that is notified when the task completes.
+        entry.with_value_and_context(|(_, jh), ctx| jh.set_join_waker(ctx.waker()));
+
         if let Some(prev) = self.aborts.insert(key, abort) {
             prev.abort();
         }
@@ -256,30 +257,20 @@ where
     /// This method is cancel safe. If `join_one` is used as the event in a `tokio::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinMap`.
-    pub async fn join_one(&mut self) -> Result<Option<(K, V)>, JoinError> {
-        match self.joins.join_one().await {
-            Ok(Some((key, val))) => {
-                self.aborts.remove(&key);
-                Ok(Some((key, val)))
-            }
-            Ok(None) => Ok(None),
-            // If a task panics or is aborted, we must clear its `AbortHandle`
-            // out of the map of abort handles, as the `AbortHandle` keeps the
-            // task from being deallocated.
-            Err(e) => {
-                // XXX(eliza): i don't _love_ the `retain` here; it would be
-                // nice if we could just look up the individiual task and remove
-                // *it* from the map. but, we don't have the key in this case.
-                // perhaps we could instead add the ability to compare
-                // `AbortHandle`s and `JoinHandle`s to see if they correspond to
-                // the same task, and change to some kind of map type allowing
-                // inverse lookups...but that would also mean adding `Hash` and `Eq`
-                // commitments to the `JoinHandle`/`AbortHandle` APIs, which i'm not
-                // sure if we want to do...
-                self.aborts.retain(|_, task| task.is_active());
-                Err(e)
-            }
-        }
+    ///
+    /// # Returns
+    ///
+    /// This function returns:
+    ///
+    ///  * `Some((key, Ok(value)))` if one of the tasks in this `JoinMap` has
+    ///    completed. The `value` is the return value of that ask, and `key` is
+    ///    the key associated with the task.
+    ///  * `Some((key, Err(err))` if one of the tasks in this JoinMap` has
+    ///    panicked or been aborted. `key` is the key associated  with the task
+    ///    that panicked or was aborted.
+    ///  * `None` if the `JoinMap` is empty.
+    pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
+        crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
     }
 
     /// Aborts all tasks and waits for them to finish shutting down.
@@ -294,7 +285,7 @@ where
     /// [`join_one`]: fn@Self::join_one
     pub async fn shutdown(&mut self) {
         self.abort_all();
-        while self.join_one().await.transpose().is_some() {}
+        while self.join_one().await.is_some() {}
     }
 
     /// Abort the task corresponding to the provided `key`.
@@ -323,9 +314,10 @@ where
     /// be cancelled.
     // XXX(eliza): do we want to consider counting the number of tasks aborted?
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
-        self.aborts
-            .drain_filter(|key, _| predicate(key))
-            .for_each(|(_, task)| task.abort());
+        // self.aborts
+        //     .drain_filter(|key, _| predicate(key))
+        //     .for_each(|(_, task)| task.abort());
+        unimplemented!()
     }
 
     /// Returns `true` if this `JoinMap` contains a task for the provided key.
@@ -393,7 +385,7 @@ where
     /// map.try_reserve(10).expect("why is the test harness OOMing on 10 bytes?");
     /// ```
     #[inline]
-    pub fn try_reserve(&mut self, additional: usize) -> Result<(), hashbrown::TryReserveError> {
+    pub fn try_reserve(&mut self, additional: usize) -> Result<(), collections::TryReserveError> {
         self.aborts.try_reserve(additional)
     }
 
@@ -442,6 +434,65 @@ where
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.aborts.shrink_to(min_capacity)
     }
+
+    /// Polls for one of the tasks in the map to complete, returning the output
+    /// and key of the completed task if one completed.
+    ///
+    /// If this returns `Poll::Ready(Some((key, _)))` or `Poll::Ready(Some((key,
+    /// Err(_))))`, then the task with the key `key` completed, and has been
+    /// removed from the map.
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided `Context` is scheduled
+    /// to receive a wakeup when a task in the `JoinSet` completes. Note that on multiple calls to
+    /// `poll_join_one`, only the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup.
+    ///
+    /// # Returns
+    ///
+    /// This function returns:
+    ///
+    ///  * `Poll::Pending` if the `JoinMap` is not empty but there is no task whose output is
+    ///     available right now.
+    ///  * `Poll::Ready(Some((key, Ok(value))))` if one of the tasks in this
+    ///    `JoinMap` has completed. The `value` is the return value of that
+    ///    task, and `key` is the key associated with the task.
+    ///  * `Poll::Ready(Some((key, Err(err)))` if one of the tasks in this
+    ///    `JoinMap` has panicked or been aborted. `key` is the key associated
+    ///    with the task that panicked or was aborted.
+    ///  * `Poll::Ready(None)` if the `JoinMap` is empty.
+    ///
+    /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
+    /// This can happen if the [coop budget] is reached.
+    ///
+    /// [coop budget]: crate::task#cooperative-scheduling
+    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Option<(K, Result<V, JoinError>)>> {
+        // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
+        // the `notified` list if the waker is notified in the `poll` call below.
+        let mut entry = match self.joins.pop_notified(cx.waker()) {
+            Some(entry) => entry,
+            None => {
+                if self.is_empty() {
+                    return Poll::Ready(None);
+                } else {
+                    // The waker was set by `pop_notified`.
+                    return Poll::Pending;
+                }
+            }
+        };
+
+        let res = entry.with_value_and_context(|(_, jh), ctx| Pin::new(jh).poll(ctx));
+
+        if let Poll::Ready(res) = res {
+            let (key, _) = entry.remove();
+            self.aborts.remove(&key);
+            Poll::Ready(Some((key, res)))
+        } else {
+            // A JoinHandle generally won't emit a wakeup without being ready unless
+            // the coop limit has been reached. We yield to the executor in this
+            // case.
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
 }
 
 impl<K, V, S> JoinMap<K, V, S>
@@ -454,17 +505,21 @@ where
     /// This does not remove the tasks from the `JoinMap`. To wait for the tasks to complete
     /// cancellation, you should call `join_one` in a loop until the `JoinMap` is empty.
     pub fn abort_all(&mut self) {
-        self.joins.abort_all();
-        self.aborts.clear();
+        self.joins.for_each(|(_, jh)| jh.abort());
     }
 
     /// Removes all tasks from this `JoinMap` without aborting them.
     ///
     /// The tasks removed by this call will continue to run in the background even if the `JoinMap`
-    /// is dropped.
+    /// is dropped. They may still be aborted by key.
     pub fn detach_all(&mut self) {
-        self.joins.detach_all();
-        self.aborts.clear();
+        self.joins.drain(drop);
+    }
+}
+
+impl<K, V, S> Drop for JoinMap<K, V, S> {
+    fn drop(&mut self) {
+        self.joins.drain(|(_, join_handle)| join_handle.abort());
     }
 }
 
@@ -488,12 +543,4 @@ impl<K, V> Default for JoinMap<K, V> {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn mk_task<K: Clone, F, V>(key: &K, task: F) -> impl Future<Output = (K, V)>
-where
-    F: Future<Output = V>,
-{
-    let key = key.clone();
-    async move { (key, task.await) }
 }

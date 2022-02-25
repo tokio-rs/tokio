@@ -302,7 +302,9 @@ cfg_rt! {
 
     cfg_unstable! {
         mod join_set;
+        mod join_map;
         pub use join_set::JoinSet;
+        pub use join_map::JoinMap;
         pub use crate::runtime::task::AbortHandle;
     }
 
