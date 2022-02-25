@@ -27,6 +27,9 @@ pub(super) struct Vtable {
     /// The join handle has been dropped.
     pub(super) drop_join_handle_slow: unsafe fn(NonNull<Header>),
 
+    /// An abort handle has been dropped.
+    pub(super) drop_abort_handle: unsafe fn(NonNull<Header>),
+
     /// The task is remotely aborted.
     pub(super) remote_abort: unsafe fn(NonNull<Header>),
 
@@ -42,6 +45,7 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
         try_read_output: try_read_output::<T, S>,
         try_set_join_waker: try_set_join_waker::<T, S>,
         drop_join_handle_slow: drop_join_handle_slow::<T, S>,
+        drop_abort_handle: drop_abort_handle::<T, S>,
         remote_abort: remote_abort::<T, S>,
         shutdown: shutdown::<T, S>,
     }
@@ -104,6 +108,11 @@ impl RawTask {
         unsafe { (vtable.drop_join_handle_slow)(self.ptr) }
     }
 
+    pub(super) fn drop_abort_handle(self) {
+        let vtable = self.header().vtable;
+        unsafe { (vtable.drop_abort_handle)(self.ptr) }
+    }
+
     pub(super) fn shutdown(self) {
         let vtable = self.header().vtable;
         unsafe { (vtable.shutdown)(self.ptr) }
@@ -112,6 +121,13 @@ impl RawTask {
     pub(super) fn remote_abort(self) {
         let vtable = self.header().vtable;
         unsafe { (vtable.remote_abort)(self.ptr) }
+    }
+
+    /// Increment the task's reference count.
+    ///
+    /// Currently, this is used only when creating an `AbortHandle`.
+    pub(super) fn ref_inc(self) {
+        self.header().state.ref_inc();
     }
 }
 
@@ -152,6 +168,11 @@ unsafe fn try_set_join_waker<T: Future, S: Schedule>(ptr: NonNull<Header>, waker
 unsafe fn drop_join_handle_slow<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     let harness = Harness::<T, S>::from_raw(ptr);
     harness.drop_join_handle_slow()
+}
+
+unsafe fn drop_abort_handle<T: Future, S: Schedule>(ptr: NonNull<Header>) {
+    let harness = Harness::<T, S>::from_raw(ptr);
+    harness.drop_reference();
 }
 
 unsafe fn remote_abort<T: Future, S: Schedule>(ptr: NonNull<Header>) {

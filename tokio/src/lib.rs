@@ -483,7 +483,7 @@ pub(crate) use self::doc::winapi;
 
 #[cfg(all(not(docsrs), windows, feature = "net"))]
 #[allow(unused)]
-pub(crate) use ::winapi;
+pub(crate) use winapi;
 
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**

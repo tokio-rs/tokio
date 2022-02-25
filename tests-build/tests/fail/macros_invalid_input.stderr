@@ -69,3 +69,11 @@ error: second test attribute is supplied
    |
 37 | #[test]
    | ^^^^^^^
+
+error: duplicated attribute
+  --> $DIR/macros_invalid_input.rs:37:1
+   |
+37 | #[test]
+   | ^^^^^^^
+   |
+   = note: `-D duplicate-macro-attributes` implied by `-D warnings`
