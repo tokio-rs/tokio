@@ -19,11 +19,10 @@ use std::{
 /// A collection of tasks spawned on a Tokio runtime, associated with hash map
 /// keys.
 ///
-/// This type is very similar to the [`JoinSet`] type in `tokio::task`, with the
-/// addition of a set of keys associated with each task. These keys allow
-/// [cancelling a task](JoinMap::abort) in the `JoinMap` by key, or [test whether
-/// a task corresponding to a given key exists](JoinMap::contains_active_task)
-/// in the `JoinMap`.
+/// This type is very similar to the [`JoinSet`] type, with the addition of a
+/// set of keys associated with each task. These keys allow [cancelling a
+/// task][abort] or [multiple tasks][abort_matching] in the `JoinMap` based on
+/// their keys, or [test whether a task corresponding to a given key exists][contains] in the `JoinMap`.
 ///
 /// In addition, when tasks in the `JoinMap` complete, they will return the
 /// associated key along with the value returned by the task, if any.
@@ -40,7 +39,11 @@ use std::{
 /// may break in 1.x releases. See [the documentation on unstable
 /// features][unstable] for details.
 ///
-/// [unstable]: tokio#unstable-features
+/// [`JoinSet`]: crate::task::JoinSet
+/// [unstable]: crate#unstable-features
+/// [abort]: fn@Self::abort
+/// [abort_matching]: fn@Self::abort_matching
+/// [contains]: fn@Self::contains_task
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
     /// A hash map of keys to `AbortHandle`s, used to cancel tasks by key.
@@ -61,9 +64,9 @@ pub struct JoinMap<K, V, S = RandomState> {
     /// Everywhere else, the `Option` is not `take`n, since the task is just
     /// removed from the map entirely in order to abort it.
     ///
-    /// When the `HashMap::drain_filter` API is stabilized in `std`, we can just
-    /// use that, instead, and remove the `Option`s here:
-    /// https://github.com/rust-lang/rust/issues/59618
+    /// When the `HashMap::drain_filter` API is stabilized in `std`
+    /// (<https://github.com/rust-lang/rust/issues/59618>), we can just
+    /// use that, instead, and remove the `Option`s here.
     aborts: HashMap<K, Option<AbortHandle>, S>,
     joins: IdleNotifiedSet<(K, JoinHandle<V>)>,
 }
@@ -172,7 +175,7 @@ impl<K, V, S> JoinMap<K, V, S> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::task::JoinMap;
+    /// use crate::task::JoinMap;
     ///
     /// let map: JoinMap<i32, i32> = JoinMap::with_capacity(100);
     /// assert!(map.capacity() >= 100);
@@ -232,7 +235,7 @@ where
     ///
     /// This method panics if it is called outside of a `LocalSet`.
     ///
-    /// [`LocalSet`]: tokio::task::LocalSet
+    /// [`LocalSet`]: crate::task::LocalSet
     pub fn spawn_local<F>(&mut self, key: K, task: F)
     where
         F: Future<Output = V>,
@@ -247,7 +250,7 @@ where
     /// If a task previously existed in the `JoinMap` for this key, that task
     /// will be cancelled and replaced with the new one.
     ///
-    /// [`LocalSet`]: tokio::task::LocalSet
+    /// [`LocalSet`]: crate::task::LocalSet
     pub fn spawn_local_on<F>(&mut self, key: K, task: F, local_set: &LocalSet)
     where
         F: Future<Output = V>,
@@ -275,7 +278,7 @@ where
     ///
     /// # Cancel Safety
     ///
-    /// This method is cancel safe. If `join_one` is used as the event in a `tokio::select!`
+    /// This method is cancel safe. If `join_one` is used as the event in a `crate::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinMap`.
     ///
@@ -352,6 +355,8 @@ where
     ///
     /// If the task has completed, but its output hasn't yet been consumed by a
     /// call to [`join_one`], this method will still return `true`.
+    ///
+    /// [`join_one`]: fn@Self::join_one
     pub fn contains_task<Q: ?Sized>(&mut self, key: &Q) -> bool
     where
         Q: Hash + Eq,
@@ -455,6 +460,7 @@ where
     /// If this returns `Poll::Ready(Some((key, _)))` or `Poll::Ready(Some((key,
     /// Err(_))))`, then the task with the key `key` completed, and has been
     /// removed from the map.
+    ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided `Context` is scheduled
     /// to receive a wakeup when a task in the `JoinSet` completes. Note that on multiple calls to
     /// `poll_join_one`, only the `Waker` from the `Context` passed to the most recent call is
