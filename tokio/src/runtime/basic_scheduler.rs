@@ -174,17 +174,16 @@ impl BasicScheduler {
 
                 if let Some(out) = enter
                     .block_on(poll_fn(|cx| {
+                        if let Ready(out) = future.as_mut().poll(cx) {
+                            return Ready(Some(out));
+                        }
+                        
                         if notified.as_mut().poll(cx).is_ready() {
                             return Ready(None);
                         }
 
-                        if let Ready(out) = future.as_mut().poll(cx) {
-                            return Ready(Some(out));
-                        }
-
                         Pending
                     }))
-                    .expect("Failed to `Enter::block_on`")
                 {
                     return out;
                 }
