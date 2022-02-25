@@ -691,6 +691,35 @@ impl<T> Drop for Sender<T> {
 }
 
 impl<T> Receiver<T> {
+    /// Returns the number of messages that were sent into the channel and that
+    /// this [`Receiver`] has yet to receive.
+    ///
+    /// [`Receiver`]: crate::sync::broadcast::Receiver
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx1) = broadcast::channel(16);
+    ///
+    ///     tx.send(10).unwrap();
+    ///     tx.send(20).unwrap();
+    ///
+    ///     assert_eq!(rx1.num_msgs(), 2);
+    ///     assert_eq!(rx1.recv().await.unwrap(), 10);
+    ///     assert_eq!(rx1.num_msgs(), 1);
+    ///     assert_eq!(rx1.recv().await.unwrap(), 20);     
+    ///     assert_eq!(rx1.num_msgs(), 0);
+    /// }
+    /// ```
+    pub fn num_msgs(&self) -> u64 {
+        let next_send_pos = self.shared.tail.lock().pos;
+        next_send_pos - self.next
+    }
+
     /// Locks the next value if there is one.
     fn recv_ref(
         &mut self,
