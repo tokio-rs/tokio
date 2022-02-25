@@ -21,6 +21,11 @@ cfg_metrics! {
 
     mod worker;
     pub(crate) use worker::WorkerMetrics;
+
+    cfg_net! {
+        mod io;
+        pub(crate) use io::IoDriverMetrics;
+    }
 }
 
 cfg_not_metrics! {

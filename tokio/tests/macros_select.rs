@@ -461,6 +461,7 @@ async fn many_branches() {
         x = async { 1 } => x,
         x = async { 1 } => x,
         x = async { 1 } => x,
+        x = async { 1 } => x,
     };
 
     assert_eq!(1, num);

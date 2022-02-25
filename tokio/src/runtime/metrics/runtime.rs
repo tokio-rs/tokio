@@ -447,3 +447,90 @@ impl RuntimeMetrics {
         self.handle.spawner.worker_local_queue_depth(worker)
     }
 }
+
+cfg_net! {
+    impl RuntimeMetrics {
+        /// Returns the number of file descriptors that have been registered with the
+        /// runtime's I/O driver.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let registered_fds = metrics.io_driver_fd_registered_count();
+        ///     println!("{} fds have been registered with the runtime's I/O driver.", registered_fds);
+        ///
+        ///     let deregistered_fds = metrics.io_fd_deregistered_count();
+        ///
+        ///     let current_fd_count = registered_fds - deregistered_fds;
+        ///     println!("{} fds are currently registered by the runtime's I/O driver.", current_fd_count);
+        /// }
+        /// ```
+        pub fn io_driver_fd_registered_count(&self) -> u64 {
+            self.with_io_driver_metrics(|m| {
+                m.fd_registered_count.load(Relaxed)
+            })
+        }
+
+        /// Returns the number of file descriptors that have been deregistered by the
+        /// runtime's I/O driver.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let n = metrics.io_driver_deregisteredd_fd_count();
+        ///     println!("{} fds have been deregistered by the runtime's I/O driver.", n);
+        /// }
+        /// ```
+        pub fn io_driver_fd_deregistered_count(&self) -> u64 {
+            self.with_io_driver_metrics(|m| {
+                m.fd_deregistered_count.load(Relaxed)
+            })
+        }
+
+        /// Returns the number of ready events processed by the runtime's
+        /// I/O driver.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let n = metrics.io_driver_ready_count();
+        ///     println!("{} ready events procssed by the runtime's I/O driver.", n);
+        /// }
+        /// ```
+        pub fn io_driver_ready_count(&self) -> u64 {
+            self.with_io_driver_metrics(|m| m.ready_count.load(Relaxed))
+        }
+
+        fn with_io_driver_metrics<F>(&self, f: F) -> u64
+        where
+            F: Fn(&super::IoDriverMetrics) -> u64,
+        {
+            // TODO: Investigate if this should return 0, most of our metrics always increase
+            // thus this breaks that guarantee.
+            self.handle
+                .io_handle
+                .as_ref()
+                .map(|h| h.with_io_driver_metrics(f))
+                .flatten()
+                .unwrap_or(0)
+        }
+    }
+}

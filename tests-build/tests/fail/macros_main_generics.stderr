@@ -1,11 +1,3 @@
-error[E0658]: default values for const generic parameters are experimental
- --> tests/fail/macros_main_generics.rs:9:53
-  |
-9 | async fn where_clause_const_generics<const T: usize = { 1 + 1 }>() {}
-  |                                                     ^^^^^^^^^^^
-  |
-  = note: see issue #44580 <https://github.com/rust-lang/rust/issues/44580> for more information
-
 error: defaults for const parameters are only allowed in `struct`, `enum`, `type`, or `trait` definitions
  --> tests/fail/macros_main_generics.rs:9:44
   |
