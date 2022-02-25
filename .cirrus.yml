@@ -26,8 +26,8 @@ task:
 task:
   name: FreeBSD docs
   env:
-    RUSTFLAGS: --cfg docsrs
-    RUSTDOCFLAGS: --cfg docsrs -Dwarnings
+    RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
+    RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
