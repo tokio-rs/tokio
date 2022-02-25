@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+USAGE="Runs Miri tests
+
+USAGE:
+    "$0" [FLAGS] [<cargo-test-options>...]
+
+FLAGS:
+    -h, --help      Show this help text and exit
+
+NOTES:
+    Additional arguments are passed through to the cargo test invocation."
+
+set -e
+
+for arg in "$@"
+do
+    if [[ "$arg" == "-h" || "$arg" == "--help" ]];
+    then
+        echo "$USAGE"
+        exit 0
+    fi
+done
+
+MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tag-raw-pointers ${MIRIFLAGS:-}" \
+    PROPTEST_CASES="${PROPTEST_CASES:-10}" \
+    cargo +nightly miri test \
+    --features full \
+    --lib \
+    "$@"

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+USAGE="Builds Tokio's RustDocs.
+
+USAGE:
+    "$0" [FLAGS] [<rustdoc-options>...]
+
+FLAGS:
+    -h, --help      Show this help text and exit
+    -u, --unstable  Build documentation for unstable features
+
+NOTES:
+    Additional arguments are passed to the RustDoc invocation. For
+    example:
+
+        "$0" --open
+
+    will open the documentatiion in a web browser.
+
+    The '-u' or '--unstable' flag will build documentation for unstable
+    features. Unstable features will also be documented if the RUSTFLAGS
+    environment variable contains \"--cfg tokio_unstable\". For example:
+
+        RUSTFLAGS=\"--cfg tokio_unstable\" "$0""
+
+set -e
+
+RUSTFLAGS="${RUSTFLAGS:-}"
+ARGS=""
+while (( $# )); do
+    case "$1" in
+        -h|--help)
+        echo "$USAGE"
+        exit 0
+        ;;
+        -u|--unstable)
+        RUSTFLAGS="--cfg tokio_unstable ${RUSTFLAGS}"
+        ;;
+        *)
+        ARGS="${ARGS} $1"
+        ;;
+    esac
+    shift
+done
+
+RUSTDOCFLAGS="${RUSTDOCFLAGS:-} --cfg docsrs ${RUSTFLAGS}" \
+    cargo +nightly doc \
+    --all-features \
+    ${ARGS}

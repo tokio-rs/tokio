@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+USAGE="Runs rustfmt
+
+USAGE:
+    $(basename "$0") [FLAGS] [<rustfmt-options>...]
+
+FLAGS:
+    -h, --help      Show this help text and exit
+
+NOTES:
+    The normal cargo fmt command does not work correctly for the Tokio
+    codebase. Instead, this script is provided to ensure all files are
+    correctly formatted.
+
+    Additional arguments are passed to the rustfmt invocation. For example:
+
+        $(basename "$0") --check
+
+    will check formatting, rather than modifying the code."
+
+set -e
+
+for arg in "$@"
+do
+    if [[ "$arg" == "-h" || "$arg" == "--help" ]];
+    then
+        echo "$USAGE"
+        exit 0
+    fi
+done
+
+rustfmt "$@" --edition 2018 $(git ls-files '*.rs')

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+USAGE="Runs Loom tests
+
+USAGE:
+    "$0" [FLAGS] [<cargo-test-options>...]
+
+FLAGS:
+    -h, --help      Show this help text and exit
+
+NOTES:
+    Additional arguments are passed through to the cargo test invocation.
+
+    By default, Loom is run with LOOM_MAX_PREEMPTIONS=1 and LOOM_LOG=info,
+    but if these environment variables are set, they will override the
+    defaults."
+
+set -e
+
+for arg in "$@"
+do
+    if [[ "$arg" == "-h" || "$arg" == "--help" ]];
+    then
+        echo "$USAGE"
+        exit 0
+    fi
+done
+
+(cd tokio &&
+    RUSTFLAGS="--cfg loom ${RUSTFLAGS}" \
+    LOOM_LOG="${LOOM_LOG:-info}" \
+    LOOM_MAX_PREEMPTIONS="${LOOM_MAX_PREEMPTIONS:-1}" \
+    cargo test \
+        --release \
+        --lib \
+        --features full \
+        "$@"
+)
