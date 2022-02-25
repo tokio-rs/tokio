@@ -89,9 +89,9 @@ impl SignalKind {
     /// ```rust,no_run
     /// # use tokio::signal::unix::SignalKind;
     /// let kind = SignalKind::interrupt();
-    /// assert_eq!(kind.value(), libc::SIGINT);
+    /// assert_eq!(kind.as_raw_value(), libc::SIGINT);
     /// ```
-    pub fn value(&self) -> std::os::raw::c_int {
+    pub fn as_raw_value(&self) -> std::os::raw::c_int {
         self.0
     }
 
@@ -209,7 +209,7 @@ impl From<std::os::raw::c_int> for SignalKind {
 
 impl From<SignalKind> for std::os::raw::c_int {
     fn from(kind: SignalKind) -> Self {
-        kind.value()
+        kind.as_raw_value()
     }
 }
 
