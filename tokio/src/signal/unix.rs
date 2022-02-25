@@ -209,7 +209,7 @@ impl From<std::os::raw::c_int> for SignalKind {
 
 impl From<SignalKind> for std::os::raw::c_int {
     fn from(kind: SignalKind) -> Self {
-        kind.0
+        kind.value()
     }
 }
 
@@ -496,5 +496,16 @@ mod tests {
             &Handle::default(),
         )
         .unwrap_err();
+    }
+
+    #[test]
+    fn from_c_int() {
+        assert_eq!(SignalKind::from(2), SignalKind::interrupt());
+    }
+
+    #[test]
+    fn into_c_int() {
+        let value: std::os::raw::c_int = SignalKind::interrupt().into();
+        assert_eq!(value, libc::SIGINT as _);
     }
 }
