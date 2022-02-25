@@ -86,7 +86,7 @@ impl SignalKind {
 
     /// Get the signal's numeric value.
     ///
-    /// ```rust,no_run
+    /// ```rust
     /// # use tokio::signal::unix::SignalKind;
     /// let kind = SignalKind::interrupt();
     /// assert_eq!(kind.as_raw_value(), libc::SIGINT);
