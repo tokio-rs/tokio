@@ -360,20 +360,6 @@ where
         self.aborts.contains_key(key)
     }
 
-    /// Returns `true` if this `JoinMap` contains a task for the provided `key`,
-    /// *and* that task has not completed.
-    ///
-    /// Unlike [`contains_task`], if the task has completed, panicked, or has
-    /// been canceled, but its output hasn't yet been consumed by a call to
-    /// [`join_one`], this method will return `false`.
-    pub fn contains_active_task<Q: ?Sized>(&mut self, key: &Q) -> bool
-    where
-        Q: Hash + Eq,
-        K: Borrow<Q>,
-    {
-        self.aborts.get(key).map_or(false, AbortHandle::is_active)
-    }
-
     /// Reserves capacity for at least `additional` more tasks to be spawned
     /// on this `JoinMap` without reallocating. The collection may reserve more space to avoid
     /// frequent reallocations.
