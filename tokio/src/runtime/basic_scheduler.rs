@@ -184,6 +184,7 @@ impl BasicScheduler {
 
                         Pending
                     }))
+                    .expect("Failed to `Enter::block_on`")
                 {
                     return out;
                 }
