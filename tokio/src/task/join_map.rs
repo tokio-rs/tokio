@@ -1,20 +1,14 @@
-use crate::{
-    runtime::Handle,
-    task::{AbortHandle, JoinError, JoinHandle, LocalSet},
-    util::IdleNotifiedSet,
-};
-use std::{
-    borrow::Borrow,
-    collections::{
-        self,
-        hash_map::{HashMap, RandomState},
-    },
-    fmt,
-    future::Future,
-    hash::{BuildHasher, Hash},
-    pin::Pin,
-    task::{Context, Poll},
-};
+use crate::runtime::Handle;
+use crate::task::{AbortHandle, JoinError, JoinHandle, LocalSet};
+use crate::util::IdleNotifiedSet;
+use std::borrow::Borrow;
+use std::collections;
+use std::collections::hash_map::{HashMap, RandomState};
+use std::fmt;
+use std::future::Future;
+use std::hash::{BuildHasher, Hash};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A collection of tasks spawned on a Tokio runtime, associated with hash map
 /// keys.
