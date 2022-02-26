@@ -77,6 +77,8 @@ impl<K, V> JoinMap<K, V> {
     /// use tokio_util::task::JoinMap;
     /// let mut map: JoinMap<&str, i32> = JoinMap::new();
     /// ```
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::with_hasher(RandomState::new())
     }
