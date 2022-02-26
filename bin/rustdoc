@@ -25,7 +25,7 @@ NOTES:
 set -e
 
 RUSTFLAGS="${RUSTFLAGS:-}"
-ARGS=""
+declare -a ARGS=()
 while (( $# )); do
     case "$1" in
         -h|--help)
@@ -36,7 +36,7 @@ while (( $# )); do
         RUSTFLAGS="--cfg tokio_unstable ${RUSTFLAGS}"
         ;;
         *)
-        ARGS="${ARGS} $1"
+        ARGS+=( $1 )
         ;;
     esac
     shift
@@ -45,4 +45,4 @@ done
 RUSTDOCFLAGS="${RUSTDOCFLAGS:-} --cfg docsrs ${RUSTFLAGS}" \
     cargo +nightly doc \
     --all-features \
-    ${ARGS}
+    ${ARGS[@]}
