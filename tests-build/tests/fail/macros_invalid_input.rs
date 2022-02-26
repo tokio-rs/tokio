@@ -1,3 +1,5 @@
+#![deny(duplicate_macro_attributes)]
+
 use tests_build::tokio;
 
 #[tokio::main]

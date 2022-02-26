@@ -1,61 +1,65 @@
 error: functions marked with `#[tokio::main]` must be `async`
- --> tests/fail/macros_invalid_input.rs:4:1
+ --> tests/fail/macros_invalid_input.rs:6:1
   |
-4 | fn main_is_not_async() {}
+6 | fn main_is_not_async() {}
   | ^^
 
 error: unknown option `foo`, expected one of: `flavor`, `worker_threads`, `start_paused`
- --> tests/fail/macros_invalid_input.rs:6:15
+ --> tests/fail/macros_invalid_input.rs:8:15
   |
-6 | #[tokio::main(foo)]
+8 | #[tokio::main(foo)]
   |               ^^^
 
 error: unknown option `threadpool`, expected one of: `flavor`, `worker_threads`, `start_paused`
- --> tests/fail/macros_invalid_input.rs:9:15
-  |
-9 | #[tokio::main(threadpool::bar)]
-  |               ^^^^^^^^^^
+  --> tests/fail/macros_invalid_input.rs:11:15
+   |
+11 | #[tokio::main(threadpool::bar)]
+   |               ^^^^^^^^^^
 
 error: functions marked with `#[tokio::test]` must be `async`
-  --> tests/fail/macros_invalid_input.rs:13:1
+  --> tests/fail/macros_invalid_input.rs:15:1
    |
-13 | fn test_is_not_async() {}
+15 | fn test_is_not_async() {}
    | ^^
 
 error: unknown option `foo`, expected one of: `flavor`, `worker_threads`, `start_paused`
-  --> tests/fail/macros_invalid_input.rs:15:15
+  --> tests/fail/macros_invalid_input.rs:17:15
    |
-15 | #[tokio::test(foo)]
+17 | #[tokio::test(foo)]
    |               ^^^
 
 error: unknown option `foo`, expected one of: `flavor`, `worker_threads`, `start_paused`
-  --> tests/fail/macros_invalid_input.rs:18:15
+  --> tests/fail/macros_invalid_input.rs:20:15
    |
-18 | #[tokio::test(foo = 123)]
+20 | #[tokio::test(foo = 123)]
    |               ^^^
 
 error: no such runtime flavor, the runtime flavors are: "current_thread", "multi_thread"
-  --> tests/fail/macros_invalid_input.rs:21:24
+  --> tests/fail/macros_invalid_input.rs:23:24
    |
-21 | #[tokio::test(flavor = 123)]
+23 | #[tokio::test(flavor = 123)]
    |                        ^^^
 
 error: no such runtime flavor, the runtime flavors are: "current_thread", "multi_thread"
-  --> tests/fail/macros_invalid_input.rs:24:24
+  --> tests/fail/macros_invalid_input.rs:26:24
    |
-24 | #[tokio::test(flavor = "foo")]
+26 | #[tokio::test(flavor = "foo")]
    |                        ^^^^^
 
 error: the `worker_threads` option requires the "multi_thread" runtime flavor. Use `#[tokio::test(flavor = "multi_thread")]`
-  --> tests/fail/macros_invalid_input.rs:33:59
+  --> tests/fail/macros_invalid_input.rs:35:59
    |
-33 | #[tokio::test(flavor = "current_thread", worker_threads = 4)]
+35 | #[tokio::test(flavor = "current_thread", worker_threads = 4)]
    |                                                           ^
 
 error: duplicated attribute
-  --> tests/fail/macros_invalid_input.rs:37:1
+  --> tests/fail/macros_invalid_input.rs:39:1
    |
-37 | #[test]
+39 | #[test]
    | ^^^^^^^
    |
-   = note: `-D duplicate-macro-attributes` implied by `-D warnings`
+note: the lint level is defined here
+  --> tests/fail/macros_invalid_input.rs:1:9
+   |
+1  | #![deny(duplicate_macro_attributes)]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
