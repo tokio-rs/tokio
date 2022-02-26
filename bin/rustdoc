@@ -2,7 +2,7 @@
 USAGE="Builds Tokio's RustDocs.
 
 USAGE:
-    "$0" [FLAGS] [<rustdoc-options>...]
+    $(basename "$0") [FLAGS] [<rustdoc-options>...]
 
 FLAGS:
     -h, --help      Show this help text and exit
@@ -12,7 +12,7 @@ NOTES:
     Additional arguments are passed to the RustDoc invocation. For
     example:
 
-        "$0" --open
+        $(basename "$0") --open
 
     will open the documentatiion in a web browser.
 
@@ -20,7 +20,7 @@ NOTES:
     features. Unstable features will also be documented if the RUSTFLAGS
     environment variable contains \"--cfg tokio_unstable\". For example:
 
-        RUSTFLAGS=\"--cfg tokio_unstable\" "$0""
+        RUSTFLAGS=\"--cfg tokio_unstable\" $(basename "$0")"
 
 set -e
 

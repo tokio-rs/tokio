@@ -2,7 +2,7 @@
 USAGE="Runs Loom tests
 
 USAGE:
-    "$0" [FLAGS] [<cargo-test-options>...]
+    $(basename "$0") [FLAGS] [<cargo-test-options>...]
 
 FLAGS:
     -h, --help      Show this help text and exit

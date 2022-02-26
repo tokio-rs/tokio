@@ -14,7 +14,7 @@ NOTES:
 
     Additional arguments are passed to the rustfmt invocation. For example:
 
-        $(basename "$0") --check
+       $(basename "$0") --check
 
     will check formatting, rather than modifying the code."
 
