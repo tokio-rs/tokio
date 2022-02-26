@@ -26,7 +26,7 @@ do
     fi
 done
 
-RUSTFLAGS="--cfg loom ${RUSTFLAGS}" \
+RUSTFLAGS="--cfg loom ${RUSTFLAGS:-}" \
 LOOM_LOG="${LOOM_LOG:-info}" \
 LOOM_MAX_PREEMPTIONS="${LOOM_MAX_PREEMPTIONS:-1}" \
 cargo test \
