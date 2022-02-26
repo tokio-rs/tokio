@@ -15,6 +15,7 @@ NOTES:
     defaults."
 
 set -euo pipefail
+cd "$(dirname "$0")"/../tokio
 
 for arg in "$@"
 do
@@ -25,13 +26,11 @@ do
     fi
 done
 
-(cd tokio &&
-    RUSTFLAGS="--cfg loom ${RUSTFLAGS}" \
-    LOOM_LOG="${LOOM_LOG:-info}" \
-    LOOM_MAX_PREEMPTIONS="${LOOM_MAX_PREEMPTIONS:-1}" \
-    cargo test \
-        --release \
-        --lib \
-        --features full \
-        "$@"
-)
+RUSTFLAGS="--cfg loom ${RUSTFLAGS}" \
+LOOM_LOG="${LOOM_LOG:-info}" \
+LOOM_MAX_PREEMPTIONS="${LOOM_MAX_PREEMPTIONS:-1}" \
+cargo test \
+    --release \
+    --lib \
+    --features full \
+    "$@"

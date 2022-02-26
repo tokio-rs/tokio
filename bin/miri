@@ -11,6 +11,7 @@ NOTES:
     Additional arguments are passed through to the cargo test invocation."
 
 set -euo pipefail
+cd "$(dirname "$0")"/..
 
 for arg in "$@"
 do

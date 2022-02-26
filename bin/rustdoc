@@ -23,6 +23,7 @@ NOTES:
         RUSTFLAGS=\"--cfg tokio_unstable\" $(basename "$0")"
 
 set -euo pipefail
+cd "$(dirname "$0")"/..
 
 RUSTDOCFLAGS="${RUSTDOCFLAGS:-} --cfg docsrs"
 

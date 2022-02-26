@@ -19,6 +19,7 @@ NOTES:
     will check formatting, rather than modifying the code."
 
 set -euo pipefail
+cd "$(dirname "$0")"/..
 
 for arg in "$@"
 do
