@@ -41,27 +41,7 @@ use std::task::{Context, Poll};
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
     /// A hash map of keys to `AbortHandle`s, used to cancel tasks by key.
-    ///
-    /// Note: this currently stores an `Option<AbortHandle>`, in order to
-    /// implement the `abort_matching` method without adding a temporary
-    /// allocation. Because we need to take the `AbortHandle`s by value to abort
-    /// them, we have to take them out of the map somehow. We cannot do that
-    /// while iterating without also removing the tasks that are _not_ being
-    /// aborted, which would then require that we store those K-V pairs someplace
-    /// and then put them back afterwards (requiring an allocation). This seems
-    /// not great.
-    ///
-    /// Instead, we store the `AbortHandle`s in an `Option`, so that we can
-    /// `take` them in `abort_matching`. When `abort_matching` is called, the
-    /// aborted tasks will still be removed from the map in `poll_join_one`, so
-    /// it's fine to leave a `(Key, None)` pair in the map for a little bit.
-    /// Everywhere else, the `Option` is not `take`n, since the task is just
-    /// removed from the map entirely in order to abort it.
-    ///
-    /// When the `HashMap::drain_filter` API is stabilized in `std`
-    /// (<https://github.com/rust-lang/rust/issues/59618>), we can just
-    /// use that, instead, and remove the `Option`s here.
-    aborts: HashMap<K, Option<AbortHandle>, S>,
+    aborts: HashMap<K, AbortHandle, S>,
     joins: IdleNotifiedSet<(K, JoinHandle<V>)>,
 }
 
@@ -262,7 +242,7 @@ where
         // Set the waker that is notified when the task completes.
         entry.with_value_and_context(|(_, jh), ctx| jh.set_join_waker(ctx.waker()));
 
-        if let Some(prev) = self.aborts.insert(key, Some(abort)).flatten() {
+        if let Some(prev) = self.aborts.insert(key, abort) {
             prev.abort();
         }
     }
@@ -318,7 +298,7 @@ where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        match self.aborts.remove(key).flatten() {
+        match self.aborts.remove(key) {
             Some(task) => {
                 task.abort();
                 true
@@ -336,13 +316,11 @@ where
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
         // TODO(eliza): when `HashMap::drain_filter` stabilizes
         // (https://github.com/rust-lang/rust/issues/59618), we can also
-        // remove the aborted tasks here, and change the `Option<AbortHandle>`
-        // to just an `AbortHandle`...
+        // remove the aborted tasks here while iterating, rather than removing
+        // them later when the cancelled tasks complete.
         self.aborts.iter_mut().for_each(|(k, task)| {
             if predicate(k) {
-                if let Some(task) = task.take() {
-                    task.abort();
-                }
+                task.abort();
             }
         })
     }
