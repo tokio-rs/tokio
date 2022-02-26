@@ -24,8 +24,14 @@ NOTES:
 
 set -euo pipefail
 
-RUSTFLAGS="${RUSTFLAGS:-}"
+RUSTDOCFLAGS="${RUSTDOCFLAGS:-} --cfg docsrs"
+
+if echo "${RUSTFLAGS}" | grep -q "tokio_unstable"; then
+    RUSTDOCFLAGS+=" --cfg tokio_unstable"
+fi
+
 declare -a ARGS=()
+
 while (( $# )); do
     case "$1" in
         -h|--help)
@@ -33,7 +39,8 @@ while (( $# )); do
         exit 0
         ;;
         -u|--unstable)
-        RUSTFLAGS="--cfg tokio_unstable ${RUSTFLAGS}"
+        RUSTFLAGS+=" --cfg tokio_unstable"
+        RUSTDOCFLAGS+=" --cfg tokio_unstable"
         ;;
         *)
         ARGS+=( $1 )
@@ -42,7 +49,8 @@ while (( $# )); do
     shift
 done
 
-RUSTDOCFLAGS="${RUSTDOCFLAGS:-} --cfg docsrs ${RUSTFLAGS}" \
-    cargo +nightly doc \
+RUSTFLAGS="${RUSTFLAGS:-}" \
+RUSTDOCFLAGS="${RUSTDOCFLAGS}" \
+cargo +nightly doc \
     --all-features \
     ${ARGS[@]}
