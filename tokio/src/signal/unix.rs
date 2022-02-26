@@ -60,7 +60,7 @@ impl Init for OsExtraData {
 }
 
 /// Represents the specific kind of signal to listen for.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct SignalKind(libc::c_int);
 
 impl SignalKind {
@@ -82,6 +82,17 @@ impl SignalKind {
     // See https://github.com/tokio-rs/tokio/issues/3767 for more.
     pub fn from_raw(signum: std::os::raw::c_int) -> Self {
         Self(signum as libc::c_int)
+    }
+
+    /// Get the signal's numeric value.
+    ///
+    /// ```rust
+    /// # use tokio::signal::unix::SignalKind;
+    /// let kind = SignalKind::interrupt();
+    /// assert_eq!(kind.as_raw_value(), libc::SIGINT);
+    /// ```
+    pub fn as_raw_value(&self) -> std::os::raw::c_int {
+        self.0
     }
 
     /// Represents the SIGALRM signal.
@@ -187,6 +198,18 @@ impl SignalKind {
     /// By default, this signal is ignored.
     pub fn window_change() -> Self {
         Self(libc::SIGWINCH)
+    }
+}
+
+impl From<std::os::raw::c_int> for SignalKind {
+    fn from(signum: std::os::raw::c_int) -> Self {
+        Self::from_raw(signum as libc::c_int)
+    }
+}
+
+impl From<SignalKind> for std::os::raw::c_int {
+    fn from(kind: SignalKind) -> Self {
+        kind.as_raw_value()
     }
 }
 
@@ -473,5 +496,16 @@ mod tests {
             &Handle::default(),
         )
         .unwrap_err();
+    }
+
+    #[test]
+    fn from_c_int() {
+        assert_eq!(SignalKind::from(2), SignalKind::interrupt());
+    }
+
+    #[test]
+    fn into_c_int() {
+        let value: std::os::raw::c_int = SignalKind::interrupt().into();
+        assert_eq!(value, libc::SIGINT as _);
     }
 }
