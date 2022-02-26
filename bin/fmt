@@ -18,7 +18,7 @@ NOTES:
 
     will check formatting, rather than modifying the code."
 
-set -e
+set -euo pipefail
 
 for arg in "$@"
 do

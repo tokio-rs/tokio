@@ -14,7 +14,7 @@ NOTES:
     but if these environment variables are set, they will override the
     defaults."
 
-set -e
+set -euo pipefail
 
 for arg in "$@"
 do

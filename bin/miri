@@ -10,7 +10,7 @@ FLAGS:
 NOTES:
     Additional arguments are passed through to the cargo test invocation."
 
-set -e
+set -euo pipefail
 
 for arg in "$@"
 do

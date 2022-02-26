@@ -22,7 +22,7 @@ NOTES:
 
         RUSTFLAGS=\"--cfg tokio_unstable\" $(basename "$0")"
 
-set -e
+set -euo pipefail
 
 RUSTFLAGS="${RUSTFLAGS:-}"
 declare -a ARGS=()
