@@ -79,8 +79,14 @@ impl<T> UnboundedReceiver<T> {
 
     /// Receives the next value for this receiver.
     ///
-    /// `None` is returned when all `Sender` halves have dropped, indicating
-    /// that no further values can be sent on the channel.
+    /// This method returns `None` if the channel has been closed and there are
+    /// no remaining messages in the channel's buffer. This indicates that no
+    /// further values can ever be received from this `Receiver`. The channel is
+    /// closed when all senders have been dropped, or when [`close`] is called.
+    /// 
+    /// If there are no messages in the channel's buffer, but the channel has
+    /// not yet been closed, this method will sleep until a message is sent or
+    /// the channel is closed.
     ///
     /// # Cancel safety
     ///
@@ -207,6 +213,10 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// This prevents any further messages from being sent on the channel while
     /// still enabling the receiver to drain messages that are buffered.
+    /// 
+    /// Since no more messages can be sent, the receiver will return `None` when
+    /// polled after the remaining messages have been drained, regardless of
+    /// whether or not all the senders have been dropped.
     pub fn close(&mut self) {
         self.chan.close();
     }
