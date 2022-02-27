@@ -79,8 +79,14 @@ impl<T> UnboundedReceiver<T> {
 
     /// Receives the next value for this receiver.
     ///
-    /// `None` is returned when all `Sender` halves have dropped, indicating
-    /// that no further values can be sent on the channel.
+    /// This method returns `None` if the channel has been closed and there are
+    /// no remaining messages in the channel's buffer. This indicates that no
+    /// further values can ever be received from this `Receiver`. The channel is
+    /// closed when all senders have been dropped, or when [`close`] is called.
+    ///
+    /// If there are no messages in the channel's buffer, but the channel has
+    /// not yet been closed, this method will sleep until a message is sent or
+    /// the channel is closed.
     ///
     /// # Cancel safety
     ///
@@ -88,6 +94,8 @@ impl<T> UnboundedReceiver<T> {
     /// [`tokio::select!`](crate::select) statement and some other branch
     /// completes first, it is guaranteed that no messages were received on this
     /// channel.
+    ///
+    /// [`close`]: Self::close
     ///
     /// # Examples
     ///
@@ -207,6 +215,9 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// This prevents any further messages from being sent on the channel while
     /// still enabling the receiver to drain messages that are buffered.
+    ///
+    /// To guarantee that no messages are dropped, after calling `close()`,
+    /// `recv()` must be called until `None` is returned.
     pub fn close(&mut self) {
         self.chan.close();
     }
