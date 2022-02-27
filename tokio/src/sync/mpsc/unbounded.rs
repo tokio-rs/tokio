@@ -214,9 +214,8 @@ impl<T> UnboundedReceiver<T> {
     /// This prevents any further messages from being sent on the channel while
     /// still enabling the receiver to drain messages that are buffered.
     /// 
-    /// Since no more messages can be sent, the receiver will return `None` when
-    /// polled after the remaining messages have been drained, regardless of
-    /// whether or not all the senders have been dropped.
+    /// To guarantee that no messages are dropped, after calling `close()`,
+    /// `recv()` must be called until `None` is returned.
     pub fn close(&mut self) {
         self.chan.close();
     }
