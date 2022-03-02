@@ -2,7 +2,6 @@ use crate::runtime::Handle;
 use crate::task::{AbortHandle, JoinError, JoinHandle, LocalSet};
 use crate::util::IdleNotifiedSet;
 use std::borrow::Borrow;
-use std::collections;
 use std::collections::hash_map::{HashMap, RandomState};
 use std::fmt;
 use std::future::Future;
@@ -312,14 +311,13 @@ where
     /// be cancelled.
     // XXX(eliza): do we want to consider counting the number of tasks aborted?
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
-        // TODO(eliza): when `HashMap::drain_filter` stabilizes
-        // (https://github.com/rust-lang/rust/issues/59618), we can also
-        // remove the aborted tasks here while iterating, rather than removing
-        // them later when the cancelled tasks complete.
-        self.aborts.iter_mut().for_each(|(k, task)| {
+        self.aborts.retain(|k, task| {
             if predicate(k) {
                 task.abort();
+                return false;
             }
+
+            true
         })
     }
 
@@ -356,28 +354,6 @@ where
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.aborts.reserve(additional)
-    }
-
-    /// Tries to reserve capacity for at least `additional` more tasks to be spawned
-    /// on this `JoinMap` without reallocating. The collection may reserve more space to avoid
-    /// frequent reallocations.
-    ///
-    /// # Errors
-    ///
-    /// If the capacity overflows, or the allocator reports a failure, then an error
-    /// is returned.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio_util::task::JoinMap;
-    ///
-    /// let mut map: JoinMap<&str, i32> = JoinMap::new();
-    /// map.try_reserve(10).expect("why is the test harness OOMing on 10 bytes?");
-    /// ```
-    #[inline]
-    pub fn try_reserve(&mut self, additional: usize) -> Result<(), collections::TryReserveError> {
-        self.aborts.try_reserve(additional)
     }
 
     /// Shrinks the capacity of the `JoinMap` as much as possible. It will drop
