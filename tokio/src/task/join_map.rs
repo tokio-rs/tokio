@@ -180,7 +180,6 @@ where
     where
         F: Future<Output = V>,
         F: Send + 'static,
-        K: Send,
         V: Send,
     {
         self.insert(key, crate::spawn(task))
@@ -195,7 +194,6 @@ where
     where
         F: Future<Output = V>,
         F: Send + 'static,
-        K: Send,
         V: Send,
     {
         self.insert(key, handle.spawn(task));
