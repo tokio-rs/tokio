@@ -1,13 +1,14 @@
 use crate::runtime::Handle;
-use crate::task::{AbortHandle, JoinError, JoinHandle, LocalSet};
+use crate::task::{JoinError, JoinHandle, LocalSet};
 use crate::util::idle_notified_set::{self, IdleNotifiedSet};
 use hashbrown::{hash_map, HashMap};
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::fmt;
 use std::future::Future;
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 /// A collection of tasks spawned on a Tokio runtime, associated with hash map
@@ -40,8 +41,8 @@ use std::task::{Context, Poll};
 /// [contains]: fn@Self::contains_task
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
-    /// A hash map of keys to `AbortHandle`s, used to cancel tasks by key.
-    aborts: HashMap<MapEntry<K, V>, (), S>,
+    aborts: HashMap<MapEntry<K, V>, (), BuildHasherDefault<IdHasher>>,
+    hash_builder: S,
     joins: IdleNotifiedSet<(K, JoinHandle<V>)>,
 }
 
@@ -128,7 +129,8 @@ impl<K, V, S> JoinMap<K, V, S> {
     #[must_use]
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
         Self {
-            aborts: HashMap::with_capacity_and_hasher(capacity, hash_builder),
+            aborts: HashMap::with_capacity_and_hasher(capacity, BuildHasherDefault::default()),
+            hash_builder,
             joins: IdleNotifiedSet::new(),
         }
     }
@@ -164,7 +166,7 @@ impl<K, V, S> JoinMap<K, V, S> {
 
 impl<K, V, S> JoinMap<K, V, S>
 where
-    K: Hash + Eq + Clone + 'static,
+    K: Hash + Eq + 'static,
     V: 'static,
     S: BuildHasher,
 {
@@ -234,35 +236,36 @@ where
     }
 
     fn insert(&mut self, key: K, jh: JoinHandle<V>) {
-        let abort = jh.abort_handle();
-        let hash = {
-            let mut hasher = self.aborts.hasher().build_hasher();
-            key.hash(&mut hasher);
-            hasher.finish()
-        };
+        let hash = self.hash(&key);
 
         let mut entry = self.joins.insert_idle((key, jh));
-        let mut map_entry = self.aborts.raw_entry_mut().from_hash(hash, |other| {
-            self.joins
-                .entry(other.entry)
-                .unwrap()
-                .with_value_and_context(|(other_key, _), _| {
-                    entry.with_value_and_context(|(key, _), _| key == other_key)
+
+        entry.with_value_and_context(|(_, jh), ctx| jh.set_join_waker(ctx.waker()));
+        let entry = entry.entry();
+        let joins = &self.joins;
+        let map_entry = self.aborts.raw_entry_mut().from_hash(hash, |other| {
+            joins.entry(&other.entry).map_or(true, |other_entry| {
+                other_entry.with_value(|(other_key, _)| {
+                    joins
+                        .entry(&entry)
+                        .expect("we just inserted this")
+                        .with_value(|(key, _)| key == other_key)
                 })
+            })
         });
         // Set the waker that is notified when the task completes.
-        entry.with_value_and_context(|(_, jh), ctx| jh.set_join_waker(ctx.waker()));
-        let entry = MapEntry { entry };
+        let entry = MapEntry { entry, hash };
 
         match map_entry {
-            hash_map::RawEntryMut::Occupied(occ) => {
+            hash_map::RawEntryMut::Occupied(mut occ) => {
                 let entry = occ.insert_key(entry);
-                self.joins
-                    .entry(&entry.entry)
-                    .unwrap()
-                    .with_value_and_context(|(_, jh), _| jh.abort());
+                if let Some(mut entry) = self.joins.entry_mut(entry.entry) {
+                    entry.with_value_and_context(|(_, jh), _| jh.abort());
+                }
             }
-            hash_map::RawEntryMut::Vacant(vac) => vac.insert_hashed_nocheck(hash, entry, ()),
+            hash_map::RawEntryMut::Vacant(vac) => {
+                vac.insert_hashed_nocheck(hash, entry, ());
+            }
         }
     }
 
@@ -317,9 +320,12 @@ where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        match self.aborts.remove(key) {
-            Some(task) => {
-                task.abort();
+        match self.remove(key) {
+            Some(mut task) => {
+                task.with_value_and_context(|(actual_key, jh), _| {
+                    debug_assert!(key == (&*actual_key).borrow());
+                    jh.abort();
+                });
                 true
             }
             None => false,
@@ -333,9 +339,11 @@ where
     /// be cancelled.
     // XXX(eliza): do we want to consider counting the number of tasks aborted?
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
-        self.aborts.retain(|k, task| {
-            self.joins.entry(&k.entry).map_or(true, |entry| {
-                entry.with_value_and_context(|(k, jh), _| {
+        let aborts = &mut self.aborts;
+        let joins = &self.joins;
+        aborts.retain(|k, _| {
+            joins.entry(&k.entry).map_or(true, |entry| {
+                entry.with_value(|(k, jh)| {
                     if predicate(&*k) {
                         jh.abort();
                         return false;
@@ -357,7 +365,7 @@ where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        self.aborts.contains_key(key)
+        self.get(key).is_some()
     }
 
     /// Reserves capacity for at least `additional` more tasks to be spawned
@@ -478,7 +486,7 @@ where
 
         if let Poll::Ready(res) = res {
             let (key, _) = entry.remove();
-            self.aborts.remove(&key);
+            self.remove(&key);
             Poll::Ready(Some((key, res)))
         } else {
             // A JoinHandle generally won't emit a wakeup without being ready unless
@@ -487,6 +495,65 @@ where
             cx.waker().wake_by_ref();
             Poll::Pending
         }
+    }
+
+    fn get<Q: ?Sized>(&self, key: &Q) -> Option<idle_notified_set::EntryRef<'_, (K, JoinHandle<V>)>>
+    where
+        Q: Hash + Eq,
+        K: Borrow<Q>,
+    {
+        let my_hash = self.hash(key);
+        let (entry, _) =
+            self.aborts
+                .raw_entry()
+                .from_hash(my_hash, |MapEntry { entry, hash }| {
+                    if my_hash != *hash {
+                        return false;
+                    }
+                    self.joins.entry(entry).map_or(false, |entry| {
+                        entry.with_value(|(other_key, _)| other_key.borrow() == key)
+                    })
+                })?;
+        self.joins.entry(&entry.entry)
+    }
+
+    fn remove<Q: ?Sized>(
+        &mut self,
+        key: &Q,
+    ) -> Option<idle_notified_set::EntryInOneOfTheLists<'_, (K, JoinHandle<V>)>>
+    where
+        Q: Hash + Eq,
+        K: Borrow<Q>,
+    {
+        let my_hash = self.hash(key);
+        let joins = &self.joins;
+        let entry = self
+            .aborts
+            .raw_entry_mut()
+            .from_hash(my_hash, |MapEntry { entry, hash }| {
+                if my_hash != *hash {
+                    return false;
+                }
+                joins.entry(entry).map_or(false, |entry| {
+                    entry.with_value(|(other_key, _)| other_key.borrow() == key)
+                })
+            });
+        match entry {
+            hash_map::RawEntryMut::Occupied(occ) => {
+                let (MapEntry { entry, .. }, _) = occ.remove_entry();
+                self.joins.entry_mut(entry)
+            }
+            _ => None,
+        }
+    }
+
+    fn hash<Q: ?Sized>(&self, key: &Q) -> u64
+    where
+        Q: Hash,
+    {
+        let mut hasher = self.hash_builder.build_hasher();
+        key.hash(&mut hasher);
+        hasher.finish()
     }
 }
 
@@ -518,13 +585,19 @@ impl<K, V, S> Drop for JoinMap<K, V, S> {
     }
 }
 
-impl<K: fmt::Debug, V, S> fmt::Debug for JoinMap<K, V, S> {
+impl<K: fmt::Debug + 'static, V: 'static, S> fmt::Debug for JoinMap<K, V, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // debug print the keys in this `JoinMap`.
         struct KeySet<'a, K, V, S>(&'a JoinMap<K, V, S>);
-        impl<K: fmt::Debug, V, S> fmt::Debug for KeySet<'_, K, V, S> {
+        impl<K: fmt::Debug + 'static, V: 'static, S> fmt::Debug for KeySet<'_, K, V, S> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_set().entries(self.0.aborts.keys()).finish()
+                let mut set = f.debug_set();
+                for MapEntry { entry, .. } in self.0.aborts.keys() {
+                    if let Some(entry) = self.0.joins.entry(entry) {
+                        entry.with_value(|(k, _)| set.entry(k));
+                    }
+                }
+                set.finish()
             }
         }
 
@@ -542,11 +615,12 @@ impl<K, V> Default for JoinMap<K, V> {
 
 struct MapEntry<K, V> {
     entry: Arc<idle_notified_set::ListEntry<(K, JoinHandle<V>)>>,
+    hash: u64,
 }
 
 impl<K, V> Hash for MapEntry<K, V> {
-    fn hash<H: Hasher>(&self, _: &mut H) {
-        unreachable!("MapEntry should never be hashed directly; this is a bug!")
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        hasher.write_u64(self.hash);
     }
 }
 
@@ -557,3 +631,22 @@ impl<K, V> PartialEq for MapEntry<K, V> {
 }
 
 impl<K, V> Eq for MapEntry<K, V> {}
+
+#[derive(Default)]
+struct IdHasher(u64);
+
+impl Hasher for IdHasher {
+    fn write(&mut self, _: &[u8]) {
+        unreachable!("whole hash should always be written via `write_u64`");
+    }
+
+    #[inline]
+    fn write_u64(&mut self, u: u64) {
+        self.0 = u;
+    }
+
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
