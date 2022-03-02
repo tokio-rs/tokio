@@ -65,7 +65,7 @@ impl<K, V> JoinMap<K, V> {
     /// Creates an empty `JoinMap` with the specified capacity.
     ///
     /// The `JoinMap` will be able to hold at least `capacity` tasks without
-    /// reallocating. If `capacity` is 0, the `JoinMap` will not allocate.
+    /// reallocating.
     ///
     /// # Examples
     ///
@@ -336,8 +336,11 @@ where
     }
 
     /// Reserves capacity for at least `additional` more tasks to be spawned
-    /// on this `JoinMap` without reallocating. The collection may reserve more space to avoid
-    /// frequent reallocations.
+    /// on this `JoinMap` without reallocating for the map of task keys. The
+    /// collection may reserve more space to avoid frequent reallocations.
+    ///
+    /// Note that spawning a task will still cause an allocation for the task
+    /// itself.
     ///
     /// # Panics
     ///
