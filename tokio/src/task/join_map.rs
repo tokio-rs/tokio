@@ -46,7 +46,7 @@ pub struct JoinMap<K, V, S = RandomState> {
 }
 
 impl<K, V> JoinMap<K, V> {
-    /// Create a new empty `JoinMap`.
+    /// Creates a new empty `JoinMap`.
     ///
     /// The `JoinMap` is initially created with a capacity of 0, so it will not
     /// allocate until a task is first spawned on it.
@@ -168,8 +168,8 @@ where
     V: 'static,
     S: BuildHasher,
 {
-    /// Spawn the provided task on the `JoinMap`, returning an [`AbortHandle`]
-    /// that can be used to remotely cancel the task.
+    /// Spawn the provided task and store it in this `JoinMap` with the provided
+    /// key.
     ///
     /// # Panics
     ///
@@ -252,7 +252,7 @@ where
     ///
     /// # Cancel Safety
     ///
-    /// This method is cancel safe. If `join_one` is used as the event in a `crate::select!`
+    /// This method is cancel safe. If `join_one` is used as the event in a `tokio::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinMap`.
     ///
@@ -274,7 +274,7 @@ where
     /// Aborts all tasks and waits for them to finish shutting down.
     ///
     /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_one`] in
-    /// a loop until it returns `Ok(None)`.
+    /// a loop until it returns `None`.
     ///
     /// This method ignores any panics in the tasks shutting down. When this call returns, the
     /// `JoinMap` will be empty.
@@ -429,9 +429,8 @@ where
     /// Polls for one of the tasks in the map to complete, returning the output
     /// and key of the completed task if one completed.
     ///
-    /// If this returns `Poll::Ready(Some((key, _)))` or `Poll::Ready(Some((key,
-    /// Err(_))))`, then the task with the key `key` completed, and has been
-    /// removed from the map.
+    /// If this returns `Poll::Ready(Some((key, _)))`  then the task with the
+    /// key `key` completed, and has been removed from the map.
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided `Context` is scheduled
     /// to receive a wakeup when a task in the `JoinSet` completes. Note that on multiple calls to
