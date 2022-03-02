@@ -194,9 +194,9 @@ pub(super) fn create(
     before_park: Option<Callback>,
     after_unpark: Option<Callback>,
 ) -> (Arc<Shared>, Launch) {
-    let mut cores = vec![];
-    let mut remotes = vec![];
-    let mut worker_metrics = vec![];
+    let mut cores = Vec::with_capacity(size);
+    let mut remotes = Vec::with_capacity(size);
+    let mut worker_metrics = Vec::with_capacity(size);
 
     // Create the local queues
     for _ in 0..size {
