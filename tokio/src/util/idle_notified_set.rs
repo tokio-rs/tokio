@@ -92,7 +92,7 @@ enum List {
 /// This type is `#[repr(C)]` because its `linked_list::Link` implementation
 /// requires that `pointers` is the first field.
 #[repr(C)]
-struct ListEntry<T> {
+pub(crate) struct ListEntry<T> {
     /// The linked list pointers of the list this entry is in.
     pointers: linked_list::Pointers<ListEntry<T>>,
     /// Pointer to the shared `Lists` struct.
@@ -161,6 +161,26 @@ impl<T> IdleNotifiedSet<T> {
 
         // Safety: We just put the entry in the idle list, so it is in one of the lists.
         EntryInOneOfTheLists { entry, set: self }
+    }
+
+    pub(crate) fn entry(
+        &mut self,
+        entry: &Arc<ListEntry<T>>,
+    ) -> Option<EntryInOneOfTheLists<'_, T>> {
+        let is_unlinked = {
+            // we must lock the lists in order to access `my_list`.
+            let _lock = self.lists.lock();
+            entry.my_list.with(|x| unsafe { *x == List::Neither })
+        };
+
+        if is_unlinked {
+            return None;
+        }
+
+        Some(EntryInOneOfTheLists {
+            entry: entry.clone(),
+            set: self,
+        })
     }
 
     /// Pop an entry from the notified list to poll it. The entry is moved to
@@ -382,6 +402,10 @@ impl<'a, T> EntryInOneOfTheLists<'a, T> {
         self.entry
             .value
             .with_mut(|ptr| unsafe { func(&mut *ptr, &mut context) })
+    }
+
+    pub(crate) fn entry(self) -> Arc<ListEntry<T>> {
+        self.entry
     }
 }
 

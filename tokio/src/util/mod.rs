@@ -45,7 +45,7 @@ mod rand;
 
 cfg_rt! {
     cfg_unstable! {
-        mod idle_notified_set;
+        pub(crate) mod idle_notified_set;
         pub(crate) use idle_notified_set::IdleNotifiedSet;
     }
 

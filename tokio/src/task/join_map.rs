@@ -1,11 +1,12 @@
 use crate::runtime::Handle;
 use crate::task::{AbortHandle, JoinError, JoinHandle, LocalSet};
-use crate::util::IdleNotifiedSet;
+use crate::util::idle_notified_set::{self, IdleNotifiedSet};
+use hashbrown::{hash_map, HashMap};
 use std::borrow::Borrow;
-use std::collections::hash_map::{HashMap, RandomState};
+use std::collections::hash_map::RandomState;
 use std::fmt;
 use std::future::Future;
-use std::hash::{BuildHasher, Hash};
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -40,7 +41,7 @@ use std::task::{Context, Poll};
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
     /// A hash map of keys to `AbortHandle`s, used to cancel tasks by key.
-    aborts: HashMap<K, AbortHandle, S>,
+    aborts: HashMap<MapEntry<K, V>, (), S>,
     joins: IdleNotifiedSet<(K, JoinHandle<V>)>,
 }
 
@@ -234,13 +235,34 @@ where
 
     fn insert(&mut self, key: K, jh: JoinHandle<V>) {
         let abort = jh.abort_handle();
-        let mut entry = self.joins.insert_idle((key.clone(), jh));
+        let hash = {
+            let mut hasher = self.aborts.hasher().build_hasher();
+            key.hash(&mut hasher);
+            hasher.finish()
+        };
 
+        let mut entry = self.joins.insert_idle((key, jh));
+        let mut map_entry = self.aborts.raw_entry_mut().from_hash(hash, |other| {
+            self.joins
+                .entry(other.entry)
+                .unwrap()
+                .with_value_and_context(|(other_key, _), _| {
+                    entry.with_value_and_context(|(key, _), _| key == other_key)
+                })
+        });
         // Set the waker that is notified when the task completes.
         entry.with_value_and_context(|(_, jh), ctx| jh.set_join_waker(ctx.waker()));
+        let entry = MapEntry { entry };
 
-        if let Some(prev) = self.aborts.insert(key, abort) {
-            prev.abort();
+        match map_entry {
+            hash_map::RawEntryMut::Occupied(occ) => {
+                let entry = occ.insert_key(entry);
+                self.joins
+                    .entry(&entry.entry)
+                    .unwrap()
+                    .with_value_and_context(|(_, jh), _| jh.abort());
+            }
+            hash_map::RawEntryMut::Vacant(vac) => vac.insert_hashed_nocheck(hash, entry, ()),
         }
     }
 
@@ -312,12 +334,15 @@ where
     // XXX(eliza): do we want to consider counting the number of tasks aborted?
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
         self.aborts.retain(|k, task| {
-            if predicate(k) {
-                task.abort();
-                return false;
-            }
-
-            true
+            self.joins.entry(&k.entry).map_or(true, |entry| {
+                entry.with_value_and_context(|(k, jh), _| {
+                    if predicate(&*k) {
+                        jh.abort();
+                        return false;
+                    }
+                    true
+                })
+            })
         })
     }
 
@@ -514,3 +539,21 @@ impl<K, V> Default for JoinMap<K, V> {
         Self::new()
     }
 }
+
+struct MapEntry<K, V> {
+    entry: Arc<idle_notified_set::ListEntry<(K, JoinHandle<V>)>>,
+}
+
+impl<K, V> Hash for MapEntry<K, V> {
+    fn hash<H: Hasher>(&self, _: &mut H) {
+        unreachable!("MapEntry should never be hashed directly; this is a bug!")
+    }
+}
+
+impl<K, V> PartialEq for MapEntry<K, V> {
+    fn eq(&self, _: &Self) -> bool {
+        unreachable!("MapEntry equality should not be compared directly; this is a bug!")
+    }
+}
+
+impl<K, V> Eq for MapEntry<K, V> {}
