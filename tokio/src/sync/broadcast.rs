@@ -694,9 +694,12 @@ impl<T> Receiver<T> {
     /// Returns the number of messages that were sent into the channel and that
     /// this [`Receiver`] has yet to receive.
     ///
-    /// If the returned value from `len` is larger or equal to the capacity of
-    /// the channel any call to [`recv`] will return an `Err(RecvError::Lagged)`
-    /// and any call to [`try_recv`] will return an `Err(TryRecvError::Lagged)`.
+    /// If the returned value from `len` is larger than the next largest power of 2
+    /// of the capacity of the channel any call to [`recv`] will return an
+    /// `Err(RecvError::Lagged)` and any call to [`try_recv`] will return an
+    /// `Err(TryRecvError::Lagged)`, e.g. if the capacity of the channel is 10,
+    /// [`recv`] will start to return `Err(RecvError::Lagged)` once `len` returns
+    /// values larger than 16.
     ///
     /// [`Receiver`]: crate::sync::broadcast::Receiver
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
