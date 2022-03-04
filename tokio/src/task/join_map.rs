@@ -254,14 +254,13 @@ where
         match map_entry {
             hash_map::RawEntryMut::Occupied(mut occ) => {
                 let prev = occ.insert_key(entry);
-                // Abort the previous entry.
+
+                // Remove the previous task from the `IdleNotifiedSet` and abort
+                // it, as it has been replaced with the new task.
                 if let Some(mut prev_entry) = self.joins.entry_mut(prev.entry) {
-                    prev_entry.with_value_and_context(|(_prev_hash, prev_task), _| {
-                        debug_assert_eq!(*_prev_hash, hash);
-                        prev_task.abort();
-                    });
-                    // XXX(eliza): we could also remove it from the
-                    // `IdleNotifiedSet` here...?
+                    let (_prev_hash, prev_task) = prev_entry.remove();
+                    debug_assert_eq!(_prev_hash, hash);
+                    prev_task.abort();
                 }
             }
             hash_map::RawEntryMut::Vacant(vac) => {
@@ -285,12 +284,14 @@ where
     ///
     /// This function returns:
     ///
-    ///  * `Ok(Some((key, value)))` if one of the tasks in this `JoinMap` has
+    ///  * `Some((key, Ok(value)))` if one of the tasks in this `JoinMap` has
     ///    completed. The `value` is the return value of that ask, and `key` is
     ///    the key associated with the task.
-    ///  * `Err(err)` if one of the tasks in this JoinMap` has panicked or been aborted.
-    ///  * `Ok(None)` if the `JoinMap` is empty.
-    pub async fn join_one(&mut self) -> Result<Option<(K, V)>, JoinError> {
+    ///  * `Some((key, Err(err))` if one of the tasks in this JoinMap` has
+    ///    panicked or been aborted. `key` is the key associated  with the task
+    ///    that panicked or was aborted.
+    ///  * `None` if the `JoinMap` is empty.
+    pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
         crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
     }
 
@@ -306,7 +307,7 @@ where
     /// [`join_one`]: fn@Self::join_one
     pub async fn shutdown(&mut self) {
         self.abort_all();
-        while self.join_one().await.transpose().is_some() {}
+        while self.join_one().await.is_some() {}
     }
 
     /// Abort the task corresponding to the provided `key`.
@@ -319,20 +320,17 @@ where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        let hash = Self::hash(&self.aborts, key);
-        let entry = self
-            .aborts
-            .raw_entry_mut()
-            .from_hash(hash, |entry| key == entry.key.borrow());
-        let entry = match entry {
-            hash_map::RawEntryMut::Occupied(entry) => entry.remove_entry().0,
-            _ => return false,
+        let aborts = &self.aborts;
+        let joins = &mut self.joins;
+        let entry = match Self::get(aborts, key) {
+            Some(entry) => entry,
+            None => return false,
         };
 
         debug_assert!(key == entry.key.borrow());
-        if let Some(mut entry) = self.joins.entry_mut(entry.entry.clone()) {
+        if let Some(mut entry) = joins.entry_mut(entry.entry.clone()) {
             entry.with_value_and_context(|(_actual_hash, jh), _| {
-                debug_assert_eq!(hash, *_actual_hash);
+                debug_assert_eq!(Self::hash(aborts, key), *_actual_hash);
                 jh.abort();
             });
             return true;
@@ -350,16 +348,14 @@ where
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
         let aborts = &mut self.aborts;
         let joins = &mut self.joins;
-        aborts.retain(|entry, _| {
-            if predicate(&entry.key) {
-                if let Some(mut entry) = joins.entry_mut(entry.entry.clone()) {
-                    entry.with_value_and_context(|(_, jh), _| jh.abort());
-                }
-                false
-            } else {
-                true
+        // Note: this method iterates over the key set *without* removing any
+        // entries, so that the keys from aborted tasks can be returned when
+        // polling the `JoinMap`.
+        for entry in aborts.keys().filter(|entry| predicate(&entry.key)) {
+            if let Some(mut entry) = joins.entry_mut(entry.entry.clone()) {
+                entry.with_value_and_context(|(_, jh), _| jh.abort());
             }
-        })
+        }
     }
 
     /// Returns `true` if this `JoinMap` contains a task for the provided key.
@@ -475,14 +471,14 @@ where
     /// This can happen if the [coop budget] is reached.
     ///
     /// [coop budget]: crate::task#cooperative-scheduling
-    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<(K, V)>, JoinError>> {
+    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Option<(K, Result<V, JoinError>)>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
         let mut entry = match self.joins.pop_notified(cx.waker()) {
             Some(entry) => entry,
             None => {
                 if self.is_empty() {
-                    return Poll::Ready(Ok(None));
+                    return Poll::Ready(None);
                 } else {
                     // The waker was set by `pop_notified`.
                     return Poll::Pending;
@@ -505,20 +501,12 @@ where
             match (map_entry, res) {
                 // Found the task in the key map! Remove it.
                 (hash_map::RawEntryMut::Occupied(occ), res) => {
-                    let (map_entry, _) = occ.remove_entry();
-                    Poll::Ready(res.map(|val| Some((map_entry.key, val))))
+                    let (MapEntry { key, .. }, _) = occ.remove_entry();
+                    Poll::Ready(Some((key, res)))
                 }
-                // The task's key is no longer in the key map ---
-                // presumably, it was already cancelled.
-                (hash_map::RawEntryMut::Vacant(_), Err(e)) => {
-                    debug_assert!(
-                        e.is_cancelled(),
-                        "if the task's key is no longer in the map, it must have been cancelled!"
-                    );
-                    Poll::Ready(Err(e))
-                }
-                (hash_map::RawEntryMut::Vacant(_), Ok(_)) => unreachable!(
-                    "if the task's key is no longer in the map, it must have been cancelled!"
+                _ => unreachable!(
+                    "if a task was removed from the key set, it must also have \
+                    been removed from the IdleNotifiedSet. this is a bug!"
                 ),
             }
         } else {

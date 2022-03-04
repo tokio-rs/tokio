@@ -24,7 +24,7 @@ async fn test_with_sleep() {
     map.detach_all();
     assert_eq!(map.len(), 0);
 
-    assert!(matches!(map.join_one().await, Ok(None)));
+    assert!(matches!(map.join_one().await, None));
 
     for i in 0..10 {
         map.spawn(i, async move {
@@ -35,19 +35,15 @@ async fn test_with_sleep() {
     }
 
     let mut seen = [false; 10];
-    while let Some((k, res)) = map
-        .join_one()
-        .await
-        .expect("task should have completed successfully")
-    {
+    while let Some((k, res)) = map.join_one().await {
         seen[k] = true;
-        assert_eq!(res, k);
+        assert_eq!(res.expect("task should have completed successfully"), k);
     }
 
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(map.join_one().await, Ok(None)));
+    assert!(matches!(map.join_one().await, None));
 
     // Do it again.
     for i in 0..10 {
@@ -58,19 +54,15 @@ async fn test_with_sleep() {
     }
 
     let mut seen = [false; 10];
-    while let Some((k, res)) = map
-        .join_one()
-        .await
-        .expect("task should have completed successfully")
-    {
+    while let Some((k, res)) = map.join_one().await {
         seen[k] = true;
-        assert_eq!(res, k);
+        assert_eq!(res.expect("task should have completed successfully"), k);
     }
 
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(map.join_one().await, Ok(None)));
+    assert!(matches!(map.join_one().await, None));
 }
 
 #[tokio::test]
@@ -109,11 +101,8 @@ async fn alternating() {
     assert_eq!(map.len(), 2);
 
     for i in 0..16 {
-        let (_, _) = map
-            .join_one()
-            .await
-            .expect("task must have completed successfully")
-            .expect("map must not be empty");
+        let (_, res) = map.join_one().await.unwrap();
+        assert!(res.is_ok());
         assert_eq!(map.len(), 1);
         map.spawn(i, async {});
         assert_eq!(map.len(), 2);
@@ -138,9 +127,9 @@ async fn abort_by_key() {
         }
     }
 
-    while let Some(res) = map.join_one().await.transpose() {
+    while let Some((key, res)) = map.join_one().await {
         match res {
-            Ok((key, _)) => {
+            Ok(()) => {
                 num_completed += 1;
                 assert_eq!(key % 2, 0);
                 assert!(!map.contains_task(&key));
@@ -148,6 +137,8 @@ async fn abort_by_key() {
             Err(e) => {
                 num_canceled += 1;
                 assert!(e.is_cancelled());
+                assert_ne!(key % 2, 0);
+                assert!(!map.contains_task(&key));
             }
         }
     }
@@ -170,9 +161,9 @@ async fn abort_by_predicate() {
     // abort odd-numbered tasks.
     map.abort_matching(|key| key % 2 != 0);
 
-    while let Some(res) = map.join_one().await.transpose() {
+    while let Some((key, res)) = map.join_one().await {
         match res {
-            Ok((key, _)) => {
+            Ok(()) => {
                 num_completed += 1;
                 assert_eq!(key % 2, 0);
                 assert!(!map.contains_task(&key));
@@ -180,6 +171,8 @@ async fn abort_by_predicate() {
             Err(e) => {
                 num_canceled += 1;
                 assert!(e.is_cancelled());
+                assert_ne!(key % 2, 0);
+                assert!(!map.contains_task(&key));
             }
         }
     }
@@ -197,8 +190,9 @@ fn runtime_gone() {
         drop(rt);
     }
 
-    let err = rt().block_on(map.join_one()).unwrap_err();
-    assert!(err.is_cancelled());
+    let (key, res) = rt().block_on(map.join_one()).unwrap();
+    assert_eq!(key, "key");
+    assert!(res.unwrap_err().is_cancelled());
 }
 
 // This ensures that `join_one` works correctly when the coop budget is
@@ -229,14 +223,14 @@ async fn join_map_coop() {
     let mut coop_count = 0;
     loop {
         match map.join_one().now_or_never() {
-            Some(Ok(Some((key, i)))) => assert_eq!(key, i),
-            Some(Err(err)) => panic!("failed: {}", err),
+            Some(Some((key, Ok(i)))) => assert_eq!(key, i),
+            Some(Some((key, Err(err)))) => panic!("failed[{}]: {}", key, err),
             None => {
                 coop_count += 1;
                 tokio::task::yield_now().await;
                 continue;
             }
-            Some(Ok(None)) => break,
+            Some(None) => break,
         }
 
         count += 1;
@@ -265,7 +259,9 @@ async fn abort_all() {
     assert_eq!(map.len(), 10);
 
     let mut count = 0;
-    while let Some(res) = map.join_one().await.transpose() {
+    let mut seen = [false; 10];
+    while let Some((k, res)) = map.join_one().await {
+        seen[k] = true;
         if let Err(err) = res {
             assert!(err.is_cancelled());
         }
@@ -273,4 +269,7 @@ async fn abort_all() {
     }
     assert_eq!(count, 10);
     assert_eq!(map.len(), 0);
+    for was_seen in &seen {
+        assert!(was_seen);
+    }
 }
