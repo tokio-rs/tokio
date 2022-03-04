@@ -1,3 +1,4 @@
+use crate::loom::sync::Arc;
 use crate::runtime::Handle;
 use crate::task::{JoinError, JoinHandle, LocalSet};
 use crate::util::idle_notified_set::{self, IdleNotifiedSet};
@@ -8,7 +9,6 @@ use std::fmt;
 use std::future::Future;
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 
 /// A collection of tasks spawned on a Tokio runtime, associated with hash map
