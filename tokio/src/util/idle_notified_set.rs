@@ -40,11 +40,6 @@ pub(crate) struct EntryInOneOfTheLists<'a, T> {
     set: &'a mut IdleNotifiedSet<T>,
 }
 
-pub(crate) struct EntryRef<'a, T> {
-    entry: &'a Arc<ListEntry<T>>,
-    set: &'a IdleNotifiedSet<T>,
-}
-
 type Lists<T> = Mutex<ListsInner<T>>;
 
 /// The linked lists hold strong references to the ListEntry items, and the
@@ -183,20 +178,6 @@ impl<T> IdleNotifiedSet<T> {
         }
 
         Some(EntryInOneOfTheLists { entry, set: self })
-    }
-
-    pub(crate) fn entry<'a>(&'a self, entry: &'a Arc<ListEntry<T>>) -> Option<EntryRef<'a, T>> {
-        let is_unlinked = {
-            // we must lock the lists in order to access `my_list`.
-            let _lock = self.lists.lock();
-            entry.my_list.with(|x| unsafe { *x == List::Neither })
-        };
-
-        if is_unlinked {
-            return None;
-        }
-
-        Some(EntryRef { entry, set: self })
     }
 
     /// Pop an entry from the notified list to poll it. The entry is moved to
@@ -423,18 +404,9 @@ impl<'a, T> EntryInOneOfTheLists<'a, T> {
     pub(crate) fn entry(self) -> Arc<ListEntry<T>> {
         self.entry
     }
-}
 
-impl<'a, T> EntryRef<'a, T> {
-    /// Access the value in this entry.
-    pub(crate) fn with_value<F, U>(&self, func: F) -> U
-    where
-        F: FnOnce(&T) -> U,
-        T: 'static,
-    {
-        // Safety: We have an immutable reference to the `IdleNotifiedSet` that
-        // owns this entry, so we can use its permission to access the value.
-        self.entry.value.with(|ptr| unsafe { func(&*ptr) })
+    pub(crate) fn ptr_eq(&self, other: &Arc<ListEntry<T>>) -> bool {
+        Arc::ptr_eq(&self.entry, other)
     }
 }
 

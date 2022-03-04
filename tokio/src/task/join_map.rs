@@ -6,7 +6,7 @@ use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::fmt;
 use std::future::Future;
-use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -41,9 +41,8 @@ use std::task::{Context, Poll};
 /// [contains]: fn@Self::contains_task
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
-    aborts: HashMap<MapEntry<K, V>, (), BuildHasherDefault<IdHasher>>,
-    hash_builder: S,
-    joins: IdleNotifiedSet<(K, JoinHandle<V>)>,
+    aborts: HashMap<MapEntry<K, V>, (), S>,
+    joins: IdleNotifiedSet<(u64, JoinHandle<V>)>,
 }
 
 impl<K, V> JoinMap<K, V> {
@@ -129,8 +128,7 @@ impl<K, V, S> JoinMap<K, V, S> {
     #[must_use]
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
         Self {
-            aborts: HashMap::with_capacity_and_hasher(capacity, BuildHasherDefault::default()),
-            hash_builder,
+            aborts: HashMap::with_capacity_and_hasher(capacity, hash_builder),
             joins: IdleNotifiedSet::new(),
         }
     }
@@ -236,35 +234,38 @@ where
     }
 
     fn insert(&mut self, key: K, jh: JoinHandle<V>) {
-        let hash = self.hash(&key);
+        let hash = Self::hash(&self.aborts, &key);
 
-        let mut entry = self.joins.insert_idle((key, jh));
+        let mut entry = self.joins.insert_idle((hash, jh));
 
-        entry.with_value_and_context(|(_, jh), ctx| jh.set_join_waker(ctx.waker()));
-        let entry = entry.entry();
-        let joins = &self.joins;
-        let map_entry = self.aborts.raw_entry_mut().from_hash(hash, |other| {
-            joins.entry(&other.entry).map_or(true, |other_entry| {
-                other_entry.with_value(|(other_key, _)| {
-                    joins
-                        .entry(&entry)
-                        .expect("we just inserted this")
-                        .with_value(|(key, _)| key == other_key)
-                })
-            })
-        });
         // Set the waker that is notified when the task completes.
-        let entry = MapEntry { entry, hash };
+        entry.with_value_and_context(|(_, jh), ctx| jh.set_join_waker(ctx.waker()));
+
+        let map_entry = self
+            .aborts
+            .raw_entry_mut()
+            .from_hash(hash, |entry| entry.key == key);
+
+        let entry = MapEntry {
+            entry: entry.entry(),
+            key,
+        };
 
         match map_entry {
             hash_map::RawEntryMut::Occupied(mut occ) => {
-                let entry = occ.insert_key(entry);
-                if let Some(mut entry) = self.joins.entry_mut(entry.entry) {
-                    entry.with_value_and_context(|(_, jh), _| jh.abort());
+                let prev = occ.insert_key(entry);
+                // Abort the previous entry.
+                if let Some(mut prev_entry) = self.joins.entry_mut(prev.entry) {
+                    prev_entry.with_value_and_context(|(_prev_hash, prev_task), _| {
+                        debug_assert_eq!(*_prev_hash, hash);
+                        prev_task.abort();
+                    });
+                    // XXX(eliza): we could also remove it from the
+                    // `IdleNotifiedSet` here...?
                 }
             }
             hash_map::RawEntryMut::Vacant(vac) => {
-                vac.insert_hashed_nocheck(hash, entry, ());
+                vac.insert(entry, ());
             }
         }
     }
@@ -284,14 +285,12 @@ where
     ///
     /// This function returns:
     ///
-    ///  * `Some((key, Ok(value)))` if one of the tasks in this `JoinMap` has
+    ///  * `Ok(Some((key, value)))` if one of the tasks in this `JoinMap` has
     ///    completed. The `value` is the return value of that ask, and `key` is
     ///    the key associated with the task.
-    ///  * `Some((key, Err(err))` if one of the tasks in this JoinMap` has
-    ///    panicked or been aborted. `key` is the key associated  with the task
-    ///    that panicked or was aborted.
-    ///  * `None` if the `JoinMap` is empty.
-    pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
+    ///  * `Err(err)` if one of the tasks in this JoinMap` has panicked or been aborted.
+    ///  * `Ok(None)` if the `JoinMap` is empty.
+    pub async fn join_one(&mut self) -> Result<Option<(K, V)>, JoinError> {
         crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
     }
 
@@ -307,7 +306,7 @@ where
     /// [`join_one`]: fn@Self::join_one
     pub async fn shutdown(&mut self) {
         self.abort_all();
-        while self.join_one().await.is_some() {}
+        while self.join_one().await.transpose().is_some() {}
     }
 
     /// Abort the task corresponding to the provided `key`.
@@ -320,16 +319,26 @@ where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        match self.remove(key) {
-            Some(mut task) => {
-                task.with_value_and_context(|(actual_key, jh), _| {
-                    debug_assert!(key == (&*actual_key).borrow());
-                    jh.abort();
-                });
-                true
-            }
-            None => false,
+        let hash = Self::hash(&self.aborts, key);
+        let entry = self
+            .aborts
+            .raw_entry_mut()
+            .from_hash(hash, |entry| key == entry.key.borrow());
+        let entry = match entry {
+            hash_map::RawEntryMut::Occupied(entry) => entry.remove_entry().0,
+            _ => return false,
+        };
+
+        debug_assert!(key == entry.key.borrow());
+        if let Some(mut entry) = self.joins.entry_mut(entry.entry.clone()) {
+            entry.with_value_and_context(|(_actual_hash, jh), _| {
+                debug_assert_eq!(hash, *_actual_hash);
+                jh.abort();
+            });
+            return true;
         }
+
+        false
     }
 
     /// Aborts all tasks with keys matching `predicate`.
@@ -340,17 +349,16 @@ where
     // XXX(eliza): do we want to consider counting the number of tasks aborted?
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
         let aborts = &mut self.aborts;
-        let joins = &self.joins;
-        aborts.retain(|k, _| {
-            joins.entry(&k.entry).map_or(true, |entry| {
-                entry.with_value(|(k, jh)| {
-                    if predicate(&*k) {
-                        jh.abort();
-                        return false;
-                    }
-                    true
-                })
-            })
+        let joins = &mut self.joins;
+        aborts.retain(|entry, _| {
+            if predicate(&entry.key) {
+                if let Some(mut entry) = joins.entry_mut(entry.entry.clone()) {
+                    entry.with_value_and_context(|(_, jh), _| jh.abort());
+                }
+                false
+            } else {
+                true
+            }
         })
     }
 
@@ -365,7 +373,7 @@ where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        self.get(key).is_some()
+        Self::get(&self.aborts, key).is_some()
     }
 
     /// Reserves capacity for at least `additional` more tasks to be spawned
@@ -467,14 +475,14 @@ where
     /// This can happen if the [coop budget] is reached.
     ///
     /// [coop budget]: crate::task#cooperative-scheduling
-    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Option<(K, Result<V, JoinError>)>> {
+    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<(K, V)>, JoinError>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
         let mut entry = match self.joins.pop_notified(cx.waker()) {
             Some(entry) => entry,
             None => {
                 if self.is_empty() {
-                    return Poll::Ready(None);
+                    return Poll::Ready(Ok(None));
                 } else {
                     // The waker was set by `pop_notified`.
                     return Poll::Pending;
@@ -485,9 +493,34 @@ where
         let res = entry.with_value_and_context(|(_, jh), ctx| Pin::new(jh).poll(ctx));
 
         if let Poll::Ready(res) = res {
-            let (key, _) = entry.remove();
-            self.remove(&key);
-            Poll::Ready(Some((key, res)))
+            // Look up the entry in the key map by the hash stored in the
+            // `IdleNotifiedSet` entry + the `Arc` pointer.
+            let hash = entry.with_value_and_context(|(hash, _), _| *hash);
+            let map_entry = self
+                .aborts
+                .raw_entry_mut()
+                .from_hash(hash, |map_entry| entry.ptr_eq(&map_entry.entry));
+            // Remove the entry from the `IdleNotifiedSet`.
+            let _ = entry.remove();
+            match (map_entry, res) {
+                // Found the task in the key map! Remove it.
+                (hash_map::RawEntryMut::Occupied(occ), res) => {
+                    let (map_entry, _) = occ.remove_entry();
+                    Poll::Ready(res.map(|val| Some((map_entry.key, val))))
+                }
+                // The task's key is no longer in the key map ---
+                // presumably, it was already cancelled.
+                (hash_map::RawEntryMut::Vacant(_), Err(e)) => {
+                    debug_assert!(
+                        e.is_cancelled(),
+                        "if the task's key is no longer in the map, it must have been cancelled!"
+                    );
+                    Poll::Ready(Err(e))
+                }
+                (hash_map::RawEntryMut::Vacant(_), Ok(_)) => unreachable!(
+                    "if the task's key is no longer in the map, it must have been cancelled!"
+                ),
+            }
         } else {
             // A JoinHandle generally won't emit a wakeup without being ready unless
             // the coop limit has been reached. We yield to the executor in this
@@ -497,61 +530,26 @@ where
         }
     }
 
-    fn get<Q: ?Sized>(&self, key: &Q) -> Option<idle_notified_set::EntryRef<'_, (K, JoinHandle<V>)>>
-    where
-        Q: Hash + Eq,
-        K: Borrow<Q>,
-    {
-        let my_hash = self.hash(key);
-        let (entry, _) =
-            self.aborts
-                .raw_entry()
-                .from_hash(my_hash, |MapEntry { entry, hash }| {
-                    if my_hash != *hash {
-                        return false;
-                    }
-                    self.joins.entry(entry).map_or(false, |entry| {
-                        entry.with_value(|(other_key, _)| other_key.borrow() == key)
-                    })
-                })?;
-        self.joins.entry(&entry.entry)
-    }
-
-    fn remove<Q: ?Sized>(
-        &mut self,
+    fn get<'a, Q: ?Sized>(
+        map: &'a HashMap<MapEntry<K, V>, (), S>,
         key: &Q,
-    ) -> Option<idle_notified_set::EntryInOneOfTheLists<'_, (K, JoinHandle<V>)>>
+    ) -> Option<&'a MapEntry<K, V>>
     where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        let my_hash = self.hash(key);
-        let joins = &self.joins;
-        let entry = self
-            .aborts
-            .raw_entry_mut()
-            .from_hash(my_hash, |MapEntry { entry, hash }| {
-                if my_hash != *hash {
-                    return false;
-                }
-                joins.entry(entry).map_or(false, |entry| {
-                    entry.with_value(|(other_key, _)| other_key.borrow() == key)
-                })
-            });
-        match entry {
-            hash_map::RawEntryMut::Occupied(occ) => {
-                let (MapEntry { entry, .. }, _) = occ.remove_entry();
-                self.joins.entry_mut(entry)
-            }
-            _ => None,
-        }
+        let hash = Self::hash(map, key);
+        let (entry, _) = map
+            .raw_entry()
+            .from_hash(hash, |entry| key == entry.key.borrow())?;
+        Some(entry)
     }
 
-    fn hash<Q: ?Sized>(&self, key: &Q) -> u64
+    fn hash<Q: ?Sized>(map: &HashMap<MapEntry<K, V>, (), S>, key: &Q) -> u64
     where
         Q: Hash,
     {
-        let mut hasher = self.hash_builder.build_hasher();
+        let mut hasher = map.hasher().build_hasher();
         key.hash(&mut hasher);
         hasher.finish()
     }
@@ -591,13 +589,9 @@ impl<K: fmt::Debug + 'static, V: 'static, S> fmt::Debug for JoinMap<K, V, S> {
         struct KeySet<'a, K, V, S>(&'a JoinMap<K, V, S>);
         impl<K: fmt::Debug + 'static, V: 'static, S> fmt::Debug for KeySet<'_, K, V, S> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let mut set = f.debug_set();
-                for MapEntry { entry, .. } in self.0.aborts.keys() {
-                    if let Some(entry) = self.0.joins.entry(entry) {
-                        entry.with_value(|(k, _)| set.entry(k));
-                    }
-                }
-                set.finish()
+                f.debug_set()
+                    .entries(self.0.aborts.keys().map(|entry| &entry.key))
+                    .finish()
             }
         }
 
@@ -614,39 +608,20 @@ impl<K, V> Default for JoinMap<K, V> {
 }
 
 struct MapEntry<K, V> {
-    entry: Arc<idle_notified_set::ListEntry<(K, JoinHandle<V>)>>,
-    hash: u64,
+    key: K,
+    entry: Arc<idle_notified_set::ListEntry<(u64, JoinHandle<V>)>>,
 }
 
-impl<K, V> Hash for MapEntry<K, V> {
+impl<K: Hash, V> Hash for MapEntry<K, V> {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        hasher.write_u64(self.hash);
+        self.key.hash(hasher);
     }
 }
 
-impl<K, V> PartialEq for MapEntry<K, V> {
-    fn eq(&self, _: &Self) -> bool {
-        unreachable!("MapEntry equality should not be compared directly; this is a bug!")
+impl<K: PartialEq, V> PartialEq for MapEntry<K, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
     }
 }
 
-impl<K, V> Eq for MapEntry<K, V> {}
-
-#[derive(Default)]
-struct IdHasher(u64);
-
-impl Hasher for IdHasher {
-    fn write(&mut self, _: &[u8]) {
-        unreachable!("whole hash should always be written via `write_u64`");
-    }
-
-    #[inline]
-    fn write_u64(&mut self, u: u64) {
-        self.0 = u;
-    }
-
-    #[inline]
-    fn finish(&self) -> u64 {
-        self.0
-    }
-}
+impl<K: Eq, V> Eq for MapEntry<K, V> {}
