@@ -24,13 +24,13 @@ pub(crate) type OsStorage = Vec<SignalInfo>;
 
 impl Init for OsStorage {
     fn init() -> Self {
-        // There are at least 33 reliable signals available on every Unix platform.
+        // There are reliable signals ranging from 1 to 33 available on every Unix platform.
         #[cfg(not(target_os = "linux"))]
-        let possible = 0..33;
+        let possible = 0..=33;
 
         // On Linux, there are additional real-time signals available.
         #[cfg(target_os = "linux")]
-        let possible = 0..libc::SIGRTMAX();
+        let possible = 0..=libc::SIGRTMAX();
 
         possible
             .map(|_| SignalInfo::default())
