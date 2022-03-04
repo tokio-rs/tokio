@@ -32,9 +32,7 @@ impl Init for OsStorage {
         #[cfg(target_os = "linux")]
         let possible = 0..=libc::SIGRTMAX();
 
-        possible
-            .map(|_| SignalInfo::default())
-            .collect()
+        possible.map(|_| SignalInfo::default()).collect()
     }
 }
 
