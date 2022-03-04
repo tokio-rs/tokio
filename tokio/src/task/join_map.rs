@@ -41,8 +41,45 @@ use std::task::{Context, Poll};
 /// [contains]: fn@Self::contains_task
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
-    keys: HashMap<Key<K, V>, (), S>,
-    joins: IdleNotifiedSet<(u64, JoinHandle<V>)>,
+    /// The map's key set.
+    ///
+    /// Tasks spawned on a `JoinMap` are uniquely identified by a key. To avoid
+    /// having to clone the keys, which may be expensive (e.g. if they are
+    /// strings...), we store the keys only in the `JoinMap` and *not* in the
+    /// tasks themselves. Instead, the key's hash is stored in the
+    /// `IdleNotifiedSet`; when a task completes, we look up the key using that
+    /// hash, resolving collisions based on whether or not two entries in the
+    /// map have the same `Arc` pointer.
+    ///
+    /// Because we look up map entries based on their raw hashes (rather than
+    /// with a typed key), we must currently use the `hashbrown` crate directly,
+    /// rather than depending on it via its re-export in
+    /// `std::collections::HashMap`. This is because the `RawEntry` API, for
+    /// looking up map entries by hash, is unstable in the standard library.
+    ///
+    /// This is technically used as a set rather than a map --- the map's value
+    /// type is `()`. However, `HashSet` doesn't provide the raw entry APIs that
+    /// we use here.
+    key_set: HashMap<Key<K, V>, (), S>,
+    /// The set of tasks spawned on the `JoinMap`.
+    ///
+    /// Each `IdleNotifiedSet` entry contains the hash of the task's key, to
+    /// allow looking the key up when the task completes.
+    task_set: IdleNotifiedSet<(u64, JoinHandle<V>)>,
+}
+
+/// A `JoinMap` key.
+///
+/// This contains both the actual key value *and* an `Arc` clone of the entry in
+/// the `IdleNotifiedSet` for the corresponding task. This way, when looking up
+/// completed tasks by their hash, we can hash resolve collisions by testing if the
+/// `Arc` points to the same `IdleNotifiedSet` entry.
+///
+/// Also, the `IdleNotifiedSet` join handle is used to cancel the task in
+/// `abort` and `abort_matching`.
+struct Key<K, V> {
+    key: K,
+    task: Arc<idle_notified_set::ListEntry<(u64, JoinHandle<V>)>>,
 }
 
 impl<K, V> JoinMap<K, V> {
@@ -128,19 +165,19 @@ impl<K, V, S> JoinMap<K, V, S> {
     #[must_use]
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
         Self {
-            keys: HashMap::with_capacity_and_hasher(capacity, hash_builder),
-            joins: IdleNotifiedSet::new(),
+            key_set: HashMap::with_capacity_and_hasher(capacity, hash_builder),
+            task_set: IdleNotifiedSet::new(),
         }
     }
 
     /// Returns the number of tasks currently in the `JoinMap`.
     pub fn len(&self) -> usize {
-        self.joins.len()
+        self.task_set.len()
     }
 
     /// Returns whether the `JoinMap` is empty.
     pub fn is_empty(&self) -> bool {
-        self.joins.is_empty()
+        self.task_set.is_empty()
     }
 
     /// Returns the number of tasks the map can hold without reallocating.
@@ -158,7 +195,7 @@ impl<K, V, S> JoinMap<K, V, S> {
     /// ```
     #[inline]
     pub fn capacity(&self) -> usize {
-        self.keys.capacity()
+        self.key_set.capacity()
     }
 }
 
@@ -234,20 +271,20 @@ where
     }
 
     fn insert(&mut self, key: K, jh: JoinHandle<V>) {
-        let hash = Self::hash(&self.keys, &key);
+        let hash = Self::hash(&self.key_set, &key);
 
-        let mut entry = self.joins.insert_idle((hash, jh));
+        let mut entry = self.task_set.insert_idle((hash, jh));
 
         // Set the waker that is notified when the task completes.
         entry.with_value_and_context(|(_, jh), ctx| jh.set_join_waker(ctx.waker()));
 
         let map_entry = self
-            .keys
+            .key_set
             .raw_entry_mut()
             .from_hash(hash, |entry| entry.key == key);
 
         let entry = Key {
-            entry: entry.entry(),
+            task: entry.entry(),
             key,
         };
 
@@ -257,7 +294,7 @@ where
 
                 // Remove the previous task from the `IdleNotifiedSet` and abort
                 // it, as it has been replaced with the new task.
-                if let Some(prev_entry) = self.joins.entry_mut(prev.entry) {
+                if let Some(prev_entry) = self.task_set.entry_mut(prev.task) {
                     let (_prev_hash, prev_task) = prev_entry.remove();
                     debug_assert_eq!(_prev_hash, hash);
                     prev_task.abort();
@@ -320,17 +357,17 @@ where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        let keys = &self.keys;
-        let joins = &mut self.joins;
-        let entry = match Self::get(keys, key) {
+        let key_set = &self.key_set;
+        let joins = &mut self.task_set;
+        let entry = match Self::get(key_set, key) {
             Some(entry) => entry,
             None => return false,
         };
 
         debug_assert!(key == entry.key.borrow());
-        if let Some(mut entry) = joins.entry_mut(entry.entry.clone()) {
+        if let Some(mut entry) = joins.entry_mut(entry.task.clone()) {
             entry.with_value_and_context(|(_actual_hash, jh), _| {
-                debug_assert_eq!(Self::hash(keys, key), *_actual_hash);
+                debug_assert_eq!(Self::hash(key_set, key), *_actual_hash);
                 jh.abort();
             });
             return true;
@@ -346,13 +383,13 @@ where
     /// be cancelled.
     // XXX(eliza): do we want to consider counting the number of tasks aborted?
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
-        let keys = &mut self.keys;
-        let joins = &mut self.joins;
+        let key_set = &mut self.key_set;
+        let joins = &mut self.task_set;
         // Note: this method iterates over the key set *without* removing any
         // entries, so that the keys from aborted tasks can be returned when
         // polling the `JoinMap`.
-        for entry in keys.keys().filter(|entry| predicate(&entry.key)) {
-            if let Some(mut entry) = joins.entry_mut(entry.entry.clone()) {
+        for entry in key_set.keys().filter(|entry| predicate(&entry.key)) {
+            if let Some(mut entry) = joins.entry_mut(entry.task.clone()) {
                 entry.with_value_and_context(|(_, jh), _| jh.abort());
             }
         }
@@ -369,7 +406,7 @@ where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        Self::get(&self.keys, key).is_some()
+        Self::get(&self.key_set, key).is_some()
     }
 
     /// Reserves capacity for at least `additional` more tasks to be spawned
@@ -393,7 +430,7 @@ where
     /// ```
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.keys.reserve(additional)
+        self.key_set.reserve(additional)
     }
 
     /// Shrinks the capacity of the `JoinMap` as much as possible. It will drop
@@ -414,7 +451,7 @@ where
     /// ```
     #[inline]
     pub fn shrink_to_fit(&mut self) {
-        self.keys.shrink_to_fit();
+        self.key_set.shrink_to_fit();
     }
 
     /// Shrinks the capacity of the map with a lower limit. It will drop
@@ -439,7 +476,7 @@ where
     /// ```
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
-        self.keys.shrink_to(min_capacity)
+        self.key_set.shrink_to(min_capacity)
     }
 
     /// Polls for one of the tasks in the map to complete, returning the output
@@ -474,7 +511,7 @@ where
     fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Option<(K, Result<V, JoinError>)>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
-        let mut entry = match self.joins.pop_notified(cx.waker()) {
+        let mut entry = match self.task_set.pop_notified(cx.waker()) {
             Some(entry) => entry,
             None => {
                 if self.is_empty() {
@@ -493,9 +530,9 @@ where
             // `IdleNotifiedSet` entry + the `Arc` pointer.
             let hash = entry.with_value_and_context(|(hash, _), _| *hash);
             let map_entry = self
-                .keys
+                .key_set
                 .raw_entry_mut()
-                .from_hash(hash, |map_entry| entry.ptr_eq(&map_entry.entry));
+                .from_hash(hash, |map_entry| entry.ptr_eq(&map_entry.task));
             // Remove the entry from the `IdleNotifiedSet`.
             let _ = entry.remove();
             match (map_entry, res) {
@@ -550,7 +587,7 @@ where
     /// This does not remove the tasks from the `JoinMap`. To wait for the tasks to complete
     /// cancellation, you should call `join_one` in a loop until the `JoinMap` is empty.
     pub fn abort_all(&mut self) {
-        self.joins.for_each(|(_, jh)| jh.abort());
+        self.task_set.for_each(|(_, jh)| jh.abort());
     }
 
     /// Removes all tasks from this `JoinMap` without aborting them.
@@ -558,13 +595,13 @@ where
     /// The tasks removed by this call will continue to run in the background even if the `JoinMap`
     /// is dropped. They may still be aborted by key.
     pub fn detach_all(&mut self) {
-        self.joins.drain(drop);
+        self.task_set.drain(drop);
     }
 }
 
 impl<K, V, S> Drop for JoinMap<K, V, S> {
     fn drop(&mut self) {
-        self.joins.drain(|(_, join_handle)| join_handle.abort());
+        self.task_set.drain(|(_, join_handle)| join_handle.abort());
     }
 }
 
@@ -575,13 +612,13 @@ impl<K: fmt::Debug + 'static, V: 'static, S> fmt::Debug for JoinMap<K, V, S> {
         impl<K: fmt::Debug + 'static, V: 'static, S> fmt::Debug for KeySet<'_, K, V, S> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.debug_set()
-                    .entries(self.0.keys.keys().map(|entry| &entry.key))
+                    .entries(self.0.key_set.keys().map(|entry| &entry.key))
                     .finish()
             }
         }
 
         f.debug_struct("JoinMap")
-            .field("keys", &KeySet(self))
+            .field("key_set", &KeySet(self))
             .finish()
     }
 }
@@ -592,10 +629,7 @@ impl<K, V> Default for JoinMap<K, V> {
     }
 }
 
-struct Key<K, V> {
-    key: K,
-    entry: Arc<idle_notified_set::ListEntry<(u64, JoinHandle<V>)>>,
-}
+// === impl Key ===
 
 impl<K: Hash, V> Hash for Key<K, V> {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
