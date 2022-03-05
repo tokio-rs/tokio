@@ -22,13 +22,17 @@ use self::driver::Handle;
 
 pub(crate) type OsStorage = Vec<SignalInfo>;
 
-// Number of different unix signals
-// (FreeBSD has 33)
-const SIGNUM: usize = 33;
-
 impl Init for OsStorage {
     fn init() -> Self {
-        (0..SIGNUM).map(|_| SignalInfo::default()).collect()
+        // There are reliable signals ranging from 1 to 33 available on every Unix platform.
+        #[cfg(not(target_os = "linux"))]
+        let possible = 0..=33;
+
+        // On Linux, there are additional real-time signals available.
+        #[cfg(target_os = "linux")]
+        let possible = 0..=libc::SIGRTMAX();
+
+        possible.map(|_| SignalInfo::default()).collect()
     }
 }
 
