@@ -3,7 +3,8 @@ use crate::runtime::Handle;
 use crate::task::{JoinError, JoinHandle, LocalSet};
 use crate::util::idle_notified_set::{self, IdleNotifiedSet};
 use std::borrow::Borrow;
-use std::collections::hash_map::{HashMap, RandomState};
+use std::collections::hash_map::RandomState;
+use std::collections::HashSet;
 use std::fmt;
 use std::future::Future;
 use std::hash::{BuildHasher, Hash, Hasher};
@@ -50,15 +51,20 @@ pub struct JoinMap<K, V, S = RandomState> {
     /// hash, resolving collisions based on whether or not two entries in the
     /// map have the same `Arc` pointer.
     ///
-    /// This is technically used as a set rather than a map --- the map's value
-    /// type is `()`. However, `HashSet` doesn't provide the raw entry APIs that
-    /// we use here.
-    key_set: HashMap<Key<K, V>, (), NoHash>,
+    /// Because we look up entries in this set with a previously computed hash
+    /// when a task completes, the `HashSet` uses a no-op `Hasher` that just
+    /// returns the value that was passed to `Hasher::write_u64`. Therefore,
+    /// when looking up keys by key (rather than by hash), we use a
+    /// `PreHashedKey` type that stores a hash computed outside of the
+    /// `HashSet`.
+    key_set: HashSet<Key<K, V>, NoHash>,
+
     /// The set of tasks spawned on the `JoinMap`.
     ///
     /// Each `IdleNotifiedSet` entry contains the hash of the task's key, to
     /// allow looking the key up when the task completes.
     task_set: IdleNotifiedSet<(u64, JoinHandle<V>)>,
+
     hash_builder: S,
 }
 
@@ -76,9 +82,46 @@ struct Key<K, V> {
     task: TaskKey<V>,
 }
 
+/// The part of the `JoinMap` key that can be looked up by-task.
+///
+/// This contains the hash value of the actual key and the `IdleNotifiedSet`
+/// entry for the corresponding task. When a task completes, we look it up in
+/// the key set using a `TaskKey`, which resolves hash collisions based on
+/// whether the `IdleNotifiedSet` entry `Arc`s have the same address, rather
+/// than based on key equality.
+///
+/// This allows storing only the actual key's `u64` hash value in the task's
+/// `IdleNotifiedSet` entry, rather than having to clone the entire key into the
+/// task.
 struct TaskKey<V> {
     hash: u64,
     entry: Arc<idle_notified_set::ListEntry<(u64, JoinHandle<V>)>>,
+}
+
+/// A `Q`-typed map key with a pre-computed hash.
+///
+/// This is used when looking up key set entries with a `Q`-typed key (such as
+/// in `contains_task` and `abort`). Because the key set `HashSet` uses a no-op
+/// hasher to permit looking up stored hash values on task completion,
+struct PreHashedKey<'a, Q: ?Sized> {
+    hash: u64,
+    key: &'a Q,
+}
+
+/// This trait is used as a workaround for the fact that we can't implement
+/// `Borrow<Q> for Key<K, V> where K: Borrow<Q>`, which is unfortunately not
+/// possible due to the blanket impl of `Borrow<T> for T`.
+///
+/// Not being able to implement `Borrow<Q>` for the `Key` type where `Q` is a
+/// borrowed form of `K` would mean that we could only call `HashSet::get` with
+/// `K`-typed keys (and not borrowed keys). This trait solves that problem by
+/// allowing us to implement `DynKey<Q> for Key<K, V> where K: Borrow<Q>`, and
+/// then have a `Borrow<dyn DynKey<Q>>` impl for `Key`. That way, the `Key<K,
+/// V>` type can be borrowed as any borrowed form of `K` while still being a
+/// more complex type than _just_ a `K`.
+trait DynKey<Q: ?Sized> {
+    fn key(&self) -> &Q;
+    fn hash_value(&self) -> u64;
 }
 
 /// The world's fastest hashing algorithm.
@@ -168,7 +211,7 @@ impl<K, V, S> JoinMap<K, V, S> {
     #[must_use]
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
         Self {
-            key_set: HashMap::with_capacity_and_hasher(capacity, NoHash(0)),
+            key_set: HashSet::with_capacity_and_hasher(capacity, NoHash(0)),
             task_set: IdleNotifiedSet::new(),
             hash_builder,
         }
@@ -275,32 +318,34 @@ where
     }
 
     fn insert(&mut self, key: K, jh: JoinHandle<V>) {
-        let (prev, hash) = {
-            let key = self.pre_hashed_key(&key);
-            let prev = self
-                .key_set
-                .remove_entry(&key as &dyn DynKey<K>)
-                .and_then(|(entry, _)| self.task_set.entry_mut(entry.task.entry));
-            (prev, key.hash)
-        };
-        if let Some(prev) = prev {
-            let (_hash, jh) = prev.remove();
-            debug_assert_eq!(_hash, hash);
-            jh.abort();
-        }
+        let hash = Self::hash(&self.hash_builder, &key);
+
         let mut entry = self.task_set.insert_idle((hash, jh));
 
         // Set the waker that is notified when the task completes.
         entry.with_value_and_context(|(_, jh), ctx| jh.set_join_waker(ctx.waker()));
 
-        let entry = Key {
+        let key = Key {
             task: TaskKey {
                 hash,
                 entry: entry.into_entry(),
             },
             key,
         };
-        self.key_set.insert(entry, ());
+
+        // Insert the new key into the key set.
+        let prev = self
+            .key_set
+            .replace(key)
+            .and_then(|Key { task, .. }| self.task_set.entry_mut(task.entry));
+
+        // If we replaced a previous task in the key set, remove that task from
+        // the value set and abort it.
+        if let Some(prev) = prev {
+            let (_hash, jh) = prev.remove();
+            debug_assert_eq!(_hash, hash);
+            jh.abort();
+        }
     }
 
     /// Waits until one of the tasks in the map completes and returns its
@@ -356,8 +401,8 @@ where
     {
         let key = self.pre_hashed_key(key);
         let task_set = &mut self.task_set;
-        let entry = match self.key_set.get_key_value(&key as &dyn DynKey<Q>) {
-            Some((entry, _)) => entry,
+        let entry = match self.key_set.get(&key as &dyn DynKey<Q>) {
+            Some(entry) => entry,
             None => return false,
         };
 
@@ -383,7 +428,7 @@ where
         // Note: this method iterates over the key set *without* removing any
         // entries, so that the keys from aborted tasks can be returned when
         // polling the `JoinMap`.
-        for entry in key_set.keys().filter(|entry| predicate(&entry.key)) {
+        for entry in key_set.iter().filter(|entry| predicate(&entry.key)) {
             if let Some(mut entry) = joins.entry_mut(entry.task.entry.clone()) {
                 entry.with_value_and_context(|(_, jh), _| jh.abort());
             }
@@ -402,7 +447,7 @@ where
         K: Borrow<Q>,
     {
         let key = self.pre_hashed_key(key);
-        self.key_set.contains_key(&key as &dyn DynKey<Q>)
+        self.key_set.contains(&key as &dyn DynKey<Q>)
     }
 
     /// Reserves capacity for at least `additional` more tasks to be spawned
@@ -531,9 +576,9 @@ where
             };
             // Remove the entry from the `IdleNotifiedSet`.
             let _ = entry.remove();
-            let (Key { key, .. }, _) = self.key_set.remove_entry(&key).expect(
+            let Key { key, .. } = self.key_set.take(&key).expect(
                 "if a task was removed from the key set, it must also have \
-            been removed from the IdleNotifiedSet. this is a bug!",
+                been removed from the IdleNotifiedSet. this is a bug!",
             );
 
             Poll::Ready(Some((key, res)))
@@ -599,7 +644,7 @@ impl<K: fmt::Debug + 'static, V: 'static, S> fmt::Debug for JoinMap<K, V, S> {
         impl<K: fmt::Debug + 'static, V: 'static, S> fmt::Debug for KeySet<'_, K, V, S> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.debug_set()
-                    .entries(self.0.key_set.keys().map(|entry| &entry.key))
+                    .entries(self.0.key_set.iter().map(|entry| &entry.key))
                     .finish()
             }
         }
@@ -678,17 +723,7 @@ impl<V> PartialEq for TaskKey<V> {
 
 impl<V> Eq for TaskKey<V> {}
 
-// === dyn key trait object stuff ==
-
-trait DynKey<Q: ?Sized> {
-    fn key(&self) -> &Q;
-    fn hash_value(&self) -> u64;
-}
-
-struct PreHashedKey<'a, Q: ?Sized> {
-    hash: u64,
-    key: &'a Q,
-}
+// === impl PreHashedKey ==
 
 impl<Q: ?Sized> DynKey<Q> for PreHashedKey<'_, Q> {
     fn key(&self) -> &Q {
@@ -699,6 +734,8 @@ impl<Q: ?Sized> DynKey<Q> for PreHashedKey<'_, Q> {
         self.hash
     }
 }
+
+// === impl (dyn DynKey + 'a) ===
 
 impl<'a, Q: PartialEq + ?Sized> PartialEq for (dyn DynKey<Q> + 'a) {
     fn eq(&self, other: &Self) -> bool {
