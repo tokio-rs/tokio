@@ -401,12 +401,12 @@ impl<'a, T> EntryInOneOfTheLists<'a, T> {
             .with_mut(|ptr| unsafe { func(&mut *ptr, &mut context) })
     }
 
-    pub(crate) fn entry(self) -> Arc<ListEntry<T>> {
-        self.entry
+    pub(crate) fn entry(&self) -> &Arc<ListEntry<T>> {
+        &self.entry
     }
 
-    pub(crate) fn ptr_eq(&self, other: &Arc<ListEntry<T>>) -> bool {
-        Arc::ptr_eq(&self.entry, other)
+    pub(crate) fn into_entry(self) -> Arc<ListEntry<T>> {
+        self.entry
     }
 }
 
