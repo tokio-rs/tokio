@@ -105,7 +105,7 @@ impl Barrier {
             n,
             wait,
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: resource_span,
+            resource_span,
         }
     }
 
