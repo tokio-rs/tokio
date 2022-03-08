@@ -136,6 +136,12 @@ impl sealed::ToSocketAddrsPriv for &[SocketAddr] {
     type Future = ReadyFuture<Self::Iter>;
 
     fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
+        // Clippy doesn't like the `to_vec()` call here (as it will allocate,
+        // while `self.iter().copied()` would not), but it's actually necessary
+        // in order to ensure that the returned iterator is valid for the
+        // `'static` lifetime, which the borrowed `slice::Iter` iterator would
+        // not be.
+        #[allow(clippy::unnecessary_to_owned)]
         let iter = self.to_vec().into_iter();
         future::ready(Ok(iter))
     }
