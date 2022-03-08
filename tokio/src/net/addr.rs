@@ -141,7 +141,10 @@ impl sealed::ToSocketAddrsPriv for &[SocketAddr] {
         // in order to ensure that the returned iterator is valid for the
         // `'static` lifetime, which the borrowed `slice::Iter` iterator would
         // not be.
-        #[allow(clippy::unnecessary_to_owned)]
+        // Note that we can't actually add an `allow` attribute for
+        // `clippy::unnecessary_to_owned` here, as Tokio's CI runs clippy lints
+        // on Rust 1.52 to avoid breaking LTS releases of Tokio. Users of newer
+        // Rust versions who see this lint should just ignore it.
         let iter = self.to_vec().into_iter();
         future::ready(Ok(iter))
     }
