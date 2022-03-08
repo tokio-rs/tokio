@@ -300,11 +300,7 @@ cfg_metrics! {
         where
             F: Fn(&IoDriverMetrics) -> R,
         {
-            if let Some(inner) = self.inner() {
-                Some(f(&inner.metrics))
-            } else {
-                None
-            }
+            self.inner().map(|inner| f(&inner.metrics))
         }
    }
 }

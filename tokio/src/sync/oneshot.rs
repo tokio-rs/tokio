@@ -526,7 +526,7 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let rx = Receiver {
         inner: Some(inner),
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        resource_span: resource_span,
+        resource_span,
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         async_op_span,
         #[cfg(all(tokio_unstable, feature = "tracing"))]

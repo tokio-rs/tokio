@@ -528,8 +528,7 @@ cfg_net! {
             self.handle
                 .io_handle
                 .as_ref()
-                .map(|h| h.with_io_driver_metrics(f))
-                .flatten()
+                .and_then(|h| h.with_io_driver_metrics(f))
                 .unwrap_or(0)
         }
     }
