@@ -122,7 +122,7 @@ fn try_lock_owned() {
         let g1 = m.clone().try_lock_owned();
         assert!(g1.is_ok());
         let g2 = m.clone().try_lock_owned();
-        assert!(!g2.is_ok());
+        assert!(g2.is_err());
     }
     let g3 = m.try_lock_owned();
     assert!(g3.is_ok());
