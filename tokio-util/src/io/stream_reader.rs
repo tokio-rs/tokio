@@ -91,6 +91,19 @@ where
             false
         }
     }
+
+    /// Consumes this `StreamReader`, returning a Tuple consisting
+    /// of the underlying stream and an Option of the interal buffer,
+    /// which is Some in case the buffer contains elements.
+    pub fn into_inner_with_chunk(self) -> (S, Option<B>) {
+        if let Some(chunk) = self.chunk {
+            if chunk.remaining() > 0 {
+                return (self.inner, Some(chunk));
+            }
+        }
+
+        (self.inner, None)
+    }
 }
 
 impl<S, B> StreamReader<S, B> {
@@ -118,6 +131,10 @@ impl<S, B> StreamReader<S, B> {
     /// Consumes this `BufWriter`, returning the underlying stream.
     ///
     /// Note that any leftover data in the internal buffer is lost.
+    /// If you additionally want access to the internal buffer use
+    /// [`into_inner_with_chunk`].
+    ///
+    /// [`into_inner_with_chunk`]: crate::io::StreamReader::into_inner_with_chunk
     pub fn into_inner(self) -> S {
         self.inner
     }
