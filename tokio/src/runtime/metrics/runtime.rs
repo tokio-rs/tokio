@@ -465,7 +465,7 @@ cfg_net! {
         ///     let registered_fds = metrics.io_driver_fd_registered_count();
         ///     println!("{} fds have been registered with the runtime's I/O driver.", registered_fds);
         ///
-        ///     let deregistered_fds = metrics.io_fd_deregistered_count();
+        ///     let deregistered_fds = metrics.io_driver_fd_deregistered_count();
         ///
         ///     let current_fd_count = registered_fds - deregistered_fds;
         ///     println!("{} fds are currently registered by the runtime's I/O driver.", current_fd_count);
@@ -489,7 +489,7 @@ cfg_net! {
         /// async fn main() {
         ///     let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.io_driver_deregisteredd_fd_count();
+        ///     let n = metrics.io_driver_fd_deregistered_count();
         ///     println!("{} fds have been deregistered by the runtime's I/O driver.", n);
         /// }
         /// ```
