@@ -155,7 +155,7 @@ fn try_lock() {
         let g1 = m.try_lock();
         assert!(g1.is_ok());
         let g2 = m.try_lock();
-        assert!(!g2.is_ok());
+        assert!(g2.is_err());
     }
     let g3 = m.try_lock();
     assert!(g3.is_ok());
