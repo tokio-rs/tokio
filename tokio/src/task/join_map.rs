@@ -54,7 +54,7 @@ use std::task::{Context, Poll};
 ///
 ///     // When a task completes, `join_one` returns the task's key along
 ///     // with its output.
-///     while let Some((key, res)) = set.join_one().await {
+///     while let Some((key, res)) = map.join_one().await {
 ///         seen[key] = true;
 ///         assert!(res.is_ok(), "task {} completed successfully!", key);
 ///     }
@@ -84,10 +84,10 @@ use std::task::{Context, Poll};
 ///     // provided key.
 ///     assert!(aborted);
 ///
-///     while let Some((key, res)) = set.join_one().await {
+///     while let Some((key, res)) = map.join_one().await {
 ///         if key == "goodbye world" {
 ///             // The aborted task should complete with a cancelled `JoinError`.
-///             assert!(res.unwrap_err().is_canceled());
+///             assert!(res.unwrap_err().is_cancelled());
 ///         } else {
 ///             // Other tasks should complete normally.
 ///             assert!(res.is_ok());
@@ -199,8 +199,8 @@ impl<K, V> JoinMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_util::task::JoinMap;
-    /// let mut map: JoinMap<&str, i32> = JoinMap::new();
+    /// use tokio::task::JoinMap;
+    /// let map: JoinMap<&str, i32> = JoinMap::new();
     /// ```
     #[inline]
     #[must_use]
@@ -216,8 +216,8 @@ impl<K, V> JoinMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_util::task::JoinMap;
-    /// let mut map: JoinMap<&str, i32> = JoinMap::with_capacity(10);
+    /// use tokio::task::JoinMap;
+    /// let map: JoinMap<&str, i32> = JoinMap::with_capacity(10);
     /// ```
     #[inline]
     #[must_use]
@@ -262,12 +262,15 @@ impl<K, V, S> JoinMap<K, V, S> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_util::task::JoinMap;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::task::JoinMap;
     /// use std::collections::hash_map::RandomState;
     ///
     /// let s = RandomState::new();
     /// let mut map = JoinMap::with_capacity_and_hasher(10, s);
     /// map.spawn(1, async move { "hello world!" });
+    /// # }
     /// ```
     #[inline]
     #[must_use]
@@ -297,7 +300,7 @@ impl<K, V, S> JoinMap<K, V, S> {
     /// # Examples
     ///
     /// ```
-    /// use crate::task::JoinMap;
+    /// use tokio::task::JoinMap;
     ///
     /// let map: JoinMap<i32, i32> = JoinMap::with_capacity(100);
     /// assert!(map.capacity() >= 100);
@@ -489,10 +492,10 @@ where
     /// // Look up the "goodbye world" task in the map and abort it.
     /// map.abort("goodbye world");
     ///
-    /// while let Some((key, res)) = set.join_one().await {
+    /// while let Some((key, res)) = map.join_one().await {
     ///     if key == "goodbye world" {
     ///         // The aborted task should complete with a cancelled `JoinError`.
-    ///         assert!(res.unwrap_err().is_canceled());
+    ///         assert!(res.unwrap_err().is_cancelled());
     ///     } else {
     ///         // Other tasks should complete normally.
     ///         assert!(res.is_ok());
@@ -517,9 +520,6 @@ where
     ///
     /// // Aborting a key that does not exist will return `false`:
     /// assert!(!map.abort("goodbye universe"));
-    ///
-    /// // Aborting the same task twice will return `false`:
-    /// assert!(!map.abort("goodbye world"));
     /// # }
     /// ```
     /// ```
@@ -555,24 +555,38 @@ where
     /// ```
     /// use tokio::task::JoinMap;
     ///
-    /// # #[tokio::main]
+    /// # // use the current thread rt so that spawned tasks don't
+    /// # // complete in the background before they can be aborted.
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut map = JoinMap::new();
     ///
-    /// map.spawn("hello world", async move { /* ... */ });
-    /// map.spawn("goodbye world", async move { /* ... */});
-    /// map.spawn("hello san francisco", async move { /* ... */});
-    /// map.spawn("goodbye universe", async move { /* ... */});
+    /// map.spawn("hello world", async move {
+    ///     // ...
+    ///     # tokio::task::yield_now().await; // don't complete immediately, get aborted!
+    /// });
+    /// map.spawn("goodbye world", async move {
+    ///     // ...
+    ///     # tokio::task::yield_now().await; // don't complete immediately, get aborted!
+    /// });
+    /// map.spawn("hello san francisco", async move {
+    ///     // ...
+    ///     # tokio::task::yield_now().await; // don't complete immediately, get aborted!
+    /// });
+    /// map.spawn("goodbye universe", async move {
+    ///     // ...
+    ///     # tokio::task::yield_now().await; // don't complete immediately, get aborted!
+    /// });
     ///
     /// // Abort all tasks whose keys begin with "goodbye"
     /// map.abort_matching(|key| key.starts_with("goodbye"));
     ///
     /// let mut seen = 0;
-    /// while let Some((key, res)) = set.join_one().await {
+    /// while let Some((key, res)) = map.join_one().await {
     ///     seen += 1;
     ///     if key.starts_with("goodbye") {
     ///         // The aborted task should complete with a cancelled `JoinError`.
-    ///         assert!(res.unwrap_err().is_canceled());
+    ///         assert!(res.unwrap_err().is_cancelled());
     ///     } else {
     ///         // Other tasks should complete normally.
     ///         assert!(key.starts_with("hello"));
@@ -626,7 +640,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use tokio_util::task::JoinMap;
+    /// use tokio::task::JoinMap;
     ///
     /// let mut map: JoinMap<&str, i32> = JoinMap::new();
     /// map.reserve(10);
@@ -643,7 +657,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use tokio_util::task::JoinMap;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::task::JoinMap;
     ///
     /// let mut map: JoinMap<i32, i32> = JoinMap::with_capacity(100);
     /// map.spawn(1, async move { 2 });
@@ -651,6 +667,7 @@ where
     /// assert!(map.capacity() >= 100);
     /// map.shrink_to_fit();
     /// assert!(map.capacity() >= 2);
+    /// # }
     /// ```
     #[inline]
     pub fn shrink_to_fit(&mut self) {
@@ -666,7 +683,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use tokio_util::task::JoinMap;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::task::JoinMap;
     ///
     /// let mut map: JoinMap<i32, i32> = JoinMap::with_capacity(100);
     /// map.spawn(1, async move { 2 });
@@ -676,6 +695,7 @@ where
     /// assert!(map.capacity() >= 10);
     /// map.shrink_to(0);
     /// assert!(map.capacity() >= 2);
+    /// # }
     /// ```
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
