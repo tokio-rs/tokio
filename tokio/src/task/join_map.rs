@@ -34,6 +34,68 @@ use std::task::{Context, Poll};
 /// may break in 1.x releases. See [the documentation on unstable
 /// features][unstable] for details.
 ///
+/// # Examples
+///
+/// Spawn multiple tasks and wait for them:
+///
+/// ```
+/// use tokio::task::JoinMap;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut map = JoinMap::new();
+///
+///     for i in 0..10 {
+///         // Spawn a task on the `JoinMap` with `i` as its key.
+///         map.spawn(i, async move { /* ... */ });
+///     }
+///
+///     let mut seen = [false; 10];
+///
+///     // When a task completes, `join_one` returns the task's key along
+///     // with its output.
+///     while let Some((key, res)) = set.join_one().await {
+///         seen[key] = true;
+///         assert!(res.is_ok(), "task {} completed successfully!", key);
+///     }
+///
+///     for i in 0..10 {
+///         assert!(seen[i]);
+///     }
+/// }
+/// ```
+///
+/// Cancel tasks based on their keys:
+///
+/// ```
+/// use tokio::task::JoinMap;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut map = JoinMap::new();
+///
+///     map.spawn("hello world", async move { /* ... */ });
+///     map.spawn("goodbye world", async move { /* ... */});
+///
+///     // Look up the "goodbye world" task in the map and abort it.
+///     let aborted = map.abort("goodbye world");
+///
+///     // `JoinMap::abort` returns `true` if a task existed for the
+///     // provided key.
+///     assert!(aborted);
+///
+///     while let Some((key, res)) = set.join_one().await {
+///         if key == "goodbye world" {
+///             // The aborted task should complete with a cancelled `JoinError`.
+///             assert!(res.unwrap_err().is_canceled());
+///         } else {
+///             // Other tasks should complete normally.
+///             assert!(res.is_ok());
+///         }
+///     }
+/// }
+/// ```
+///
 /// [`JoinSet`]: crate::task::JoinSet
 /// [unstable]: crate#unstable-features
 /// [abort]: fn@Self::abort
@@ -409,6 +471,58 @@ where
     /// If this `JoinMap` contains a task corresponding to `key`, this method
     /// will abort that task and return `true`. Otherwise, if no task exists for
     /// `key`, this method returns `false`.
+    ///
+    /// # Examples
+    ///
+    /// Aborting a task by key:
+    ///
+    /// ```
+    /// use tokio::task::JoinMap;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut map = JoinMap::new();
+    ///
+    /// map.spawn("hello world", async move { /* ... */ });
+    /// map.spawn("goodbye world", async move { /* ... */});
+    ///
+    /// // Look up the "goodbye world" task in the map and abort it.
+    /// map.abort("goodbye world");
+    ///
+    /// while let Some((key, res)) = set.join_one().await {
+    ///     if key == "goodbye world" {
+    ///         // The aborted task should complete with a cancelled `JoinError`.
+    ///         assert!(res.unwrap_err().is_canceled());
+    ///     } else {
+    ///         // Other tasks should complete normally.
+    ///         assert!(res.is_ok());
+    ///     }
+    /// }
+    /// # }
+    /// ```
+    ///
+    /// `abort` returns `true` if a task was aborted:
+    /// ```
+    /// use tokio::task::JoinMap;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut map = JoinMap::new();
+    ///
+    /// map.spawn("hello world", async move { /* ... */ });
+    /// map.spawn("goodbye world", async move { /* ... */});
+    ///
+    /// // A task for the key "goodbye world" should exist in the map:
+    /// assert!(map.abort("goodbye world"));
+    ///
+    /// // Aborting a key that does not exist will return `false`:
+    /// assert!(!map.abort("goodbye universe"));
+    ///
+    /// // Aborting the same task twice will return `false`:
+    /// assert!(!map.abort("goodbye world"));
+    /// # }
+    /// ```
+    /// ```
     pub fn abort<Q: ?Sized>(&mut self, key: &Q) -> bool
     where
         Q: Hash + Eq,
@@ -436,6 +550,40 @@ where
     /// `predicate` is a function called with a reference to each key in the
     /// map. If it returns `true` for a given key, the corresponding task will
     /// be cancelled.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::task::JoinMap;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut map = JoinMap::new();
+    ///
+    /// map.spawn("hello world", async move { /* ... */ });
+    /// map.spawn("goodbye world", async move { /* ... */});
+    /// map.spawn("hello san francisco", async move { /* ... */});
+    /// map.spawn("goodbye universe", async move { /* ... */});
+    ///
+    /// // Abort all tasks whose keys begin with "goodbye"
+    /// map.abort_matching(|key| key.starts_with("goodbye"));
+    ///
+    /// let mut seen = 0;
+    /// while let Some((key, res)) = set.join_one().await {
+    ///     seen += 1;
+    ///     if key.starts_with("goodbye") {
+    ///         // The aborted task should complete with a cancelled `JoinError`.
+    ///         assert!(res.unwrap_err().is_canceled());
+    ///     } else {
+    ///         // Other tasks should complete normally.
+    ///         assert!(key.starts_with("hello"));
+    ///         assert!(res.is_ok());
+    ///     }
+    /// }
+    ///
+    /// // All spawned tasks should have completed.
+    /// assert_eq!(seen, 4);
+    /// # }
+    /// ```
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
         let key_set = &mut self.key_set;
         let joins = &mut self.task_set;
