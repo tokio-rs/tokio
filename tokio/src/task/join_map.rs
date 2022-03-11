@@ -522,7 +522,6 @@ where
     /// assert!(!map.abort("goodbye universe"));
     /// # }
     /// ```
-    /// ```
     pub fn abort<Q: ?Sized>(&mut self, key: &Q) -> bool
     where
         Q: Hash + Eq,
