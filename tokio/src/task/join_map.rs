@@ -255,11 +255,16 @@ where
     /// Spawn the provided task and store it in this `JoinMap` with the provided
     /// key.
     ///
+    /// If a task previously existed in the `JoinMap` for this key, that task
+    /// will be cancelled and replaced with the new one. The previous task will
+    /// be removed from the `JoinMap`; a subsequent call to [`join_one`] will
+    /// *not* return a cancelled [`JoinError`] for that task.
+    ///
     /// # Panics
     ///
     /// This method panics if called outside of a Tokio runtime.
     ///
-    /// [`AbortHandle`]: crate::task::AbortHandle
+    /// [`join_one`]: Self::join_one
     pub fn spawn<F>(&mut self, key: K, task: F)
     where
         F: Future<Output = V>,
@@ -273,7 +278,11 @@ where
     /// `JoinMap` with the provided key.
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
-    /// will be cancelled and replaced with the new one.
+    /// will be cancelled and replaced with the new one. The previous task will
+    /// be removed from the `JoinMap`; a subsequent call to [`join_one`] will
+    /// *not* return a cancelled [`JoinError`] for that task.
+    ///
+    /// [`join_one`]: Self::join_one
     pub fn spawn_on<F>(&mut self, key: K, task: F, handle: &Handle)
     where
         F: Future<Output = V>,
@@ -287,13 +296,16 @@ where
     /// `JoinMap` with the provided key.
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
-    /// will be cancelled and replaced with the new one.
+    /// will be cancelled and replaced with the new one. The previous task will
+    /// be removed from the `JoinMap`; a subsequent call to [`join_one`] will
+    /// *not* return a cancelled [`JoinError`] for that task.
     ///
     /// # Panics
     ///
     /// This method panics if it is called outside of a `LocalSet`.
     ///
     /// [`LocalSet`]: crate::task::LocalSet
+    /// [`join_one`]: Self::join_one
     pub fn spawn_local<F>(&mut self, key: K, task: F)
     where
         F: Future<Output = V>,
@@ -306,9 +318,12 @@ where
     /// this `JoinMap` with the provided key.
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
-    /// will be cancelled and replaced with the new one.
+    /// will be cancelled and replaced with the new one. The previous task will
+    /// be removed from the `JoinMap`; a subsequent call to [`join_one`] will
+    /// *not* return a cancelled [`JoinError`] for that task.
     ///
     /// [`LocalSet`]: crate::task::LocalSet
+    /// [`join_one`]: Self::join_one
     pub fn spawn_local_on<F>(&mut self, key: K, task: F, local_set: &LocalSet)
     where
         F: Future<Output = V>,
@@ -374,7 +389,7 @@ where
         crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
     }
 
-    /// keys all tasks and waits for them to finish shutting down.
+    /// Aborts all tasks and waits for them to finish shutting down.
     ///
     /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_one`] in
     /// a loop until it returns `None`.
@@ -416,12 +431,11 @@ where
         false
     }
 
-    /// keys all tasks with keys matching `predicate`.
+    /// Aborts all tasks with keys matching `predicate`.
     ///
     /// `predicate` is a function called with a reference to each key in the
     /// map. If it returns `true` for a given key, the corresponding task will
     /// be cancelled.
-    // XXX(eliza): do we want to consider counting the number of tasks aborted?
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
         let key_set = &mut self.key_set;
         let joins = &mut self.task_set;
@@ -535,14 +549,14 @@ where
     ///
     /// This function returns:
     ///
-    ///  * `Poll::Pending` if the `JoinMap` is not empty but there is no task whose output is
-    ///     available right now.
+    ///  * `Poll::Pending` if the `JoinMap` is not empty but there is no task
+    ///    whose output is available right now.
     ///  * `Poll::Ready(Some((key, Ok(value))))` if one of the tasks in this
     ///    `JoinMap` has completed. The `value` is the return value of that
     ///    task, and `key` is the key associated with the task.
     ///  * `Poll::Ready(Some((key, Err(err)))` if one of the tasks in this
-    ///    `JoinMap` has panicked or been aborted. `key` is the key associated
-    ///    with the task that panicked or was aborted.
+    ///    `JoinMap` has panicked or has been aborted. `key` is the key
+    ///    associated with the task that panicked or was aborted.
     ///  * `Poll::Ready(None)` if the `JoinMap` is empty.
     ///
     /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
@@ -614,7 +628,7 @@ where
     K: 'static,
     V: 'static,
 {
-    /// keys all tasks on this `JoinMap`.
+    /// Aborts all tasks on this `JoinMap`.
     ///
     /// This does not remove the tasks from the `JoinMap`. To wait for the tasks to complete
     /// cancellation, you should call `join_one` in a loop until the `JoinMap` is empty.
