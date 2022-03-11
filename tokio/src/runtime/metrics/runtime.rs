@@ -489,7 +489,7 @@ cfg_net! {
         /// async fn main() {
         ///     let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.io_driver_deregisteredd_fd_count();
+        ///     let n = metrics.io_driver_deregistered_fd_count();
         ///     println!("{} fds have been deregistered by the runtime's I/O driver.", n);
         /// }
         /// ```
