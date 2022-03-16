@@ -31,7 +31,7 @@ impl Deref for WakerRef<'_> {
 
 /// Creates a reference to a `Waker` from a reference to `Arc<impl Wake>`.
 pub(crate) fn waker_ref<W: Wake>(wake: &Arc<W>) -> WakerRef<'_> {
-    let ptr = &**wake as *const _ as *const ();
+    let ptr = Arc::as_ptr(wake) as *const ();
 
     let waker = unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) };
 

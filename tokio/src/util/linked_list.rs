@@ -57,6 +57,13 @@ pub(crate) unsafe trait Link {
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle;
 
     /// Return the pointers for a node
+    ///
+    /// # Safety
+    ///
+    /// The resulting pointer should have the same tag in the stacked-borrows
+    /// stack as the argument. In particular, the method may not create an
+    /// intermediate reference in the process of creating the resulting raw
+    /// pointer.
     unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>>;
 }
 
@@ -353,6 +360,7 @@ mod tests {
     use std::pin::Pin;
 
     #[derive(Debug)]
+    #[repr(C)]
     struct Entry {
         pointers: Pointers<Entry>,
         val: i32,
@@ -370,8 +378,8 @@ mod tests {
             Pin::new_unchecked(&*ptr.as_ptr())
         }
 
-        unsafe fn pointers(mut target: NonNull<Entry>) -> NonNull<Pointers<Entry>> {
-            NonNull::from(&mut target.as_mut().pointers)
+        unsafe fn pointers(target: NonNull<Entry>) -> NonNull<Pointers<Entry>> {
+            target.cast()
         }
     }
 

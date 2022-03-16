@@ -14,7 +14,7 @@ use std::task::{Context, Poll};
 /// [`Stream`]: trait@crate::Stream
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub struct BroadcastStream<T> {
-    inner: ReusableBoxFuture<(Result<T, RecvError>, Receiver<T>)>,
+    inner: ReusableBoxFuture<'static, (Result<T, RecvError>, Receiver<T>)>,
 }
 
 /// An error returned from the inner stream of a [`BroadcastStream`].

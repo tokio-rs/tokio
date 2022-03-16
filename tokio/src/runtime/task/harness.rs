@@ -26,6 +26,10 @@ where
         }
     }
 
+    fn header_ptr(&self) -> NonNull<Header> {
+        self.cell.cast()
+    }
+
     fn header(&self) -> &Header {
         unsafe { &self.cell.as_ref().header }
     }
@@ -93,7 +97,8 @@ where
 
         match self.header().state.transition_to_running() {
             TransitionToRunning::Success => {
-                let waker_ref = waker_ref::<T, S>(self.header());
+                let header_ptr = self.header_ptr();
+                let waker_ref = waker_ref::<T, S>(&header_ptr);
                 let cx = Context::from_waker(&*waker_ref);
                 let res = poll_future(&self.core().stage, cx);
 

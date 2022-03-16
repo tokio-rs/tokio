@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", tokio_unstable))]
 
 use tokio::sync::oneshot;
 use tokio::task::JoinSet;
@@ -104,6 +104,40 @@ async fn alternating() {
         set.spawn(async {});
         assert_eq!(set.len(), 2);
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn abort_tasks() {
+    let mut set = JoinSet::new();
+    let mut num_canceled = 0;
+    let mut num_completed = 0;
+    for i in 0..16 {
+        let abort = set.spawn(async move {
+            tokio::time::sleep(Duration::from_secs(i as u64)).await;
+            i
+        });
+
+        if i % 2 != 0 {
+            // abort odd-numbered tasks.
+            abort.abort();
+        }
+    }
+    loop {
+        match set.join_one().await {
+            Ok(Some(res)) => {
+                num_completed += 1;
+                assert_eq!(res % 2, 0);
+            }
+            Err(e) => {
+                assert!(e.is_cancelled());
+                num_canceled += 1;
+            }
+            Ok(None) => break,
+        }
+    }
+
+    assert_eq!(num_canceled, 8);
+    assert_eq!(num_completed, 8);
 }
 
 #[test]

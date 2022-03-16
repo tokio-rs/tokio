@@ -434,13 +434,6 @@ async_assert_fn!(tokio::sync::watch::Receiver<YY>::changed(_): Send & Sync & !Un
 async_assert_fn!(tokio::sync::watch::Sender<NN>::closed(_): !Send & !Sync & !Unpin);
 async_assert_fn!(tokio::sync::watch::Sender<YN>::closed(_): !Send & !Sync & !Unpin);
 async_assert_fn!(tokio::sync::watch::Sender<YY>::closed(_): Send & Sync & !Unpin);
-
-async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::join_one(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::shutdown(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::join_one(_): !Send & !Sync & !Unpin);
-async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::shutdown(_): !Send & !Sync & !Unpin);
-async_assert_fn!(tokio::task::JoinSet<u32>::join_one(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::task::JoinSet<u32>::shutdown(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::task::LocalKey<Cell<u32>>::scope(_, Cell<u32>, BoxFuture<()>): !Send & !Sync & !Unpin);
 async_assert_fn!(tokio::task::LocalKey<Cell<u32>>::scope(_, Cell<u32>, BoxFutureSend<()>): Send & !Sync & !Unpin);
 async_assert_fn!(tokio::task::LocalKey<Cell<u32>>::scope(_, Cell<u32>, BoxFutureSync<()>): Send & !Sync & !Unpin);
@@ -458,10 +451,20 @@ assert_value!(tokio::task::JoinError: Send & Sync & Unpin);
 assert_value!(tokio::task::JoinHandle<NN>: !Send & !Sync & Unpin);
 assert_value!(tokio::task::JoinHandle<YN>: Send & Sync & Unpin);
 assert_value!(tokio::task::JoinHandle<YY>: Send & Sync & Unpin);
-assert_value!(tokio::task::JoinSet<YY>: Send & Sync & Unpin);
-assert_value!(tokio::task::JoinSet<YN>: Send & Sync & Unpin);
-assert_value!(tokio::task::JoinSet<NN>: !Send & !Sync & Unpin);
-assert_value!(tokio::task::LocalSet: !Send & !Sync & Unpin);
+#[cfg(tokio_unstable)]
+mod unstable {
+    use super::*;
+    async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::join_one(_): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::shutdown(_): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::join_one(_): !Send & !Sync & !Unpin);
+    async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::shutdown(_): !Send & !Sync & !Unpin);
+    async_assert_fn!(tokio::task::JoinSet<u32>::join_one(_): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::task::JoinSet<u32>::shutdown(_): Send & Sync & !Unpin);
+    assert_value!(tokio::task::JoinSet<YY>: Send & Sync & Unpin);
+    assert_value!(tokio::task::JoinSet<YN>: Send & Sync & Unpin);
+    assert_value!(tokio::task::JoinSet<NN>: !Send & !Sync & Unpin);
+    assert_value!(tokio::task::LocalSet: !Send & !Sync & Unpin);
+}
 
 assert_value!(tokio::runtime::Builder: Send & Sync & Unpin);
 assert_value!(tokio::runtime::EnterGuard<'_>: Send & Sync & Unpin);

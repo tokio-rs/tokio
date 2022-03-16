@@ -56,7 +56,7 @@ mod try_next;
 use try_next::TryNext;
 
 cfg_time! {
-    mod timeout;
+    pub(crate) mod timeout;
     use timeout::Timeout;
     use tokio::time::Duration;
     mod throttle;

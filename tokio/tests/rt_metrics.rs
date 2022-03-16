@@ -369,6 +369,40 @@ fn worker_local_queue_depth() {
     });
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[test]
+fn io_driver_fd_count() {
+    let rt = basic();
+    let metrics = rt.metrics();
+
+    // Since this is enabled w/ the process driver we always
+    // have 1 fd registered.
+    assert_eq!(metrics.io_driver_fd_registered_count(), 1);
+
+    let stream = tokio::net::TcpStream::connect("google.com:80");
+    let stream = rt.block_on(async move { stream.await.unwrap() });
+
+    assert_eq!(metrics.io_driver_fd_registered_count(), 2);
+    assert_eq!(metrics.io_driver_fd_deregistered_count(), 0);
+
+    drop(stream);
+
+    assert_eq!(metrics.io_driver_fd_deregistered_count(), 1);
+    assert_eq!(metrics.io_driver_fd_registered_count(), 2);
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[test]
+fn io_driver_ready_count() {
+    let rt = basic();
+    let metrics = rt.metrics();
+
+    let stream = tokio::net::TcpStream::connect("google.com:80");
+    let _stream = rt.block_on(async move { stream.await.unwrap() });
+
+    assert_eq!(metrics.io_driver_ready_count(), 2);
+}
+
 fn basic() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()

@@ -24,9 +24,9 @@ use guard::DropGuard;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use tokio::select;
-/// use tokio::scope::CancellationToken;
+/// use tokio_util::sync::CancellationToken;
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -172,9 +172,9 @@ impl CancellationToken {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use tokio::select;
-    /// use tokio::scope::CancellationToken;
+    /// use tokio_util::sync::CancellationToken;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -824,7 +824,7 @@ impl CancellationTokenState {
             let need_waker_update = wait_node
                 .task
                 .as_ref()
-                .map(|waker| waker.will_wake(cx.waker()))
+                .map(|waker| !waker.will_wake(cx.waker()))
                 .unwrap_or(true);
 
             if need_waker_update {

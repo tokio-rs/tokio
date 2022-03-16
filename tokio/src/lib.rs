@@ -340,13 +340,43 @@
 //!
 //! ### Unstable features
 //!
-//! These feature flags enable **unstable** features. The public API may break in 1.x
-//! releases. To enable these features, the `--cfg tokio_unstable` must be passed to
-//! `rustc` when compiling. This is easiest done using the `RUSTFLAGS` env variable:
-//! `RUSTFLAGS="--cfg tokio_unstable"`.
+//! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
 //! - `tracing`: Enables tracing events.
 //!
+//! Likewise, some parts of the API are only available with the same flag:
+//!
+//! - [`task::JoinSet`]
+//! - [`task::Builder`]
+//!  
+//! This flag enables **unstable** features. The public API of these features
+//! may break in 1.x releases. To enable these features, the `--cfg
+//! tokio_unstable` argument must be passed to `rustc` when compiling. This
+//! serves to explicitly opt-in to features which may break semver conventions,
+//! since Cargo [does not yet directly support such opt-ins][unstable features].
+//!
+//! You can specify it in your project's `.cargo/config.toml` file:
+//!
+//! ```toml
+//! [build]
+//! rustflags = ["--cfg", "tokio_unstable"]
+//! ```
+//!
+//! Alternatively, you can specify it with an environment variable:
+//!
+//! ```sh
+//! ## Many *nix shells:
+//! export RUSTFLAGS="--cfg tokio_unstable"
+//! cargo build
+//! ```
+//!
+//! ```powershell
+//! ## Windows PowerShell:
+//! $Env:RUSTFLAGS="--cfg tokio_unstable"
+//! cargo build
+//! ```
+//!
+//! [unstable features]: https://internals.rust-lang.org/t/feature-request-unstable-opt-in-non-transitive-crate-features/16193#why-not-a-crate-feature-2
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
@@ -483,7 +513,7 @@ pub(crate) use self::doc::winapi;
 
 #[cfg(all(not(docsrs), windows, feature = "net"))]
 #[allow(unused)]
-pub(crate) use ::winapi;
+pub(crate) use winapi;
 
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**

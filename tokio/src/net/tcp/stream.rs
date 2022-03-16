@@ -387,7 +387,7 @@ impl TcpStream {
     ///             // if the readiness event is a false positive.
     ///             match stream.try_read(&mut data) {
     ///                 Ok(n) => {
-    ///                     println!("read {} bytes", n);        
+    ///                     println!("read {} bytes", n);
     ///                 }
     ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                     continue;
@@ -1090,9 +1090,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        let mio_socket = std::mem::ManuallyDrop::new(self.to_mio());
-
-        mio_socket.get_linger()
+        socket2::SockRef::from(self).linger()
     }
 
     /// Sets the linger duration of this socket by setting the SO_LINGER option.
@@ -1117,23 +1115,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        let mio_socket = std::mem::ManuallyDrop::new(self.to_mio());
-
-        mio_socket.set_linger(dur)
-    }
-
-    fn to_mio(&self) -> mio::net::TcpSocket {
-        #[cfg(windows)]
-        {
-            use std::os::windows::io::{AsRawSocket, FromRawSocket};
-            unsafe { mio::net::TcpSocket::from_raw_socket(self.as_raw_socket()) }
-        }
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::io::{AsRawFd, FromRawFd};
-            unsafe { mio::net::TcpSocket::from_raw_fd(self.as_raw_fd()) }
-        }
+        socket2::SockRef::from(self).set_linger(dur)
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
