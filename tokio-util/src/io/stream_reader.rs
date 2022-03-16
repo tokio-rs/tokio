@@ -84,8 +84,8 @@ where
     }
 
     /// Do we have a chunk and is it non-empty?
-    fn has_chunk(self: Pin<&mut Self>) -> bool {
-        if let Some(chunk) = self.project().chunk {
+    fn has_chunk(&self) -> bool {
+        if let Some(ref chunk) = self.chunk {
             chunk.remaining() > 0
         } else {
             false
@@ -96,13 +96,11 @@ where
     /// of the underlying stream and an Option of the interal buffer,
     /// which is Some in case the buffer contains elements.
     pub fn into_inner_with_chunk(self) -> (S, Option<B>) {
-        if let Some(chunk) = self.chunk {
-            if chunk.remaining() > 0 {
-                return (self.inner, Some(chunk));
-            }
+        if self.has_chunk() {
+            (self.inner, self.chunk)
+        } else {
+            (self.inner, None)
         }
-
-        (self.inner, None)
     }
 }
 
