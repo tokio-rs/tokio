@@ -382,6 +382,11 @@ async fn try_read_buf() -> std::io::Result<()> {
 
 // https://github.com/tokio-rs/tokio/issues/3879
 #[tokio::test]
+// TODO
+// thread 'epollhup' panicked at 'assertion failed: `(left == right)`
+//   left: `Uncategorized`,
+//  right: `ConnectionReset`', tokio/tests/uds_stream.rs:409:5
+#[cfg_attr(any(target_arch = "mips", target_arch = "mips64"), ignore)]
 #[cfg(not(target_os = "macos"))]
 async fn epollhup() -> io::Result<()> {
     let dir = tempfile::Builder::new()

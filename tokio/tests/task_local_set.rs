@@ -455,6 +455,7 @@ fn local_tasks_wake_join_all() {
 
 #[cfg(not(tokio_wasi))] // Wasi doesn't support panic recovery
 #[test]
+#[cfg_attr(qemu, ignore)] // qemu is slow
 fn local_tasks_are_polled_after_tick() {
     // This test depends on timing, so we run it up to five times.
     for _ in 0..4 {

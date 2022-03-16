@@ -239,32 +239,48 @@ jobs:
     strategy:
       matrix:
         target:
+          - aarch64-unknown-linux-gnu
+          - armv7-unknown-linux-gnueabihf
           - i686-unknown-linux-gnu
-          - powerpc-unknown-linux-gnu
-          - powerpc64-unknown-linux-gnu
-          - mips-unknown-linux-gnu
-          - arm-linux-androideabi
-          - mipsel-unknown-linux-musl
+          - mips64el-unknown-linux-gnuabi64
+          - mipsel-unknown-linux-gnu
+          - powerpc64le-unknown-linux-gnu
+          - riscv64gc-unknown-linux-gnu
+          - s390x-unknown-linux-gnu
+        # setup-cross-toolchain-action doesn't support testing of them
+        include:
+          - target: arm-linux-androideabi
+            cmd: check
+          - target: aarch64-pc-windows-msvc
+            cmd: check
     steps:
       - uses: actions/checkout@v3
-      - name: Install Rust ${{ env.rust_stable }}
+      # Use nightly to cross-testing doctest
+      - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_nightly }}
           target: ${{ matrix.target }}
           override: true
-      - uses: actions-rs/cargo@v1
+      - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
-          use-cross: true
-          command: check
-          args: --workspace --all-features --target ${{ matrix.target }}
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: check
-          args: --workspace --all-features --target ${{ matrix.target }}
+          target: ${{ matrix.target }}
+        if: matrix.cmd != 'check'
+      - uses: Swatinem/rust-cache@v1
+      - run: cargo test -v --workspace --all-features --target ${{ matrix.target }} $DOCTEST_XCOMPILE
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: ${{ env.RUSTFLAGS }} --cfg qemu
+        if: matrix.cmd != 'check'
+      - run: cargo test -v --workspace --all-features --target ${{ matrix.target }} $DOCTEST_XCOMPILE
+        env:
+          RUSTFLAGS: ${{ env.RUSTFLAGS }} --cfg qemu --cfg tokio_unstable
+        if: matrix.cmd != 'check'
+      - run: cargo ${{ matrix.cmd }} -v --workspace --all-features --target ${{ matrix.target }}
+        if: matrix.cmd == 'check'
+      - run: cargo ${{ matrix.cmd }} -v --workspace --all-features --target ${{ matrix.target }}
+        env:
+          RUSTFLAGS: ${{ env.RUSTFLAGS }} --cfg tokio_unstable
+        if: matrix.cmd == 'check'
 
   features:
     name: features
