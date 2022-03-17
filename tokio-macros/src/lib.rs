@@ -193,7 +193,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### Using default
 ///
 /// ```rust
-/// #[tokio::main(flavor = "current_thread")]
+/// #[tokio::main_rt(flavor = "current_thread")]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
@@ -276,7 +276,7 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ## Usage
 ///
 /// ```no_run
-/// #[tokio::test]
+/// #[tokio::test_rt]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
