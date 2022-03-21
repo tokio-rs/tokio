@@ -1,8 +1,8 @@
 #![warn(rust_2018_idioms)]
 
-use tokio_util::codec::{AnyDelimiterCodec, BytesCodec, Decoder, Encoder, LinesCodec};
+use tokio_util::codec::{AnyDelimiterCodec, BytesCodec, CobsCodec, Decoder, Encoder, LinesCodec};
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[test]
 fn bytes_decoder() {
@@ -41,6 +41,93 @@ fn bytes_encoder() {
     codec
         .encode(BytesMut::from(&b"hello"[..]), &mut buf)
         .unwrap();
+}
+
+#[test]
+fn cobs_decoder() {
+    const MAX_LENGTH: usize = 10;
+
+    let mut codec = CobsCodec::new(MAX_LENGTH);
+
+    let mut buf = BytesMut::with_capacity(MAX_LENGTH);
+    buf.put_slice(&[0x01, 0x01, 0x00]);
+    assert_eq!(codec.decode(&mut buf).unwrap().unwrap().chunk(), &[0x00]);
+    buf.put_slice(&[0x01, 0x01, 0x01, 0x00]);
+    assert_eq!(
+        codec.decode(&mut buf).unwrap().unwrap().chunk(),
+        &[0x00, 0x00]
+    );
+    buf.put_slice(&[0x03, 0x11, 0x22, 0x02, 0x33, 0x00]);
+    assert_eq!(
+        codec.decode(&mut buf).unwrap().unwrap().chunk(),
+        &[0x11, 0x22, 0x00, 0x33]
+    );
+    buf.put_slice(&[0x05, 0x11, 0x22, 0x33, 0x44, 0x00]);
+    assert_eq!(
+        codec.decode(&mut buf).unwrap().unwrap().chunk(),
+        &[0x11, 0x22, 0x33, 0x44]
+    );
+    buf.put_slice(&[0x02, 0x11, 0x01, 0x01, 0x01, 0x00]);
+    assert_eq!(
+        codec.decode(&mut buf).unwrap().unwrap().chunk(),
+        &[0x11, 0x00, 0x00, 0x00]
+    );
+}
+
+#[test]
+fn cobs_decoder_max_length() {
+    const MAX_LENGTH: usize = 1;
+
+    let mut codec = CobsCodec::new(MAX_LENGTH);
+
+    let mut buf = BytesMut::with_capacity(MAX_LENGTH);
+    buf.put_slice(&[0x02, 0x11, 0x01, 0x01, 0x01, 0x00]);
+    assert!(codec.decode(&mut buf).is_err());
+}
+
+#[test]
+fn cobs_encoder() {
+    const MAX_LENGTH: usize = 10;
+
+    let mut codec = CobsCodec::new(MAX_LENGTH);
+
+    let mut buf = BytesMut::with_capacity(MAX_LENGTH);
+    codec.encode(Bytes::from_static(&[0x00]), &mut buf).unwrap();
+    assert_eq!(buf.chunk(), &[0x01, 0x01, 0x00]);
+    codec
+        .encode(Bytes::from_static(&[0x00, 0x00]), &mut buf)
+        .unwrap();
+    assert_eq!(buf.chunk(), &[0x01, 0x01, 0x01, 0x00]);
+    codec
+        .encode(Bytes::from_static(&[0x11, 0x22, 0x00, 0x33]), &mut buf)
+        .unwrap();
+    assert_eq!(buf.chunk(), &[0x03, 0x11, 0x22, 0x02, 0x33, 0x00]);
+    codec
+        .encode(Bytes::from_static(&[0x11, 0x22, 0x33, 0x44]), &mut buf)
+        .unwrap();
+    assert_eq!(buf.chunk(), &[0x05, 0x11, 0x22, 0x33, 0x44, 0x00]);
+    codec
+        .encode(Bytes::from_static(&[0x11, 0x00, 0x00, 0x00]), &mut buf)
+        .unwrap();
+    assert_eq!(buf.chunk(), &[0x02, 0x11, 0x01, 0x01, 0x01, 0x00]);
+}
+
+#[test]
+fn cobs_encoder_large() {
+    const MAX_LENGTH: usize = 512;
+    const MAX_ENCODED_LENGTH: usize = MAX_LENGTH + 2 + 2;
+
+    let mut codec = CobsCodec::new(MAX_ENCODED_LENGTH);
+
+    let mut buf = BytesMut::with_capacity(MAX_ENCODED_LENGTH);
+    codec
+        .encode(Bytes::from_static(&[0x00; MAX_LENGTH]), &mut buf)
+        .unwrap();
+    assert_eq!(buf.len(), MAX_ENCODED_LENGTH);
+    assert_eq!(
+        codec.decode(&mut buf).unwrap().unwrap().chunk(),
+        &[0x00; MAX_LENGTH]
+    );
 }
 
 #[test]

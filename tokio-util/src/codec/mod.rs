@@ -261,6 +261,9 @@
 mod bytes_codec;
 pub use self::bytes_codec::BytesCodec;
 
+mod cobs;
+pub use self::cobs::{CobsCodec, CobsCodecError};
+
 mod decoder;
 pub use self::decoder::Decoder;
 
