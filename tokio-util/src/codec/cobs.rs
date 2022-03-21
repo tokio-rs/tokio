@@ -1,4 +1,4 @@
-use bytes::{Bytes, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::codec::{Decoder, Encoder};
 use std::{fmt, io, usize};
@@ -42,11 +42,14 @@ impl CobsCodec {
     }
 }
 
+const CHUNK_LEN: usize = 254;
+const MAX_BYTE_OVERHEAD: usize = 2;
+
 impl Decoder for CobsCodec {
     type Item = BytesMut;
     type Error = CobsCodecError;
 
-    fn decode(&mut self, src: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         todo!()
     }
 }
@@ -54,8 +57,34 @@ impl Decoder for CobsCodec {
 impl Encoder<Bytes> for CobsCodec {
     type Error = CobsCodecError;
 
-    fn encode(&mut self, item: Bytes, dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
-        todo!()
+    fn encode(&mut self, src: Bytes, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let encoded_len = (src.len() / CHUNK_LEN) * (CHUNK_LEN + MAX_BYTE_OVERHEAD);
+        let encoded_remaining_len = src.len() % CHUNK_LEN;
+        let encoded_len = if encoded_remaining_len > 0 {
+            encoded_len + encoded_remaining_len + MAX_BYTE_OVERHEAD
+        } else {
+            encoded_len
+        };
+        dst.reserve(encoded_len);
+        for (i, byte) in src.iter().enumerate() {
+            if i % CHUNK_LEN == 0 {
+                dst.put_u8(0);
+            }
+            dst.put_u8(*byte);
+        }
+        dst.put_u8(0);
+        let mut distance = 0;
+        for byte in dst.iter_mut().rev() {
+            if *byte == self.delimiter {
+                if distance > 0 {
+                    *byte = distance;
+                }
+                distance = 1;
+            } else {
+                distance += 1;
+            }
+        }
+        Ok(())
     }
 }
 
