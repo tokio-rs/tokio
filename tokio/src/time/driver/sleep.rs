@@ -72,7 +72,9 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 ///
 /// No work is performed while awaiting on the sleep future to complete. `Sleep`
 /// operates at millisecond granularity and should not be used for tasks that
-/// require high-resolution timers.
+/// require high-resolution timers. The implementation is platform specific,
+/// and some platforms (specifically Windows) will provide timers with a
+/// larger resolution than 1 ms.
 ///
 /// To run something regularly on a schedule, see [`interval`].
 ///
@@ -261,7 +263,7 @@ impl Sleep {
         let inner = {
             let time_source = handle.time_source().clone();
             let deadline_tick = time_source.deadline_to_tick(deadline);
-            let duration = deadline_tick.checked_sub(time_source.now()).unwrap_or(0);
+            let duration = deadline_tick.saturating_sub(time_source.now());
 
             let location = location.expect("should have location if tracing");
             let resource_span = tracing::trace_span!(
@@ -373,7 +375,7 @@ impl Sleep {
             let duration = {
                 let now = me.inner.time_source.now();
                 let deadline_tick = me.inner.time_source.deadline_to_tick(deadline);
-                deadline_tick.checked_sub(now).unwrap_or(0)
+                deadline_tick.saturating_sub(now)
             };
 
             tracing::trace!(

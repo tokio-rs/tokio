@@ -11,7 +11,7 @@ env:
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2022-01-12
+  rust_nightly: nightly-2022-03-21
   rust_clippy: 1.52.0
   rust_min: 1.49.0
 
@@ -174,6 +174,9 @@ jobs:
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          # in order to run doctests for unstable features, we must also pass
+          # the unstable cfg to RustDoc
+          RUSTDOCFLAGS: --cfg tokio_unstable
 
   miri:
     name: miri
@@ -359,8 +362,8 @@ jobs:
       - name: "doc --lib --all-features"
         run: cargo doc --lib --no-deps --all-features --document-private-items
         env:
-          RUSTFLAGS: --cfg docsrs
-          RUSTDOCFLAGS: --cfg docsrs -Dwarnings
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
 
   loom-compile:
     name: build loom tests

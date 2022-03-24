@@ -25,7 +25,7 @@ full = ["codec", "compat", "io-util", "time", "net", "rt"]
 
 net = ["tokio/net"]
 compat = ["futures-io",]
-codec = []
+codec = ["tracing"]
 time = ["tokio/time","slab"]
 io = []
 io-util = ["io", "tokio/rt", "tokio/io-util"]
@@ -41,9 +41,9 @@ futures-core = "0.3.0"
 futures-sink = "0.3.0"
 futures-io = { version = "0.3.0", optional = true }
 futures-util = { version = "0.3.0", optional = true }
-log = "0.4"
 pin-project-lite = "0.2.0"
 slab = { version = "0.4.4", optional = true } # Backs `DelayQueue`
+tracing = { version = "0.1.25", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }

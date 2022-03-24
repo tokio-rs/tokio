@@ -136,6 +136,15 @@ impl sealed::ToSocketAddrsPriv for &[SocketAddr] {
     type Future = ReadyFuture<Self::Iter>;
 
     fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
+        // Clippy doesn't like the `to_vec()` call here (as it will allocate,
+        // while `self.iter().copied()` would not), but it's actually necessary
+        // in order to ensure that the returned iterator is valid for the
+        // `'static` lifetime, which the borrowed `slice::Iter` iterator would
+        // not be.
+        // Note that we can't actually add an `allow` attribute for
+        // `clippy::unnecessary_to_owned` here, as Tokio's CI runs clippy lints
+        // on Rust 1.52 to avoid breaking LTS releases of Tokio. Users of newer
+        // Rust versions who see this lint should just ignore it.
         let iter = self.to_vec().into_iter();
         future::ready(Ok(iter))
     }
