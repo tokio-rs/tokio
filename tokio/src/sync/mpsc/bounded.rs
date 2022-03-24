@@ -22,6 +22,50 @@ pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
 
+/// A Sender that does not influence RAII semantics, i.e. if all [`Sender`]
+/// instances of a channel were dropped and only `WeakSender` instances remain,
+/// the channel is closed.
+///
+/// In order to send messages, the `WeakSender` needs to be upgraded using
+/// [`WeakSender::upgrade`], which returns `Option<Sender>`, `None` if all
+/// `Sender`s were already dropped, otherwise `Some` (at which point it does
+/// influence RAII semantics again).
+///
+/// [`Sender`]: Sender
+/// [`WeakSender::upgrade`]: WeakSender::upgrade
+///
+/// #Examples
+///
+/// ```rust
+/// use tokio;
+/// use tokio::sync::mpsc::channel;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (tx, mut rx) = channel(15);
+///     let _ = tx.send(1).await;
+///     let tx_weak = tx.downgrade();
+///
+///     let _ = tokio::spawn(async move {
+///         for i in 0..2 {
+///             if i == 0 {
+///                 assert_eq!(rx.recv().await.unwrap(), 1);
+///             } else if i == 1 {
+///                 // only WeakSender instance remains -> channel is dropped
+///                 assert!(rx.recv().await.is_none());
+///             }
+///         }
+///     })
+///     .await;
+///
+///     assert!(tx_weak.upgrade().is_none());
+/// }
+///
+/// ```
+pub struct WeakSender<T> {
+    chan: chan::TxWeak<T, Semaphore>,
+}
+
 /// Permits to send one value into the channel.
 ///
 /// `Permit` values are returned by [`Sender::reserve()`] and [`Sender::try_reserve()`]
@@ -991,6 +1035,18 @@ impl<T> Sender<T> {
     pub fn capacity(&self) -> usize {
         self.chan.semaphore().0.available_permits()
     }
+
+    /// Converts the `Sender` to a [`WeakSender`] that does not count
+    /// towards RAII semantics, i.e. if all `Sender` instances of the
+    /// channel were dropped and only `WeakSender` instances remain,
+    /// the channel is closed.
+    pub fn downgrade(self) -> WeakSender<T> {
+        // Note: If this is the last `Sender` instance we want to close the
+        // channel when downgrading, so it's important to move into `self` here.
+
+        let chan = self.chan.downgrade();
+        WeakSender { chan }
+    }
 }
 
 impl<T> Clone for Sender<T> {
@@ -1006,6 +1062,21 @@ impl<T> fmt::Debug for Sender<T> {
         fmt.debug_struct("Sender")
             .field("chan", &self.chan)
             .finish()
+    }
+}
+
+impl<T> WeakSender<T> {
+    /// Tries to conver a WeakSender into a [`Sender`]. This will return `Some`
+    /// if there are other `Sender` instances alive and the channel wasn't
+    /// previously dropped, otherwise `None` is returned.
+    pub fn upgrade(&self) -> Option<Sender<T>> {
+        self.chan.upgrade().map(Sender::new)
+    }
+}
+
+impl<T> fmt::Debug for WeakSender<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("WeakSender").finish()
     }
 }
 

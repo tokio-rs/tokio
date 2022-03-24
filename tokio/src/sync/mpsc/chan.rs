@@ -1,7 +1,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::Arc;
+use crate::loom::sync::{Arc, Weak};
 use crate::park::thread::CachedParkThread;
 use crate::park::Park;
 use crate::sync::mpsc::error::TryRecvError;
@@ -9,8 +9,9 @@ use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
 
 use std::fmt;
+use std::mem;
 use std::process;
-use std::sync::atomic::Ordering::{AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, SeqCst};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 
@@ -22,6 +23,16 @@ pub(crate) struct Tx<T, S> {
 impl<T, S: fmt::Debug> fmt::Debug for Tx<T, S> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Tx").field("inner", &self.inner).finish()
+    }
+}
+
+pub(crate) struct TxWeak<T, S> {
+    inner: Weak<Chan<T, S>>,
+}
+
+impl<T, S: fmt::Debug> fmt::Debug for TxWeak<T, S> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("TxWeak").finish()
     }
 }
 
@@ -129,6 +140,14 @@ impl<T, S> Tx<T, S> {
         Tx { inner: chan }
     }
 
+    pub(super) fn downgrade(self) -> TxWeak<T, S> {
+        // We don't decrement the `tx_counter` here, but let the counter be decremented
+        // through the drop of self.inner.
+        let weak_inner = Arc::<Chan<T, S>>::downgrade(&self.inner);
+
+        TxWeak::new(weak_inner)
+    }
+
     pub(super) fn semaphore(&self) -> &S {
         &self.inner.semaphore
     }
@@ -146,6 +165,50 @@ impl<T, S> Tx<T, S> {
     /// Returns `true` if senders belong to the same channel.
     pub(crate) fn same_channel(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl<T, S> TxWeak<T, S> {
+    fn new(inner: Weak<Chan<T, S>>) -> Self {
+        TxWeak { inner }
+    }
+
+    pub(super) fn upgrade(&self) -> Option<Tx<T, S>> {
+        let inner = self.inner.upgrade();
+
+        if let Some(inner) = inner {
+            // If we were able to upgrade, `Chan` is guaranteed to still exist,
+            // even though the channel might have been closed in the meantime.
+            // Need to check here whether the channel was actually closed.
+
+            let mut tx_count = inner.tx_count.load(Relaxed);
+            loop {
+                // FIXME Haven't thought the orderings on the CAS through yet
+                match inner
+                    .tx_count
+                    .compare_exchange(tx_count, tx_count + 1, SeqCst, SeqCst)
+                {
+                    Ok(prev_count) => {
+                        if prev_count == 0 {
+                            mem::drop(inner);
+                            return None;
+                        }
+
+                        return Some(Tx::new(inner));
+                    }
+                    Err(count) => {
+                        if count == 0 {
+                            mem::drop(inner);
+                            return None;
+                        }
+
+                        tx_count = count;
+                    }
+                }
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -378,7 +441,7 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
 
 // ===== impl Semaphore for AtomicUsize =====
 
-use std::sync::atomic::Ordering::{Acquire, Release};
+use std::sync::atomic::Ordering::Release;
 use std::usize;
 
 impl Semaphore for AtomicUsize {
