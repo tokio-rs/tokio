@@ -9,7 +9,7 @@ use std::mem::ManuallyDrop;
 use std::sync::Arc;
 
 #[cfg(feature = "serde-impls")]
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub(crate) mod owned_read_guard;
 pub(crate) mod owned_write_guard;

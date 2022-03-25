@@ -5,7 +5,7 @@ use crate::sync::batch_semaphore as semaphore;
 use crate::util::trace;
 
 #[cfg(feature = "serde-impls")]
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use std::cell::UnsafeCell;
 use std::error::Error;
