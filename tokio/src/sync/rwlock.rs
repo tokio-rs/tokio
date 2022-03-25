@@ -9,7 +9,7 @@ use std::mem::ManuallyDrop;
 use std::sync::Arc;
 
 #[cfg(feature = "serde-impls")]
-use serde::{Serialize, Serializer};
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 pub(crate) mod owned_read_guard;
 pub(crate) mod owned_write_guard;
@@ -1087,8 +1087,18 @@ where
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         self.blocking_read().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde-impls")]
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for RwLock<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Deserialize::deserialize(deserializer).map(RwLock::new)
     }
 }
