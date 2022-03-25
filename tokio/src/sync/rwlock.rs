@@ -8,6 +8,9 @@ use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::sync::Arc;
 
+#[cfg(feature = "serde-impls")]
+use serde::{Serialize, Serializer};
+
 pub(crate) mod owned_read_guard;
 pub(crate) mod owned_write_guard;
 pub(crate) mod owned_write_guard_mapped;
@@ -1074,5 +1077,18 @@ where
 {
     fn default() -> Self {
         Self::new(T::default())
+    }
+}
+
+#[cfg(feature = "serde-impls")]
+impl<T> Serialize for RwLock<T>
+where
+    T: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        self.blocking_read().serialize(serializer)
     }
 }
