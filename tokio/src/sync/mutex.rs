@@ -4,6 +4,9 @@ use crate::sync::batch_semaphore as semaphore;
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
 
+#[cfg(feature = "serde-impls")]
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
 use std::cell::UnsafeCell;
 use std::error::Error;
 use std::ops::{Deref, DerefMut};
@@ -632,6 +635,29 @@ where
 {
     fn default() -> Self {
         Self::new(T::default())
+    }
+}
+
+#[cfg(feature = "serde-impls")]
+impl<T> Serialize for Mutex<T>
+where
+    T: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.blocking_lock().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde-impls")]
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Mutex<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Deserialize::deserialize(deserializer).map(Mutex::new)
     }
 }
 
