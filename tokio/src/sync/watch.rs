@@ -467,6 +467,22 @@ impl<T> Receiver<T> {
         }
     }
 
+    /// Returns `true` if receivers belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let (tx, rx) = tokio::sync::watch::channel(true);
+    /// let rx2 = rx.clone();
+    /// assert!(rx.same_channel(&rx2));
+    ///
+    /// let (tx3, rx3) = tokio::sync::watch::channel(true);
+    /// assert!(!rx3.same_channel(&rx2));
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
+    }
+
     cfg_process_driver! {
         pub(crate) fn try_has_changed(&mut self) -> Option<Result<(), error::RecvError>> {
             maybe_changed(&self.shared, &mut self.version)
