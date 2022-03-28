@@ -1,3 +1,25 @@
+# 0.7.1 (February 21, 2022)
+
+### Added
+
+- codec: add `length_field_type` to `LengthDelimitedCodec` builder ([#4508])
+- io: add `StreamReader::into_inner_with_chunk()` ([#4559])
+
+### Changed
+
+- switch from log to tracing ([#4539])
+
+### Fixed
+
+- sync: fix waker update condition in `CancellationToken` ([#4497])
+- bumped tokio dependency to 1.6 to satisfy minimum requirements ([#4490])
+
+[#4490]: https://github.com/tokio-rs/tokio/pull/4490
+[#4497]: https://github.com/tokio-rs/tokio/pull/4497
+[#4508]: https://github.com/tokio-rs/tokio/pull/4508
+[#4539]: https://github.com/tokio-rs/tokio/pull/4539
+[#4559]: https://github.com/tokio-rs/tokio/pull/4559
+
 # 0.7.0 (February 9, 2022)
 
 ### Added
