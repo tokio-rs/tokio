@@ -1,5 +1,14 @@
 # 0.7.1 (February 21, 2022)
 
+### Added
+
+- codec: add `length_field_type` to `LengthDelimitedCodec` builder ([#4508])
+- io: add `StreamReader::into_inner_with_chunk()` ([#4559])
+
+### Changed
+
+- switch from log to tracing ([#4539])
+
 ### Fixed
 
 - sync: fix waker update condition in `CancellationToken` ([#4497])
