@@ -14,6 +14,12 @@
 - sync: fix waker update condition in `CancellationToken` ([#4497])
 - bumped tokio dependency to 1.6 to satisfy minimum requirements ([#4490])
 
+[#4490]: https://github.com/tokio-rs/tokio/pull/4490
+[#4497]: https://github.com/tokio-rs/tokio/pull/4497
+[#4508]: https://github.com/tokio-rs/tokio/pull/4508
+[#4539]: https://github.com/tokio-rs/tokio/pull/4539
+[#4559]: https://github.com/tokio-rs/tokio/pull/4559
+
 # 0.7.0 (February 9, 2022)
 
 ### Added
