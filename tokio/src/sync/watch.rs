@@ -641,18 +641,19 @@ impl<T> Sender<T> {
             // Update the value and catch possible panic inside func.
             let result = panic::catch_unwind(panic::AssertUnwindSafe(|| modify(&mut lock)));
             match result {
-                Ok(true) => {
+                Ok(modified) => {
+                    if !modified {
+                        // Abort, i.e. don't notify receivers if unmodified
+                        return false;
+                    }
                     // Continue if modified
-                },
-                Ok(false) => {
-                    // Don't notify receivers if unmodified
-                    return false;
                 }
                 Err(panicked) => {
                     // Drop the lock to avoid poisoning it.
                     drop(lock);
                     // Forward the panic to the caller.
                     panic::resume_unwind(panicked);
+                    // Unreachable
                 }
             };
 
