@@ -637,20 +637,24 @@ impl<T> Sender<T> {
         {
             // Acquire the write lock and update the value.
             let mut lock = self.shared.value.write().unwrap();
+
             // Update the value and catch possible panic inside func.
-            let mut modified = false;
-            let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                modified = modify(&mut lock);
-            }));
-            // If the func panicked return the panic to the caller.
-            if let Err(error) = result {
-                // Drop the lock to avoid poisoning it.
-                drop(lock);
-                panic::resume_unwind(error);
-            }
-            if !modified {
-                return false;
-            }
+            let result = panic::catch_unwind(panic::AssertUnwindSafe(|| modify(&mut lock)));
+            match result {
+                Ok(true) => {
+                    // Continue if modified
+                },
+                Ok(false) => {
+                    // Don't notify receivers if unmodified
+                    return false;
+                }
+                Err(panicked) => {
+                    // Drop the lock to avoid poisoning it.
+                    drop(lock);
+                    // Forward the panic to the caller.
+                    panic::resume_unwind(panicked);
+                }
+            };
 
             self.shared.state.increment_version();
 
