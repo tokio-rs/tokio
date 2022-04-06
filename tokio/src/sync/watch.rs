@@ -155,7 +155,7 @@ pub mod error {
     impl<T: fmt::Debug> std::error::Error for SendError<T> {}
 
     /// Error produced when receiving a change notification.
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct RecvError(pub(super) ());
 
     // ===== impl RecvError =====
