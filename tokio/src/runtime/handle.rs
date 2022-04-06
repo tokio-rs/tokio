@@ -63,7 +63,8 @@ pub struct EnterGuard<'a> {
 impl Handle {
     /// Enters the runtime context. This allows you to construct types that must
     /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
-    /// It will also allow you to call methods such as [`tokio::spawn`].
+    /// It will also allow you to call methods such as [`tokio::spawn`] and [`Handle::current`]
+    /// without panicking.
     ///
     /// [`Sleep`]: struct@crate::time::Sleep
     /// [`TcpStream`]: struct@crate::net::TcpStream
@@ -80,8 +81,9 @@ impl Handle {
     /// # Panic
     ///
     /// This will panic if called outside the context of a Tokio runtime. That means that you must
-    /// call this on one of the threads **being run by the runtime**. Calling this from within a
-    /// thread created by `std::thread::spawn` (for example) will cause a panic.
+    /// call this on one of the threads **being run by the runtime**, or from a thread with an active
+    /// `EnterGuard`. Calling this from within a thread created by `std::thread::spawn` (for example)
+    /// will cause a panic unless that thread has an active `EnterGuard`.
     ///
     /// # Examples
     ///
@@ -105,9 +107,14 @@ impl Handle {
     /// # let handle =
     /// thread::spawn(move || {
     ///     // Notice that the handle is created outside of this thread and then moved in
-    ///     handle.spawn(async { /* ... */ })
-    ///     // This next line would cause a panic
-    ///     // let handle2 = Handle::current();
+    ///     handle.spawn(async { /* ... */ });
+    ///     // This next line would cause a panic because we haven't entered the runtime
+    ///     // and created an EnterGuard
+    ///     // let handle2 = Handle::current(); // panic
+    ///     // So we create a guard here with Handle::enter();
+    ///     let _guard = handle.enter();
+    ///     // Now we can call Handle::current();
+    ///     let handle2 = Handle::current();
     /// });
     /// # handle.join().unwrap();
     /// # });
