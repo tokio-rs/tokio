@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::future::Future;
 use std::marker::PhantomPinned;
+use std::mem::ManuallyDrop;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{fmt, thread};
@@ -123,7 +124,7 @@ impl<T: 'static> LocalKey<T> {
         TaskLocalFuture {
             local: self,
             slot: Some(value),
-            future: f,
+            future: ManuallyDrop::new(f),
             _pinned: PhantomPinned,
         }
     }
@@ -152,7 +153,7 @@ impl<T: 'static> LocalKey<T> {
         let scope = TaskLocalFuture {
             local: self,
             slot: Some(value),
-            future: (),
+            future: ManuallyDrop::new(()),
             _pinned: PhantomPinned,
         };
         crate::pin!(scope);
@@ -208,6 +209,19 @@ impl<T: 'static> fmt::Debug for LocalKey<T> {
     }
 }
 
+struct TaskLocalGuard<'a, T: 'static> {
+    local: &'static LocalKey<T>,
+    slot: &'a mut Option<T>,
+    prev: Option<T>,
+}
+
+impl<T> Drop for TaskLocalGuard<'_, T> {
+    fn drop(&mut self) {
+        let value = self.local.inner.with(|c| c.replace(self.prev.take()));
+        *self.slot = value;
+    }
+}
+
 pin_project! {
     /// A future that sets a value `T` of a task local for the future `F` during
     /// its execution.
@@ -237,39 +251,52 @@ pin_project! {
         local: &'static LocalKey<T>,
         slot: Option<T>,
         #[pin]
-        future: F,
+        future: ManuallyDrop<F>,
         #[pin]
         _pinned: PhantomPinned,
+    }
+
+    impl<T: 'static, F> PinnedDrop for TaskLocalFuture<T, F> {
+        fn drop(this: Pin<&mut Self>) {
+            let project = this.project();
+            let val = project.slot.take();
+
+            let prev = project.local.inner.with(|c| c.replace(val));
+
+            let _guard = TaskLocalGuard {
+                prev,
+                slot: project.slot,
+                local: *project.local,
+            };
+
+            unsafe {
+                drop(project.future.map_unchecked_mut(|fut| {
+                    ManuallyDrop::drop(fut);
+                    fut
+                }));
+            }
+        }
     }
 }
 
 impl<T: 'static, F> TaskLocalFuture<T, F> {
     fn with_task<F2: FnOnce(Pin<&mut F>) -> R, R>(self: Pin<&mut Self>, f: F2) -> R {
-        struct Guard<'a, T: 'static> {
-            local: &'static LocalKey<T>,
-            slot: &'a mut Option<T>,
-            prev: Option<T>,
-        }
-
-        impl<T> Drop for Guard<'_, T> {
-            fn drop(&mut self) {
-                let value = self.local.inner.with(|c| c.replace(self.prev.take()));
-                *self.slot = value;
-            }
-        }
-
         let project = self.project();
         let val = project.slot.take();
 
         let prev = project.local.inner.with(|c| c.replace(val));
 
-        let _guard = Guard {
+        let _guard = TaskLocalGuard {
             prev,
             slot: project.slot,
             local: *project.local,
         };
 
-        f(project.future)
+        unsafe {
+            use std::ops::DerefMut;
+            let fut = project.future.map_unchecked_mut(|f| f.deref_mut());
+            f(fut)
+        }
     }
 }
 
