@@ -547,17 +547,23 @@ impl<T> Sender<T> {
         Ok(())
     }
 
-    /// Modifies watched value, notifying all receivers.
+    /// Modifies the watched value **unconditionally** in-place,
+    /// notifying all receivers.
     ///
     /// This can useful for modifying the watched value, without
     /// having to allocate a new instance. Additionally, this
     /// method permits sending values even when there are no receivers.
     ///
+    /// Prefer to use the more versatile function [`Self::send_if_modified()`]
+    /// if the value is only modified conditionally during the mutable borrow
+    /// to prevent unneeded change notifications for unmodified values.
+    ///
     /// # Panics
     ///
-    /// This function panics if calling `func` results in a panic.
-    /// No receivers are notified if panic occurred, but if the closure has modified
-    /// the value, that change is still visible to future calls to `borrow`.
+    /// This function panics when the invocation of the `modify` closure panics.
+    /// No receivers are notified when panicking. All changes of the watched
+    /// value applied by the closure before panicking will be visible in
+    /// subsequent calls to `borrow`.
     ///
     /// # Examples
     ///
@@ -571,35 +577,43 @@ impl<T> Sender<T> {
     /// state_tx.send_modify(|state| state.counter += 1);
     /// assert_eq!(state_rx.borrow().counter, 1);
     /// ```
-    pub fn send_modify<F>(&self, func: F)
+    pub fn send_modify<F>(&self, modify: F)
     where
         F: FnOnce(&mut T),
     {
         self.send_if_modified(|value| {
-            func(value);
+            modify(value);
             true
         });
     }
 
-    /// Modifies watched value, notifying all receivers if modified.
+    /// Modifies the watched value **conditionally** in-place,
+    /// notifying all receivers only if modified.
     ///
     /// This can useful for modifying the watched value, without
     /// having to allocate a new instance. Additionally, this
     /// method permits sending values even when there are no receivers.
     ///
-    /// The closure that modifies the value must return `true` if the
-    /// value has actually been modified. It should only return `false`
+    /// The `modify` closure must return `true` if the value has actually
+    /// been modified during the mutable borrow. It should only return `false`
     /// if the value is guaranteed to be unnmodified despite the mutable
-    /// borrow. Receivers are only notified if the value has been modified.
+    /// borrow.
+    ///
+    /// Receivers are only notified if the closure returned `true`. If the
+    /// closure has modified the value but returned `false` this results
+    /// in a *silent modification*, i.e. the modified value will be visible
+    /// in subsequent calls to `borrow`, but receivers will not receive
+    /// a change notification.
     ///
     /// Returns the result of the closure, i.e. `true` if the value has
     /// been modified and `false` otherwise.
     ///
     /// # Panics
     ///
-    /// This function panics if calling `func` results in a panic.
-    /// No receivers are notified if panic occurred, but if the closure has modified
-    /// the value, that change is still visible to future calls to `borrow`.
+    /// This function panics when the invocation of the `modify` closure panics.
+    /// No receivers are notified when panicking. All changes of the watched
+    /// value applied by the closure before panicking will be visible in
+    /// subsequent calls to `borrow`.
     ///
     /// # Examples
     ///
