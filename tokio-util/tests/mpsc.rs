@@ -246,7 +246,7 @@ async fn weak_sender() {
 
     let tx_weak = tokio::spawn(async move {
         for i in 0..10 {
-            if let Err(_) = tx.send(i).await {
+            if tx.send(i).await.is_err() {
                 return None;
             }
         }
@@ -339,19 +339,14 @@ async fn actor_weak_sender() {
 
         async fn run(&mut self) {
             let mut i = 0;
-            loop {
-                match self.receiver.recv().await {
-                    Some(msg) => {
-                        self.handle_message(msg);
-                    }
-                    None => {
-                        break;
-                    }
-                }
+            while let Some(msg) = self.receiver.recv().await {
+                self.handle_message(msg);
+
                 if i == 0 {
                     self.send_message_to_self().await;
                 }
-                i += 1;
+
+                i += 1
             }
 
             assert!(self.received_self_msg);

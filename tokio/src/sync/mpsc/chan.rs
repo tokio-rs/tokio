@@ -1,7 +1,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Arc, Weak};
+use crate::loom::sync::Arc;
 use crate::park::thread::CachedParkThread;
 use crate::park::Park;
 use crate::sync::mpsc::error::TryRecvError;
@@ -11,9 +11,11 @@ use crate::sync::notify::Notify;
 use std::fmt;
 use std::mem;
 use std::process;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, SeqCst};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
+use std::sync::Weak;
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
+use std::usize;
 
 /// Channel sender.
 pub(crate) struct Tx<T, S> {
@@ -181,28 +183,31 @@ impl<T, S> TxWeak<T, S> {
             // even though the channel might have been closed in the meantime.
             // Need to check here whether the channel was actually closed.
 
-            let mut tx_count = inner.tx_count.load(Relaxed);
+            let mut tx_count = inner.tx_count.load(Acquire);
+
+            if tx_count == 0 {
+                // channel is closed
+                mem::drop(inner);
+                return None;
+            }
+
             loop {
-                // FIXME Haven't thought the orderings on the CAS through yet
                 match inner
                     .tx_count
-                    .compare_exchange(tx_count, tx_count + 1, SeqCst, SeqCst)
+                    .compare_exchange(tx_count, tx_count + 1, AcqRel, Acquire)
                 {
                     Ok(prev_count) => {
+                        assert!(prev_count != 0);
+
+                        return Some(Tx::new(inner));
+                    }
+                    Err(prev_count) => {
                         if prev_count == 0 {
                             mem::drop(inner);
                             return None;
                         }
 
-                        return Some(Tx::new(inner));
-                    }
-                    Err(count) => {
-                        if count == 0 {
-                            mem::drop(inner);
-                            return None;
-                        }
-
-                        tx_count = count;
+                        tx_count = prev_count;
                     }
                 }
             }
@@ -440,9 +445,6 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
 }
 
 // ===== impl Semaphore for AtomicUsize =====
-
-use std::sync::atomic::Ordering::Release;
-use std::usize;
 
 impl Semaphore for AtomicUsize {
     fn add_permit(&self) {
