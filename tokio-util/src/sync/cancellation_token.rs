@@ -108,26 +108,24 @@ impl Drop for CancellationToken {
     fn drop(&mut self) {
         let token_state_pointer = self.inner;
 
+        let inner = self.inner.as_ptr();
+
         // Safety: The state inside a `CancellationToken` is always valid, since
         // is reference counted
-        let inner = unsafe { &mut *self.inner.as_ptr() };
-
-        let mut current_state = inner.snapshot();
-
-        // We need to safe the parent, since the state might be released by the
-        // next call
-        let parent = inner.parent;
-
         unsafe {
+            let mut current_state = (*inner).snapshot();
+
+            // We need to save the parent, since the state might be released by the
+            // next call
+            let parent = (*inner).parent;
+
             // Drop our own refcount
             current_state = CancellationTokenState::decrement_refcount(inner, current_state);
-        }
 
-        // If this was the last reference, unregister from the parent
-        if current_state.refcount == 0 {
-            if let Some(parent) = parent {
-                // Safety: Since we still retain a reference on the parent, it must be valid.
-                unsafe {
+            // If this was the last reference, unregister from the parent
+            if current_state.refcount == 0 {
+                if let Some(parent) = parent {
+                    // Since the reference count has not reached 0, current_state must still be valid.
                     CancellationTokenState::unregister_child(
                         parent.as_ptr(),
                         token_state_pointer,
