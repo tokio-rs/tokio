@@ -479,3 +479,28 @@ fn receiver_len_with_lagged() {
 fn is_closed(err: broadcast::error::RecvError) -> bool {
     matches!(err, broadcast::error::RecvError::Closed)
 }
+
+#[test]
+fn receiver_clone_same_position_as_cloned() {
+    let (tx, mut rx) = broadcast::channel(2);
+    let mut other_rx = tx.subscribe();
+
+    assert_ok!(tx.send(1));
+    assert_ok!(tx.send(2));
+
+    assert_eq!(assert_recv!(rx), 1);
+
+    assert_eq!(tx.receiver_count(), 2);
+    let mut rx_clone = rx.clone();
+
+    // verify rx count is incremented
+    assert_eq!(tx.receiver_count(), 3);
+
+    // rx and rx_clone should have the same next element at clone-time.
+    assert_eq!(assert_recv!(rx), 2);
+    assert_eq!(assert_recv!(rx_clone), 2);
+    assert_empty!(rx);
+    assert_empty!(rx_clone);
+
+    assert_eq!(assert_recv!(other_rx), 1);
+}
