@@ -31,3 +31,34 @@ async fn local() {
     j2.await.unwrap();
     j3.await.unwrap();
 }
+
+tokio::task_local! {
+    static KEY: u32;
+}
+
+struct Guard(u32);
+impl Drop for Guard {
+    fn drop(&mut self) {
+        assert_eq!(KEY.try_with(|x| *x), Ok(self.0));
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn task_local_available_on_drop() {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    let h = tokio::spawn(KEY.scope(42, async move {
+        let _g = Guard(42);
+        let _ = tx.send(());
+        std::future::pending::<()>().await;
+    }));
+
+    rx.await.unwrap();
+
+    h.abort();
+
+    let err = h.await.unwrap_err();
+    if err.is_panic() {
+        panic!("{}", err);
+    }
+}
