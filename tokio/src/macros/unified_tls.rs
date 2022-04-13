@@ -6,9 +6,9 @@
 //! This mod combines multiple `thread_local` into one struct,
 //! thus avoiding excessive use of pthread key resources.
 
-use std::fmt;
-use std::error::Error;
 use std::cell::RefCell;
+use std::error::Error;
+use std::fmt;
 
 #[derive(Default)]
 pub(crate) struct UnifiedThreadLocal {
@@ -25,25 +25,22 @@ thread_local! {
 }
 
 pub(crate) struct LocalKey<T: 'static> {
-    init: fn() -> T,
-    with: fn(&UnifiedThreadLocal) -> &RefCell<Option<T>>
+    pub(crate) init: fn() -> T,
+    pub(crate) with: fn(&UnifiedThreadLocal) -> &RefCell<Option<T>>,
 }
 
 macro_rules! unified_thread_local {
     ( static $name:ident with $field:ident : $ty:ty = $init:expr ; ) => {
-        static $name : $crate::macros::unified_tls::LocalKey<$ty> =
-            $crate::macros::unified_tls::LocalKey::new(
-                || $init,
-                |utls| &utls.$field
-            );
-    }
+        static $name: $crate::macros::unified_tls::LocalKey<$ty> =
+            $crate::macros::unified_tls::LocalKey {
+                init: || $init,
+                with: |utls| &utls.$field,
+            };
+    };
 }
 
 impl<T: 'static> LocalKey<T> {
-    pub(crate) const fn new(init: fn() -> T, with: fn(&UnifiedThreadLocal) -> &RefCell<Option<T>>) -> LocalKey<T> {
-        LocalKey { init, with }
-    }
-
+    #[allow(dead_code)]
     pub(crate) fn with<F, R>(&'static self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
@@ -54,16 +51,18 @@ impl<T: 'static> LocalKey<T> {
         )
     }
 
+    #[allow(dead_code)]
     pub(crate) fn try_with<F, R>(&'static self, f: F) -> Result<R, AccessError>
     where
         F: FnOnce(&T) -> R,
     {
-        UNIFIED_THREAD_LOCAL.try_with(|utls| {
-            let cell = (self.with)(utls);
-            let mut cell = cell.try_borrow_mut().map_err(|_| AccessError)?;
-            let cell = cell.get_or_insert_with(self.init);
-            Ok(f(cell))
-        })
+        UNIFIED_THREAD_LOCAL
+            .try_with(|utls| {
+                let cell = (self.with)(utls);
+                let mut cell = cell.try_borrow_mut().map_err(|_| AccessError)?;
+                let cell = cell.get_or_insert_with(self.init);
+                Ok(f(cell))
+            })
             .map_err(|_| AccessError)?
     }
 }

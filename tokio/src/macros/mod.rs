@@ -16,6 +16,7 @@ mod ready;
 mod thread_local;
 
 #[macro_use]
+#[cfg(any(feature = "rt", feature = "sync", feature = "macros"))]
 pub(crate) mod unified_tls;
 
 cfg_trace! {
