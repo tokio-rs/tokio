@@ -31,8 +31,8 @@ const EMPTY: usize = 0;
 const PARKED: usize = 1;
 const NOTIFIED: usize = 2;
 
-thread_local! {
-    static CURRENT_PARKER: ParkThread = ParkThread::new();
+unified_thread_local! {
+    static CURRENT_PARKER with thread_current_parker: ParkThread = ParkThread::new();
 }
 
 // ==== impl ParkThread ====

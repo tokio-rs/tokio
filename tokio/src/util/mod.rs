@@ -41,7 +41,7 @@ pub(crate) use wake_list::WakeList;
 pub(crate) mod linked_list;
 
 #[cfg(any(feature = "rt-multi-thread", feature = "macros"))]
-mod rand;
+pub(crate) mod rand;
 
 cfg_rt! {
     cfg_unstable! {

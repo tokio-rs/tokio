@@ -15,6 +15,9 @@ mod ready;
 #[macro_use]
 mod thread_local;
 
+#[macro_use]
+pub(crate) mod unified_tls;
+
 cfg_trace! {
     #[macro_use]
     mod trace;
