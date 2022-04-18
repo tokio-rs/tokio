@@ -33,6 +33,15 @@ async fn test_worker_threads_not_int() {}
 #[tokio::test(flavor = "current_thread", worker_threads = 4)]
 async fn test_worker_threads_and_current_thread() {}
 
+#[tokio::test(crate = 456)]
+async fn test_crate_not_ident_int() {}
+
+#[tokio::test(crate = "456")]
+async fn test_crate_not_ident_invalid() {}
+
+#[tokio::test(crate = "abc::edf")]
+async fn test_crate_not_ident_path() {}
+
 #[tokio::test]
 #[test]
 async fn test_has_second_test_attr() {}

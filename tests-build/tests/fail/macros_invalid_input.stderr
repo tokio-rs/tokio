@@ -4,7 +4,7 @@ error: the `async` keyword is missing from the function declaration
 4 | fn main_is_not_async() {}
   | ^^
 
-error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`
+error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`
  --> $DIR/macros_invalid_input.rs:6:15
   |
 6 | #[tokio::main(foo)]
@@ -22,13 +22,13 @@ error: the `async` keyword is missing from the function declaration
 13 | fn test_is_not_async() {}
    | ^^
 
-error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`
+error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`
   --> $DIR/macros_invalid_input.rs:15:15
    |
 15 | #[tokio::test(foo)]
    |               ^^^
 
-error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`
+error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`
   --> $DIR/macros_invalid_input.rs:18:15
    |
 18 | #[tokio::test(foo = 123)]
@@ -64,16 +64,34 @@ error: The `worker_threads` option requires the `multi_thread` runtime flavor. U
 33 | #[tokio::test(flavor = "current_thread", worker_threads = 4)]
    |                                                           ^
 
-error: second test attribute is supplied
-  --> $DIR/macros_invalid_input.rs:37:1
+error: Failed to parse value of `crate` as ident.
+  --> $DIR/macros_invalid_input.rs:36:23
    |
-37 | #[test]
+36 | #[tokio::test(crate = 456)]
+   |                       ^^^
+
+error: Failed to parse value of `crate` as ident: "456"
+  --> $DIR/macros_invalid_input.rs:39:23
+   |
+39 | #[tokio::test(crate = "456")]
+   |                       ^^^^^
+
+error: Failed to parse value of `crate` as ident: "abc::edf"
+  --> $DIR/macros_invalid_input.rs:42:23
+   |
+42 | #[tokio::test(crate = "abc::edf")]
+   |                       ^^^^^^^^^^
+
+error: second test attribute is supplied
+  --> $DIR/macros_invalid_input.rs:46:1
+   |
+46 | #[test]
    | ^^^^^^^
 
 error: duplicated attribute
-  --> $DIR/macros_invalid_input.rs:37:1
+  --> $DIR/macros_invalid_input.rs:46:1
    |
-37 | #[test]
+46 | #[test]
    | ^^^^^^^
    |
    = note: `-D duplicate-macro-attributes` implied by `-D warnings`

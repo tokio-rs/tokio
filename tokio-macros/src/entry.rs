@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use proc_macro2::Span;
+use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::Parser;
 
@@ -29,6 +29,7 @@ struct FinalConfig {
     flavor: RuntimeFlavor,
     worker_threads: Option<usize>,
     start_paused: Option<bool>,
+    crate_name: Option<String>,
 }
 
 /// Config used in case of the attribute not being able to build a valid config
@@ -36,6 +37,7 @@ const DEFAULT_ERROR_CONFIG: FinalConfig = FinalConfig {
     flavor: RuntimeFlavor::CurrentThread,
     worker_threads: None,
     start_paused: None,
+    crate_name: None,
 };
 
 struct Configuration {
@@ -45,6 +47,7 @@ struct Configuration {
     worker_threads: Option<(usize, Span)>,
     start_paused: Option<(bool, Span)>,
     is_test: bool,
+    crate_name: Option<String>,
 }
 
 impl Configuration {
@@ -59,6 +62,7 @@ impl Configuration {
             worker_threads: None,
             start_paused: None,
             is_test,
+            crate_name: None,
         }
     }
 
@@ -101,6 +105,15 @@ impl Configuration {
 
         let start_paused = parse_bool(start_paused, span, "start_paused")?;
         self.start_paused = Some((start_paused, span));
+        Ok(())
+    }
+
+    fn set_crate_name(&mut self, name: syn::Lit, span: Span) -> Result<(), syn::Error> {
+        if self.crate_name.is_some() {
+            return Err(syn::Error::new(span, "`crate` set multiple times."));
+        }
+        let name_ident = parse_ident(name, span, "crate")?;
+        self.crate_name = Some(name_ident.to_string());
         Ok(())
     }
 
@@ -151,6 +164,7 @@ impl Configuration {
         };
 
         Ok(FinalConfig {
+            crate_name: self.crate_name.clone(),
             flavor,
             worker_threads,
             start_paused,
@@ -181,6 +195,27 @@ fn parse_string(int: syn::Lit, span: Span, field: &str) -> Result<String, syn::E
         _ => Err(syn::Error::new(
             span,
             format!("Failed to parse value of `{}` as string.", field),
+        )),
+    }
+}
+
+fn parse_ident(lit: syn::Lit, span: Span, field: &str) -> Result<Ident, syn::Error> {
+    match lit {
+        syn::Lit::Str(s) => {
+            let err = syn::Error::new(
+                span,
+                format!(
+                    "Failed to parse value of `{}` as ident: \"{}\"",
+                    field,
+                    s.value()
+                ),
+            );
+            let path = s.parse::<syn::Path>().map_err(|_| err.clone())?;
+            path.get_ident().cloned().ok_or(err)
+        }
+        _ => Err(syn::Error::new(
+            span,
+            format!("Failed to parse value of `{}` as ident.", field),
         )),
     }
 }
@@ -243,9 +278,15 @@ fn build_config(
                         let msg = "Attribute `core_threads` is renamed to `worker_threads`";
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
+                    "crate" => {
+                        config.set_crate_name(
+                            namevalue.lit.clone(),
+                            syn::spanned::Spanned::span(&namevalue.lit),
+                        )?;
+                    }
                     name => {
                         let msg = format!(
-                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`",
+                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`",
                             name,
                         );
                         return Err(syn::Error::new_spanned(namevalue, msg));
@@ -275,7 +316,7 @@ fn build_config(
                         format!("The `{}` attribute requires an argument.", name)
                     }
                     name => {
-                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`", name)
+                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`", name)
                     }
                 };
                 return Err(syn::Error::new_spanned(path, msg));
@@ -313,12 +354,16 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
         (start, end)
     };
 
+    let crate_name = config.crate_name.as_deref().unwrap_or("tokio");
+
+    let crate_ident = Ident::new(crate_name, last_stmt_start_span);
+
     let mut rt = match config.flavor {
         RuntimeFlavor::CurrentThread => quote_spanned! {last_stmt_start_span=>
-            tokio::runtime::Builder::new_current_thread()
+            #crate_ident::runtime::Builder::new_current_thread()
         },
         RuntimeFlavor::Threaded => quote_spanned! {last_stmt_start_span=>
-            tokio::runtime::Builder::new_multi_thread()
+            #crate_ident::runtime::Builder::new_multi_thread()
         },
     };
     if let Some(v) = config.worker_threads {

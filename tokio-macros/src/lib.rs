@@ -168,12 +168,32 @@ use proc_macro::TokenStream;
 ///
 /// Note that `start_paused` requires the `test-util` feature to be enabled.
 ///
-/// ### NOTE:
+/// ### Rename package
 ///
-/// If you rename the Tokio crate in your dependencies this macro will not work.
-/// If you must rename the current version of Tokio because you're also using an
-/// older version of Tokio, you _must_ make the current version of Tokio
-/// available as `tokio` in the module where this macro is expanded.
+/// ```rust
+/// use tokio as tokio1;
+///
+/// #[tokio1::main(crate = "tokio1")]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// use tokio as tokio1;
+///
+/// fn main() {
+///     tokio1::runtime::Builder::new_multi_thread()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
@@ -213,12 +233,32 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// ### NOTE:
+/// ### Rename package
 ///
-/// If you rename the Tokio crate in your dependencies this macro will not work.
-/// If you must rename the current version of Tokio because you're also using an
-/// older version of Tokio, you _must_ make the current version of Tokio
-/// available as `tokio` in the module where this macro is expanded.
+/// ```rust
+/// use tokio as tokio1;
+///
+/// #[tokio1::main(crate = "tokio1")]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// use tokio as tokio1;
+///
+/// fn main() {
+///     tokio1::runtime::Builder::new_multi_thread()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
@@ -260,12 +300,16 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// Note that `start_paused` requires the `test-util` feature to be enabled.
 ///
-/// ### NOTE:
+/// ### Rename package
 ///
-/// If you rename the Tokio crate in your dependencies this macro will not work.
-/// If you must rename the current version of Tokio because you're also using an
-/// older version of Tokio, you _must_ make the current version of Tokio
-/// available as `tokio` in the module where this macro is expanded.
+/// ```rust
+/// use tokio as tokio1;
+///
+/// #[tokio1::test(crate = "tokio1")]
+/// async fn my_test() {
+///     println!("Hello world");
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::test(args, item, true)
@@ -281,13 +325,6 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 ///     assert!(true);
 /// }
 /// ```
-///
-/// ### NOTE:
-///
-/// If you rename the Tokio crate in your dependencies this macro will not work.
-/// If you must rename the current version of Tokio because you're also using an
-/// older version of Tokio, you _must_ make the current version of Tokio
-/// available as `tokio` in the module where this macro is expanded.
 #[proc_macro_attribute]
 pub fn test_rt(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::test(args, item, false)
