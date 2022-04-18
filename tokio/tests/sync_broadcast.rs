@@ -481,26 +481,49 @@ fn is_closed(err: broadcast::error::RecvError) -> bool {
 }
 
 #[test]
-fn receiver_clone_same_position_as_cloned() {
-    let (tx, mut rx) = broadcast::channel(2);
-    let mut other_rx = tx.subscribe();
+fn receiver_same_position_as_cloned() {
+    let (tx, mut rx) = broadcast::channel(3);
 
-    assert_ok!(tx.send(1));
-    assert_ok!(tx.send(2));
-
-    assert_eq!(assert_recv!(rx), 1);
-
+    let mut rx_clone = rx.clone();
+    // verify rx count is incremented
     assert_eq!(tx.receiver_count(), 2);
+
+    // verify ok to start recv on rx_clone before rx
+    assert_ok!(tx.send(1));
+    assert_eq!(assert_recv!(rx_clone), 1);
+
+    drop(rx_clone);
+    assert_ok!(tx.send(2));
+    assert_ok!(tx.send(3));
+    // rx: [1,2,3]
+
+    // verify ok to start recv on rx before rx_clone
+    let mut rx_clone = rx.clone();
+    assert_eq!(assert_recv!(rx), 1);
+    assert_eq!(assert_recv!(rx_clone), 1);
+    // as we drop the rx_clone we should have registered interest in all positions between Receiver::next and tail.pos so each are decremented when we recv them.
+    drop(rx_clone);
+
+    // rx: [2, 3, _]
+    assert_ok!(tx.send(4));
+    // rx: [2, 3, 4]
     let mut rx_clone = rx.clone();
 
-    // verify rx count is incremented
-    assert_eq!(tx.receiver_count(), 3);
-
-    // rx and rx_clone should have the same next element at clone-time.
+    // verify interest registered in slot, if not 3 and 4 is dropped and will rx_clone will not recv them.
     assert_eq!(assert_recv!(rx), 2);
-    assert_eq!(assert_recv!(rx_clone), 2);
-    assert_empty!(rx);
-    assert_empty!(rx_clone);
+    assert_eq!(assert_recv!(rx), 3);
 
-    assert_eq!(assert_recv!(other_rx), 1);
+    // rx: [4, _, _]
+    // rx_clone: [2, 3, 4]
+    assert_eq!(assert_recv!(rx_clone), 2);
+    assert_eq!(assert_recv!(rx_clone), 3);
+    assert_eq!(assert_recv!(rx_clone), 4);
+    assert_eq!(assert_recv!(rx), 4);
+    assert_ok!(tx.send(5));
+    drop(tx);
+    assert_eq!(assert_recv!(rx), 5);
+    assert_eq!(assert_recv!(rx_clone), 5);
+
+    assert_closed!(rx.try_recv());
+    assert_closed!(rx_clone.try_recv());
 }

@@ -178,6 +178,46 @@ fn drop_rx() {
         assert_ok!(th2.join());
     });
 }
+#[test]
+fn drop_cloned_rx() {
+    loom::model(|| {
+        let (tx, mut rx1) = broadcast::channel(16);
+        let rx2 = rx1.clone();
+
+        let th1 = thread::spawn(move || {
+            block_on(async {
+                let v = assert_ok!(rx1.recv().await);
+                assert_eq!(v, "one");
+
+                let v = assert_ok!(rx1.recv().await);
+                assert_eq!(v, "two");
+
+                let v = assert_ok!(rx1.recv().await);
+                assert_eq!(v, "three");
+
+                let v = assert_ok!(rx1.recv().await);
+
+                match assert_err!(rx1.recv().await) {
+                    Closed => {}
+                    _ => panic!(),
+                }
+            });
+        });
+
+        let th2 = thread::spawn(move || {
+            drop(rx2);
+        });
+
+        assert_ok!(tx.send("one"));
+        assert_ok!(tx.send("two"));
+        assert_ok!(tx.send("three"));
+        drop(tx);
+
+        assert_ok!(th1.join());
+        assert_ok!(th2.join());
+    });
+}
+
 
 #[test]
 fn drop_multiple_rx_with_overflow() {
@@ -185,6 +225,33 @@ fn drop_multiple_rx_with_overflow() {
         // It is essential to have multiple senders and receivers in this test case.
         let (tx, mut rx) = broadcast::channel(1);
         let _rx2 = tx.subscribe();
+
+        let _ = tx.send(());
+        let tx2 = tx.clone();
+        let th1 = thread::spawn(move || {
+            block_on(async {
+                for _ in 0..100 {
+                    let _ = tx2.send(());
+                }
+            });
+        });
+        let _ = tx.send(());
+
+        let th2 = thread::spawn(move || {
+            block_on(async { while let Ok(_) = rx.recv().await {} });
+        });
+
+        assert_ok!(th1.join());
+        assert_ok!(th2.join());
+    });
+}
+
+#[test]
+fn drop_multiple_cloned_rx_with_overflow() {
+    loom::model(move || {
+        // It is essential to have multiple senders and receivers in this test case.
+        let (tx, mut rx) = broadcast::channel(1);
+        let _rx2 = rx.clone();
 
         let _ = tx.send(());
         let tx2 = tx.clone();

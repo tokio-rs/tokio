@@ -1029,8 +1029,32 @@ impl<T> Drop for Receiver<T> {
 
 impl<T> Clone for Receiver<T> {
     fn clone(&self) -> Self {
+        let next = self.next;
+        // register interest in the slot that next points to
+        {
+            for n in next..=self.shared.tail.lock().pos {
+                let idx = (n & self.shared.mask as u64) as usize;
+                let slot = self.shared.buffer[idx].read().unwrap();
+
+                // a race with RecvGuard::drop would be bad, but is impossible since `self.next`
+                // is already incremented to the slot after the one that the `RecvGuard` points to. Additionally
+                // all methods that drop a `RecvGuard` require a &mut `Receiver` which ensures this method is not
+                // called concurrently.
+                slot.rem.fetch_add(1, SeqCst);
+            }
+        }
         let shared = self.shared.clone();
-        new_receiver(shared, Some(self.next))
+        // register the new receiver with `Tail`
+        {
+            let mut tail = shared.tail.lock();
+
+            if tail.rx_cnt == MAX_RECEIVERS {
+                panic!("max receivers");
+            }
+            tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
+        }
+
+        Receiver { shared, next }
     }
 }
 
