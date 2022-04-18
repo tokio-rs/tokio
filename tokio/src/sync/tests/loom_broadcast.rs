@@ -195,7 +195,6 @@ fn drop_cloned_rx() {
                 let v = assert_ok!(rx1.recv().await);
                 assert_eq!(v, "three");
 
-                let v = assert_ok!(rx1.recv().await);
 
                 match assert_err!(rx1.recv().await) {
                     Closed => {}
@@ -272,3 +271,28 @@ fn drop_multiple_cloned_rx_with_overflow() {
         assert_ok!(th2.join());
     });
 }
+
+#[test]
+fn send_and_rx_clone() {
+    // test the interraction of Sender::send and Rx::clone
+    loom::model(move || {
+        let (tx, mut rx) = broadcast::channel(2);
+
+        let th1 = thread::spawn(move || {
+            block_on(async {
+                let mut rx2 = rx.clone();
+                let v = assert_ok!(rx.recv().await);
+                assert_eq!(v, 1);
+
+                // this would return closed if rem was incr'd in clone between
+                // read and write of rem for new tail entry.
+                let v2 = assert_ok!(rx2.recv().await);
+                assert_eq!(v2, 1);
+            });
+        });
+        assert_ok!(tx.send(1));
+
+        assert_ok!(th1.join());
+    });
+}
+
