@@ -1218,6 +1218,8 @@ impl NamedPipeClient {
         /// use std::error::Error;
         /// use std::io;
         ///
+        /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-client-readable";
+        ///
         /// #[tokio::main]
         /// async fn main() -> Result<(), Box<dyn Error>> {
         ///     let client = named_pipe::ClientOptions::new().open(PIPE_NAME)?;
