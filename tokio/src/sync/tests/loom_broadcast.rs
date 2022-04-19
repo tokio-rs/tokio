@@ -241,7 +241,6 @@ fn drop_cloned_rx() {
                 let v = assert_ok!(rx1.recv().await);
                 assert_eq!(v, "three");
 
-
                 match assert_err!(rx1.recv().await) {
                     Closed => {}
                     _ => panic!(),
@@ -262,7 +261,6 @@ fn drop_cloned_rx() {
         assert_ok!(th2.join());
     });
 }
-
 
 #[test]
 fn drop_multiple_rx_with_overflow() {
@@ -341,4 +339,3 @@ fn send_and_rx_clone() {
         assert_ok!(th1.join());
     });
 }
-
