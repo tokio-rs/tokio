@@ -92,6 +92,52 @@ fn broadcast_two() {
     });
 }
 
+// An `Arc` is used as the value in order to detect memory leaks.
+#[test]
+fn broadcast_two_cloned() {
+    loom::model(|| {
+        let (tx, mut rx1) = broadcast::channel::<Arc<&'static str>>(16);
+        let mut rx2 = rx1.clone();
+
+        let th1 = thread::spawn(move || {
+            block_on(async {
+                let v = assert_ok!(rx1.recv().await);
+                assert_eq!(*v, "hello");
+
+                let v = assert_ok!(rx1.recv().await);
+                assert_eq!(*v, "world");
+
+                match assert_err!(rx1.recv().await) {
+                    Closed => {}
+                    _ => panic!(),
+                }
+            });
+        });
+
+        let th2 = thread::spawn(move || {
+            block_on(async {
+                let v = assert_ok!(rx2.recv().await);
+                assert_eq!(*v, "hello");
+
+                let v = assert_ok!(rx2.recv().await);
+                assert_eq!(*v, "world");
+
+                match assert_err!(rx2.recv().await) {
+                    Closed => {}
+                    _ => panic!(),
+                }
+            });
+        });
+
+        assert_ok!(tx.send(Arc::new("hello")));
+        assert_ok!(tx.send(Arc::new("world")));
+        drop(tx);
+
+        assert_ok!(th1.join());
+        assert_ok!(th2.join());
+    });
+}
+
 #[test]
 fn broadcast_wrap() {
     loom::model(|| {
@@ -274,7 +320,7 @@ fn drop_multiple_cloned_rx_with_overflow() {
 
 #[test]
 fn send_and_rx_clone() {
-    // test the interraction of Sender::send and Rx::clone
+    // test the interaction of Sender::send and Rx::clone
     loom::model(move || {
         let (tx, mut rx) = broadcast::channel(2);
 

@@ -1031,11 +1031,19 @@ impl<T> Clone for Receiver<T> {
     fn clone(&self) -> Self {
         let next = self.next;
         let shared = self.shared.clone();
+        let mut tail = shared.tail.lock();
 
-        // register interest in the slot that next points to
-        // let this be lock-free since we're not yet operating on the tail.
-        let tail_pos = shared.tail.lock().pos;
-        for n in next..tail_pos {
+        // register the new receiver with `Tail`
+        if tail.rx_cnt == MAX_RECEIVERS {
+            panic!("max receivers");
+        }
+        tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
+
+        // Register interest in the slots from next to tail.pos.
+
+        // We need to hold the lock here to prevent a race with send2 where send2 overwrites
+        // next or moves past tail before we register interest in the slot.
+        for n in next..tail.pos {
             let idx = (n & shared.mask as u64) as usize;
             let slot = shared.buffer[idx].read().unwrap();
 
@@ -1045,21 +1053,6 @@ impl<T> Clone for Receiver<T> {
             // called concurrently.
             slot.rem.fetch_add(1, SeqCst);
         }
-        // tail pos may have changed, we need a locked section here to prevent a race with `Sender::send2`
-        let mut n = tail_pos.wrapping_sub(1);
-        let mut tail = shared.tail.lock();
-        while n <= tail.pos {
-            let idx = (n & shared.mask as u64) as usize;
-            let slot = self.shared.buffer[idx].read().unwrap();
-            slot.rem.fetch_add(1, SeqCst);
-            n = n.wrapping_add(1);
-        }
-
-        // register the new receiver with `Tail`
-        if tail.rx_cnt == MAX_RECEIVERS {
-            panic!("max receivers");
-        }
-        tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
 
         drop(tail);
 
