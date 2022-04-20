@@ -129,6 +129,28 @@ impl RawTask {
     pub(super) fn ref_inc(self) {
         self.header().state.ref_inc();
     }
+
+    #[cfg(tokio_unstable)]
+    #[inline]
+    pub(super) fn id(&self) -> super::Id {
+        use std::num::NonZeroUsize;
+        let addr = self.ptr.as_ptr() as usize;
+
+        #[cfg(debug_assertions)]
+        let inner = NonZeroUsize::new(addr)
+            .expect("a `NonNull` pointer will never be 0 when cast to `usize`");
+
+        #[cfg(not(debug_assertions))]
+        let inner = unsafe {
+            // Safety: `addr` was cast from a `NonNull` pointer, which must
+            // never be null (0). Since the pointer is not null, the integer
+            // will never be zero, so this is safe as long as the `NonNull` was
+            // constructed safely.
+            NonZeroUsize::new_unchecked(addr)
+        };
+
+        super::Id(inner)
+    }
 }
 
 impl Clone for RawTask {

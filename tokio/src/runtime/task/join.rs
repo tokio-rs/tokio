@@ -220,6 +220,17 @@ impl<T> JoinHandle<T> {
         });
         super::AbortHandle::new(raw)
     }
+
+    /// Returns a [task ID] that uniquely identifies this task relative to other
+    /// currently running tasks.
+    ///
+    /// [task ID]: crate::task::Id
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn id(&self) -> super::Id {
+        // XXX(eliza): should this return an option instead? probably not...
+        self.raw.unwrap().id()
+    }
 }
 
 impl<T> Unpin for JoinHandle<T> {}

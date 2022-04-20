@@ -47,6 +47,15 @@ impl AbortHandle {
             raw.remote_abort();
         }
     }
+
+    /// Returns a [task ID] that uniquely identifies this task relative to other
+    /// currently running tasks.
+    ///
+    /// [task ID]: crate::task::Id
+    pub fn id(&self) -> super::Id {
+        // XXX(eliza): should this return an option instead? probably not...
+        self.raw.unwrap().id()
+    }
 }
 
 unsafe impl Send for AbortHandle {}

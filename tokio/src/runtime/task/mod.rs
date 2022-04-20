@@ -184,6 +184,27 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{fmt, mem};
 
+/// An opaque ID that uniquely identifies a task relative to all other currently
+/// running tasks.
+///
+/// # Notes
+///
+/// - Task IDs are unique relative to other *currently running* tasks. When a
+///   task completes, the same ID may be used for another task.
+/// - Task IDs are *not* sequential, and do not indicate the order in which
+///   tasks are spawned, what runtime a task is spawned on, or any other data.
+///
+/// **Note**: This is an [unstable API][unstable]. The public API of this type
+/// may break in 1.x releases. See [the documentation on unstable
+/// features][unstable] for details.
+///
+/// [unstable]: crate#unstable-features
+#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+// TODO(eliza): there's almost certainly no reason not to make this `Copy` as well...
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct Id(std::num::NonZeroUsize);
+
 /// An owned handle to the task, tracked by ref count.
 #[repr(transparent)]
 pub(crate) struct Task<S: 'static> {
