@@ -222,9 +222,16 @@ impl<T> JoinHandle<T> {
     }
 
     /// Returns a [task ID] that uniquely identifies this task relative to other
-    /// currently running tasks.
+    /// currently spawned tasks.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
     ///
     /// [task ID]: crate::task::Id
+    /// [unstable]: crate#unstable-features
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn id(&self) -> super::Id {

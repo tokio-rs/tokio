@@ -471,3 +471,31 @@ unsafe impl<S> linked_list::Link for Task<S> {
         NonNull::from(target.as_ref().owned.with_mut(|ptr| &mut *ptr))
     }
 }
+
+impl fmt::Display for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+impl Id {
+    #[inline]
+    fn from_raw(ptr: NonNull<Header>) -> Self {
+        use std::num::NonZeroUsize;
+        let addr = ptr.as_ptr() as usize;
+
+        #[cfg(debug_assertions)]
+        let inner = NonZeroUsize::new(addr)
+            .expect("a `NonNull` pointer will never be 0 when cast to `usize`");
+
+        #[cfg(not(debug_assertions))]
+        let inner = unsafe {
+            // Safety: `addr` was cast from a `NonNull` pointer, which must
+            // never be null (0). Since the pointer is not null, the integer
+            // will never be zero, so this is safe as long as the `NonNull` was
+            // constructed safely.
+            NonZeroUsize::new_unchecked(addr)
+        };
+
+        Self(inner)
+    }
+}

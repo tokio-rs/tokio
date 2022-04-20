@@ -157,8 +157,7 @@ impl<T: 'static> JoinSet<T> {
     pub async fn join_one(&mut self) -> Result<Option<T>, JoinError> {
         crate::future::poll_fn(|cx| self.poll_join_one(cx))
             .await
-            .map(|(_, res)| res)
-            .transpose()
+            .map(|opt| opt.map(|(_, res)| res))
     }
 
     /// Waits until one of the tasks in the set completes and returns its
@@ -173,7 +172,7 @@ impl<T: 'static> JoinSet<T> {
     /// removed from this `JoinSet`.
     ///
     /// [task ID]: crate::task::Id
-    pub async fn join_with_id(&mut self) -> Option<(Id, Result<T, JoinError>)> {
+    pub async fn join_with_id(&mut self) -> Result<Option<(Id, T)>, JoinError> {
         crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
     }
 
@@ -224,27 +223,26 @@ impl<T: 'static> JoinSet<T> {
     ///
     ///  * `Poll::Pending` if the `JoinSet` is not empty but there is no task whose output is
     ///     available right now.
-    ///  * `Poll::Ready(Some((Id, Ok(value))))` if one of the tasks in this `JoinSet` has completed. The
+    ///  * `Poll::Ready(Ok(Some((id, value)))` if one of the tasks in this `JoinSet` has completed. The
     ///    `value` is the return value of one of the tasks that completed, while
     ///    `id` is the [task ID] of that task.
-    ///  * `Poll::Ready(Some((Id, Err(err))))` if one of the tasks in this `JoinSet` has panicked or been
-    ///     aborted. The `err` is the `JoinError` from the panicked/aborted
-    ///     task, and `id` is the [task ID] of that task.
-    ///  * `Poll::Ready(None)` if the `JoinSet` is empty.
+    ///  * `Poll::Ready(Err(err))` if one of the tasks in this `JoinSet` has panicked or been
+    ///     aborted. The `err` is the `JoinError` from the panicked/aborted task.
+    ///  * `Poll::Ready(Ok(None))` if the `JoinSet` is empty.
     ///
     /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
     /// This can happen if the [coop budget] is reached.
     ///
     /// [coop budget]: crate::task#cooperative-scheduling
     /// [task ID]: crate::task::Id
-    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Option<(Id, Result<T, JoinError>)>> {
+    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<(Id, T)>, JoinError>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
         let mut entry = match self.inner.pop_notified(cx.waker()) {
             Some(entry) => entry,
             None => {
                 if self.is_empty() {
-                    return Poll::Ready(None);
+                    return Poll::Ready(Ok(None));
                 } else {
                     // The waker was set by `pop_notified`.
                     return Poll::Pending;
@@ -256,8 +254,10 @@ impl<T: 'static> JoinSet<T> {
 
         if let Poll::Ready(res) = res {
             let entry = entry.remove();
-            let id = entry.id();
-            Poll::Ready(Some((id, res)))
+            // If the task succeeded, add the task ID to the output. Otherwise, the
+            // `JoinError` will already have the task's ID.
+            let res = res.map(|output| (entry.id(), output));
+            Poll::Ready(Some(res).transpose())
         } else {
             // A JoinHandle generally won't emit a wakeup without being ready unless
             // the coop limit has been reached. We yield to the executor in this
