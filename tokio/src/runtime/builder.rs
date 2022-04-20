@@ -555,32 +555,37 @@ impl Builder {
     }
 
     fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::{BasicScheduler, Kind};
+        use crate::runtime::{BasicScheduler, HandleInner, Kind};
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
-
-        // And now put a single-threaded scheduler on top of the timer. When
-        // there are no futures ready to do something, it'll let the timer or
-        // the reactor to generate some new stimuli for the futures to continue
-        // in their life.
-        let scheduler =
-            BasicScheduler::new(driver, self.before_park.clone(), self.after_unpark.clone());
-        let spawner = Spawner::Basic(scheduler.spawner().clone());
 
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
 
+        let handle_inner = HandleInner {
+            io_handle: resources.io_handle,
+            time_handle: resources.time_handle,
+            signal_handle: resources.signal_handle,
+            clock: resources.clock,
+            blocking_spawner,
+        };
+
+        // And now put a single-threaded scheduler on top of the timer. When
+        // there are no futures ready to do something, it'll let the timer or
+        // the reactor to generate some new stimuli for the futures to continue
+        // in their life.
+        let scheduler = BasicScheduler::new(
+            driver,
+            handle_inner,
+            self.before_park.clone(),
+            self.after_unpark.clone(),
+        );
+        let spawner = Spawner::Basic(scheduler.spawner().clone());
+
         Ok(Runtime {
             kind: Kind::CurrentThread(scheduler),
-            handle: Handle {
-                spawner,
-                io_handle: resources.io_handle,
-                time_handle: resources.time_handle,
-                signal_handle: resources.signal_handle,
-                clock: resources.clock,
-                blocking_spawner,
-            },
+            handle: Handle { spawner },
             blocking_pool,
         })
     }
@@ -662,28 +667,30 @@ cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
-            use crate::runtime::{Kind, ThreadPool};
-            use crate::runtime::park::Parker;
+            use crate::runtime::{Kind, HandleInner, ThreadPool};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
-            let (scheduler, launch) = ThreadPool::new(core_threads, Parker::new(driver), self.before_park.clone(), self.after_unpark.clone());
-            let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
-
             // Create the blocking pool
             let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
-            // Create the runtime handle
-            let handle = Handle {
-                spawner,
+            let handle_inner = HandleInner {
                 io_handle: resources.io_handle,
                 time_handle: resources.time_handle,
                 signal_handle: resources.signal_handle,
                 clock: resources.clock,
                 blocking_spawner,
+            };
+
+            let (scheduler, launch) = ThreadPool::new(core_threads, driver, handle_inner, self.before_park.clone(), self.after_unpark.clone());
+            let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
+
+            // Create the runtime handle
+            let handle = Handle {
+                spawner,
             };
 
             // Spawn the thread pool workers

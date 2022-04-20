@@ -11,14 +11,14 @@ use std::ptr;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 
 /// Producer handle. May only be used from a single thread.
-pub(super) struct Local<T: 'static> {
+pub(crate) struct Local<T: 'static> {
     inner: Arc<Inner<T>>,
 }
 
 /// Consumer handle. May be used from many threads.
-pub(super) struct Steal<T: 'static>(Arc<Inner<T>>);
+pub(crate) struct Steal<T: 'static>(Arc<Inner<T>>);
 
-pub(super) struct Inner<T: 'static> {
+pub(crate) struct Inner<T: 'static> {
     /// Concurrently updated by many threads.
     ///
     /// Contains two `u16` values. The LSB byte is the "real" head of the queue.
@@ -65,7 +65,7 @@ fn make_fixed_size<T>(buffer: Box<[T]>) -> Box<[T; LOCAL_QUEUE_CAPACITY]> {
 }
 
 /// Create a new local run-queue
-pub(super) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
+pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
     let mut buffer = Vec::with_capacity(LOCAL_QUEUE_CAPACITY);
 
     for _ in 0..LOCAL_QUEUE_CAPACITY {
@@ -89,7 +89,7 @@ pub(super) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
 
 impl<T> Local<T> {
     /// Returns true if the queue has entries that can be stealed.
-    pub(super) fn is_stealable(&self) -> bool {
+    pub(crate) fn is_stealable(&self) -> bool {
         !self.inner.is_empty()
     }
 
@@ -97,12 +97,12 @@ impl<T> Local<T> {
     ///
     /// Separate to is_stealable so that refactors of is_stealable to "protect"
     /// some tasks from stealing won't affect this
-    pub(super) fn has_tasks(&self) -> bool {
+    pub(crate) fn has_tasks(&self) -> bool {
         !self.inner.is_empty()
     }
 
     /// Pushes a task to the back of the local queue, skipping the LIFO slot.
-    pub(super) fn push_back(
+    pub(crate) fn push_back(
         &mut self,
         mut task: task::Notified<T>,
         inject: &Inject<T>,
@@ -259,7 +259,7 @@ impl<T> Local<T> {
     }
 
     /// Pops a task from the local queue.
-    pub(super) fn pop(&mut self) -> Option<task::Notified<T>> {
+    pub(crate) fn pop(&mut self) -> Option<task::Notified<T>> {
         let mut head = self.inner.head.load(Acquire);
 
         let idx = loop {
@@ -301,12 +301,12 @@ impl<T> Local<T> {
 }
 
 impl<T> Steal<T> {
-    pub(super) fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Steals half the tasks from self and place them into `dst`.
-    pub(super) fn steal_into(
+    pub(crate) fn steal_into(
         &self,
         dst: &mut Local<T>,
         dst_metrics: &mut MetricsBatch,

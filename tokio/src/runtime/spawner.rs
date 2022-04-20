@@ -1,5 +1,5 @@
 use crate::future::Future;
-use crate::runtime::basic_scheduler;
+use crate::runtime::{basic_scheduler, HandleInner};
 use crate::task::JoinHandle;
 
 cfg_rt_multi_thread! {
@@ -32,6 +32,14 @@ impl Spawner {
             Spawner::Basic(spawner) => spawner.spawn(future),
             #[cfg(feature = "rt-multi-thread")]
             Spawner::ThreadPool(spawner) => spawner.spawn(future),
+        }
+    }
+
+    pub(crate) fn as_handle_inner(&self) -> &HandleInner {
+        match self {
+            Spawner::Basic(spawner) => spawner.as_handle_inner(),
+            #[cfg(feature = "rt-multi-thread")]
+            Spawner::ThreadPool(spawner) => spawner.as_handle_inner(),
         }
     }
 }

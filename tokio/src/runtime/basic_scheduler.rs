@@ -5,7 +5,7 @@ use crate::park::{Park, Unpark};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::Driver;
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
-use crate::runtime::Callback;
+use crate::runtime::{Callback, HandleInner};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
@@ -78,6 +78,9 @@ struct Shared {
     /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
 
+    /// Handle to I/O driver, timer, blocking pool, ...
+    handle_inner: HandleInner,
+
     /// Callback for a worker parking itself
     before_park: Option<Callback>,
 
@@ -119,6 +122,7 @@ scoped_thread_local!(static CURRENT: Context);
 impl BasicScheduler {
     pub(crate) fn new(
         driver: Driver,
+        handle_inner: HandleInner,
         before_park: Option<Callback>,
         after_unpark: Option<Callback>,
     ) -> BasicScheduler {
@@ -130,6 +134,7 @@ impl BasicScheduler {
                 owned: OwnedTasks::new(),
                 unpark,
                 woken: AtomicBool::new(false),
+                handle_inner,
                 before_park,
                 after_unpark,
                 scheduler_metrics: SchedulerMetrics::new(),
@@ -396,6 +401,10 @@ impl Spawner {
     // reset woken to false and return original value
     pub(crate) fn reset_woken(&self) -> bool {
         self.shared.woken.swap(false, AcqRel)
+    }
+
+    pub(crate) fn as_handle_inner(&self) -> &HandleInner {
+        &self.shared.handle_inner
     }
 }
 
