@@ -63,10 +63,9 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
-use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
-use crate::runtime::thread_pool::Idle;
-use crate::runtime::{queue, task, Callback, MetricsBatch, SchedulerMetrics, WorkerMetrics};
+use crate::runtime::thread_pool::{queue, Idle, Parker, Unparker};
+use crate::runtime::{task, Callback, HandleInner, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::FastRand;
 
@@ -122,6 +121,9 @@ struct Core {
 
 /// State shared across all workers
 pub(super) struct Shared {
+    /// Handle to the I/O driver, timer, blocking spawner, ...
+    handle_inner: HandleInner,
+
     /// Per-worker remote state. All other workers have access to this and is
     /// how they communicate between each other.
     remotes: Box<[Remote]>,
@@ -193,6 +195,7 @@ scoped_thread_local!(static CURRENT: Context);
 pub(super) fn create(
     size: usize,
     park: Parker,
+    handle_inner: HandleInner,
     before_park: Option<Callback>,
     after_unpark: Option<Callback>,
 ) -> (Arc<Shared>, Launch) {
@@ -223,6 +226,7 @@ pub(super) fn create(
     }
 
     let shared = Arc::new(Shared {
+        handle_inner,
         remotes: remotes.into_boxed_slice(),
         inject: Inject::new(),
         idle: Idle::new(size),
@@ -715,6 +719,10 @@ impl task::Schedule for Arc<Shared> {
 }
 
 impl Shared {
+    pub(crate) fn as_handle_inner(&self) -> &HandleInner {
+        &self.handle_inner
+    }
+
     pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
@@ -850,6 +858,19 @@ impl Shared {
 
     fn ptr_eq(&self, other: &Shared) -> bool {
         std::ptr::eq(self, other)
+    }
+}
+
+impl crate::runtime::ToHandle for Arc<Shared> {
+    fn to_handle(&self) -> crate::runtime::Handle {
+        use crate::runtime::thread_pool::Spawner;
+        use crate::runtime::{self, Handle};
+
+        Handle {
+            spawner: runtime::Spawner::ThreadPool(Spawner {
+                shared: self.clone(),
+            }),
+        }
     }
 }
 

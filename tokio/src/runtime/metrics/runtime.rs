@@ -526,6 +526,7 @@ cfg_net! {
             // TODO: Investigate if this should return 0, most of our metrics always increase
             // thus this breaks that guarantee.
             self.handle
+                .as_inner()
                 .io_handle
                 .as_ref()
                 .and_then(|h| h.with_io_driver_metrics(f))
