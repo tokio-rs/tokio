@@ -219,7 +219,6 @@ cfg_rt! {
 
     pub(crate) mod context;
     mod driver;
-    use driver::Driver;
 
     use self::enter::enter;
 
@@ -232,6 +231,8 @@ cfg_rt! {
 }
 
 cfg_rt_multi_thread! {
+    use driver::Driver;
+
     pub(crate) mod thread_pool;
     use self::thread_pool::ThreadPool;
 }
