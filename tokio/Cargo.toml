@@ -113,7 +113,7 @@ signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.42" }
-nix = { version = "0.23" }
+nix = { version = "0.24", default-features = false, features = ["fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"
