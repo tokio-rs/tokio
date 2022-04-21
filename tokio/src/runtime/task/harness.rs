@@ -100,8 +100,8 @@ where
                 let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<T, S>(&header_ptr);
                 let cx = Context::from_waker(&*waker_ref);
-                let id = super::Id::from_raw(header_ptr);
-                let res = poll_future(&self.core().stage, id.clone(), cx);
+                let core = self.core();
+                let res = poll_future(&core.stage, core.task_id.clone(), cx);
 
                 if res == Poll::Ready(()) {
                     // The future completed. Move on to complete the task.
@@ -115,14 +115,15 @@ where
                     TransitionToIdle::Cancelled => {
                         // The transition to idle failed because the task was
                         // cancelled during the poll.
-
-                        cancel_task(&self.core().stage, id);
+                        let core = self.core();
+                        cancel_task(&core.stage, core.task_id.clone());
                         PollFuture::Complete
                     }
                 }
             }
             TransitionToRunning::Cancelled => {
-                cancel_task(&self.core().stage, super::Id::from_raw(self.header_ptr()));
+                let core = self.core();
+                cancel_task(&core.stage, core.task_id.clone());
                 PollFuture::Complete
             }
             TransitionToRunning::Failed => PollFuture::Done,
@@ -145,7 +146,8 @@ where
 
         // By transitioning the lifecycle to `Running`, we have permission to
         // drop the future.
-        cancel_task(&self.core().stage, super::Id::from_raw(self.header_ptr()));
+        let core = self.core();
+        cancel_task(&core.stage, core.task_id.clone());
         self.complete();
     }
 

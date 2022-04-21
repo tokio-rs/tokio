@@ -1,4 +1,4 @@
-use crate::runtime::task::RawTask;
+use crate::runtime::task::{Id, RawTask};
 use std::fmt;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 
@@ -21,11 +21,12 @@ use std::panic::{RefUnwindSafe, UnwindSafe};
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 pub struct AbortHandle {
     raw: Option<RawTask>,
+    id: Id,
 }
 
 impl AbortHandle {
-    pub(super) fn new(raw: Option<RawTask>) -> Self {
-        Self { raw }
+    pub(super) fn new(raw: Option<RawTask>, id: Id) -> Self {
+        Self { raw, id }
     }
 
     /// Abort the task associated with the handle.
@@ -60,8 +61,7 @@ impl AbortHandle {
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn id(&self) -> super::Id {
-        // XXX(eliza): should this return an option instead? probably not...
-        self.raw.unwrap().id()
+        self.id.clone()
     }
 }
 
@@ -73,7 +73,9 @@ impl RefUnwindSafe for AbortHandle {}
 
 impl fmt::Debug for AbortHandle {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("AbortHandle").finish()
+        fmt.debug_struct("AbortHandle")
+            .field("id", &self.id)
+            .finish()
     }
 }
 

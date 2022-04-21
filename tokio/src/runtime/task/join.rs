@@ -1,4 +1,4 @@
-use crate::runtime::task::RawTask;
+use crate::runtime::task::{Id, RawTask};
 
 use std::fmt;
 use std::future::Future;
@@ -144,6 +144,7 @@ cfg_rt! {
     /// [`JoinError`]: crate::task::JoinError
     pub struct JoinHandle<T> {
         raw: Option<RawTask>,
+        id: Id,
         _p: PhantomData<T>,
     }
 }
@@ -155,9 +156,10 @@ impl<T> UnwindSafe for JoinHandle<T> {}
 impl<T> RefUnwindSafe for JoinHandle<T> {}
 
 impl<T> JoinHandle<T> {
-    pub(super) fn new(raw: RawTask) -> JoinHandle<T> {
+    pub(super) fn new(raw: RawTask, id: Id) -> JoinHandle<T> {
         JoinHandle {
             raw: Some(raw),
+            id,
             _p: PhantomData,
         }
     }
@@ -218,7 +220,7 @@ impl<T> JoinHandle<T> {
             raw.ref_inc();
             raw
         });
-        super::AbortHandle::new(raw)
+        super::AbortHandle::new(raw, self.id.clone())
     }
 
     /// Returns a [task ID] that uniquely identifies this task relative to other
@@ -235,8 +237,7 @@ impl<T> JoinHandle<T> {
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn id(&self) -> super::Id {
-        // XXX(eliza): should this return an option instead? probably not...
-        self.raw.unwrap().id()
+        self.id.clone()
     }
 }
 
@@ -298,6 +299,8 @@ where
     T: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("JoinHandle").finish()
+        fmt.debug_struct("JoinHandle")
+            .field("id", &self.id)
+            .finish()
     }
 }

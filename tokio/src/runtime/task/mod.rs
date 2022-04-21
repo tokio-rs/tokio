@@ -203,7 +203,7 @@ use std::{fmt, mem};
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 // TODO(eliza): there's almost certainly no reason not to make this `Copy` as well...
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct Id(std::num::NonZeroUsize);
+pub struct Id(usize);
 
 /// An owned handle to the task, tracked by ref count.
 #[repr(transparent)]
@@ -278,7 +278,8 @@ cfg_rt! {
         T: Future + 'static,
         T::Output: 'static,
     {
-        let raw = RawTask::new::<T, S>(task, scheduler);
+        let id = Id::next();
+        let raw = RawTask::new::<T, S>(task, scheduler, id.clone());
         let task = Task {
             raw,
             _p: PhantomData,
@@ -287,7 +288,7 @@ cfg_rt! {
             raw,
             _p: PhantomData,
         });
-        let join = JoinHandle::new(raw);
+        let join = JoinHandle::new(raw, id);
 
         (task, notified, join)
     }
@@ -477,25 +478,11 @@ impl fmt::Display for Id {
         self.0.fmt(f)
     }
 }
+
 impl Id {
-    #[inline]
-    fn from_raw(ptr: NonNull<Header>) -> Self {
-        use std::num::NonZeroUsize;
-        let addr = ptr.as_ptr() as usize;
-
-        #[cfg(debug_assertions)]
-        let inner = NonZeroUsize::new(addr)
-            .expect("a `NonNull` pointer will never be 0 when cast to `usize`");
-
-        #[cfg(not(debug_assertions))]
-        let inner = unsafe {
-            // Safety: `addr` was cast from a `NonNull` pointer, which must
-            // never be null (0). Since the pointer is not null, the integer
-            // will never be zero, so this is safe as long as the `NonNull` was
-            // constructed safely.
-            NonZeroUsize::new_unchecked(addr)
-        };
-
-        Self(inner)
+    fn next() -> Self {
+        use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+        static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
+        Self(NEXT_ID.fetch_add(1, Relaxed))
     }
 }

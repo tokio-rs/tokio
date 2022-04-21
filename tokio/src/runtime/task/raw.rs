@@ -1,5 +1,5 @@
 use crate::future::Future;
-use crate::runtime::task::{Cell, Harness, Header, Schedule, State};
+use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
 
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
@@ -52,12 +52,12 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
 }
 
 impl RawTask {
-    pub(super) fn new<T, S>(task: T, scheduler: S) -> RawTask
+    pub(super) fn new<T, S>(task: T, scheduler: S, id: Id) -> RawTask
     where
         T: Future,
         S: Schedule,
     {
-        let ptr = Box::into_raw(Cell::<_, S>::new(task, scheduler, State::new()));
+        let ptr = Box::into_raw(Cell::<_, S>::new(task, scheduler, State::new(), id));
         let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
 
         RawTask { ptr }
@@ -128,10 +128,6 @@ impl RawTask {
     /// Currently, this is used only when creating an `AbortHandle`.
     pub(super) fn ref_inc(self) {
         self.header().state.ref_inc();
-    }
-
-    pub(super) fn id(&self) -> super::Id {
-        super::Id::from_raw(self.ptr)
     }
 }
 
