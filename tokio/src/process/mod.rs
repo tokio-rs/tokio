@@ -111,7 +111,7 @@
 //!     let mut cmd = Command::new("sort");
 //!
 //!     // Specifying that we want pipe both the output and the input.
-//!     // Similarily to capturing the output, by configuring the pipe
+//!     // Similarly to capturing the output, by configuring the pipe
 //!     // to stdin it can now be used as an asynchronous writer.
 //!     cmd.stdout(Stdio::piped());
 //!     cmd.stdin(Stdio::piped());
