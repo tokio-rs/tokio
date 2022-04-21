@@ -616,7 +616,7 @@ impl Core {
 
     /// Prepares the worker state for parking.
     ///
-    /// Returns true if the transition happend, false if there is work to do first.
+    /// Returns true if the transition happened, false if there is work to do first.
     fn transition_to_parked(&mut self, worker: &Worker) -> bool {
         // Workers should not park if they have work to do
         if self.lifo_slot.is_some() || self.run_queue.has_tasks() {
