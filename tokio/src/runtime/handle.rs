@@ -400,7 +400,7 @@ impl HandleInner {
                 "runtime.spawn",
                 kind = %"blocking",
                 task.name = %name.unwrap_or_default(),
-                task.id = id.as_usize(),
+                task.id = id.as_u64(),
                 "fn" = %std::any::type_name::<F>(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
             );
