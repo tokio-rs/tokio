@@ -501,11 +501,12 @@ impl Id {
     cfg_not_has_atomic_u64! {
         pub(crate) fn next() -> Self {
             use once_cell::sync::Lazy;
-            use crate::loom::Mutex;
-            static NEXT_ID: Lazy<Mutex<u64>> = Lazy(|| Mutex::new(1));
+            use crate::loom::sync::Mutex;
+
+            static NEXT_ID: Lazy<Mutex<u64>> = Lazy::new(|| Mutex::new(1));
             let mut lock = NEXT_ID.lock();
             let id = *lock;
-            lock += 1;
+            *lock += 1;
             Self(id)
         }
     }
