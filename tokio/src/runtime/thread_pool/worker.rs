@@ -723,12 +723,16 @@ impl Shared {
         &self.handle_inner
     }
 
-    pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T) -> JoinHandle<T::Output>
+    pub(super) fn bind_new_task<T>(
+        me: &Arc<Self>,
+        future: T,
+        id: crate::runtime::task::Id,
+    ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (handle, notified) = me.owned.bind(future, me.clone());
+        let (handle, notified) = me.owned.bind(future, me.clone(), id);
 
         if let Some(notified) = notified {
             me.schedule(notified, false);

@@ -14,7 +14,7 @@ pub(crate) use worker::Launch;
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
-use crate::runtime::task::JoinHandle;
+use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Callback, Driver, HandleInner};
 
 use std::fmt;
@@ -98,12 +98,12 @@ impl Drop for ThreadPool {
 
 impl Spawner {
     /// Spawns a future onto the thread pool
-    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(&self, future: F, id: task::Id) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        worker::Shared::bind_new_task(&self.shared, future)
+        worker::Shared::bind_new_task(&self.shared, future, id)
     }
 
     pub(crate) fn shutdown(&mut self) {

@@ -271,14 +271,14 @@ cfg_rt! {
     /// notification.
     fn new_task<T, S>(
         task: T,
-        scheduler: S
+        scheduler: S,
+        id: Id,
     ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let id = Id::next();
         let raw = RawTask::new::<T, S>(task, scheduler, id.clone());
         let task = Task {
             raw,
@@ -297,13 +297,13 @@ cfg_rt! {
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.
-    pub(crate) fn unowned<T, S>(task: T, scheduler: S) -> (UnownedTask<S>, JoinHandle<T::Output>)
+    pub(crate) fn unowned<T, S>(task: T, scheduler: S, id: Id) -> (UnownedTask<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Send + Future + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) = new_task(task, scheduler);
+        let (task, notified, join) = new_task(task, scheduler, id);
 
         // This transfers the ref-count of task and notified into an UnownedTask.
         // This is valid because an UnownedTask holds two ref-counts.
@@ -480,9 +480,13 @@ impl fmt::Display for Id {
 }
 
 impl Id {
-    fn next() -> Self {
+    pub(crate) fn next() -> Self {
         use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
         static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
         Self(NEXT_ID.fetch_add(1, Relaxed))
+    }
+
+    pub(crate) fn as_usize(&self) -> usize {
+        self.0
     }
 }
