@@ -177,7 +177,7 @@ impl Handle {
     {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task", None, id.as_usize());
+        let future = crate::util::trace::task(future, "task", None, id.as_u64());
         self.spawner.spawn(future, id)
     }
 
@@ -286,7 +286,8 @@ impl Handle {
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "block_on", None);
+        let future =
+            crate::util::trace::task(future, "block_on", None, super::task::Id::next().as_u64());
 
         // Enter the **runtime** context. This configures spawning, the current I/O driver, ...
         let _rt_enter = self.enter();
