@@ -203,7 +203,7 @@ use std::{fmt, mem};
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 // TODO(eliza): there's almost certainly no reason not to make this `Copy` as well...
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct Id(usize);
+pub struct Id(u64);
 
 /// An owned handle to the task, tracked by ref count.
 #[repr(transparent)]
@@ -480,13 +480,37 @@ impl fmt::Display for Id {
 }
 
 impl Id {
-    pub(crate) fn next() -> Self {
-        use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
-        static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
-        Self(NEXT_ID.fetch_add(1, Relaxed))
+    // When 64-bit atomics are available, use a static `AtomicU64` counter to
+    // generate task IDs.
+    //
+    // Note(eliza): we _could_ just use `crate::loom::AtomicU64`, which switches
+    // between an atomic and mutex-based implementation here, rather than having
+    // two separate functions for targets with and without 64-bit atomics.
+    // However, because we can't use the mutex-based implementation in a static
+    // initializer directly, the 32-bit impl also has to use a `OnceCell`, and I
+    // thought it was nicer to avoid the `OnceCell` overhead on 64-bit
+    // platforms...
+    cfg_has_atomic_u64! {
+        pub(crate) fn next() -> Self {
+            use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+            static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+            Self(NEXT_ID.fetch_add(1, Relaxed))
+        }
     }
 
-    pub(crate) fn as_usize(&self) -> usize {
+    cfg_not_has_atomic_u64! {
+        pub(crate) fn next() -> Self {
+            use once_cell::sync::Lazy;
+            use crate::loom::Mutex;
+            static NEXT_ID: Lazy<Mutex<u64>> = Lazy(|| Mutex::new(1));
+            let mut lock = NEXT_ID.lock();
+            let id = *lock;
+            lock += 1;
+            Self(id)
+        }
+    }
+
+    pub(crate) fn as_u64(&self) -> u64 {
         self.0
     }
 }

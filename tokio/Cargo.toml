@@ -65,7 +65,7 @@ process = [
   "winapi/threadpoollegacyapiset",
 ]
 # Includes basic task execution capabilities
-rt = []
+rt = ["once_cell"]
 rt-multi-thread = [
   "num_cpus",
   "rt",

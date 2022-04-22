@@ -10,7 +10,7 @@ cfg_trace! {
 
         #[inline]
         #[track_caller]
-        pub(crate) fn task<F>(task: F, kind: &'static str, name: Option<&str>, id: usize) -> Instrumented<F> {
+        pub(crate) fn task<F>(task: F, kind: &'static str, name: Option<&str>, id: u64) -> Instrumented<F> {
             use tracing::instrument::Instrument;
             let location = std::panic::Location::caller();
             let span = tracing::trace_span!(
@@ -92,7 +92,7 @@ cfg_time! {
 cfg_not_trace! {
     cfg_rt! {
         #[inline]
-        pub(crate) fn task<F>(task: F, _: &'static str, _name: Option<&str>, _: usize) -> F {
+        pub(crate) fn task<F>(task: F, _: &'static str, _name: Option<&str>, _: u64) -> F {
             // nop
             task
         }

@@ -302,7 +302,7 @@ cfg_rt! {
           F::Output: 'static
     {
         let id = crate::runtime::task::Id::next();
-        let future = crate::util::trace::task(future, "local", name, id.as_usize());
+        let future = crate::util::trace::task(future, "local", name, id.as_u64());
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
@@ -387,7 +387,7 @@ impl LocalSet {
         F::Output: 'static,
     {
         let id = crate::runtime::task::Id::next();
-        let future = crate::util::trace::task(future, "local", None, id.as_usize());
+        let future = crate::util::trace::task(future, "local", None, id.as_u64());
 
         let (handle, notified) = self
             .context

@@ -145,7 +145,7 @@ cfg_rt! {
         use crate::runtime::{task, context};
         let id = task::Id::next();
         let spawn_handle = context::spawn_handle().expect(CONTEXT_MISSING_ERROR);
-        let task = crate::util::trace::task(future, "task", name, id.as_usize());
+        let task = crate::util::trace::task(future, "task", name, id.as_u64());
         spawn_handle.spawn(task, id)
     }
 }
