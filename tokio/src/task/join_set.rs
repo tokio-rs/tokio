@@ -167,12 +167,12 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// # Cancel Safety
     ///
-    /// This method is cancel safe. If `join_with_id` is used as the event in a `tokio::select!`
+    /// This method is cancel safe. If `join_one_with_id` is used as the event in a `tokio::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinSet`.
     ///
     /// [task ID]: crate::task::Id
-    pub async fn join_with_id(&mut self) -> Result<Option<(Id, T)>, JoinError> {
+    pub async fn join_one_with_id(&mut self) -> Result<Option<(Id, T)>, JoinError> {
         crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
     }
 
