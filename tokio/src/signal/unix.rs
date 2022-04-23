@@ -411,7 +411,7 @@ impl Signal {
     ///
     /// This method is cancel safe. If you use it as the event in a
     /// [`tokio::select!`](crate::select) statement and some other branch
-    /// completes first, then it is guaranteed that signal is not lost.
+    /// completes first, then it is guaranteed that no signal is lost.
     ///
     /// # Examples
     ///
