@@ -386,12 +386,14 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
     input.block = syn::parse2(quote_spanned! {last_stmt_end_span=>
         {
             let body = async #body;
-            #[allow(clippy::expect_used)]
-            return #rt
-                .enable_all()
-                .build()
-                .expect("Failed building the Runtime")
-                .block_on(body);
+            #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
+            {
+                return #rt
+                    .enable_all()
+                    .build()
+                    .expect("Failed building the Runtime")
+                    .block_on(body);
+            }
         }
     })
     .expect("Parsing failure");
