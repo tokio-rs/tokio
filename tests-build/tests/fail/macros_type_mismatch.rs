@@ -25,6 +25,7 @@ async fn extra_semicolon() -> Result<(), ()> {
 
 // https://github.com/tokio-rs/tokio/issues/4635
 #[allow(redundant_semicolons)]
+#[rustfmt::skip]
 #[tokio::main]
 async fn issue_4635() {
     return 1;
