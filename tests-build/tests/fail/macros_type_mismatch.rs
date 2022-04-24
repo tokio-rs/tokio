@@ -23,4 +23,12 @@ async fn extra_semicolon() -> Result<(), ()> {
     Ok(());
 }
 
+// https://github.com/tokio-rs/tokio/issues/4635
+#[allow(redundant_semicolons)]
+#[tokio::main]
+async fn issue_4635() {
+    return 1;
+    ;
+}
+
 fn main() {}

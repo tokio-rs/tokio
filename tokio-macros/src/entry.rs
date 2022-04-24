@@ -383,16 +383,16 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
 
     let body = &input.block;
     let brace_token = input.block.brace_token;
-    let (tail_return, tail_semicolon) = match body.stmts.last() {
+    let (tail_return_or_let, tail_semicolon) = match body.stmts.last() {
         Some(syn::Stmt::Semi(syn::Expr::Return(_), _)) => (quote! { return }, quote! { ; }),
         Some(syn::Stmt::Semi(..)) | Some(syn::Stmt::Local(..)) | None => {
             match &input.sig.output {
                 syn::ReturnType::Type(_, ty) if matches!(&**ty, syn::Type::Tuple(ty) if ty.elems.is_empty()) =>
                 {
-                    (quote! {}, quote! { ; }) // unit
+                    (quote! { let () = }, quote! { ; }) // unit
                 }
-                syn::ReturnType::Default => (quote! {}, quote! { ; }), // unit
-                syn::ReturnType::Type(..) => (quote! {}, quote! {}),   // ! or another
+                syn::ReturnType::Default => (quote! { let () = }, quote! { ; }), // unit
+                syn::ReturnType::Type(..) => (quote! {}, quote! {}),             // ! or another
             }
         }
         _ => (quote! {}, quote! {}),
@@ -401,7 +401,7 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
         {
             let body = async #body;
             #[allow(clippy::expect_used)]
-            #tail_return #rt
+            #tail_return_or_let #rt
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
