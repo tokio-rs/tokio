@@ -151,6 +151,9 @@ pub(super) struct Shared {
     /// Callback for a worker unparking itself
     after_unpark: Option<Callback>,
 
+    /// Callback for a task being polled
+    before_task_poll: Option<Callback>,
+
     /// Collects metrics from the runtime.
     pub(super) scheduler_metrics: SchedulerMetrics,
 
@@ -198,6 +201,7 @@ pub(super) fn create(
     handle_inner: HandleInner,
     before_park: Option<Callback>,
     after_unpark: Option<Callback>,
+    before_task_poll: Option<Callback>,
 ) -> (Arc<Shared>, Launch) {
     let mut cores = Vec::with_capacity(size);
     let mut remotes = Vec::with_capacity(size);
@@ -234,6 +238,7 @@ pub(super) fn create(
         shutdown_cores: Mutex::new(vec![]),
         before_park,
         after_unpark,
+        before_task_poll,
         scheduler_metrics: SchedulerMetrics::new(),
         worker_metrics: worker_metrics.into_boxed_slice(),
     });
@@ -424,6 +429,11 @@ impl Context {
 
         // Make the core available to the runtime context
         core.metrics.incr_poll_count();
+
+        if let Some(f) = &self.worker.shared.before_task_poll {
+            f();
+        }
+
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
@@ -449,6 +459,11 @@ impl Context {
                 if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
                     core.metrics.incr_poll_count();
+
+                    if let Some(f) = &self.worker.shared.before_task_poll {
+                        f();
+                    }
+
                     *self.core.borrow_mut() = Some(core);
                     let task = self.worker.shared.owned.assert_owner(task);
                     task.run();

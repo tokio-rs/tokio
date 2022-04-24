@@ -87,6 +87,9 @@ struct Shared {
     /// Callback for a worker unparking itself
     after_unpark: Option<Callback>,
 
+    /// Callback for a task being polled
+    before_task_poll: Option<Callback>,
+
     /// Keeps track of various runtime metrics.
     scheduler_metrics: SchedulerMetrics,
 
@@ -125,6 +128,7 @@ impl BasicScheduler {
         handle_inner: HandleInner,
         before_park: Option<Callback>,
         after_unpark: Option<Callback>,
+        before_task_enter: Option<Callback>,
     ) -> BasicScheduler {
         let unpark = driver.unpark();
 
@@ -137,6 +141,7 @@ impl BasicScheduler {
                 handle_inner,
                 before_park,
                 after_unpark,
+                before_task_poll: before_task_enter,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics: WorkerMetrics::new(),
             }),
@@ -293,6 +298,12 @@ impl Context {
     /// thread-local context.
     fn run_task<R>(&self, mut core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
         core.metrics.incr_poll_count();
+
+        // run before polling the task
+        if let Some(f) = &self.spawner.shared.before_task_poll {
+            f()
+        }
+
         self.enter(core, || crate::coop::budget(f))
     }
 

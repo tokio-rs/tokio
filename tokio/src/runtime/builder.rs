@@ -76,6 +76,9 @@ pub struct Builder {
     /// To run after each thread is unparked.
     pub(super) after_unpark: Option<Callback>,
 
+    /// To run before each task is entered.
+    pub(super) before_task_poll: Option<Callback>,
+
     /// Customizable keep alive timeout for BlockingPool
     pub(super) keep_alive: Option<Duration>,
 }
@@ -143,6 +146,9 @@ impl Builder {
             before_stop: None,
             before_park: None,
             after_unpark: None,
+
+            // No task callbacks
+            before_task_poll: None,
 
             keep_alive: None,
         }
@@ -496,6 +502,59 @@ impl Builder {
         self
     }
 
+    /// Executes a function `f` just before a task is polled.
+    ///
+    /// This is intended for bookkeeping and monitoring use cases; note that work
+    /// in this callback will increase latencies when the runtime polls tasks.
+    ///
+    /// Note: There can only be one pre-poll callback for a runtime; calling this function
+    /// more than once replaces the last callback defined, rather than adding to it.
+    ///
+    /// # Examples
+    /// ```
+    /// # use tokio::runtime;
+    /// # use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+    ///
+    /// // test that our task was entered
+    /// let state = Arc::new(AtomicBool::new(false));
+    /// let callback_state = state.clone();
+    ///
+    /// let runtime = runtime::Builder::new_multi_thread()
+    ///     .on_task_poll_start(move || callback_state.store(true, Ordering::SeqCst))
+    ///     .build();
+    ///
+    /// runtime.unwrap().block_on(async {
+    ///     let state = state.clone();
+    ///     tokio::spawn(async move { assert!(state.load(Ordering::SeqCst)) }).await.unwrap()
+    /// });
+    /// ```
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+    ///
+    /// // test that our task was entered
+    /// let state = Arc::new(AtomicBool::new(false));
+    /// let callback_state = state.clone();
+    ///
+    /// let runtime = runtime::Builder::new_current_thread()
+    ///     .on_task_poll_start(move || callback_state.store(true, Ordering::SeqCst))
+    ///     .build();
+    ///
+    /// runtime.unwrap().block_on(async {
+    ///     let state = state.clone();
+    ///     tokio::spawn(async move { assert!(state.load(Ordering::SeqCst)) }).await.unwrap()
+    /// });
+    /// ```
+    #[cfg(not(loom))]
+    pub fn on_task_poll_start<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.before_task_poll = Some(std::sync::Arc::new(f));
+        self
+    }
+
     /// Creates the configured `Runtime`.
     ///
     /// The returned `Runtime` instance is ready to spawn tasks.
@@ -580,6 +639,7 @@ impl Builder {
             handle_inner,
             self.before_park.clone(),
             self.after_unpark.clone(),
+            self.before_task_poll.clone(),
         );
         let spawner = Spawner::Basic(scheduler.spawner().clone());
 
@@ -685,7 +745,14 @@ cfg_rt_multi_thread! {
                 blocking_spawner,
             };
 
-            let (scheduler, launch) = ThreadPool::new(core_threads, driver, handle_inner, self.before_park.clone(), self.after_unpark.clone());
+            let (scheduler, launch) = ThreadPool::new(
+                core_threads,
+                driver,
+                handle_inner,
+                self.before_park.clone(),
+                self.after_unpark.clone(),
+                self.before_task_poll.clone(),
+            );
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the runtime handle
