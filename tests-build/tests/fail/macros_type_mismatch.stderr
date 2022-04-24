@@ -39,10 +39,10 @@ help: try wrapping the expression in a variant of `Result`
    |     ++++       +
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:31:5
+  --> tests/fail/macros_type_mismatch.rs:32:5
    |
-29 | async fn issue_4635() {
+30 | async fn issue_4635() {
    |                       - possibly return type missing here?
-30 |     return 1;
-31 |     ;
+31 |     return 1;
+32 |     ;
    |     ^ expected `()`, found integer
