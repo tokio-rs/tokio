@@ -378,8 +378,18 @@ where
     ///    that panicked or was aborted.
     ///  * `None` if the `JoinMap` is empty.
     pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
-        // crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
-        todo!("eliza")
+        let (res, id) = match self.task_set.join_one_with_id().await {
+            Ok(task) => {
+                let (id, output) = task?;
+                (Ok(output), id)
+            },
+            Err(e) => {
+                let id = e.id();
+                (Err(e), id)
+            }
+        };
+        let key = self.remove_by_id(id)?;
+        Some((key, res))
     }
 
     /// Aborts all tasks and waits for them to finish shutting down.
@@ -639,15 +649,17 @@ where
         self.tasks_by_key.raw_entry().from_hash(*hash, |k| &k.id == id)
     }
 
-    fn remove_by_id(&mut self, id: Id) -> Option<AbortHandle> {
+    fn remove_by_id(&mut self, id: Id) -> Option<K> {
         let hash = self.hashes_by_task.remove(&id)?;
         let entry = self.tasks_by_key.raw_entry_mut().from_hash(hash, |k| k.id == id);
-        let handle = match entry {
-            RawEntryMut::Occupied(entry) => entry.remove(),
+        let (Key { id: _key_id, key }, handle) = match entry {
+            RawEntryMut::Occupied(entry) => entry.remove_entry(),
             _ => return None,
         };
-        self.hashes_by_task.remove(&handle.id());
-        Some(handle)
+        debug_assert_eq!(_key_id, id);
+        debug_assert_eq!(id, handle.id());
+        self.hashes_by_task.remove(&id);
+        Some(key)
     }
 
     fn remove_by_key<Q: ?Sized>(&mut self, key: &Q) -> Option<AbortHandle>
@@ -658,7 +670,7 @@ where
         let hash = self.hash(key);
         let entry = self.tasks_by_key.raw_entry_mut().from_hash(hash, |k| k.key.borrow() == key);
         let handle = match entry {
-            RawEntryMut::Occupied(mut entry) => entry.remove(),
+            RawEntryMut::Occupied(entry) => entry.remove(),
             _ => return None,
         };
         self.hashes_by_task.remove(&handle.id());
