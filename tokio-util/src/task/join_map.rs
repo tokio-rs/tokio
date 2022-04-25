@@ -1,12 +1,12 @@
-use tokio::runtime::Handle;
-use tokio::task::{JoinError, AbortHandle, LocalSet, JoinSet, Id};
-use hashbrown::HashMap;
 use hashbrown::hash_map::RawEntryMut;
+use hashbrown::HashMap;
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::fmt;
 use std::future::Future;
 use std::hash::{BuildHasher, Hash, Hasher};
+use tokio::runtime::Handle;
+use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 
 /// A collection of tasks spawned on a Tokio runtime, associated with hash map
 /// keys.
@@ -15,7 +15,7 @@ use std::hash::{BuildHasher, Hash, Hasher};
 /// addition of a  set of keys associated with each task. These keys allow
 /// [cancelling a task][abort] or [multiple tasks][abort_matching] in the
 /// `JoinMap` based on   their keys, or [test whether a task corresponding to a
-/// given key exists][contains] in the `JoinMap`. 
+/// given key exists][contains] in the `JoinMap`.
 ///
 /// In addition, when tasks in the `JoinMap` complete, they will return the
 /// associated key along with the value returned by the task, if any.
@@ -339,17 +339,23 @@ where
         F: Future<Output = V>,
         F: 'static,
     {
-        let task =  self.tasks.spawn_local_on(task, local_set);
+        let task = self.tasks.spawn_local_on(task, local_set);
         self.insert(key, task)
     }
 
     fn insert(&mut self, key: K, abort: AbortHandle) {
         let hash = self.hash(&key);
         let id = abort.id();
-        let map_key = Key { id: id.clone(), key };
+        let map_key = Key {
+            id: id.clone(),
+            key,
+        };
 
         // Insert the new key into the map of tasks by keys.
-        let entry = self.tasks_by_key.raw_entry_mut().from_hash(hash, |k| k.key == map_key.key);
+        let entry = self
+            .tasks_by_key
+            .raw_entry_mut()
+            .from_hash(hash, |k| k.key == map_key.key);
         match entry {
             RawEntryMut::Occupied(mut occ) => {
                 // There was a previous task spawned with the same key! Cancel
@@ -358,8 +364,8 @@ where
                 occ.insert(abort).abort();
                 let _prev_hash = self.hashes_by_task.remove(&prev_id);
                 debug_assert_eq!(Some(hash), _prev_hash);
-            },
-            RawEntryMut::Vacant(vac) => { 
+            }
+            RawEntryMut::Vacant(vac) => {
                 vac.insert(map_key, abort);
             }
         };
@@ -396,7 +402,7 @@ where
             Ok(task) => {
                 let (id, output) = task?;
                 (Ok(output), id)
-            },
+            }
             Err(e) => {
                 let id = e.id();
                 (Err(e), id)
@@ -480,7 +486,10 @@ where
         K: Borrow<Q>,
     {
         match self.get_by_key(key) {
-            Some((_, handle)) => { handle.abort(); true }
+            Some((_, handle)) => {
+                handle.abort();
+                true
+            }
             None => false,
         }
     }
@@ -542,7 +551,7 @@ where
         // Note: this method iterates over the key set *without* removing any
         // entries, so that the keys from aborted tasks can be returned when
         // polling the `JoinMap`.
-        for (Key {ref key, ..}, task) in &self.tasks_by_key {
+        for (Key { ref key, .. }, task) in &self.tasks_by_key {
             if predicate(key) {
                 task.abort();
             }
@@ -654,7 +663,6 @@ where
         self.tasks_by_key.shrink_to(min_capacity)
     }
 
-
     /// Look up a task in the map by its key, returning the key and abort handle.
     fn get_by_key<'map, Q: ?Sized>(&'map self, key: &Q) -> Option<(&'map Key<K>, &'map AbortHandle)>
     where
@@ -662,13 +670,17 @@ where
         K: Borrow<Q>,
     {
         let hash = self.hash(key);
-        self.tasks_by_key.raw_entry().from_hash(hash, |k| k.key.borrow() == key)
+        self.tasks_by_key
+            .raw_entry()
+            .from_hash(hash, |k| k.key.borrow() == key)
     }
 
     /// Look up a task in the map by its task ID, returning the key and abort handle.
     fn get_by_id<'map>(&'map self, id: &Id) -> Option<(&'map Key<K>, &'map AbortHandle)> {
         let hash = self.hashes_by_task.get(id)?;
-        self.tasks_by_key.raw_entry().from_hash(*hash, |k| &k.id == id)
+        self.tasks_by_key
+            .raw_entry()
+            .from_hash(*hash, |k| &k.id == id)
     }
 
     /// Remove a task from the map by ID, returning the key for that task.
@@ -677,7 +689,10 @@ where
         let hash = self.hashes_by_task.remove(&id)?;
 
         // Remove the entry for that hash.
-        let entry = self.tasks_by_key.raw_entry_mut().from_hash(hash, |k| k.id == id);
+        let entry = self
+            .tasks_by_key
+            .raw_entry_mut()
+            .from_hash(hash, |k| k.id == id);
         let (Key { id: _key_id, key }, handle) = match entry {
             RawEntryMut::Occupied(entry) => entry.remove_entry(),
             _ => return None,

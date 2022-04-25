@@ -2,8 +2,8 @@
 #![cfg(all(feature = "rt", tokio_unstable))]
 
 use tokio::sync::oneshot;
-use tokio_util::task::JoinMap;
 use tokio::time::Duration;
+use tokio_util::task::JoinMap;
 
 use futures::future::FutureExt;
 
