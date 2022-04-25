@@ -702,7 +702,9 @@ where
     /// The tasks removed by this call will continue to run in the background even if the `JoinMap`
     /// is dropped. They may still be aborted by key.
     pub fn detach_all(&mut self) {
-        self.task_set.detach_all()
+        self.task_set.detach_all();
+        self.tasks_by_key.clear();
+        self.hashes_by_task.clear();
     }
 }
 
