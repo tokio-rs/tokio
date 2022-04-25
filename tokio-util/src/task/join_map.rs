@@ -35,7 +35,7 @@ use std::hash::{BuildHasher, Hash, Hasher};
 /// Spawn multiple tasks and wait for them:
 ///
 /// ```
-/// use tokio::task::JoinMap;
+/// use tokio_util::task::JoinMap;
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -64,7 +64,7 @@ use std::hash::{BuildHasher, Hash, Hasher};
 /// Cancel tasks based on their keys:
 ///
 /// ```
-/// use tokio::task::JoinMap;
+/// use tokio_util::task::JoinMap;
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -126,7 +126,7 @@ impl<K, V> JoinMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::task::JoinMap;
+    /// use tokio_util::task::JoinMap;
     /// let map: JoinMap<&str, i32> = JoinMap::new();
     /// ```
     #[inline]
@@ -143,7 +143,7 @@ impl<K, V> JoinMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::task::JoinMap;
+    /// use tokio_util::task::JoinMap;
     /// let map: JoinMap<&str, i32> = JoinMap::with_capacity(10);
     /// ```
     #[inline]
@@ -191,7 +191,7 @@ impl<K, V, S: Clone> JoinMap<K, V, S> {
     /// ```
     /// # #[tokio::main]
     /// # async fn main() {
-    /// use tokio::task::JoinMap;
+    /// use tokio_util::task::JoinMap;
     /// use std::collections::hash_map::RandomState;
     ///
     /// let s = RandomState::new();
@@ -231,7 +231,7 @@ impl<K, V, S: Clone> JoinMap<K, V, S> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::task::JoinMap;
+    /// use tokio_util::task::JoinMap;
     ///
     /// let map: JoinMap<i32, i32> = JoinMap::with_capacity(100);
     /// assert!(map.capacity() >= 100);
@@ -418,7 +418,7 @@ where
     /// Aborting a task by key:
     ///
     /// ```
-    /// use tokio::task::JoinMap;
+    /// use tokio_util::task::JoinMap;
     ///
     /// # #[tokio::main]
     /// # async fn main() {
@@ -444,7 +444,7 @@ where
     ///
     /// `abort` returns `true` if a task was aborted:
     /// ```
-    /// use tokio::task::JoinMap;
+    /// use tokio_util::task::JoinMap;
     ///
     /// # #[tokio::main]
     /// # async fn main() {
@@ -479,7 +479,7 @@ where
     ///
     /// # Examples
     /// ```
-    /// use tokio::task::JoinMap;
+    /// use tokio_util::task::JoinMap;
     ///
     /// # // use the current thread rt so that spawned tasks don't
     /// # // complete in the background before they can be aborted.
@@ -567,7 +567,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use tokio::task::JoinMap;
+    /// use tokio_util::task::JoinMap;
     ///
     /// let mut map: JoinMap<&str, i32> = JoinMap::new();
     /// map.reserve(10);
@@ -587,7 +587,7 @@ where
     /// ```
     /// # #[tokio::main]
     /// # async fn main() {
-    /// use tokio::task::JoinMap;
+    /// use tokio_util::task::JoinMap;
     ///
     /// let mut map: JoinMap<i32, i32> = JoinMap::with_capacity(100);
     /// map.spawn(1, async move { 2 });
@@ -614,7 +614,7 @@ where
     /// ```
     /// # #[tokio::main]
     /// # async fn main() {
-    /// use tokio::task::JoinMap;
+    /// use tokio_util::task::JoinMap;
     ///
     /// let mut map: JoinMap<i32, i32> = JoinMap::with_capacity(100);
     /// map.spawn(1, async move { 2 });
