@@ -234,8 +234,6 @@ impl<T> JoinHandle<T> {
     /// [unstable]: crate#unstable-features
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn id(&self) -> super::Id {
         self.id.clone()
     }
