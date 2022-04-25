@@ -108,10 +108,18 @@ pub struct JoinMap<K, V, S = RandomState> {
     ///
     /// Each `IdleNotifiedSet` entry contains the hash of the task's key, to
     /// allow looking the key up when the task completes.
-    task_set: JoinSet<V>,
+    tasks: JoinSet<V>,
 }
 
 /// A `JoinMap` key.
+///
+/// This holds both a `K`-typed key (the actual key as seen by the user), _and_
+/// a task ID, so that hash collisions between `K`-typed keys can be resolved
+/// using either `K`'s `Eq` impl *or* by checking the task IDs.
+///
+/// This allows looking up a task using either an actual key (such as when the
+/// user queries the map with a key), *or* using a task ID and a hash (such as
+/// when removing completed tasks from the map).
 #[derive(Debug)]
 struct Key<K> {
     key: K,
@@ -206,7 +214,7 @@ impl<K, V, S: Clone> JoinMap<K, V, S> {
         Self {
             tasks_by_key: HashMap::with_capacity_and_hasher(capacity, hash_builder.clone()),
             hashes_by_task: HashMap::with_capacity_and_hasher(capacity, hash_builder),
-            task_set: JoinSet::new(),
+            tasks: JoinSet::new(),
         }
     }
 
@@ -270,7 +278,7 @@ where
         F: Send + 'static,
         V: Send,
     {
-        let task = self.task_set.spawn(task);
+        let task = self.tasks.spawn(task);
         self.insert(key, task)
     }
 
@@ -289,7 +297,7 @@ where
         F: Send + 'static,
         V: Send,
     {
-        let task = self.task_set.spawn_on(task, handle);
+        let task = self.tasks.spawn_on(task, handle);
         self.insert(key, task);
     }
 
@@ -305,14 +313,14 @@ where
     ///
     /// This method panics if it is called outside of a `LocalSet`.
     ///
-    /// [`LocalSet`]: crate::task::LocalSet
+    /// [`LocalSet`]: tokio::task::LocalSet
     /// [`join_one`]: Self::join_one
     pub fn spawn_local<F>(&mut self, key: K, task: F)
     where
         F: Future<Output = V>,
         F: 'static,
     {
-        let task = self.task_set.spawn_local(task);
+        let task = self.tasks.spawn_local(task);
         self.insert(key, task);
     }
 
@@ -331,7 +339,7 @@ where
         F: Future<Output = V>,
         F: 'static,
     {
-        let task =  self.task_set.spawn_local_on(task, local_set);
+        let task =  self.tasks.spawn_local_on(task, local_set);
         self.insert(key, task)
     }
 
@@ -339,9 +347,13 @@ where
         let hash = self.hash(&key);
         let id = abort.id();
         let map_key = Key { id: id.clone(), key };
+
+        // Insert the new key into the map of tasks by keys.
         let entry = self.tasks_by_key.raw_entry_mut().from_hash(hash, |k| k.key == map_key.key);
         match entry {
             RawEntryMut::Occupied(mut occ) => {
+                // There was a previous task spawned with the same key! Cancel
+                // that task, and remove its ID from the map of hashes by task IDs.
                 let Key { id: prev_id, .. } = occ.insert_key(map_key);
                 occ.insert(abort).abort();
                 let _prev_hash = self.hashes_by_task.remove(&prev_id);
@@ -352,6 +364,7 @@ where
             }
         };
 
+        // Associate the key's hash with this task's ID, for looking up tasks by ID.
         let _prev = self.hashes_by_task.insert(id, hash);
         debug_assert!(_prev.is_none(), "no prior task should have had the same ID");
     }
@@ -379,7 +392,7 @@ where
     ///    that panicked or was aborted.
     ///  * `None` if the `JoinMap` is empty.
     pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
-        let (res, id) = match self.task_set.join_one_with_id().await {
+        let (res, id) = match self.tasks.join_one_with_id().await {
             Ok(task) => {
                 let (id, output) = task?;
                 (Ok(output), id)
@@ -641,6 +654,8 @@ where
         self.tasks_by_key.shrink_to(min_capacity)
     }
 
+
+    /// Look up a task in the map by its key, returning the key and abort handle.
     fn get_by_key<'map, Q: ?Sized>(&'map self, key: &Q) -> Option<(&'map Key<K>, &'map AbortHandle)>
     where
         Q: Hash + Eq,
@@ -650,13 +665,18 @@ where
         self.tasks_by_key.raw_entry().from_hash(hash, |k| k.key.borrow() == key)
     }
 
+    /// Look up a task in the map by its task ID, returning the key and abort handle.
     fn get_by_id<'map>(&'map self, id: &Id) -> Option<(&'map Key<K>, &'map AbortHandle)> {
         let hash = self.hashes_by_task.get(id)?;
         self.tasks_by_key.raw_entry().from_hash(*hash, |k| &k.id == id)
     }
 
+    /// Remove a task from the map by ID, returning the key for that task.
     fn remove_by_id(&mut self, id: Id) -> Option<K> {
+        // Get the hash for the given ID.
         let hash = self.hashes_by_task.remove(&id)?;
+
+        // Remove the entry for that hash.
         let entry = self.tasks_by_key.raw_entry_mut().from_hash(hash, |k| k.id == id);
         let (Key { id: _key_id, key }, handle) = match entry {
             RawEntryMut::Occupied(entry) => entry.remove_entry(),
@@ -668,21 +688,8 @@ where
         Some(key)
     }
 
-    fn remove_by_key<Q: ?Sized>(&mut self, key: &Q) -> Option<AbortHandle>
-    where
-        Q: Hash + Eq,
-        K: Borrow<Q>,
-    {
-        let hash = self.hash(key);
-        let entry = self.tasks_by_key.raw_entry_mut().from_hash(hash, |k| k.key.borrow() == key);
-        let handle = match entry {
-            RawEntryMut::Occupied(entry) => entry.remove(),
-            _ => return None,
-        };
-        self.hashes_by_task.remove(&handle.id());
-        Some(handle)
-    }
-
+    /// Returns the hash for a given key.
+    #[inline]
     fn hash<Q: ?Sized>(&self, key: &Q) -> u64
     where
         Q: Hash,
@@ -703,7 +710,7 @@ where
     /// This does not remove the tasks from the `JoinMap`. To wait for the tasks to complete
     /// cancellation, you should call `join_one` in a loop until the `JoinMap` is empty.
     pub fn abort_all(&mut self) {
-        self.task_set.abort_all()
+        self.tasks.abort_all()
     }
 
     /// Removes all tasks from this `JoinMap` without aborting them.
@@ -711,7 +718,7 @@ where
     /// The tasks removed by this call will continue to run in the background even if the `JoinMap`
     /// is dropped. They may still be aborted by key.
     pub fn detach_all(&mut self) {
-        self.task_set.detach_all();
+        self.tasks.detach_all();
         self.tasks_by_key.clear();
         self.hashes_by_task.clear();
     }
@@ -743,6 +750,8 @@ impl<K: Hash> Hash for Key<K> {
     }
 }
 
+// Because we override `Hash` for this type, we must also override the
+// `PartialEq` impl, so that all instances with the same hash are equal.
 impl<K: PartialEq> PartialEq for Key<K> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
