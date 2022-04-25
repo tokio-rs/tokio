@@ -525,17 +525,14 @@ where
     /// # }
     /// ```
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
-        // let key_set = &mut self.key_set;
-        // let joins = &mut self.task_set;
-        // // Note: this method iterates over the key set *without* removing any
-        // // entries, so that the keys from aborted tasks can be returned when
-        // // polling the `JoinMap`.
-        // for entry in key_set.iter().filter(|entry| predicate(&entry.key)) {
-        //     if let Some(mut entry) = joins.entry_mut(entry.task.entry.clone()) {
-        //         entry.with_value_and_context(|(_, jh), _| jh.abort());
-        //     }
-        // }
-        todo!("eliza")
+        // Note: this method iterates over the key set *without* removing any
+        // entries, so that the keys from aborted tasks can be returned when
+        // polling the `JoinMap`.
+        for (Key {ref key, ..}, task) in &self.tasks_by_key {
+            if predicate(key) {
+                task.abort();
+            }
+        }
     }
 
     /// Returns `true` if this `JoinMap` contains a task for the provided key.
