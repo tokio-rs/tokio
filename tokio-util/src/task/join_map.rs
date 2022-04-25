@@ -111,7 +111,7 @@ pub struct JoinMap<K, V, S = RandomState> {
 }
 
 /// A `JoinMap` key.
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug)]
 struct Key<K> {
     key: K,
     id: Id,
@@ -465,8 +465,8 @@ where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        match self.remove_by_key(key) {
-            Some(handle) => { handle.abort(); true }
+        match self.get_by_key(key) {
+            Some((_, handle)) => { handle.abort(); true }
             None => false,
         }
     }
@@ -733,3 +733,22 @@ impl<K, V> Default for JoinMap<K, V> {
         Self::new()
     }
 }
+
+// === impl Key ===
+
+impl<K: Hash> Hash for Key<K> {
+    // Don't include the task ID in the hash.
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.key.hash(hasher);
+    }
+}
+
+impl<K: PartialEq> PartialEq for Key<K> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
+impl<K: Eq> Eq for Key<K> {}
