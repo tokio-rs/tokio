@@ -1,9 +1,10 @@
 use tokio::runtime::Handle;
 use tokio::task::{JoinError, AbortHandle, LocalSet, JoinSet, Id};
-use std::borrow::Borrow;
-use std::collections::hash_map::RandomState;
 use hashbrown::HashMap;
 use hashbrown::hash_map::RawEntryMut;
+use std::borrow::Borrow;
+use std::collections::hash_map::RandomState;
+use std::fmt;
 use std::future::Future;
 use std::hash::{BuildHasher, Hash, Hasher};
 
@@ -99,7 +100,6 @@ use std::hash::{BuildHasher, Hash, Hasher};
 /// [abort_matching]: fn@Self::abort_matching
 /// [contains]: fn@Self::contains_key
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
-#[derive(Debug)]
 pub struct JoinMap<K, V, S = RandomState> {
     tasks_by_key: HashMap<Key<K>, AbortHandle, S>,
     hashes_by_task: HashMap<Id, u64, S>,
@@ -717,24 +717,15 @@ where
     }
 }
 
-
-// impl<K: fmt::Debug + 'static, V: 'static, S> fmt::Debug for JoinMap<K, V, S> {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         // debug print the keys in this `JoinMap`.
-//         struct KeySet<'a, K, V, S>(&'a JoinMap<K, V, S>);
-//         impl<K: fmt::Debug + 'static, V: 'static, S> fmt::Debug for KeySet<'_, K, V, S> {
-//             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//                 f.debug_set()
-//                     .entries(self.0.key_set.iter().map(|entry| &entry.key))
-//                     .finish()
-//             }
-//         }
-
-//         f.debug_struct("JoinMap")
-//             .field("key_set", &KeySet(self))
-//             .finish()
-//     }
-// }
+// Hand-written `fmt::Debug` implementation in order to avoid requiring `V:
+// Debug`, since no value is ever actually stored in the map.
+impl<K: fmt::Debug, V, S> fmt::Debug for JoinMap<K, V, S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("JoinMap")
+            .field("tasks_by_key", &self.tasks_by_key)
+            .finish()
+    }
+}
 
 impl<K, V> Default for JoinMap<K, V> {
     fn default() -> Self {
