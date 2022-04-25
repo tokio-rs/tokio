@@ -10,10 +10,11 @@ use std::hash::{BuildHasher, Hash, Hasher};
 /// A collection of tasks spawned on a Tokio runtime, associated with hash map
 /// keys.
 ///
-/// This type is very similar to the [`JoinSet`] type, with the addition of a
-/// set of keys associated with each task. These keys allow [cancelling a
-/// task][abort] or [multiple tasks][abort_matching] in the `JoinMap` based on
-/// their keys, or [test whether a task corresponding to a given key exists][contains] in the `JoinMap`.
+/// This type is very similar to the [`JoinSet`] type in `tokio::task`, with the
+/// addition of a  set of keys associated with each task. These keys allow
+/// [cancelling a task][abort] or [multiple tasks][abort_matching] in the
+/// `JoinMap` based on   their keys, or [test whether a task corresponding to a
+/// given key exists][contains] in the `JoinMap`. 
 ///
 /// In addition, when tasks in the `JoinMap` complete, they will return the
 /// associated key along with the value returned by the task, if any.
@@ -26,9 +27,9 @@ use std::hash::{BuildHasher, Hash, Hasher};
 ///
 /// When the `JoinMap` is dropped, all tasks in the `JoinMap` are immediately aborted.
 ///
-/// **Note**: This is an [unstable API][unstable]. The public API of this type
-/// may break in 1.x releases. See [the documentation on unstable
-/// features][unstable] for details.
+/// **Note**: This type depends on Tokio's [unstable API][unstable]. See [the
+/// documentation on unstable features][unstable] for details on how to enable
+/// Tokio's unstable features.
 ///
 /// # Examples
 ///
@@ -92,11 +93,11 @@ use std::hash::{BuildHasher, Hash, Hasher};
 /// }
 /// ```
 ///
-/// [`JoinSet`]: crate::task::JoinSet
-/// [unstable]: crate#unstable-features
+/// [`JoinSet`]: tokio::task::JoinSet
+/// [unstable]: tokio#unstable-features
 /// [abort]: fn@Self::abort
 /// [abort_matching]: fn@Self::abort_matching
-/// [contains]: fn@Self::contains_task
+/// [contains]: fn@Self::contains_key
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 #[derive(Debug)]
 pub struct JoinMap<K, V, S = RandomState> {
@@ -549,6 +550,14 @@ where
         self.get_by_key(key).is_some()
     }
 
+    /// Returns `true` if this `JoinMap` contains a task with the provided
+    /// [task ID].
+    ///
+    /// If the task has completed, but its output hasn't yet been consumed by a
+    /// call to [`join_one`], this method will still return `true`.
+    ///
+    /// [`join_one`]: fn@Self::join_one
+    /// [task ID]: tokio::task::Id
     pub fn contains_task(&self, task: &Id) -> bool {
         self.get_by_id(task).is_some()
     }
