@@ -332,7 +332,7 @@ where
     /// be removed from the `JoinMap`; a subsequent call to [`join_one`] will
     /// *not* return a cancelled [`JoinError`] for that task.
     ///
-    /// [`LocalSet`]: crate::task::LocalSet
+    /// [`LocalSet`]: tokio::task::LocalSet
     /// [`join_one`]: Self::join_one
     pub fn spawn_local_on<F>(&mut self, key: K, task: F, local_set: &LocalSet)
     where
