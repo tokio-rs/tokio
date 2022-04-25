@@ -370,12 +370,12 @@ impl Context {
 
 impl Spawner {
     /// Spawns a future onto the basic scheduler
-    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(&self, future: F, id: super::task::Id) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (handle, notified) = self.shared.owned.bind(future, self.shared.clone());
+        let (handle, notified) = self.shared.owned.bind(future, self.shared.clone(), id);
 
         if let Some(notified) = notified {
             self.shared.schedule(notified);

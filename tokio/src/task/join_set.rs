@@ -4,7 +4,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use crate::runtime::Handle;
-use crate::task::{AbortHandle, JoinError, JoinHandle, LocalSet};
+use crate::task::{AbortHandle, Id, JoinError, JoinHandle, LocalSet};
 use crate::util::IdleNotifiedSet;
 
 /// A collection of tasks spawned on a Tokio runtime.
@@ -155,6 +155,24 @@ impl<T: 'static> JoinSet<T> {
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinSet`.
     pub async fn join_one(&mut self) -> Result<Option<T>, JoinError> {
+        crate::future::poll_fn(|cx| self.poll_join_one(cx))
+            .await
+            .map(|opt| opt.map(|(_, res)| res))
+    }
+
+    /// Waits until one of the tasks in the set completes and returns its
+    /// output, along with the [task ID] of the completed task.
+    ///
+    /// Returns `None` if the set is empty.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This method is cancel safe. If `join_one_with_id` is used as the event in a `tokio::select!`
+    /// statement and some other branch completes first, it is guaranteed that no tasks were
+    /// removed from this `JoinSet`.
+    ///
+    /// [task ID]: crate::task::Id
+    pub async fn join_one_with_id(&mut self) -> Result<Option<(Id, T)>, JoinError> {
         crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
     }
 
@@ -191,8 +209,8 @@ impl<T: 'static> JoinSet<T> {
 
     /// Polls for one of the tasks in the set to complete.
     ///
-    /// If this returns `Poll::Ready(Ok(Some(_)))` or `Poll::Ready(Err(_))`, then the task that
-    /// completed is removed from the set.
+    /// If this returns `Poll::Ready(Some((_, Ok(_))))` or `Poll::Ready(Some((_,
+    /// Err(_)))`, then the task that completed is removed from the set.
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided `Context` is scheduled
     /// to receive a wakeup when a task in the `JoinSet` completes. Note that on multiple calls to
@@ -205,17 +223,19 @@ impl<T: 'static> JoinSet<T> {
     ///
     ///  * `Poll::Pending` if the `JoinSet` is not empty but there is no task whose output is
     ///     available right now.
-    ///  * `Poll::Ready(Ok(Some(value)))` if one of the tasks in this `JoinSet` has completed. The
-    ///    `value` is the return value of one of the tasks that completed.
+    ///  * `Poll::Ready(Ok(Some((id, value)))` if one of the tasks in this `JoinSet` has completed. The
+    ///    `value` is the return value of one of the tasks that completed, while
+    ///    `id` is the [task ID] of that task.
     ///  * `Poll::Ready(Err(err))` if one of the tasks in this `JoinSet` has panicked or been
-    ///     aborted.
+    ///     aborted. The `err` is the `JoinError` from the panicked/aborted task.
     ///  * `Poll::Ready(Ok(None))` if the `JoinSet` is empty.
     ///
     /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
     /// This can happen if the [coop budget] is reached.
     ///
     /// [coop budget]: crate::task#cooperative-scheduling
-    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<T>, JoinError>> {
+    /// [task ID]: crate::task::Id
+    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<(Id, T)>, JoinError>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
         let mut entry = match self.inner.pop_notified(cx.waker()) {
@@ -233,7 +253,10 @@ impl<T: 'static> JoinSet<T> {
         let res = entry.with_value_and_context(|jh, ctx| Pin::new(jh).poll(ctx));
 
         if let Poll::Ready(res) = res {
-            entry.remove();
+            let entry = entry.remove();
+            // If the task succeeded, add the task ID to the output. Otherwise, the
+            // `JoinError` will already have the task's ID.
+            let res = res.map(|output| (entry.id(), output));
             Poll::Ready(Some(res).transpose())
         } else {
             // A JoinHandle generally won't emit a wakeup without being ready unless

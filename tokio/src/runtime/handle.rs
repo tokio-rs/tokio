@@ -175,9 +175,10 @@ impl Handle {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
+        let id = crate::runtime::task::Id::next();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task", None);
-        self.spawner.spawn(future)
+        let future = crate::util::trace::task(future, "task", None, id.as_u64());
+        self.spawner.spawn(future, id)
     }
 
     /// Runs the provided function on an executor dedicated to blocking.
@@ -285,7 +286,8 @@ impl Handle {
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "block_on", None);
+        let future =
+            crate::util::trace::task(future, "block_on", None, super::task::Id::next().as_u64());
 
         // Enter the **runtime** context. This configures spawning, the current I/O driver, ...
         let _rt_enter = self.enter();
@@ -388,7 +390,7 @@ impl HandleInner {
         R: Send + 'static,
     {
         let fut = BlockingTask::new(func);
-
+        let id = super::task::Id::next();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let fut = {
             use tracing::Instrument;
@@ -398,6 +400,7 @@ impl HandleInner {
                 "runtime.spawn",
                 kind = %"blocking",
                 task.name = %name.unwrap_or_default(),
+                task.id = id.as_u64(),
                 "fn" = %std::any::type_name::<F>(),
                 spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
             );
@@ -407,7 +410,7 @@ impl HandleInner {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
 
-        let (task, handle) = task::unowned(fut, NoopSchedule);
+        let (task, handle) = task::unowned(fut, NoopSchedule, id);
         let spawned = self
             .blocking_spawner
             .spawn(blocking::Task::new(task, is_mandatory), rt);

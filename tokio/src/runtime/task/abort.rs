@@ -1,4 +1,4 @@
-use crate::runtime::task::RawTask;
+use crate::runtime::task::{Id, RawTask};
 use std::fmt;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 
@@ -21,11 +21,12 @@ use std::panic::{RefUnwindSafe, UnwindSafe};
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 pub struct AbortHandle {
     raw: Option<RawTask>,
+    id: Id,
 }
 
 impl AbortHandle {
-    pub(super) fn new(raw: Option<RawTask>) -> Self {
-        Self { raw }
+    pub(super) fn new(raw: Option<RawTask>, id: Id) -> Self {
+        Self { raw, id }
     }
 
     /// Abort the task associated with the handle.
@@ -47,6 +48,21 @@ impl AbortHandle {
             raw.remote_abort();
         }
     }
+
+    /// Returns a [task ID] that uniquely identifies this task relative to other
+    /// currently spawned tasks.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [task ID]: crate::task::Id
+    /// [unstable]: crate#unstable-features
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn id(&self) -> super::Id {
+        self.id.clone()
+    }
 }
 
 unsafe impl Send for AbortHandle {}
@@ -57,7 +73,9 @@ impl RefUnwindSafe for AbortHandle {}
 
 impl fmt::Debug for AbortHandle {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("AbortHandle").finish()
+        fmt.debug_struct("AbortHandle")
+            .field("id", &self.id)
+            .finish()
     }
 }
 

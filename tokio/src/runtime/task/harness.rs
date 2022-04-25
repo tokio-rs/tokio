@@ -100,7 +100,8 @@ where
                 let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<T, S>(&header_ptr);
                 let cx = Context::from_waker(&*waker_ref);
-                let res = poll_future(&self.core().stage, cx);
+                let core = self.core();
+                let res = poll_future(&core.stage, core.task_id.clone(), cx);
 
                 if res == Poll::Ready(()) {
                     // The future completed. Move on to complete the task.
@@ -114,14 +115,15 @@ where
                     TransitionToIdle::Cancelled => {
                         // The transition to idle failed because the task was
                         // cancelled during the poll.
-
-                        cancel_task(&self.core().stage);
+                        let core = self.core();
+                        cancel_task(&core.stage, core.task_id.clone());
                         PollFuture::Complete
                     }
                 }
             }
             TransitionToRunning::Cancelled => {
-                cancel_task(&self.core().stage);
+                let core = self.core();
+                cancel_task(&core.stage, core.task_id.clone());
                 PollFuture::Complete
             }
             TransitionToRunning::Failed => PollFuture::Done,
@@ -144,7 +146,8 @@ where
 
         // By transitioning the lifecycle to `Running`, we have permission to
         // drop the future.
-        cancel_task(&self.core().stage);
+        let core = self.core();
+        cancel_task(&core.stage, core.task_id.clone());
         self.complete();
     }
 
@@ -432,7 +435,7 @@ enum PollFuture {
 }
 
 /// Cancels the task and store the appropriate error in the stage field.
-fn cancel_task<T: Future>(stage: &CoreStage<T>) {
+fn cancel_task<T: Future>(stage: &CoreStage<T>, id: super::Id) {
     // Drop the future from a panic guard.
     let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         stage.drop_future_or_output();
@@ -440,17 +443,17 @@ fn cancel_task<T: Future>(stage: &CoreStage<T>) {
 
     match res {
         Ok(()) => {
-            stage.store_output(Err(JoinError::cancelled()));
+            stage.store_output(Err(JoinError::cancelled(id)));
         }
         Err(panic) => {
-            stage.store_output(Err(JoinError::panic(panic)));
+            stage.store_output(Err(JoinError::panic(id, panic)));
         }
     }
 }
 
 /// Polls the future. If the future completes, the output is written to the
 /// stage field.
-fn poll_future<T: Future>(core: &CoreStage<T>, cx: Context<'_>) -> Poll<()> {
+fn poll_future<T: Future>(core: &CoreStage<T>, id: super::Id, cx: Context<'_>) -> Poll<()> {
     // Poll the future.
     let output = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         struct Guard<'a, T: Future> {
@@ -473,7 +476,7 @@ fn poll_future<T: Future>(core: &CoreStage<T>, cx: Context<'_>) -> Poll<()> {
     let output = match output {
         Ok(Poll::Pending) => return Poll::Pending,
         Ok(Poll::Ready(output)) => Ok(output),
-        Err(panic) => Err(JoinError::panic(panic)),
+        Err(panic) => Err(JoinError::panic(id, panic)),
     };
 
     // Catch and ignore panics if the future panics on drop.
