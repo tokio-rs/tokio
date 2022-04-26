@@ -757,8 +757,23 @@ where
 // Debug`, since no value is ever actually stored in the map.
 impl<K: fmt::Debug, V, S> fmt::Debug for JoinMap<K, V, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // format the task keys and abort handles a little nicer by just
+        // printing the key and task ID pairs, without format the `Key` struct
+        // itself or the `AbortHandle`, which would just format the task's ID
+        // again.
+        struct KeySet<'a, K: fmt::Debug, S>(&'a HashMap<Key<K>, AbortHandle, S>);
+        impl<K: fmt::Debug, S> fmt::Debug for KeySet<'_, K, S> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_map().entries(self.0.keys().map(|Key { key, id }| (key, id))).finish()
+            }
+        }
+
         f.debug_struct("JoinMap")
-            .field("tasks_by_key", &self.tasks_by_key)
+            // The `tasks_by_key` map is the only one that contains information
+            // that's really worth formatting for the user, since it contains
+            // the tasks' keys and IDs. The other fields are basically
+            // implementation details.
+            .field("tasks", &KeySet(&self.tasks_by_key))
             .finish()
     }
 }
