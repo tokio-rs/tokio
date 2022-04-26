@@ -9,6 +9,8 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::linked_list::{self, LinkedList};
 use crate::util::WakeList;
+use crate::sync::{Mutex as TokioMutex, MutexGuard as TokioMutexGuard};
+use crate::sync::mutex::PollLock;
 
 use std::cell::UnsafeCell;
 use std::future::Future;
@@ -158,6 +160,23 @@ pub struct Notified<'a> {
     waiter: UnsafeCell<Waiter>,
 }
 
+/// Future returned from [`Notify::notified()`]
+pub struct WaitNotified<'a, T> {
+    state: Option<WaitState<'a, T>>,
+}
+
+enum WaitState<'a, T> {
+    Locked{
+        lock: TokioMutexGuard<'a, T>,
+        inner: Pin<Box<Notified<'a>>>,
+    },
+    Waiting{
+        mutex: &'a TokioMutex<T>,
+        inner: Pin<Box<Notified<'a>>>,
+    },
+    Locking(Pin<Box<PollLock<'a, T>>>),
+}
+
 unsafe impl<'a> Send for Notified<'a> {}
 unsafe impl<'a> Sync for Notified<'a> {}
 
@@ -290,6 +309,33 @@ impl Notify {
                 notified: None,
                 _p: PhantomPinned,
             }),
+        }
+    }
+
+    /// Wait for a notification
+    ///
+    /// This function behaves the same as `Notify::notified` but allows passing a MutexGuard
+    /// analogous to how `std::sync::Condvar::wait` behaves.
+    pub fn wait<'a, T>(&'a self, lock: TokioMutexGuard<'a, T>) -> WaitNotified<'a, T> {
+        // we load the number of times notify_waiters
+        // was called and store that in our initial state
+        let state = self.state.load(SeqCst);
+
+        let inner = Box::pin(Notified {
+            notify: self,
+            state: State::Init(state >> NOTIFY_WAITERS_SHIFT),
+            waiter: UnsafeCell::new(Waiter {
+                pointers: linked_list::Pointers::new(),
+                waker: None,
+                notified: None,
+                _p: PhantomPinned,
+            }),
+        });
+
+        WaitNotified {
+            state: Some(WaitState::Locked{
+                lock, inner,
+            })
         }
     }
 
@@ -524,6 +570,54 @@ impl Notified<'_> {
 
             let me = self.get_unchecked_mut();
             (me.notify, &mut me.state, &me.waiter)
+        }
+    }
+}
+
+impl<'a, T> Future for WaitNotified<'a, T> {
+    type Output = TokioMutexGuard<'a, T>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<TokioMutexGuard<'a, T>> {
+        use WaitState::*;
+
+        loop {
+            let state = self.state.take().unwrap();
+
+            match state {
+                Locked{lock, mut inner} => {
+                    let poll_result = inner.as_mut().poll(cx);
+
+                    if !matches!(inner.as_ref().state, State::Init(_)) {
+                        if poll_result.is_ready() {
+                            return Poll::Ready(lock);
+                        } else {
+                            self.state = Some(Waiting {
+                                mutex: lock.into_mutex(),
+                                inner
+                            });
+                        }
+                    }
+                }
+                Waiting{mutex, mut inner} => {
+                    let poll_result = inner.as_mut().poll(cx);
+
+                    if poll_result.is_ready() {
+                        self.state = Some(Locking(Box::pin(mutex.poll_lock())))
+                    } else {
+                        self.state = Some(Waiting{
+                            mutex, inner
+                        });
+                    }
+                }
+                Locking(mut lock_fut) => {
+                    if let Poll::Ready(result) = lock_fut.as_mut().poll(cx) {
+                        return Poll::Ready(result)
+                    } else {
+                        self.state = Some(Locking(lock_fut));
+                        return Poll::Pending;
+                    }
+                }
+            }
         }
     }
 }

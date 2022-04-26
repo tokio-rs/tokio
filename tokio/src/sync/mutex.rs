@@ -9,6 +9,9 @@ use std::error::Error;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::{fmt, marker, mem};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// An asynchronous `Mutex`-like type.
 ///
@@ -216,6 +219,27 @@ impl fmt::Display for TryLockError {
 
 impl Error for TryLockError {}
 
+pub(super) struct PollLock<'a, T: ?Sized> {
+    mutex: &'a Mutex<T>,
+    acquire: Pin<Box<super::batch_semaphore::Acquire<'a>>>,
+}
+
+impl<'a, T> Future for PollLock<'a, T> {
+    type Output = MutexGuard<'a, T>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<MutexGuard<'a, T>> {
+        if self.acquire.as_mut().poll(cx).is_ready() {
+            let lock = MutexGuard {
+                lock: self.mutex
+            };
+
+            Poll::Ready(lock)
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
 #[test]
 #[cfg(not(loom))]
 fn bounds() {
@@ -361,6 +385,13 @@ impl<T: ?Sized> Mutex<T> {
             lock: self,
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: self.resource_span.clone(),
+        }
+    }
+
+    pub(super) fn poll_lock(&self) -> PollLock<'_, T> {
+        PollLock{
+            mutex: self,
+            acquire: Box::pin(self.s.acquire(1)),
         }
     }
 
@@ -695,6 +726,12 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
             data,
             marker: marker::PhantomData,
         }
+    }
+
+    /// Drops the lock and returns the underlying mutex
+    pub fn into_mutex(self) -> &'a Mutex<T> {
+        self.lock.s.release(1);
+        self.lock
     }
 
     /// Attempts to make a new [`MappedMutexGuard`] for a component of the locked data. The

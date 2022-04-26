@@ -77,7 +77,7 @@ pub(crate) struct Acquire<'a> {
 }
 
 /// An entry in the wait queue.
-struct Waiter {
+pub(super) struct Waiter {
     /// The current state of the waiter.
     ///
     /// This is either the number of remaining permits required by
@@ -339,7 +339,7 @@ impl Semaphore {
         assert_eq!(rem, 0);
     }
 
-    fn poll_acquire(
+    pub(super) fn poll_acquire(
         &self,
         cx: &mut Context<'_>,
         num_permits: u32,
