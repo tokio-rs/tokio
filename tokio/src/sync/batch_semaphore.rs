@@ -69,6 +69,7 @@ pub enum TryAcquireError {
 #[derive(Debug)]
 pub struct AcquireError(());
 
+#[derive(Debug)]
 pub(crate) struct Acquire<'a> {
     node: Waiter,
     semaphore: &'a Semaphore,
@@ -77,6 +78,7 @@ pub(crate) struct Acquire<'a> {
 }
 
 /// An entry in the wait queue.
+#[derive(Debug)]
 pub(super) struct Waiter {
     /// The current state of the waiter.
     ///

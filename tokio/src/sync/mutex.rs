@@ -219,6 +219,7 @@ impl fmt::Display for TryLockError {
 
 impl Error for TryLockError {}
 
+#[derive(Debug)]
 pub(super) struct PollLock<'a, T: ?Sized> {
     mutex: &'a Mutex<T>,
     acquire: Pin<Box<super::batch_semaphore::Acquire<'a>>>,

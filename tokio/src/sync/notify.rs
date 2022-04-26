@@ -161,10 +161,12 @@ pub struct Notified<'a> {
 }
 
 /// Future returned from [`Notify::notified()`]
+#[derive(Debug)]
 pub struct WaitNotified<'a, T> {
     state: Option<WaitState<'a, T>>,
 }
 
+#[derive(Debug)]
 enum WaitState<'a, T> {
     Locked{
         lock: TokioMutexGuard<'a, T>,
@@ -607,7 +609,9 @@ impl<'a, T> Future for WaitNotified<'a, T> {
                         self.state = Some(Waiting{
                             mutex, inner
                         });
+                        return Poll::Pending;
                     }
+
                 }
                 Locking(mut lock_fut) => {
                     if let Poll::Ready(result) = lock_fut.as_mut().poll(cx) {
