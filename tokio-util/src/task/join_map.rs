@@ -101,17 +101,30 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// [contains]: fn@Self::contains_key
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
+    /// A map of the [`AbortHandle`]s of the tasks spawned on this `JoinMap`,
+    /// indexed by their keys and task IDs.
+    ///
+    /// The [`Key`] type contains both the task's `K`-typed key provided when
+    /// spawning tasks, and the task's IDs. The IDs are stored here to resolve
+    /// hash collisions when looking up tasks based on their pre-computed hash
+    /// (as stored in the `hashes_by_task` map).
     tasks_by_key: HashMap<Key<K>, AbortHandle, S>,
+
+    /// A map from task IDs to the hash of the key associated with that task.
+    ///
+    /// This map is used to perform reverse lookups of tasks in the
+    /// `tasks_by_key` map based on their task IDs. When a task terminates, the
+    /// ID is provided to us by the `JoinSet`, so we can look up the hash value
+    /// of that task's key, and then remove it from the `tasks_by_key` map using
+    /// the raw hash code, resolving collisions by comparing task IDs.
     hashes_by_task: HashMap<Id, u64, S>,
 
-    /// The set of tasks spawned on the `JoinMap`.
-    ///
-    /// Each `IdleNotifiedSet` entry contains the hash of the task's key, to
-    /// allow looking the key up when the task completes.
+    /// The [`JoinSet`] that awaits the completion of tasks spawned on this
+    /// `JoinMap`.
     tasks: JoinSet<V>,
 }
 
-/// A `JoinMap` key.
+/// A [`JoinMap`] key.
 ///
 /// This holds both a `K`-typed key (the actual key as seen by the user), _and_
 /// a task ID, so that hash collisions between `K`-typed keys can be resolved
@@ -382,7 +395,7 @@ where
     ///
     /// # Cancel Safety
     ///
-    /// This method is cancel safe. If `join_one` is used as the event in a `tokio::select!`
+    /// This method is cancel safe. If `join_one` is used as the event in a [`tokio::select!`]
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinMap`.
     ///
@@ -397,6 +410,8 @@ where
     ///    panicked or been aborted. `key` is the key associated  with the task
     ///    that panicked or was aborted.
     ///  * `None` if the `JoinMap` is empty.
+    ///
+    /// [`tokio::select!`]: tokio::select
     pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
         let (res, id) = match self.tasks.join_one_with_id().await {
             Ok(task) => {
@@ -548,9 +563,9 @@ where
     /// # }
     /// ```
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
-        // Note: this method iterates over the key set *without* removing any
-        // entries, so that the keys from aborted tasks can be returned when
-        // polling the `JoinMap`.
+        // Note: this method iterates over the tasks and keys *without* removing
+        // any entries, so that the keys from aborted tasks can still be
+        // returned when calling `join_one` in the future.
         for (Key { ref key, .. }, task) in &self.tasks_by_key {
             if predicate(key) {
                 task.abort();
