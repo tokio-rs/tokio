@@ -764,7 +764,9 @@ impl<K: fmt::Debug, V, S> fmt::Debug for JoinMap<K, V, S> {
         struct KeySet<'a, K: fmt::Debug, S>(&'a HashMap<Key<K>, AbortHandle, S>);
         impl<K: fmt::Debug, S> fmt::Debug for KeySet<'_, K, S> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_map().entries(self.0.keys().map(|Key { key, id }| (key, id))).finish()
+                f.debug_map()
+                    .entries(self.0.keys().map(|Key { key, id }| (key, id)))
+                    .finish()
             }
         }
 
