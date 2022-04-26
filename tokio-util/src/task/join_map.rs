@@ -268,7 +268,7 @@ impl<K, V, S: Clone> JoinMap<K, V, S> {
 
 impl<K, V, S> JoinMap<K, V, S>
 where
-    K: Hash + Eq + 'static,
+    K: Hash + Eq,
     V: 'static,
     S: BuildHasher,
 {
@@ -732,7 +732,6 @@ where
 
 impl<K, V, S> JoinMap<K, V, S>
 where
-    K: 'static,
     V: 'static,
 {
     /// Aborts all tasks on this `JoinMap`.
