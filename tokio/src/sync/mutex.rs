@@ -731,7 +731,6 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
 
     /// Drops the lock and returns the underlying mutex
     pub fn into_mutex(self) -> &'a Mutex<T> {
-        self.lock.s.release(1);
         self.lock
     }
 
