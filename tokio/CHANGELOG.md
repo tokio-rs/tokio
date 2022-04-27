@@ -27,7 +27,6 @@ task), as well as a number of bugfixes.
 
 ### Changed
 
-- update `nix` to 0.24, limit features ([#4631])
 - update `mio` to 0.8.1 ([#4582])
 - macros: rename `tokio::select!`'s internal `util` module ([#4543])
 - runtime: use `Vec::with_capacity` when building runtime ([#4553])
