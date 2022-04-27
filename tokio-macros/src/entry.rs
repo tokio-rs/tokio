@@ -383,29 +383,17 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
 
     let body = &input.block;
     let brace_token = input.block.brace_token;
-    let (tail_return, tail_semicolon) = match body.stmts.last() {
-        Some(syn::Stmt::Semi(syn::Expr::Return(_), _)) => (quote! { return }, quote! { ; }),
-        Some(syn::Stmt::Semi(..)) | Some(syn::Stmt::Local(..)) | None => {
-            match &input.sig.output {
-                syn::ReturnType::Type(_, ty) if matches!(&**ty, syn::Type::Tuple(ty) if ty.elems.is_empty()) =>
-                {
-                    (quote! {}, quote! { ; }) // unit
-                }
-                syn::ReturnType::Default => (quote! {}, quote! { ; }), // unit
-                syn::ReturnType::Type(..) => (quote! {}, quote! {}),   // ! or another
-            }
-        }
-        _ => (quote! {}, quote! {}),
-    };
     input.block = syn::parse2(quote_spanned! {last_stmt_end_span=>
         {
             let body = async #body;
-            #[allow(clippy::expect_used)]
-            #tail_return #rt
-                .enable_all()
-                .build()
-                .expect("Failed building the Runtime")
-                .block_on(body)#tail_semicolon
+            #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
+            {
+                return #rt
+                    .enable_all()
+                    .build()
+                    .expect("Failed building the Runtime")
+                    .block_on(body);
+            }
         }
     })
     .expect("Parsing failure");
