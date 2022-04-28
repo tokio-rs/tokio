@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use tokio_util::task;
@@ -190,4 +191,48 @@ async fn tasks_are_balanced() {
     // Since the first task was active when the second task spawned, they should
     // be on separate workers/threads.
     assert_ne!(thread_id1, thread_id2);
+}
+
+
+#[test]
+#[should_panic(expected = "the number of workers is 1 but the index is 1")]
+fn cannot_spawn_task_with_index_out_of_range() {
+    let pool = task::LocalPoolHandle::<()>::new(1);
+    pool.spawn_pinned_at(1, |_| async { "test" });
+}
+
+#[tokio::test]
+async fn can_access_shared_local_data() {
+    let pool = task::LocalPoolHandle::<Rc<RefCell<Option<String>>>>::new(2);
+
+    pool
+        .spawn_pinned_at(1, |data| async move {
+            data.borrow_mut().replace("test".to_string())
+        })
+        .await
+        .unwrap();
+
+    let output = pool
+        .spawn_pinned_at(1, |data| async move { data.borrow().clone() })
+        .await
+        .unwrap();
+
+    assert_eq!(output, Some("test".to_string()));
+}
+
+#[tokio::test]
+async fn can_spawn_multiple_futures_on_same_worker() {
+    let pool = task::LocalPoolHandle::<()>::new(2);
+
+    let join_handle1 = pool.spawn_pinned_at(1, |_| {
+        let local_data = Rc::new("test1");
+        async move { local_data.to_string() }
+    });
+    let join_handle2 = pool.spawn_pinned_at(1, |_| {
+        let local_data = Rc::new("test2");
+        async move { local_data.to_string() }
+    });
+
+    assert_eq!(join_handle1.await.unwrap(), "test1");
+    assert_eq!(join_handle2.await.unwrap(), "test2");
 }

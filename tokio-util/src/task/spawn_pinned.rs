@@ -46,7 +46,7 @@ impl<T: Clone + Default + 'static> LocalPoolHandle<T> {
         LocalPoolHandle { pool }
     }
 
-    /// Spawn a task onto a worker thread and pin it there so it can't be moved
+    /// Spawn a task onto a least burdened worker thread and pin it there so it can't be moved
     /// off of the thread. Note that the future is not [`Send`], but the
     /// [`FnOnce`] which creates it is.
     ///
@@ -84,6 +84,52 @@ impl<T: Clone + Default + 'static> LocalPoolHandle<T> {
     {
         self.pool.spawn_pinned(create_task)
     }
+
+    /// Spawn a task onto a specific worker thread and pin it there so it can't
+    /// be moved off of the thread. Note that the future is not [`Send`], but the
+    /// [`FnOnce`] which creates it is.
+    ///
+    /// # Examples
+    /// ```
+    /// use std::cell::RefCell;
+    /// use std::rc::Rc;
+    /// use tokio_util::task::LocalPoolHandle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     // Create the local pool with a local !Send data
+    ///     let pool = LocalPoolHandle::<Rc<RefCell<String>>>::new(2);
+    ///
+    ///     pool
+    ///         .spawn_pinned_at(0, |data| async move {
+    ///             *data.borrow_mut() = "test".to_string();
+    ///         })
+    ///         .await
+    ///         .unwrap();
+    ///
+    ///     // Spawn a task onto the same worker thread
+    ///     let output = pool
+    ///         .spawn_pinned_at(0, |data| async move {
+    ///             data.borrow().clone()
+    ///         })
+    ///         .await
+    ///         .unwrap();
+    ///
+    ///     assert_eq!(output, "test");
+    /// }
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if the worker index is out of range.
+    pub fn spawn_pinned_at<F, Fut>(&self, worker_index: usize, create_task: F) -> JoinHandle<Fut::Output>
+    where
+        F: FnOnce(T) -> Fut,
+        F: Send + 'static,
+        Fut: Future + 'static,
+        Fut::Output: Send + 'static,
+    {
+        self.pool.spawn_pinned_at(worker_index, create_task)
+    }
 }
 
 impl<T: Clone + Default> Debug for LocalPoolHandle<T> {
@@ -105,9 +151,36 @@ impl<T: Clone + Default + 'static> LocalPool<T> {
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
+        let (worker_index, job_guard) = self.find_and_incr_least_burdened_worker();
+        self.do_spawn_pinned(worker_index, job_guard, create_task)
+    }
+
+    /// Spawn a `?Send` future onto a specified worker
+    fn spawn_pinned_at<F, Fut>(&self, worker_index: usize, create_task: F) -> JoinHandle<Fut::Output>
+    where
+        F: FnOnce(T) -> Fut,
+        F: Send + 'static,
+        Fut: Future + 'static,
+        Fut::Output: Send + 'static,
+    {
+        if worker_index >= self.workers.len() {
+            panic!("the number of workers is {} but the index is {}", self.workers.len(), worker_index);
+        }
+
+        let job_guard = self.incr_worker(worker_index);
+        self.do_spawn_pinned(worker_index, job_guard, create_task)
+    }
+
+    fn do_spawn_pinned<F, Fut>(&self, worker_index: usize, job_guard: JobCountGuard, create_task: F) -> JoinHandle<Fut::Output>
+    where
+        F: FnOnce(T) -> Fut,
+        F: Send + 'static,
+        Fut: Future + 'static,
+        Fut::Output: Send + 'static,
+    {
         let (sender, receiver) = oneshot::channel();
 
-        let (worker, job_guard) = self.find_and_incr_least_burdened_worker();
+        let worker = &self.workers[worker_index];
         let worker_spawner = worker.spawner.clone();
 
         // Spawn a future onto the worker's runtime so we can immediately return
@@ -194,13 +267,14 @@ impl<T: Clone + Default + 'static> LocalPool<T> {
     ///
     /// A job count guard is also returned to ensure the task count gets
     /// decremented when the job is done.
-    fn find_and_incr_least_burdened_worker(&self) -> (&LocalWorkerHandle<T>, JobCountGuard) {
+    fn find_and_incr_least_burdened_worker(&self) -> (usize, JobCountGuard) {
         loop {
-            let (worker, task_count) = self
+            let (worker_index, worker, task_count) = self
                 .workers
                 .iter()
-                .map(|worker| (worker, worker.task_count.load(Ordering::SeqCst)))
-                .min_by_key(|&(_, count)| count)
+                .enumerate()
+                .map(|(i, worker)| (i, worker, worker.task_count.load(Ordering::SeqCst)))
+                .min_by_key(|&(_, _, count)| count)
                 .expect("There must be more than one worker");
 
             // Make sure the task count hasn't changed since when we choose this
@@ -215,9 +289,15 @@ impl<T: Clone + Default + 'static> LocalPool<T> {
                 )
                 .is_ok()
             {
-                return (worker, JobCountGuard(Arc::clone(&worker.task_count)));
+                return (worker_index, JobCountGuard(Arc::clone(&worker.task_count)));
             }
         }
+    }
+
+    fn incr_worker(&self, worker_index: usize) -> JobCountGuard {
+        let task_count = &self.workers[worker_index].task_count;
+        task_count.fetch_add(1, Ordering::SeqCst);
+        JobCountGuard(Arc::clone(task_count))
     }
 }
 
