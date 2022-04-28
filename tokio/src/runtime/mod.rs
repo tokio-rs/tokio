@@ -218,24 +218,20 @@ cfg_rt! {
     pub use self::builder::Builder;
 
     pub(crate) mod context;
-    pub(crate) mod driver;
+    mod driver;
 
     use self::enter::enter;
 
     mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};
+    pub(crate) use handle::{HandleInner, ToHandle};
 
     mod spawner;
     use self::spawner::Spawner;
 }
 
 cfg_rt_multi_thread! {
-    mod park;
-    use park::Parker;
-}
-
-cfg_rt_multi_thread! {
-    mod queue;
+    use driver::Driver;
 
     pub(crate) mod thread_pool;
     use self::thread_pool::ThreadPool;
@@ -471,7 +467,7 @@ cfg_rt! {
         #[track_caller]
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            let future = crate::util::trace::task(future, "block_on", None);
+            let future = crate::util::trace::task(future, "block_on", None, task::Id::next().as_u64());
 
             let _enter = self.enter();
 

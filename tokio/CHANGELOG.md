@@ -1,3 +1,87 @@
+# 1.18.0 (April 27, 2022)
+
+This release adds a number of new APIs in `tokio::net`, `tokio::signal`, and
+`tokio::sync`. In addition, it adds new unstable APIs to `tokio::task` (`Id`s
+for uniquely identifying a task, and `AbortHandle` for remotely cancelling a
+task), as well as a number of bugfixes.
+
+### Fixed
+
+- blocking: add missing `#[track_caller]` for `spawn_blocking` ([#4616])
+- macros: fix `select` macro to process 64 branches ([#4519])
+- net: fix `try_io` methods not calling Mio's `try_io` internally ([#4582])
+- runtime: recover when OS fails to spawn a new thread ([#4485])
+
+### Added
+
+- macros: support setting a custom crate name for `#[tokio::main]` and
+  `#[tokio::test]` ([#4613])
+- net: add `UdpSocket::peer_addr` ([#4611])
+- net: add `try_read_buf` method for named pipes ([#4626])
+- signal: add `SignalKind` `Hash`/`Eq` impls and `c_int` conversion ([#4540])
+- signal: add support for signals up to `SIGRTMAX` ([#4555])
+- sync: add `watch::Sender::send_modify` method ([#4310])
+- sync: add `broadcast::Receiver::len` method ([#4542])
+- sync: add `watch::Receiver::same_channel` method ([#4581])
+- sync: implement `Clone` for `RecvError` types ([#4560])
+
+### Changed
+
+- update `mio` to 0.8.1 ([#4582])
+- macros: rename `tokio::select!`'s internal `util` module ([#4543])
+- runtime: use `Vec::with_capacity` when building runtime ([#4553])
+
+### Documented
+
+- improve docs for `tokio_unstable` ([#4524])
+- runtime: include more documentation for thread_pool/worker ([#4511])
+- runtime: update `Handle::current`'s docs to mention `EnterGuard` ([#4567])
+- time: clarify platform specific timer resolution ([#4474])
+- signal: document that `Signal::recv` is cancel-safe ([#4634])
+- sync: `UnboundedReceiver` close docs ([#4548])
+
+### Unstable
+
+The following changes only apply when building with `--cfg tokio_unstable`:
+
+- task: add `task::Id` type ([#4630])
+- task: add `AbortHandle` type for cancelling tasks in a `JoinSet` ([#4530],
+  [#4640])
+- task: fix missing `doc(cfg(...))` attributes for `JoinSet` ([#4531])
+- task: fix broken link in `AbortHandle` RustDoc ([#4545])
+- metrics: add initial IO driver metrics ([#4507])
+
+
+[#4616]: https://github.com/tokio-rs/tokio/pull/4616
+[#4519]: https://github.com/tokio-rs/tokio/pull/4519
+[#4582]: https://github.com/tokio-rs/tokio/pull/4582
+[#4485]: https://github.com/tokio-rs/tokio/pull/4485
+[#4613]: https://github.com/tokio-rs/tokio/pull/4613
+[#4611]: https://github.com/tokio-rs/tokio/pull/4611
+[#4626]: https://github.com/tokio-rs/tokio/pull/4626
+[#4540]: https://github.com/tokio-rs/tokio/pull/4540
+[#4555]: https://github.com/tokio-rs/tokio/pull/4555
+[#4310]: https://github.com/tokio-rs/tokio/pull/4310
+[#4542]: https://github.com/tokio-rs/tokio/pull/4542
+[#4581]: https://github.com/tokio-rs/tokio/pull/4581
+[#4560]: https://github.com/tokio-rs/tokio/pull/4560
+[#4631]: https://github.com/tokio-rs/tokio/pull/4631
+[#4582]: https://github.com/tokio-rs/tokio/pull/4582
+[#4543]: https://github.com/tokio-rs/tokio/pull/4543
+[#4553]: https://github.com/tokio-rs/tokio/pull/4553
+[#4524]: https://github.com/tokio-rs/tokio/pull/4524
+[#4511]: https://github.com/tokio-rs/tokio/pull/4511
+[#4567]: https://github.com/tokio-rs/tokio/pull/4567
+[#4474]: https://github.com/tokio-rs/tokio/pull/4474
+[#4634]: https://github.com/tokio-rs/tokio/pull/4634
+[#4548]: https://github.com/tokio-rs/tokio/pull/4548
+[#4630]: https://github.com/tokio-rs/tokio/pull/4630
+[#4530]: https://github.com/tokio-rs/tokio/pull/4530
+[#4640]: https://github.com/tokio-rs/tokio/pull/4640
+[#4531]: https://github.com/tokio-rs/tokio/pull/4531
+[#4545]: https://github.com/tokio-rs/tokio/pull/4545
+[#4507]: https://github.com/tokio-rs/tokio/pull/4507
+
 # 1.17.0 (February 16, 2022)
 
 This release updates the minimum supported Rust version (MSRV) to 1.49, the

@@ -7,7 +7,7 @@ use crate::runtime::blocking::shutdown;
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{Builder, Callback, Handle};
+use crate::runtime::{Builder, Callback, ToHandle};
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -104,6 +104,7 @@ const KEEP_ALIVE: Duration = Duration::from_secs(10);
 /// Runs the provided function on an executor dedicated to blocking operations.
 /// Tasks will be scheduled as non-mandatory, meaning they may not get executed
 /// in case of runtime shutdown.
+#[track_caller]
 pub(crate) fn spawn_blocking<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
@@ -128,7 +129,7 @@ cfg_fs! {
         R: Send + 'static,
     {
         let rt = context::current();
-        rt.spawn_mandatory_blocking(func)
+        rt.as_inner().spawn_mandatory_blocking(&rt, func)
     }
 }
 
@@ -219,7 +220,7 @@ impl fmt::Debug for BlockingPool {
 // ===== impl Spawner =====
 
 impl Spawner {
-    pub(crate) fn spawn(&self, task: Task, rt: &Handle) -> Result<(), ()> {
+    pub(crate) fn spawn(&self, task: Task, rt: &dyn ToHandle) -> Result<(), ()> {
         let mut shared = self.inner.shared.lock();
 
         if shared.shutdown {
@@ -282,7 +283,7 @@ impl Spawner {
     fn spawn_thread(
         &self,
         shutdown_tx: shutdown::Sender,
-        rt: &Handle,
+        rt: &dyn ToHandle,
         id: usize,
     ) -> std::io::Result<thread::JoinHandle<()>> {
         let mut builder = thread::Builder::new().name((self.inner.thread_name)());
@@ -291,12 +292,12 @@ impl Spawner {
             builder = builder.stack_size(stack_size);
         }
 
-        let rt = rt.clone();
+        let rt = rt.to_handle();
 
         builder.spawn(move || {
             // Only the reference should be moved into the closure
             let _enter = crate::runtime::context::enter(rt.clone());
-            rt.blocking_spawner.inner.run(id);
+            rt.as_inner().blocking_spawner.inner.run(id);
             drop(shutdown_tx);
         })
     }

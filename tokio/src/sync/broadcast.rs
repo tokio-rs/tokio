@@ -230,7 +230,7 @@ pub mod error {
     ///
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
     /// [`Receiver`]: crate::sync::broadcast::Receiver
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Clone)]
     pub enum RecvError {
         /// There are no more active senders implying no further messages will ever
         /// be sent.
@@ -258,7 +258,7 @@ pub mod error {
     ///
     /// [`try_recv`]: crate::sync::broadcast::Receiver::try_recv
     /// [`Receiver`]: crate::sync::broadcast::Receiver
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Clone)]
     pub enum TryRecvError {
         /// The channel is currently empty. There are still active
         /// [`Sender`] handles, so data may yet become available.
@@ -425,6 +425,11 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 ///     tx.send(20).unwrap();
 /// }
 /// ```
+///
+/// # Panics
+///
+/// This will panic if `capacity` is equal to `0` or larger
+/// than `usize::MAX / 2`.
 pub fn channel<T: Clone>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
     assert!(capacity > 0, "capacity is empty");
     assert!(capacity <= usize::MAX >> 1, "requested capacity too large");

@@ -386,7 +386,7 @@ impl RuntimeMetrics {
     /// Returns the number of tasks currently scheduled in the runtime's
     /// injection queue.
     ///
-    /// Tasks that are spanwed or notified from a non-runtime thread are
+    /// Tasks that are spawned or notified from a non-runtime thread are
     /// scheduled using the runtime's injection queue. This metric returns the
     /// **current** number of tasks pending in the injection queue. As such, the
     /// returned value may increase or decrease as new tasks are scheduled and
@@ -526,6 +526,7 @@ cfg_net! {
             // TODO: Investigate if this should return 0, most of our metrics always increase
             // thus this breaks that guarantee.
             self.handle
+                .as_inner()
                 .io_handle
                 .as_ref()
                 .and_then(|h| h.with_io_driver_metrics(f))

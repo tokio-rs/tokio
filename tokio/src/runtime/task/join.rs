@@ -1,4 +1,4 @@
-use crate::runtime::task::RawTask;
+use crate::runtime::task::{Id, RawTask};
 
 use std::fmt;
 use std::future::Future;
@@ -144,6 +144,7 @@ cfg_rt! {
     /// [`JoinError`]: crate::task::JoinError
     pub struct JoinHandle<T> {
         raw: Option<RawTask>,
+        id: Id,
         _p: PhantomData<T>,
     }
 }
@@ -155,9 +156,10 @@ impl<T> UnwindSafe for JoinHandle<T> {}
 impl<T> RefUnwindSafe for JoinHandle<T> {}
 
 impl<T> JoinHandle<T> {
-    pub(super) fn new(raw: RawTask) -> JoinHandle<T> {
+    pub(super) fn new(raw: RawTask, id: Id) -> JoinHandle<T> {
         JoinHandle {
             raw: Some(raw),
+            id,
             _p: PhantomData,
         }
     }
@@ -218,7 +220,22 @@ impl<T> JoinHandle<T> {
             raw.ref_inc();
             raw
         });
-        super::AbortHandle::new(raw)
+        super::AbortHandle::new(raw, self.id.clone())
+    }
+
+    /// Returns a [task ID] that uniquely identifies this task relative to other
+    /// currently spawned tasks.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [task ID]: crate::task::Id
+    /// [unstable]: crate#unstable-features
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn id(&self) -> super::Id {
+        self.id.clone()
     }
 }
 
@@ -280,6 +297,8 @@ where
     T: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("JoinHandle").finish()
+        fmt.debug_struct("JoinHandle")
+            .field("id", &self.id)
+            .finish()
     }
 }

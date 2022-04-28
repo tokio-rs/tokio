@@ -301,12 +301,13 @@ cfg_rt! {
     where F: Future + 'static,
           F::Output: 'static
     {
-        let future = crate::util::trace::task(future, "local", name);
+        let id = crate::runtime::task::Id::next();
+        let future = crate::util::trace::task(future, "local", name, id.as_u64());
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
 
-            let (handle, notified) = cx.owned.bind(future, cx.shared.clone());
+            let (handle, notified) = cx.owned.bind(future, cx.shared.clone(), id);
 
             if let Some(notified) = notified {
                 cx.shared.schedule(notified);
@@ -385,9 +386,13 @@ impl LocalSet {
         F: Future + 'static,
         F::Output: 'static,
     {
-        let future = crate::util::trace::task(future, "local", None);
+        let id = crate::runtime::task::Id::next();
+        let future = crate::util::trace::task(future, "local", None, id.as_u64());
 
-        let (handle, notified) = self.context.owned.bind(future, self.context.shared.clone());
+        let (handle, notified) = self
+            .context
+            .owned
+            .bind(future, self.context.shared.clone(), id);
 
         if let Some(notified) = notified {
             self.context.shared.schedule(notified);
