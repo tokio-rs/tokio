@@ -7,10 +7,10 @@ use tokio_util::task;
 /// Simple test of running a !Send future via spawn_pinned
 #[tokio::test]
 async fn can_spawn_not_send_future() {
-    let pool = task::LocalPoolHandle::new(1);
+    let pool = task::LocalPoolHandle::<()>::new(1);
 
     let output = pool
-        .spawn_pinned(|| {
+        .spawn_pinned(|_| {
             // Rc is !Send + !Sync
             let local_data = Rc::new("test");
 
@@ -26,10 +26,10 @@ async fn can_spawn_not_send_future() {
 /// Dropping the join handle still lets the task execute
 #[test]
 fn can_drop_future_and_still_get_output() {
-    let pool = task::LocalPoolHandle::new(1);
+    let pool = task::LocalPoolHandle::<()>::new(1);
     let (sender, receiver) = std::sync::mpsc::channel();
 
-    let _ = pool.spawn_pinned(move || {
+    let _ = pool.spawn_pinned(move |_| {
         // Rc is !Send + !Sync
         let local_data = Rc::new("test");
 
@@ -45,19 +45,19 @@ fn can_drop_future_and_still_get_output() {
 #[test]
 #[should_panic(expected = "assertion failed: pool_size > 0")]
 fn cannot_create_zero_sized_pool() {
-    let _pool = task::LocalPoolHandle::new(0);
+    let _pool = task::LocalPoolHandle::<()>::new(0);
 }
 
 /// We should be able to spawn multiple futures onto the pool at the same time.
 #[tokio::test]
 async fn can_spawn_multiple_futures() {
-    let pool = task::LocalPoolHandle::new(2);
+    let pool = task::LocalPoolHandle::<()>::new(2);
 
-    let join_handle1 = pool.spawn_pinned(|| {
+    let join_handle1 = pool.spawn_pinned(|_| {
         let local_data = Rc::new("test1");
         async move { local_data.to_string() }
     });
-    let join_handle2 = pool.spawn_pinned(|| {
+    let join_handle2 = pool.spawn_pinned(|_| {
         let local_data = Rc::new("test2");
         async move { local_data.to_string() }
     });
@@ -70,9 +70,9 @@ async fn can_spawn_multiple_futures() {
 /// But, you can continue to spawn tasks.
 #[tokio::test]
 async fn task_panic_propagates() {
-    let pool = task::LocalPoolHandle::new(1);
+    let pool = task::LocalPoolHandle::<()>::new(1);
 
-    let join_handle = pool.spawn_pinned(|| async {
+    let join_handle = pool.spawn_pinned(|_| async {
         panic!("Test panic");
     });
 
@@ -84,7 +84,7 @@ async fn task_panic_propagates() {
     assert_eq!(panic_str, "Test panic");
 
     // Trying again with a "safe" task still works
-    let join_handle = pool.spawn_pinned(|| async { "test" });
+    let join_handle = pool.spawn_pinned(|_| async { "test" });
     let result = join_handle.await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "test");
@@ -94,9 +94,9 @@ async fn task_panic_propagates() {
 /// But, you can continue to spawn tasks.
 #[tokio::test]
 async fn callback_panic_does_not_kill_worker() {
-    let pool = task::LocalPoolHandle::new(1);
+    let pool = task::LocalPoolHandle::<()>::new(1);
 
-    let join_handle = pool.spawn_pinned(|| {
+    let join_handle = pool.spawn_pinned(|_| {
         panic!("Test panic");
         #[allow(unreachable_code)]
         async {}
@@ -110,7 +110,7 @@ async fn callback_panic_does_not_kill_worker() {
     assert_eq!(panic_str, "Test panic");
 
     // Trying again with a "safe" callback works
-    let join_handle = pool.spawn_pinned(|| async { "test" });
+    let join_handle = pool.spawn_pinned(|_| async { "test" });
     let result = join_handle.await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "test");
@@ -120,13 +120,13 @@ async fn callback_panic_does_not_kill_worker() {
 /// (which has a different, internal join handle).
 #[tokio::test]
 async fn task_cancellation_propagates() {
-    let pool = task::LocalPoolHandle::new(1);
+    let pool = task::LocalPoolHandle::<()>::new(1);
     let notify_dropped = Arc::new(());
     let weak_notify_dropped = Arc::downgrade(&notify_dropped);
 
     let (start_sender, start_receiver) = tokio::sync::oneshot::channel();
     let (drop_sender, drop_receiver) = tokio::sync::oneshot::channel::<()>();
-    let join_handle = pool.spawn_pinned(|| async move {
+    let join_handle = pool.spawn_pinned(|_| async move {
         let _drop_sender = drop_sender;
         // Move the Arc into the task
         let _notify_dropped = notify_dropped;
@@ -157,12 +157,12 @@ async fn task_cancellation_propagates() {
 /// workers.
 #[tokio::test]
 async fn tasks_are_balanced() {
-    let pool = task::LocalPoolHandle::new(2);
+    let pool = task::LocalPoolHandle::<()>::new(2);
 
     // Spawn a task so one thread has a task count of 1
     let (start_sender1, start_receiver1) = tokio::sync::oneshot::channel();
     let (end_sender1, end_receiver1) = tokio::sync::oneshot::channel();
-    let join_handle1 = pool.spawn_pinned(|| async move {
+    let join_handle1 = pool.spawn_pinned(|_| async move {
         let _ = start_sender1.send(());
         let _ = end_receiver1.await;
         std::thread::current().id()
@@ -173,7 +173,7 @@ async fn tasks_are_balanced() {
 
     // This task should be spawned on the other thread
     let (start_sender2, start_receiver2) = tokio::sync::oneshot::channel();
-    let join_handle2 = pool.spawn_pinned(|| async move {
+    let join_handle2 = pool.spawn_pinned(|_| async move {
         let _ = start_sender2.send(());
         std::thread::current().id()
     });

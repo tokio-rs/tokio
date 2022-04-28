@@ -11,17 +11,30 @@ use tokio::task::{spawn_local, JoinHandle, LocalSet};
 
 /// A handle to a local pool, used for spawning `!Send` tasks.
 #[derive(Clone)]
-pub struct LocalPoolHandle {
-    pool: Arc<LocalPool>,
+pub struct LocalPoolHandle<T: Clone + Default> {
+    pool: Arc<LocalPool<T>>,
 }
 
-impl LocalPoolHandle {
+impl<T: Clone + Default + 'static> LocalPoolHandle<T> {
     /// Create a new pool of threads to handle `!Send` tasks. Spawn tasks onto this
     /// pool via [`LocalPoolHandle::spawn_pinned`].
     ///
+    /// Each worker thread can have a local `!Send` data that tasks running on a
+    /// same worker thread can mutually access without synchronization. A local
+    /// data is initialized with [`Default`].
+    ///
+    /// # Examples
+    /// ```
+    /// use std::cell::RefCell;
+    /// use std::rc::Rc;
+    /// use tokio_util::task::LocalPoolHandle;
+    ///
+    /// LocalPoolHandle::<Rc<RefCell<String>>>::new(1);
+    /// ```
+    ///
     /// # Panics
     /// Panics if the pool size is less than one.
-    pub fn new(pool_size: usize) -> LocalPoolHandle {
+    pub fn new(pool_size: usize) -> LocalPoolHandle<T> {
         assert!(pool_size > 0);
 
         let workers = (0..pool_size)
@@ -45,11 +58,11 @@ impl LocalPoolHandle {
     /// #[tokio::main]
     /// async fn main() {
     ///     // Create the local pool
-    ///     let pool = LocalPoolHandle::new(1);
+    ///     let pool = LocalPoolHandle::<()>::new(1);
     ///
     ///     // Spawn a !Send future onto the pool and await it
     ///     let output = pool
-    ///         .spawn_pinned(|| {
+    ///         .spawn_pinned(|_| {
     ///             // Rc is !Send + !Sync
     ///             let local_data = Rc::new("test");
     ///
@@ -64,7 +77,7 @@ impl LocalPoolHandle {
     /// ```
     pub fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
     where
-        F: FnOnce() -> Fut,
+        F: FnOnce(T) -> Fut,
         F: Send + 'static,
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
@@ -73,21 +86,21 @@ impl LocalPoolHandle {
     }
 }
 
-impl Debug for LocalPoolHandle {
+impl<T: Clone + Default> Debug for LocalPoolHandle<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("LocalPoolHandle")
     }
 }
 
-struct LocalPool {
-    workers: Vec<LocalWorkerHandle>,
+struct LocalPool<T: Clone + Default> {
+    workers: Vec<LocalWorkerHandle<T>>,
 }
 
-impl LocalPool {
+impl<T: Clone + Default + 'static> LocalPool<T> {
     /// Spawn a `?Send` future onto a worker
     fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
     where
-        F: FnOnce() -> Fut,
+        F: FnOnce(T) -> Fut,
         F: Send + 'static,
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
@@ -110,11 +123,11 @@ impl LocalPool {
             // Inside the future we can't run spawn_local yet because we're not
             // in the context of a LocalSet. We need to send create_task to the
             // LocalSet task for spawning.
-            let spawn_task = Box::new(move || {
+            let spawn_task = Box::new(move |data: T| {
                 // Once we're in the LocalSet context we can call spawn_local
                 let join_handle =
                     spawn_local(
-                        async move { Abortable::new(create_task(), abort_registration).await },
+                        async move { Abortable::new(create_task(data), abort_registration).await },
                     );
 
                 // Send the join handle back to the spawner. If sending fails,
@@ -181,7 +194,7 @@ impl LocalPool {
     ///
     /// A job count guard is also returned to ensure the task count gets
     /// decremented when the job is done.
-    fn find_and_incr_least_burdened_worker(&self) -> (&LocalWorkerHandle, JobCountGuard) {
+    fn find_and_incr_least_burdened_worker(&self) -> (&LocalWorkerHandle<T>, JobCountGuard) {
         loop {
             let (worker, task_count) = self
                 .workers
@@ -229,17 +242,17 @@ impl Drop for AbortGuard {
     }
 }
 
-type PinnedFutureSpawner = Box<dyn FnOnce() + Send + 'static>;
+type PinnedFutureSpawner<T> = Box<dyn FnOnce(T) + Send + 'static>;
 
-struct LocalWorkerHandle {
+struct LocalWorkerHandle<T: Clone + Default> {
     runtime_handle: tokio::runtime::Handle,
-    spawner: UnboundedSender<PinnedFutureSpawner>,
+    spawner: UnboundedSender<PinnedFutureSpawner<T>>,
     task_count: Arc<AtomicUsize>,
 }
 
-impl LocalWorkerHandle {
+impl<T: Clone + Default + 'static> LocalWorkerHandle<T> {
     /// Create a new worker for executing pinned tasks
-    fn new_worker() -> LocalWorkerHandle {
+    fn new_worker() -> Self {
         let (sender, receiver) = unbounded_channel();
         let runtime = Builder::new_current_thread()
             .enable_all()
@@ -251,7 +264,7 @@ impl LocalWorkerHandle {
 
         std::thread::spawn(|| Self::run(runtime, receiver, task_count_clone));
 
-        LocalWorkerHandle {
+        Self {
             runtime_handle,
             spawner: sender,
             task_count,
@@ -260,14 +273,15 @@ impl LocalWorkerHandle {
 
     fn run(
         runtime: tokio::runtime::Runtime,
-        mut task_receiver: UnboundedReceiver<PinnedFutureSpawner>,
+        mut task_receiver: UnboundedReceiver<PinnedFutureSpawner<T>>,
         task_count: Arc<AtomicUsize>,
     ) {
         let local_set = LocalSet::new();
         local_set.block_on(&runtime, async {
+            let data = T::default();
             while let Some(spawn_task) = task_receiver.recv().await {
                 // Calls spawn_local(future)
-                (spawn_task)();
+                (spawn_task)(data.clone());
             }
         });
 
