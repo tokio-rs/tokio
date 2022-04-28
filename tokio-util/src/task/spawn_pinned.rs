@@ -121,7 +121,11 @@ impl<T: Clone + Default + 'static> LocalPoolHandle<T> {
     ///
     /// # Panics
     /// Panics if the worker index is out of range.
-    pub fn spawn_pinned_at<F, Fut>(&self, worker_index: usize, create_task: F) -> JoinHandle<Fut::Output>
+    pub fn spawn_pinned_at<F, Fut>(
+        &self,
+        worker_index: usize,
+        create_task: F,
+    ) -> JoinHandle<Fut::Output>
     where
         F: FnOnce(T) -> Fut,
         F: Send + 'static,
@@ -155,8 +159,12 @@ impl<T: Clone + Default + 'static> LocalPool<T> {
         self.do_spawn_pinned(worker_index, job_guard, create_task)
     }
 
-    /// Spawn a `?Send` future onto a specified worker
-    fn spawn_pinned_at<F, Fut>(&self, worker_index: usize, create_task: F) -> JoinHandle<Fut::Output>
+    /// Spawn a `?Send` future onto a specific worker
+    fn spawn_pinned_at<F, Fut>(
+        &self,
+        worker_index: usize,
+        create_task: F,
+    ) -> JoinHandle<Fut::Output>
     where
         F: FnOnce(T) -> Fut,
         F: Send + 'static,
@@ -164,14 +172,23 @@ impl<T: Clone + Default + 'static> LocalPool<T> {
         Fut::Output: Send + 'static,
     {
         if worker_index >= self.workers.len() {
-            panic!("the number of workers is {} but the index is {}", self.workers.len(), worker_index);
+            panic!(
+                "the number of workers is {} but the index is {}",
+                self.workers.len(),
+                worker_index
+            );
         }
 
         let job_guard = self.incr_worker(worker_index);
         self.do_spawn_pinned(worker_index, job_guard, create_task)
     }
 
-    fn do_spawn_pinned<F, Fut>(&self, worker_index: usize, job_guard: JobCountGuard, create_task: F) -> JoinHandle<Fut::Output>
+    fn do_spawn_pinned<F, Fut>(
+        &self,
+        worker_index: usize,
+        job_guard: JobCountGuard,
+        create_task: F,
+    ) -> JoinHandle<Fut::Output>
     where
         F: FnOnce(T) -> Fut,
         F: Send + 'static,
@@ -198,10 +215,9 @@ impl<T: Clone + Default + 'static> LocalPool<T> {
             // LocalSet task for spawning.
             let spawn_task = Box::new(move |data: T| {
                 // Once we're in the LocalSet context we can call spawn_local
-                let join_handle =
-                    spawn_local(
-                        async move { Abortable::new(create_task(data), abort_registration).await },
-                    );
+                let join_handle = spawn_local(async move {
+                    Abortable::new(create_task(data), abort_registration).await
+                });
 
                 // Send the join handle back to the spawner. If sending fails,
                 // we assume the parent task was canceled, so cancel this task
