@@ -1,6 +1,12 @@
+#[cfg(all(tokio_unstable, feature = "tracing"))]
+use tracing::Span;
+
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{SendError, TryRecvError};
+
+#[cfg(all(tokio_unstable, feature = "tracing"))]
+use crate::util::trace;
 
 use std::fmt;
 use std::task::{Context, Poll};
@@ -11,12 +17,16 @@ use std::task::{Context, Poll};
 /// [`unbounded_channel`](unbounded_channel) function.
 pub struct UnboundedSender<T> {
     chan: chan::Tx<T, Semaphore>,
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: Span,
 }
 
 impl<T> Clone for UnboundedSender<T> {
     fn clone(&self) -> Self {
         UnboundedSender {
             chan: self.chan.clone(),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: self.resource_span.clone(),
         }
     }
 }
@@ -40,6 +50,8 @@ impl<T> fmt::Debug for UnboundedSender<T> {
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: Span,
 }
 
 impl<T> fmt::Debug for UnboundedReceiver<T> {
@@ -60,11 +72,37 @@ impl<T> fmt::Debug for UnboundedReceiver<T> {
 /// **Note** that the amount of available system memory is an implicit bound to
 /// the channel. Using an `unbounded` channel has the ability of causing the
 /// process to run out of memory. In this case, the process will be aborted.
+#[track_caller]
 pub fn unbounded_channel<T>() -> (UnboundedSender<T>, UnboundedReceiver<T>) {
-    let (tx, rx) = chan::channel(AtomicUsize::new(0));
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    let resource_span = {
+        let location = std::panic::Location::caller();
+        tracing::trace_span!(
+            "runtime.resource",
+            concrete_type = "Sender|Receiver",
+            kind = "Sync",
+            loc.file = location.file(),
+            loc.line = location.line(),
+            loc.col = location.column(),
+        )
+    };
 
-    let tx = UnboundedSender::new(tx);
-    let rx = UnboundedReceiver::new(rx);
+    let (tx, rx) = chan::channel(
+        AtomicUsize::new(0),
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        resource_span.clone(),
+    );
+
+    let tx = UnboundedSender::new(
+        tx,
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        resource_span.clone(),
+    );
+    let rx = UnboundedReceiver::new(
+        rx,
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        resource_span,
+    );
 
     (tx, rx)
 }
@@ -73,8 +111,15 @@ pub fn unbounded_channel<T>() -> (UnboundedSender<T>, UnboundedReceiver<T>) {
 type Semaphore = AtomicUsize;
 
 impl<T> UnboundedReceiver<T> {
-    pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> UnboundedReceiver<T> {
-        UnboundedReceiver { chan }
+    pub(crate) fn new(
+        chan: chan::Rx<T, Semaphore>,
+        #[cfg(all(tokio_unstable, feature = "tracing"))] resource_span: Span,
+    ) -> UnboundedReceiver<T> {
+        UnboundedReceiver {
+            chan,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
+        }
     }
 
     /// Receives the next value for this receiver.
@@ -134,7 +179,21 @@ impl<T> UnboundedReceiver<T> {
     pub async fn recv(&mut self) -> Option<T> {
         use crate::future::poll_fn;
 
-        poll_fn(|cx| self.poll_recv(cx)).await
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let poll = {
+            let resource_span = self.resource_span.clone();
+            trace::async_op(
+                || poll_fn(|cx| self.poll_recv(cx)),
+                resource_span,
+                "Receiver::recv",
+                "poll_recv",
+                true,
+            )
+        };
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let poll = poll_fn(|cx| self.poll_recv(cx));
+
+        poll.await
     }
 
     /// Tries to receive the next value for this receiver.
@@ -249,8 +308,15 @@ impl<T> UnboundedReceiver<T> {
 }
 
 impl<T> UnboundedSender<T> {
-    pub(crate) fn new(chan: chan::Tx<T, Semaphore>) -> UnboundedSender<T> {
-        UnboundedSender { chan }
+    pub(crate) fn new(
+        chan: chan::Tx<T, Semaphore>,
+        #[cfg(all(tokio_unstable, feature = "tracing"))] resource_span: Span,
+    ) -> UnboundedSender<T> {
+        UnboundedSender {
+            chan,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
+        }
     }
 
     /// Attempts to send a message on this `UnboundedSender` without blocking.
@@ -341,7 +407,21 @@ impl<T> UnboundedSender<T> {
     /// }
     /// ```
     pub async fn closed(&self) {
-        self.chan.closed().await
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let poll = {
+            let resource_span = self.resource_span.clone();
+            trace::async_op(
+                || self.chan.closed(),
+                resource_span,
+                "Receiver::recv",
+                "poll_recv",
+                true,
+            )
+        };
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let poll = self.chan.closed();
+
+        poll.await
     }
 
     /// Checks if the channel has been closed. This happens when the

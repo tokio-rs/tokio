@@ -17,6 +17,9 @@ use std::task::{Context, Poll};
 /// Channel sender.
 pub(crate) struct Tx<T, S> {
     inner: Arc<Chan<T, S>>,
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
 }
 
 impl<T, S: fmt::Debug> fmt::Debug for Tx<T, S> {
@@ -28,6 +31,9 @@ impl<T, S: fmt::Debug> fmt::Debug for Tx<T, S> {
 /// Channel receiver.
 pub(crate) struct Rx<T, S: Semaphore> {
     inner: Arc<Chan<T, S>>,
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
 }
 
 impl<T, S: Semaphore + fmt::Debug> fmt::Debug for Rx<T, S> {
@@ -104,7 +110,10 @@ impl<T> fmt::Debug for RxFields<T> {
 unsafe impl<T: Send, S: Send> Send for Chan<T, S> {}
 unsafe impl<T: Send, S: Sync> Sync for Chan<T, S> {}
 
-pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
+pub(crate) fn channel<T, S: Semaphore>(
+    semaphore: S,
+    #[cfg(all(tokio_unstable, feature = "tracing"))] resource_span: tracing::Span,
+) -> (Tx<T, S>, Rx<T, S>) {
     let (tx, rx) = list::channel();
 
     let chan = Arc::new(Chan {
@@ -119,14 +128,77 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
         }),
     });
 
-    (Tx::new(chan.clone()), Rx::new(chan))
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    {
+        resource_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                rx = 0,
+                rx.op = "override",
+            )
+        });
+        resource_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                tx = 0,
+                tx.op = "override",
+            )
+        });
+        resource_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                values = 0,
+                values.op = "override",
+            )
+        });
+        resource_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                rx_dropped = false,
+                rx_dropped.op = "override",
+            )
+        });
+    }
+
+    let tx = Tx::new(
+        chan.clone(),
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        resource_span.clone(),
+    );
+
+    let rx = Rx::new(
+        chan,
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        resource_span,
+    );
+
+    (tx, rx)
 }
 
 // ===== impl Tx =====
 
 impl<T, S> Tx<T, S> {
-    fn new(chan: Arc<Chan<T, S>>) -> Tx<T, S> {
-        Tx { inner: chan }
+    fn new(
+        chan: Arc<Chan<T, S>>,
+        #[cfg(all(tokio_unstable, feature = "tracing"))] resource_span: tracing::Span,
+    ) -> Tx<T, S> {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        {
+            let tx_handles = chan.tx_count.load(Relaxed) + 1;
+            resource_span.in_scope(|| {
+                tracing::trace!(
+                    target: "runtime::resource::state_update",
+                    tx_handles,
+                    tx_handles.op = "override",
+                )
+            });
+        }
+
+        Tx {
+            inner: chan,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
+        }
     }
 
     pub(super) fn semaphore(&self) -> &S {
@@ -135,6 +207,20 @@ impl<T, S> Tx<T, S> {
 
     /// Send a message and notify the receiver.
     pub(crate) fn send(&self, value: T) {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                tx = 1,
+                tx.op = "add",
+            );
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                values = 1,
+                values.op = "add",
+            )
+        });
+
         self.inner.send(value);
     }
 
@@ -171,17 +257,38 @@ impl<T, S> Clone for Tx<T, S> {
     fn clone(&self) -> Tx<T, S> {
         // Using a Relaxed ordering here is sufficient as the caller holds a
         // strong ref to `self`, preventing a concurrent decrement to zero.
-        self.inner.tx_count.fetch_add(1, Relaxed);
+        #[allow(unused_variables)]
+        let tx_count = self.inner.tx_count.fetch_add(1, Relaxed);
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                tx_handles = tx_count + 1,
+                tx_handles.op = "override",
+            )
+        });
 
         Tx {
             inner: self.inner.clone(),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: self.resource_span.clone(),
         }
     }
 }
 
 impl<T, S> Drop for Tx<T, S> {
     fn drop(&mut self) {
-        if self.inner.tx_count.fetch_sub(1, AcqRel) != 1 {
+        let tx_count = self.inner.tx_count.fetch_sub(1, AcqRel);
+        if tx_count != 1 {
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            self.resource_span.in_scope(|| {
+                tracing::trace!(
+                    target: "runtime::resource::state_update",
+                    tx_handles = tx_count - 1,
+                    tx_handles.op = "override",
+                )
+            });
             return;
         }
 
@@ -196,8 +303,15 @@ impl<T, S> Drop for Tx<T, S> {
 // ===== impl Rx =====
 
 impl<T, S: Semaphore> Rx<T, S> {
-    fn new(chan: Arc<Chan<T, S>>) -> Rx<T, S> {
-        Rx { inner: chan }
+    fn new(
+        chan: Arc<Chan<T, S>>,
+        #[cfg(all(tokio_unstable, feature = "tracing"))] resource_span: tracing::Span,
+    ) -> Rx<T, S> {
+        Rx {
+            inner: chan,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span,
+        }
     }
 
     pub(crate) fn close(&mut self) {
@@ -231,6 +345,21 @@ impl<T, S: Semaphore> Rx<T, S> {
                         Some(Value(value)) => {
                             self.inner.semaphore.add_permit();
                             coop.made_progress();
+
+                            #[cfg(all(tokio_unstable, feature = "tracing"))]
+                            self.resource_span.in_scope(|| {
+                                tracing::trace!(
+                                    target: "runtime::resource::state_update",
+                                    rx = 1,
+                                    rx.op = "add",
+                                );
+                                tracing::trace!(
+                                    target: "runtime::resource::state_update",
+                                    values = 1,
+                                    values.op = "sub",
+                                )
+                            });
+
                             return Ready(Some(value));
                         }
                         Some(Closed) => {
@@ -279,6 +408,21 @@ impl<T, S: Semaphore> Rx<T, S> {
                     match rx_fields.list.try_pop(&self.inner.tx) {
                         TryPopResult::Ok(value) => {
                             self.inner.semaphore.add_permit();
+
+                            #[cfg(all(tokio_unstable, feature = "tracing"))]
+                            self.resource_span.in_scope(|| {
+                                tracing::trace!(
+                                    target: "runtime::resource::state_update",
+                                    rx = 1,
+                                    rx.op = "add",
+                                );
+                                tracing::trace!(
+                                    target: "runtime::resource::state_update",
+                                    values = 1,
+                                    values.op = "sub",
+                                )
+                            });
+
                             return Ok(value);
                         }
                         TryPopResult::Closed => return Err(TryRecvError::Disconnected),
@@ -316,6 +460,15 @@ impl<T, S: Semaphore> Rx<T, S> {
 impl<T, S: Semaphore> Drop for Rx<T, S> {
     fn drop(&mut self) {
         use super::block::Read::Value;
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::state_update",
+                rx_dropped = true,
+                rx_dropped.op = "override",
+            )
+        });
 
         self.close();
 
