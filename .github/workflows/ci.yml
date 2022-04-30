@@ -214,8 +214,7 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: asan
-        run: cargo test --all-features --target x86_64-unknown-linux-gnu --lib -- --test-threads 1
-        working-directory: tokio
+        run: cargo test --workspace --all-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1
         env:
           RUSTFLAGS: -Z sanitizer=address
 
