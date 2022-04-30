@@ -557,7 +557,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
-        new_receiver(shared, None)
+        new_receiver(shared)
     }
 
     /// Returns the number of active receivers
@@ -647,7 +647,7 @@ impl<T> Sender<T> {
     }
 }
 
-/// Create a new `Receiver` which reads starting from the tail if `next_pos` is not specified.
+/// Create a new `Receiver` which reads starting from the tail.
 fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     let mut tail = shared.tail.lock();
 
