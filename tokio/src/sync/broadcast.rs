@@ -648,7 +648,7 @@ impl<T> Sender<T> {
 }
 
 /// Create a new `Receiver` which reads starting from the tail if `next_pos` is not specified.
-fn new_receiver<T>(shared: Arc<Shared<T>>, next_pos: Option<u64>) -> Receiver<T> {
+fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     let mut tail = shared.tail.lock();
 
     if tail.rx_cnt == MAX_RECEIVERS {
@@ -657,9 +657,10 @@ fn new_receiver<T>(shared: Arc<Shared<T>>, next_pos: Option<u64>) -> Receiver<T>
 
     tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
 
-    let next = next_pos.unwrap_or(tail.pos);
+    let next = tail.pos;
 
     drop(tail);
+
     Receiver { shared, next }
 }
 
