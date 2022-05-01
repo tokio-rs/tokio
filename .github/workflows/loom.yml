@@ -29,7 +29,7 @@ jobs:
           - loom_pool::group_d
           - time::driver
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
