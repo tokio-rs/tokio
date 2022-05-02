@@ -156,7 +156,9 @@ impl CancellationToken {
     /// }
     /// ```
     pub fn child_token(&self) -> CancellationToken {
-        todo!()
+        CancellationToken {
+            inner: implementation::child_node(&self.inner),
+        }
     }
 
     /// Cancel the [`CancellationToken`] and all child tokens which had been
@@ -164,7 +166,7 @@ impl CancellationToken {
     ///
     /// This will wake up all tasks which are waiting for cancellation.
     pub fn cancel(&self) {
-        todo!()
+        implementation::cancel_node(&self.inner);
     }
 
     /// Returns `true` if the `CancellationToken` had been cancelled
@@ -842,6 +844,42 @@ mod implementation {
         node.inner.lock().unwrap().is_cancelled
     }
 
+    /// Creates a child node
+    pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
+        let mut locked_parent = parent.inner.lock().unwrap();
+
+        // Do not register as child if we are already cancelled.
+        // Cancelled trees can never be uncancelled and therefore
+        // need no connection to parents or children any more.
+        if locked_parent.is_cancelled {
+            return Arc::new(TreeNode {
+                inner: Mutex::new(Inner {
+                    parent: None,
+                    parent_idx: 0,
+                    children: vec![],
+                    is_cancelled: true,
+                    num_handles: 1,
+                }),
+                waker: tokio::sync::Notify::new(),
+            });
+        }
+
+        let child = Arc::new(TreeNode {
+            inner: Mutex::new(Inner {
+                parent: Some(parent.clone()),
+                parent_idx: locked_parent.children.len(),
+                children: vec![],
+                is_cancelled: false,
+                num_handles: 1,
+            }),
+            waker: tokio::sync::Notify::new(),
+        });
+
+        locked_parent.children.push(child.clone());
+
+        child
+    }
+
     /// Disconnects the given parent from all of its children.
     ///
     /// Takes a reference to [Inner] to make sure the parent is already locked.
@@ -1003,8 +1041,10 @@ mod implementation {
     /// Cancels a node.
     ///
     /// Then, disconnects the node from the rest of the tree for easier disposal.
-    pub fn cancel_node(node: &Arc<TreeNode>) {
-        with_locked_node_and_parent(node, |node, parent| {
+    pub(crate) fn cancel_node(node: &Arc<TreeNode>) {
+        // Remove node from its parent, if parent exists
+        with_locked_node_and_parent(node, |mut node, parent| {
+            node.is_cancelled = true;
             match parent {
                 Some(mut parent) => {
                     remove_child(&mut parent, node);
@@ -1012,5 +1052,21 @@ mod implementation {
                 None => (),
             };
         });
+
+        // Now `node` is a parent-less toplevel node.
+
+        // Trigger waiting futures
+        node.waker.notify_waiters();
+
+        // Disconnect children
+        let children = {
+            let mut locked_node = node.inner.lock().unwrap();
+            disconnect_children(&mut locked_node)
+        };
+
+        // Recursively cancel all children
+        for child in children.into_iter() {
+            cancel_node(&child);
+        }
     }
 }
