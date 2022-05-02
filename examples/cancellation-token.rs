@@ -16,13 +16,8 @@
 
 #![warn(rust_2018_idioms)]
 
-use futures::StreamExt;
-use tokio::io;
 use tokio_util::sync::CancellationToken;
 
-use std::env;
-use std::error::Error;
-use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() {

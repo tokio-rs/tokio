@@ -2,17 +2,10 @@
 //! The token allows to signal a cancellation request to one or more tasks.
 pub(crate) mod guard;
 
-use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::Mutex;
-use crate::sync::intrusive_double_linked_list::{LinkedList, ListNode};
-
+use crate::loom::sync::Arc;
 use core::future::Future;
 use core::pin::Pin;
-use core::ptr::NonNull;
-use core::sync::atomic::Ordering;
-use core::task::{Context, Poll, Waker};
-use std::pin;
-use std::sync::Arc;
+use core::task::{Context, Poll};
 
 use guard::DropGuard;
 
@@ -67,7 +60,7 @@ pub struct CancellationToken {
 #[must_use = "futures do nothing unless polled"]
 pub struct WaitForCancellationFuture<'a> {
     /// The CancellationToken that is associated with this WaitForCancellationFuture
-    _cancellation_token: Arc<implementation::TreeNode>,
+    _cancellation_token: CancellationToken,
     /// Future, to wait for cancellation
     future: Option<Pin<Box<tokio::sync::futures::Notified<'a>>>>,
 }
@@ -75,7 +68,8 @@ pub struct WaitForCancellationFuture<'a> {
 // Safety: Futures can be sent between threads as long as the underlying
 // cancellation_token is thread-safe (Sync),
 // which allows to poll/register/unregister from a different thread.
-unsafe impl<'a> Send for WaitForCancellationFuture<'a> {}
+// TODO: figure out if this is still necessary
+// unsafe impl<'a> Send for WaitForCancellationFuture<'a> {}
 
 // ===== impl CancellationToken =====
 
@@ -176,7 +170,7 @@ impl CancellationToken {
     /// Returns a `Future` that gets fulfilled when cancellation is requested.
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
-            _cancellation_token: self.inner.clone(),
+            _cancellation_token: self.clone(),
             future: get_future(&self.inner).map(Box::pin),
         }
     }
@@ -209,37 +203,6 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
     }
 }
 
-/// Tracks how the future had interacted with the [`CancellationToken`]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum PollState {
-    /// The task has never interacted with the [`CancellationToken`].
-    New,
-    /// The task was added to the wait queue at the [`CancellationToken`].
-    Waiting,
-    /// The task has been polled to completion.
-    Done,
-}
-
-/// Tracks the WaitForCancellationFuture waiting state.
-/// Access to this struct is synchronized through the mutex in the CancellationToken.
-struct WaitQueueEntry {
-    /// The task handle of the waiting task
-    task: Option<Waker>,
-    // Current polling state. This state is only updated inside the Mutex of
-    // the CancellationToken.
-    state: PollState,
-}
-
-impl WaitQueueEntry {
-    /// Creates a new WaitQueueEntry
-    fn new() -> WaitQueueEntry {
-        WaitQueueEntry {
-            task: None,
-            state: PollState::New,
-        }
-    }
-}
-
 /// GENERAL NOTES
 /// -------------
 ///
@@ -259,7 +222,7 @@ impl WaitQueueEntry {
 ///
 ///
 mod implementation {
-    use std::sync::{Arc, Mutex, MutexGuard};
+    use crate::loom::sync::{Arc, Mutex, MutexGuard};
 
     /// A node of the cancellation tree structure
     ///
