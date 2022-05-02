@@ -21,7 +21,7 @@ pub(crate) mod guard;
 ///
 ///
 mod implementation {
-    use std::sync::{Arc, Mutex};
+    use std::sync::{Arc, Mutex, MutexGuard};
 
     /// A node of the cancellation tree structure
     ///
@@ -59,5 +59,52 @@ mod implementation {
         std::mem::swap(&mut node.children, &mut dropped_children);
 
         dropped_children
+    }
+
+    /// Figures out the parent of the node and locks the node and its parent atomically.
+    ///
+    /// The basic principle of preventing deadlocks in the tree is
+    /// that we always lock the parent first, and then the child.
+    ///
+    /// Sadly, it's impossible to figure out the parent of a node without
+    /// locking it. To then achieve locking order consistency, the node
+    /// has to be unlocked before the parent gets locked.
+    /// This leaves a small window where we already assume that we know the parent,
+    /// but neighter the parent or the node is locked. Therefore, the parent could change.
+    ///
+    /// To prevent that this problem leaks into the rest of the code, it is abstracted
+    /// in this function.
+    fn lock_node_and_parent(
+        node: &Arc<TreeNode>,
+    ) -> (MutexGuard<'_, Inner>, Option<MutexGuard<'_, Inner>>) {
+        loop {
+            let potential_parent = {
+                let locked_node = node.inner.lock().unwrap();
+                match locked_node.parent {
+                    Some(parent) => parent,
+                    // If we locked the node and its parent is `None`, we are in a valid state
+                    // and can return.
+                    None => return (locked_node, None),
+                }
+            };
+
+            // Deadlock safety:
+            // This might deadlock if `node` suddenly became a PARENT of `potential_parent`.
+            // This is impossible, though, as at most it might become a sibling or an uncle.
+            let locked_parent = potential_parent.inner.lock().unwrap();
+            let locked_node = node.inner.lock().unwrap();
+
+            let actual_parent = match locked_node.parent {
+                Some(parent) => parent,
+                // If we locked the node and its parent is `None`, we are in a valid state
+                // and can return.
+                None => return (locked_node, None),
+            };
+
+            // Loop until we managed to lock both the node and its parent
+            if ::std::ptr::eq(actual_parent.as_ref(), potential_parent.as_ref()) {
+                return (locked_node, Some(locked_parent));
+            }
+        }
     }
 }
