@@ -1,3 +1,10 @@
+# 1.18.1 (May 2, 2022)
+
+The 1.18.0 release broke the build for targets without 64-bit atomics when
+building with `tokio_unstable`. This release fixes that. ([#4649])
+
+[#4649]: https://github.com/tokio-rs/tokio/pull/4649
+
 # 1.18.0 (April 27, 2022)
 
 This release adds a number of new APIs in `tokio::net`, `tokio::signal`, and
