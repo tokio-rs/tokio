@@ -806,12 +806,12 @@ mod implementation {
     /// A node of the cancellation tree structure
     ///
     /// The actual data it holds is wrapped inside a mutex for synchronization.
-    pub struct TreeNode {
+    pub(crate) struct TreeNode {
         inner: Mutex<Inner>,
         waker: tokio::sync::Notify,
     }
     impl TreeNode {
-        pub fn new() -> Self {
+        pub(crate) fn new() -> Self {
             Self {
                 inner: Mutex::new(Inner {
                     parent: None,
@@ -838,7 +838,7 @@ mod implementation {
     }
 
     /// Returns whether or not the node is cancelled
-    pub fn is_cancelled(node: &Arc<TreeNode>) -> bool {
+    pub(crate) fn is_cancelled(node: &Arc<TreeNode>) -> bool {
         node.inner.lock().unwrap().is_cancelled
     }
 
@@ -914,7 +914,7 @@ mod implementation {
     /// Moves all children from `node` to `parent`.
     ///
     /// `parent` MUST be the parent of `node`.
-    /// To aquire the locks for node and parent, use `lock_node_and_parent`.
+    /// To aquire the locks for node and parent, use [with_locked_node_and_parent].
     fn move_children_to_parent(node: &mut Inner, parent: &mut Inner) {
         // Pre-allocate in the parent, for performance
         parent.children.reserve(node.children.len());
@@ -929,21 +929,28 @@ mod implementation {
         }
     }
 
-    /// Removes a child.
+    /// Removes a child from the parent.
     ///
-    /// IMPORTANT: The child may NOT be locked already
-    fn remove_child(parent: &mut Inner, pos: usize) -> Arc<TreeNode> {
-        // Lock one child at a time. Locking both children simultaneously might cause a deadlock.
-        {
-            let mut locked_child_to_remove = parent.children[pos].inner.lock().unwrap();
-            locked_child_to_remove.parent = None;
-            locked_child_to_remove.parent_idx = 0;
-        }
+    /// `parent` MUST be the parent of `node`.
+    /// To aquire the locks for node and parent, use [with_locked_node_and_parent].
+    fn remove_child(parent: &mut Inner, mut node: MutexGuard<'_, Inner>) -> Arc<TreeNode> {
+        // Query the position from where to remove a node
+        let pos = node.parent_idx;
+        node.parent = None;
+        node.parent_idx = 0;
 
+        // Unlock node, so that only one child at a time is locked.
+        // Locking both children simultaneously might cause a deadlock.
+        drop(node);
+
+        // If there is only one child in the list, that must be the node.
+        // Remove it and we are done.
         if parent.children.len() == 1 {
+            assert_eq!(pos, 0);
             return parent.children.pop().unwrap();
         }
 
+        // If there are more than one node in the list, we need to swap it with the last one before we can pop it.
         let mut replacement_child = parent.children.pop().unwrap();
 
         {
@@ -951,13 +958,14 @@ mod implementation {
             locked_replacement_child.parent_idx = pos;
         }
 
+        // Swap the element to remove out of the list
         std::mem::swap(&mut parent.children[pos], &mut replacement_child);
 
         replacement_child
     }
 
     /// Increases the reference count of handles.
-    pub fn increase_handle_refcount(node: &Arc<TreeNode>) {
+    pub(crate) fn increase_handle_refcount(node: &Arc<TreeNode>) {
         let mut locked_node = node.inner.lock().unwrap();
         assert!(locked_node.num_handles > 0);
         locked_node.num_handles += 1;
@@ -967,7 +975,7 @@ mod implementation {
     ///
     /// Once no handle is left, we can remove the node from the
     /// tree and connect its parent directly to its children.
-    pub fn decrease_handle_refcount(node: &Arc<TreeNode>) {
+    pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
         let num_handles = {
             let mut locked_node = node.inner.lock().unwrap();
             locked_node.num_handles -= 1;
@@ -981,17 +989,8 @@ mod implementation {
                     Some(mut parent) => {
                         move_children_to_parent(&mut node, &mut parent);
 
-                        // Query the position of the node to remove.
-                        // The position of the child cannot change because we
-                        // keep the parent locked the entire time.
-                        let parent_idx = node.parent_idx;
-
-                        // Make sure the current node is not locked any more.
-                        // Required by remove_child.
-                        drop(node);
-
                         // Remove the node from the parent
-                        remove_child(&mut parent, parent_idx);
+                        remove_child(&mut parent, node);
                     }
                     None => {
                         disconnect_children(&mut node);
@@ -999,5 +998,19 @@ mod implementation {
                 }
             });
         }
+    }
+
+    /// Cancels a node.
+    ///
+    /// Then, disconnects the node from the rest of the tree for easier disposal.
+    pub fn cancel_node(node: &Arc<TreeNode>) {
+        with_locked_node_and_parent(node, |node, parent| {
+            match parent {
+                Some(mut parent) => {
+                    remove_child(&mut parent, node);
+                }
+                None => (),
+            };
+        });
     }
 }
