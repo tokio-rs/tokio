@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "net"), allow(dead_code))]
 
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
 #[derive(Default)]
 pub(crate) struct IoDriverMetrics {
