@@ -242,12 +242,12 @@ jobs:
         with:
           use-cross: true
           command: check
-          args: --workspace --target ${{ matrix.target }}
+          args: --workspace --all-features --target ${{ matrix.target }}
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: check
-          args: --workspace --target ${{ matrix.target }}
+          args: --workspace --all-features --target ${{ matrix.target }}
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
