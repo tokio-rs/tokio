@@ -873,9 +873,13 @@ mod implementation {
     ///
     /// To prevent that this problem leaks into the rest of the code, it is abstracted
     /// in this function.
-    fn lock_node_and_parent<'a>(
-        node: &'a Arc<TreeNode>,
-    ) -> (MutexGuard<'a, Inner>, Option<MutexGuard<'a, Inner>>) {
+    fn with_locked_node_and_parent<
+        F: FnOnce(MutexGuard<'_, Inner>, Option<MutexGuard<'_, Inner>>) -> Ret,
+        Ret,
+    >(
+        node: &Arc<TreeNode>,
+        func: F,
+    ) -> Ret {
         loop {
             let potential_parent = {
                 let locked_node = node.inner.lock().unwrap();
@@ -883,7 +887,7 @@ mod implementation {
                     Some(parent) => parent,
                     // If we locked the node and its parent is `None`, we are in a valid state
                     // and can return.
-                    None => return (locked_node, None),
+                    None => return func(locked_node, None),
                 }
             };
 
@@ -897,12 +901,12 @@ mod implementation {
                 Some(parent) => parent,
                 // If we locked the node and its parent is `None`, we are in a valid state
                 // and can return.
-                None => return (locked_node, None),
+                None => return func(locked_node, None),
             };
 
             // Loop until we managed to lock both the node and its parent
             if Arc::ptr_eq(&actual_parent, &potential_parent) {
-                return (locked_node, Some(locked_parent));
+                return func(locked_node, Some(locked_parent));
             }
         }
     }
@@ -925,6 +929,33 @@ mod implementation {
         }
     }
 
+    /// Removes a child.
+    ///
+    /// IMPORTANT: The child may NOT be locked already
+    fn remove_child(parent: &mut Inner, pos: usize) -> Arc<TreeNode> {
+        // Lock one child at a time. Locking both children simultaneously might cause a deadlock.
+        {
+            let mut locked_child_to_remove = parent.children[pos].inner.lock().unwrap();
+            locked_child_to_remove.parent = None;
+            locked_child_to_remove.parent_idx = 0;
+        }
+
+        if parent.children.len() == 1 {
+            return parent.children.pop().unwrap();
+        }
+
+        let mut replacement_child = parent.children.pop().unwrap();
+
+        {
+            let mut locked_replacement_child = replacement_child.inner.lock().unwrap();
+            locked_replacement_child.parent_idx = pos;
+        }
+
+        std::mem::swap(&mut parent.children[pos], &mut replacement_child);
+
+        replacement_child
+    }
+
     /// Increases the reference count of handles.
     pub fn increase_handle_refcount(node: &Arc<TreeNode>) {
         let mut locked_node = node.inner.lock().unwrap();
@@ -944,9 +975,29 @@ mod implementation {
         };
 
         if num_handles == 0 {
-            let (locked_node, locked_parent) = lock_node_and_parent(node);
+            with_locked_node_and_parent(node, |mut node, parent| {
+                // Move all children to parent
+                match parent {
+                    Some(mut parent) => {
+                        move_children_to_parent(&mut node, &mut parent);
 
-            todo!()
+                        // Query the position of the node to remove.
+                        // The position of the child cannot change because we
+                        // keep the parent locked the entire time.
+                        let parent_idx = node.parent_idx;
+
+                        // Make sure the current node is not locked any more.
+                        // Required by remove_child.
+                        drop(node);
+
+                        // Remove the node from the parent
+                        remove_child(&mut parent, parent_idx);
+                    }
+                    None => {
+                        disconnect_children(&mut node);
+                    }
+                }
+            });
         }
     }
 }

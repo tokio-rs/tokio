@@ -27,6 +27,13 @@ use std::net::SocketAddr;
 #[tokio::main]
 async fn main() {
     let token = CancellationToken::new();
+    let child = token.child_node().child_node();
 
     println!("{:?}", token);
+    println!("{:?}", child);
+
+    token.cancel();
+
+    println!("{:?}", token);
+    println!("{:?}", child);
 }
