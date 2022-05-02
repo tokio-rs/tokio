@@ -59,19 +59,20 @@ pub struct CancellationToken {
     inner: Arc<implementation::TreeNode>,
 }
 
-/*
 /// A Future that is resolved once the corresponding [`CancellationToken`]
 /// was cancelled
 #[must_use = "futures do nothing unless polled"]
-pub struct WaitForCancellationFuture<'a> {
-    /// The CancellationToken that is associated with this WaitForCancellationFuture
-    cancellation_token: Option<&'a CancellationToken>,
-    /// Node for waiting at the cancellation_token
-    wait_node: ListNode<WaitQueueEntry>,
-    /// Whether this future was registered at the token yet as a waiter
-    is_registered: bool,
-}
+pub struct WaitForCancellationFuture {
+    /*
+/// The CancellationToken that is associated with this WaitForCancellationFuture
+cancellation_token: Option<&'a CancellationToken>,
+/// Node for waiting at the cancellation_token
+wait_node: ListNode<WaitQueueEntry>,
+/// Whether this future was registered at the token yet as a waiter
+is_registered: bool,
+*/}
 
+/*
 // Safety: Futures can be sent between threads as long as the underlying
 // cancellation_token is thread-safe (Sync),
 // which allows to poll/register/unregister from a different thread.
@@ -90,7 +91,9 @@ impl core::fmt::Debug for CancellationToken {
 impl Clone for CancellationToken {
     fn clone(&self) -> Self {
         implementation::increase_handle_refcount(&self.inner);
-        CancellationToken { inner: self.inner }
+        CancellationToken {
+            inner: self.inner.clone(),
+        }
     }
 }
 
@@ -845,13 +848,13 @@ mod implementation {
     ///
     /// Returns the (now parentless) children.
     fn disconnect_children(node: &mut Inner) -> Vec<Arc<TreeNode>> {
-        for child in node.children {
-            let child = child.inner.lock().unwrap();
+        for child in &node.children {
+            let mut child = child.inner.lock().unwrap();
             child.parent_idx = 0;
             child.parent = None;
         }
 
-        let dropped_children = vec![];
+        let mut dropped_children = vec![];
         std::mem::swap(&mut node.children, &mut dropped_children);
 
         dropped_children
@@ -870,13 +873,13 @@ mod implementation {
     ///
     /// To prevent that this problem leaks into the rest of the code, it is abstracted
     /// in this function.
-    fn lock_node_and_parent(
-        node: &Arc<TreeNode>,
-    ) -> (MutexGuard<'_, Inner>, Option<MutexGuard<'_, Inner>>) {
+    fn lock_node_and_parent<'a>(
+        node: &'a Arc<TreeNode>,
+    ) -> (MutexGuard<'a, Inner>, Option<MutexGuard<'a, Inner>>) {
         loop {
             let potential_parent = {
                 let locked_node = node.inner.lock().unwrap();
-                match locked_node.parent {
+                match locked_node.parent.clone() {
                     Some(parent) => parent,
                     // If we locked the node and its parent is `None`, we are in a valid state
                     // and can return.
@@ -890,7 +893,7 @@ mod implementation {
             let locked_parent = potential_parent.inner.lock().unwrap();
             let locked_node = node.inner.lock().unwrap();
 
-            let actual_parent = match locked_node.parent {
+            let actual_parent = match locked_node.parent.clone() {
                 Some(parent) => parent,
                 // If we locked the node and its parent is `None`, we are in a valid state
                 // and can return.
@@ -913,18 +916,37 @@ mod implementation {
         parent.children.reserve(node.children.len());
 
         for child in node.children.drain(..) {
-            let child_locked = child.inner.lock().unwrap();
-            child_locked.parent = node.parent;
-            child_locked.parent_idx = parent.children.len();
+            {
+                let mut child_locked = child.inner.lock().unwrap();
+                child_locked.parent = node.parent.clone();
+                child_locked.parent_idx = parent.children.len();
+            }
             parent.children.push(child);
         }
     }
 
+    /// Increases the reference count of handles.
     pub fn increase_handle_refcount(node: &Arc<TreeNode>) {
-        todo!();
+        let mut locked_node = node.inner.lock().unwrap();
+        assert!(locked_node.num_handles > 0);
+        locked_node.num_handles += 1;
     }
 
+    /// Decreses the reference count of handles.
+    ///
+    /// Once no handle is left, we can remove the node from the
+    /// tree and connect its parent directly to its children.
     pub fn decrease_handle_refcount(node: &Arc<TreeNode>) {
-        todo!();
+        let num_handles = {
+            let mut locked_node = node.inner.lock().unwrap();
+            locked_node.num_handles -= 1;
+            locked_node.num_handles
+        };
+
+        if num_handles == 0 {
+            let (locked_node, locked_parent) = lock_node_and_parent(node);
+
+            todo!()
+        }
     }
 }
