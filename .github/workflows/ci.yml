@@ -228,6 +228,7 @@ jobs:
           - powerpc64-unknown-linux-gnu
           - mips-unknown-linux-gnu
           - arm-linux-androideabi
+          - mipsel-unknown-linux-musl
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust ${{ env.rust_stable }}
@@ -241,7 +242,14 @@ jobs:
         with:
           use-cross: true
           command: check
-          args: --workspace --target ${{ matrix.target }}
+          args: --workspace --all-features --target ${{ matrix.target }}
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: check
+          args: --workspace --all-features --target ${{ matrix.target }}
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   features:
     name: features

@@ -75,4 +75,12 @@ cfg_not_has_atomic_u64! {
             self.compare_exchange(current, new, success, failure)
         }
     }
+
+    impl Default for AtomicU64 {
+        fn default() -> AtomicU64 {
+            Self {
+                inner: Mutex::new(0),
+            }
+        }
+    }
 }
