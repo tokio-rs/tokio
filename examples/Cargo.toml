@@ -12,14 +12,9 @@ tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
 tracing = "0.1"
-tracing-subscriber = { version = "0.3.1", default-features = false, features = [
-    "fmt",
-    "ansi",
-    "env-filter",
-    "tracing-log",
-] }
+tracing-subscriber = { version = "0.3.1", default-features = false, features = ["fmt", "ansi", "env-filter", "tracing-log"] }
 bytes = "1.0.0"
-futures = { version = "0.3.0", features = ["thread-pool"] }
+futures = { version = "0.3.0", features = ["thread-pool"]}
 http = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
@@ -96,7 +91,3 @@ path = "named-pipe-ready.rs"
 [[example]]
 name = "named-pipe-multi-client"
 path = "named-pipe-multi-client.rs"
-
-[[example]]
-name = "cancellation-token"
-path = "cancellation-token.rs"
