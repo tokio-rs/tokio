@@ -157,7 +157,7 @@ impl CancellationToken {
     ///
     /// This will wake up all tasks which are waiting for cancellation.
     pub fn cancel(&self) {
-        implementation::cancel_node(&self.inner);
+        implementation::cancel(&self.inner);
     }
 
     /// Returns `true` if the `CancellationToken` had been cancelled
@@ -461,7 +461,7 @@ mod implementation {
     /// Cancels a node.
     ///
     /// Then, disconnects the node from the rest of the tree for easier disposal.
-    pub(crate) fn cancel_node(node: &Arc<TreeNode>) {
+    pub(crate) fn cancel(node: &Arc<TreeNode>) {
         // Remove node from its parent, if parent exists
         with_locked_node_and_parent(node, |mut node, parent| {
             node.is_cancelled = true;
