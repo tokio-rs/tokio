@@ -534,10 +534,10 @@ fn resubscribe_points_to_tail() {
     tx.send(1);
 
     let mut rx_resub = rx.resubscribe();
-    
+
     // verify we're one behind at the start
-    assert_empty!(rx_resub), 
-    assert_eq!(assert_recv!(rx), 1)
+    assert_empty!(rx_resub);
+    assert_eq!(assert_recv!(rx), 1);
 
     // verify we do not affect rx
     tx.send(2);
@@ -564,5 +564,4 @@ fn resubscribe_lagged() {
     assert_empty!(rx);
     assert_eq!(assert_recv!(rx_resub), 2);
     assert_empty!(rx_resub);
-
 }
