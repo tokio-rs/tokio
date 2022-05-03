@@ -8,6 +8,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use guard::DropGuard;
+use pin_project_lite::pin_project;
 
 /// A token which can be used to signal a cancellation request to one or more
 /// tasks.
@@ -53,14 +54,15 @@ pub struct CancellationToken {
     inner: Arc<implementation::TreeNode>,
 }
 
-/// A Future that is resolved once the corresponding [`CancellationToken`]
-/// was cancelled
-#[must_use = "futures do nothing unless polled"]
-pub struct WaitForCancellationFuture<'a> {
-    /// The CancellationToken that is associated with this WaitForCancellationFuture
-    cancellation_token: CancellationToken,
-    /// Future, to wait for cancellation
-    future: Option<Pin<Box<tokio::sync::futures::Notified<'a>>>>,
+pin_project! {
+    /// A Future that is resolved once the corresponding [`CancellationToken`]
+    /// was cancelled
+    #[must_use = "futures do nothing unless polled"]
+    pub struct WaitForCancellationFuture<'a> {
+        cancellation_token: CancellationToken,
+        #[pin]
+        future: Option<tokio::sync::futures::Notified<'a>>,
+    }
 }
 
 // Safety: Futures can be sent between threads as long as the underlying
@@ -169,7 +171,7 @@ impl CancellationToken {
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
             cancellation_token: self.clone(),
-            future: implementation::get_future(&self.inner).map(Box::pin),
+            future: implementation::get_future(&self.inner),
         }
     }
 
@@ -193,16 +195,18 @@ impl<'a> core::fmt::Debug for WaitForCancellationFuture<'a> {
 impl<'a> Future for WaitForCancellationFuture<'a> {
     type Output = ();
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let future = match &mut self.future {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let this = self.project();
+
+        let future = match this.future.as_pin_mut() {
             Some(future) => future,
             None => return Poll::Ready(()),
         };
 
-        let poll_result = Pin::new(future).poll(cx);
+        let poll_result = future.poll(cx);
         if poll_result.is_ready() {
             // The future should never become ready without the token being cancelled
-            assert!(self.cancellation_token.is_cancelled());
+            assert!(this.cancellation_token.is_cancelled());
         }
 
         poll_result
