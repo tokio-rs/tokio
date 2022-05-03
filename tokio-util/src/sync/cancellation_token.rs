@@ -59,7 +59,7 @@ pin_project! {
     /// was cancelled
     #[must_use = "futures do nothing unless polled"]
     pub struct WaitForCancellationFuture<'a> {
-        cancellation_token: CancellationToken,
+        cancellation_token: &'a CancellationToken,
         #[pin]
         future: Option<tokio::sync::futures::Notified<'a>>,
     }
@@ -170,7 +170,7 @@ impl CancellationToken {
     /// Returns a `Future` that gets fulfilled when cancellation is requested.
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
-            cancellation_token: self.clone(),
+            cancellation_token: &self,
             future: implementation::get_future(&self.inner),
         }
     }
@@ -196,20 +196,25 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let this = self.project();
+        let mut this = self.project();
+        loop {
+            {
+                let future = match this.future.as_mut().as_pin_mut() {
+                    Some(future) => future,
+                    None => return Poll::Ready(()),
+                };
 
-        let future = match this.future.as_pin_mut() {
-            Some(future) => future,
-            None => return Poll::Ready(()),
-        };
+                let poll_result = future.poll(cx);
+                if poll_result.is_pending() {
+                    return poll_result;
+                }
+            }
 
-        let poll_result = future.poll(cx);
-        if poll_result.is_ready() {
-            // The future should never become ready without the token being cancelled
-            assert!(this.cancellation_token.is_cancelled());
+            // If the future was finished, try to query another one.
+            // Once `get_future` returns `None`, we know the token was cancelled.
+            this.future
+                .set(implementation::get_future(&this.cancellation_token.inner));
         }
-
-        poll_result
     }
 }
 
