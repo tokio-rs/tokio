@@ -882,6 +882,44 @@ impl<T> Receiver<T> {
 }
 
 impl<T: Clone> Receiver<T> {
+    /// Re-subscribes to the channel starting from the current tail element (the last element passed to `Sender::send`.)
+    pub fn resubscribe(&self) -> Self {
+        let shared = self.shared.clone();
+        new_receiver(shared)
+    }
+
+    /// Clones the receiver maintaining the current position of the queue. This operation is `O(n)`,
+    /// if you do not need to maintain the current position please use `Receiver::resubscribe`.
+    pub fn clone_at_position(&self) -> Self {
+        let next = self.next;
+        let shared = self.shared.clone();
+        let mut tail = shared.tail.lock();
+
+        // register the new receiver with `Tail`
+        if tail.rx_cnt == MAX_RECEIVERS {
+            panic!("max receivers");
+        }
+        tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
+
+        // Register interest in the slots from next to tail.pos.
+
+        // We need to hold the lock here to prevent a race with send2 where send2 overwrites
+        // next or moves past tail before we register interest in the slot.
+        for n in next..tail.pos {
+            let idx = (n & shared.mask as u64) as usize;
+            let slot = shared.buffer[idx].read().unwrap();
+
+            // a race with RecvGuard::drop would be bad, but is impossible since `self.next`
+            // is already incremented to the slot after the one that the `RecvGuard` points to. Additionally
+            // all methods that drop a `RecvGuard` require a &mut `Receiver` which ensures this method is not
+            // called concurrently.
+            slot.rem.fetch_add(1, SeqCst);
+        }
+
+        drop(tail);
+
+        Receiver { shared, next }
+    }
     /// Receives the next value for this receiver.
     ///
     /// Each [`Receiver`] handle will receive a clone of all values sent
@@ -1025,39 +1063,6 @@ impl<T> Drop for Receiver<T> {
                 Err(TryRecvError::Empty) => panic!("unexpected empty broadcast channel"),
             }
         }
-    }
-}
-
-impl<T> Clone for Receiver<T> {
-    fn clone(&self) -> Self {
-        let next = self.next;
-        let shared = self.shared.clone();
-        let mut tail = shared.tail.lock();
-
-        // register the new receiver with `Tail`
-        if tail.rx_cnt == MAX_RECEIVERS {
-            panic!("max receivers");
-        }
-        tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
-
-        // Register interest in the slots from next to tail.pos.
-
-        // We need to hold the lock here to prevent a race with send2 where send2 overwrites
-        // next or moves past tail before we register interest in the slot.
-        for n in next..tail.pos {
-            let idx = (n & shared.mask as u64) as usize;
-            let slot = shared.buffer[idx].read().unwrap();
-
-            // a race with RecvGuard::drop would be bad, but is impossible since `self.next`
-            // is already incremented to the slot after the one that the `RecvGuard` points to. Additionally
-            // all methods that drop a `RecvGuard` require a &mut `Receiver` which ensures this method is not
-            // called concurrently.
-            slot.rem.fetch_add(1, SeqCst);
-        }
-
-        drop(tail);
-
-        Receiver { shared, next }
     }
 }
 

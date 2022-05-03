@@ -97,7 +97,7 @@ fn broadcast_two() {
 fn broadcast_two_cloned() {
     loom::model(|| {
         let (tx, mut rx1) = broadcast::channel::<Arc<&'static str>>(16);
-        let mut rx2 = rx1.clone();
+        let mut rx2 = rx1.clone_at_position();
 
         let th1 = thread::spawn(move || {
             block_on(async {
@@ -228,7 +228,7 @@ fn drop_rx() {
 fn drop_cloned_rx() {
     loom::model(|| {
         let (tx, mut rx1) = broadcast::channel(16);
-        let rx2 = rx1.clone();
+        let rx2 = rx1.clone_at_position();
 
         let th1 = thread::spawn(move || {
             block_on(async {
@@ -294,7 +294,7 @@ fn drop_multiple_cloned_rx_with_overflow() {
     loom::model(move || {
         // It is essential to have multiple senders and receivers in this test case.
         let (tx, mut rx) = broadcast::channel(1);
-        let _rx2 = rx.clone();
+        let _rx2 = rx.clone_at_position();
 
         let _ = tx.send(());
         let tx2 = tx.clone();
@@ -318,17 +318,17 @@ fn drop_multiple_cloned_rx_with_overflow() {
 
 #[test]
 fn send_and_rx_clone() {
-    // test the interaction of Sender::send and Rx::clone
+    // test the interaction of Sender::send and Rx::clone_at_position
     loom::model(move || {
         let (tx, mut rx) = broadcast::channel(2);
 
         let th1 = thread::spawn(move || {
             block_on(async {
-                let mut rx2 = rx.clone();
+                let mut rx2 = rx.clone_at_position();
                 let v = assert_ok!(rx.recv().await);
                 assert_eq!(v, 1);
 
-                // this would return closed if rem was incr'd in clone between
+                // this would return closed if rem was incr'd in clone_at_position between
                 // read and write of rem for new tail entry.
                 let v2 = assert_ok!(rx2.recv().await);
                 assert_eq!(v2, 1);

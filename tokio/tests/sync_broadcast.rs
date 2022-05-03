@@ -484,7 +484,7 @@ fn is_closed(err: broadcast::error::RecvError) -> bool {
 fn receiver_same_position_as_cloned() {
     let (tx, mut rx) = broadcast::channel(3);
 
-    let mut rx_clone = rx.clone();
+    let mut rx_clone = rx.clone_at_position();
     // verify rx count is incremented
     assert_eq!(tx.receiver_count(), 2);
 
@@ -507,7 +507,7 @@ fn receiver_same_position_as_cloned() {
     // rx: [2, 3, _]
     assert_ok!(tx.send(4));
     // rx: [2, 3, 4]
-    let mut rx_clone = rx.clone();
+    let mut rx_clone = rx.clone_at_position();
 
     // verify interest registered in slot, if not 3 and 4 is dropped and will rx_clone will not recv them.
     assert_eq!(assert_recv!(rx), 2);
@@ -526,4 +526,43 @@ fn receiver_same_position_as_cloned() {
 
     assert_closed!(rx.try_recv());
     assert_closed!(rx_clone.try_recv());
+}
+
+#[test]
+fn resubscribe_points_to_tail() {
+    let (tx, mut rx) = broadcast::channel(3);
+    tx.send(1);
+
+    let mut rx_resub = rx.resubscribe();
+    
+    // verify we're one behind at the start
+    assert_empty!(rx_resub), 
+    assert_eq!(assert_recv!(rx), 1)
+
+    // verify we do not affect rx
+    tx.send(2);
+    assert_eq!(assert_recv!(rx_resub), 2);
+    tx.send(3);
+    assert_eq!(assert_recv!(rx), 2);
+    assert_eq!(assert_recv!(rx), 3);
+    assert_empty!(rx);
+
+    assert_eq!(assert_recv!(rx_resub), 3);
+    assert_empty!(rx_resub);
+}
+
+#[test]
+fn resubscribe_lagged() {
+    let (tx, mut rx) = broadcast::channel(1);
+    tx.send(1);
+    tx.send(2);
+
+    let rx_resub = rx.resubscribe();
+    assert_lagged!(rx);
+    assert_lagged!(rx_resub);
+    assert_eq!(assert_recv!(rx), 2);
+    assert_empty!(rx);
+    assert_eq!(assert_recv!(rx_resub), 2);
+    assert_empty!(rx_resub);
+
 }
