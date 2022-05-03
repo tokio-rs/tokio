@@ -204,9 +204,8 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
                     None => return Poll::Ready(()),
                 };
 
-                let poll_result = future.poll(cx);
-                if poll_result.is_pending() {
-                    return poll_result;
+                if future.poll(cx).is_pending() {
+                    return Poll::Pending;
                 }
             }
 
