@@ -400,10 +400,8 @@ mod implementation {
         // Locking both children simultaneously might cause a deadlock.
         drop(node);
 
-        // If there is only one child in the list, that must be the node.
-        // Remove it and we are done.
-        if parent.children.len() == 1 {
-            assert_eq!(pos, 0);
+        // If `node` is the last element in the list, we don't need any swapping
+        if parent.children.len() == pos + 1 {
             return parent.children.pop().unwrap();
         }
 
