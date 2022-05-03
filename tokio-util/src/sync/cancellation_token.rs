@@ -309,10 +309,7 @@ mod implementation {
             child.parent = None;
         }
 
-        let mut dropped_children = vec![];
-        std::mem::swap(&mut node.children, &mut dropped_children);
-
-        dropped_children
+        std::mem::take(&mut node.children)
     }
 
     /// Figures out the parent of the node and locks the node and its parent atomically.
@@ -324,45 +321,49 @@ mod implementation {
     /// locking it. To then achieve locking order consistency, the node
     /// has to be unlocked before the parent gets locked.
     /// This leaves a small window where we already assume that we know the parent,
-    /// but neither the parent or the node is locked. Therefore, the parent could change.
+    /// but neither the parent nor the node is locked. Therefore, the parent could change.
     ///
     /// To prevent that this problem leaks into the rest of the code, it is abstracted
     /// in this function.
-    fn with_locked_node_and_parent<
+    ///
+    /// The locked child and optionally its locked parent, if a parent exists, get passed
+    /// to the `func` argument via (node, None) or (node, Some(parent)).
+    fn with_locked_node_and_parent<F, Ret>(node: &Arc<TreeNode>, func: F) -> Ret
+    where
         F: FnOnce(MutexGuard<'_, Inner>, Option<MutexGuard<'_, Inner>>) -> Ret,
-        Ret,
-    >(
-        node: &Arc<TreeNode>,
-        func: F,
-    ) -> Ret {
-        loop {
-            let potential_parent = {
-                let locked_node = node.inner.lock().unwrap();
-                match locked_node.parent.clone() {
-                    Some(parent) => parent,
-                    // If we locked the node and its parent is `None`, we are in a valid state
-                    // and can return.
-                    None => return func(locked_node, None),
-                }
-            };
-
-            // Deadlock safety:
-            // This might deadlock if `node` suddenly became a PARENT of `potential_parent`.
-            // This is impossible, though, as at most it might become a sibling or an uncle.
-            let locked_parent = potential_parent.inner.lock().unwrap();
+    {
+        let mut potential_parent = {
             let locked_node = node.inner.lock().unwrap();
-
-            let actual_parent = match locked_node.parent.clone() {
+            match locked_node.parent.clone() {
                 Some(parent) => parent,
                 // If we locked the node and its parent is `None`, we are in a valid state
                 // and can return.
                 None => return func(locked_node, None),
-            };
-
-            // Loop until we managed to lock both the node and its parent
-            if Arc::ptr_eq(&actual_parent, &potential_parent) {
-                return func(locked_node, Some(locked_parent));
             }
+        };
+
+        loop {
+            potential_parent = {
+                // Deadlock safety:
+                // This might deadlock if `node` suddenly became a PARENT of `potential_parent`.
+                // This is impossible, though, as at most it might become a sibling or an uncle.
+                let locked_parent = potential_parent.inner.lock().unwrap();
+                let locked_node = node.inner.lock().unwrap();
+
+                let actual_parent = match locked_node.parent.clone() {
+                    Some(parent) => parent,
+                    // If we locked the node and its parent is `None`, we are in a valid state
+                    // and can return.
+                    None => return func(locked_node, None),
+                };
+
+                // Loop until we managed to lock both the node and its parent
+                if Arc::ptr_eq(&actual_parent, &potential_parent) {
+                    return func(locked_node, Some(locked_parent));
+                }
+
+                actual_parent
+            };
         }
     }
 
@@ -405,7 +406,7 @@ mod implementation {
 
         // If `node` is not the last element in the list, we need to swap it with the
         // last one before we can pop it.
-        let mut replacement_child = parent.children.pop().unwrap();
+        let replacement_child = parent.children.pop().unwrap();
 
         {
             let mut locked_replacement_child = replacement_child.inner.lock().unwrap();
@@ -413,9 +414,7 @@ mod implementation {
         }
 
         // Swap the element to remove out of the list
-        std::mem::swap(&mut parent.children[pos], &mut replacement_child);
-
-        replacement_child
+        std::mem::replace(&mut parent.children[pos], replacement_child)
     }
 
     /// Increases the reference count of handles.
