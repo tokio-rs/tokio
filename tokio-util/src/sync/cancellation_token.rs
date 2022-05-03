@@ -324,7 +324,7 @@ mod implementation {
     /// locking it. To then achieve locking order consistency, the node
     /// has to be unlocked before the parent gets locked.
     /// This leaves a small window where we already assume that we know the parent,
-    /// but neighter the parent or the node is locked. Therefore, the parent could change.
+    /// but neither the parent or the node is locked. Therefore, the parent could change.
     ///
     /// To prevent that this problem leaks into the rest of the code, it is abstracted
     /// in this function.
