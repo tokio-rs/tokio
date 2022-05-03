@@ -58,7 +58,7 @@ pub struct CancellationToken {
 #[must_use = "futures do nothing unless polled"]
 pub struct WaitForCancellationFuture<'a> {
     /// The CancellationToken that is associated with this WaitForCancellationFuture
-    _cancellation_token: CancellationToken,
+    cancellation_token: CancellationToken,
     /// Future, to wait for cancellation
     future: Option<Pin<Box<tokio::sync::futures::Notified<'a>>>>,
 }
@@ -168,7 +168,7 @@ impl CancellationToken {
     /// Returns a `Future` that gets fulfilled when cancellation is requested.
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
-            _cancellation_token: self.clone(),
+            cancellation_token: self.clone(),
             future: implementation::get_future(&self.inner).map(Box::pin),
         }
     }
@@ -194,10 +194,18 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        match &mut self.future {
-            Some(future) => Pin::new(future).poll(cx),
-            None => Poll::Ready(()),
+        let future = match &mut self.future {
+            Some(future) => future,
+            None => return Poll::Ready(()),
+        };
+
+        let poll_result = Pin::new(future).poll(cx);
+        if poll_result.is_ready() {
+            // The future should never become ready without the token being cancelled
+            assert!(self.cancellation_token.is_cancelled());
         }
+
+        poll_result
     }
 }
 
