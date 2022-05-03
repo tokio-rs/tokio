@@ -405,7 +405,8 @@ mod implementation {
             return parent.children.pop().unwrap();
         }
 
-        // If there are more than one node in the list, we need to swap it with the last one before we can pop it.
+        // If `node` is not the last element in the list, we need to swap it with the
+        // last one before we can pop it.
         let mut replacement_child = parent.children.pop().unwrap();
 
         {
