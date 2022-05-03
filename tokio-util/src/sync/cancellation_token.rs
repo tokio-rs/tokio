@@ -9,8 +9,6 @@ use core::task::{Context, Poll};
 
 use guard::DropGuard;
 
-use self::implementation::get_future;
-
 /// A token which can be used to signal a cancellation request to one or more
 /// tasks.
 ///
@@ -171,7 +169,7 @@ impl CancellationToken {
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
             _cancellation_token: self.clone(),
-            future: get_future(&self.inner).map(Box::pin),
+            future: implementation::get_future(&self.inner).map(Box::pin),
         }
     }
 
