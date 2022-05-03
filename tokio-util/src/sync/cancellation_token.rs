@@ -486,7 +486,7 @@ mod implementation {
 
         // Recursively cancel all children
         for child in children.into_iter() {
-            cancel_node(&child);
+            cancel(&child);
         }
     }
 
