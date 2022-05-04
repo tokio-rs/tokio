@@ -225,9 +225,9 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
 /// 2. If node B *is* or *was* a child of node A, then node B was created *after* node A.
 ///     This is important for deadlock safety, as it is used for lock order.
 ///     Node B can only become the child of node A in two ways:
-///         - being created with [child_node()], in which case it is trivially true that
+///         - being created with `child_node()`, in which case it is trivially true that
 ///           node A already existed when node B was created
-///         - being moved A->C->B to A->B because node C was removed in [decrease_handle_refcount].
+///         - being moved A->C->B to A->B because node C was removed in `decrease_handle_refcount()`.
 ///           In this case the invariant still holds, as B was younger than C, and C was younger
 ///           than A, therefore B is also younger than A.
 ///
@@ -240,7 +240,7 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
 ///     1. We always lock in the order of creation time. We can prove this through invariant #2.
 ///        Specifically, through invariant #2, we know that we always have to lock a parent before its child.
 ///     2. We never lock two siblings simultaneously, because we cannot establish an order.
-///        There is one exception in [with_locked_node_and_parent], which is described in the function itself.
+///        There is one exception in `with_locked_node_and_parent()`, which is described in the function itself.
 ///
 mod implementation {
     use crate::loom::sync::{Arc, Mutex, MutexGuard};
@@ -365,9 +365,8 @@ mod implementation {
         loop {
             // Deadlock safety:
             // At this very point, we *assume* that 'potential_parent' is the parent of 'node'.
-            // BUT: nodes of which the last handle got dropped get removed from the tree.
-            // Therefore, we cannot rely any more that this is the case. Even worse,
-            // 'potential_parent' might actually now be a *sibling* of 'node', which would violate
+            // But both are currently unlocked. Therefore, we cannot rely any more that this is the case.
+            // Even worse, 'potential_parent' might actually become a *sibling* of 'node', which would violate
             // our 2. rule of deadlock safety.
             //
             // However, we can prove that the lock order has to be 'potential_parent' first, then 'node',
