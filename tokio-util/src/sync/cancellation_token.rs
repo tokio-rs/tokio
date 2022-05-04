@@ -214,20 +214,33 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
 /// GENERAL NOTES
 /// -------------
 ///
-/// **Locking**
+/// ** Invariants **
 ///
-/// Locking always needs to be performed top-down, to prevent deadlocks.
-/// In detail, that means: If a both the parent and a child needs to be locked,
-/// make sure to lock the parent first, and then the child.
+/// Those invariants shall be true at any time, and are required to prove correctness
+/// of the CancellationToken.
 ///
-/// **Consistency**
+/// 1. A node that has no parents and no handles can no longer be cancelled.
+///     This is important during both cancellation and refcounting.
 ///
-/// It is important that every call leaves the global state consistent.
-/// No call should require further actions to restore consistency.
+/// 2. If node B *is* or *was* a child of node A, then node B was created *after* node A.
+///     This is important for deadlock safety, as it is used for lock order.
+///     Node A can only become the child of node B in two ways:
+///         - being created with [child_node()], in which case it is trivially true that
+///           node A already existed when node B was created
+///         - being moved A->C->B to A->B because node B was removed in [decrease_handle_refcount].
+///           In this case the invariant still holds, as B was younger than C, and C was younger
+///           than A, therefore B is also younger than A.
 ///
-/// Example: The call to remove the reference to the parent of a child should
-/// also remove the reference to the child from the parent.
+/// 3. If two nodes are both unlocked and node A is the parent of node B, then node B is a child of node A.
+///     It is important to always restore that invariant before dropping the lock to a node.
 ///
+/// ** Deadlock safety **
+///
+/// Principles that provide deadlock safety:
+///     1. We always lock in the order of creation time. We can prove this through invariant #2.
+///        Specifically, through invariant #2, we know that we always have to lock a parent before its child.
+///     2. We never lock two siblings simultaneously, because we cannot establish an order.
+///        There is one exception in [with_locked_node_and_parent], which is described in the function itself.
 ///
 mod implementation {
     use crate::loom::sync::{Arc, Mutex, MutexGuard};
@@ -322,6 +335,7 @@ mod implementation {
     ///
     /// The basic principle of preventing deadlocks in the tree is
     /// that we always lock the parent first, and then the child.
+    /// For more info look at *deadlock safety* and *invariant #2*.
     ///
     /// Sadly, it's impossible to figure out the parent of a node without
     /// locking it. To then achieve locking order consistency, the node
@@ -350,8 +364,15 @@ mod implementation {
 
         loop {
             // Deadlock safety:
-            // This might deadlock if `node` suddenly became a PARENT of `potential_parent`.
-            // This is impossible, though, as at most it might become a sibling or an uncle.
+            // At this very point, we *assume* that 'potential_parent' is the parent of 'node'.
+            // BUT: nodes of which the last handle got dropped get removed from the tree.
+            // Therefore, we cannot rely any more that this is the case. Even worse,
+            // 'potential_parent' might actually now be a *sibling* of 'node', which would violate
+            // our 2. rule of deadlock safety.
+            //
+            // However, we can prove that the lock order has to be 'potential_parent' first, then 'node',
+            // because based on invariant #2, 'node' is younger than 'potential_parent', as
+            // 'potential_parent' once was the parent of 'node'.
             let locked_parent = potential_parent.inner.lock().unwrap();
             let locked_node = node.inner.lock().unwrap();
 
@@ -396,7 +417,7 @@ mod implementation {
     ///
     /// `parent` MUST be the parent of `node`.
     /// To aquire the locks for node and parent, use [with_locked_node_and_parent].
-    fn remove_child(parent: &mut Inner, mut node: MutexGuard<'_, Inner>) -> Arc<TreeNode> {
+    fn remove_child(parent: &mut Inner, mut node: MutexGuard<'_, Inner>) {
         // Query the position from where to remove a node
         let pos = node.parent_idx;
         node.parent = None;
@@ -408,20 +429,14 @@ mod implementation {
 
         // If `node` is the last element in the list, we don't need any swapping
         if parent.children.len() == pos + 1 {
-            return parent.children.pop().unwrap();
+            parent.children.pop().unwrap();
+        } else {
+            // If `node` is not the last element in the list, we need to
+            // replace it with the last element
+            let replacement_child = parent.children.pop().unwrap();
+            replacement_child.inner.lock().unwrap().parent_idx = pos;
+            parent.children[pos] = replacement_child;
         }
-
-        // If `node` is not the last element in the list, we need to swap it with the
-        // last one before we can pop it.
-        let replacement_child = parent.children.pop().unwrap();
-
-        {
-            let mut locked_replacement_child = replacement_child.inner.lock().unwrap();
-            locked_replacement_child.parent_idx = pos;
-        }
-
-        // Swap the element to remove out of the list
-        std::mem::replace(&mut parent.children[pos], replacement_child)
     }
 
     /// Increases the reference count of handles.
@@ -451,12 +466,20 @@ mod implementation {
                 // Move all children to parent
                 match parent {
                     Some(mut parent) => {
+                        // As we want to remove ourselves from the tree,
+                        // we have to move the children to the parent, so that
+                        // they still receive the cancellation event without us.
+                        // Moving this does not violate invariant #1.
                         move_children_to_parent(&mut node, &mut parent);
 
                         // Remove the node from the parent
                         remove_child(&mut parent, node);
                     }
                     None => {
+                        // Due to invariant #1, we can assume that our
+                        // children can no longer be cancelled through us.
+                        // (as we now have neither a parent nor handles)
+                        // Therefore we can disconnect them.
                         disconnect_children(&mut node);
                     }
                 }
@@ -467,9 +490,10 @@ mod implementation {
     /// Recursively cancels a subtree.
     ///
     /// Sadly, due to the constraint of keeping the parent's lock alive
-    /// while iterating over the children while NOT locking multiple children at
-    /// the same time makes it very hard to unroll this recursion. Feel
-    /// free to try, but I gave up.
+    /// while iterating over the children (invariant #3) while NOT
+    /// locking multiple children at the same time (deadlock prevention #2)
+    /// makes it very hard to unroll this recursion.
+    /// Feel free to try, but I gave up.
     fn cancel_locked_subtree(node: &mut Inner) {
         while let Some(child) = node.children.pop() {
             let mut locked_child = child.inner.lock().unwrap();
@@ -480,15 +504,20 @@ mod implementation {
             locked_child.is_cancelled = true;
             child.waker.notify_waiters();
 
+            // Propagate the cancellation to the child without dropping the lock,
+            // as it is now disconnected from its parent. As soon as we drop the lock,
+            // others (like [decrease_handle_refcount]) might assume that this is a node
+            // without a parent, which can therefore no longer receive a cancellation. (invariant #1)
             cancel_locked_subtree(&mut locked_child);
         }
     }
 
-    /// Cancels a node.
+    /// Cancels a node and its children.
     ///
-    /// Then, disconnects the node from the rest of the tree for easier disposal.
+    /// Then, dissolves the entire subtree for easier disposal.
     ///
-    /// Reliability: It's important that during the entire process of cancellation, there is
+    /// Invariant #1:
+    /// It's important that during the entire process of cancellation, there is
     /// never a gap in lock propagation. We need to lock both the parent and the child for the
     /// entire duration of cancellation and disconnection. Those cannot happen separately,
     /// otherwise other calls like [decrease_handle_refcount] could modify the tree structure
@@ -499,8 +528,9 @@ mod implementation {
     ///
     /// Example: Holding a reference of a child does not influence its handle reference count, so
     /// it will happily drop its grandchildren in [decrease_handle_refcount] before we got the chance
-    /// to propagate the cancellation to them. Unless we keep the child locked during the entire time,
-    /// from the moment on when we disconnected it from its parent.
+    /// to propagate the cancellation to them, if we violate invariant #1.
+    /// Unless we keep the child locked during the entire time, from the moment on when we
+    /// disconnected it from its parent.
     pub(crate) fn cancel(node: &Arc<TreeNode>) {
         let waker = &node.waker;
 
@@ -510,10 +540,10 @@ mod implementation {
             node.is_cancelled = true;
             waker.notify_waiters();
 
-            // Recursively cancel all children
+            // Recursively cancel all children.
             cancel_locked_subtree(&mut node);
 
-            // Connect the node from its parent.
+            // Disconnect the node from its parent.
             // Now that it is cancelled, it doesn't need any cancellation from
             // its parent any more.
             if let Some(mut parent) = parent {
