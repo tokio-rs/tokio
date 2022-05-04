@@ -224,7 +224,7 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
 ///
 /// 2. If node B *is* or *was* a child of node A, then node B was created *after* node A.
 ///     This is important for deadlock safety, as it is used for lock order.
-///     Node A can only become the child of node B in two ways:
+///     Node B can only become the child of node A in two ways:
 ///         - being created with [child_node()], in which case it is trivially true that
 ///           node A already existed when node B was created
 ///         - being moved A->C->B to A->B because node C was removed in [decrease_handle_refcount].
