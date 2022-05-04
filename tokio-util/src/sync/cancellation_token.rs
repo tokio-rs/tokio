@@ -424,7 +424,7 @@ mod implementation {
         node.parent_idx = 0;
 
         // Unlock node, so that only one child at a time is locked.
-        // Locking both children simultaneously might cause a deadlock.
+        // Otherwise we would violate deadlock safety #2.
         drop(node);
 
         // If `node` is the last element in the list, we don't need any swapping
