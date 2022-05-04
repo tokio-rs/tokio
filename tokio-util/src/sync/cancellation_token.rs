@@ -353,27 +353,28 @@ mod implementation {
         };
 
         loop {
-            potential_parent = {
-                // Deadlock safety:
-                // This might deadlock if `node` suddenly became a PARENT of `potential_parent`.
-                // This is impossible, though, as at most it might become a sibling or an uncle.
-                let locked_parent = potential_parent.inner.lock().unwrap();
-                let locked_node = node.inner.lock().unwrap();
+            // Deadlock safety:
+            // This might deadlock if `node` suddenly became a PARENT of `potential_parent`.
+            // This is impossible, though, as at most it might become a sibling or an uncle.
+            let locked_parent = potential_parent.inner.lock().unwrap();
+            let locked_node = node.inner.lock().unwrap();
 
-                let actual_parent = match locked_node.parent.clone() {
-                    Some(parent) => parent,
-                    // If we locked the node and its parent is `None`, we are in a valid state
-                    // and can return.
-                    None => return func(locked_node, None),
-                };
-
-                // Loop until we managed to lock both the node and its parent
-                if Arc::ptr_eq(&actual_parent, &potential_parent) {
-                    return func(locked_node, Some(locked_parent));
-                }
-
-                actual_parent
+            let actual_parent = match locked_node.parent.clone() {
+                Some(parent) => parent,
+                // If we locked the node and its parent is `None`, we are in a valid state
+                // and can return.
+                None => return func(locked_node, None),
             };
+
+            // Loop until we managed to lock both the node and its parent
+            if Arc::ptr_eq(&actual_parent, &potential_parent) {
+                return func(locked_node, Some(locked_parent));
+            }
+
+            drop(locked_node);
+            drop(locked_parent);
+
+            potential_parent = actual_parent;
         }
     }
 
