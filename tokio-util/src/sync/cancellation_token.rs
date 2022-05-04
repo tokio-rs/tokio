@@ -462,13 +462,13 @@ mod implementation {
 
         if num_handles == 0 {
             with_locked_node_and_parent(node, |mut node, parent| {
-                // Move all children to parent
+                // Remove the node from the tree
                 match parent {
                     Some(mut parent) => {
                         // As we want to remove ourselves from the tree,
                         // we have to move the children to the parent, so that
                         // they still receive the cancellation event without us.
-                        // Moving this does not violate invariant #1.
+                        // Moving them does not violate invariant #1.
                         move_children_to_parent(&mut node, &mut parent);
 
                         // Remove the node from the parent
