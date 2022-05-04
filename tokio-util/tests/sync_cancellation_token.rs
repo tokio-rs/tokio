@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::pin;
-use tokio_util::sync::CancellationToken;
+use tokio_util::sync::{CancellationToken, WaitForCancellationFuture};
 
 use core::future::Future;
 use core::task::{Context, Poll};
@@ -217,4 +217,15 @@ fn drop_parent_before_child_tokens() {
 
     drop(child1);
     drop(child2);
+}
+
+#[test]
+fn derives_send_sync() {
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+
+    assert_send::<CancellationToken>();
+    assert_sync::<CancellationToken>();
+
+    assert_send::<WaitForCancellationFuture<'static>>();
 }

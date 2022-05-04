@@ -65,12 +65,6 @@ pin_project! {
     }
 }
 
-// Safety: Futures can be sent between threads as long as the underlying
-// cancellation_token is thread-safe (Sync),
-// which allows to poll/register/unregister from a different thread.
-// TODO: figure out if this is still necessary
-// unsafe impl<'a> Send for WaitForCancellationFuture<'a> {}
-
 // ===== impl CancellationToken =====
 
 impl core::fmt::Debug for CancellationToken {
