@@ -57,7 +57,7 @@ where
     T: Borrow<UdpSocket>,
     C: Decoder,
 {
-    type Item = Result<(C::Item, SocketAddr), C::Error>;
+    type Item = Result<(C::Item, SocketAddr), (C::Error, Option<SocketAddr>)>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let pin = self.get_mut();
@@ -67,11 +67,13 @@ where
         loop {
             // Are there still bytes left in the read buffer to decode?
             if pin.is_readable {
-                if let Some(frame) = pin.codec.decode_eof(&mut pin.rd)? {
-                    let current_addr = pin
-                        .current_addr
-                        .expect("will always be set before this line is called");
-
+                let current_addr = pin
+                    .current_addr
+                    .expect("will always be set before this line is called");
+                if let Some(frame) = pin
+                    .codec
+                    .decode_eof(&mut pin.rd)
+                    .map_err(|e| (e, Some(current_addr)))? {
                     return Poll::Ready(Some(Ok((frame, current_addr))));
                 }
 
@@ -90,7 +92,7 @@ where
                 let res = ready!(pin.socket.borrow().poll_recv_from(cx, &mut read));
 
                 assert_eq!(ptr, read.filled().as_ptr());
-                let addr = res?;
+                let addr = res.map_err(|e| (C::Error::from(e), None))?;
 
                 // Safety: This is guaranteed to be the number of initialized (and read) bytes due
                 // to the invariants provided by `ReadBuf::filled`.
