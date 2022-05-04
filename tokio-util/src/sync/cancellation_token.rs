@@ -164,7 +164,7 @@ impl CancellationToken {
     /// Returns a `Future` that gets fulfilled when cancellation is requested.
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
-            cancellation_token: &self,
+            cancellation_token: self,
             future: implementation::get_future(&self.inner),
         }
     }
