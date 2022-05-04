@@ -310,16 +310,12 @@ mod implementation {
     /// Disconnects the given parent from all of its children.
     ///
     /// Takes a reference to [Inner] to make sure the parent is already locked.
-    ///
-    /// Returns the (now parentless) children.
-    fn disconnect_children(node: &mut Inner) -> Vec<Arc<TreeNode>> {
-        for child in &node.children {
-            let mut child = child.inner.lock().unwrap();
-            child.parent_idx = 0;
-            child.parent = None;
+    fn disconnect_children(node: &mut Inner) {
+        for child in node.children.drain(..) {
+            let mut locked_child = child.inner.lock().unwrap();
+            locked_child.parent_idx = 0;
+            locked_child.parent = None;
         }
-
-        std::mem::take(&mut node.children)
     }
 
     /// Figures out the parent of the node and locks the node and its parent atomically.
@@ -468,36 +464,58 @@ mod implementation {
         }
     }
 
+    /// Recursively cancels a subtree.
+    ///
+    /// Sadly, due to the constraint of keeping the parent's lock alive
+    /// while iterating over the children while NOT locking multiple children at
+    /// the same time makes it very hard to unroll this recursion. Feel
+    /// free to try, but I gave up.
+    fn cancel_locked_subtree(node: &mut Inner) {
+        while let Some(child) = node.children.pop() {
+            let mut locked_child = child.inner.lock().unwrap();
+
+            locked_child.parent = None;
+            locked_child.parent_idx = 0;
+
+            locked_child.is_cancelled = true;
+            child.waker.notify_waiters();
+
+            cancel_locked_subtree(&mut locked_child);
+        }
+    }
+
     /// Cancels a node.
     ///
     /// Then, disconnects the node from the rest of the tree for easier disposal.
+    ///
+    /// Reliability: It's important that during the entire process of cancellation, there is
+    /// never a gap in lock propagation. We need to lock both the parent and the child for the
+    /// entire duration of cancellation and disconnection. Those cannot happen separately,
+    /// otherwise other calls like [decrease_handle_refcount] could modify the tree structure
+    /// while we recurse over it.
+    ///
+    /// The problem here is that holding a reference of a child does not influence its handle
+    /// reference count, so it will happily drop its children in [decrease_handle_refcount] before
+    /// we got the chance to propagate the cancellation to them.
     pub(crate) fn cancel(node: &Arc<TreeNode>) {
+        let waker = &node.waker;
+
         // Remove node from its parent, if parent exists
         with_locked_node_and_parent(node, |mut node, parent| {
+            // Cancel the subtree
             node.is_cancelled = true;
-            match parent {
-                Some(mut parent) => {
-                    remove_child(&mut parent, node);
-                }
-                None => (),
+            waker.notify_waiters();
+
+            // Recursively cancel all children
+            cancel_locked_subtree(&mut node);
+
+            // Connect the node from its parent.
+            // Now that it is cancelled, it doesn't need any cancellation from
+            // its parent any more.
+            if let Some(mut parent) = parent {
+                remove_child(&mut parent, node);
             };
         });
-
-        // Now `node` is a parent-less toplevel node.
-
-        // Trigger waiting futures
-        node.waker.notify_waiters();
-
-        // Disconnect children
-        let children = {
-            let mut locked_node = node.inner.lock().unwrap();
-            disconnect_children(&mut locked_node)
-        };
-
-        // Recursively cancel all children
-        for child in children.into_iter() {
-            cancel(&child);
-        }
     }
 
     pub(crate) fn get_future(node: &Arc<TreeNode>) -> Option<tokio::sync::futures::Notified<'_>> {
