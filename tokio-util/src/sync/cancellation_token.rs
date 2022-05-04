@@ -227,7 +227,7 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
 ///     Node A can only become the child of node B in two ways:
 ///         - being created with [child_node()], in which case it is trivially true that
 ///           node A already existed when node B was created
-///         - being moved A->C->B to A->B because node B was removed in [decrease_handle_refcount].
+///         - being moved A->C->B to A->B because node C was removed in [decrease_handle_refcount].
 ///           In this case the invariant still holds, as B was younger than C, and C was younger
 ///           than A, therefore B is also younger than A.
 ///
