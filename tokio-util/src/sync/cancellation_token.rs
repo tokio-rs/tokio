@@ -232,7 +232,7 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
 ///           than A, therefore B is also younger than A.
 ///
 /// 3. If two nodes are both unlocked and node A is the parent of node B, then node B is a child of node A.
-///     It is important to always restore that invariant before dropping the lock to a node.
+///     It is important to always restore that invariant before dropping the lock of a node.
 ///
 /// ** Deadlock safety **
 ///
