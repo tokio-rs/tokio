@@ -533,7 +533,6 @@ mod implementation {
     pub(crate) fn cancel(node: &Arc<TreeNode>) {
         let waker = &node.waker;
 
-        // Remove node from its parent, if parent exists
         with_locked_node_and_parent(node, |mut node, parent| {
             // Cancel the subtree
             node.is_cancelled = true;
