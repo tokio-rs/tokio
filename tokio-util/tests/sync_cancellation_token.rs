@@ -78,6 +78,46 @@ fn cancel_child_token_through_parent() {
 }
 
 #[test]
+fn cancel_grandchild_token_through_parent_if_child_was_dropped() {
+    let (waker, wake_counter) = new_count_waker();
+    let token = CancellationToken::new();
+
+    let intermediate_token = token.child_token();
+    let child_token = intermediate_token.child_token();
+    drop(intermediate_token);
+    assert!(!child_token.is_cancelled());
+
+    let child_fut = child_token.cancelled();
+    pin!(child_fut);
+    let parent_fut = token.cancelled();
+    pin!(parent_fut);
+
+    assert_eq!(
+        Poll::Pending,
+        child_fut.as_mut().poll(&mut Context::from_waker(&waker))
+    );
+    assert_eq!(
+        Poll::Pending,
+        parent_fut.as_mut().poll(&mut Context::from_waker(&waker))
+    );
+    assert_eq!(wake_counter, 0);
+
+    token.cancel();
+    assert_eq!(wake_counter, 2);
+    assert!(token.is_cancelled());
+    assert!(child_token.is_cancelled());
+
+    assert_eq!(
+        Poll::Ready(()),
+        child_fut.as_mut().poll(&mut Context::from_waker(&waker))
+    );
+    assert_eq!(
+        Poll::Ready(()),
+        parent_fut.as_mut().poll(&mut Context::from_waker(&waker))
+    );
+}
+
+#[test]
 fn cancel_child_token_without_parent() {
     let (waker, wake_counter) = new_count_waker();
     let token = CancellationToken::new();
