@@ -494,9 +494,13 @@ mod implementation {
     /// otherwise other calls like [decrease_handle_refcount] could modify the tree structure
     /// while we recurse over it.
     ///
-    /// The problem here is that holding a reference of a child does not influence its handle
-    /// reference count, so it will happily drop its children in [decrease_handle_refcount] before
-    /// we got the chance to propagate the cancellation to them.
+    /// We basically have to create a "lock wave" from the parent to children, that nothing else
+    /// can bypass. Otherwise, other actions could add/remove children that our cancellation would miss.
+    ///
+    /// Example: Holding a reference of a child does not influence its handle reference count, so
+    /// it will happily drop its grandchildren in [decrease_handle_refcount] before we got the chance
+    /// to propagate the cancellation to them. Unless we keep the child locked during the entire time,
+    /// from the moment on when we disconnected it from its parent.
     pub(crate) fn cancel(node: &Arc<TreeNode>) {
         let waker = &node.waker;
 
