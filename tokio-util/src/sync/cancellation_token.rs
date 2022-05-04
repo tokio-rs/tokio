@@ -488,8 +488,8 @@ mod implementation {
 
     /// Recursively cancels a subtree.
     ///
-    /// Sadly, due to the constraint of keeping the parent's lock alive
-    /// while iterating over the children (invariant #3) while NOT
+    /// Sadly, the constraint of keeping the parent's lock alive
+    /// while iterating over the children (invariant #3) *without*
     /// locking multiple children at the same time (deadlock prevention #2)
     /// makes it very hard to unroll this recursion.
     /// Feel free to try, but I gave up.
