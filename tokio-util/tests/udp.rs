@@ -5,7 +5,7 @@ use tokio_stream::StreamExt;
 use tokio_util::codec::{Decoder, Encoder, LinesCodec};
 use tokio_util::udp::UdpFramed;
 
-use bytes::{BufMut, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 use futures::future::try_join;
 use futures::future::FutureExt;
 use futures::sink::SinkExt;
@@ -29,7 +29,9 @@ async fn send_framed_byte_codec() -> std::io::Result<()> {
         let msg = b"4567";
 
         let send = a.send((msg, b_addr));
-        let recv = b.next().map(|e| e.unwrap());
+        let recv = b.next().map(|e| {
+            e.unwrap().map_err(|(e, _)| e)
+        });
         let (_, received) = try_join(send, recv).await.unwrap();
 
         let (data, addr) = received;
@@ -49,7 +51,9 @@ async fn send_framed_byte_codec() -> std::io::Result<()> {
         let msg = b"";
 
         let send = a.send((msg, b_addr));
-        let recv = b.next().map(|e| e.unwrap());
+        let recv = b.next().map(|e| {
+            e.unwrap().map_err(|(e, _)| e)
+        });
         let (_, received) = try_join(send, recv).await.unwrap();
 
         let (data, addr) = received;
@@ -129,4 +133,65 @@ async fn framed_half() -> std::io::Result<()> {
     assert_eq!(b.next().await.unwrap().unwrap(), ("6".to_string(), a_addr));
 
     Ok(())
+}
+
+#[tokio::test]
+async fn decode_error() -> std::io::Result<()> {
+    let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
+    let b_soc = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let a_addr = a_soc.local_addr()?;
+    let b_addr = b_soc.local_addr()?;
+
+    // test sending & receiving bytes
+    let mut a = UdpFramed::new(a_soc, EvenOnlyCodec);
+    let mut b = UdpFramed::new(b_soc, EvenOnlyCodec);
+
+    // Gasp, an odd number!
+    let msg = 1;
+
+    let _ = a.send((msg, b_addr)).await?;
+    let recv = b.next().map(|e| e.unwrap()).await;
+    let (_, bad_sender) = recv.expect_err("Expected OddError");
+
+    assert_eq!(bad_sender.unwrap(), a_addr);
+
+    Ok(())
+}
+
+pub struct EvenOnlyCodec;
+
+impl Decoder for EvenOnlyCodec {
+    type Item = u8;
+    type Error = EvenOnlyError;
+
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let value = buf.get_u8();
+        if value % 2 != 0 {
+            Err(EvenOnlyError::OddNumber(value))
+        } else {
+            Ok(Some(value))
+        }
+    }
+}
+
+impl Encoder<u8> for EvenOnlyCodec {
+    type Error = io::Error;
+
+    fn encode(&mut self, data: u8, buf: &mut BytesMut) -> Result<(), io::Error> {
+        buf.reserve(1);
+        buf.put_u8(data);
+        Ok(())
+    }
+}
+
+pub enum EvenOnlyError {
+    OddNumber(u8),
+    IoError(io::Error),
+}
+
+impl From<io::Error> for EvenOnlyError {
+    fn from(value: io::Error) -> Self {
+        EvenOnlyError::IoError(value)
+    }
 }
