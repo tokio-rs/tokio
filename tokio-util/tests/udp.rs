@@ -151,7 +151,7 @@ async fn decode_error() -> std::io::Result<()> {
     let msg = 1;
 
     let _ = a.send((msg, b_addr)).await?;
-    let recv = b.next().map(|e| e.unwrap()).await;
+    let recv = b.next().await.unwrap();
     let (_, bad_sender) = recv.expect_err("Expected OddError");
 
     assert_eq!(bad_sender.unwrap(), a_addr);
