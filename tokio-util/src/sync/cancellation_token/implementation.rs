@@ -150,14 +150,10 @@ where
 
     loop {
         // Deadlock safety:
-        // At this very point, we *assume* that 'potential_parent' is the parent of 'node'.
-        // But both are currently unlocked. Therefore, we cannot rely any more that this is the case.
-        // Even worse, 'potential_parent' might actually become a *sibling* of 'node', which would violate
-        // our 2. rule of deadlock safety.
         //
-        // However, we can prove that the lock order has to be 'potential_parent' first, then 'node',
-        // because based on invariant #2, 'node' is younger than 'potential_parent', as
-        // 'potential_parent' once was the parent of 'node'.
+        // Due to invariant #2, we know that we have to lock the parent first, and then the child.
+        // This is true even if the potential_parent is no longer the current parent or even its sibling,
+        // as the invariant still holds.
         let locked_parent = potential_parent.inner.lock().unwrap();
         let locked_node = node.inner.lock().unwrap();
 
