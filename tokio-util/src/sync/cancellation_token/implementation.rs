@@ -178,7 +178,9 @@ where
 
 /// Moves all children from `node` to `parent`.
 ///
-/// `parent` MUST be the parent of `node`.
+/// `parent` MUST have been a parent of the node when they both got locked,
+/// otherwise there is a potential for a deadlock as invariant #2 would be violated.
+///
 /// To aquire the locks for node and parent, use [with_locked_node_and_parent].
 fn move_children_to_parent(node: &mut Inner, parent: &mut Inner) {
     // Pre-allocate in the parent, for performance
@@ -268,31 +270,6 @@ pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
     }
 }
 
-/// Recursively cancels a subtree.
-///
-/// Sadly, the constraint of keeping the parent's lock alive
-/// while iterating over the children (invariant #3) *without*
-/// locking multiple children at the same time (deadlock prevention #2)
-/// makes it very hard to unroll this recursion.
-/// Feel free to try, but I gave up.
-fn cancel_locked_subtree(node: &mut Inner) {
-    while let Some(child) = node.children.pop() {
-        let mut locked_child = child.inner.lock().unwrap();
-
-        locked_child.parent = None;
-        locked_child.parent_idx = 0;
-
-        locked_child.is_cancelled = true;
-        child.waker.notify_waiters();
-
-        // Propagate the cancellation to the child without dropping the lock,
-        // as it is now disconnected from its parent. As soon as we drop the lock,
-        // others (like [decrease_handle_refcount]) might assume that this is a node
-        // without a parent, which can therefore no longer receive a cancellation. (invariant #1)
-        cancel_locked_subtree(&mut locked_child);
-    }
-}
-
 /// Cancels a node and its children.
 ///
 /// Then, dissolves the entire subtree for easier disposal.
@@ -320,12 +297,32 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         node.is_cancelled = true;
         waker.notify_waiters();
 
-        // Recursively cancel all children.
-        cancel_locked_subtree(&mut node);
+        // One by one, adopt grandchildren and then cancel and detach the child
+        while let Some(child) = node.children.pop() {
+            // `node` is already locked, so we can lock the child
+            let mut locked_child = child.inner.lock().unwrap();
+
+            // Detach the child from node
+            // No need to modify node.children, as the child already got removed with `.pop`
+            locked_child.parent = None;
+            locked_child.parent_idx = 0;
+
+            // Adopt children
+            move_children_to_parent(&mut locked_child, &mut node);
+
+            // Cancel the child
+            locked_child.is_cancelled = true;
+            child.waker.notify_waiters();
+
+            // Now the child is cancelled and detached and all its children are adopted.
+            // Just continue until all (including adopted) children are cancelled and detached.
+        }
 
         // Disconnect the node from its parent.
         // Now that it is cancelled, it doesn't need any cancellation from
         // its parent any more.
+        // This has to happen at the very end, as this unlocks `node`, and therefore
+        // we would validate invariant #1 otherwise.
         if let Some(mut parent) = parent {
             remove_child(&mut parent, node);
         };
