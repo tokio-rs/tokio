@@ -294,6 +294,10 @@ pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
 pub(crate) fn cancel(node: &Arc<TreeNode>) {
     let mut locked_node = node.inner.lock().unwrap();
 
+    if locked_node.is_cancelled {
+        return;
+    }
+
     // One by one, adopt grandchildren and then cancel and detach the child
     while let Some(child) = locked_node.children.pop() {
         // `node` is already locked, so we can lock the child
@@ -304,17 +308,27 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         locked_child.parent = None;
         locked_child.parent_idx = 0;
 
+        // If child is already cancelled, detaching is enough
+        if locked_child.is_cancelled {
+            continue;
+        }
+
         // Cancel or adopt grandchildren
         while let Some(grandchild) = locked_child.children.pop() {
             let mut locked_grandchild = grandchild.inner.lock().unwrap();
 
+            // Detach the grandchild
+            locked_grandchild.parent = None;
+            locked_grandchild.parent_idx = 0;
+
+            // If grandchild is already cancelled, detaching is enough
+            if locked_grandchild.is_cancelled {
+                continue;
+            }
+
             // For performance reasons, only adopt grandchildren that have children.
             // Otherwise, just cancel them right away, no need for another iteration.
             if locked_grandchild.children.is_empty() {
-                // Detach the grandchild
-                locked_grandchild.parent = None;
-                locked_grandchild.parent_idx = 0;
-
                 // Cancel the grandchild
                 locked_grandchild.is_cancelled = true;
                 drop(locked_grandchild);
