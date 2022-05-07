@@ -106,6 +106,9 @@ macro_rules! try_join {
         // normalization is complete.
         ( $($count:tt)* )
 
+        // The expression `0+1+1+ ... +1` equal to the number of branches.
+        ( $($total:tt)* )
+
         // Normalized try_join! branches
         $( ( $($skip:tt)* ) $e:expr, )*
 
@@ -117,24 +120,56 @@ macro_rules! try_join {
         // the requirement of `Pin::new_unchecked` called below.
         let mut futures = ( $( maybe_done($e), )* );
 
+        // Each time the future created by poll_fn is polled, a different future will be polled first
+        // to ensure every future passed to join! gets a chance to make progress even if
+        // one of the futures consumes the whole budget.
+        //
+        // This is number of futures that will be skipped in the first loop
+        // iteration the next time.
+        let mut skip_next_time: u32 = 0;
+
         poll_fn(move |cx| {
+            const COUNT: u32 = $($total)*;
+
             let mut is_pending = false;
 
+            let mut to_run = COUNT;
+
+            // The number of futures that will be skipped in the first loop iteration
+            let mut skip = skip_next_time;
+
+            skip_next_time = if skip + 1 == COUNT { 0 } else { skip + 1 };
+
+            // This loop runs twice and the first `skip` futures
+            // are not polled in the first iteration.
+            loop {
             $(
-                // Extract the future for this branch from the tuple.
-                let ( $($skip,)* fut, .. ) = &mut futures;
+                if skip == 0 {
+                    if to_run == 0 {
+                        // Every future has been polled
+                        break;
+                    }
+                    to_run -= 1;
 
-                // Safety: future is stored on the stack above
-                // and never moved.
-                let mut fut = unsafe { Pin::new_unchecked(fut) };
+                    // Extract the future for this branch from the tuple.
+                    let ( $($skip,)* fut, .. ) = &mut futures;
 
-                // Try polling
-                if fut.as_mut().poll(cx).is_pending() {
-                    is_pending = true;
-                } else if fut.as_mut().output_mut().expect("expected completed future").is_err() {
-                    return Ready(Err(fut.take_output().expect("expected completed future").err().unwrap()))
+                    // Safety: future is stored on the stack above
+                    // and never moved.
+                    let mut fut = unsafe { Pin::new_unchecked(fut) };
+
+                    // Try polling
+                    if fut.as_mut().poll(cx).is_pending() {
+                        is_pending = true;
+                    } else if fut.as_mut().output_mut().expect("expected completed future").is_err() {
+                        return Ready(Err(fut.take_output().expect("expected completed future").err().unwrap()))
+                    }
+                } else {
+                    // Future skipped, one less future to skip in the next iteration
+                    skip -= 1;
                 }
             )*
+            }
 
             if is_pending {
                 Pending
@@ -159,13 +194,13 @@ macro_rules! try_join {
 
     // ===== Normalize =====
 
-    (@ { ( $($s:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
-        $crate::try_join!(@{ ($($s)* _) $($t)* ($($s)*) $e, } $($r)*)
+    (@ { ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
+      $crate::try_join!(@{ ($($s)* _) ($($n)* + 1) $($t)* ($($s)*) $e, } $($r)*)
     };
 
     // ===== Entry point =====
 
     ( $($e:expr),* $(,)?) => {
-        $crate::try_join!(@{ () } $($e,)*)
+        $crate::try_join!(@{ () (0) } $($e,)*)
     };
 }
