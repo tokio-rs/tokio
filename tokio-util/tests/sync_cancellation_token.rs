@@ -257,6 +257,8 @@ fn cancel_only_all_descendants() {
     let child1_token = token.child_token();
     let child2_token = token.child_token();
     let grandchild_token = child1_token.child_token();
+    let grandchild2_token = child1_token.child_token();
+    let grandgrandchild_token = grandchild_token.child_token();
 
     assert!(!parent_token.is_cancelled());
     assert!(!token.is_cancelled());
@@ -264,6 +266,8 @@ fn cancel_only_all_descendants() {
     assert!(!child1_token.is_cancelled());
     assert!(!child2_token.is_cancelled());
     assert!(!grandchild_token.is_cancelled());
+    assert!(!grandchild2_token.is_cancelled());
+    assert!(!grandgrandchild_token.is_cancelled());
 
     let parent_fut = parent_token.cancelled();
     let fut = token.cancelled();
@@ -271,6 +275,8 @@ fn cancel_only_all_descendants() {
     let child1_fut = child1_token.cancelled();
     let child2_fut = child2_token.cancelled();
     let grandchild_fut = grandchild_token.cancelled();
+    let grandchild2_fut = grandchild2_token.cancelled();
+    let grandgrandchild_fut = grandgrandchild_token.cancelled();
 
     pin!(parent_fut);
     pin!(fut);
@@ -278,6 +284,8 @@ fn cancel_only_all_descendants() {
     pin!(child1_fut);
     pin!(child2_fut);
     pin!(grandchild_fut);
+    pin!(grandchild2_fut);
+    pin!(grandgrandchild_fut);
 
     assert_eq!(
         Poll::Pending,
@@ -305,19 +313,33 @@ fn cancel_only_all_descendants() {
             .as_mut()
             .poll(&mut Context::from_waker(&waker))
     );
+    assert_eq!(
+        Poll::Pending,
+        grandchild2_fut
+            .as_mut()
+            .poll(&mut Context::from_waker(&waker))
+    );
+    assert_eq!(
+        Poll::Pending,
+        grandgrandchild_fut
+            .as_mut()
+            .poll(&mut Context::from_waker(&waker))
+    );
     assert_eq!(wake_counter, 0);
 
     // ACT
     token.cancel();
 
     // ASSERT
-    assert_eq!(wake_counter, 4);
+    assert_eq!(wake_counter, 6);
     assert!(!parent_token.is_cancelled());
     assert!(token.is_cancelled());
     assert!(!sibling_token.is_cancelled());
     assert!(child1_token.is_cancelled());
     assert!(child2_token.is_cancelled());
     assert!(grandchild_token.is_cancelled());
+    assert!(grandchild2_token.is_cancelled());
+    assert!(grandgrandchild_token.is_cancelled());
 
     assert_eq!(
         Poll::Ready(()),
@@ -337,7 +359,19 @@ fn cancel_only_all_descendants() {
             .as_mut()
             .poll(&mut Context::from_waker(&waker))
     );
-    assert_eq!(wake_counter, 4);
+    assert_eq!(
+        Poll::Ready(()),
+        grandchild2_fut
+            .as_mut()
+            .poll(&mut Context::from_waker(&waker))
+    );
+    assert_eq!(
+        Poll::Ready(()),
+        grandgrandchild_fut
+            .as_mut()
+            .poll(&mut Context::from_waker(&waker))
+    );
+    assert_eq!(wake_counter, 6);
 }
 
 #[test]

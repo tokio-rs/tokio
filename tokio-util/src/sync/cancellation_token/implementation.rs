@@ -161,7 +161,11 @@ where
             Some(parent) => parent,
             // If we locked the node and its parent is `None`, we are in a valid state
             // and can return.
-            None => return func(locked_node, None),
+            None => {
+                // Drop locked_parent as it is not relevant any more
+                drop(locked_parent);
+                return func(locked_node, None);
+            }
         };
 
         // Loop until we managed to lock both the node and its parent
@@ -272,8 +276,6 @@ pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
 
 /// Cancels a node and its children.
 ///
-/// Then, dissolves the entire subtree for easier disposal.
-///
 /// Invariant #1:
 /// It's important that during the entire process of cancellation, there is
 /// never a gap in lock propagation. We need to lock both the parent and the child for the
@@ -290,43 +292,55 @@ pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
 /// Unless we keep the child locked during the entire time, from the moment on when we
 /// disconnected it from its parent.
 pub(crate) fn cancel(node: &Arc<TreeNode>) {
-    let waker = &node.waker;
+    let mut locked_node = node.inner.lock().unwrap();
 
-    with_locked_node_and_parent(node, |mut node, parent| {
-        // Cancel the subtree
-        node.is_cancelled = true;
-        waker.notify_waiters();
+    // One by one, adopt grandchildren and then cancel and detach the child
+    while let Some(child) = locked_node.children.pop() {
+        // `node` is already locked, so we can lock the child
+        let mut locked_child = child.inner.lock().unwrap();
 
-        // One by one, adopt grandchildren and then cancel and detach the child
-        while let Some(child) = node.children.pop() {
-            // `node` is already locked, so we can lock the child
-            let mut locked_child = child.inner.lock().unwrap();
+        // Detach the child from node
+        // No need to modify node.children, as the child already got removed with `.pop`
+        locked_child.parent = None;
+        locked_child.parent_idx = 0;
 
-            // Detach the child from node
-            // No need to modify node.children, as the child already got removed with `.pop`
-            locked_child.parent = None;
-            locked_child.parent_idx = 0;
+        // Cancel or adopt grandchildren
+        while let Some(grandchild) = locked_child.children.pop() {
+            let mut locked_grandchild = grandchild.inner.lock().unwrap();
 
-            // Adopt children
-            move_children_to_parent(&mut locked_child, &mut node);
+            // For performance reasons, only adopt grandchildren that have children.
+            // Otherwise, just cancel them right away, no need for another iteration.
+            if locked_grandchild.children.is_empty() {
+                // Detach the grandchild
+                locked_grandchild.parent = None;
+                locked_grandchild.parent_idx = 0;
 
-            // Cancel the child
-            locked_child.is_cancelled = true;
-            child.waker.notify_waiters();
-
-            // Now the child is cancelled and detached and all its children are adopted.
-            // Just continue until all (including adopted) children are cancelled and detached.
+                // Cancel the grandchild
+                locked_grandchild.is_cancelled = true;
+                drop(locked_grandchild);
+                grandchild.waker.notify_waiters();
+            } else {
+                // Otherwise, adopt grandchild
+                locked_grandchild.parent = locked_child.parent.clone();
+                locked_grandchild.parent_idx = locked_node.children.len();
+                drop(locked_grandchild);
+                locked_node.children.push(grandchild);
+            }
         }
 
-        // Disconnect the node from its parent.
-        // Now that it is cancelled, it doesn't need any cancellation from
-        // its parent any more.
-        // This has to happen at the very end, as this unlocks `node`, and therefore
-        // we would validate invariant #1 otherwise.
-        if let Some(mut parent) = parent {
-            remove_child(&mut parent, node);
-        };
-    });
+        // Cancel the child
+        locked_child.is_cancelled = true;
+        drop(locked_child);
+        child.waker.notify_waiters();
+
+        // Now the child is cancelled and detached and all its children are adopted.
+        // Just continue until all (including adopted) children are cancelled and detached.
+    }
+
+    // Cancel the subtree
+    locked_node.is_cancelled = true;
+    drop(locked_node);
+    node.waker.notify_waiters();
 }
 
 pub(crate) fn get_future(node: &Arc<TreeNode>) -> Option<tokio::sync::futures::Notified<'_>> {
