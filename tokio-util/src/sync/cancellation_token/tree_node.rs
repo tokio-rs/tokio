@@ -251,11 +251,15 @@ pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
             // Remove the node from the tree
             match parent {
                 Some(mut parent) => {
-                    // As we want to remove ourselves from the tree,
-                    // we have to move the children to the parent, so that
-                    // they still receive the cancellation event without us.
-                    // Moving them does not violate invariant #1.
-                    move_children_to_parent(&mut node, &mut parent);
+                    if node.is_cancelled {
+                        disconnect_children(&mut node);
+                    } else {
+                        // As we want to remove ourselves from the tree,
+                        // we have to move the children to the parent, so that
+                        // they still receive the cancellation event without us.
+                        // Moving them does not violate invariant #1.
+                        move_children_to_parent(&mut node, &mut parent);
+                    }
 
                     // Remove the node from the parent
                     remove_child(&mut parent, node);
