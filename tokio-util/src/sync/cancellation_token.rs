@@ -57,7 +57,7 @@ pub struct CancellationToken {
 
 pin_project! {
     /// A Future that is resolved once the corresponding [`CancellationToken`]
-    /// was cancelled
+    /// is cancelled.
     #[must_use = "futures do nothing unless polled"]
     pub struct WaitForCancellationFuture<'a> {
         cancellation_token: &'a CancellationToken,
