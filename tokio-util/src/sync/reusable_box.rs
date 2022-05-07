@@ -122,7 +122,12 @@ impl<T> Future for ReusableBoxFuture<'_, T> {
     }
 }
 
-// The future stored inside ReusableBoxFuture<'_, T> must be Send.
+// The future stored inside ReusableBoxFuture<'_, T> must be Send since the
+// `new` and `set` and `try_set` methods only allow setting the future to Send
+// futures.
+//
+// Note that T is the return type of the future, so its not relevant for
+// whether the future itself is Send.
 unsafe impl<T> Send for ReusableBoxFuture<'_, T> {}
 
 // The only method called on self.boxed is poll, which takes &mut self, so this
