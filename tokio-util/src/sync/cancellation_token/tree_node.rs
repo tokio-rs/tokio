@@ -251,15 +251,11 @@ pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
             // Remove the node from the tree
             match parent {
                 Some(mut parent) => {
-                    if node.is_cancelled {
-                        disconnect_children(&mut node);
-                    } else {
-                        // As we want to remove ourselves from the tree,
-                        // we have to move the children to the parent, so that
-                        // they still receive the cancellation event without us.
-                        // Moving them does not violate invariant #1.
-                        move_children_to_parent(&mut node, &mut parent);
-                    }
+                    // As we want to remove ourselves from the tree,
+                    // we have to move the children to the parent, so that
+                    // they still receive the cancellation event without us.
+                    // Moving them does not violate invariant #1.
+                    move_children_to_parent(&mut node, &mut parent);
 
                     // Remove the node from the parent
                     remove_child(&mut parent, node);
@@ -277,22 +273,6 @@ pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
 }
 
 /// Cancels a node and its children.
-///
-/// Invariant #1:
-/// It's important that during the entire process of cancellation, there is
-/// never a gap in lock propagation. We need to lock both the parent and the child for the
-/// entire duration of cancellation and disconnection. Those cannot happen separately,
-/// otherwise other calls like [decrease_handle_refcount] could modify the tree structure
-/// while we recurse over it.
-///
-/// We basically have to create a "lock wave" from the parent to children, that nothing else
-/// can bypass. Otherwise, other actions could add/remove children that our cancellation would miss.
-///
-/// Example: Holding a reference of a child does not influence its handle reference count, so
-/// it will happily drop its grandchildren in [decrease_handle_refcount] before we got the chance
-/// to propagate the cancellation to them, if we violate invariant #1.
-/// Unless we keep the child locked during the entire time, from the moment on when we
-/// disconnected it from its parent.
 pub(crate) fn cancel(node: &Arc<TreeNode>) {
     let mut locked_node = node.inner.lock().unwrap();
 
