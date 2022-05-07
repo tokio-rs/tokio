@@ -1,7 +1,7 @@
 //! An asynchronously awaitable `CancellationToken`.
 //! The token allows to signal a cancellation request to one or more tasks.
 pub(crate) mod guard;
-mod implementation;
+mod tree_node;
 
 use crate::loom::sync::Arc;
 use core::future::Future;
@@ -52,7 +52,7 @@ use pin_project_lite::pin_project;
 /// }
 /// ```
 pub struct CancellationToken {
-    inner: Arc<implementation::TreeNode>,
+    inner: Arc<tree_node::TreeNode>,
 }
 
 pin_project! {
@@ -78,7 +78,7 @@ impl core::fmt::Debug for CancellationToken {
 
 impl Clone for CancellationToken {
     fn clone(&self) -> Self {
-        implementation::increase_handle_refcount(&self.inner);
+        tree_node::increase_handle_refcount(&self.inner);
         CancellationToken {
             inner: self.inner.clone(),
         }
@@ -87,7 +87,7 @@ impl Clone for CancellationToken {
 
 impl Drop for CancellationToken {
     fn drop(&mut self) {
-        implementation::decrease_handle_refcount(&self.inner);
+        tree_node::decrease_handle_refcount(&self.inner);
     }
 }
 
@@ -101,7 +101,7 @@ impl CancellationToken {
     /// Creates a new CancellationToken in the non-cancelled state.
     pub fn new() -> CancellationToken {
         CancellationToken {
-            inner: Arc::new(implementation::TreeNode::new()),
+            inner: Arc::new(tree_node::TreeNode::new()),
         }
     }
 
@@ -145,7 +145,7 @@ impl CancellationToken {
     /// ```
     pub fn child_token(&self) -> CancellationToken {
         CancellationToken {
-            inner: implementation::child_node(&self.inner),
+            inner: tree_node::child_node(&self.inner),
         }
     }
 
@@ -154,19 +154,19 @@ impl CancellationToken {
     ///
     /// This will wake up all tasks which are waiting for cancellation.
     pub fn cancel(&self) {
-        implementation::cancel(&self.inner);
+        tree_node::cancel(&self.inner);
     }
 
     /// Returns `true` if the `CancellationToken` had been cancelled
     pub fn is_cancelled(&self) -> bool {
-        implementation::is_cancelled(&self.inner)
+        tree_node::is_cancelled(&self.inner)
     }
 
     /// Returns a `Future` that gets fulfilled when cancellation is requested.
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
             cancellation_token: self,
-            future: implementation::get_future(&self.inner),
+            future: tree_node::get_future(&self.inner),
         }
     }
 
@@ -207,7 +207,7 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
             // If the future was finished, try to query another one.
             // Once `get_future` returns `None`, we know the token was cancelled.
             this.future
-                .set(implementation::get_future(&this.cancellation_token.inner));
+                .set(tree_node::get_future(&this.cancellation_token.inner));
         }
     }
 }
