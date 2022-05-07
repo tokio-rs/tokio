@@ -193,21 +193,18 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let mut this = self.project();
         loop {
-            {
-                let future = match this.future.as_mut().as_pin_mut() {
-                    Some(future) => future,
-                    None => return Poll::Ready(()),
-                };
-
-                if future.poll(cx).is_pending() {
-                    return Poll::Pending;
+            match this.future.as_mut().as_pin_mut() {
+                Some(future) => {
+                    if future.poll(cx).is_pending() {
+                        return Poll::Pending;
+                    }
+                    // If the future was finished, try to query another one.
+                    // Once `get_future` returns `None`, we know the token was cancelled.
+                    this.future
+                        .set(tree_node::get_future(&this.cancellation_token.inner));
                 }
+                None => return Poll::Ready(()),
             }
-
-            // If the future was finished, try to query another one.
-            // Once `get_future` returns `None`, we know the token was cancelled.
-            this.future
-                .set(tree_node::get_future(&this.cancellation_token.inner));
         }
     }
 }
