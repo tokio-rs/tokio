@@ -14,7 +14,7 @@
 //!     Node B can only become the child of node A in two ways:
 //!         - being created with `child_node()`, in which case it is trivially true that
 //!           node A already existed when node B was created
-//!         - being moved A->C->B to A->B because node C was removed in `decrease_handle_refcount()`.
+//!         - being moved A->C->B to A->B because node C was removed in `decrease_handle_refcount()` or `cancel()`.
 //!           In this case the invariant still holds, as B was younger than C, and C was younger
 //!           than A, therefore B is also younger than A.
 //!
@@ -23,11 +23,8 @@
 //!
 //! ** Deadlock safety **
 //!
-//! Principles that provide deadlock safety:
-//!     1. We always lock in the order of creation time. We can prove this through invariant #2.
-//!        Specifically, through invariant #2, we know that we always have to lock a parent before its child.
-//!     2. We never lock two siblings simultaneously, because we cannot establish an order.
-//!        There is one exception in `with_locked_node_and_parent()`, which is described in the function itself.
+//! We always lock in the order of creation time. We can prove this through invariant #2.
+//! Specifically, through invariant #2, we know that we always have to lock a parent before its child.
 //!
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 
@@ -211,7 +208,8 @@ fn remove_child(parent: &mut Inner, mut node: MutexGuard<'_, Inner>) {
     node.parent_idx = 0;
 
     // Unlock node, so that only one child at a time is locked.
-    // Otherwise we would violate deadlock safety #2.
+    // Otherwise we would violate the lock order (see 'deadlock safety') as we
+    // don't know the creation order of the child nodes
     drop(node);
 
     // If `node` is the last element in the list, we don't need any swapping
@@ -335,7 +333,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
                 grandchild.waker.notify_waiters();
             } else {
                 // Otherwise, adopt grandchild
-                locked_grandchild.parent = locked_child.parent.clone();
+                locked_grandchild.parent = Some(node.clone());
                 locked_grandchild.parent_idx = locked_node.children.len();
                 drop(locked_grandchild);
                 locked_node.children.push(grandchild);
