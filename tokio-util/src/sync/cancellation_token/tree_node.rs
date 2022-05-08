@@ -48,6 +48,10 @@ impl TreeNode {
             waker: tokio::sync::Notify::new(),
         }
     }
+
+    pub(crate) fn get_notified_future(&self) -> tokio::sync::futures::Notified<'_> {
+        self.waker.notified()
+    }
 }
 
 /// The data contained inside a TreeNode.
@@ -340,15 +344,4 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
     locked_node.is_cancelled = true;
     drop(locked_node);
     node.waker.notify_waiters();
-}
-
-pub(crate) fn get_future(node: &Arc<TreeNode>) -> Option<tokio::sync::futures::Notified<'_>> {
-    let notified = node.waker.notified();
-    {
-        let node_lock = node.inner.lock().unwrap();
-        if node_lock.is_cancelled {
-            return None;
-        }
-    }
-    Some(notified)
 }
