@@ -282,7 +282,8 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
 
     // One by one, adopt grandchildren and then cancel and detach the child
     while let Some(child) = locked_node.children.pop() {
-        // `node` is already locked, so we can lock the child
+        // This can't deadlock because the mutex we are already
+        // holding is the parent of child.
         let mut locked_child = child.inner.lock().unwrap();
 
         // Detach the child from node
@@ -297,6 +298,8 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
 
         // Cancel or adopt grandchildren
         while let Some(grandchild) = locked_child.children.pop() {
+            // This can't deadlock because the two mutexes we are already
+            // holding is the parent and grandparent of grandchild.
             let mut locked_grandchild = grandchild.inner.lock().unwrap();
 
             // Detach the grandchild
@@ -333,7 +336,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         // Just continue until all (including adopted) children are cancelled and detached.
     }
 
-    // Cancel the subtree
+    // Cancel the node itself.
     locked_node.is_cancelled = true;
     drop(locked_node);
     node.waker.notify_waiters();
