@@ -1,3 +1,9 @@
+# 1.18.2 (May 5, 2022)
+
+Add missing features for the `winapi` dependency. ([#4663])
+
+[#4663]: https://github.com/tokio-rs/tokio/pull/4663
+
 # 1.18.1 (May 2, 2022)
 
 The 1.18.0 release broke the build for targets without 64-bit atomics when
