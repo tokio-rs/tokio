@@ -118,6 +118,7 @@ nix = { version = "0.24", default-features = false, features = ["fs", "socket"] 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"
 default-features = false
+features = ["std", "winsock2", "mswsock", "handleapi", "ws2ipdef", "ws2tcpip"]
 optional = true
 
 [target.'cfg(windows)'.dev-dependencies.ntapi]
