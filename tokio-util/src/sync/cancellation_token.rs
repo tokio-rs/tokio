@@ -153,16 +153,29 @@ impl CancellationToken {
     /// derived from it.
     ///
     /// This will wake up all tasks which are waiting for cancellation.
+    ///
+    /// Be aware that cancellation is not an atomic operation. It is possible
+    /// for another thread running in parallel with a call to `cancel` to first
+    /// receive `true` from `is_cancelled` on one child node, and then receive
+    /// `false` from `is_cancelled` on another child node. However, once the
+    /// call to `cancel` returns, all child nodes have been fully cancelled.
     pub fn cancel(&self) {
         tree_node::cancel(&self.inner);
     }
 
-    /// Returns `true` if the `CancellationToken` had been cancelled
+    /// Returns `true` if the `CancellationToken` is cancelled.
     pub fn is_cancelled(&self) -> bool {
         tree_node::is_cancelled(&self.inner)
     }
 
     /// Returns a `Future` that gets fulfilled when cancellation is requested.
+    ///
+    /// The future will complete immediately if the token is already cancelled
+    /// when this method is called.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe.
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
             cancellation_token: self,
