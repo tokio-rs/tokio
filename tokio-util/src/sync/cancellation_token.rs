@@ -210,6 +210,10 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
                 return Poll::Ready(());
             }
 
+            // No wakeups can be lost here because there is always a call to
+            // `is_cancelled` between the creation of the future and the call to
+            // `poll`, and the code that sets the cancelled flag does so before
+            // waking the `Notified`.
             if this.future.as_mut().poll(cx).is_pending() {
                 return Poll::Pending;
             }
