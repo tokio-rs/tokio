@@ -1,3 +1,11 @@
+# 1.14.2 (May 8, 2022)
+
+This is a backport of the change in 1.18.2.
+
+Add missing features for the `winapi` dependency. ([#4663])
+
+[#4663]: https://github.com/tokio-rs/tokio/pull/4663
+
 # 1.14.1 (January 30, 2022)
 
 This release backports a bug fix from 1.16.1
