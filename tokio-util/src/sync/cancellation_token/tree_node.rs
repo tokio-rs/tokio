@@ -228,8 +228,8 @@ fn remove_child(parent: &mut Inner, mut node: MutexGuard<'_, Inner>) {
     }
 
     let len = parent.children.len();
-    if 4*len <= parent.children.capacity() {
-        parent.children.shrink_to(2*len);
+    if 4 * len <= parent.children.capacity() {
+        parent.children.shrink_to(2 * len);
     }
 }
 
