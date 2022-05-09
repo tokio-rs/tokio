@@ -78,6 +78,12 @@ pub struct Builder {
 
     /// Customizable keep alive timeout for BlockingPool
     pub(super) keep_alive: Option<Duration>,
+
+    /// How many ticks before pulling a task from the global/remote queue?
+    pub(super) global_queue_interval: u8,
+
+    /// How many ticks before yielding to the driver for timer and I/O events?
+    pub(super) event_interval: u8,
 }
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
@@ -98,7 +104,20 @@ impl Builder {
     ///
     /// [`LocalSet`]: crate::task::LocalSet
     pub fn new_current_thread() -> Builder {
-        Builder::new(Kind::CurrentThread)
+        /// How often to check the remote queue first.
+        const REMOTE_FIRST_INTERVAL: u8 = 31;
+
+        /// Max number of tasks to poll per tick.
+        #[cfg(loom)]
+        const MAX_TASKS_PER_TICK: u8 = 4;
+        #[cfg(not(loom))]
+        const MAX_TASKS_PER_TICK: u8 = 61;
+
+        Builder::new(
+            Kind::CurrentThread,
+            REMOTE_FIRST_INTERVAL,
+            MAX_TASKS_PER_TICK,
+        )
     }
 
     /// Returns a new builder with the multi thread scheduler selected.
@@ -107,14 +126,26 @@ impl Builder {
     #[cfg(feature = "rt-multi-thread")]
     #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
     pub fn new_multi_thread() -> Builder {
-        Builder::new(Kind::MultiThread)
+        /// After how many ticks is the global queue polled. This helps to ensure
+        /// fairness.
+        ///
+        /// The same value is used to control when to yield to the driver for events.
+        ///
+        /// The number is fairly arbitrary. I believe this value was copied from golang.
+        const GLOBAL_POLL_INTERVAL: u8 = 61;
+
+        Builder::new(
+            Kind::MultiThread,
+            GLOBAL_POLL_INTERVAL,
+            GLOBAL_POLL_INTERVAL,
+        )
     }
 
     /// Returns a new runtime builder initialized with default configuration
     /// values.
     ///
     /// Configuration methods can be chained on the return value.
-    pub(crate) fn new(kind: Kind) -> Builder {
+    pub(crate) fn new(kind: Kind, global_queue_interval: u8, event_interval: u8) -> Builder {
         Builder {
             kind,
 
@@ -145,6 +176,11 @@ impl Builder {
             after_unpark: None,
 
             keep_alive: None,
+
+            // Defaults for these values depend on the scheduler kind, so we get them
+            // as parameters.
+            global_queue_interval,
+            event_interval,
         }
     }
 
@@ -554,6 +590,54 @@ impl Builder {
         self
     }
 
+    /// Sets the number of scheduler ticks after which the scheduler will poll the global
+    /// task queue.
+    ///
+    /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task. Schedulers
+    /// have a local queue of already-claimed tasks, and a global queue of incoming tasks.
+    /// Setting the interval to a smaller value increases the fairness of the scheduler,
+    /// at the cost of more synchronization overhead.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .global_queue_interval(31)
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn global_queue_interval(&mut self, val: u8) -> &mut Self {
+        self.global_queue_interval = val;
+        self
+    }
+
+    /// Sets the number of scheduler ticks after which the scheduler will poll for
+    /// external events (timers, I/O, and so on).
+    ///
+    /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task.
+    /// Setting the event interval determines the effective "priority" of delivering
+    /// these external events (which may wake up additional tasks), compared to
+    /// executing tasks that are currently ready to run.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .event_interval(31)
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn event_interval(&mut self, val: u8) -> &mut Self {
+        self.event_interval = val;
+        self
+    }
+
     fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::{BasicScheduler, HandleInner, Kind};
 
@@ -580,6 +664,8 @@ impl Builder {
             handle_inner,
             self.before_park.clone(),
             self.after_unpark.clone(),
+            self.global_queue_interval,
+            self.event_interval,
         );
         let spawner = Spawner::Basic(scheduler.spawner().clone());
 
@@ -667,14 +753,15 @@ cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
-            use crate::runtime::{Kind, HandleInner, ThreadPool};
+            use crate::runtime::{HandleInner, Kind, ThreadPool};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
             // Create the blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
+            let blocking_pool =
+                blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             let handle_inner = HandleInner {
@@ -685,13 +772,19 @@ cfg_rt_multi_thread! {
                 blocking_spawner,
             };
 
-            let (scheduler, launch) = ThreadPool::new(core_threads, driver, handle_inner, self.before_park.clone(), self.after_unpark.clone());
+            let (scheduler, launch) = ThreadPool::new(
+                core_threads,
+                driver,
+                handle_inner,
+                self.before_park.clone(),
+                self.after_unpark.clone(),
+                self.global_queue_interval,
+                self.event_interval,
+            );
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the runtime handle
-            let handle = Handle {
-                spawner,
-            };
+            let handle = Handle { spawner };
 
             // Spawn the thread pool workers
             let _enter = crate::runtime::context::enter(handle.clone());
