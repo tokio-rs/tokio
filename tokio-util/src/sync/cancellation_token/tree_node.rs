@@ -111,7 +111,7 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
 ///
 /// Takes a reference to [Inner] to make sure the parent is already locked.
 fn disconnect_children(node: &mut Inner) {
-    for child in node.children.drain(..) {
+    for child in std::mem::take(&mut node.children) {
         let mut locked_child = child.inner.lock().unwrap();
         locked_child.parent_idx = 0;
         locked_child.parent = None;
@@ -191,7 +191,7 @@ fn move_children_to_parent(node: &mut Inner, parent: &mut Inner) {
     // Pre-allocate in the parent, for performance
     parent.children.reserve(node.children.len());
 
-    for child in node.children.drain(..) {
+    for child in std::mem::take(&mut node.children) {
         {
             let mut child_locked = child.inner.lock().unwrap();
             child_locked.parent = node.parent.clone();
@@ -225,6 +225,11 @@ fn remove_child(parent: &mut Inner, mut node: MutexGuard<'_, Inner>) {
         let replacement_child = parent.children.pop().unwrap();
         replacement_child.inner.lock().unwrap().parent_idx = pos;
         parent.children[pos] = replacement_child;
+    }
+
+    let len = parent.children.len();
+    if 4*len <= parent.children.capacity() {
+        parent.children.shrink_to(2*len);
     }
 }
 
@@ -320,6 +325,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
             if locked_grandchild.children.is_empty() {
                 // Cancel the grandchild
                 locked_grandchild.is_cancelled = true;
+                locked_grandchild.children = Vec::new();
                 drop(locked_grandchild);
                 grandchild.waker.notify_waiters();
             } else {
@@ -333,6 +339,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
 
         // Cancel the child
         locked_child.is_cancelled = true;
+        locked_child.children = Vec::new();
         drop(locked_child);
         child.waker.notify_waiters();
 
@@ -342,6 +349,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
 
     // Cancel the node itself.
     locked_node.is_cancelled = true;
+    locked_node.children = Vec::new();
     drop(locked_node);
     node.waker.notify_waiters();
 }
