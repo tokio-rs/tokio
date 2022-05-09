@@ -396,4 +396,5 @@ fn derives_send_sync() {
     assert_sync::<CancellationToken>();
 
     assert_send::<WaitForCancellationFuture<'static>>();
+    assert_sync::<WaitForCancellationFuture<'static>>();
 }
