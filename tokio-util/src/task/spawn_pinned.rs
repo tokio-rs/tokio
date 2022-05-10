@@ -9,6 +9,19 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 use tokio::task::{spawn_local, JoinHandle, LocalSet};
 
+#[derive(Debug)]
+pub struct WorkerIdxError(usize, usize);
+
+impl fmt::Display for WorkerIdxError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Index {} out of bounds, only {} workers in pool",
+            self.0, self.1
+        )
+    }
+}
+
 /// A handle to a local pool, used for spawning `!Send` tasks.
 #[derive(Clone)]
 pub struct LocalPoolHandle {
@@ -31,6 +44,21 @@ impl LocalPoolHandle {
         let pool = Arc::new(LocalPool { workers });
 
         LocalPoolHandle { pool }
+    }
+
+    /// Returns the number of threads of the Pool.
+    pub fn num_threads(&self) -> usize {
+        self.pool.workers.len()
+    }
+
+    /// Returns the number of tasks scheduled on each worker. The indices of the
+    /// workers correspond to the indices in the returned `Vec`.
+    pub fn get_task_loads_for_each_worker(&self) -> Vec<usize> {
+        self.pool
+            .workers
+            .iter()
+            .map(|worker| worker.task_count.load(Ordering::SeqCst))
+            .collect::<Vec<_>>()
     }
 
     /// Spawn a task onto a worker thread and pin it there so it can't be moved
@@ -69,7 +97,48 @@ impl LocalPoolHandle {
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
-        self.pool.spawn_pinned(create_task)
+        self.pool
+            .spawn_pinned(create_task, WorkerChoice::LeastBurdened)
+    }
+
+    /// Differs from `spawn_pinned` only in that you can choose a specific worker of
+    /// the pool, whereas `spawn_pinned` chooses the worker with the smallest
+    /// number of tasks scheduled.
+    pub fn spawn_pinned_by_idx<F, Fut>(
+        &self,
+        create_task: F,
+        idx: usize,
+    ) -> Result<JoinHandle<Fut::Output>, WorkerIdxError>
+    where
+        F: FnOnce() -> Fut,
+        F: Send + 'static,
+        Fut: Future + 'static,
+        Fut::Output: Send + 'static,
+    {
+        if idx >= self.pool.workers.len() {
+            return Err(WorkerIdxError(idx, self.pool.workers.len()));
+        }
+
+        Ok(self
+            .pool
+            .spawn_pinned(create_task, WorkerChoice::ByIdx(idx)))
+    }
+
+    /// Spawn a task on every worker thread in the pool and pin it so that it
+    /// can't be moved off of the thread.
+    pub fn spawn_pinned_on_all_workers<F, Fut>(
+        &self,
+        create_task: F,
+    ) -> Vec<JoinHandle<Fut::Output>>
+    where
+        F: Fn() -> Fut,
+        F: Send + Clone + 'static,
+        Fut: Future + 'static,
+        Fut::Output: Send + 'static,
+    {
+        (0..self.pool.workers.len())
+            .map(|idx| self.spawn_pinned_by_idx(create_task.clone(), idx).unwrap())
+            .collect::<Vec<_>>()
     }
 }
 
@@ -79,13 +148,22 @@ impl Debug for LocalPoolHandle {
     }
 }
 
+enum WorkerChoice {
+    LeastBurdened,
+    ByIdx(usize),
+}
+
 struct LocalPool {
     workers: Vec<LocalWorkerHandle>,
 }
 
 impl LocalPool {
     /// Spawn a `?Send` future onto a worker
-    fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
+    fn spawn_pinned<F, Fut>(
+        &self,
+        create_task: F,
+        worker_choice: WorkerChoice,
+    ) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut,
         F: Send + 'static,
@@ -93,8 +171,10 @@ impl LocalPool {
         Fut::Output: Send + 'static,
     {
         let (sender, receiver) = oneshot::channel();
-
-        let (worker, job_guard) = self.find_and_incr_least_burdened_worker();
+        let (worker, job_guard) = match worker_choice {
+            WorkerChoice::LeastBurdened => self.find_and_incr_least_burdened_worker(),
+            WorkerChoice::ByIdx(idx) => self.find_worker_by_idx(idx),
+        };
         let worker_spawner = worker.spawner.clone();
 
         // Spawn a future onto the worker's runtime so we can immediately return
@@ -189,6 +269,28 @@ impl LocalPool {
                 .map(|worker| (worker, worker.task_count.load(Ordering::SeqCst)))
                 .min_by_key(|&(_, count)| count)
                 .expect("There must be more than one worker");
+
+            // Make sure the task count hasn't changed since when we choose this
+            // worker. Otherwise, restart the search.
+            if worker
+                .task_count
+                .compare_exchange(
+                    task_count,
+                    task_count + 1,
+                    Ordering::SeqCst,
+                    Ordering::Relaxed,
+                )
+                .is_ok()
+            {
+                return (worker, JobCountGuard(Arc::clone(&worker.task_count)));
+            }
+        }
+    }
+
+    fn find_worker_by_idx(&self, idx: usize) -> (&LocalWorkerHandle, JobCountGuard) {
+        loop {
+            let worker = &self.workers[idx];
+            let task_count = worker.task_count.load(Ordering::SeqCst);
 
             // Make sure the task count hasn't changed since when we choose this
             // worker. Otherwise, restart the search.
