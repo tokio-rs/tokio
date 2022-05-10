@@ -191,3 +191,39 @@ async fn tasks_are_balanced() {
     // be on separate workers/threads.
     assert_ne!(thread_id1, thread_id2);
 }
+
+#[tokio::test]
+async fn spawn_by_idx() {
+    let pool = task::LocalPoolHandle::new(3);
+
+    let handle1 = pool.spawn_pinned_by_idx(|| async { std::thread::current().id() }, 0);
+    let handle2 = pool.spawn_pinned_by_idx(|| async { std::thread::current().id() }, 1);
+
+    let loads = pool.get_task_loads_for_each_worker();
+    assert_eq!(loads[0], 1);
+    assert_eq!(loads[1], 1);
+    assert_eq!(loads[2], 0);
+
+    let thread_id1 = handle1.unwrap().await.unwrap();
+    let thread_id2 = handle2.unwrap().await.unwrap();
+
+    assert_ne!(thread_id1, thread_id2);
+}
+
+#[tokio::test]
+async fn spawn_on_all_workers() {
+    let pool = task::LocalPoolHandle::new(3);
+
+    let _ = pool.spawn_pinned_on_all_workers(|| {
+        // Rc is !Send + !Sync
+        let local_data = Rc::new("test");
+
+        // This future holds an Rc, so it is !Send
+        async move { local_data.to_string() }
+    });
+
+    let loads = pool.get_task_loads_for_each_worker();
+    assert_eq!(loads[0], 1);
+    assert_eq!(loads[1], 1);
+    assert_eq!(loads[2], 1);
+}
