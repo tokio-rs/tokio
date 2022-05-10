@@ -163,6 +163,18 @@ several other libraries, including:
 
 ## Supported Rust Versions
 
+<!--
+When updating this, also update:
+- .github/workflows/ci.yml
+- CONTRIBUTING.md
+- README.md
+- tokio/README.md
+- tokio/Cargo.toml
+- tokio-util/Cargo.toml
+- tokio-test/Cargo.toml
+- tokio-stream/Cargo.toml
+-->
+
 Tokio will keep a rolling MSRV (minimum supported rust version) policy of **at
 least** 6 months. When increasing the MSRV, the new Rust version must have been
 released at least six months ago. The current MSRV is 1.49.0.

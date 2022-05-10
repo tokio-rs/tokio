@@ -13,6 +13,14 @@ env:
   rust_stable: stable
   rust_nightly: nightly-2022-03-21
   rust_clippy: 1.52.0
+  # When updating this, also update:
+  # - README.md
+  # - tokio/README.md
+  # - CONTRIBUTING.md
+  # - tokio/Cargo.toml
+  # - tokio-util/Cargo.toml
+  # - tokio-test/Cargo.toml
+  # - tokio-stream/Cargo.toml
   rust_min: 1.49.0
 
 defaults:
