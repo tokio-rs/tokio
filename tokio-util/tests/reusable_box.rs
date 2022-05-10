@@ -8,6 +8,8 @@ use std::task::{Context, Poll};
 use tokio_util::sync::ReusableBoxFuture;
 
 #[test]
+// Clippy false positive; it's useful to be able to test the trait impls for any lifetime
+#[allow(clippy::extra_unused_lifetimes)]
 fn traits<'a>() {
     fn assert_traits<T: Send + Sync + Unpin>() {}
     // Use a type that is !Unpin
