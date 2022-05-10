@@ -167,6 +167,7 @@ several other libraries, including:
 When updating this, also update:
 - .github/workflows/ci.yml
 - CONTRIBUTING.md
+- README.md
 - tokio/README.md
 - tokio/Cargo.toml
 - tokio-util/Cargo.toml
