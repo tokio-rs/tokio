@@ -1,9 +1,20 @@
 use futures::future::FutureExt;
 use std::alloc::Layout;
 use std::future::Future;
+use std::marker::PhantomPinned;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::task::{Context, Poll};
 use tokio_util::sync::ReusableBoxFuture;
+
+#[test]
+fn traits<'a>() {
+    fn assert_traits<T: Send + Sync + Unpin>() {}
+    // Use a type that is !Unpin
+    assert_traits::<ReusableBoxFuture<'a, PhantomPinned>>();
+    // Use a type that is !Send + !Sync
+    assert_traits::<ReusableBoxFuture<'a, Rc<()>>>();
+}
 
 #[test]
 fn test_different_futures() {
