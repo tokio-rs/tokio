@@ -331,7 +331,10 @@ async fn actor_weak_sender() {
         async fn send_message_to_self(&mut self) {
             let msg = ActorMessage::SelfMessage {};
 
-            if let Some(sender) = self.sender.upgrade() {
+            let sender = self.sender.clone();
+
+            // cannot move self.sender here
+            if let Some(sender) = sender.upgrade() {
                 let _ = sender.send(msg).await;
                 self.sender = sender.downgrade();
             }

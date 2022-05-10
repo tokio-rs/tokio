@@ -9,10 +9,8 @@ use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
 
 use std::fmt;
-use std::mem;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
-use std::sync::Weak;
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 use std::usize;
@@ -25,16 +23,6 @@ pub(crate) struct Tx<T, S> {
 impl<T, S: fmt::Debug> fmt::Debug for Tx<T, S> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Tx").field("inner", &self.inner).finish()
-    }
-}
-
-pub(crate) struct TxWeak<T, S> {
-    inner: Weak<Chan<T, S>>,
-}
-
-impl<T, S: fmt::Debug> fmt::Debug for TxWeak<T, S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("TxWeak").finish()
     }
 }
 
@@ -142,12 +130,47 @@ impl<T, S> Tx<T, S> {
         Tx { inner: chan }
     }
 
-    pub(super) fn downgrade(self) -> TxWeak<T, S> {
-        // We don't decrement the `tx_counter` here, but let the counter be decremented
-        // through the drop of self.inner.
-        let weak_inner = Arc::<Chan<T, S>>::downgrade(&self.inner);
+    pub(super) fn downgrade(self) -> Self {
+        if self.inner.tx_count.fetch_sub(1, AcqRel) == 1 {
+            // Close the list, which sends a `Close` message
+            self.inner.tx.close();
 
-        TxWeak::new(weak_inner)
+            // Notify the receiver
+            self.wake_rx();
+        }
+
+        self
+    }
+
+    // Returns a boolean that indicates whether the channel is closed.
+    pub(super) fn upgrade(self) -> Option<Self> {
+        let mut tx_count = self.inner.tx_count.load(Acquire);
+
+        if tx_count == 0 {
+            // channel is closed
+            return None;
+        }
+
+        loop {
+            match self
+                .inner
+                .tx_count
+                .compare_exchange(tx_count, tx_count + 1, AcqRel, Acquire)
+            {
+                Ok(prev_count) => {
+                    assert!(prev_count != 0);
+
+                    return Some(self);
+                }
+                Err(prev_count) => {
+                    if prev_count == 0 {
+                        return None;
+                    }
+
+                    tx_count = prev_count;
+                }
+            }
+        }
     }
 
     pub(super) fn semaphore(&self) -> &S {
@@ -167,53 +190,6 @@ impl<T, S> Tx<T, S> {
     /// Returns `true` if senders belong to the same channel.
     pub(crate) fn same_channel(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.inner, &other.inner)
-    }
-}
-
-impl<T, S> TxWeak<T, S> {
-    fn new(inner: Weak<Chan<T, S>>) -> Self {
-        TxWeak { inner }
-    }
-
-    pub(super) fn upgrade(&self) -> Option<Tx<T, S>> {
-        let inner = self.inner.upgrade();
-
-        if let Some(inner) = inner {
-            // If we were able to upgrade, `Chan` is guaranteed to still exist,
-            // even though the channel might have been closed in the meantime.
-            // Need to check here whether the channel was actually closed.
-
-            let mut tx_count = inner.tx_count.load(Acquire);
-
-            if tx_count == 0 {
-                // channel is closed
-                mem::drop(inner);
-                return None;
-            }
-
-            loop {
-                match inner
-                    .tx_count
-                    .compare_exchange(tx_count, tx_count + 1, AcqRel, Acquire)
-                {
-                    Ok(prev_count) => {
-                        assert!(prev_count != 0);
-
-                        return Some(Tx::new(inner));
-                    }
-                    Err(prev_count) => {
-                        if prev_count == 0 {
-                            mem::drop(inner);
-                            return None;
-                        }
-
-                        tx_count = prev_count;
-                    }
-                }
-            }
-        } else {
-            None
-        }
     }
 }
 

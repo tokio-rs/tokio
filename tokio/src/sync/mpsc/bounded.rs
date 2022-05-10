@@ -63,7 +63,7 @@ pub struct Sender<T> {
 ///
 /// ```
 pub struct WeakSender<T> {
-    chan: chan::TxWeak<T, Semaphore>,
+    chan: chan::Tx<T, Semaphore>,
 }
 
 /// Permits to send one value into the channel.
@@ -1044,8 +1044,9 @@ impl<T> Sender<T> {
         // Note: If this is the last `Sender` instance we want to close the
         // channel when downgrading, so it's important to move into `self` here.
 
-        let chan = self.chan.downgrade();
-        WeakSender { chan }
+        WeakSender {
+            chan: self.chan.downgrade(),
+        }
     }
 }
 
@@ -1065,12 +1066,20 @@ impl<T> fmt::Debug for Sender<T> {
     }
 }
 
+impl<T> Clone for WeakSender<T> {
+    fn clone(&self) -> Self {
+        WeakSender {
+            chan: self.chan.clone(),
+        }
+    }
+}
+
 impl<T> WeakSender<T> {
-    /// Tries to conver a WeakSender into a [`Sender`]. This will return `Some`
+    /// Tries to convert a WeakSender into a [`Sender`]. This will return `Some`
     /// if there are other `Sender` instances alive and the channel wasn't
     /// previously dropped, otherwise `None` is returned.
-    pub fn upgrade(&self) -> Option<Sender<T>> {
-        self.chan.upgrade().map(Sender::new)
+    pub fn upgrade(self) -> Option<Sender<T>> {
+        self.chan.upgrade().map(|tx| Sender::new(tx))
     }
 }
 
