@@ -52,6 +52,7 @@ impl<'a, T> ReusableBoxFuture<'a, T> {
         // the bound `T: 'a` is not satisfied in the call to `pending()`. But by putting it in an
         // inner function that doesn't have `T` as a generic parameter, we implicitly get the bound
         // `F::Output: 'a` transitively through `F: 'a`, allowing us to call `pending()`.
+        #[inline(always)]
         fn real_try_set<'a, F>(
             this: &mut ReusableBoxFuture<'a, F::Output>,
             future: F,
