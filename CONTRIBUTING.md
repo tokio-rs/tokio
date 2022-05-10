@@ -139,6 +139,10 @@ When updating this, also update:
 - .github/workflows/ci.yml
 - README.md
 - tokio/README.md
+- tokio/Cargo.toml
+- tokio-util/Cargo.toml
+- tokio-test/Cargo.toml
+- tokio-stream/Cargo.toml
 -->
 
 ```

@@ -167,6 +167,11 @@ several other libraries, including:
 When updating this, also update:
 - .github/workflows/ci.yml
 - CONTRIBUTING.md
+- README.md
+- tokio/Cargo.toml
+- tokio-util/Cargo.toml
+- tokio-test/Cargo.toml
+- tokio-stream/Cargo.toml
 -->
 
 Tokio will keep a rolling MSRV (minimum supported rust version) policy of **at
