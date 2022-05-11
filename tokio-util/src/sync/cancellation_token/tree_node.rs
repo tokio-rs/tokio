@@ -248,7 +248,7 @@ pub(crate) fn increase_handle_refcount(node: &Arc<TreeNode>) {
     locked_node.num_handles += 1;
 }
 
-/// Decreses the reference count of handles.
+/// Decreases the reference count of handles.
 ///
 /// Once no handle is left, we can remove the node from the
 /// tree and connect its parent directly to its children.
