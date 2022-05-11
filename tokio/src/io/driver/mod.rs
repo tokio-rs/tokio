@@ -290,19 +290,21 @@ cfg_not_rt! {
     }
 }
 
-cfg_metrics! {
-   impl Handle {
-        // TODO: Remove this when handle contains `Arc<Inner>` so that we can return
-        // &IoDriverMetrics instead of using a closure.
-        //
-        // Related issue: https://github.com/tokio-rs/tokio/issues/4509
-        pub(crate) fn with_io_driver_metrics<F, R>(&self, f: F) -> Option<R>
-        where
-            F: Fn(&IoDriverMetrics) -> R,
-        {
-            self.inner().map(|inner| f(&inner.metrics))
-        }
-   }
+cfg_net! {
+    cfg_metrics! {
+       impl Handle {
+            // TODO: Remove this when handle contains `Arc<Inner>` so that we can return
+            // &IoDriverMetrics instead of using a closure.
+            //
+            // Related issue: https://github.com/tokio-rs/tokio/issues/4509
+            pub(crate) fn with_io_driver_metrics<F, R>(&self, f: F) -> Option<R>
+            where
+                F: Fn(&IoDriverMetrics) -> R,
+            {
+                self.inner().map(|inner| f(&inner.metrics))
+            }
+       }
+    }
 }
 
 impl Handle {
