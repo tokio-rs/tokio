@@ -131,7 +131,7 @@ where
     unsafe { ptr::drop_in_place(raw) };
 
     // Run the rest of the code.
-    Ok(guard.into_inner()())
+    Ok(guard.call())
 }
 
 struct CallOnDrop<O, F: FnOnce() -> O> {
@@ -143,9 +143,10 @@ impl<O, F: FnOnce() -> O> CallOnDrop<O, F> {
         let f = ManuallyDrop::new(f);
         Self { f }
     }
-    fn into_inner(self) -> F {
+    fn call(self) -> O {
         let mut this = ManuallyDrop::new(self);
-        unsafe { ManuallyDrop::take(&mut this.f) }
+        let f = unsafe { ManuallyDrop::take(&mut this.f) };
+        f()
     }
 }
 
