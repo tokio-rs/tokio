@@ -22,7 +22,44 @@ impl fmt::Display for WorkerIdxError {
     }
 }
 
-/// A handle to a local pool, used for spawning `!Send` tasks.
+/// A cloneable handle to a local pool, used for spawning `!Send` tasks.
+///
+/// Internally the local pool uses a [`tokio::task::LocalSet`] for each worker thread
+/// in the pool. Consequently you can also use [`tokio::task::spawn_local`] (which will
+/// execute on the same thread) inside the Future you supply to the various spawn methods
+/// of `LocalPoolHandle`,
+///
+/// [`tokio::task::LocalSet`]: tokio::task::LocalSet
+/// [`tokio::task::spawn_local`]: tokio::task::spawn_local
+///
+/// # Examples
+///
+/// ```
+/// use std::rc::Rc;
+/// use tokio::{self, task };
+/// use tokio_util::task::LocalPoolHandle;
+///
+/// #[tokio::main(flavor = "current_thread")]
+/// async fn main() {
+///     let pool = LocalPoolHandle::new(5);
+///
+///     let output = pool.spawn_pinned(|| {
+///         // `data` is !Send + !Sync
+///         let data = Rc::new("local data");
+///         let data_clone = data.clone();
+///
+///         async move {
+///             task::spawn_local(async move {
+///                 println!("{}", data_clone);
+///             });
+///     
+///             data.to_string()
+///         }   
+///     }).await.unwrap();
+///     println!("output: {}", output);
+/// }
+/// ```
+///
 #[derive(Clone)]
 pub struct LocalPoolHandle {
     pool: Arc<LocalPool>,
@@ -47,12 +84,13 @@ impl LocalPoolHandle {
     }
 
     /// Returns the number of threads of the Pool.
+    #[inline]
     pub fn num_threads(&self) -> usize {
         self.pool.workers.len()
     }
 
     /// Returns the number of tasks scheduled on each worker. The indices of the
-    /// workers correspond to the indices in the returned `Vec`.
+    /// worker threads correspond to the indices of the returned `Vec`.
     pub fn get_task_loads_for_each_worker(&self) -> Vec<usize> {
         self.pool
             .workers
@@ -101,9 +139,14 @@ impl LocalPoolHandle {
             .spawn_pinned(create_task, WorkerChoice::LeastBurdened)
     }
 
-    /// Differs from `spawn_pinned` only in that you can choose a specific worker of
-    /// the pool, whereas `spawn_pinned` chooses the worker with the smallest
+    /// Differs from `spawn_pinned` only in that you can choose a specific worker thread
+    /// of the pool, whereas `spawn_pinned` chooses the worker with the smallest
     /// number of tasks scheduled.
+    ///
+    /// A worker thread is chosen by index. Indices are 0 based and the largest index
+    /// is given by `num_threads() - 1`
+    ///
+    /// Returns a `WorkerIdxError` if the provided index is out of bounds.
     pub fn spawn_pinned_by_idx<F, Fut>(
         &self,
         create_task: F,
