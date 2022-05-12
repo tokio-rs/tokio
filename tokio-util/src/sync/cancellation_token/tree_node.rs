@@ -1,10 +1,8 @@
-//! GENERAL NOTES
-//! -------------
+//! This mod provides the logic for the inner tree structure of the CancellationToken.
 //!
-//! ** Invariants **
+//! # Invariants
 //!
-//! Those invariants shall be true at any time, and are required to prove correctness
-//! of the CancellationToken.
+//! Those invariants shall be true at any time.
 //!
 //! 1. A node that has no parents and no handles can no longer be cancelled.
 //!     This is important during both cancellation and refcounting.
@@ -21,7 +19,7 @@
 //! 3. If two nodes are both unlocked and node A is the parent of node B, then node B is a child of node A.
 //!     It is important to always restore that invariant before dropping the lock of a node.
 //!
-//! ** Deadlock safety **
+//! # Deadlock safety
 //!
 //! We always lock in the order of creation time. We can prove this through invariant #2.
 //! Specifically, through invariant #2, we know that we always have to lock a parent before its child.
@@ -49,7 +47,7 @@ impl TreeNode {
         }
     }
 
-    pub(crate) fn get_notified_future(&self) -> tokio::sync::futures::Notified<'_> {
+    pub(crate) fn notified(&self) -> tokio::sync::futures::Notified<'_> {
         self.waker.notified()
     }
 }
@@ -163,7 +161,7 @@ where
             // If we locked the node and its parent is `None`, we are in a valid state
             // and can return.
             None => {
-                // Drop locked_parent as it is not relevant any more
+                // Was the wrong parent, so unlock it before calling `func`
                 drop(locked_parent);
                 return func(locked_node, None);
             }
@@ -174,6 +172,7 @@ where
             return func(locked_node, Some(locked_parent));
         }
 
+        // Drop locked_parent, as potential_parent is borrowed in it
         drop(locked_node);
         drop(locked_parent);
 

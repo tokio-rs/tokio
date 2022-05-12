@@ -179,7 +179,7 @@ impl CancellationToken {
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
             cancellation_token: self,
-            future: self.inner.get_notified_future(),
+            future: self.inner.notified(),
         }
     }
 
@@ -218,8 +218,7 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
                 return Poll::Pending;
             }
 
-            this.future
-                .set(this.cancellation_token.inner.get_notified_future());
+            this.future.set(this.cancellation_token.inner.notified());
         }
     }
 }
