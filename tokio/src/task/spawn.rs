@@ -1,4 +1,4 @@
-use crate::{task::JoinHandle, util::error::CONTEXT_MISSING_ERROR};
+use crate::task::JoinHandle;
 
 use std::future::Future;
 
@@ -127,25 +127,13 @@ cfg_rt! {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
+        use crate::runtime::context;
         // preventing stack overflows on debug mode, by quickly sending the
         // task to the heap.
         if cfg!(debug_assertions) && std::mem::size_of::<T>() > 2048 {
-            spawn_inner(Box::pin(future), None)
+            context::current().spawn_named(Box::pin(future), None)
         } else {
-            spawn_inner(future, None)
+            context::current().spawn_named(future, None)
         }
-    }
-
-    #[track_caller]
-    pub(super) fn spawn_inner<T>(future: T, name: Option<&str>) -> JoinHandle<T::Output>
-    where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
-    {
-        use crate::runtime::{task, context};
-        let id = task::Id::next();
-        let spawn_handle = context::spawn_handle().expect(CONTEXT_MISSING_ERROR);
-        let task = crate::util::trace::task(future, "task", name, id.as_u64());
-        spawn_handle.spawn(task, id)
     }
 }
