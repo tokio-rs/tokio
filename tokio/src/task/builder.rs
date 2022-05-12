@@ -84,10 +84,20 @@ impl<'a> Builder<'a> {
         super::spawn::spawn_inner(future, self.name)
     }
 
-    /// Spawns a task on the current thread.
+    /// Spawns `!Send` a task on the current [`LocalSet`] with this builder's
+    /// settings.
     ///
-    /// See [`task::spawn_local`](crate::task::spawn_local)
-    /// for more details.
+    /// The spawned future will be run on the same thread that called `spawn_local.`
+    /// This may only be called from the context of a [local task set][`LocalSet`].
+    ///
+    /// # Panics
+    ///
+    /// - This function panics if called outside of a [local task set][`LocalSet`].
+    ///
+    /// See [`task::spawn_local`] for more details.
+    ///
+    /// [`task::spawn_local`]: crate::task::spawn_local
+    /// [`LocalSet`]: crate::task::LocalSet
     #[track_caller]
     pub fn spawn_local<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
     where
