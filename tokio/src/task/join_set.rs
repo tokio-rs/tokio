@@ -57,6 +57,8 @@ pub struct JoinSet<T> {
 /// than on the current default runtime.
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+#[must_use = "builders do nothing unless used to spawn a task"]
+#[derive(Debug)]
 pub struct Builder<'a, T> {
     joinset: &'a mut JoinSet<T>,
     builder: super::Builder<'a>,
