@@ -55,6 +55,8 @@ pub struct JoinSet<T> {
 
 /// A variant of [`task::Builder`] that spawns tasks on a [`JoinSet`] rather
 /// than on the current default runtime.
+#[cfg(all(tokio_unstable, feature = "tracing"))]
+#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 pub struct Builder<'a, T> {
     joinset: &'a mut JoinSet<T>,
     builder: super::Builder<'a>,
@@ -98,6 +100,8 @@ impl<T: 'static> JoinSet<T> {
     ///         .spawn(async { /* ... */ });
     /// }
     /// ```
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
     pub fn build_task(&mut self) -> Builder<'_, T> {
         Builder {
             builder: super::Builder::new(),
@@ -323,6 +327,9 @@ impl<T> Default for JoinSet<T> {
 }
 
 // === impl Builder ===
+
+#[cfg(all(tokio_unstable, feature = "tracing"))]
+#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 impl<'a, T: 'static> Builder<'a, T> {
 
     /// Assigns a name to the task which will be spawned.
