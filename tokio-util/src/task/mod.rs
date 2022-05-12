@@ -3,7 +3,7 @@
 #[cfg(tokio_unstable)]
 mod join_map;
 mod spawn_pinned;
-pub use spawn_pinned::LocalPoolHandle;
+pub use spawn_pinned::{LocalPoolHandle, WorkerIdxError};
 
 #[cfg(tokio_unstable)]
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt"))))]

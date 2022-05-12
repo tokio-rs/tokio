@@ -2,6 +2,7 @@
 
 use std::rc::Rc;
 use std::sync::Arc;
+use tokio::sync::Barrier;
 use tokio_util::task;
 
 /// Simple test of running a !Send future via spawn_pinned
@@ -195,11 +196,27 @@ async fn tasks_are_balanced() {
 #[tokio::test]
 async fn spawn_by_idx() {
     let pool = task::LocalPoolHandle::new(3);
+    let barrier = Arc::new(Barrier::new(3));
+    let barrier1 = barrier.clone();
+    let barrier2 = barrier.clone();
 
-    let handle1 = pool.spawn_pinned_by_idx(|| async { std::thread::current().id() }, 0);
-    let handle2 = pool.spawn_pinned_by_idx(|| async { std::thread::current().id() }, 1);
+    let handle1 = pool.spawn_pinned_by_idx(
+        || async move {
+            barrier1.wait().await;
+            std::thread::current().id()
+        },
+        0,
+    );
+    let handle2 = pool.spawn_pinned_by_idx(
+        || async move {
+            barrier2.wait().await;
+            std::thread::current().id()
+        },
+        1,
+    );
 
     let loads = pool.get_task_loads_for_each_worker();
+    barrier.wait().await;
     assert_eq!(loads[0], 1);
     assert_eq!(loads[1], 1);
     assert_eq!(loads[2], 0);
@@ -212,17 +229,19 @@ async fn spawn_by_idx() {
 
 #[tokio::test]
 async fn spawn_on_all_workers() {
-    let pool = task::LocalPoolHandle::new(3);
+    const NUM_WORKERS: usize = 3;
+    let pool = task::LocalPoolHandle::new(NUM_WORKERS);
+    let barrier = Arc::new(Barrier::new(NUM_WORKERS + 1));
+    let barrier_clone = barrier.clone();
 
-    let _ = pool.spawn_pinned_on_all_workers(|| {
-        // Rc is !Send + !Sync
-        let local_data = Rc::new("test");
+    let _ = pool.spawn_pinned_on_all_workers(|| async move {
+        barrier_clone.wait().await;
 
-        // This future holds an Rc, so it is !Send
-        async move { local_data.to_string() }
+        "test"
     });
 
     let loads = pool.get_task_loads_for_each_worker();
+    barrier.wait().await;
     assert_eq!(loads[0], 1);
     assert_eq!(loads[1], 1);
     assert_eq!(loads[2], 1);

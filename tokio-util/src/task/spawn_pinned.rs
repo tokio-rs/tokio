@@ -1,4 +1,5 @@
 use futures_util::future::{AbortHandle, Abortable};
+use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
@@ -9,18 +10,26 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 use tokio::task::{spawn_local, JoinHandle, LocalSet};
 
+/// Error Type for out-of-bounds indexing error in [`LocalPoolHandle::spawn_pinned_by_idx`].
+///
+/// [`LocalPoolHandle::spawn_pinned_by_idx`]: LocalPoolHandle::spawn_pinned_by_idx
 #[derive(Debug)]
-pub struct WorkerIdxError(usize, usize);
+pub struct WorkerIdxError {
+    idx: usize,
+    num_workers: usize,
+}
 
 impl fmt::Display for WorkerIdxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Index {} out of bounds, only {} workers in pool",
-            self.0, self.1
+            self.idx, self.num_workers
         )
     }
 }
+
+impl Error for WorkerIdxError {}
 
 /// A cloneable handle to a local pool, used for spawning `!Send` tasks.
 ///
@@ -159,7 +168,10 @@ impl LocalPoolHandle {
         Fut::Output: Send + 'static,
     {
         if idx >= self.pool.workers.len() {
-            return Err(WorkerIdxError(idx, self.pool.workers.len()));
+            return Err(WorkerIdxError {
+                idx,
+                num_workers: self.pool.workers.len(),
+            });
         }
 
         Ok(self
@@ -169,12 +181,32 @@ impl LocalPoolHandle {
 
     /// Spawn a task on every worker thread in the pool and pin it so that it
     /// can't be moved off of the thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::rc::Rc;
+    /// use tokio_util::task::LocalPoolHandle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let pool = LocalPoolHandle::new(3);
+    ///
+    ///     let _ = pool.spawn_pinned_on_all_workers(|| {
+    ///         // Rc is !Send + !Sync
+    ///         let local_data = Rc::new("test");
+    ///
+    ///         // This future holds an Rc, so it is !Send
+    ///         async move { local_data.to_string() }
+    ///     });
+    /// }
+    /// ```
     pub fn spawn_pinned_on_all_workers<F, Fut>(
         &self,
         create_task: F,
     ) -> Vec<JoinHandle<Fut::Output>>
     where
-        F: Fn() -> Fut,
+        F: FnOnce() -> Fut,
         F: Send + Clone + 'static,
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
@@ -331,25 +363,13 @@ impl LocalPool {
     }
 
     fn find_worker_by_idx(&self, idx: usize) -> (&LocalWorkerHandle, JobCountGuard) {
-        loop {
-            let worker = &self.workers[idx];
-            let task_count = worker.task_count.load(Ordering::SeqCst);
+        let worker = &self.workers[idx];
+        let task_count = worker.task_count.load(Ordering::SeqCst);
+        worker
+            .task_count
+            .fetch_add(task_count + 1, Ordering::SeqCst);
 
-            // Make sure the task count hasn't changed since when we choose this
-            // worker. Otherwise, restart the search.
-            if worker
-                .task_count
-                .compare_exchange(
-                    task_count,
-                    task_count + 1,
-                    Ordering::SeqCst,
-                    Ordering::Relaxed,
-                )
-                .is_ok()
-            {
-                return (worker, JobCountGuard(Arc::clone(&worker.task_count)));
-            }
-        }
+        (worker, JobCountGuard(Arc::clone(&worker.task_count)))
     }
 }
 
