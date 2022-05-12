@@ -1,7 +1,7 @@
 #![allow(unreachable_pub)]
 use crate::{
     runtime::{context, Handle},
-    task::JoinHandle,
+    task::{JoinHandle, LocalSet},
 };
 use std::future::Future;
 
@@ -88,7 +88,7 @@ impl<'a> Builder<'a> {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        super::spawn_inner(future, self.name)
+        super::spawn::spawn_inner(future, self.name)
     }
 
     /// Spawn a task with this builder's settings on the provided [runtime
@@ -99,7 +99,7 @@ impl<'a> Builder<'a> {
     /// [runtime handle]: crate::runtime::Handle
     /// [`Handle::spawn`]: crate::runtime::Handle::spawn
     #[track_caller]
-    pub fn spawn_on<Fut>(&mut self, task: F, handle: &Handle) -> JoinHandle<Fut::Output>
+    pub fn spawn_on<Fut>(&mut self, future: Fut, handle: &Handle) -> JoinHandle<Fut::Output>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
@@ -143,7 +143,7 @@ impl<'a> Builder<'a> {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        local_set.spawn_inner(future, self.name)
+        local_set.spawn_named(future, self.name)
     }
 
     /// Spawns blocking code on the blocking threadpool.
@@ -160,7 +160,7 @@ impl<'a> Builder<'a> {
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
-        self.spawn_blocking_on(function, context::current())
+        self.spawn_blocking_on(function, &context::current())
     }
 
     /// Spawns blocking code on the provided [runtime handle]'s blocking threadpool.
@@ -184,7 +184,7 @@ impl<'a> Builder<'a> {
             function,
             Mandatory::NonMandatory,
             self.name,
-            &handle,
+            handle,
         );
         join_handle
     }
