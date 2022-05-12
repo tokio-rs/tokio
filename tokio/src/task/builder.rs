@@ -88,7 +88,7 @@ impl<'a> Builder<'a> {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        self.spawn_on(task, context::current())
+        super::spawn_inner(future, self.name)
     }
 
     /// Spawn a task with this builder's settings on the provided [runtime

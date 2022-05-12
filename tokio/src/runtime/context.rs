@@ -68,6 +68,15 @@ cfg_time! {
     }
 }
 
+cfg_rt! {
+    pub(crate) fn spawn_handle() -> Option<crate::runtime::Spawner> {
+        match CONTEXT.try_with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.spawner.clone())) {
+            Ok(spawner) => spawner,
+            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+        }
+    }
+}
+
 /// Sets this [`Handle`] as the current active [`Handle`].
 ///
 /// [`Handle`]: Handle
