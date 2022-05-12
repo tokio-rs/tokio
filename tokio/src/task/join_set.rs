@@ -317,8 +317,9 @@ impl<'a, T: 'static> Builder<'a, T> {
         }
     }
 
-    /// Spawn the provided task on the [`JoinSet`] with this builder's settings.
-    /// returning an [`AbortHandle`] that can be used to remotely cancel the task.
+    /// Spawn the provided task with this builder's settings and store it in the
+    /// [`JoinSet`], returning an [`AbortHandle`] that can be used to remotely
+    /// cancel the task.
     ///
     /// # Returns
     ///
@@ -337,6 +338,27 @@ impl<'a, T: 'static> Builder<'a, T> {
         T: Send,
     {
         self.joinset.insert(self.builder.spawn(future))
+    }
+
+
+    /// Spawn the provided task on the provided [runtime handle] with this
+    /// builder's settings, and store it in the [`JoinSet`].
+    ///
+    /// # Returns
+    ///
+    /// An [`AbortHandle`] that can be used to remotely cancel the task.
+    ///
+    ///
+    /// [`AbortHandle`]: crate::task::AbortHandle
+    /// [runtime handle]: crate::runtime::Handle
+    #[track_caller]
+    pub fn spawn_on<F>(self, future: F, handle: &Handle) -> AbortHandle
+    where
+        F: Future<Output = T>,
+        F: Send + 'static,
+        T: Send,
+    {
+        self.joinset.insert(self.builder.spawn_on(future, handle))
     }
 
     /// Spawn the provided task on the current [`LocalSet`] with this builder's
@@ -359,5 +381,23 @@ impl<'a, T: 'static> Builder<'a, T> {
         F: 'static,
     {
         self.joinset.insert(self.builder.spawn_local(future))
+    }
+
+    /// Spawn the provided task on the provided [`LocalSet`] with this builder's
+    /// settings, and store it in the [`JoinSet`].
+    ///
+    /// # Returns
+    ///
+    /// An [`AbortHandle`] that can be used to remotely cancel the task.
+    ///
+    /// [`LocalSet`]: crate::task::LocalSet
+    /// [`AbortHandle`]: crate::task::AbortHandle
+    #[track_caller]
+    pub fn spawn_local_on<F>(self, future: F, local_set: &LocalSet) -> AbortHandle
+    where
+        F: Future<Output = T>,
+        F: 'static,
+    {
+        self.joinset.insert(self.builder.spawn_local_on(future, local_set))
     }
 }
