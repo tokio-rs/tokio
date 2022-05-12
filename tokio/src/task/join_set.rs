@@ -82,6 +82,22 @@ impl<T> JoinSet<T> {
 impl<T: 'static> JoinSet<T> {
     /// Returns a [`Builder`] that can be used to configure a task prior to
     /// spawning it on this `JoinSet`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::task::JoinSet;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut set = JoinSet::new();
+    ///
+    ///     // Use the builder to configure a task's name before spawning it.
+    ///     set.build_task()
+    ///         .name("my_task")
+    ///         .spawn(async { /* ... */ });
+    /// }
+    /// ```
     pub fn build_task(&mut self) -> Builder<'_, T> {
         Builder {
             builder: super::Builder::new(),
