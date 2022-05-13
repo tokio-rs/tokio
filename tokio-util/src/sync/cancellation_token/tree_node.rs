@@ -183,7 +183,8 @@ where
             return func(locked_node, Some(locked_parent));
         }
 
-        // Drop locked_parent, as potential_parent is borrowed in it
+        // Drop locked_parent before reassigning to potential_parent, 
+        // as potential_parent is borrowed in it
         drop(locked_node);
         drop(locked_parent);
 
