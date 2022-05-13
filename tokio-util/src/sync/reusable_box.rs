@@ -1,17 +1,18 @@
 use std::alloc::Layout;
+use std::fmt;
 use std::future::Future;
-use std::panic::AssertUnwindSafe;
+use std::marker::PhantomData;
+use std::mem::{self, ManuallyDrop};
 use std::pin::Pin;
-use std::ptr::{self, NonNull};
+use std::ptr;
 use std::task::{Context, Poll};
-use std::{fmt, panic};
 
 /// A reusable `Pin<Box<dyn Future<Output = T> + Send + 'a>>`.
 ///
 /// This type lets you replace the future stored in the box without
 /// reallocating when the size and alignment permits this.
 pub struct ReusableBoxFuture<'a, T> {
-    boxed: NonNull<dyn Future<Output = T> + Send + 'a>,
+    boxed: Pin<Box<dyn Future<Output = T> + Send + 'a>>,
 }
 
 impl<'a, T> ReusableBoxFuture<'a, T> {
@@ -20,11 +21,9 @@ impl<'a, T> ReusableBoxFuture<'a, T> {
     where
         F: Future<Output = T> + Send + 'a,
     {
-        let boxed: Box<dyn Future<Output = T> + Send + 'a> = Box::new(future);
-
-        let boxed = NonNull::from(Box::leak(boxed));
-
-        Self { boxed }
+        Self {
+            boxed: Box::pin(future),
+        }
     }
 
     /// Replace the future currently stored in this box.
@@ -49,62 +48,29 @@ impl<'a, T> ReusableBoxFuture<'a, T> {
     where
         F: Future<Output = T> + Send + 'a,
     {
-        // SAFETY: The pointer is not dangling.
-        let self_layout = {
-            let dyn_future: &(dyn Future<Output = T> + Send) = unsafe { self.boxed.as_ref() };
-            Layout::for_value(dyn_future)
-        };
-
-        if Layout::new::<F>() == self_layout {
-            // SAFETY: We just checked that the layout of F is correct.
-            unsafe {
-                self.set_same_layout(future);
-            }
-
-            Ok(())
-        } else {
-            Err(future)
+        // If we try to inline the contents of this function, the type checker complains because
+        // the bound `T: 'a` is not satisfied in the call to `pending()`. But by putting it in an
+        // inner function that doesn't have `T` as a generic parameter, we implicitly get the bound
+        // `F::Output: 'a` transitively through `F: 'a`, allowing us to call `pending()`.
+        #[inline(always)]
+        fn real_try_set<'a, F>(
+            this: &mut ReusableBoxFuture<'a, F::Output>,
+            future: F,
+        ) -> Result<(), F>
+        where
+            F: Future + Send + 'a,
+        {
+            // future::Pending<T> is a ZST so this never allocates.
+            let boxed = mem::replace(&mut this.boxed, Box::pin(Pending(PhantomData)));
+            reuse_pin_box(boxed, future, |boxed| this.boxed = Pin::from(boxed))
         }
-    }
 
-    /// Set the current future.
-    ///
-    /// # Safety
-    ///
-    /// This function requires that the layout of the provided future is the
-    /// same as `self.layout`.
-    unsafe fn set_same_layout<F>(&mut self, future: F)
-    where
-        F: Future<Output = T> + Send + 'a,
-    {
-        // Drop the existing future, catching any panics.
-        let result = panic::catch_unwind(AssertUnwindSafe(|| {
-            ptr::drop_in_place(self.boxed.as_ptr());
-        }));
-
-        // Overwrite the future behind the pointer. This is safe because the
-        // allocation was allocated with the same size and alignment as the type F.
-        let self_ptr: *mut F = self.boxed.as_ptr() as *mut F;
-        ptr::write(self_ptr, future);
-
-        // Update the vtable of self.boxed. The pointer is not null because we
-        // just got it from self.boxed, which is not null.
-        self.boxed = NonNull::new_unchecked(self_ptr);
-
-        // If the old future's destructor panicked, resume unwinding.
-        match result {
-            Ok(()) => {}
-            Err(payload) => {
-                panic::resume_unwind(payload);
-            }
-        }
+        real_try_set(self, future)
     }
 
     /// Get a pinned reference to the underlying future.
     pub fn get_pin(&mut self) -> Pin<&mut (dyn Future<Output = T> + Send)> {
-        // SAFETY: The user of this box cannot move the box, and we do not move it
-        // either.
-        unsafe { Pin::new_unchecked(self.boxed.as_mut()) }
+        self.boxed.as_mut()
     }
 
     /// Poll the future stored inside this box.
@@ -122,32 +88,84 @@ impl<T> Future for ReusableBoxFuture<'_, T> {
     }
 }
 
-// The future stored inside ReusableBoxFuture<'_, T> must be Send since the
-// `new` and `set` and `try_set` methods only allow setting the future to Send
-// futures.
-//
-// Note that T is the return type of the future, so its not relevant for
-// whether the future itself is Send.
-unsafe impl<T> Send for ReusableBoxFuture<'_, T> {}
-
 // The only method called on self.boxed is poll, which takes &mut self, so this
 // struct being Sync does not permit any invalid access to the Future, even if
 // the future is not Sync.
 unsafe impl<T> Sync for ReusableBoxFuture<'_, T> {}
 
-// Just like a Pin<Box<dyn Future>> is always Unpin, so is this type.
-impl<T> Unpin for ReusableBoxFuture<'_, T> {}
-
-impl<T> Drop for ReusableBoxFuture<'_, T> {
-    fn drop(&mut self) {
-        unsafe {
-            drop(Box::from_raw(self.boxed.as_ptr()));
-        }
-    }
-}
-
 impl<T> fmt::Debug for ReusableBoxFuture<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReusableBoxFuture").finish()
+    }
+}
+
+fn reuse_pin_box<T: ?Sized, U, O, F>(boxed: Pin<Box<T>>, new_value: U, callback: F) -> Result<O, U>
+where
+    F: FnOnce(Box<U>) -> O,
+{
+    let layout = Layout::for_value::<T>(&*boxed);
+    if layout != Layout::new::<U>() {
+        return Err(new_value);
+    }
+
+    // SAFETY: We don't ever construct a non-pinned reference to the old `T` from now on, and we
+    // always drop the `T`.
+    let raw: *mut T = Box::into_raw(unsafe { Pin::into_inner_unchecked(boxed) });
+
+    // When dropping the old value panics, we still want to call `callback` — so move the rest of
+    // the code into a guard type.
+    let guard = CallOnDrop::new(|| {
+        let raw: *mut U = raw.cast::<U>();
+        unsafe { raw.write(new_value) };
+
+        // SAFETY:
+        // - `T` and `U` have the same layout.
+        // - `raw` comes from a `Box` that uses the same allocator as this one.
+        // - `raw` points to a valid instance of `U` (we just wrote it in).
+        let boxed = unsafe { Box::from_raw(raw) };
+
+        callback(boxed)
+    });
+
+    // Drop the old value.
+    unsafe { ptr::drop_in_place(raw) };
+
+    // Run the rest of the code.
+    Ok(guard.call())
+}
+
+struct CallOnDrop<O, F: FnOnce() -> O> {
+    f: ManuallyDrop<F>,
+}
+
+impl<O, F: FnOnce() -> O> CallOnDrop<O, F> {
+    fn new(f: F) -> Self {
+        let f = ManuallyDrop::new(f);
+        Self { f }
+    }
+    fn call(self) -> O {
+        let mut this = ManuallyDrop::new(self);
+        let f = unsafe { ManuallyDrop::take(&mut this.f) };
+        f()
+    }
+}
+
+impl<O, F: FnOnce() -> O> Drop for CallOnDrop<O, F> {
+    fn drop(&mut self) {
+        let f = unsafe { ManuallyDrop::take(&mut self.f) };
+        f();
+    }
+}
+
+/// The same as `std::future::Pending<T>`; we can't use that type directly because on rustc
+/// versions <1.60 it didn't unconditionally implement `Send`.
+// FIXME: use `std::future::Pending<T>` once the MSRV is >=1.60
+struct Pending<T>(PhantomData<fn() -> T>);
+
+impl<T> Future for Pending<T> {
+    type Output = T;
+
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Poll::Pending
     }
 }
