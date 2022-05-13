@@ -55,6 +55,8 @@ pub struct JoinSet<T> {
 
 /// A variant of [`task::Builder`] that spawns tasks on a [`JoinSet`] rather
 /// than on the current default runtime.
+/// 
+/// [`task::Builder`]: crate::task::Builder
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 #[must_use = "builders do nothing unless used to spawn a task"]
