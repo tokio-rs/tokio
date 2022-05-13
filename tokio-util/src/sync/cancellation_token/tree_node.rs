@@ -7,7 +7,7 @@
 //! children.
 //!
 //! A TreeNode can receive the request to perform a cancellation through a CancellationToken.
-//! This cancellation request will cancel the node and all of its children.
+//! This cancellation request will cancel the node and all of its descendants.
 //!
 //! As soon as a node cannot get cancelled any more (because it was already cancelled or it has no
 //! more CancellationTokens pointing to it any more), it gets removed from the tree, to keep the
