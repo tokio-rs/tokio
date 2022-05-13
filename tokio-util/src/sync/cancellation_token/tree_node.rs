@@ -3,13 +3,15 @@
 //! CancellationTokens are only light handles with references to TreeNode.
 //! All the logic is actually implemented in the TreeNode.
 //!
-//! A TreeNode is part of the cancellation tree and may have one parent and an arbitrary number of children.
+//! A TreeNode is part of the cancellation tree and may have one parent and an arbitrary number of
+//! children.
 //!
 //! A TreeNode can receive the request to perform a cancellation through a CancellationToken.
 //! This cancellation request will cancel the node and all of its children.
 //!
-//! As soon as a node cannot get cancelled any more (because it was already cancelled or it has no more CancellationTokens
-//! pointing to it any more), it gets removed from the tree, to keep the tree as small as possible.
+//! As soon as a node cannot get cancelled any more (because it was already cancelled or it has no
+//! more CancellationTokens pointing to it any more), it gets removed from the tree, to keep the
+//! tree as small as possible.
 //!
 //! # Invariants
 //!
@@ -23,17 +25,18 @@
 //!     Node B can only become the child of node A in two ways:
 //!         - being created with `child_node()`, in which case it is trivially true that
 //!           node A already existed when node B was created
-//!         - being moved A->C->B to A->B because node C was removed in `decrease_handle_refcount()` or `cancel()`.
-//!           In this case the invariant still holds, as B was younger than C, and C was younger
-//!           than A, therefore B is also younger than A.
+//!         - being moved A->C->B to A->B because node C was removed in `decrease_handle_refcount()`
+//!           or `cancel()`. In this case the invariant still holds, as B was younger than C, and C
+//!           was younger than A, therefore B is also younger than A.
 //!
-//! 3. If two nodes are both unlocked and node A is the parent of node B, then node B is a child of node A.
-//!     It is important to always restore that invariant before dropping the lock of a node.
+//! 3. If two nodes are both unlocked and node A is the parent of node B, then node B is a child of
+//!    node A. It is important to always restore that invariant before dropping the lock of a node.
 //!
 //! # Deadlock safety
 //!
 //! We always lock in the order of creation time. We can prove this through invariant #2.
-//! Specifically, through invariant #2, we know that we always have to lock a parent before its child.
+//! Specifically, through invariant #2, we know that we always have to lock a parent
+//! before its child.
 //!
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 
@@ -162,8 +165,8 @@ where
         // Deadlock safety:
         //
         // Due to invariant #2, we know that we have to lock the parent first, and then the child.
-        // This is true even if the potential_parent is no longer the current parent or even its sibling,
-        // as the invariant still holds.
+        // This is true even if the potential_parent is no longer the current parent or even its
+        // sibling, as the invariant still holds.
         let locked_parent = potential_parent.inner.lock().unwrap();
         let locked_node = node.inner.lock().unwrap();
 
@@ -183,7 +186,7 @@ where
             return func(locked_node, Some(locked_parent));
         }
 
-        // Drop locked_parent before reassigning to potential_parent, 
+        // Drop locked_parent before reassigning to potential_parent,
         // as potential_parent is borrowed in it
         drop(locked_node);
         drop(locked_parent);
