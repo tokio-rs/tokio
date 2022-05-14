@@ -58,4 +58,8 @@ futures-test = "0.3.5"
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+# enable unstable features in the documentation
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
+# it's necessary to _also_ pass `--cfg tokio_unstable` to rustc, or else
+# dependencies will not be enabled, and the docs build will fail.
+rustc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
