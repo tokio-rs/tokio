@@ -1,3 +1,9 @@
+# 0.7.2 (May 14, 2022)
+
+This release contains a rewrite of `CancellationToken` that fixes a memory leak. ([#4652])
+
+[#4652]: https://github.com/tokio-rs/tokio/pull/4652
+
 # 0.7.1 (February 21, 2022)
 
 ### Added
@@ -51,7 +57,7 @@
 
 # 0.6.10 (May 14, 2021)
 
-This is a backport for a memory leak in `CancellationToken`. ([#4652])
+This is a backport for the memory leak in `CancellationToken` that was originally fixed in 0.7.2. ([#4652])
 
 [#4652]: https://github.com/tokio-rs/tokio/pull/4652
 
