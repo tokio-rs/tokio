@@ -8,6 +8,7 @@ on:
 name: Loom
 
 env:
+  RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
 
 jobs:
@@ -34,6 +35,6 @@ jobs:
         run: cargo test --lib --release --features full -- --nocapture $SCOPE
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg loom --cfg tokio_unstable
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
           LOOM_MAX_PREEMPTIONS: 2
           SCOPE: ${{ matrix.scope }}
