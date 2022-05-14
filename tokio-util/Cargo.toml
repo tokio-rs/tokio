@@ -6,7 +6,7 @@ name = "tokio-util"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "tokio-util-0.6.x" git tag.
-version = "0.6.9"
+version = "0.6.10"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
