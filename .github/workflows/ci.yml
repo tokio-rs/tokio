@@ -7,7 +7,6 @@ on:
 name: CI
 
 env:
-  RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
   nightly: nightly-2021-10-25
   minrust: 1.45.2
@@ -64,11 +63,6 @@ jobs:
       - name: test tests-integration --each-feature
         run: cargo hack test --each-feature
         working-directory: tests-integration
-
-      # Run macro build tests
-      - name: test tests-build --each-feature
-        run: cargo hack test --each-feature
-        working-directory: tests-build
 
       # Build benchmarks. Run of benchmarks is done by bench.yml workflow.
       - name: build benches
@@ -129,7 +123,7 @@ jobs:
         run: cargo test --all-features
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable
 
   miri:
     name: miri
@@ -213,7 +207,7 @@ jobs:
       - name: check --each-feature --unstable
         run: cargo hack check --all --each-feature -Z avoid-dev-deps
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable
 
   minrust:
     name: minrust
@@ -298,7 +292,7 @@ jobs:
         run: cargo doc --lib --no-deps --all-features --document-private-items
         env:
           RUSTFLAGS: --cfg docsrs
-          RUSTDOCFLAGS: --cfg docsrs -Dwarnings
+          RUSTDOCFLAGS: --cfg docsrs
 
   loom-compile:
     name: build loom tests
@@ -312,7 +306,7 @@ jobs:
         run: cargo test --no-run --lib --features full
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable
 
   check-readme:
     name: Check README

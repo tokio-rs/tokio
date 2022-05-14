@@ -324,8 +324,8 @@ impl Sleep {
     }
 
     fn reset_inner(self: Pin<&mut Self>, deadline: Instant) {
-        let me = self.project();
-        me.entry.reset(deadline);
+        let mut me = self.project();
+        me.entry.as_mut().reset(deadline);
         (*me.inner).deadline = deadline;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -349,12 +349,12 @@ impl Sleep {
 
     cfg_not_trace! {
         fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
-            let me = self.project();
+            let mut me = self.project();
 
             // Keep track of task budget
             let coop = ready!(crate::coop::poll_proceed(cx));
 
-            me.entry.poll_elapsed(cx).map(move |r| {
+            me.entry.as_mut().poll_elapsed(cx).map(move |r| {
                 coop.made_progress();
                 r
             })
@@ -363,7 +363,7 @@ impl Sleep {
 
     cfg_trace! {
         fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
-            let me = self.project();
+            let mut me = self.project();
             // Keep track of task budget
             let coop = ready!(trace_poll_op!(
                 "poll_elapsed",
@@ -371,7 +371,7 @@ impl Sleep {
                 me.inner.resource_span.id(),
             ));
 
-            let result =  me.entry.poll_elapsed(cx).map(move |r| {
+            let result =  me.entry.as_mut().poll_elapsed(cx).map(move |r| {
                 coop.made_progress();
                 r
             });
