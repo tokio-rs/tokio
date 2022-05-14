@@ -49,6 +49,12 @@
 [#4214]: https://github.com/tokio-rs/tokio/pull/4214
 [#4241]: https://github.com/tokio-rs/tokio/pull/4241
 
+# 0.6.10 (May 14, 2021)
+
+This is a backport for a memory leak in `CancellationToken`. ([#4652])
+
+[#4652]: https://github.com/tokio-rs/tokio/pull/4652
+
 # 0.6.9 (October 29, 2021)
 
 ### Added
