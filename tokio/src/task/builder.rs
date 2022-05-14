@@ -1,5 +1,8 @@
 #![allow(unreachable_pub)]
-use crate::{runtime::context, task::JoinHandle};
+use crate::{
+    runtime::{context, Handle},
+    task::{JoinHandle, LocalSet},
+};
 use std::future::Future;
 
 /// Factory which is used to configure the properties of a new task.
@@ -71,7 +74,11 @@ impl<'a> Builder<'a> {
         Self { name: Some(name) }
     }
 
-    /// Spawns a task on the executor.
+    /// Spawns a task with this builder's settings on the current runtime.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if called outside of a Tokio runtime.
     ///
     /// See [`task::spawn`](crate::task::spawn) for
     /// more details.
@@ -84,10 +91,36 @@ impl<'a> Builder<'a> {
         super::spawn::spawn_inner(future, self.name)
     }
 
-    /// Spawns a task on the current thread.
+    /// Spawn a task with this builder's settings on the provided [runtime
+    /// handle].
     ///
-    /// See [`task::spawn_local`](crate::task::spawn_local)
-    /// for more details.
+    /// See [`Handle::spawn`] for more details.
+    ///
+    /// [runtime handle]: crate::runtime::Handle
+    /// [`Handle::spawn`]: crate::runtime::Handle::spawn
+    #[track_caller]
+    pub fn spawn_on<Fut>(&mut self, future: Fut, handle: &Handle) -> JoinHandle<Fut::Output>
+    where
+        Fut: Future + Send + 'static,
+        Fut::Output: Send + 'static,
+    {
+        handle.spawn_named(future, self.name)
+    }
+
+    /// Spawns `!Send` a task on the current [`LocalSet`] with this builder's
+    /// settings.
+    ///
+    /// The spawned future will be run on the same thread that called `spawn_local.`
+    /// This may only be called from the context of a [local task set][`LocalSet`].
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called outside of a [local task set][`LocalSet`].
+    ///
+    /// See [`task::spawn_local`] for more details.
+    ///
+    /// [`task::spawn_local`]: crate::task::spawn_local
+    /// [`LocalSet`]: crate::task::LocalSet
     #[track_caller]
     pub fn spawn_local<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
     where
@@ -97,7 +130,27 @@ impl<'a> Builder<'a> {
         super::local::spawn_local_inner(future, self.name)
     }
 
+    /// Spawns `!Send` a task on the provided [`LocalSet`] with this builder's
+    /// settings.
+    ///
+    /// See [`LocalSet::spawn_local`] for more details.
+    ///
+    /// [`LocalSet::spawn_local`]: crate::task::LocalSet::spawn_local
+    /// [`LocalSet`]: crate::task::LocalSet
+    #[track_caller]
+    pub fn spawn_local_on<Fut>(self, future: Fut, local_set: &LocalSet) -> JoinHandle<Fut::Output>
+    where
+        Fut: Future + 'static,
+        Fut::Output: 'static,
+    {
+        local_set.spawn_named(future, self.name)
+    }
+
     /// Spawns blocking code on the blocking threadpool.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if called outside of a Tokio runtime.
     ///
     /// See [`task::spawn_blocking`](crate::task::spawn_blocking)
     /// for more details.
@@ -107,13 +160,31 @@ impl<'a> Builder<'a> {
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
+        self.spawn_blocking_on(function, &context::current())
+    }
+
+    /// Spawns blocking code on the provided [runtime handle]'s blocking threadpool.
+    ///
+    /// See [`Handle::spawn_blocking`] for more details.
+    ///
+    /// [runtime handle]: crate::runtime::Handle
+    /// [`Handle::spawn_blocking`]: crate::runtime::Handle::spawn_blocking
+    #[track_caller]
+    pub fn spawn_blocking_on<Function, Output>(
+        self,
+        function: Function,
+        handle: &Handle,
+    ) -> JoinHandle<Output>
+    where
+        Function: FnOnce() -> Output + Send + 'static,
+        Output: Send + 'static,
+    {
         use crate::runtime::Mandatory;
-        let handle = context::current();
         let (join_handle, _was_spawned) = handle.as_inner().spawn_blocking_inner(
             function,
             Mandatory::NonMandatory,
             self.name,
-            &handle,
+            handle,
         );
         join_handle
     }

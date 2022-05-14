@@ -301,19 +301,11 @@ cfg_rt! {
     where F: Future + 'static,
           F::Output: 'static
     {
-        let id = crate::runtime::task::Id::next();
-        let future = crate::util::trace::task(future, "local", name, id.as_u64());
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
 
-            let (handle, notified) = cx.owned.bind(future, cx.shared.clone(), id);
-
-            if let Some(notified) = notified {
-                cx.shared.schedule(notified);
-            }
-
-            handle
+            cx.spawn(future, name)
         })
     }
 }
@@ -386,20 +378,7 @@ impl LocalSet {
         F: Future + 'static,
         F::Output: 'static,
     {
-        let id = crate::runtime::task::Id::next();
-        let future = crate::util::trace::task(future, "local", None, id.as_u64());
-
-        let (handle, notified) = self
-            .context
-            .owned
-            .bind(future, self.context.shared.clone(), id);
-
-        if let Some(notified) = notified {
-            self.context.shared.schedule(notified);
-        }
-
-        self.context.shared.waker.wake();
-        handle
+        self.spawn_named(future, None)
     }
 
     /// Runs a future to completion on the provided runtime, driving any local
@@ -510,6 +489,21 @@ impl LocalSet {
             local_set: self,
         };
         run_until.await
+    }
+
+    pub(in crate::task) fn spawn_named<F>(
+        &self,
+        future: F,
+        name: Option<&str>,
+    ) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        let handle = self.context.spawn(future, name);
+
+        self.context.shared.waker.wake();
+        handle
     }
 
     /// Ticks the scheduler, returning whether the local future needs to be
@@ -625,6 +619,28 @@ impl Drop for LocalSet {
 
             assert!(self.context.owned.is_empty());
         });
+    }
+}
+
+// === impl Context ===
+
+impl Context {
+    #[track_caller]
+    fn spawn<F>(&self, future: F, name: Option<&str>) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        let id = crate::runtime::task::Id::next();
+        let future = crate::util::trace::task(future, "local", name, id.as_u64());
+
+        let (handle, notified) = self.owned.bind(future, self.shared.clone(), id);
+
+        if let Some(notified) = notified {
+            self.shared.schedule(notified);
+        }
+
+        handle
     }
 }
 
