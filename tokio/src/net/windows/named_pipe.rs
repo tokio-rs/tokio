@@ -2314,7 +2314,7 @@ impl ClientOptions {
 /// The pipe mode of a named pipe.
 ///
 /// Set through [`ServerOptions::pipe_mode`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum PipeMode {
     /// Data is written to the pipe as a stream of bytes. The pipe does not
@@ -2334,7 +2334,7 @@ pub enum PipeMode {
 }
 
 /// Indicates the end of a named pipe.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum PipeEnd {
     /// The named pipe refers to the client end of a named pipe instance.
@@ -2350,7 +2350,7 @@ pub enum PipeEnd {
 /// Information about a named pipe.
 ///
 /// Constructed through [`NamedPipeServer::info`] or [`NamedPipeClient::info`].
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub struct PipeInfo {
     /// Indicates the mode of a named pipe.
