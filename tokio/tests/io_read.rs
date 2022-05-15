@@ -8,6 +8,11 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+mod support {
+    pub(crate) mod leaked_buffers;
+}
+use support::leaked_buffers::LeakedBuffers;
+
 #[tokio::test]
 async fn read() {
     #[derive(Default)]
@@ -37,16 +42,27 @@ async fn read() {
     assert_eq!(buf[..], b"hello world"[..]);
 }
 
-struct BadAsyncRead;
+struct BadAsyncRead {
+    leaked_buffers: LeakedBuffers,
+}
+
+impl BadAsyncRead {
+    fn new() -> Self {
+        Self {
+            leaked_buffers: LeakedBuffers::new(),
+        }
+    }
+}
 
 impl AsyncRead for BadAsyncRead {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        *buf = ReadBuf::new(Box::leak(vec![0; buf.capacity()].into_boxed_slice()));
+        *buf = ReadBuf::new(unsafe { self.leaked_buffers.create(buf.capacity()) });
         buf.advance(buf.capacity());
+
         Poll::Ready(Ok(()))
     }
 }
@@ -55,5 +71,5 @@ impl AsyncRead for BadAsyncRead {
 #[should_panic]
 async fn read_buf_bad_async_read() {
     let mut buf = Vec::with_capacity(10);
-    BadAsyncRead.read_buf(&mut buf).await.unwrap();
+    BadAsyncRead::new().read_buf(&mut buf).await.unwrap();
 }
