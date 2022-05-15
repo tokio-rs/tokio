@@ -61,6 +61,8 @@ cfg_time! {
     use tokio::time::Duration;
     mod throttle;
     use throttle::{throttle, Throttle};
+    mod chunks_timeout;
+    use chunks_timeout::ChunksTimeout;
 }
 
 /// An extension trait for the [`Stream`] trait that provides a variety of
@@ -992,6 +994,47 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         throttle(duration, self)
+    }
+
+    /// Collects items into batches inside a vector within a deadline.
+    ///
+    /// `chunks_timeout` attempts to yield a vector of len `capacity` within the deadline,
+    /// otherwise will yield a vector of len less than `capacity` if the deadline is reached
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::time::Duration;
+    /// use tokio::time;
+    /// use tokio_stream::{self as stream, StreamExt};
+    /// use futures::FutureExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let iter = vec![1, 2, 3].into_iter();
+    ///     let stream0 = stream::iter(iter);
+    ///
+    ///     let iter = vec![4].into_iter();
+    ///     let stream1 = stream::iter(iter)
+    ///          .then(move |n| time::sleep(Duration::from_secs(2)).map(move |_| n));
+    ///
+    ///     let chunk_stream = stream0
+    ///         .chain(stream1)
+    ///         .chunks_timeout(4, Duration::from_secs(1));
+    ///
+    ///     tokio::pin!(chunk_stream);
+    ///
+    ///     assert_eq!(chunk_stream.next().await, Some(vec![1,2,3]));
+    ///     assert_eq!(chunk_stream.next().await, Some(vec![4]));
+    /// }
+    /// ```
+    #[cfg(all(feature = "time"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    fn chunks_timeout(self, capacity: usize, duration: Duration) -> ChunksTimeout<Self>
+    where
+        Self: Sized,
+    {
+        ChunksTimeout::new(self, capacity, duration)
     }
 }
 
