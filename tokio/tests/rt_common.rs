@@ -749,6 +749,10 @@ rt_test! {
     #[test]
     fn wake_while_rt_is_dropping() {
         use tokio::task;
+        use core::sync::atomic::{AtomicBool, Ordering};
+
+        let drop_triggered = Arc::new(AtomicBool::new(false));
+        let set_drop_triggered = drop_triggered.clone();
 
         struct OnDrop<F: FnMut()>(F);
 
@@ -764,8 +768,6 @@ rt_test! {
 
         let rt = rt();
 
-        let h1 = rt.clone();
-
         rt.spawn(async move {
             // Ensure a waker gets stored in oneshot 1.
             let _ = rx1.await;
@@ -773,6 +775,7 @@ rt_test! {
         });
 
         rt.spawn(async move {
+            let h1 = tokio::runtime::Handle::current();
             // When this task is dropped, we'll be "closing remotes".
             // We spawn a new task that owns the `tx1`, to move its Drop
             // out of here.
@@ -785,6 +788,8 @@ rt_test! {
                 h1.spawn(async move {
                     tx1.send(()).unwrap();
                 });
+                // Just a sanity check that this entire thing actually happened
+                set_drop_triggered.store(true, Ordering::Relaxed);
             });
             let _ = rx2.await;
         });
@@ -803,6 +808,9 @@ rt_test! {
 
         // Drop the rt
         drop(rt);
+
+        // Make sure that the spawn actually happened
+        assert!(drop_triggered.load(Ordering::Relaxed));
     }
 
     #[test]
