@@ -280,11 +280,11 @@ cfg_not_rt! {
 
 cfg_net! {
     cfg_metrics! {
-       impl Handle {
+        impl Handle {
             pub(crate) fn metrics(&self) -> &IoDriverMetrics {
                 &self.inner.metrics
             }
-       }
+        }
     }
 }
 
