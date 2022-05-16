@@ -81,6 +81,7 @@ impl<T: 'static> JoinSet<T> {
     /// This method panics if called outside of a Tokio runtime.
     ///
     /// [`AbortHandle`]: crate::task::AbortHandle
+    #[track_caller]
     pub fn spawn<F>(&mut self, task: F) -> AbortHandle
     where
         F: Future<Output = T>,
@@ -95,6 +96,7 @@ impl<T: 'static> JoinSet<T> {
     /// cancel the task.
     ///
     /// [`AbortHandle`]: crate::task::AbortHandle
+    #[track_caller]
     pub fn spawn_on<F>(&mut self, task: F, handle: &Handle) -> AbortHandle
     where
         F: Future<Output = T>,
@@ -114,6 +116,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`AbortHandle`]: crate::task::AbortHandle
+    #[track_caller]
     pub fn spawn_local<F>(&mut self, task: F) -> AbortHandle
     where
         F: Future<Output = T>,
@@ -128,6 +131,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`AbortHandle`]: crate::task::AbortHandle
+    #[track_caller]
     pub fn spawn_local_on<F>(&mut self, task: F, local_set: &LocalSet) -> AbortHandle
     where
         F: Future<Output = T>,
