@@ -1,0 +1,15 @@
+[build]
+  command = """
+    rustup install nightly --profile minimal \
+      && cargo doc --no-deps --all-features
+    """
+  publish = "target/doc"
+
+[build.environment]
+  RUSTDOCFLAGS="""
+    -D warnings \
+    --cfg docsrs \
+    --html-before-content /opt/build/repo/assets/warning.html \
+    --html-in-header /opt/build/repo/assets/noindex.html \
+    --extend-css /opt/build/repo/assets/warning.css \
+    """
