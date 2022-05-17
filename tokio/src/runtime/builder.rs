@@ -104,20 +104,13 @@ impl Builder {
     ///
     /// [`LocalSet`]: crate::task::LocalSet
     pub fn new_current_thread() -> Builder {
-        /// How often to check the remote queue first.
-        const REMOTE_FIRST_INTERVAL: u32 = 31;
-
-        /// Max number of tasks to poll per tick.
         #[cfg(loom)]
-        const MAX_TASKS_PER_TICK: u32 = 4;
+        const EVENT_INTERVAL: u32 = 4;
+        // The number `61` is fairly arbitrary. I believe this value was copied from golang.
         #[cfg(not(loom))]
-        const MAX_TASKS_PER_TICK: u32 = 61;
+        const EVENT_INTERVAL: u32 = 61;
 
-        Builder::new(
-            Kind::CurrentThread,
-            REMOTE_FIRST_INTERVAL,
-            MAX_TASKS_PER_TICK,
-        )
+        Builder::new(Kind::CurrentThread, 31, EVENT_INTERVAL)
     }
 
     /// Returns a new builder with the multi thread scheduler selected.
@@ -126,19 +119,8 @@ impl Builder {
     #[cfg(feature = "rt-multi-thread")]
     #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
     pub fn new_multi_thread() -> Builder {
-        /// After how many ticks is the global queue polled. This helps to ensure
-        /// fairness.
-        ///
-        /// The same value is used to control when to yield to the driver for events.
-        ///
-        /// The number is fairly arbitrary. I believe this value was copied from golang.
-        const GLOBAL_POLL_INTERVAL: u32 = 61;
-
-        Builder::new(
-            Kind::MultiThread,
-            GLOBAL_POLL_INTERVAL,
-            GLOBAL_POLL_INTERVAL,
-        )
+        // The number `61` is fairly arbitrary. I believe this value was copied from golang.
+        Builder::new(Kind::MultiThread, 61, 61)
     }
 
     /// Returns a new runtime builder initialized with default configuration
@@ -588,10 +570,15 @@ impl Builder {
     /// Sets the number of scheduler ticks after which the scheduler will poll the global
     /// task queue.
     ///
-    /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task. Schedulers
-    /// have a local queue of already-claimed tasks, and a global queue of incoming tasks.
+    /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task.
     ///
-    /// Setting the interval to a smaller value increases the fairness of the scheduler,
+    /// By default the global queue interval is:
+    ///
+    /// * `31` for the current-thread scheduler.
+    /// * `61` for the multithreaded scheduler.
+    ///
+    /// Schedulers have a local queue of already-claimed tasks, and a global queue of incoming
+    /// tasks. Setting the interval to a smaller value increases the fairness of the scheduler,
     /// at the cost of more synchronization overhead. That can be beneficial for prioritizing
     /// getting started on new work, especially if tasks frequently yield rather than complete
     /// or await on further I/O. Conversely, a higher value prioritizes existing work, and
@@ -616,6 +603,8 @@ impl Builder {
     /// external events (timers, I/O, and so on).
     ///
     /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task.
+    ///
+    /// By default, the event interval is `61` for all scheduler types.
     ///
     /// Setting the event interval determines the effective "priority" of delivering
     /// these external events (which may wake up additional tasks), compared to
