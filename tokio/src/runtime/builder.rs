@@ -322,7 +322,6 @@ impl Builder {
     /// ```
     /// # use tokio::runtime;
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
-    ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_name_fn(|| {
@@ -374,7 +373,6 @@ impl Builder {
     ///
     /// ```
     /// # use tokio::runtime;
-    ///
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
     ///     .on_thread_start(|| {
@@ -400,7 +398,6 @@ impl Builder {
     ///
     /// ```
     /// # use tokio::runtime;
-    ///
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
     ///     .on_thread_stop(|| {
@@ -509,7 +506,6 @@ impl Builder {
     ///
     /// ```
     /// # use tokio::runtime;
-    ///
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
     ///     .on_thread_unpark(|| {
@@ -578,7 +574,6 @@ impl Builder {
     /// ```
     /// # use tokio::runtime;
     /// # use std::time::Duration;
-    ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_keep_alive(Duration::from_millis(100))
@@ -606,7 +601,6 @@ impl Builder {
     ///
     /// ```
     /// # use tokio::runtime;
-    ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .global_queue_interval(31)
@@ -637,7 +631,6 @@ impl Builder {
     ///
     /// ```
     /// # use tokio::runtime;
-    ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .event_interval(31)
