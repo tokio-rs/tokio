@@ -196,7 +196,7 @@ async fn tasks_are_balanced() {
 #[tokio::test]
 async fn spawn_by_idx() {
     let pool = task::LocalPoolHandle::new(3);
-    let barrier = Arc::new(Barrier::new(3));
+    let barrier = Arc::new(Barrier::new(4));
     let barrier1 = barrier.clone();
     let barrier2 = barrier.clone();
     let barrier3 = barrier.clone();
@@ -229,8 +229,8 @@ async fn spawn_by_idx() {
     assert_eq!(loads[1], 1);
     assert_eq!(loads[2], 0);
 
-    let thread_id1 = handle1.unwrap().await.unwrap();
-    let thread_id2 = handle2.unwrap().await.unwrap();
+    let thread_id1 = handle1.await.unwrap();
+    let thread_id2 = handle2.await.unwrap();
 
     assert_ne!(thread_id1, thread_id2);
 }
@@ -242,7 +242,7 @@ async fn spawn_on_all_workers() {
     let barrier = Arc::new(Barrier::new(NUM_WORKERS + 1));
     let barrier_clone = barrier.clone();
 
-    let _ = pool.spawn_pinned_on_all_workers(|| async move {
+    let handles = pool.spawn_pinned_on_all_workers(|| async move {
         barrier_clone.wait().await;
 
         "test"
@@ -253,4 +253,8 @@ async fn spawn_on_all_workers() {
     assert_eq!(loads[0], 1);
     assert_eq!(loads[1], 1);
     assert_eq!(loads[2], 1);
+
+    let _ = handles
+        .into_iter()
+        .map(|handle| async { handle.await.unwrap() });
 }

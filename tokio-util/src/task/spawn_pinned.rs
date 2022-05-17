@@ -1,5 +1,4 @@
 use futures_util::future::{AbortHandle, Abortable};
-use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
@@ -9,27 +8,6 @@ use tokio::runtime::Builder;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 use tokio::task::{spawn_local, JoinHandle, LocalSet};
-
-/// Error Type for out-of-bounds indexing error in [`LocalPoolHandle::spawn_pinned_by_idx`].
-///
-/// [`LocalPoolHandle::spawn_pinned_by_idx`]: LocalPoolHandle::spawn_pinned_by_idx
-#[derive(Debug)]
-pub struct WorkerIdxError {
-    idx: usize,
-    num_workers: usize,
-}
-
-impl fmt::Display for WorkerIdxError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Index {} out of bounds, only {} workers in pool",
-            self.idx, self.num_workers
-        )
-    }
-}
-
-impl Error for WorkerIdxError {}
 
 /// A cloneable handle to a local pool, used for spawning `!Send` tasks.
 ///
@@ -155,28 +133,16 @@ impl LocalPoolHandle {
     /// A worker thread is chosen by index. Indices are 0 based and the largest index
     /// is given by `num_threads() - 1`
     ///
-    /// Returns a `WorkerIdxError` if the provided index is out of bounds.
-    pub fn spawn_pinned_by_idx<F, Fut>(
-        &self,
-        create_task: F,
-        idx: usize,
-    ) -> Result<JoinHandle<Fut::Output>, WorkerIdxError>
+    /// Panics if the index is out of bounds.
+    pub fn spawn_pinned_by_idx<F, Fut>(&self, create_task: F, idx: usize) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut,
         F: Send + 'static,
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
-        if idx >= self.pool.workers.len() {
-            return Err(WorkerIdxError {
-                idx,
-                num_workers: self.pool.workers.len(),
-            });
-        }
-
-        Ok(self
-            .pool
-            .spawn_pinned(create_task, WorkerChoice::ByIdx(idx)))
+        self.pool
+            .spawn_pinned(create_task, WorkerChoice::ByIdx(idx))
     }
 
     /// Spawn a task on every worker thread in the pool and pin it so that it
@@ -212,7 +178,7 @@ impl LocalPoolHandle {
         Fut::Output: Send + 'static,
     {
         (0..self.pool.workers.len())
-            .map(|idx| self.spawn_pinned_by_idx(create_task.clone(), idx).unwrap())
+            .map(|idx| self.spawn_pinned_by_idx(create_task.clone(), idx))
             .collect::<Vec<_>>()
     }
 }
