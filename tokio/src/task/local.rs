@@ -502,6 +502,12 @@ impl LocalSet {
     {
         let handle = self.context.spawn(future, name);
 
+        // Because a task was spawned from *outside* the `JoinSet`, wake the
+        // `JoinSet` future to execute the new task, if it hasn't been woken.
+        //
+        // Spawning via the free fn `spawn` does not require this, as it can
+        // only be called from *within* a future executing on the `JoinSet` — in
+        // that case, the `JoinSet` must already be awake.
         self.context.shared.waker.wake();
         handle
     }
