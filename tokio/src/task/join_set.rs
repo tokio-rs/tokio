@@ -61,7 +61,7 @@ pub struct JoinSet<T> {
 
 /// A variant of [`task::Builder`] that spawns tasks on a [`JoinSet`] rather
 /// than on the current default runtime.
-/// 
+///
 /// [`task::Builder`]: crate::task::Builder
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
@@ -340,13 +340,10 @@ impl<T> Default for JoinSet<T> {
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 impl<'a, T: 'static> Builder<'a, T> {
-
     /// Assigns a name to the task which will be spawned.
     pub fn name(self, name: &'a str) -> Self {
         let builder = self.builder.name(name);
-        Self {
-            builder, ..self
-        }
+        Self { builder, ..self }
     }
 
     /// Spawn the provided task with this builder's settings and store it in the
@@ -371,7 +368,6 @@ impl<'a, T: 'static> Builder<'a, T> {
     {
         self.joinset.insert(self.builder.spawn(future))
     }
-
 
     /// Spawn the provided task on the provided [runtime handle] with this
     /// builder's settings, and store it in the [`JoinSet`].
@@ -430,7 +426,8 @@ impl<'a, T: 'static> Builder<'a, T> {
         F: Future<Output = T>,
         F: 'static,
     {
-        self.joinset.insert(self.builder.spawn_local_on(future, local_set))
+        self.joinset
+            .insert(self.builder.spawn_local_on(future, local_set))
     }
 }
 
