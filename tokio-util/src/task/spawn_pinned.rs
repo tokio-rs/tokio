@@ -364,10 +364,7 @@ impl LocalPool {
 
     fn find_worker_by_idx(&self, idx: usize) -> (&LocalWorkerHandle, JobCountGuard) {
         let worker = &self.workers[idx];
-        let task_count = worker.task_count.load(Ordering::SeqCst);
-        worker
-            .task_count
-            .fetch_add(task_count + 1, Ordering::SeqCst);
+        worker.task_count.fetch_add(1, Ordering::SeqCst);
 
         (worker, JobCountGuard(Arc::clone(&worker.task_count)))
     }

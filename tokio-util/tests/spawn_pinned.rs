@@ -199,6 +199,7 @@ async fn spawn_by_idx() {
     let barrier = Arc::new(Barrier::new(3));
     let barrier1 = barrier.clone();
     let barrier2 = barrier.clone();
+    let barrier3 = barrier.clone();
 
     let handle1 = pool.spawn_pinned_by_idx(
         || async move {
@@ -207,9 +208,16 @@ async fn spawn_by_idx() {
         },
         0,
     );
-    let handle2 = pool.spawn_pinned_by_idx(
+    let _ = pool.spawn_pinned_by_idx(
         || async move {
             barrier2.wait().await;
+            std::thread::current().id()
+        },
+        0,
+    );
+    let handle2 = pool.spawn_pinned_by_idx(
+        || async move {
+            barrier3.wait().await;
             std::thread::current().id()
         },
         1,
@@ -217,7 +225,7 @@ async fn spawn_by_idx() {
 
     let loads = pool.get_task_loads_for_each_worker();
     barrier.wait().await;
-    assert_eq!(loads[0], 1);
+    assert_eq!(loads[0], 2);
     assert_eq!(loads[1], 1);
     assert_eq!(loads[2], 0);
 
