@@ -66,7 +66,6 @@ pub struct JoinSet<T> {
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 #[must_use = "builders do nothing unless used to spawn a task"]
-#[derive(Debug)]
 pub struct Builder<'a, T> {
     joinset: &'a mut JoinSet<T>,
     builder: super::Builder<'a>,
@@ -432,5 +431,16 @@ impl<'a, T: 'static> Builder<'a, T> {
         F: 'static,
     {
         self.joinset.insert(self.builder.spawn_local_on(future, local_set))
+    }
+}
+
+// Manual `Debug` impl so that `Builder` is `Debug` regardless of whether `T` is
+// `Debug`.
+impl<'a, T> fmt::Debug for Builder<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("join_set::Builder")
+            .field("joinset", &self.joinset)
+            .field("builder", &self.builder)
+            .finish()
     }
 }
