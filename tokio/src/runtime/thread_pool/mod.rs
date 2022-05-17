@@ -51,8 +51,8 @@ impl ThreadPool {
         handle_inner: HandleInner,
         before_park: Option<Callback>,
         after_unpark: Option<Callback>,
-        global_queue_interval: u8,
-        event_interval: u8,
+        global_queue_interval: u32,
+        event_interval: u32,
     ) -> (ThreadPool, Launch) {
         let parker = Parker::new(driver);
         let (shared, launch) = worker::create(

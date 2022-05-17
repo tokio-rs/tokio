@@ -87,7 +87,7 @@ pub(super) struct Worker {
 /// Core data
 struct Core {
     /// Used to schedule bookkeeping tasks every so often.
-    tick: u8,
+    tick: u32,
 
     /// When a task is scheduled from a worker, it is stored in this slot. The
     /// worker will check this slot for a task **before** checking the run
@@ -119,10 +119,10 @@ struct Core {
     rand: FastRand,
 
     /// How many ticks before pulling a task from the global/remote queue?
-    global_queue_interval: u8,
+    global_queue_interval: u32,
 
     /// How many ticks before yielding to the driver for timer and I/O events?
-    event_interval: u8,
+    event_interval: u32,
 }
 
 /// State shared across all workers
@@ -204,8 +204,8 @@ pub(super) fn create(
     handle_inner: HandleInner,
     before_park: Option<Callback>,
     after_unpark: Option<Callback>,
-    global_queue_interval: u8,
-    event_interval: u8,
+    global_queue_interval: u32,
+    event_interval: u32,
 ) -> (Arc<Shared>, Launch) {
     let mut cores = Vec::with_capacity(size);
     let mut remotes = Vec::with_capacity(size);

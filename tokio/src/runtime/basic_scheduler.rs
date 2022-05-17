@@ -48,7 +48,7 @@ struct Core {
     spawner: Spawner,
 
     /// Current tick
-    tick: u8,
+    tick: u32,
 
     /// Runtime driver
     ///
@@ -59,10 +59,10 @@ struct Core {
     metrics: MetricsBatch,
 
     /// How many ticks before pulling a task from the global/remote queue?
-    global_queue_interval: u8,
+    global_queue_interval: u32,
 
     /// How many ticks before yielding to the driver for timer and I/O events?
-    event_interval: u8,
+    event_interval: u32,
 }
 
 #[derive(Clone)]
@@ -122,8 +122,8 @@ impl BasicScheduler {
         handle_inner: HandleInner,
         before_park: Option<Callback>,
         after_unpark: Option<Callback>,
-        global_queue_interval: u8,
-        event_interval: u8,
+        global_queue_interval: u32,
+        event_interval: u32,
     ) -> BasicScheduler {
         let unpark = driver.unpark();
 

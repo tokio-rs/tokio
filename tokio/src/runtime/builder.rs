@@ -80,10 +80,10 @@ pub struct Builder {
     pub(super) keep_alive: Option<Duration>,
 
     /// How many ticks before pulling a task from the global/remote queue?
-    pub(super) global_queue_interval: u8,
+    pub(super) global_queue_interval: u32,
 
     /// How many ticks before yielding to the driver for timer and I/O events?
-    pub(super) event_interval: u8,
+    pub(super) event_interval: u32,
 }
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
@@ -105,13 +105,13 @@ impl Builder {
     /// [`LocalSet`]: crate::task::LocalSet
     pub fn new_current_thread() -> Builder {
         /// How often to check the remote queue first.
-        const REMOTE_FIRST_INTERVAL: u8 = 31;
+        const REMOTE_FIRST_INTERVAL: u32 = 31;
 
         /// Max number of tasks to poll per tick.
         #[cfg(loom)]
-        const MAX_TASKS_PER_TICK: u8 = 4;
+        const MAX_TASKS_PER_TICK: u32 = 4;
         #[cfg(not(loom))]
-        const MAX_TASKS_PER_TICK: u8 = 61;
+        const MAX_TASKS_PER_TICK: u32 = 61;
 
         Builder::new(
             Kind::CurrentThread,
@@ -132,7 +132,7 @@ impl Builder {
         /// The same value is used to control when to yield to the driver for events.
         ///
         /// The number is fairly arbitrary. I believe this value was copied from golang.
-        const GLOBAL_POLL_INTERVAL: u8 = 61;
+        const GLOBAL_POLL_INTERVAL: u32 = 61;
 
         Builder::new(
             Kind::MultiThread,
@@ -145,7 +145,7 @@ impl Builder {
     /// values.
     ///
     /// Configuration methods can be chained on the return value.
-    pub(crate) fn new(kind: Kind, global_queue_interval: u8, event_interval: u8) -> Builder {
+    pub(crate) fn new(kind: Kind, global_queue_interval: u32, event_interval: u32) -> Builder {
         Builder {
             kind,
 
@@ -595,8 +595,12 @@ impl Builder {
     ///
     /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task. Schedulers
     /// have a local queue of already-claimed tasks, and a global queue of incoming tasks.
+    ///
     /// Setting the interval to a smaller value increases the fairness of the scheduler,
-    /// at the cost of more synchronization overhead.
+    /// at the cost of more synchronization overhead. That can be beneficial for prioritizing
+    /// getting started on new work, especially if tasks frequently yield rather than complete
+    /// or await on further I/O. Conversely, a higher value prioritizes existing work, and
+    /// is a good choice when most tasks quickly complete polling.
     ///
     /// # Examples
     ///
@@ -609,7 +613,7 @@ impl Builder {
     ///     .build();
     /// # }
     /// ```
-    pub fn global_queue_interval(&mut self, val: u8) -> &mut Self {
+    pub fn global_queue_interval(&mut self, val: u32) -> &mut Self {
         self.global_queue_interval = val;
         self
     }
@@ -618,9 +622,16 @@ impl Builder {
     /// external events (timers, I/O, and so on).
     ///
     /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task.
+    ///
     /// Setting the event interval determines the effective "priority" of delivering
     /// these external events (which may wake up additional tasks), compared to
-    /// executing tasks that are currently ready to run.
+    /// executing tasks that are currently ready to run. A smaller value is useful
+    /// when tasks frequently spend a long time in polling, or frequently yield,
+    /// which can result in overly long delays picking up I/O events. Conversely,
+    /// picking up new events requires extra synchronization and syscall overhead,
+    /// so if tasks generally complete their polling quickly, a higher event interval
+    /// will minimize that overhead while still keeping the scheduler responsive to
+    /// events.
     ///
     /// # Examples
     ///
@@ -633,7 +644,7 @@ impl Builder {
     ///     .build();
     /// # }
     /// ```
-    pub fn event_interval(&mut self, val: u8) -> &mut Self {
+    pub fn event_interval(&mut self, val: u32) -> &mut Self {
         self.event_interval = val;
         self
     }
