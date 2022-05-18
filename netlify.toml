@@ -1,7 +1,6 @@
 [build]
   command = """
-    rustup install nightly --profile minimal \
-      && cargo doc --no-deps --all-features
+    rustup install nightly --profile minimal && cargo doc
     """
   publish = "target/doc"
 
