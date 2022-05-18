@@ -1,8 +1,12 @@
-use crate::future::poll_fn;
+cfg_not_wasi! {
+    use crate::future::poll_fn;
+    use crate::net::{to_socket_addrs, ToSocketAddrs};
+    use std::time::Duration;
+}
+
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
-use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -10,7 +14,6 @@ use std::io;
 use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -70,86 +73,88 @@ cfg_net! {
 }
 
 impl TcpStream {
-    /// Opens a TCP connection to a remote host.
-    ///
-    /// `addr` is an address of the remote host. Anything which implements the
-    /// [`ToSocketAddrs`] trait can be supplied as the address.  If `addr`
-    /// yields multiple addresses, connect will be attempted with each of the
-    /// addresses until a connection is successful. If none of the addresses
-    /// result in a successful connection, the error returned from the last
-    /// connection attempt (the last address) is returned.
-    ///
-    /// To configure the socket before connecting, you can use the [`TcpSocket`]
-    /// type.
-    ///
-    /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
-    /// [`TcpSocket`]: struct@crate::net::TcpSocket
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    /// use tokio::io::AsyncWriteExt;
-    /// use std::error::Error;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    ///     // Write some data.
-    ///     stream.write_all(b"hello world!").await?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
-    ///
-    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
-    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-    pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
-        let addrs = to_socket_addrs(addr).await?;
+    cfg_not_wasi! {
+        /// Opens a TCP connection to a remote host.
+        ///
+        /// `addr` is an address of the remote host. Anything which implements the
+        /// [`ToSocketAddrs`] trait can be supplied as the address.  If `addr`
+        /// yields multiple addresses, connect will be attempted with each of the
+        /// addresses until a connection is successful. If none of the addresses
+        /// result in a successful connection, the error returned from the last
+        /// connection attempt (the last address) is returned.
+        ///
+        /// To configure the socket before connecting, you can use the [`TcpSocket`]
+        /// type.
+        ///
+        /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+        /// [`TcpSocket`]: struct@crate::net::TcpSocket
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpStream;
+        /// use tokio::io::AsyncWriteExt;
+        /// use std::error::Error;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> Result<(), Box<dyn Error>> {
+        ///     // Connect to a peer
+        ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
+        ///
+        ///     // Write some data.
+        ///     stream.write_all(b"hello world!").await?;
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        ///
+        /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+        ///
+        /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+        /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+        pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
+            let addrs = to_socket_addrs(addr).await?;
 
-        let mut last_err = None;
+            let mut last_err = None;
 
-        for addr in addrs {
-            match TcpStream::connect_addr(addr).await {
-                Ok(stream) => return Ok(stream),
-                Err(e) => last_err = Some(e),
+            for addr in addrs {
+                match TcpStream::connect_addr(addr).await {
+                    Ok(stream) => return Ok(stream),
+                    Err(e) => last_err = Some(e),
+                }
             }
+
+            Err(last_err.unwrap_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "could not resolve to any address",
+                )
+            }))
         }
 
-        Err(last_err.unwrap_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "could not resolve to any address",
-            )
-        }))
-    }
-
-    /// Establishes a connection to the specified `addr`.
-    async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
-        let sys = mio::net::TcpStream::connect(addr)?;
-        TcpStream::connect_mio(sys).await
-    }
-
-    pub(crate) async fn connect_mio(sys: mio::net::TcpStream) -> io::Result<TcpStream> {
-        let stream = TcpStream::new(sys)?;
-
-        // Once we've connected, wait for the stream to be writable as
-        // that's when the actual connection has been initiated. Once we're
-        // writable we check for `take_socket_error` to see if the connect
-        // actually hit an error or not.
-        //
-        // If all that succeeded then we ship everything on up.
-        poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;
-
-        if let Some(e) = stream.io.take_error()? {
-            return Err(e);
+        /// Establishes a connection to the specified `addr`.
+        async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
+            let sys = mio::net::TcpStream::connect(addr)?;
+            TcpStream::connect_mio(sys).await
         }
 
-        Ok(stream)
+        pub(crate) async fn connect_mio(sys: mio::net::TcpStream) -> io::Result<TcpStream> {
+            let stream = TcpStream::new(sys)?;
+
+            // Once we've connected, wait for the stream to be writable as
+            // that's when the actual connection has been initiated. Once we're
+            // writable we check for `take_socket_error` to see if the connect
+            // actually hit an error or not.
+            //
+            // If all that succeeded then we ship everything on up.
+            poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;
+
+            if let Some(e) = stream.io.take_error()? {
+                return Err(e);
+            }
+
+            Ok(stream)
+        }
     }
 
     pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
@@ -243,6 +248,15 @@ impl TcpStream {
                 .into_inner()
                 .map(|io| io.into_raw_socket())
                 .map(|raw_socket| unsafe { std::net::TcpStream::from_raw_socket(raw_socket) })
+        }
+
+        #[cfg(target_os = "wasi")]
+        {
+            use std::os::wasi::io::{FromRawFd, IntoRawFd};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_fd())
+                .map(|raw_fd| unsafe { std::net::TcpStream::from_raw_fd(raw_fd) })
         }
     }
 
@@ -1077,52 +1091,54 @@ impl TcpStream {
         self.io.set_nodelay(nodelay)
     }
 
-    /// Reads the linger duration for this socket by getting the `SO_LINGER`
-    /// option.
-    ///
-    /// For more information about this option, see [`set_linger`].
-    ///
-    /// [`set_linger`]: TcpStream::set_linger
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// println!("{:?}", stream.linger()?);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn linger(&self) -> io::Result<Option<Duration>> {
-        socket2::SockRef::from(self).linger()
-    }
+    cfg_not_wasi! {
+        /// Reads the linger duration for this socket by getting the `SO_LINGER`
+        /// option.
+        ///
+        /// For more information about this option, see [`set_linger`].
+        ///
+        /// [`set_linger`]: TcpStream::set_linger
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpStream;
+        ///
+        /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+        /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+        ///
+        /// println!("{:?}", stream.linger()?);
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub fn linger(&self) -> io::Result<Option<Duration>> {
+            socket2::SockRef::from(self).linger()
+        }
 
-    /// Sets the linger duration of this socket by setting the SO_LINGER option.
-    ///
-    /// This option controls the action taken when a stream has unsent messages and the stream is
-    /// closed. If SO_LINGER is set, the system shall block the process until it can transmit the
-    /// data or until the time expires.
-    ///
-    /// If SO_LINGER is not specified, and the stream is closed, the system handles the call in a
-    /// way that allows the process to continue as quickly as possible.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// stream.set_linger(None)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        socket2::SockRef::from(self).set_linger(dur)
+        /// Sets the linger duration of this socket by setting the SO_LINGER option.
+        ///
+        /// This option controls the action taken when a stream has unsent messages and the stream is
+        /// closed. If SO_LINGER is set, the system shall block the process until it can transmit the
+        /// data or until the time expires.
+        ///
+        /// If SO_LINGER is not specified, and the stream is closed, the system handles the call in a
+        /// way that allows the process to continue as quickly as possible.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpStream;
+        ///
+        /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+        /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+        ///
+        /// stream.set_linger(None)?;
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
+            socket2::SockRef::from(self).set_linger(dur)
+        }
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -1312,6 +1328,18 @@ mod sys {
     impl AsRawSocket for TcpStream {
         fn as_raw_socket(&self) -> RawSocket {
             self.io.as_raw_socket()
+        }
+    }
+}
+
+#[cfg(all(tokio_unstable, target_os = "wasi"))]
+mod sys {
+    use super::TcpStream;
+    use std::os::wasi::prelude::*;
+
+    impl AsRawFd for TcpStream {
+        fn as_raw_fd(&self) -> RawFd {
+            self.io.as_raw_fd()
         }
     }
 }

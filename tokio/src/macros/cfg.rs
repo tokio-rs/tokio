@@ -61,6 +61,7 @@ macro_rules! cfg_fs {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "fs")]
+            #[cfg(not(target_os = "wasi"))]
             #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
             $item
         )*
@@ -247,6 +248,7 @@ macro_rules! cfg_process {
             #[cfg(feature = "process")]
             #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
+            #[cfg(not(target_os = "wasi"))]
             $item
         )*
     }
@@ -275,6 +277,7 @@ macro_rules! cfg_signal {
             #[cfg(feature = "signal")]
             #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
             #[cfg(not(loom))]
+            #[cfg(not(target_os = "wasi"))]
             $item
         )*
     }
@@ -451,7 +454,8 @@ macro_rules! cfg_has_atomic_u64 {
                     target_arch = "arm",
                     target_arch = "mips",
                     target_arch = "powerpc",
-                    target_arch = "riscv32"
+                    target_arch = "riscv32",
+                    target_arch = "wasm32"
                     )))]
             $item
         )*
@@ -465,8 +469,18 @@ macro_rules! cfg_not_has_atomic_u64 {
                     target_arch = "arm",
                     target_arch = "mips",
                     target_arch = "powerpc",
-                    target_arch = "riscv32"
+                    target_arch = "riscv32",
+                    target_arch = "wasm32"
                     ))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_wasi {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(target_os = "wasi"))]
             $item
         )*
     }

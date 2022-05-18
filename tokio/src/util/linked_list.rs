@@ -631,6 +631,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn run_fuzz(ops: Vec<usize>) {
         use std::collections::VecDeque;
 

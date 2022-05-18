@@ -197,14 +197,16 @@ impl Builder {
         Builder::new(Kind::CurrentThread, 31, EVENT_INTERVAL)
     }
 
-    /// Returns a new builder with the multi thread scheduler selected.
-    ///
-    /// Configuration methods can be chained on the return value.
-    #[cfg(feature = "rt-multi-thread")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
-    pub fn new_multi_thread() -> Builder {
-        // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-        Builder::new(Kind::MultiThread, 61, 61)
+    cfg_not_wasi! {
+        /// Returns a new builder with the multi thread scheduler selected.
+        ///
+        /// Configuration methods can be chained on the return value.
+        #[cfg(feature = "rt-multi-thread")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+        pub fn new_multi_thread() -> Builder {
+            // The number `61` is fairly arbitrary. I believe this value was copied from golang.
+            Builder::new(Kind::MultiThread, 61, 61)
+        }
     }
 
     /// Returns a new runtime builder initialized with default configuration
