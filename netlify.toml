@@ -9,3 +9,4 @@
     -D warnings \
     --cfg docsrs \
     """
+    RUSTFLAGS="--cfg tokio_unstable"
