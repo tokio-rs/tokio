@@ -433,6 +433,8 @@ impl<'a, T: 'static> Builder<'a, T> {
 
 // Manual `Debug` impl so that `Builder` is `Debug` regardless of whether `T` is
 // `Debug`.
+#[cfg(all(tokio_unstable, feature = "tracing"))]
+#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 impl<'a, T> fmt::Debug for Builder<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("join_set::Builder")
