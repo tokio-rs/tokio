@@ -8,5 +8,6 @@
   RUSTDOCFLAGS="""
     -D warnings \
     --cfg docsrs \
+    --cfg tokio_unstable \
     """
     RUSTFLAGS="--cfg tokio_unstable"
