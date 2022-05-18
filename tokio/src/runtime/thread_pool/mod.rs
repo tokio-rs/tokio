@@ -51,10 +51,19 @@ impl ThreadPool {
         handle_inner: HandleInner,
         before_park: Option<Callback>,
         after_unpark: Option<Callback>,
+        global_queue_interval: u32,
+        event_interval: u32,
     ) -> (ThreadPool, Launch) {
         let parker = Parker::new(driver);
-        let (shared, launch) =
-            worker::create(size, parker, handle_inner, before_park, after_unpark);
+        let (shared, launch) = worker::create(
+            size,
+            parker,
+            handle_inner,
+            before_park,
+            after_unpark,
+            global_queue_interval,
+            event_interval,
+        );
         let spawner = Spawner { shared };
         let thread_pool = ThreadPool { spawner };
 

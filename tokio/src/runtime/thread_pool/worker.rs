@@ -87,7 +87,7 @@ pub(super) struct Worker {
 /// Core data
 struct Core {
     /// Used to schedule bookkeeping tasks every so often.
-    tick: u8,
+    tick: u32,
 
     /// When a task is scheduled from a worker, it is stored in this slot. The
     /// worker will check this slot for a task **before** checking the run
@@ -117,6 +117,12 @@ struct Core {
 
     /// Fast random number generator.
     rand: FastRand,
+
+    /// How many ticks before pulling a task from the global/remote queue?
+    global_queue_interval: u32,
+
+    /// How many ticks before yielding to the driver for timer and I/O events?
+    event_interval: u32,
 }
 
 /// State shared across all workers
@@ -198,6 +204,8 @@ pub(super) fn create(
     handle_inner: HandleInner,
     before_park: Option<Callback>,
     after_unpark: Option<Callback>,
+    global_queue_interval: u32,
+    event_interval: u32,
 ) -> (Arc<Shared>, Launch) {
     let mut cores = Vec::with_capacity(size);
     let mut remotes = Vec::with_capacity(size);
@@ -219,6 +227,8 @@ pub(super) fn create(
             park: Some(park),
             metrics: MetricsBatch::new(),
             rand: FastRand::new(seed()),
+            global_queue_interval,
+            event_interval,
         }));
 
         remotes.push(Remote { steal, unpark });
@@ -346,12 +356,6 @@ where
     }
 }
 
-/// After how many ticks is the global queue polled. This helps to ensure
-/// fairness.
-///
-/// The number is fairly arbitrary. I believe this value was copied from golang.
-const GLOBAL_POLL_INTERVAL: u8 = 61;
-
 impl Launch {
     pub(crate) fn launch(mut self) {
         for worker in self.0.drain(..) {
@@ -464,7 +468,7 @@ impl Context {
     }
 
     fn maintenance(&self, mut core: Box<Core>) -> Box<Core> {
-        if core.tick % GLOBAL_POLL_INTERVAL == 0 {
+        if core.tick % core.event_interval == 0 {
             // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
             // to run without actually putting the thread to sleep.
             core = self.park_timeout(core, Some(Duration::from_millis(0)));
@@ -551,7 +555,7 @@ impl Core {
 
     /// Return the next notified task available to this worker.
     fn next_task(&mut self, worker: &Worker) -> Option<Notified> {
-        if self.tick % GLOBAL_POLL_INTERVAL == 0 {
+        if self.tick % self.global_queue_interval == 0 {
             worker.inject().pop().or_else(|| self.next_local_task())
         } else {
             self.next_local_task().or_else(|| worker.inject().pop())
