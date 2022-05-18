@@ -6,7 +6,6 @@
 
 [build.environment]
   RUSTDOCFLAGS="""
-    -D warnings \
     --cfg docsrs \
     --cfg tokio_unstable \
     """
