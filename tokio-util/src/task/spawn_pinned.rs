@@ -133,7 +133,40 @@ impl LocalPoolHandle {
     /// A worker thread is chosen by index. Indices are 0 based and the largest index
     /// is given by `num_threads() - 1`
     ///
-    /// Panics if the index is out of bounds.
+    /// # Panics
+    ///
+    /// This method panics if the index is out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// This method can be used to spawn a task on all worker threads of the pool:
+    ///
+    /// ```
+    /// use tokio_util::task::LocalPoolHandle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     const NUM_WORKERS: usize = 3;
+    ///     let pool = LocalPoolHandle::new(NUM_WORKERS);
+    ///     let handles = (0..pool.num_threads())
+    ///         .map(|worker_idx| {
+    ///             pool.spawn_pinned_by_idx(
+    ///                 || {
+    ///                     async {
+    ///                         "test"
+    ///                     }
+    ///                 },
+    ///                 worker_idx,
+    ///             )
+    ///         })
+    ///         .collect::<Vec<_>>();
+    ///
+    ///     let _ = handles
+    ///         .into_iter()
+    ///         .map(|handle| async { handle.await.unwrap() });
+    /// }
+    /// ```
+    ///
     pub fn spawn_pinned_by_idx<F, Fut>(&self, create_task: F, idx: usize) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut,
@@ -143,43 +176,6 @@ impl LocalPoolHandle {
     {
         self.pool
             .spawn_pinned(create_task, WorkerChoice::ByIdx(idx))
-    }
-
-    /// Spawn a task on every worker thread in the pool and pin it so that it
-    /// can't be moved off of the thread.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::rc::Rc;
-    /// use tokio_util::task::LocalPoolHandle;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let pool = LocalPoolHandle::new(3);
-    ///
-    ///     let _ = pool.spawn_pinned_on_all_workers(|| {
-    ///         // Rc is !Send + !Sync
-    ///         let local_data = Rc::new("test");
-    ///
-    ///         // This future holds an Rc, so it is !Send
-    ///         async move { local_data.to_string() }
-    ///     });
-    /// }
-    /// ```
-    pub fn spawn_pinned_on_all_workers<F, Fut>(
-        &self,
-        create_task: F,
-    ) -> Vec<JoinHandle<Fut::Output>>
-    where
-        F: FnOnce() -> Fut,
-        F: Send + Clone + 'static,
-        Fut: Future + 'static,
-        Fut::Output: Send + 'static,
-    {
-        (0..self.pool.workers.len())
-            .map(|idx| self.spawn_pinned_by_idx(create_task.clone(), idx))
-            .collect::<Vec<_>>()
     }
 }
 

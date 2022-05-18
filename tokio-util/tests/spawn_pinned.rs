@@ -234,27 +234,3 @@ async fn spawn_by_idx() {
 
     assert_ne!(thread_id1, thread_id2);
 }
-
-#[tokio::test]
-async fn spawn_on_all_workers() {
-    const NUM_WORKERS: usize = 3;
-    let pool = task::LocalPoolHandle::new(NUM_WORKERS);
-    let barrier = Arc::new(Barrier::new(NUM_WORKERS + 1));
-    let barrier_clone = barrier.clone();
-
-    let handles = pool.spawn_pinned_on_all_workers(|| async move {
-        barrier_clone.wait().await;
-
-        "test"
-    });
-
-    let loads = pool.get_task_loads_for_each_worker();
-    barrier.wait().await;
-    assert_eq!(loads[0], 1);
-    assert_eq!(loads[1], 1);
-    assert_eq!(loads[2], 1);
-
-    let _ = handles
-        .into_iter()
-        .map(|handle| async { handle.await.unwrap() });
-}
