@@ -11,3 +11,7 @@
     --cfg tokio_unstable \
     """
   RUSTFLAGS="--cfg tokio_unstable"
+
+[[redirects]]
+  from = "/"
+  to = "/tokio"
