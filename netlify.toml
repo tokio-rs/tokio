@@ -8,7 +8,4 @@
   RUSTDOCFLAGS="""
     -D warnings \
     --cfg docsrs \
-    --html-before-content /opt/build/repo/assets/warning.html \
-    --html-in-header /opt/build/repo/assets/noindex.html \
-    --extend-css /opt/build/repo/assets/warning.css \
     """
