@@ -818,9 +818,11 @@ impl Notified<'_> {
                         }
                     }
 
-                    // Safety: called while locked.
-                    unsafe {
-                        (*waiter.get()).waker = waker;
+                    if waker.is_some() {
+                        // Safety: called while locked.
+                        unsafe {
+                            (*waiter.get()).waker = waker;
+                        }
                     }
 
                     // Insert the waiter into the linked list
