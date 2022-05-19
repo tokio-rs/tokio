@@ -529,7 +529,7 @@ cfg_net! {
                 .as_inner()
                 .io_handle
                 .as_ref()
-                .and_then(|h| h.with_io_driver_metrics(f))
+                .map(|h| f(h.metrics()))
                 .unwrap_or(0)
         }
     }
