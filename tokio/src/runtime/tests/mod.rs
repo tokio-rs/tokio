@@ -36,7 +36,9 @@ cfg_loom! {
     mod loom_pool;
     mod loom_queue;
     mod loom_shutdown_join;
-    mod loom_join_set;
+    cfg_unstable! {
+        mod loom_join_set;
+    }
 }
 
 cfg_not_loom! {
