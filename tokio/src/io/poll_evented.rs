@@ -1,5 +1,4 @@
 use crate::io::driver::{Handle, Interest, Registration};
-use crate::util::ready;
 
 use mio::event::Source;
 use std::fmt;
@@ -138,6 +137,7 @@ feature! {
     #![any(feature = "net", feature = "process")]
 
     use crate::io::ReadBuf;
+    use crate::util::ready;
     use std::task::{Context, Poll};
 
     impl<E: Source> PollEvented<E> {

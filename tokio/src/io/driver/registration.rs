@@ -1,7 +1,6 @@
 #![cfg_attr(not(feature = "net"), allow(dead_code))]
 
 use crate::io::driver::{Direction, Handle, Interest, ReadyEvent, ScheduledIo};
-use crate::pin;
 use crate::util::ready;
 use crate::util::slab;
 
@@ -217,6 +216,8 @@ fn gone() -> io::Error {
 }
 
 cfg_io_readiness! {
+    use crate::pin;
+
     impl Registration {
         pub(crate) async fn readiness(&self, interest: Interest) -> io::Result<ReadyEvent> {
             use std::future::Future;

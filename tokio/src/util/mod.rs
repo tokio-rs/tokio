@@ -2,6 +2,7 @@
 mod cfg;
 
 mod ready;
+#[allow(unused_imports)]
 pub(crate) use ready::ready;
 
 cfg_rt! {
