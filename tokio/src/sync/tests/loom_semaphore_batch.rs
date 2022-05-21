@@ -1,5 +1,5 @@
-use crate::sync::batch_semaphore::*;
 use crate::pin;
+use crate::sync::batch_semaphore::*;
 
 use futures::future::poll_fn;
 use loom::future::block_on;
