@@ -203,6 +203,38 @@ impl<T> JoinHandle<T> {
         }
     }
 
+    /// Checks if the task associated with the handle has finished(whether completed or cancelled).
+    /// This function does not block. Once this returns true, the task is expected
+    /// to finish quickly, without blocking for any significant amount of time.
+    ///
+    /// ```rust
+    /// use tokio::time;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///    let handle1 = tokio::spawn(async {
+    ///        // do some stuff here
+    ///    });
+    ///    let handle2 = tokio::spawn(async {
+    ///        // do some other stuff here
+    ///        time::sleep(time::Duration::from_secs(10)).await;
+    ///    });
+    ///    // Wait for the task to finish
+    ///    time::sleep(time::Duration::from_secs(1)).await;
+    ///    assert!(handle1.is_finished());
+    ///    handle2.abort();
+    ///    assert!(handle2.is_finished());
+    /// }
+    /// ```
+    pub fn is_finished(&self) -> bool {
+        if let Some(raw) = self.raw {
+            let state = raw.header().state.load();
+            state.is_complete() || state.is_cancelled()
+        } else {
+            true
+        }
+    }
+
     /// Set the waker that is notified when the task completes.
     pub(crate) fn set_join_waker(&mut self, waker: &Waker) {
         if let Some(raw) = self.raw {
