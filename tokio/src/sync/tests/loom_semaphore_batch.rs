@@ -1,4 +1,5 @@
 use crate::sync::batch_semaphore::*;
+use crate::pin;
 
 use futures::future::poll_fn;
 use loom::future::block_on;
