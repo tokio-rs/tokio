@@ -378,6 +378,9 @@
 //!
 //! [unstable features]: https://internals.rust-lang.org/t/feature-request-unstable-opt-in-non-transitive-crate-features/16193#why-not-a-crate-feature-2
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
+// As of now the MSRV (1.49.0) does not feature the patch
+// https://github.com/rust-lang/rust-clippy/pull/7120.
+#![allow(clippy::single_component_path_imports)]
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.

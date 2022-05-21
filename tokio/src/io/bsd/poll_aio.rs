@@ -1,6 +1,7 @@
 //! Use POSIX AIO futures with Tokio.
 
 use crate::io::driver::{Handle, Interest, ReadyEvent, Registration};
+use crate::util::ready;
 use mio::event::Source;
 use mio::Registry;
 use mio::Token;
