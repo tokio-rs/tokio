@@ -2,7 +2,9 @@
 
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::loom::sync::Mutex;
-use crate::util::ready;
+cfg_coop! {
+    use crate::util::ready;
+}
 
 use bytes::{Buf, BytesMut};
 use std::{
