@@ -204,8 +204,7 @@ impl<T> JoinHandle<T> {
     }
 
     /// Checks if the task associated with the handle has finished(whether completed or cancelled).
-    /// This function does not block. Once this returns true, the task is expected
-    /// to finish quickly, without blocking for any significant amount of time.
+    /// This function does not block.
     ///
     /// ```rust
     /// use tokio::time;
@@ -229,7 +228,7 @@ impl<T> JoinHandle<T> {
     pub fn is_finished(&self) -> bool {
         if let Some(raw) = self.raw {
             let state = raw.header().state.load();
-            state.is_complete() || state.is_cancelled()
+            state.is_complete()
         } else {
             true
         }

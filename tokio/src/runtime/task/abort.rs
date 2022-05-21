@@ -50,16 +50,14 @@ impl AbortHandle {
     }
 
     /// Checks if the task associated with the handle has finished(whether completed or cancelled).
-    /// Like [`JoinHandle::is_finished`] this function does not block.
-    /// Once this returns true, the task is expected to finish quickly,
-    /// without blocking for any significant amount of time.
+    /// Like [`JoinHandle::is_finished`], this function does not block.
     ///
     /// [`JoinHandle::is_finished`]: method@super::JoinHandle::is_finished
     #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
     pub fn is_finished(&self) -> bool {
         if let Some(raw) = self.raw {
             let state = raw.header().state.load();
-            state.is_complete() || state.is_cancelled()
+            state.is_complete()
         } else {
             true
         }
