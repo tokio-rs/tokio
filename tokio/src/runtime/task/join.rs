@@ -219,9 +219,9 @@ impl<T> JoinHandle<T> {
     ///        time::sleep(time::Duration::from_secs(10)).await;
     ///    });
     ///    // Wait for the task to finish
+    ///    handle2.abort();
     ///    time::sleep(time::Duration::from_secs(1)).await;
     ///    assert!(handle1.is_finished());
-    ///    handle2.abort();
     ///    assert!(handle2.is_finished());
     /// }
     /// ```
