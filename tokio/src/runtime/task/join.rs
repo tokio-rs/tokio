@@ -206,11 +206,17 @@ impl<T> JoinHandle<T> {
     /// Checks if the task associated with the handle has finished(whether completed or cancelled).
     /// This function does not block.
     ///
+    /// # Notes
+    ///
+    /// Cancelling a task may need some time to take effect. This function only returns true
+    /// when the task has completed the cancellation process.
+    ///
     /// ```rust
     /// use tokio::time;
     ///
-    /// #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// async fn main() {
+    /// #  time::pause();
     ///    let handle1 = tokio::spawn(async {
     ///        // do some stuff here
     ///    });
