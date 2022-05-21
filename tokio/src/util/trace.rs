@@ -1,4 +1,31 @@
 cfg_trace! {
+    macro_rules! poll_op_inner {
+        ($name:expr, $readiness:literal) => {
+            tracing::trace!(
+                target: "runtime::resource::poll_op",
+                op_name = $name,
+                is_ready = $readiness
+            );
+        }
+    }
+    pub(crate) use poll_op_inner;
+
+    macro_rules! poll_op {
+        ($name:expr, $poll:expr $(,)*) => {
+            match $poll {
+                std::task::Poll::Ready(t) => {
+                    $crate::util::trace::poll_op_inner!($name, true);
+                    std::task::Poll::Ready(t)
+                }
+                std::task::Poll::Pending => {
+                    $crate::util::trace::poll_op_inner!($name, false);
+                    return std::task::Poll::Pending;
+                }
+            }
+        };
+    }
+    pub(crate) use poll_op;
+
     cfg_rt! {
         use core::{
             pin::Pin,
@@ -74,7 +101,7 @@ cfg_trace! {
                 let _res_enter = this.tracing_ctx.resource_span.enter();
                 let _async_op_enter = this.tracing_ctx.async_op_span.enter();
                 let _async_op_poll_enter = this.tracing_ctx.async_op_poll_span.enter();
-                trace_poll_op!(poll_op_name, this.inner.poll(cx))
+                poll_op!(poll_op_name, this.inner.poll(cx))
             }
         }
     }

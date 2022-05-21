@@ -130,7 +130,7 @@ macro_rules! pin {
         // ever again.
         #[allow(unused_mut)]
         let mut $x = unsafe {
-            $crate::macros::support::Pin::new_unchecked(&mut $x)
+            $crate::macro_support::Pin::new_unchecked(&mut $x)
         };
     )* };
     ($(

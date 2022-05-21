@@ -392,13 +392,16 @@ compile_error! {
     "Tokio requires the platform pointer width to be 32, 64, or 128 bits"
 }
 
-// Includes re-exports used by macros.
+// #[macro_use] is used to import the `cfg_*` macros everywhere in the crate.
+#[macro_use]
+mod util;
+
+// Re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any
 // `doc(hidden)` code is not part of Tokio's public and stable API.
-#[macro_use]
 #[doc(hidden)]
-pub mod macros;
+pub mod macro_support;
 
 cfg_fs! {
     pub mod fs;
@@ -452,7 +455,7 @@ cfg_time! {
     pub mod time;
 }
 
-mod util;
+mod pin;
 
 /// Due to the `Stream` trait's inclusion in `std` landing later than Tokio's 1.0
 /// release, most of the Tokio stream utilities have been moved into the [`tokio-stream`]

@@ -2,6 +2,7 @@
 use crate::time::driver::ClockTime;
 use crate::time::driver::{Handle, TimerEntry};
 use crate::time::{error::Error, Duration, Instant};
+use crate::util::ready;
 use crate::util::trace;
 
 use pin_project_lite::pin_project;
@@ -392,7 +393,7 @@ impl Sleep {
 
         // Keep track of task budget
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let coop = ready!(trace_poll_op!(
+        let coop = ready!(trace::poll_op!(
             "poll_elapsed",
             crate::coop::poll_proceed(cx),
         ));
@@ -406,7 +407,7 @@ impl Sleep {
         });
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return trace_poll_op!("poll_elapsed", result);
+        return trace::poll_op!("poll_elapsed", result);
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         return result;

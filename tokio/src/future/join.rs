@@ -67,8 +67,8 @@ macro_rules! join {
         $( ( $($skip:tt)* ) $e:expr, )*
 
     }) => {{
-        use $crate::macros::support::{maybe_done, poll_fn, Future, Pin};
-        use $crate::macros::support::Poll::{Ready, Pending};
+        use $crate::macro_support::{maybe_done, poll_fn, Future, Pin};
+        use $crate::macro_support::Poll::{Ready, Pending};
 
         // Safety: nothing must be moved out of `futures`. This is to satisfy
         // the requirement of `Pin::new_unchecked` called below.

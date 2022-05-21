@@ -1,5 +1,6 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
+use crate::util::ready;
 
 use pin_project_lite::pin_project;
 use std::io::{self, IoSlice, SeekFrom};

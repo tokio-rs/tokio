@@ -244,6 +244,7 @@ mod kill;
 
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::process::kill::Kill;
+use crate::util::ready;
 
 use std::convert::TryInto;
 use std::ffi::OsStr;

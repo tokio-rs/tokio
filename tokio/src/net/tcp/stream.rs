@@ -3,6 +3,7 @@ use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
+use crate::util::ready;
 
 use std::convert::TryFrom;
 use std::fmt;

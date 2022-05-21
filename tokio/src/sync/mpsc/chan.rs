@@ -7,6 +7,7 @@ use crate::park::Park;
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
+use crate::util::ready;
 
 use std::fmt;
 use std::process;

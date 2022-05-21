@@ -31,7 +31,7 @@
 
 use std::cell::Cell;
 
-thread_local! {
+crate::loom::thread_local! {
     static CURRENT: Cell<Budget> = Cell::new(Budget::unconstrained());
 }
 
@@ -216,6 +216,7 @@ mod test {
 
     #[test]
     fn bugeting() {
+        use crate::util::ready;
         use futures::future::poll_fn;
         use tokio_test::*;
 

@@ -1,5 +1,6 @@
 use crate::io::util::vec_with_initialized::{into_read_buf_parts, VecU8, VecWithInitialized};
 use crate::io::AsyncRead;
+use crate::util::ready;
 
 use pin_project_lite::pin_project;
 use std::future::Future;

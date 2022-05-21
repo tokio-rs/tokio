@@ -5,6 +5,7 @@
 //! `split::WriteHalf` use `unsplit`.
 
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
+use crate::util::ready;
 
 use std::cell::UnsafeCell;
 use std::fmt;

@@ -3,7 +3,7 @@ use crate::runtime::{Handle, TryCurrentError};
 
 use std::cell::RefCell;
 
-thread_local! {
+crate::loom::thread_local! {
     static CONTEXT: RefCell<Option<Handle>> = RefCell::new(None)
 }
 

@@ -7,10 +7,10 @@ use std::marker;
 macro_rules! scoped_thread_local {
     ($(#[$attrs:meta])* $vis:vis static $name:ident: $ty:ty) => (
         $(#[$attrs])*
-        $vis static $name: $crate::macros::scoped_tls::ScopedKey<$ty>
-            = $crate::macros::scoped_tls::ScopedKey {
+        $vis static $name: $crate::util::ScopedKey<$ty>
+            = $crate::util::ScopedKey {
                 inner: {
-                    thread_local!(static FOO: ::std::cell::Cell<*const ()> = {
+                    $crate::loom::thread_local!(static FOO: ::std::cell::Cell<*const ()> = {
                         std::cell::Cell::new(::std::ptr::null())
                     });
                     &FOO
@@ -19,6 +19,7 @@ macro_rules! scoped_thread_local {
             };
     )
 }
+pub(crate) use scoped_thread_local;
 
 /// Type representing a thread local storage key corresponding to a reference
 /// to the type parameter `T`.

@@ -1,4 +1,5 @@
 use crate::io::driver::{Handle, Interest, ReadyEvent, Registration};
+use crate::util::ready;
 
 use mio::unix::SourceFd;
 use std::io;

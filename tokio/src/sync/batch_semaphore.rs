@@ -19,6 +19,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Mutex, MutexGuard};
 use crate::util::linked_list::{self, LinkedList};
+use crate::util::ready;
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
 use crate::util::WakeList;
@@ -530,7 +531,7 @@ impl Future for Acquire<'_> {
 
         // First, ensure the current task has enough budget to proceed.
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let coop = ready!(trace_poll_op!(
+        let coop = ready!(trace::poll_op!(
             "poll_acquire",
             crate::coop::poll_proceed(cx),
         ));
@@ -552,7 +553,7 @@ impl Future for Acquire<'_> {
         };
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return trace_poll_op!("poll_acquire", result);
+        return trace::poll_op!("poll_acquire", result);
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         return result;

@@ -106,3 +106,4 @@ pub(crate) mod thread {
         Result, Thread, ThreadId,
     };
 }
+pub(crate) use std::thread_local;

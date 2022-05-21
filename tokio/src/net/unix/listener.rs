@@ -1,5 +1,6 @@
 use crate::io::{Interest, PollEvented};
 use crate::net::unix::{SocketAddr, UnixStream};
+use crate::util::ready;
 
 use std::convert::TryFrom;
 use std::fmt;

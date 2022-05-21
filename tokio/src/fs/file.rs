@@ -7,6 +7,7 @@ use crate::fs::asyncify;
 use crate::io::blocking::Buf;
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
+use crate::util::ready;
 
 use std::fmt;
 use std::fs::{Metadata, Permissions};

@@ -2,6 +2,7 @@
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
 use crate::sync::AtomicWaker;
+use crate::util::scoped_thread_local;
 use crate::util::VecDequeCell;
 
 use std::cell::Cell;

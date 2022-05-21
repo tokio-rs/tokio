@@ -122,6 +122,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
+use crate::util::ready;
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
 
@@ -1076,7 +1077,7 @@ impl<T> Future for Receiver<T> {
 
         let ret = if let Some(inner) = self.as_ref().get_ref().inner.as_ref() {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx)))?;
+            let res = ready!(trace::poll_op!("poll_recv", inner.poll_recv(cx)))?;
 
             #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
             let res = ready!(inner.poll_recv(cx))?;

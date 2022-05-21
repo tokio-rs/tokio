@@ -1,4 +1,5 @@
 use crate::fs::asyncify;
+use crate::util::ready;
 
 use std::ffi::OsString;
 use std::fs::{FileType, Metadata};

@@ -1,5 +1,6 @@
 use crate::future::poll_fn;
 use crate::time::{sleep_until, Duration, Instant, Sleep};
+use crate::util::ready;
 use crate::util::trace;
 
 use std::panic::Location;

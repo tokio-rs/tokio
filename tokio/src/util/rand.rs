@@ -56,7 +56,7 @@ impl FastRand {
 #[doc(hidden)]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub fn thread_rng_n(n: u32) -> u32 {
-    thread_local! {
+    crate::loom::thread_local! {
         static THREAD_RNG: FastRand = FastRand::new(crate::loom::rand::seed());
     }
 

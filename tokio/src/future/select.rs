@@ -436,11 +436,11 @@ macro_rules! select {
             $crate::select_priv_declare_output_enum!( ( $($count)* ) );
         }
 
-        // `tokio::macros::support` is a public, but doc(hidden) module
+        // `tokio::macro_support` is a public, but doc(hidden) module
         // including a re-export of all types needed by this macro.
-        use $crate::macros::support::Future;
-        use $crate::macros::support::Pin;
-        use $crate::macros::support::Poll::{Ready, Pending};
+        use $crate::macro_support::Future;
+        use $crate::macro_support::Pin;
+        use $crate::macro_support::Poll::{Ready, Pending};
 
         const BRANCHES: u32 = $crate::count!( $($count)* );
 
@@ -462,7 +462,7 @@ macro_rules! select {
             // satisfy the requirement of `Pin::new_unchecked` called below.
             let mut futures = ( $( $fut , )+ );
 
-            $crate::macros::support::poll_fn(|cx| {
+            $crate::macro_support::poll_fn(|cx| {
                 // Track if any branch returns pending. If no branch completes
                 // **or** returns pending, this implies that all branches are
                 // disabled.
@@ -598,7 +598,7 @@ macro_rules! select {
     ( $p:pat = $($t:tt)* ) => {
         // Randomly generate a starting point. This makes `select!` a bit more
         // fair and avoids always polling the first future.
-        $crate::select!(@{ start={ $crate::macros::support::thread_rng_n(BRANCHES) }; () } $p = $($t)*)
+        $crate::select!(@{ start={ $crate::macro_support::thread_rng_n(BRANCHES) }; () } $p = $($t)*)
     };
     () => {
         compile_error!("select! requires at least one branch.")

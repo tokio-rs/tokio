@@ -1,5 +1,6 @@
 use crate::io::util::read_line::read_line_internal;
 use crate::io::AsyncBufRead;
+use crate::util::ready;
 
 use pin_project_lite::pin_project;
 use std::io;

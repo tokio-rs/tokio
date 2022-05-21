@@ -1,82 +1,206 @@
-use crate::future::maybe_done::{maybe_done, MaybeDone};
+/// Waits on multiple concurrent branches, returning when **all** branches
+/// complete with `Ok(_)` or on the first `Err(_)`.
+///
+/// The `try_join!` macro must be used inside of async functions, closures, and
+/// blocks.
+///
+/// Similar to [`join!`], the `try_join!` macro takes a list of async
+/// expressions and evaluates them concurrently on the same task. Each async
+/// expression evaluates to a future and the futures from each expression are
+/// multiplexed on the current task. The `try_join!` macro returns when **all**
+/// branches return with `Ok` or when the **first** branch returns with `Err`.
+///
+/// [`join!`]: macro@join
+///
+/// # Notes
+///
+/// The supplied futures are stored inline and does not require allocating a
+/// `Vec`.
+///
+/// ### Runtime characteristics
+///
+/// By running all async expressions on the current task, the expressions are
+/// able to run **concurrently** but not in **parallel**. This means all
+/// expressions are run on the same thread and if one branch blocks the thread,
+/// all other expressions will be unable to continue. If parallelism is
+/// required, spawn each async expression using [`tokio::spawn`] and pass the
+/// join handle to `try_join!`.
+///
+/// [`tokio::spawn`]: crate::spawn
+///
+/// # Examples
+///
+/// Basic try_join with two branches.
+///
+/// ```
+/// async fn do_stuff_async() -> Result<(), &'static str> {
+///     // async work
+/// # Ok(())
+/// }
+///
+/// async fn more_async_work() -> Result<(), &'static str> {
+///     // more here
+/// # Ok(())
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let res = tokio::try_join!(
+///         do_stuff_async(),
+///         more_async_work());
+///
+///     match res {
+///          Ok((first, second)) => {
+///              // do something with the values
+///          }
+///          Err(err) => {
+///             println!("processing failed; error = {}", err);
+///          }
+///     }
+/// }
+/// ```
+///
+/// Using `try_join!` with spawned tasks.
+///
+/// ```
+/// use tokio::task::JoinHandle;
+///
+/// async fn do_stuff_async() -> Result<(), &'static str> {
+///     // async work
+/// # Err("failed")
+/// }
+///
+/// async fn more_async_work() -> Result<(), &'static str> {
+///     // more here
+/// # Ok(())
+/// }
+///
+/// async fn flatten<T>(handle: JoinHandle<Result<T, &'static str>>) -> Result<T, &'static str> {
+///     match handle.await {
+///         Ok(Ok(result)) => Ok(result),
+///         Ok(Err(err)) => Err(err),
+///         Err(err) => Err("handling failed"),
+///     }
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let handle1 = tokio::spawn(do_stuff_async());
+///     let handle2 = tokio::spawn(more_async_work());
+///     match tokio::try_join!(flatten(handle1), flatten(handle2)) {
+///         Ok(val) => {
+///             // do something with the values
+///         }
+///         Err(err) => {
+///             println!("Failed with {}.", err);
+///             # assert_eq!(err, "failed");
+///         }
+///     }
+/// }
+/// ```
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+macro_rules! try_join {
+    (@ {
+        // One `_` for each branch in the `try_join!` macro. This is not used once
+        // normalization is complete.
+        ( $($count:tt)* )
 
-use pin_project_lite::pin_project;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+        // The expression `0+1+1+ ... +1` equal to the number of branches.
+        ( $($total:tt)* )
 
-pub(crate) fn try_join3<T1, F1, T2, F2, T3, F3, E>(
-    future1: F1,
-    future2: F2,
-    future3: F3,
-) -> TryJoin3<F1, F2, F3>
-where
-    F1: Future<Output = Result<T1, E>>,
-    F2: Future<Output = Result<T2, E>>,
-    F3: Future<Output = Result<T3, E>>,
-{
-    TryJoin3 {
-        future1: maybe_done(future1),
-        future2: maybe_done(future2),
-        future3: maybe_done(future3),
-    }
-}
+        // Normalized try_join! branches
+        $( ( $($skip:tt)* ) $e:expr, )*
 
-pin_project! {
-    pub(crate) struct TryJoin3<F1, F2, F3>
-    where
-        F1: Future,
-        F2: Future,
-        F3: Future,
-    {
-        #[pin]
-        future1: MaybeDone<F1>,
-        #[pin]
-        future2: MaybeDone<F2>,
-        #[pin]
-        future3: MaybeDone<F3>,
-    }
-}
+    }) => {{
+        use $crate::macro_support::{maybe_done, poll_fn, Future, Pin};
+        use $crate::macro_support::Poll::{Ready, Pending};
 
-impl<T1, F1, T2, F2, T3, F3, E> Future for TryJoin3<F1, F2, F3>
-where
-    F1: Future<Output = Result<T1, E>>,
-    F2: Future<Output = Result<T2, E>>,
-    F3: Future<Output = Result<T3, E>>,
-{
-    type Output = Result<(T1, T2, T3), E>;
+        // Safety: nothing must be moved out of `futures`. This is to satisfy
+        // the requirement of `Pin::new_unchecked` called below.
+        let mut futures = ( $( maybe_done($e), )* );
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut all_done = true;
+        // Each time the future created by poll_fn is polled, a different future will be polled first
+        // to ensure every future passed to join! gets a chance to make progress even if
+        // one of the futures consumes the whole budget.
+        //
+        // This is number of futures that will be skipped in the first loop
+        // iteration the next time.
+        let mut skip_next_time: u32 = 0;
 
-        let mut me = self.project();
+        poll_fn(move |cx| {
+            const COUNT: u32 = $($total)*;
 
-        if me.future1.as_mut().poll(cx).is_pending() {
-            all_done = false;
-        } else if me.future1.as_mut().output_mut().unwrap().is_err() {
-            return Poll::Ready(Err(me.future1.take_output().unwrap().err().unwrap()));
-        }
+            let mut is_pending = false;
 
-        if me.future2.as_mut().poll(cx).is_pending() {
-            all_done = false;
-        } else if me.future2.as_mut().output_mut().unwrap().is_err() {
-            return Poll::Ready(Err(me.future2.take_output().unwrap().err().unwrap()));
-        }
+            let mut to_run = COUNT;
 
-        if me.future3.as_mut().poll(cx).is_pending() {
-            all_done = false;
-        } else if me.future3.as_mut().output_mut().unwrap().is_err() {
-            return Poll::Ready(Err(me.future3.take_output().unwrap().err().unwrap()));
-        }
+            // The number of futures that will be skipped in the first loop iteration
+            let mut skip = skip_next_time;
 
-        if all_done {
-            Poll::Ready(Ok((
-                me.future1.take_output().unwrap().ok().unwrap(),
-                me.future2.take_output().unwrap().ok().unwrap(),
-                me.future3.take_output().unwrap().ok().unwrap(),
-            )))
-        } else {
-            Poll::Pending
-        }
-    }
+            skip_next_time = if skip + 1 == COUNT { 0 } else { skip + 1 };
+
+            // This loop runs twice and the first `skip` futures
+            // are not polled in the first iteration.
+            loop {
+            $(
+                if skip == 0 {
+                    if to_run == 0 {
+                        // Every future has been polled
+                        break;
+                    }
+                    to_run -= 1;
+
+                    // Extract the future for this branch from the tuple.
+                    let ( $($skip,)* fut, .. ) = &mut futures;
+
+                    // Safety: future is stored on the stack above
+                    // and never moved.
+                    let mut fut = unsafe { Pin::new_unchecked(fut) };
+
+                    // Try polling
+                    if fut.as_mut().poll(cx).is_pending() {
+                        is_pending = true;
+                    } else if fut.as_mut().output_mut().expect("expected completed future").is_err() {
+                        return Ready(Err(fut.take_output().expect("expected completed future").err().unwrap()))
+                    }
+                } else {
+                    // Future skipped, one less future to skip in the next iteration
+                    skip -= 1;
+                }
+            )*
+            }
+
+            if is_pending {
+                Pending
+            } else {
+                Ready(Ok(($({
+                    // Extract the future for this branch from the tuple.
+                    let ( $($skip,)* fut, .. ) = &mut futures;
+
+                    // Safety: future is stored on the stack above
+                    // and never moved.
+                    let mut fut = unsafe { Pin::new_unchecked(fut) };
+
+                    fut
+                        .take_output()
+                        .expect("expected completed future")
+                        .ok()
+                        .expect("expected Ok(_)")
+                },)*)))
+            }
+        }).await
+    }};
+
+    // ===== Normalize =====
+
+    (@ { ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
+      $crate::try_join!(@{ ($($s)* _) ($($n)* + 1) $($t)* ($($s)*) $e, } $($r)*)
+    };
+
+    // ===== Entry point =====
+
+    ( $($e:expr),* $(,)?) => {
+        $crate::try_join!(@{ () (0) } $($e,)*)
+    };
 }

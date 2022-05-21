@@ -1,6 +1,7 @@
 use super::copy::CopyBuffer;
 
 use crate::io::{AsyncRead, AsyncWrite};
+use crate::util::ready;
 
 use std::future::Future;
 use std::io;

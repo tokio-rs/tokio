@@ -5,6 +5,7 @@ use futures::task::noop_waker_ref;
 
 use crate::loom::sync::Arc;
 use crate::loom::thread;
+use crate::pin;
 use crate::{
     loom::sync::atomic::{AtomicBool, Ordering},
     park::Unpark,

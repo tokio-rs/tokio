@@ -8,9 +8,15 @@ pub(crate) mod maybe_done;
 mod poll_fn;
 pub use poll_fn::poll_fn;
 
-cfg_process! {
+cfg_macros! {
+    mod select;
+    mod join;
     mod try_join;
-    pub(crate) use try_join::try_join3;
+}
+
+cfg_process! {
+    mod try_join3;
+    pub(crate) use try_join3::try_join3;
 }
 
 cfg_sync! {

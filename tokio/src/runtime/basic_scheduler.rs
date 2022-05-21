@@ -2,6 +2,7 @@ use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
+use crate::pin;
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::Driver;
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
@@ -9,6 +10,7 @@ use crate::runtime::{Callback, HandleInner};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
+use crate::util::scoped_thread_local;
 use crate::util::{waker_ref, Wake, WakerRef};
 
 use std::cell::RefCell;

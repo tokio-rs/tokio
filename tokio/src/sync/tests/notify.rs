@@ -1,3 +1,4 @@
+use crate::pin;
 use crate::sync::Notify;
 use std::future::Future;
 use std::mem::ManuallyDrop;

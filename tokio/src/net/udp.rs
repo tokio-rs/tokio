@@ -1,5 +1,6 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
+use crate::util::ready;
 
 use std::convert::TryFrom;
 use std::fmt;

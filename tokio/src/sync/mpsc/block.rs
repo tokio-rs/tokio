@@ -364,11 +364,10 @@ impl<T> Values<T> {
         let mut vals = MaybeUninit::uninit();
 
         // When fuzzing, `UnsafeCell` needs to be initialized.
-        if_loom! {
+        if cfg!(loom) {
             let p = vals.as_mut_ptr() as *mut UnsafeCell<MaybeUninit<T>>;
             for i in 0..BLOCK_CAP {
-                p.add(i)
-                    .write(UnsafeCell::new(MaybeUninit::uninit()));
+                p.add(i).write(UnsafeCell::new(MaybeUninit::uninit()));
             }
         }
 

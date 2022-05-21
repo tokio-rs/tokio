@@ -1,3 +1,6 @@
+use crate::loom::thread_local;
+use crate::pin;
+
 use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::marker::PhantomData;

@@ -3,6 +3,7 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::park::{Park, Unpark};
+use crate::pin;
 
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
@@ -31,7 +32,7 @@ const EMPTY: usize = 0;
 const PARKED: usize = 1;
 const NOTIFIED: usize = 2;
 
-thread_local! {
+crate::loom::thread_local! {
     static CURRENT_PARKER: ParkThread = ParkThread::new();
 }
 

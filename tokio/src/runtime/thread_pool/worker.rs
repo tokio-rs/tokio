@@ -67,6 +67,7 @@ use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::{queue, Idle, Parker, Unparker};
 use crate::runtime::{task, Callback, HandleInner, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
+use crate::util::scoped_thread_local;
 use crate::util::FastRand;
 
 use std::cell::RefCell;

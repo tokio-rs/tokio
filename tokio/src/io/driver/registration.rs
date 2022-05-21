@@ -1,6 +1,8 @@
 #![cfg_attr(not(feature = "net"), allow(dead_code))]
 
 use crate::io::driver::{Direction, Handle, Interest, ReadyEvent, ScheduledIo};
+use crate::pin;
+use crate::util::ready;
 use crate::util::slab;
 
 use mio::event::Source;

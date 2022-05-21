@@ -1,5 +1,7 @@
 //! Definition of the MaybeDone combinator.
 
+use crate::util::ready;
+
 use std::future::Future;
 use std::mem;
 use std::pin::Pin;

@@ -248,6 +248,8 @@ pub(crate) mod sealed {
     //! part of the `ToSocketAddrs` public API. The details will change over
     //! time.
 
+    use crate::util::ready;
+
     use std::future::Future;
     use std::io;
     use std::net::SocketAddr;
