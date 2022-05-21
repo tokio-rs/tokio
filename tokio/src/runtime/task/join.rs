@@ -203,13 +203,12 @@ impl<T> JoinHandle<T> {
         }
     }
 
-    /// Checks if the task associated with the handle has finished(whether completed or cancelled).
-    /// This function does not block.
+    /// Checks if the task associated with this `JoinHandle` has finished.
     ///
-    /// # Notes
-    ///
-    /// Cancelling a task may need some time to take effect. This function only returns true
-    /// when the task has completed the cancellation process.
+    /// Please note that this method can return `false` even if `abort` has been
+    /// called on the task. This is because the cancellation process may take
+    /// some time, and this method does not return `true` until it has
+    /// completed.
     ///
     /// ```rust
     /// use tokio::time;
@@ -231,6 +230,7 @@ impl<T> JoinHandle<T> {
     ///    assert!(handle2.is_finished());
     /// }
     /// ```
+    /// [`abort`]: method@JoinHandle::abort
     pub fn is_finished(&self) -> bool {
         if let Some(raw) = self.raw {
             let state = raw.header().state.load();

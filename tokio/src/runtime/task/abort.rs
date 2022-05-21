@@ -49,15 +49,12 @@ impl AbortHandle {
         }
     }
 
-    /// Checks if the task associated with the handle has finished(whether completed or cancelled).
-    /// Like [`JoinHandle::is_finished`], this function does not block.
+    /// Checks if the task associated with this `JoinHandle` has finished.
     ///
-    /// # Notes
-    ///
-    /// Cancelling a task may need some time to take effect. This function only returns true
-    /// when the task has completed the cancellation process.
-    ///
-    /// [`JoinHandle::is_finished`]: method@super::JoinHandle::is_finished
+    /// Please note that this method can return `false` even if `abort` has been
+    /// called on the task. This is because the cancellation process may take
+    /// some time, and this method does not return `true` until it has
+    /// completed.
     #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
     pub fn is_finished(&self) -> bool {
         if let Some(raw) = self.raw {
