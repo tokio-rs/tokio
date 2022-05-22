@@ -49,7 +49,7 @@ impl AbortHandle {
         }
     }
 
-    /// Checks if the task associated with this `JoinHandle` has finished.
+    /// Checks if the task associated with this `AbortHandle` has finished.
     ///
     /// Please note that this method can return `false` even if `abort` has been
     /// called on the task. This is because the cancellation process may take
