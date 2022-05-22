@@ -114,7 +114,7 @@
 //! The [`tokio::sync`] module contains synchronization primitives to use when
 //! needing to communicate or share data. These include:
 //!
-//! * channels ([`oneshot`], [`mpsc`], and [`watch`], and [`broadcast`]), for sending values
+//! * channels ([`oneshot`], [`mpsc`], [`watch`], and [`broadcast`]), for sending values
 //!   between tasks,
 //! * a non-blocking [`Mutex`], for controlling access to a shared, mutable
 //!   value,
