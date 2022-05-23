@@ -92,52 +92,6 @@ fn broadcast_two() {
     });
 }
 
-// An `Arc` is used as the value in order to detect memory leaks.
-#[test]
-fn broadcast_two_cloned() {
-    loom::model(|| {
-        let (tx, mut rx1) = broadcast::channel::<Arc<&'static str>>(16);
-        let mut rx2 = rx1.clone_at_position();
-
-        let th1 = thread::spawn(move || {
-            block_on(async {
-                let v = assert_ok!(rx1.recv().await);
-                assert_eq!(*v, "hello");
-
-                let v = assert_ok!(rx1.recv().await);
-                assert_eq!(*v, "world");
-
-                match assert_err!(rx1.recv().await) {
-                    Closed => {}
-                    _ => panic!(),
-                }
-            });
-        });
-
-        let th2 = thread::spawn(move || {
-            block_on(async {
-                let v = assert_ok!(rx2.recv().await);
-                assert_eq!(*v, "hello");
-
-                let v = assert_ok!(rx2.recv().await);
-                assert_eq!(*v, "world");
-
-                match assert_err!(rx2.recv().await) {
-                    Closed => {}
-                    _ => panic!(),
-                }
-            });
-        });
-
-        assert_ok!(tx.send(Arc::new("hello")));
-        assert_ok!(tx.send(Arc::new("world")));
-        drop(tx);
-
-        assert_ok!(th1.join());
-        assert_ok!(th2.join());
-    });
-}
-
 #[test]
 fn broadcast_wrap() {
     loom::model(|| {
@@ -224,43 +178,6 @@ fn drop_rx() {
         assert_ok!(th2.join());
     });
 }
-#[test]
-fn drop_cloned_rx() {
-    loom::model(|| {
-        let (tx, mut rx1) = broadcast::channel(16);
-        let rx2 = rx1.clone_at_position();
-
-        let th1 = thread::spawn(move || {
-            block_on(async {
-                let v = assert_ok!(rx1.recv().await);
-                assert_eq!(v, "one");
-
-                let v = assert_ok!(rx1.recv().await);
-                assert_eq!(v, "two");
-
-                let v = assert_ok!(rx1.recv().await);
-                assert_eq!(v, "three");
-
-                match assert_err!(rx1.recv().await) {
-                    Closed => {}
-                    _ => panic!(),
-                }
-            });
-        });
-
-        let th2 = thread::spawn(move || {
-            drop(rx2);
-        });
-
-        assert_ok!(tx.send("one"));
-        assert_ok!(tx.send("two"));
-        assert_ok!(tx.send("three"));
-        drop(tx);
-
-        assert_ok!(th1.join());
-        assert_ok!(th2.join());
-    });
-}
 
 #[test]
 fn drop_multiple_rx_with_overflow() {
@@ -286,56 +203,5 @@ fn drop_multiple_rx_with_overflow() {
 
         assert_ok!(th1.join());
         assert_ok!(th2.join());
-    });
-}
-
-#[test]
-fn drop_multiple_cloned_rx_with_overflow() {
-    loom::model(move || {
-        // It is essential to have multiple senders and receivers in this test case.
-        let (tx, mut rx) = broadcast::channel(1);
-        let _rx2 = rx.clone_at_position();
-
-        let _ = tx.send(());
-        let tx2 = tx.clone();
-        let th1 = thread::spawn(move || {
-            block_on(async {
-                for _ in 0..100 {
-                    let _ = tx2.send(());
-                }
-            });
-        });
-        let _ = tx.send(());
-
-        let th2 = thread::spawn(move || {
-            block_on(async { while let Ok(_) = rx.recv().await {} });
-        });
-
-        assert_ok!(th1.join());
-        assert_ok!(th2.join());
-    });
-}
-
-#[test]
-fn send_and_rx_clone() {
-    // test the interaction of Sender::send and Rx::clone_at_position
-    loom::model(move || {
-        let (tx, mut rx) = broadcast::channel(2);
-
-        let th1 = thread::spawn(move || {
-            block_on(async {
-                let mut rx2 = rx.clone_at_position();
-                let v = assert_ok!(rx.recv().await);
-                assert_eq!(v, 1);
-
-                // this would return closed if rem was incr'd in clone_at_position between
-                // read and write of rem for new tail entry.
-                let v2 = assert_ok!(rx2.recv().await);
-                assert_eq!(v2, 1);
-            });
-        });
-        assert_ok!(tx.send(1));
-
-        assert_ok!(th1.join());
     });
 }
