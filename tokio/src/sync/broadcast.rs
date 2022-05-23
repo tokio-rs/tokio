@@ -901,7 +901,7 @@ impl<T: Clone> Receiver<T> {
     ///   let mut rx2 = rx.resubscribe();
     ///   tx.send(2).unwrap();
     ///
-    ///   assert_neq!(rx.recv().await.unwrap(), rx2.recv().await.unwrap()); // 1 != 2
+    ///   assert_eq!(rx.recv().await.unwrap(), rx2.recv().await.unwrap()); // 1 != 2
     /// }
     /// ```
     pub fn resubscribe(&self) -> Self {
