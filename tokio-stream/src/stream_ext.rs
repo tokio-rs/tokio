@@ -1003,7 +1003,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust,no_run
     /// use std::time::Duration;
     /// use tokio::time;
     /// use tokio_stream::{self as stream, StreamExt};
@@ -1022,13 +1022,11 @@ pub trait StreamExt: Stream {
     ///         .chain(stream1)
     ///         .chunks_timeout(4, Duration::from_secs(1));
     ///
-    ///     tokio::pin!(chunk_stream);
-    ///
     ///     assert_eq!(chunk_stream.next().await, Some(vec![1,2,3]));
     ///     assert_eq!(chunk_stream.next().await, Some(vec![4]));
     /// }
     /// ```
-    #[cfg(all(feature = "time"))]
+    #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     fn chunks_timeout(self, capacity: usize, duration: Duration) -> ChunksTimeout<Self>
     where

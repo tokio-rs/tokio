@@ -49,45 +49,44 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.as_mut().project();
-        loop {
-            match me.stream.as_mut().poll_next(cx) {
-                Poll::Pending => {}
-                Poll::Ready(Some(item)) => {
-                    me.items.push(item);
-                    if me.items.len() >= *me.cap {
-                        return Poll::Ready(Some(self.take()));
-                    }
-                }
 
-                Poll::Ready(None) => {
-                    let last = if me.items.is_empty() {
-                        None
-                    } else {
-                        let full_buf = std::mem::take(me.items);
-                        Some(full_buf)
-                    };
-
-                    return Poll::Ready(last);
-                }
-            }
-
-            match me.deadline.as_mut().poll(cx) {
-                Poll::Pending => {}
-                Poll::Ready(()) => {
+        match me.stream.as_mut().poll_next(cx) {
+            Poll::Pending => {}
+            Poll::Ready(Some(item)) => {
+                me.items.push(item);
+                if me.items.len() >= *me.cap {
                     return Poll::Ready(Some(self.take()));
                 }
             }
+
+            Poll::Ready(None) => {
+                let last = if me.items.is_empty() {
+                    None
+                } else {
+                    let full_buf = std::mem::take(me.items);
+                    Some(full_buf)
+                };
+
+                return Poll::Ready(last);
+            }
         }
+
+        match me.deadline.as_mut().poll(cx) {
+            Poll::Pending => {}
+            Poll::Ready(()) => {
+                return Poll::Ready(Some(self.take()));
+            }
+        }
+
+        cx.waker().wake_by_ref();
+        Poll::Pending
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let chunk_len = if self.items.is_empty() { 0 } else { 1 };
         let (lower, upper) = self.stream.size_hint();
         let lower = lower.saturating_add(chunk_len);
-        let upper = match upper {
-            Some(x) => x.checked_add(chunk_len),
-            None => None,
-        };
+        let upper = upper.and_then(|x| x.checked_add(chunk_len));
         (lower, upper)
     }
 }
