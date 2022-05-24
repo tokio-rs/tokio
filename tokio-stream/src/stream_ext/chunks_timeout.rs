@@ -49,37 +49,34 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.as_mut().project();
-
-        match me.stream.as_mut().poll_next(cx) {
-            Poll::Pending => {}
-            Poll::Ready(Some(item)) => {
-                me.items.push(item);
-                if me.items.len() >= *me.cap {
-                    return Poll::Ready(Some(self.take()));
+        loop {
+            match me.stream.as_mut().poll_next(cx) {
+                Poll::Pending => break,
+                Poll::Ready(Some(item)) => {
+                    me.items.push(item);
+                    if me.items.len() >= *me.cap {
+                        return Poll::Ready(Some(self.take()));
+                    }
                 }
-            }
+                Poll::Ready(None) => {
+                    let last = if me.items.is_empty() {
+                        None
+                    } else {
+                        let full_buf = std::mem::take(me.items);
+                        Some(full_buf)
+                    };
 
-            Poll::Ready(None) => {
-                let last = if me.items.is_empty() {
-                    None
-                } else {
-                    let full_buf = std::mem::take(me.items);
-                    Some(full_buf)
-                };
-
-                return Poll::Ready(last);
+                    return Poll::Ready(last);
+                }
             }
         }
 
         match me.deadline.as_mut().poll(cx) {
-            Poll::Pending => {}
+            Poll::Pending => Poll::Pending,
             Poll::Ready(()) => {
                 return Poll::Ready(Some(self.take()));
             }
         }
-
-        cx.waker().wake_by_ref();
-        Poll::Pending
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

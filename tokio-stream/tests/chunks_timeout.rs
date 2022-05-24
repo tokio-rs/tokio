@@ -25,12 +25,10 @@ async fn usage() {
     let mut chunk_stream = task::spawn(chunk_stream);
 
     assert_pending!(chunk_stream.poll_next());
-    assert_pending!(chunk_stream.poll_next());
-    assert_pending!(chunk_stream.poll_next());
-    time::advance(Duration::from_secs(3)).await;
+    time::advance(Duration::from_secs(2)).await;
     assert_eq!(chunk_stream.next().await, Some(vec![1, 2, 3]));
 
-    time::advance(Duration::from_secs(3)).await;
+    time::advance(Duration::from_secs(2)).await;
     assert_eq!(chunk_stream.next().await, Some(vec![4]));
 }
 
