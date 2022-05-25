@@ -28,6 +28,40 @@ async fn usage() {
     time::advance(Duration::from_secs(2)).await;
     assert_eq!(chunk_stream.next().await, Some(vec![1, 2, 3]));
 
+    assert_pending!(chunk_stream.poll_next());
+    time::advance(Duration::from_secs(2)).await;
+    assert_eq!(chunk_stream.next().await, Some(vec![4]));
+}
+
+#[tokio::test(start_paused = true)]
+async fn full_chunk_with_timeout() {
+    let iter = vec![1, 2].into_iter();
+    let stream0 = stream::iter(iter);
+
+    let iter = vec![3].into_iter();
+    let stream1 =
+        stream::iter(iter).then(move |n| time::sleep(Duration::from_secs(1)).map(move |_| n));
+
+    let iter = vec![4].into_iter();
+    let stream2 =
+        stream::iter(iter).then(move |n| time::sleep(Duration::from_secs(3)).map(move |_| n));
+
+    let chunk_stream = stream0
+        .chain(stream1)
+        .chain(stream2)
+        .chunks_timeout(3, Duration::from_secs(2));
+
+    let mut chunk_stream = task::spawn(chunk_stream);
+
+    assert_pending!(chunk_stream.poll_next());
+    time::advance(Duration::from_secs(2)).await;
+    assert_eq!(chunk_stream.next().await, Some(vec![1, 2, 3]));
+
+    assert_pending!(chunk_stream.poll_next());
+    time::advance(Duration::from_secs(2)).await;
+    assert_eq!(chunk_stream.next().await, Some(vec![]));
+
+    assert_pending!(chunk_stream.poll_next());
     time::advance(Duration::from_secs(2)).await;
     assert_eq!(chunk_stream.next().await, Some(vec![4]));
 }
