@@ -116,3 +116,68 @@ async fn task_local_available_on_completion_drop() {
     assert_eq!(rx.await.unwrap(), 42);
     h.await.unwrap();
 }
+
+#[cfg(tokio_unstable)]
+#[tokio::test(flavor = "current_thread")]
+async fn test_task_id() {
+    use tokio::task;
+
+    let handle = tokio::spawn(async {
+        let id = task::current_id();
+        println!("current task id: {}", id);
+    });
+
+    handle.await.unwrap();
+}
+
+#[cfg(tokio_unstable)]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_task_id_colliding_mt() {
+    use tokio::task;
+
+    let handle1 = tokio::spawn(async { task::current_id() });
+    let handle2 = tokio::spawn(async { task::current_id() });
+
+    let (id1, id2) = tokio::join!(handle1, handle2);
+    assert_ne!(id1.unwrap(), id2.unwrap());
+}
+
+#[cfg(tokio_unstable)]
+#[tokio::test(flavor = "current_thread")]
+async fn test_task_id_colliding_ct() {
+    use tokio::task;
+
+    let handle1 = tokio::spawn(async { task::current_id() });
+    let handle2 = tokio::spawn(async { task::current_id() });
+
+    let (id1, id2) = tokio::join!(handle1, handle2);
+    assert_ne!(id1.unwrap(), id2.unwrap());
+}
+
+#[cfg(tokio_unstable)]
+#[tokio::test(flavor = "current_thread")]
+async fn test_task_ids_match_ct() {
+    use tokio::{sync::oneshot, task};
+
+    let (tx, rx) = oneshot::channel();
+    let handle = tokio::spawn(async {
+        let id = rx.await.unwrap();
+        assert_eq!(id, task::current_id());
+    });
+    tx.send(handle.id()).unwrap();
+    handle.await.unwrap();
+}
+
+#[cfg(tokio_unstable)]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_task_ids_match_mt() {
+    use tokio::{sync::oneshot, task};
+
+    let (tx, rx) = oneshot::channel();
+    let handle = tokio::spawn(async {
+        let id = rx.await.unwrap();
+        assert_eq!(id, task::current_id());
+    });
+    tx.send(handle.id()).unwrap();
+    handle.await.unwrap();
+}

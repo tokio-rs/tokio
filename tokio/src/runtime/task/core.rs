@@ -50,8 +50,9 @@ pub(super) struct Core<T: Future, S> {
     /// Either the future or the output.
     pub(super) stage: CoreStage<T>,
 
-    /// The task's ID, used for populating `JoinError`s.
-    pub(super) task_id: Id,
+    /// The tracing ID for this instrumented task.
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(super) id: Option<tracing::Id>,
 }
 
 /// Crate public as this is also needed by the pool.
@@ -79,9 +80,8 @@ pub(crate) struct Header {
     /// removed from the list.
     pub(super) owner_id: UnsafeCell<u64>,
 
-    /// The tracing ID for this instrumented task.
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(super) id: Option<tracing::Id>,
+    /// The task's ID, used for populating `JoinError`s.
+    pub(crate) task_id: Id,
 }
 
 unsafe impl Send for Header {}
@@ -123,15 +123,15 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 queue_next: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
                 owner_id: UnsafeCell::new(0),
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
-                id,
+                task_id,
             },
             core: Core {
                 scheduler,
                 stage: CoreStage {
                     stage: UnsafeCell::new(Stage::Running(future)),
                 },
-                task_id,
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                id,
             },
             trailer: Trailer {
                 waker: UnsafeCell::new(None),
@@ -297,5 +297,10 @@ impl Trailer {
 fn header_lte_cache_line() {
     use std::mem::size_of;
 
-    assert!(size_of::<Header>() <= 8 * size_of::<*const ()>());
+    assert!(
+        size_of::<Header>() <= 8 * size_of::<*const ()>(),
+        "Header size: {:?} not smaller or equal to {:?}",
+        size_of::<Header>(),
+        8 * size_of::<*const ()>()
+    );
 }

@@ -179,6 +179,10 @@ impl RawTask {
     pub(super) fn ref_inc(self) {
         self.header().state.ref_inc();
     }
+
+    pub(crate) fn get_task_id(&self) -> Id {
+        self.header().task_id
+    }
 }
 
 impl Clone for RawTask {

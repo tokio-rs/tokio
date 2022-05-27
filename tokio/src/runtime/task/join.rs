@@ -265,7 +265,7 @@ impl<T> JoinHandle<T> {
             raw.ref_inc();
             raw
         });
-        super::AbortHandle::new(raw, self.id.clone())
+        super::AbortHandle::new(raw, self.id)
     }
 
     /// Returns a [task ID] that uniquely identifies this task relative to other
@@ -280,7 +280,7 @@ impl<T> JoinHandle<T> {
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn id(&self) -> super::Id {
-        self.id.clone()
+        self.id
     }
 }
 

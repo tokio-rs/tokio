@@ -3,7 +3,7 @@ use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::{self, Driver};
-use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task, TaskIdGuard};
 use crate::runtime::{blocking, Config};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
@@ -569,6 +569,8 @@ impl CoreGuard<'_> {
                         }
                     };
 
+                    let task_id = task.get_task_id();
+                    let _task_id_guard = TaskIdGuard::new(task_id);
                     let task = context.handle.shared.owned.assert_owner(task);
 
                     let (c, _) = context.run_task(core, || {

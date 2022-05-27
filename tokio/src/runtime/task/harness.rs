@@ -2,7 +2,7 @@ use crate::future::Future;
 use crate::runtime::task::core::{Cell, Core, CoreStage, Header, Trailer};
 use crate::runtime::task::state::Snapshot;
 use crate::runtime::task::waker::waker_ref;
-use crate::runtime::task::{JoinError, Notified, Schedule, Task};
+use crate::runtime::task::{Id, JoinError, Notified, Schedule, Task};
 
 use std::mem;
 use std::mem::ManuallyDrop;
@@ -28,6 +28,11 @@ where
 
     fn header_ptr(&self) -> NonNull<Header> {
         self.cell.cast()
+    }
+
+    #[inline]
+    fn get_task_id(&self) -> Id {
+        self.header().task_id
     }
 
     fn header(&self) -> &Header {
@@ -98,15 +103,12 @@ where
         match self.header().state.transition_to_running() {
             TransitionToRunning::Success => {
                 let header_ptr = self.header_ptr();
+
                 let waker_ref = waker_ref::<T, S>(&header_ptr);
                 let cx = Context::from_waker(&*waker_ref);
                 let core = self.core();
-                let res = poll_future(
-                    &core.stage,
-                    &self.core().scheduler,
-                    core.task_id.clone(),
-                    cx,
-                );
+                let task_id = self.get_task_id();
+                let res = poll_future(&core.stage, &self.core().scheduler, task_id, cx);
 
                 if res == Poll::Ready(()) {
                     // The future completed. Move on to complete the task.
@@ -121,14 +123,15 @@ where
                         // The transition to idle failed because the task was
                         // cancelled during the poll.
                         let core = self.core();
-                        cancel_task(&core.stage, core.task_id.clone());
+                        cancel_task(&core.stage, task_id);
                         PollFuture::Complete
                     }
                 }
             }
             TransitionToRunning::Cancelled => {
                 let core = self.core();
-                cancel_task(&core.stage, core.task_id.clone());
+                let task_id = self.get_task_id();
+                cancel_task(&core.stage, task_id);
                 PollFuture::Complete
             }
             TransitionToRunning::Failed => PollFuture::Done,
@@ -152,7 +155,8 @@ where
         // By transitioning the lifecycle to `Running`, we have permission to
         // drop the future.
         let core = self.core();
-        cancel_task(&core.stage, core.task_id.clone());
+        let task_id = self.get_task_id();
+        cancel_task(&core.stage, task_id);
         self.complete();
     }
 
@@ -289,7 +293,7 @@ where
 
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) fn id(&self) -> Option<&tracing::Id> {
-        self.header().id.as_ref()
+        self.core().id.as_ref()
     }
 
     // ====== internal ======

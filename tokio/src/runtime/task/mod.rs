@@ -178,6 +178,7 @@ use self::state::State;
 mod waker;
 
 use crate::future::Future;
+use crate::runtime::context;
 use crate::util::linked_list;
 
 use std::marker::PhantomData;
@@ -201,8 +202,7 @@ use std::{fmt, mem};
 /// [unstable]: crate#unstable-features
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-// TODO(eliza): there's almost certainly no reason not to make this `Copy` as well...
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Id(u64);
 
 /// An owned handle to the task, tracked by ref count.
@@ -284,7 +284,7 @@ cfg_rt! {
         T: Future + 'static,
         T::Output: 'static,
     {
-        let raw = RawTask::new::<T, S>(task, scheduler, id.clone());
+        let raw = RawTask::new::<T, S>(task, scheduler, id);
         let task = Task {
             raw,
             _p: PhantomData,
@@ -338,11 +338,19 @@ impl<S: 'static> Task<S> {
     fn header_ptr(&self) -> NonNull<Header> {
         self.raw.header_ptr()
     }
+
+    pub(crate) fn get_id(&self) -> Id {
+        self.raw.get_task_id()
+    }
 }
 
 impl<S: 'static> Notified<S> {
     fn header(&self) -> &Header {
         self.0.header()
+    }
+
+    pub(crate) fn get_task_id(&self) -> Id {
+        self.0.get_id()
     }
 }
 
@@ -381,6 +389,7 @@ impl<S: Schedule> LocalNotified<S> {
     /// Runs the task.
     pub(crate) fn run(self) {
         let raw = self.task.raw;
+        let _guard = TaskIdGuard::new(raw.get_task_id());
         mem::forget(self);
         raw.poll();
     }
@@ -417,6 +426,8 @@ impl<S: Schedule> UnownedTask<S> {
             raw,
             _p: PhantomData,
         };
+
+        let _guard = TaskIdGuard::new(task.get_id());
 
         // Use the other ref-count to poll the task.
         raw.poll();
@@ -541,5 +552,22 @@ impl Id {
 
     pub(crate) fn as_u64(&self) -> u64 {
         self.0
+    }
+}
+
+pub(crate) struct TaskIdGuard {
+    old_id: Option<Id>,
+}
+
+impl TaskIdGuard {
+    pub(crate) fn new(task_id: Id) -> Self {
+        let old_id = context::set_current_task_id(Some(task_id));
+        TaskIdGuard { old_id }
+    }
+}
+
+impl Drop for TaskIdGuard {
+    fn drop(&mut self) {
+        context::set_current_task_id(self.old_id);
     }
 }
