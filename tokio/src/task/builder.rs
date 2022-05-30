@@ -110,7 +110,7 @@ impl<'a> Builder<'a> {
     /// Spawns `!Send` a task on the current [`LocalSet`] with this builder's
     /// settings.
     ///
-    /// The spawned future will be run on the same thread that called `spawn_local.`
+    /// The spawned future will be run on the same thread that called `spawn_local`.
     /// This may only be called from the context of a [local task set][`LocalSet`].
     ///
     /// # Panics
