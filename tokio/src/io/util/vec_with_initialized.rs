@@ -1,19 +1,18 @@
 use crate::io::ReadBuf;
 use std::mem::MaybeUninit;
 
-mod private {
-    pub trait Sealed {}
+/// Something that looks like a `Vec<u8>`.
+///
+/// # Safety
+///
+/// The implementor must guarantee that the vector returned by the
+/// `as_mut` and `as_mut` methods do not change from one call to
+/// another.
+pub(crate) unsafe trait VecU8: AsRef<Vec<u8>> + AsMut<Vec<u8>> {}
 
-    impl Sealed for Vec<u8> {}
-    impl Sealed for &mut Vec<u8> {}
-}
+unsafe impl VecU8 for Vec<u8> {}
+unsafe impl VecU8 for &mut Vec<u8> {}
 
-/// A sealed trait that constrains the generic type parameter in `VecWithInitialized<V>`.  That struct's safety relies
-/// on certain invariants upheld by `Vec<u8>`.
-pub(crate) trait VecU8: AsMut<Vec<u8>> + private::Sealed {}
-
-impl VecU8 for Vec<u8> {}
-impl VecU8 for &mut Vec<u8> {}
 /// This struct wraps a `Vec<u8>` or `&mut Vec<u8>`, combining it with a
 /// `num_initialized`, which keeps track of the number of initialized bytes
 /// in the unused capacity.
@@ -64,8 +63,8 @@ where
     }
 
     #[cfg(feature = "io-util")]
-    pub(crate) fn is_empty(&mut self) -> bool {
-        self.vec.as_mut().is_empty()
+    pub(crate) fn is_empty(&self) -> bool {
+        self.vec.as_ref().is_empty()
     }
 
     pub(crate) fn get_read_buf<'a>(&'a mut self) -> ReadBuf<'a> {
