@@ -418,14 +418,12 @@ where
     /// [`tokio::select!`]: tokio::select
     pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
         let (res, id) = match self.tasks.join_one_with_id().await {
-            Ok(task) => {
-                let (id, output) = task?;
-                (Ok(output), id)
-            }
-            Err(e) => {
+            Some(Ok((id, output))) => (Ok(output), id),
+            Some(Err(e)) => {
                 let id = e.id();
                 (Err(e), id)
             }
+            None => return None,
         };
         let key = self.remove_by_id(id)?;
         Some((key, res))
