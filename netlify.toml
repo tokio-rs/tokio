@@ -1,0 +1,16 @@
+[build]
+  command = """
+    rustup install nightly --profile minimal && cargo doc --no-deps --all-features
+    """
+  publish = "target/doc"
+
+[build.environment]
+  RUSTDOCFLAGS="""
+    --cfg docsrs \
+    --cfg tokio_unstable \
+    """
+  RUSTFLAGS="--cfg tokio_unstable --cfg docsrs"
+
+[[redirects]]
+  from = "/"
+  to = "/tokio"

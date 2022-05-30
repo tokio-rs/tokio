@@ -43,8 +43,8 @@ impl AbortHandle {
     // the `AbortHandle` type is only publicly exposed when `tokio_unstable` is
     // enabled, but it is still defined for testing purposes.
     #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-    pub fn abort(self) {
-        if let Some(raw) = self.raw {
+    pub fn abort(&self) {
+        if let Some(ref raw) = self.raw {
             raw.remote_abort();
         }
     }

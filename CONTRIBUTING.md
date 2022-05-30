@@ -131,6 +131,24 @@ cargo check --all-features
 cargo test --all-features
 ```
 
+Clippy must be run using the MSRV, so Tokio can avoid having to `#[allow]` new
+lints whose fixes would be incompatible with the current MSRV:
+
+<!--
+When updating this, also update:
+- .github/workflows/ci.yml
+- README.md
+- tokio/README.md
+- tokio/Cargo.toml
+- tokio-util/Cargo.toml
+- tokio-test/Cargo.toml
+- tokio-stream/Cargo.toml
+-->
+
+```
+cargo +1.49.0 clippy --all-features
+```
+
 When building documentation normally, the markers that list the features
 required for various parts of Tokio are missing. To build the documentation
 correctly, use this command:

@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.0.x" git tag.
-version = "1.17.0"
+version = "1.18.2"
 edition = "2018"
 rust-version = "1.49"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -118,6 +118,7 @@ nix = { version = "0.24", default-features = false, features = ["fs", "socket"] 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"
 default-features = false
+features = ["std", "winsock2", "mswsock", "handleapi", "ws2ipdef", "ws2tcpip"]
 optional = true
 
 [target.'cfg(windows)'.dev-dependencies.ntapi]
@@ -127,7 +128,7 @@ version = "0.3.6"
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
-mockall = "0.10.2"
+mockall = "0.11.1"
 tempfile = "3.1.0"
 async-stream = "0.3"
 

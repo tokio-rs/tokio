@@ -56,7 +56,7 @@ Make sure you activated the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.17.0", features = ["full"] }
+tokio = { version = "1.18.2", features = ["full"] }
 ```
 Then, on your main.rs:
 
@@ -162,6 +162,18 @@ several other libraries, including:
 [`bytes`]: https://github.com/tokio-rs/bytes
 
 ## Supported Rust Versions
+
+<!--
+When updating this, also update:
+- .github/workflows/ci.yml
+- CONTRIBUTING.md
+- README.md
+- tokio/README.md
+- tokio/Cargo.toml
+- tokio-util/Cargo.toml
+- tokio-test/Cargo.toml
+- tokio-stream/Cargo.toml
+-->
 
 Tokio will keep a rolling MSRV (minimum supported rust version) policy of **at
 least** 6 months. When increasing the MSRV, the new Rust version must have been
