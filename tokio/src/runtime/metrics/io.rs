@@ -11,20 +11,14 @@ pub(crate) struct IoDriverMetrics {
 
 impl IoDriverMetrics {
     pub(crate) fn incr_fd_count(&self) {
-        let prev = self.fd_registered_count.load(Relaxed);
-        let new = prev.wrapping_add(1);
-        self.fd_registered_count.store(new, Relaxed);
+        self.fd_registered_count.fetch_add(1, Relaxed);
     }
 
     pub(crate) fn dec_fd_count(&self) {
-        let prev = self.fd_deregistered_count.load(Relaxed);
-        let new = prev.wrapping_add(1);
-        self.fd_deregistered_count.store(new, Relaxed);
+        self.fd_deregistered_count.fetch_add(1, Relaxed);
     }
 
     pub(crate) fn incr_ready_count_by(&self, amt: u64) {
-        let prev = self.ready_count.load(Relaxed);
-        let new = prev.wrapping_add(amt);
-        self.ready_count.store(new, Relaxed);
+        self.ready_count.fetch_add(amt, Relaxed);
     }
 }
