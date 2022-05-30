@@ -37,8 +37,9 @@ use crate::util::IdleNotifiedSet;
 ///     }
 ///
 ///     let mut seen = [false; 10];
-///     while let Some(res) = set.join_one().await.unwrap() {
-///         seen[res] = true;
+///     while let Some(res) = set.join_one().await {
+///         let idx = res.unwrap();
+///         seen[idx] = true;
 ///     }
 ///
 ///     for i in 0..10 {
