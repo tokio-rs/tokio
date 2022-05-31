@@ -15,6 +15,7 @@ pub(crate) fn try_current() -> Result<Handle, crate::runtime::TryCurrentError> {
     }
 }
 
+#[track_caller]
 pub(crate) fn current() -> Handle {
     match try_current() {
         Ok(handle) => handle,

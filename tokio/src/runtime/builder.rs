@@ -200,7 +200,7 @@ impl Builder {
     ///
     /// The default value is the number of cores available to the system.
     ///
-    /// # Panic
+    /// # Panics
     ///
     /// When using the `current_thread` runtime this method will panic, since
     /// those variants do not allow setting worker thread counts.
@@ -237,9 +237,10 @@ impl Builder {
     /// rt.block_on(async move {});
     /// ```
     ///
-    /// # Panic
+    /// # Panics
     ///
     /// This will panic if `val` is not larger than `0`.
+    #[track_caller]
     pub fn worker_threads(&mut self, val: usize) -> &mut Self {
         assert!(val > 0, "Worker threads cannot be set to 0");
         self.worker_threads = Some(val);
@@ -255,7 +256,7 @@ impl Builder {
     ///
     /// The default value is 512.
     ///
-    /// # Panic
+    /// # Panics
     ///
     /// This will panic if `val` is not larger than `0`.
     ///
@@ -267,6 +268,7 @@ impl Builder {
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
     /// [`worker_threads`]: Self::worker_threads
     /// [`thread_keep_alive`]: Self::thread_keep_alive
+    #[track_caller]
     #[cfg_attr(docsrs, doc(alias = "max_threads"))]
     pub fn max_blocking_threads(&mut self, val: usize) -> &mut Self {
         assert!(val > 0, "Max blocking threads cannot be set to 0");
