@@ -24,7 +24,7 @@ async fn test_with_sleep() {
     set.detach_all();
     assert_eq!(set.len(), 0);
 
-    assert!(matches!(set.join_one().await, Ok(None)));
+    assert!(matches!(set.join_one().await, None));
 
     for i in 0..10 {
         set.spawn(async move {
@@ -35,14 +35,14 @@ async fn test_with_sleep() {
     }
 
     let mut seen = [false; 10];
-    while let Some(res) = set.join_one().await.unwrap() {
+    while let Some(res) = set.join_one().await.transpose().unwrap() {
         seen[res] = true;
     }
 
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(set.join_one().await, Ok(None)));
+    assert!(matches!(set.join_one().await, None));
 
     // Do it again.
     for i in 0..10 {
@@ -53,14 +53,14 @@ async fn test_with_sleep() {
     }
 
     let mut seen = [false; 10];
-    while let Some(res) = set.join_one().await.unwrap() {
+    while let Some(res) = set.join_one().await.transpose().unwrap() {
         seen[res] = true;
     }
 
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(set.join_one().await, Ok(None)));
+    assert!(matches!(set.join_one().await, None));
 }
 
 #[tokio::test]
@@ -124,15 +124,15 @@ async fn abort_tasks() {
     }
     loop {
         match set.join_one().await {
-            Ok(Some(res)) => {
+            Some(Ok(res)) => {
                 num_completed += 1;
                 assert_eq!(res % 2, 0);
             }
-            Err(e) => {
+            Some(Err(e)) => {
                 assert!(e.is_cancelled());
                 num_canceled += 1;
             }
-            Ok(None) => break,
+            None => break,
         }
     }
 
@@ -149,7 +149,11 @@ fn runtime_gone() {
         drop(rt);
     }
 
-    assert!(rt().block_on(set.join_one()).unwrap_err().is_cancelled());
+    assert!(rt()
+        .block_on(set.join_one())
+        .unwrap()
+        .unwrap_err()
+        .is_cancelled());
 }
 
 // This ensures that `join_one` works correctly when the coop budget is
@@ -179,14 +183,14 @@ async fn join_set_coop() {
     let mut coop_count = 0;
     loop {
         match set.join_one().now_or_never() {
-            Some(Ok(Some(()))) => {}
-            Some(Err(err)) => panic!("failed: {}", err),
+            Some(Some(Ok(()))) => {}
+            Some(Some(Err(err))) => panic!("failed: {}", err),
             None => {
                 coop_count += 1;
                 tokio::task::yield_now().await;
                 continue;
             }
-            Some(Ok(None)) => break,
+            Some(None) => break,
         }
 
         count += 1;
@@ -215,7 +219,7 @@ async fn abort_all() {
     assert_eq!(set.len(), 10);
 
     let mut count = 0;
-    while let Some(res) = set.join_one().await.transpose() {
+    while let Some(res) = set.join_one().await {
         if let Err(err) = res {
             assert!(err.is_cancelled());
         }
