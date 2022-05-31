@@ -479,3 +479,41 @@ fn receiver_len_with_lagged() {
 fn is_closed(err: broadcast::error::RecvError) -> bool {
     matches!(err, broadcast::error::RecvError::Closed)
 }
+
+#[test]
+fn resubscribe_points_to_tail() {
+    let (tx, mut rx) = broadcast::channel(3);
+    tx.send(1).unwrap();
+
+    let mut rx_resub = rx.resubscribe();
+
+    // verify we're one behind at the start
+    assert_empty!(rx_resub);
+    assert_eq!(assert_recv!(rx), 1);
+
+    // verify we do not affect rx
+    tx.send(2).unwrap();
+    assert_eq!(assert_recv!(rx_resub), 2);
+    tx.send(3).unwrap();
+    assert_eq!(assert_recv!(rx), 2);
+    assert_eq!(assert_recv!(rx), 3);
+    assert_empty!(rx);
+
+    assert_eq!(assert_recv!(rx_resub), 3);
+    assert_empty!(rx_resub);
+}
+
+#[test]
+fn resubscribe_lagged() {
+    let (tx, mut rx) = broadcast::channel(1);
+    tx.send(1).unwrap();
+    tx.send(2).unwrap();
+
+    let mut rx_resub = rx.resubscribe();
+    assert_lagged!(rx.try_recv(), 1);
+    assert_empty!(rx_resub);
+
+    assert_eq!(assert_recv!(rx), 2);
+    assert_empty!(rx);
+    assert_empty!(rx_resub);
+}

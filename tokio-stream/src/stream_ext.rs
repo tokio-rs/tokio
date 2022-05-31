@@ -115,6 +115,12 @@ pub trait StreamExt: Stream {
     /// pinning it to the stack using the `pin_mut!` macro from the `pin_utils`
     /// crate.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. The returned future only
+    /// holds onto a reference to the underlying stream,
+    /// so dropping it will never lose a value.
+    ///
     /// # Examples
     ///
     /// ```
@@ -150,6 +156,12 @@ pub trait StreamExt: Stream {
     /// but returns a [`Result<Option<T>, E>`](Result) rather than
     /// an [`Option<Result<T, E>>`](Option), making for easy use
     /// with the [`?`](std::ops::Try) operator.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. The returned future only
+    /// holds onto a reference to the underlying stream,
+    /// so dropping it will never lose a value.
     ///
     /// # Examples
     ///

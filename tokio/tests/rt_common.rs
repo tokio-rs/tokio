@@ -748,7 +748,11 @@ rt_test! {
 
     #[test]
     fn wake_while_rt_is_dropping() {
-        use tokio::task;
+        use tokio::sync::Barrier;
+        use core::sync::atomic::{AtomicBool, Ordering};
+
+        let drop_triggered = Arc::new(AtomicBool::new(false));
+        let set_drop_triggered = drop_triggered.clone();
 
         struct OnDrop<F: FnMut()>(F);
 
@@ -762,17 +766,21 @@ rt_test! {
         let (tx2, rx2) = oneshot::channel();
         let (tx3, rx3) = oneshot::channel();
 
-        let rt = rt();
+        let barrier = Arc::new(Barrier::new(4));
+        let barrier1 = barrier.clone();
+        let barrier2 = barrier.clone();
+        let barrier3 = barrier.clone();
 
-        let h1 = rt.clone();
+        let rt = rt();
 
         rt.spawn(async move {
             // Ensure a waker gets stored in oneshot 1.
-            let _ = rx1.await;
+            let _ = tokio::join!(rx1, barrier1.wait());
             tx3.send(()).unwrap();
         });
 
         rt.spawn(async move {
+            let h1 = tokio::runtime::Handle::current();
             // When this task is dropped, we'll be "closing remotes".
             // We spawn a new task that owns the `tx1`, to move its Drop
             // out of here.
@@ -785,24 +793,27 @@ rt_test! {
                 h1.spawn(async move {
                     tx1.send(()).unwrap();
                 });
+                // Just a sanity check that this entire thing actually happened
+                set_drop_triggered.store(true, Ordering::Relaxed);
             });
-            let _ = rx2.await;
+            let _ = tokio::join!(rx2, barrier2.wait());
         });
 
         rt.spawn(async move {
-            let _ = rx3.await;
+            let _ = tokio::join!(rx3, barrier3.wait());
             // We'll never get here, but once task 3 drops, this will
             // force task 2 to re-schedule since it's waiting on oneshot 2.
             tx2.send(()).unwrap();
         });
 
-        // Tick the loop
-        rt.block_on(async {
-            task::yield_now().await;
-        });
+        // Wait until every oneshot channel has been polled.
+        rt.block_on(barrier.wait());
 
         // Drop the rt
         drop(rt);
+
+        // Make sure that the spawn actually happened
+        assert!(drop_triggered.load(Ordering::Relaxed));
     }
 
     #[test]
@@ -1040,6 +1051,31 @@ rt_test! {
 
                 Ready(())
             })).await;
+        });
+    }
+
+    #[cfg(tokio_unstable)]
+    #[test]
+    fn coop_consume_budget() {
+        let rt = rt();
+
+        rt.block_on(async {
+            poll_fn(|cx| {
+                let counter = Arc::new(std::sync::Mutex::new(0));
+                let counter_clone = Arc::clone(&counter);
+                let mut worker = Box::pin(async move {
+                    // Consume the budget until a yield happens
+                    for _ in 0..1000 {
+                        *counter.lock().unwrap() += 1;
+                        task::consume_budget().await
+                    }
+                });
+                // Assert that the worker was yielded and it didn't manage
+                // to finish the whole work (assuming the total budget of 128)
+                assert!(Pin::new(&mut worker).poll(cx).is_pending());
+                assert!(*counter_clone.lock().unwrap() < 1000);
+                std::task::Poll::Ready(())
+            }).await;
         });
     }
 

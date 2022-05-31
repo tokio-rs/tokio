@@ -647,6 +647,7 @@ impl<T> Sender<T> {
     }
 }
 
+/// Create a new `Receiver` which reads starting from the tail.
 fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     let mut tail = shared.tail.lock();
 
@@ -881,6 +882,33 @@ impl<T> Receiver<T> {
 }
 
 impl<T: Clone> Receiver<T> {
+    /// Re-subscribes to the channel starting from the current tail element.
+    ///
+    /// This [`Receiver`] handle will receive a clone of all values sent
+    /// **after** it has resubscribed. This will not include elements that are
+    /// in the queue of the current receiver. Consider the following example.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///   let (tx, mut rx) = broadcast::channel(2);
+    ///
+    ///   tx.send(1).unwrap();
+    ///   let mut rx2 = rx.resubscribe();
+    ///   tx.send(2).unwrap();
+    ///
+    ///   assert_eq!(rx2.recv().await.unwrap(), 2);
+    ///   assert_eq!(rx.recv().await.unwrap(), 1);
+    /// }
+    /// ```
+    pub fn resubscribe(&self) -> Self {
+        let shared = self.shared.clone();
+        new_receiver(shared)
+    }
     /// Receives the next value for this receiver.
     ///
     /// Each [`Receiver`] handle will receive a clone of all values sent

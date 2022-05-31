@@ -285,6 +285,7 @@ where
     /// This method panics if called outside of a Tokio runtime.
     ///
     /// [`join_one`]: Self::join_one
+    #[track_caller]
     pub fn spawn<F>(&mut self, key: K, task: F)
     where
         F: Future<Output = V>,
@@ -304,6 +305,7 @@ where
     /// *not* return a cancelled [`JoinError`] for that task.
     ///
     /// [`join_one`]: Self::join_one
+    #[track_caller]
     pub fn spawn_on<F>(&mut self, key: K, task: F, handle: &Handle)
     where
         F: Future<Output = V>,
@@ -328,6 +330,7 @@ where
     ///
     /// [`LocalSet`]: tokio::task::LocalSet
     /// [`join_one`]: Self::join_one
+    #[track_caller]
     pub fn spawn_local<F>(&mut self, key: K, task: F)
     where
         F: Future<Output = V>,
@@ -347,6 +350,7 @@ where
     ///
     /// [`LocalSet`]: tokio::task::LocalSet
     /// [`join_one`]: Self::join_one
+    #[track_caller]
     pub fn spawn_local_on<F>(&mut self, key: K, task: F, local_set: &LocalSet)
     where
         F: Future<Output = V>,
@@ -414,14 +418,12 @@ where
     /// [`tokio::select!`]: tokio::select
     pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
         let (res, id) = match self.tasks.join_one_with_id().await {
-            Ok(task) => {
-                let (id, output) = task?;
-                (Ok(output), id)
-            }
-            Err(e) => {
+            Some(Ok((id, output))) => (Ok(output), id),
+            Some(Err(e)) => {
                 let id = e.id();
                 (Err(e), id)
             }
+            None => return None,
         };
         let key = self.remove_by_id(id)?;
         Some((key, res))

@@ -11,7 +11,7 @@ env:
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2022-03-21
+  rust_nightly: nightly-2022-04-18
   rust_clippy: 1.52.0
   # When updating this, also update:
   # - README.md
@@ -207,11 +207,14 @@ jobs:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-tag-raw-pointers
           PROPTEST_CASES: 10
 
-  san:
-    name: san
+  asan:
+    name: asan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install llvm
+        # Required to resolve symbols in sanitizer output
+        run: sudo apt-get install -y llvm
       - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
@@ -219,11 +222,11 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: asan
-        run: cargo test --all-features --target x86_64-unknown-linux-gnu --lib -- --test-threads 1
-        working-directory: tokio
+        run: cargo test --workspace --all-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1
         env:
           RUSTFLAGS: -Z sanitizer=address
-          ASAN_OPTIONS: detect_leaks=0
+          # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
+          TRYBUILD: overwrite
 
   cross:
     name: cross
