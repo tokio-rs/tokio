@@ -73,9 +73,7 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
 
         match me.deadline.as_mut().poll(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(()) => {
-                return Poll::Ready(Some(self.take()));
-            }
+            Poll::Ready(()) => Poll::Ready(Some(self.take())),
         }
     }
 
