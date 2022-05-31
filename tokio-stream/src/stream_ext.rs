@@ -998,8 +998,10 @@ pub trait StreamExt: Stream {
 
     /// Collects items into batches inside a vector within a deadline.
     ///
-    /// `chunks_timeout` attempts to yield a vector of len `capacity` within the deadline,
-    /// otherwise will yield a vector of len less than `capacity` if the deadline is reached
+    /// Attempts to yield a vector of len `capacity` within the deadline,
+    /// otherwise will yield a vector of len less than `capacity` if the deadline is reached.
+    /// If the wrapped stream does not yield a value before the deadline is reached, then an
+    /// empty vector will be yielded. The deadline will be reset after every batch is yielded.
     ///
     /// # Example
     ///
@@ -1016,14 +1018,20 @@ pub trait StreamExt: Stream {
     ///
     ///     let iter = vec![4].into_iter();
     ///     let stream1 = stream::iter(iter)
-    ///          .then(move |n| time::sleep(Duration::from_secs(2)).map(move |_| n));
+    ///          .then(move |n| time::sleep(Duration::from_secs(5)).map(move |_| n));
     ///
     ///     let chunk_stream = stream0
     ///         .chain(stream1)
-    ///         .chunks_timeout(4, Duration::from_secs(1));
+    ///         .chunks_timeout(3, Duration::from_secs(2));
     ///
+    ///     // a full batch was received
     ///     assert_eq!(chunk_stream.next().await, Some(vec![1,2,3]));
+    ///     // deadline was reached before capacity was reached
     ///     assert_eq!(chunk_stream.next().await, Some(vec![4]));
+    ///     // no items were emitted within the deadline
+    ///     assert_eq!(chunk_stream.next().await, Some(vec![]));
+    ///     // deadline was reached before capacity was reached
+    ///     assert_eq!(chunk_stream.next().await, Some(vec![5]));
     /// }
     /// ```
     #[cfg(feature = "time")]

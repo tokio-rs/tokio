@@ -69,19 +69,21 @@ async fn full_chunk_with_timeout() {
 #[tokio::test]
 #[ignore]
 async fn real_time() {
-    let iter = vec![1, 2, 3].into_iter();
+    let iter = vec![1, 2, 3, 4].into_iter();
     let stream0 = stream::iter(iter);
 
-    let iter = vec![4].into_iter();
+    let iter = vec![5].into_iter();
     let stream1 =
-        stream::iter(iter).then(move |n| time::sleep(Duration::from_secs(3)).map(move |_| n));
+        stream::iter(iter).then(move |n| time::sleep(Duration::from_secs(5)).map(move |_| n));
 
     let chunk_stream = stream0
         .chain(stream1)
-        .chunks_timeout(4, Duration::from_secs(2));
+        .chunks_timeout(3, Duration::from_secs(2));
 
     let mut chunk_stream = task::spawn(chunk_stream);
 
     assert_eq!(chunk_stream.next().await, Some(vec![1, 2, 3]));
     assert_eq!(chunk_stream.next().await, Some(vec![4]));
+    assert_eq!(chunk_stream.next().await, Some(vec![]));
+    assert_eq!(chunk_stream.next().await, Some(vec![5]));
 }
