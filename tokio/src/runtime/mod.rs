@@ -435,6 +435,8 @@ cfg_rt! {
         /// When the multi thread scheduler is used this will allow futures
         /// to run within the io driver and timer context of the overall runtime.
         ///
+        /// Any spawned tasks will continue running after `block_on` returns.
+        ///
         /// # Current thread scheduler
         ///
         /// When the current thread scheduler is enabled `block_on`
@@ -443,6 +445,9 @@ cfg_rt! {
         /// other threads which do not own the drivers will hook into that one.
         /// When the first `block_on` completes, other threads will be able to
         /// "steal" the driver to allow continued execution of their futures.
+        ///
+        /// Any spawned tasks will be suspended after `block_on` returns. Calling
+        /// `block_on` again will resume previously spawned tasks.
         ///
         /// # Panics
         ///
