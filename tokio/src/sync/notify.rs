@@ -906,11 +906,9 @@ impl Drop for Notified<'_> {
             // being the only `LinkedList` available to the type.
             unsafe { waiters.remove(NonNull::new_unchecked(waiter.get())) };
 
-            if waiters.is_empty() {
-                if get_state(notify_state) == WAITING {
-                    notify_state = set_state(notify_state, EMPTY);
-                    notify.state.store(notify_state, SeqCst);
-                }
+            if waiters.is_empty() && get_state(notify_state) == WAITING {
+                notify_state = set_state(notify_state, EMPTY);
+                notify.state.store(notify_state, SeqCst);
             }
 
             // See if the node was notified but not received. In this case, if
@@ -919,7 +917,10 @@ impl Drop for Notified<'_> {
             //
             // Safety: with the entry removed from the linked list, there can be
             // no concurrent access to the entry
-            if matches!(unsafe { (*waiter.get()).notified }, Some(NotificationType::OneWaiter)) {
+            if matches!(
+                unsafe { (*waiter.get()).notified },
+                Some(NotificationType::OneWaiter)
+            ) {
                 if let Some(waker) = notify_locked(&mut waiters, &notify.state, notify_state) {
                     drop(waiters);
                     waker.wake();
