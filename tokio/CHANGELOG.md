@@ -1,3 +1,55 @@
+# 1.19.0 (June 3, 2022)
+
+### Added
+
+- runtime: add `is_finished` method for `JoinHandle` and `AbortHandle` ([#4709])
+- runtime: make global queue and event polling intervals configurable ([#4671])
+- sync: add `Notified::enable` ([#4705])
+- sync: add `watch::Sender::send_if_modified` ([#4591])
+- sync: add resubscribe method to broadcast::Receiver ([#4607])
+- net: add `take_error` to `TcpSocket and `TcpStream` ([#4739])
+
+### Changed
+
+- io: refactor out usage of Weak in the io handle ([#4656])
+
+### Fixed
+
+- macros: avoid starvation in `join!` and `try_join!` ([#4624])
+
+### Documented
+
+- runtime: clarify semantics of tasks outliving `block_on` ([#4729])
+- time: fix example for `MissedTickBehavior::Burst` ([#4713])
+
+### Unstable
+
+- metrics: correctly update atomics in `IoDriverMetrics` ([#4725])
+- metrics: fix compilation with unstable, process, and rt, but without net ([#4682])
+- task: add `#[track_caller]` to `JoinSet`/`JoinMap` ([#4697])
+- task: add `Builder::{spawn_on, spawn_local_on, spawn_blocking_on}` ([#4683])
+- task: add `consume_budget` for cooperative scheduling ([#4498])
+- task: add `join_set::Builder` for configuring `JoinSet` tasks ([#4687])
+- task: update return value of `JoinSet::join_one` ([#4726])
+
+[#4498]: https://github.com/tokio-rs/tokio/pull/4498
+[#4591]: https://github.com/tokio-rs/tokio/pull/4591
+[#4607]: https://github.com/tokio-rs/tokio/pull/4607
+[#4624]: https://github.com/tokio-rs/tokio/pull/4624
+[#4656]: https://github.com/tokio-rs/tokio/pull/4656
+[#4671]: https://github.com/tokio-rs/tokio/pull/4671
+[#4682]: https://github.com/tokio-rs/tokio/pull/4682
+[#4683]: https://github.com/tokio-rs/tokio/pull/4683
+[#4687]: https://github.com/tokio-rs/tokio/pull/4687
+[#4697]: https://github.com/tokio-rs/tokio/pull/4697
+[#4705]: https://github.com/tokio-rs/tokio/pull/4705
+[#4709]: https://github.com/tokio-rs/tokio/pull/4709
+[#4713]: https://github.com/tokio-rs/tokio/pull/4713
+[#4725]: https://github.com/tokio-rs/tokio/pull/4725
+[#4726]: https://github.com/tokio-rs/tokio/pull/4726
+[#4729]: https://github.com/tokio-rs/tokio/pull/4729
+[#4739]: https://github.com/tokio-rs/tokio/pull/4739
+
 # 1.18.2 (May 5, 2022)
 
 Add missing features for the `winapi` dependency. ([#4663])
