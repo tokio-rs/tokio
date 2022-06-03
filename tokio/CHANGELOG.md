@@ -11,12 +11,10 @@
 ### Changed
 
 - io: refactor out usage of Weak in the io handle ([#4656])
-- metrics: correctly update atomics in `IoDriverMetrics` ([#4725])
 
 ### Fixed
 
 - macros: avoid starvation in `join!` and `try_join!` ([#4624])
-- metrics: fix compilation with unstable, process, and rt, but without net ([#4682])
 
 ### Documented
 
@@ -25,6 +23,8 @@
 
 ### Unstable
 
+- metrics: correctly update atomics in `IoDriverMetrics` ([#4725])
+- metrics: fix compilation with unstable, process, and rt, but without net ([#4682])
 - task: add `#[track_caller]` to `JoinSet`/`JoinMap` ([#4697])
 - task: add `Builder::{spawn_on, spawn_local_on, spawn_blocking_on}` ([#4683])
 - task: add `consume_budget` for cooperative scheduling ([#4498])
