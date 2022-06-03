@@ -501,7 +501,7 @@ impl Notify {
         // transition out of WAITING while the lock is held.
         let curr = self.state.load(SeqCst);
 
-        if let EMPTY | NOTIFIED = get_state(curr) {
+        if matches!(get_state(curr), EMPTY | NOTIFIED) {
             // There are no waiting tasks. All we need to do is increment the
             // number of times this method was called.
             atomic_inc_num_notify_waiters_calls(&self.state);
@@ -896,7 +896,7 @@ impl Drop for Notified<'_> {
         // This is where we ensure safety. The `Notified` value is being
         // dropped, which means we must ensure that the waiter entry is no
         // longer stored in the linked list.
-        if let Waiting = *state {
+        if matches!(*state, Waiting) {
             let mut waiters = notify.waiters.lock();
             let mut notify_state = notify.state.load(SeqCst);
 
@@ -906,11 +906,9 @@ impl Drop for Notified<'_> {
             // being the only `LinkedList` available to the type.
             unsafe { waiters.remove(NonNull::new_unchecked(waiter.get())) };
 
-            if waiters.is_empty() {
-                if let WAITING = get_state(notify_state) {
-                    notify_state = set_state(notify_state, EMPTY);
-                    notify.state.store(notify_state, SeqCst);
-                }
+            if waiters.is_empty() && get_state(notify_state) == WAITING {
+                notify_state = set_state(notify_state, EMPTY);
+                notify.state.store(notify_state, SeqCst);
             }
 
             // See if the node was notified but not received. In this case, if
@@ -919,7 +917,10 @@ impl Drop for Notified<'_> {
             //
             // Safety: with the entry removed from the linked list, there can be
             // no concurrent access to the entry
-            if let Some(NotificationType::OneWaiter) = unsafe { (*waiter.get()).notified } {
+            if matches!(
+                unsafe { (*waiter.get()).notified },
+                Some(NotificationType::OneWaiter)
+            ) {
                 if let Some(waker) = notify_locked(&mut waiters, &notify.state, notify_state) {
                     drop(waiters);
                     waker.wake();
