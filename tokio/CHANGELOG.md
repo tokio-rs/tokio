@@ -7,7 +7,7 @@
 - sync: add `Notified::enable` ([#4705])
 - sync: add `watch::Sender::send_if_modified` ([#4591])
 - sync: add resubscribe method to broadcast::Receiver ([#4607])
-- net: add `take_error` to `TcpSocket and `TcpStream` ([#4739])
+- net: add `take_error` to `TcpSocket` and `TcpStream` ([#4739])
 
 ### Changed
 
