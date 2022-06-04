@@ -79,8 +79,6 @@ task), as well as a number of bugfixes.
 
 ### Added
 
-- macros: support setting a custom crate name for `#[tokio::main]` and
-  `#[tokio::test]` ([#4613])
 - net: add `UdpSocket::peer_addr` ([#4611])
 - net: add `try_read_buf` method for named pipes ([#4626])
 - signal: add `SignalKind` `Hash`/`Eq` impls and `c_int` conversion ([#4540])
