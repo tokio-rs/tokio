@@ -169,8 +169,27 @@ fn test_notify_one_after_enable() {
     let notify = Notify::new();
     let mut future = spawn(notify.notified());
 
-    future.enter(|_, fut| fut.enable());
+    future.enter(|_, fut| assert!(!fut.enable()));
 
     notify.notify_one();
     assert_ready!(future.poll());
+    future.enter(|_, fut| assert!(fut.enable()));
+}
+
+#[test]
+fn test_poll_after_enable() {
+    let notify = Notify::new();
+    let mut future = spawn(notify.notified());
+
+    future.enter(|_, fut| assert!(!fut.enable()));
+    assert_pending!(future.poll());
+}
+
+#[test]
+fn test_enable_after_poll() {
+    let notify = Notify::new();
+    let mut future = spawn(notify.notified());
+
+    assert_pending!(future.poll());
+    future.enter(|_, fut| assert!(!fut.enable()));
 }
