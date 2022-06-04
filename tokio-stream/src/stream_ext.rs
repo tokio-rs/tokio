@@ -1012,7 +1012,7 @@ pub trait StreamExt: Stream {
     ///
     /// This stream returns the next batch of items in the following situations:
     ///  1. The inner stream has returned at least `max_size` many items since the last batch.
-    ///  2. The time since the first element of a batch is greater than the given duration.
+    ///  2. The time since the first item of a batch is greater than the given duration.
     ///  3. The end of the stream is reached.
     ///
     /// The length of the returned vector is never empty or greater than the maximum size. Empty batches
