@@ -855,7 +855,11 @@ impl Notified<'_> {
                     } else {
                         // Update the waker, if necessary.
                         if let Some(waker) = waker {
-                            if !w.waker.as_ref().unwrap().will_wake(waker) {
+                            let should_update = match w.waker.as_ref() {
+                                Some(current_waker) => current_waker.will_wake(waker),
+                                None => true,
+                            };
+                            if should_update {
                                 w.waker = Some(waker.clone());
                             }
                         }

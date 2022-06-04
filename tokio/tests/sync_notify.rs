@@ -154,3 +154,23 @@ fn notify_one_after_dropped_all() {
 
     assert_ready!(notified2.poll());
 }
+
+#[test]
+fn test_notify_one_not_enabled() {
+    let notify = Notify::new();
+    let mut future = spawn(notify.notified());
+
+    notify.notify_one();
+    assert_ready!(future.poll());
+}
+
+#[test]
+fn test_notify_one_after_enable() {
+    let notify = Notify::new();
+    let mut future = spawn(notify.notified());
+
+    future.enter(|_, fut| fut.enable());
+
+    notify.notify_one();
+    assert_ready!(future.poll());
+}
