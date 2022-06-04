@@ -193,3 +193,17 @@ fn test_enable_after_poll() {
     assert_pending!(future.poll());
     future.enter(|_, fut| assert!(!fut.enable()));
 }
+
+#[test]
+fn test_enable_consumes_permit() {
+    let notify = Notify::new();
+
+    // Add a permit.
+    notify.notify_one();
+
+    let mut future1 = spawn(notify.notified());
+    future1.enter(|_, fut| assert!(fut.enable()));
+
+    let mut future2 = spawn(notify.notified());
+    future2.enter(|_, fut| assert!(!fut.enable()));
+}
