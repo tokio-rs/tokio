@@ -1008,27 +1008,31 @@ pub trait StreamExt: Stream {
         throttle(duration, self)
     }
 
-
-
     /// Batches the items in the given stream using a maximum duration and size for each batch.
     ///
     /// This stream returns the next batch of items in the following situations:
     ///  1. The inner stream has returned at least `max_size` many items since the last batch.
     ///  2. The time since the first element of a batch is greater than the given duration.
-    ///  3. The end of the stream is reached
+    ///  3. The end of the stream is reached.
     ///
-    /// The length of the returned vector is never empty or greater than capacity. Empty batches
+    /// The length of the returned vector is never empty or greater than the maximum size. Empty batches
     /// will not be emitted if no items are received upstream.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `max_size` is zero
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```rust
     /// use std::time::Duration;
     /// use tokio::time;
     /// use tokio_stream::{self as stream, StreamExt};
     /// use futures::FutureExt;
     ///
     /// #[tokio::main]
+    /// # async fn _unused() {}
+    /// #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// async fn main() {
     ///     let iter = vec![1, 2, 3, 4].into_iter();
     ///     let stream0 = stream::iter(iter);
@@ -1056,6 +1060,7 @@ pub trait StreamExt: Stream {
     where
         Self: Sized,
     {
+        assert!(max_size > 0, "`max_size` must be non-zero.");
         ChunksTimeout::new(self, max_size, duration)
     }
 }
