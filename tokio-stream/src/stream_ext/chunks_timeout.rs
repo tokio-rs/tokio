@@ -1,6 +1,6 @@
 use crate::stream_ext::Fuse;
 use crate::Stream;
-use tokio::time::Sleep;
+use tokio::time::{sleep, Instant, Sleep};
 
 use core::future::Future;
 use core::pin::Pin;
@@ -17,6 +17,7 @@ pin_project! {
         stream: Fuse<S>,
         #[pin]
         deadline: Sleep,
+        poll_deadline: bool,
         duration: Duration,
         items: Vec<S::Item>,
         cap: usize, // https://github.com/rust-lang/futures-rs/issues/1475
@@ -24,21 +25,21 @@ pin_project! {
 }
 
 impl<S: Stream> ChunksTimeout<S> {
-    pub(super) fn new(stream: S, capacity: usize, duration: Duration) -> Self {
+    pub(super) fn new(stream: S, max_size: usize, duration: Duration) -> Self {
         ChunksTimeout {
             stream: Fuse::new(stream),
-            deadline: tokio::time::sleep(duration),
+            deadline: sleep(duration),
+            poll_deadline: false,
             duration,
-            items: Vec::with_capacity(capacity),
-            cap: capacity,
+            items: Vec::with_capacity(max_size),
+            cap: max_size,
         }
     }
 
     fn take(mut self: Pin<&mut Self>) -> Vec<S::Item> {
-        let duration = self.duration;
         let cap = self.cap;
         let this = self.as_mut().project();
-        this.deadline.reset(tokio::time::Instant::now() + duration);
+        *this.poll_deadline = false;
 
         std::mem::replace(this.items, Vec::with_capacity(cap))
     }
@@ -53,6 +54,10 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
             match me.stream.as_mut().poll_next(cx) {
                 Poll::Pending => break,
                 Poll::Ready(Some(item)) => {
+                    if me.items.is_empty() {
+                        me.deadline.as_mut().reset(Instant::now() + *me.duration);
+                        *me.poll_deadline = true;
+                    }
                     me.items.push(item);
                     if me.items.len() >= *me.cap {
                         return Poll::Ready(Some(self.take()));
@@ -71,10 +76,12 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
             }
         }
 
-        match me.deadline.as_mut().poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(()) => Poll::Ready(Some(self.take())),
+        if *me.poll_deadline {
+            ready!(me.deadline.poll(cx));
+            return Poll::Ready(Some(self.take()));
         }
+
+        Poll::Pending
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

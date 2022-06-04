@@ -59,10 +59,6 @@ async fn full_chunk_with_timeout() {
 
     assert_pending!(chunk_stream.poll_next());
     time::advance(Duration::from_secs(2)).await;
-    assert_eq!(chunk_stream.next().await, Some(vec![]));
-
-    assert_pending!(chunk_stream.poll_next());
-    time::advance(Duration::from_secs(2)).await;
     assert_eq!(chunk_stream.next().await, Some(vec![4]));
 }
 
@@ -84,6 +80,5 @@ async fn real_time() {
 
     assert_eq!(chunk_stream.next().await, Some(vec![1, 2, 3]));
     assert_eq!(chunk_stream.next().await, Some(vec![4]));
-    assert_eq!(chunk_stream.next().await, Some(vec![]));
     assert_eq!(chunk_stream.next().await, Some(vec![5]));
 }

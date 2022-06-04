@@ -1008,12 +1008,17 @@ pub trait StreamExt: Stream {
         throttle(duration, self)
     }
 
-    /// Collects items into batches inside a vector within a deadline.
+
+
+    /// Batches the items in the given stream using a maximum duration and size for each batch.
     ///
-    /// Attempts to yield a vector of len `capacity` within the deadline,
-    /// otherwise will yield a vector of len less than `capacity` if the deadline is reached.
-    /// If the wrapped stream does not yield a value before the deadline is reached, then an
-    /// empty vector will be yielded. The deadline will be reset after every batch is yielded.
+    /// This stream returns the next batch of items in the following situations:
+    ///  1. The inner stream has returned at least `max_size` many items since the last batch.
+    ///  2. The time since the first element of a batch is greater than the given duration.
+    ///  3. The end of the stream is reached
+    ///
+    /// The length of the returned vector is never empty or greater than capacity. Empty batches
+    /// will not be emitted if no items are received upstream.
     ///
     /// # Example
     ///
@@ -1039,21 +1044,19 @@ pub trait StreamExt: Stream {
     ///
     ///     // a full batch was received
     ///     assert_eq!(chunk_stream.next().await, Some(vec![1,2,3]));
-    ///     // deadline was reached before capacity was reached
+    ///     // deadline was reached before max_size was reached
     ///     assert_eq!(chunk_stream.next().await, Some(vec![4]));
-    ///     // no items were emitted within the deadline
-    ///     assert_eq!(chunk_stream.next().await, Some(vec![]));
-    ///     // deadline was reached before capacity was reached
+    ///     // last element in the stream
     ///     assert_eq!(chunk_stream.next().await, Some(vec![5]));
     /// }
     /// ```
     #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
-    fn chunks_timeout(self, capacity: usize, duration: Duration) -> ChunksTimeout<Self>
+    fn chunks_timeout(self, max_size: usize, duration: Duration) -> ChunksTimeout<Self>
     where
         Self: Sized,
     {
-        ChunksTimeout::new(self, capacity, duration)
+        ChunksTimeout::new(self, max_size, duration)
     }
 }
 
