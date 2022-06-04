@@ -1,3 +1,19 @@
+# 0.7.3 (June 4, 2022)
+
+### Changed
+
+- tracing: don't require default tracing features ([#4592])
+- util: simplify implementation of `ReusableBoxFuture` ([#4675])
+
+### Added (unstable)
+
+- task: add `JoinMap` ([#4640], [#4697])
+
+[#4592]: https://github.com/tokio-rs/tokio/pull/4592
+[#4640]: https://github.com/tokio-rs/tokio/pull/4640
+[#4675]: https://github.com/tokio-rs/tokio/pull/4675
+[#4697]: https://github.com/tokio-rs/tokio/pull/4697
+
 # 0.7.2 (May 14, 2022)
 
 This release contains a rewrite of `CancellationToken` that fixes a memory leak. ([#4652])
