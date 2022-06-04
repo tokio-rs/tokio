@@ -1032,7 +1032,7 @@ pub trait StreamExt: Stream {
     ///
     /// #[tokio::main]
     /// # async fn _unused() {}
-    /// #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// async fn main() {
     ///     let iter = vec![1, 2, 3, 4].into_iter();
     ///     let stream0 = stream::iter(iter);
