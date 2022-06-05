@@ -856,7 +856,7 @@ impl Notified<'_> {
                         // Update the waker, if necessary.
                         if let Some(waker) = waker {
                             let should_update = match w.waker.as_ref() {
-                                Some(current_waker) => current_waker.will_wake(waker),
+                                Some(current_waker) => !current_waker.will_wake(waker),
                                 None => true,
                             };
                             if should_update {
