@@ -207,3 +207,21 @@ fn test_enable_consumes_permit() {
     let mut future2 = spawn(notify.notified());
     future2.enter(|_, fut| assert!(!fut.enable()));
 }
+
+#[test]
+fn test_waker_update() {
+    use futures::task::noop_waker;
+    use std::future::Future;
+    use std::task::Context;
+
+    let notify = Notify::new();
+    let mut future = spawn(notify.notified());
+
+    let noop = noop_waker();
+    future.enter(|_, fut| assert_pending!(fut.poll(&mut Context::from_waker(&noop))));
+
+    assert_pending!(future.poll());
+    notify.notify_one();
+
+    assert!(future.is_woken());
+}
