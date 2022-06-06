@@ -1,3 +1,9 @@
+# 1.19.2 (June 6, 2022)
+
+This release fixes another bug in `Notified::enable`. ([#4751])
+
+[#4751]: https://github.com/tokio-rs/tokio/pull/4751
+
 # 1.19.1 (June 5, 2022)
 
 This release fixes a bug in `Notified::enable`. ([#4747])
