@@ -16,13 +16,13 @@ fn test_join_set() {
             assert_eq!(set.len(), 1);
             set.spawn(async { () });
             assert_eq!(set.len(), 2);
-            let () = set.join_one().await.unwrap().unwrap();
+            let () = set.join_next().await.unwrap().unwrap();
             assert_eq!(set.len(), 1);
             set.spawn(async { () });
             assert_eq!(set.len(), 2);
-            let () = set.join_one().await.unwrap().unwrap();
+            let () = set.join_next().await.unwrap().unwrap();
             assert_eq!(set.len(), 1);
-            let () = set.join_one().await.unwrap().unwrap();
+            let () = set.join_next().await.unwrap().unwrap();
             assert_eq!(set.len(), 0);
             set.spawn(async { () });
             assert_eq!(set.len(), 1);
@@ -60,7 +60,7 @@ fn abort_all_during_completion() {
                 set.spawn(async { () });
                 set.abort_all();
 
-                match set.join_one().await {
+                match set.join_next().await {
                     Some(Ok(())) => complete_happened.store(true, SeqCst),
                     Some(Err(err)) if err.is_cancelled() => cancel_happened.store(true, SeqCst),
                     Some(Err(err)) => panic!("fail: {}", err),
@@ -69,7 +69,7 @@ fn abort_all_during_completion() {
                     }
                 }
 
-                assert!(matches!(set.join_one().await, None));
+                assert!(matches!(set.join_next().await, None));
             });
 
             drop(set);

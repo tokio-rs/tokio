@@ -24,7 +24,7 @@ async fn test_with_sleep() {
     set.detach_all();
     assert_eq!(set.len(), 0);
 
-    assert!(matches!(set.join_one().await, None));
+    assert!(matches!(set.join_next().await, None));
 
     for i in 0..10 {
         set.spawn(async move {
@@ -35,14 +35,14 @@ async fn test_with_sleep() {
     }
 
     let mut seen = [false; 10];
-    while let Some(res) = set.join_one().await.transpose().unwrap() {
+    while let Some(res) = set.join_next().await.transpose().unwrap() {
         seen[res] = true;
     }
 
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(set.join_one().await, None));
+    assert!(matches!(set.join_next().await, None));
 
     // Do it again.
     for i in 0..10 {
@@ -53,14 +53,14 @@ async fn test_with_sleep() {
     }
 
     let mut seen = [false; 10];
-    while let Some(res) = set.join_one().await.transpose().unwrap() {
+    while let Some(res) = set.join_next().await.transpose().unwrap() {
         seen[res] = true;
     }
 
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(set.join_one().await, None));
+    assert!(matches!(set.join_next().await, None));
 }
 
 #[tokio::test]
@@ -99,7 +99,7 @@ async fn alternating() {
     assert_eq!(set.len(), 2);
 
     for _ in 0..16 {
-        let () = set.join_one().await.unwrap().unwrap();
+        let () = set.join_next().await.unwrap().unwrap();
         assert_eq!(set.len(), 1);
         set.spawn(async {});
         assert_eq!(set.len(), 2);
@@ -123,7 +123,7 @@ async fn abort_tasks() {
         }
     }
     loop {
-        match set.join_one().await {
+        match set.join_next().await {
             Some(Ok(res)) => {
                 num_completed += 1;
                 assert_eq!(res % 2, 0);
@@ -150,13 +150,13 @@ fn runtime_gone() {
     }
 
     assert!(rt()
-        .block_on(set.join_one())
+        .block_on(set.join_next())
         .unwrap()
         .unwrap_err()
         .is_cancelled());
 }
 
-// This ensures that `join_one` works correctly when the coop budget is
+// This ensures that `join_next` works correctly when the coop budget is
 // exhausted.
 #[tokio::test(flavor = "current_thread")]
 async fn join_set_coop() {
@@ -182,7 +182,7 @@ async fn join_set_coop() {
     let mut count = 0;
     let mut coop_count = 0;
     loop {
-        match set.join_one().now_or_never() {
+        match set.join_next().now_or_never() {
             Some(Some(Ok(()))) => {}
             Some(Some(Err(err))) => panic!("failed: {}", err),
             None => {
@@ -219,7 +219,7 @@ async fn abort_all() {
     assert_eq!(set.len(), 10);
 
     let mut count = 0;
-    while let Some(res) = set.join_one().await {
+    while let Some(res) = set.join_next().await {
         if let Err(err) = res {
             assert!(err.is_cancelled());
         }
