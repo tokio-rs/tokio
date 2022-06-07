@@ -416,6 +416,7 @@ where
     ///  * `None` if the `JoinMap` is empty.
     ///
     /// [`tokio::select!`]: tokio::select
+    #[doc(alias = "join_one")]
     pub async fn join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
         let (res, id) = match self.tasks.join_next_with_id().await {
             Some(Ok((id, output))) => (Ok(output), id),
