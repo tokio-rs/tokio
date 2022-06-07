@@ -242,7 +242,7 @@ impl<T: 'static> JoinSet<T> {
 
     #[doc(hidden)]
     #[deprecated(
-        note = "This method is deprecated and will be removed. Use `JoinSet::join_next_with_id` instead."
+        note = "renamed to `JoinSet::join_next_with_id`"
     )]
     pub async fn join_one_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         self.join_next_with_id().await
