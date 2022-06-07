@@ -195,6 +195,14 @@ impl<T: 'static> JoinSet<T> {
         abort
     }
 
+    #[doc(hidden)]
+    #[deprecated(
+        note = "This method is deprecated and will be removed. Use `JoinSet::join_next` instead."
+    )]
+    pub async fn join_one(&mut self) -> Option<Result<T, JoinError>> {
+        self.join_next().await
+    }
+
     /// Waits until one of the tasks in the set completes and returns its output.
     ///
     /// Returns `None` if the set is empty.
@@ -230,6 +238,14 @@ impl<T: 'static> JoinSet<T> {
     #[doc(alias = "join_one_with_id")]
     pub async fn join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         crate::future::poll_fn(|cx| self.poll_join_next(cx)).await
+    }
+
+    #[doc(hidden)]
+    #[deprecated(
+        note = "This method is deprecated and will be removed. Use `JoinSet::join_next_with_id` instead."
+    )]
+    pub async fn join_one_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
+        self.join_next_with_id().await
     }
 
     /// Aborts all tasks and waits for them to finish shutting down.

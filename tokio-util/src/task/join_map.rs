@@ -430,6 +430,14 @@ where
         Some((key, res))
     }
 
+    #[doc(hidden)]
+    #[deprecated(
+        note = "This method is deprecated and will be removed. Use `JoinMap::join_next` instead."
+    )]
+    pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
+        self.join_next().await
+    }
+
     /// Aborts all tasks and waits for them to finish shutting down.
     ///
     /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_next`] in
