@@ -204,6 +204,7 @@ impl<T: 'static> JoinSet<T> {
     /// This method is cancel safe. If `join_next` is used as the event in a `tokio::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinSet`.
+    #[doc(alias = "join_one")]
     pub async fn join_next(&mut self) -> Option<Result<T, JoinError>> {
         crate::future::poll_fn(|cx| self.poll_join_next(cx))
             .await
