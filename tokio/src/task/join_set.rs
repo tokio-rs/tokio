@@ -227,6 +227,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
+    #[doc(alias = "join_one_with_id")]
     pub async fn join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         crate::future::poll_fn(|cx| self.poll_join_next(cx)).await
     }
