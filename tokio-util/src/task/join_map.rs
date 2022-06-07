@@ -432,7 +432,8 @@ where
 
     #[doc(hidden)]
     #[deprecated(
-        note = "This method is deprecated and will be removed. Use `JoinMap::join_next` instead."
+        since = "0.7.4",
+        note = "renamed to `JoinMap::join_next`."
     )]
     pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
         self.join_next().await
