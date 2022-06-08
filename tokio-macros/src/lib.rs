@@ -265,11 +265,13 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args, item, false)
 }
 
-/// Marks async function to be executed by runtime, suitable to test environment
+/// Marks async function to be executed by runtime, suitable to test environment.
+/// Each test gets a separate current-thread runtime.
 ///
 /// ## Usage
 ///
 /// ### Multi-thread runtime
+/// To use the multi-threaded runtime, the macro can be configured using
 ///
 /// ```no_run
 /// #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -277,6 +279,12 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///     assert!(true);
 /// }
 /// ```
+///
+/// The worker_threads option configures the number of worker threads, and
+/// defaults to the number of cpus on the system. This is the default flavor.
+///
+/// Note: The multi-threaded runtime requires the rt-multi-thread feature
+/// flag.
 ///
 /// ### Using default
 ///
