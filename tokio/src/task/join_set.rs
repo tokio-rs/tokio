@@ -196,10 +196,7 @@ impl<T: 'static> JoinSet<T> {
     }
 
     #[doc(hidden)]
-    #[deprecated(
-        since = "1.20.0",
-        note = "renamed to `JoinSet::join_next`."
-    )]
+    #[deprecated(since = "1.20.0", note = "renamed to `JoinSet::join_next`.")]
     pub async fn join_one(&mut self) -> Option<Result<T, JoinError>> {
         self.join_next().await
     }
@@ -242,9 +239,7 @@ impl<T: 'static> JoinSet<T> {
     }
 
     #[doc(hidden)]
-    #[deprecated(
-        note = "renamed to `JoinSet::join_next_with_id`"
-    )]
+    #[deprecated(since = "1.20.0", note = "renamed to `JoinSet::join_next_with_id`")]
     pub async fn join_one_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         self.join_next_with_id().await
     }
