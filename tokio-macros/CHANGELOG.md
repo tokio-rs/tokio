@@ -1,6 +1,14 @@
+# 1.8.0 (June 4th, 2022)
+
+- macros: always emit return statement ([#4636])
+- macros: support setting a custom crate name for `#[tokio::main]` and `#[tokio::test]` ([#4613])
+
+[#4613]: https://github.com/tokio-rs/tokio/pull/4613
+[#4636]: https://github.com/tokio-rs/tokio/pull/4636
+
 # 1.7.0 (December 15th, 2021)
 
-- macros: address remainging clippy::semicolon_if_nothing_returned warning ([#4252])
+- macros: address remaining `clippy::semicolon_if_nothing_returned` warning ([#4252])
 
 [#4252]: https://github.com/tokio-rs/tokio/pull/4252
 
