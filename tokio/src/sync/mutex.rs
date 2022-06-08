@@ -221,6 +221,8 @@ impl Error for TryLockError {}
 
 #[derive(Debug)]
 pub(super) struct PollLock<'a, T: ?Sized> {
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
     mutex: &'a Mutex<T>,
     acquire: Pin<Box<super::batch_semaphore::Acquire<'a>>>,
 }
@@ -231,7 +233,9 @@ impl<'a, T> Future for PollLock<'a, T> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<MutexGuard<'a, T>> {
         if self.acquire.as_mut().poll(cx).is_ready() {
             let lock = MutexGuard {
-                lock: self.mutex
+                lock: self.mutex,
+                #[ cfg(all(tokio_unstable, feature="tracing")) ]
+                resource_span: self.resource_span.clone(),
             };
 
             Poll::Ready(lock)
@@ -393,6 +397,8 @@ impl<T: ?Sized> Mutex<T> {
         PollLock{
             mutex: self,
             acquire: Box::pin(self.s.acquire(1)),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: self.resource_span.clone(),
         }
     }
 
