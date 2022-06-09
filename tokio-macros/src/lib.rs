@@ -305,14 +305,14 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// The `worker_threads` option configures the number of worker threads, and
-/// defaults to the number of cpus on the system. The dafault flavour is 
-/// one worker thread.
+/// The `worker_threads` option configures the number of worker threads,
+/// and defaults to the number of cpus on the system. The dafault
+/// flavour is one worker thread.
 ///
 /// ### Using default
 ///
-/// The default test runtime is single-threaded. Each test gets a separate
-/// current-thread runtime.
+/// The default test runtime is single-threaded. Each test gets a
+/// separate current-thread runtime.
 ///
 /// ```no_run
 /// #[tokio::test]
