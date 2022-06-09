@@ -265,27 +265,74 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args, item, false)
 }
 
-/// Marks async function to be executed by runtime, suitable to test environment
+/// Marks async function to be executed by runtime, suitable to test environment.
+/// This macro helps set up a `Runtime` without requiring the user to use
+/// [Runtime](../tokio/runtime/struct.Runtime.html) or
+/// [Builder](../tokio/runtime/struct.Builder.html) directly.
+///
+/// Note: This macro is designed to be simplistic and targets applications that
+/// do not require a complex setup. If the provided functionality is not
+/// sufficient, you may be interested in using
+/// [Builder](../tokio/runtime/struct.Builder.html), which provides a more
+/// powerful interface.
 ///
 /// ## Usage
 ///
 /// ### Multi-thread runtime
 ///
+/// To use the multi-threaded runtime, the macro can be configured using
+///
 /// ```no_run
-/// #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+/// #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
 /// ```
 ///
+///Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// #[test]
+/// fn my_test() {
+///     tokio::runtime::Builder::new_multi_thread()
+///         .worker_threads(2)
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             assert!(true);
+///         })
+/// }
+/// ```
+///
+/// The `worker_threads` option configures the number of worker threads, and
+/// defaults to the number of cpus on the system. The dafault flavour is 
+/// one worker thread.
+///
 /// ### Using default
 ///
-/// The default test runtime is single-threaded.
+/// The default test runtime is single-threaded. Each test gets a separate
+/// current-thread runtime.
 ///
 /// ```no_run
 /// #[tokio::test]
 /// async fn my_test() {
 ///     assert!(true);
+/// }
+/// ```
+///
+///Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// #[test]
+/// fn my_test() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             assert!(true);
+///         })
 /// }
 /// ```
 ///
@@ -295,6 +342,22 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// #[tokio::test(start_paused = true)]
 /// async fn my_test() {
 ///     assert!(true);
+/// }
+/// ```
+///
+///Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// #[test]
+/// fn my_test() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .start_paused(true)
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             assert!(true);
+///         })
 /// }
 /// ```
 ///
