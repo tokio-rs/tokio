@@ -24,7 +24,7 @@ async fn test_with_sleep() {
     map.detach_all();
     assert_eq!(map.len(), 0);
 
-    assert!(matches!(map.join_one().await, None));
+    assert!(matches!(map.join_next().await, None));
 
     for i in 0..10 {
         map.spawn(i, async move {
@@ -35,7 +35,7 @@ async fn test_with_sleep() {
     }
 
     let mut seen = [false; 10];
-    while let Some((k, res)) = map.join_one().await {
+    while let Some((k, res)) = map.join_next().await {
         seen[k] = true;
         assert_eq!(res.expect("task should have completed successfully"), k);
     }
@@ -43,7 +43,7 @@ async fn test_with_sleep() {
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(map.join_one().await, None));
+    assert!(matches!(map.join_next().await, None));
 
     // Do it again.
     for i in 0..10 {
@@ -54,7 +54,7 @@ async fn test_with_sleep() {
     }
 
     let mut seen = [false; 10];
-    while let Some((k, res)) = map.join_one().await {
+    while let Some((k, res)) = map.join_next().await {
         seen[k] = true;
         assert_eq!(res.expect("task should have completed successfully"), k);
     }
@@ -62,7 +62,7 @@ async fn test_with_sleep() {
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(map.join_one().await, None));
+    assert!(matches!(map.join_next().await, None));
 }
 
 #[tokio::test]
@@ -101,7 +101,7 @@ async fn alternating() {
     assert_eq!(map.len(), 2);
 
     for i in 0..16 {
-        let (_, res) = map.join_one().await.unwrap();
+        let (_, res) = map.join_next().await.unwrap();
         assert!(res.is_ok());
         assert_eq!(map.len(), 1);
         map.spawn(i, async {});
@@ -127,7 +127,7 @@ async fn abort_by_key() {
         }
     }
 
-    while let Some((key, res)) = map.join_one().await {
+    while let Some((key, res)) = map.join_next().await {
         match res {
             Ok(()) => {
                 num_completed += 1;
@@ -161,7 +161,7 @@ async fn abort_by_predicate() {
     // abort odd-numbered tasks.
     map.abort_matching(|key| key % 2 != 0);
 
-    while let Some((key, res)) = map.join_one().await {
+    while let Some((key, res)) = map.join_next().await {
         match res {
             Ok(()) => {
                 num_completed += 1;
@@ -190,12 +190,12 @@ fn runtime_gone() {
         drop(rt);
     }
 
-    let (key, res) = rt().block_on(map.join_one()).unwrap();
+    let (key, res) = rt().block_on(map.join_next()).unwrap();
     assert_eq!(key, "key");
     assert!(res.unwrap_err().is_cancelled());
 }
 
-// This ensures that `join_one` works correctly when the coop budget is
+// This ensures that `join_next` works correctly when the coop budget is
 // exhausted.
 #[tokio::test(flavor = "current_thread")]
 async fn join_map_coop() {
@@ -222,7 +222,7 @@ async fn join_map_coop() {
     let mut count = 0;
     let mut coop_count = 0;
     loop {
-        match map.join_one().now_or_never() {
+        match map.join_next().now_or_never() {
             Some(Some((key, Ok(i)))) => assert_eq!(key, i),
             Some(Some((key, Err(err)))) => panic!("failed[{}]: {}", key, err),
             None => {
@@ -260,7 +260,7 @@ async fn abort_all() {
 
     let mut count = 0;
     let mut seen = [false; 10];
-    while let Some((k, res)) = map.join_one().await {
+    while let Some((k, res)) = map.join_next().await {
         seen[k] = true;
         if let Err(err) = res {
             assert!(err.is_cancelled());

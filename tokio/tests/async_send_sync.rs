@@ -454,11 +454,11 @@ assert_value!(tokio::task::JoinHandle<YY>: Send & Sync & Unpin);
 #[cfg(tokio_unstable)]
 mod unstable {
     use super::*;
-    async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::join_one(_): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::join_next(_): Send & Sync & !Unpin);
     async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::shutdown(_): Send & Sync & !Unpin);
-    async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::join_one(_): !Send & !Sync & !Unpin);
+    async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::join_next(_): !Send & !Sync & !Unpin);
     async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::shutdown(_): !Send & !Sync & !Unpin);
-    async_assert_fn!(tokio::task::JoinSet<u32>::join_one(_): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::task::JoinSet<u32>::join_next(_): Send & Sync & !Unpin);
     async_assert_fn!(tokio::task::JoinSet<u32>::shutdown(_): Send & Sync & !Unpin);
     assert_value!(tokio::task::JoinSet<YY>: Send & Sync & Unpin);
     assert_value!(tokio::task::JoinSet<YN>: Send & Sync & Unpin);
