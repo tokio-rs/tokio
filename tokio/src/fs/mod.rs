@@ -39,6 +39,7 @@
 //! }
 //! ```
 //!
+//! [`spawn_blocking`]: fn@crate::task::spawn_blocking
 //! [`AsyncRead`]: trait@crate::io::AsyncRead
 
 mod canonicalize;
