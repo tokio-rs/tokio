@@ -276,14 +276,41 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// [Builder](../tokio/runtime/struct.Builder.html), which provides a more
 /// powerful interface.
 ///
-/// ## Usage
-///
-/// ### Multi-thread runtime
+/// # Multi-threaded runtime
 ///
 /// To use the multi-threaded runtime, the macro can be configured using
 ///
 /// ```no_run
-/// #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+/// #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+/// The `worker_threads` option configures the number of worker threads, and
+/// defaults to the number of cpus on the system. This is the default
+/// flavor.
+///
+/// Note: The multi-threaded runtime requires the `rt-multi-thread` feature
+/// flag.
+///
+/// # Current thread runtime
+///
+/// The default test runtime is single-threaded. Each test gets a
+/// separate current-thread runtime.
+///
+/// ```no_run
+/// #[tokio::test]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+///
+/// ## Usage
+///
+/// ### Using the multi-thread runtime
+///
+/// ```no_run
+/// #[tokio::test(flavor = "multi_thread")]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -295,7 +322,6 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// #[test]
 /// fn my_test() {
 ///     tokio::runtime::Builder::new_multi_thread()
-///         .worker_threads(2)
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
@@ -305,14 +331,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// The `worker_threads` option configures the number of worker threads,
-/// and defaults to the number of cpus on the system. The dafault
-/// flavour is one worker thread.
-///
-/// ### Using default
-///
-/// The default test runtime is single-threaded. Each test gets a
-/// separate current-thread runtime.
+/// ### Using current thread runtime
 ///
 /// ```no_run
 /// #[tokio::test]
@@ -327,6 +346,31 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// #[test]
 /// fn my_test() {
 ///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             assert!(true);
+///         })
+/// }
+/// ```
+///
+/// ### Set number of worker threads
+///
+/// ```no_run
+/// #[tokio::test(flavor ="multi_thread", worker_threads = 2)]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+///
+///Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// #[test]
+/// fn my_test() {
+///     tokio::runtime::Builder::new_multi_thread()
+///         .worker_threads(2)
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
