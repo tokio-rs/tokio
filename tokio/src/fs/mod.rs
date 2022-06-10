@@ -21,7 +21,7 @@
 //! return `std::io::Result`. Be warned that these adapted methods may return
 //! `std::io::ErrorKind::WouldBlock` if a *worker* thread can not be converted
 //! to a *backup* thread immediately.
-//! 
+//!
 //! **Warning**: These adapters may create a large number of temporary tasks,
 //! especially when reading large files. When performing a lot of operations
 //! in one batch, it may be significantly faster to use [`spawn_blocking`]
