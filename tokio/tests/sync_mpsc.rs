@@ -2,12 +2,12 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(target_arch = "wasm32", not(target_os = "wasi"))))]
 use tokio::test as maybe_tokio_test;
 
 use tokio::sync::mpsc;
@@ -88,7 +88,7 @@ async fn reserve_disarm() {
 }
 
 #[tokio::test]
-#[cfg(feature = "full")]
+#[cfg(all(feature = "full", not(target_os = "wasi")))]
 async fn send_recv_stream_with_buffer() {
     use tokio_stream::StreamExt;
 
@@ -105,7 +105,9 @@ async fn send_recv_stream_with_buffer() {
     assert_eq!(None, rx.next().await);
 }
 
+// https://github.com/tokio-rs/mio/pull/1580
 #[tokio::test]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn async_send_recv_with_buffer() {
     let (tx, mut rx) = mpsc::channel(16);
@@ -177,6 +179,7 @@ async fn send_recv_unbounded() {
 }
 
 #[tokio::test]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn async_send_recv_unbounded() {
     let (tx, mut rx) = mpsc::unbounded_channel();
@@ -192,7 +195,7 @@ async fn async_send_recv_unbounded() {
 }
 
 #[tokio::test]
-#[cfg(feature = "full")]
+#[cfg(all(feature = "full", not(target_os = "wasi")))]
 async fn send_recv_stream_unbounded() {
     use tokio_stream::StreamExt;
 
@@ -453,7 +456,7 @@ fn unconsumed_messages_are_dropped() {
 }
 
 #[test]
-#[cfg(feature = "full")]
+#[cfg(all(feature = "full", not(target_os = "wasi")))]
 fn blocking_recv() {
     let (tx, mut rx) = mpsc::channel::<u8>(1);
 
@@ -478,7 +481,7 @@ async fn blocking_recv_async() {
 }
 
 #[test]
-#[cfg(feature = "full")]
+#[cfg(all(feature = "full", not(target_os = "wasi")))]
 fn blocking_send() {
     let (tx, mut rx) = mpsc::channel::<u8>(1);
 

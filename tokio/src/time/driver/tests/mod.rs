@@ -1,3 +1,5 @@
+#![cfg(not(target_os = "wasi"))]
+
 use std::{task::Context, time::Duration};
 
 #[cfg(not(loom))]

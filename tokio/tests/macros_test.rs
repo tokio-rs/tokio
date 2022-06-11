@@ -1,4 +1,4 @@
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 use tokio::test;
 

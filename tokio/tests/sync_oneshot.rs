@@ -1,12 +1,12 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(target_arch = "wasm32", not(target_os = "wasi"))))]
 use tokio::test as maybe_tokio_test;
 
 use tokio::sync::oneshot;
@@ -93,7 +93,9 @@ fn close_rx() {
     assert_err!(tx.into_inner().send(1));
 }
 
+// https://github.com/tokio-rs/mio/pull/1580
 #[tokio::test]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn async_rx_closed() {
     let (mut tx, rx) = oneshot::channel::<()>();

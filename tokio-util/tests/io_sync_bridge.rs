@@ -1,4 +1,5 @@
 #![cfg(feature = "io-util")]
+#![cfg(not(target_os = "wasi"))]
 
 use std::error::Error;
 use std::io::{Cursor, Read, Result as IoResult};

@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "time")]
+#![cfg(not(target_os = "wasi"))]
 
 use parking_lot::{const_mutex, Mutex};
 use std::error::Error;

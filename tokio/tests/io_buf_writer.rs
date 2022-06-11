@@ -131,6 +131,8 @@ async fn buf_writer_seek() {
     assert_eq!(&w.into_inner().into_inner()[..], &[0, 1, 8, 9, 4, 5, 6, 7]);
 }
 
+// https://github.com/tokio-rs/mio/pull/1580
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn maybe_pending_buf_writer() {
     let mut writer = BufWriter::with_capacity(2, MaybePending::new(Vec::new()));
@@ -179,6 +181,7 @@ async fn maybe_pending_buf_writer() {
     );
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn maybe_pending_buf_writer_inner_flushes() {
     let mut w = BufWriter::with_capacity(3, MaybePending::new(Vec::new()));
@@ -189,6 +192,7 @@ async fn maybe_pending_buf_writer_inner_flushes() {
     assert_eq!(w, [0, 1]);
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn maybe_pending_buf_writer_seek() {
     struct MaybePendingSeek {

@@ -1,6 +1,6 @@
 #![cfg(feature = "sync")]
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use std::sync::Arc;
@@ -35,7 +35,9 @@ fn try_acquire_many() {
     assert!(sem.try_acquire_owned().is_err());
 }
 
+// https://github.com/tokio-rs/mio/pull/1580
 #[tokio::test]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn acquire() {
     let sem = Arc::new(Semaphore::new(1));
@@ -49,6 +51,7 @@ async fn acquire() {
 }
 
 #[tokio::test]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn acquire_many() {
     let semaphore = Arc::new(Semaphore::new(42));
@@ -65,6 +68,7 @@ async fn acquire_many() {
 }
 
 #[tokio::test]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn add_permits() {
     let sem = Arc::new(Semaphore::new(0));
@@ -90,6 +94,7 @@ fn forget() {
 }
 
 #[tokio::test]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn stresstest() {
     let sem = Arc::new(Semaphore::new(5));

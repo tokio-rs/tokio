@@ -3,7 +3,9 @@
 
 use tokio::time::{self, Duration, Instant};
 
+// https://github.com/tokio-rs/mio/pull/1580
 #[tokio::test]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 async fn resume_lets_time_move_forward_instead_of_resetting_it() {
     let start = Instant::now();
     time::pause();
@@ -17,6 +19,7 @@ async fn resume_lets_time_move_forward_instead_of_resetting_it() {
 }
 
 #[tokio::test]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 async fn can_pause_after_resume() {
     let start = Instant::now();
     time::pause();

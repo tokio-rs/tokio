@@ -222,6 +222,8 @@ async fn test_short_reads() {
     assert_eq!(reader.read(&mut buf).await.unwrap(), 0);
 }
 
+// https://github.com/tokio-rs/mio/pull/1580
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn maybe_pending() {
     let inner: &[u8] = &[5, 6, 7, 0, 1, 2, 3, 4];
@@ -259,6 +261,7 @@ async fn maybe_pending() {
     assert_eq!(reader.read(&mut buf).await.unwrap(), 0);
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn maybe_pending_buf_read() {
     let inner = MaybePending::new(&[0, 1, 2, 3, 1, 0]);
@@ -278,6 +281,7 @@ async fn maybe_pending_buf_read() {
 }
 
 // https://github.com/rust-lang/futures-rs/pull/1573#discussion_r281162309
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn maybe_pending_seek() {
     struct MaybePendingSeek<'a> {

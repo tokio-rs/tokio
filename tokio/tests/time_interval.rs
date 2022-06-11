@@ -38,6 +38,8 @@ async fn interval_zero_duration() {
 //                                                                 Ready(s + 5p)           |
 //                                                                             Ready(s + 6p)
 #[tokio::test(start_paused = true)]
+// https://github.com/tokio-rs/mio/pull/1580
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 async fn burst() {
     let start = Instant::now();
 
@@ -82,6 +84,7 @@ async fn burst() {
 //                                                               Ready(s + 3p + d)           |
 //                                                                           Ready(s + 4p + d)
 #[tokio::test(start_paused = true)]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 async fn delay() {
     let start = Instant::now();
 
@@ -134,6 +137,7 @@ async fn delay() {
 //                  Ready(s + p)                                   Ready(s + 5p)           |
 //                                                                             Ready(s + 6p)
 #[tokio::test(start_paused = true)]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 async fn skip() {
     let start = Instant::now();
 
@@ -167,6 +171,7 @@ async fn skip() {
 }
 
 #[tokio::test(start_paused = true)]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 async fn reset() {
     let start = Instant::now();
 

@@ -1,12 +1,12 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(target_arch = "wasm32", not(target_os = "wasi"))))]
 use tokio::test as maybe_tokio_test;
 
 use tokio::sync::Mutex;

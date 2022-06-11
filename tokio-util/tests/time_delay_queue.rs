@@ -778,6 +778,7 @@ async fn compact_change_deadline() {
     assert!(entry.is_none());
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
 #[tokio::test(start_paused = true)]
 async fn remove_after_compact() {
     let now = Instant::now();
@@ -794,6 +795,7 @@ async fn remove_after_compact() {
     assert!(panic.is_err());
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
 #[tokio::test(start_paused = true)]
 async fn remove_after_compact_poll() {
     let now = Instant::now();

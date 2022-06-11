@@ -1,10 +1,10 @@
 #![cfg(feature = "macros")]
 #![allow(clippy::blacklisted_name)]
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(target_arch = "wasm32", not(target_os = "wasi"))))]
 use tokio::test as maybe_tokio_test;
 
 use tokio::sync::oneshot;
@@ -125,7 +125,9 @@ async fn one_ready() {
     assert_eq!(1, v);
 }
 
+// https://github.com/tokio-rs/mio/pull/1580
 #[maybe_tokio_test]
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn select_streams() {
     use tokio::sync::mpsc;

@@ -53,16 +53,10 @@ struct Configuration {
 impl Configuration {
     fn new(is_test: bool, rt_multi_thread: bool) -> Self {
         Configuration {
-            #[cfg(not(target_os = "wasi"))]
             rt_multi_thread_available: rt_multi_thread,
-            #[cfg(target_os = "wasi")]
-            rt_multi_thread_available: false,
             default_flavor: match is_test {
                 true => RuntimeFlavor::CurrentThread,
-                #[cfg(not(target_os = "wasi"))]
                 false => RuntimeFlavor::Threaded,
-                #[cfg(target_os = "wasi")]
-                false => RuntimeFlavor::CurrentThread,
             },
             flavor: None,
             worker_threads: None,
@@ -148,9 +142,6 @@ impl Configuration {
                 worker_threads.map(|(val, _span)| val)
             }
             (Threaded, _) => {
-                #[cfg(target_os = "wasi")]
-                let msg =  "The runtime flavor `multi_thread` is not available for the target `wasm32-wasi`, please use `current_thread`.";
-                #[cfg(not(target_os = "wasi"))]
                 let msg = if self.flavor.is_none() {
                     "The default runtime flavor is `multi_thread`, but the `rt-multi-thread` feature is disabled."
                 } else {

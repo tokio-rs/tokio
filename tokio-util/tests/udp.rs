@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![cfg(not(target_os = "wasi"))]
 
 use tokio::net::UdpSocket;
 use tokio_stream::StreamExt;

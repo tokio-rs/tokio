@@ -153,7 +153,7 @@ proptest = "1"
 rand = "0.8.0"
 socket2 = "0.4"
 
-[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+[target.'cfg(all(target_arch = "wasm32", not(target_os = "wasi")))'.dev-dependencies]
 wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]

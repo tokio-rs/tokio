@@ -1,7 +1,7 @@
 use crate::sync::batch_semaphore::Semaphore;
 use tokio_test::*;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 #[test]

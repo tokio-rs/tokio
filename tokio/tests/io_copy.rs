@@ -37,6 +37,8 @@ async fn copy() {
     assert_eq!(wr, b"hello world");
 }
 
+// https://github.com/tokio-rs/mio/pull/1580
+#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn proxy() {
     struct BufferedWd {
