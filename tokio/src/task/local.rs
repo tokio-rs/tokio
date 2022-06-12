@@ -319,6 +319,10 @@ const MAX_TASKS_PER_TICK: usize = 61;
 /// How often it check the remote queue first.
 const REMOTE_FIRST_INTERVAL: u8 = 31;
 
+pub struct EnterGuard<'a>{
+    _guard: &'a LocalSet,
+}
+
 impl LocalSet {
     /// Returns a new local task set.
     pub fn new() -> LocalSet {
@@ -334,6 +338,14 @@ impl LocalSet {
             },
             _not_send: PhantomData,
         }
+    }
+
+    /// Enter current LocalSet context
+    pub fn enter(&self) -> EnterGuard<'_> {
+        CURRENT.inner.with(|c| {
+            c.set(&self.context as *const _ as *const ());
+            EnterGuard {_guard: &self}
+        })
     }
 
     /// Spawns a `!Send` task onto the local task set.

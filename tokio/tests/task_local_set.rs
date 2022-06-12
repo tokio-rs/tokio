@@ -126,6 +126,23 @@ async fn local_threadpool_timer() {
         })
         .await;
 }
+#[test]
+fn enter_guard_spawn() {
+    let local = LocalSet::new();
+    let _guard = local.enter();
+    // Run the local task set.
+
+    let join = task::spawn_local(async  {
+        true
+    });
+    let rt = runtime::Builder::new_current_thread()
+    .enable_all()
+    .build()
+    .unwrap();
+    local.block_on(&rt, async move {
+        assert!(join.await.unwrap());
+    });
+}
 
 #[test]
 // This will panic, since the thread that calls `block_on` cannot use
