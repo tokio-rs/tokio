@@ -286,6 +286,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///     assert!(true);
 /// }
 /// ```
+///
 /// The `worker_threads` option configures the number of worker threads, and
 /// defaults to the number of cpus on the system. This is the default
 /// flavor.
@@ -316,7 +317,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-///Equivalent code not using `#[tokio::test]`
+/// Equivalent code not using `#[tokio::test]`
 ///
 /// ```no_run
 /// #[test]
@@ -340,7 +341,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-///Equivalent code not using `#[tokio::test]`
+/// Equivalent code not using `#[tokio::test]`
 ///
 /// ```no_run
 /// #[test]
@@ -364,7 +365,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-///Equivalent code not using `#[tokio::test]`
+/// Equivalent code not using `#[tokio::test]`
 ///
 /// ```no_run
 /// #[test]
@@ -389,7 +390,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-///Equivalent code not using `#[tokio::test]`
+/// Equivalent code not using `#[tokio::test]`
 ///
 /// ```no_run
 /// #[test]
