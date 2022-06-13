@@ -319,6 +319,7 @@ const MAX_TASKS_PER_TICK: usize = 61;
 /// How often it check the remote queue first.
 const REMOTE_FIRST_INTERVAL: u8 = 31;
 
+#[derive(Debug)]
 pub struct EnterGuard<'a>{
     _guard: &'a LocalSet,
 }
