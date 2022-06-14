@@ -132,13 +132,11 @@ fn enter_guard_spawn() {
     let _guard = local.enter();
     // Run the local task set.
 
-    let join = task::spawn_local(async  {
-        true
-    });
+    let join = task::spawn_local(async { true });
     let rt = runtime::Builder::new_current_thread()
-    .enable_all()
-    .build()
-    .unwrap();
+        .enable_all()
+        .build()
+        .unwrap();
     local.block_on(&rt, async move {
         assert!(join.await.unwrap());
     });

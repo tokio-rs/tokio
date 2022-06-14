@@ -320,7 +320,7 @@ const MAX_TASKS_PER_TICK: usize = 61;
 const REMOTE_FIRST_INTERVAL: u8 = 31;
 
 #[derive(Debug)]
-pub struct EnterGuard<'a>{
+pub struct EnterGuard<'a> {
     _guard: &'a LocalSet,
 }
 
@@ -345,7 +345,7 @@ impl LocalSet {
     pub fn enter(&self) -> EnterGuard<'_> {
         CURRENT.inner.with(|c| {
             c.set(&self.context as *const _ as *const ());
-            EnterGuard {_guard: &self}
+            EnterGuard { _guard: &self }
         })
     }
 
