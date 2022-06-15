@@ -85,7 +85,7 @@ pub(crate) trait Park {
     /// `Park` implementation.
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error>;
 
-    /// Releases all resources holded by the parker for proper leak-free shutdown.
+    /// Releases all resources held by the parker for proper leak-free shutdown.
     fn shutdown(&mut self);
 }
 

@@ -88,7 +88,7 @@ impl RuntimeMetrics {
     ///
     /// `worker` is the index of the worker being queried. The given value must
     /// be between 0 and `num_workers()`. The index uniquely identifies a single
-    /// worker and will continue to indentify the worker throughout the lifetime
+    /// worker and will continue to identify the worker throughout the lifetime
     /// of the runtime instance.
     ///
     /// # Panics
@@ -176,7 +176,7 @@ impl RuntimeMetrics {
     ///
     /// `worker` is the index of the worker being queried. The given value must
     /// be between 0 and `num_workers()`. The index uniquely identifies a single
-    /// worker and will continue to indentify the worker throughout the lifetime
+    /// worker and will continue to identify the worker throughout the lifetime
     /// of the runtime instance.
     ///
     /// # Panics
@@ -217,7 +217,7 @@ impl RuntimeMetrics {
     ///
     /// `worker` is the index of the worker being queried. The given value must
     /// be between 0 and `num_workers()`. The index uniquely identifies a single
-    /// worker and will continue to indentify the worker throughout the lifetime
+    /// worker and will continue to identify the worker throughout the lifetime
     /// of the runtime instance.
     ///
     /// # Panics
@@ -261,7 +261,7 @@ impl RuntimeMetrics {
     ///
     /// `worker` is the index of the worker being queried. The given value must
     /// be between 0 and `num_workers()`. The index uniquely identifies a single
-    /// worker and will continue to indentify the worker throughout the lifetime
+    /// worker and will continue to identify the worker throughout the lifetime
     /// of the runtime instance.
     ///
     /// # Panics
@@ -308,7 +308,7 @@ impl RuntimeMetrics {
     ///
     /// `worker` is the index of the worker being queried. The given value must
     /// be between 0 and `num_workers()`. The index uniquely identifies a single
-    /// worker and will continue to indentify the worker throughout the lifetime
+    /// worker and will continue to identify the worker throughout the lifetime
     /// of the runtime instance.
     ///
     /// # Panics
@@ -354,7 +354,7 @@ impl RuntimeMetrics {
     ///
     /// `worker` is the index of the worker being queried. The given value must
     /// be between 0 and `num_workers()`. The index uniquely identifies a single
-    /// worker and will continue to indentify the worker throughout the lifetime
+    /// worker and will continue to identify the worker throughout the lifetime
     /// of the runtime instance.
     ///
     /// # Panics
@@ -422,7 +422,7 @@ impl RuntimeMetrics {
     ///
     /// `worker` is the index of the worker being queried. The given value must
     /// be between 0 and `num_workers()`. The index uniquely identifies a single
-    /// worker and will continue to indentify the worker throughout the lifetime
+    /// worker and will continue to identify the worker throughout the lifetime
     /// of the runtime instance.
     ///
     /// # Panics
@@ -512,7 +512,7 @@ cfg_net! {
         ///     let metrics = Handle::current().metrics();
         ///
         ///     let n = metrics.io_driver_ready_count();
-        ///     println!("{} ready events procssed by the runtime's I/O driver.", n);
+        ///     println!("{} ready events processed by the runtime's I/O driver.", n);
         /// }
         /// ```
         pub fn io_driver_ready_count(&self) -> u64 {
