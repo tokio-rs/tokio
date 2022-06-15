@@ -632,6 +632,7 @@ impl Builder {
     }
 
     fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
+        use crate::runtime::basic_scheduler::Config;
         use crate::runtime::{BasicScheduler, HandleInner, Kind};
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
@@ -655,10 +656,12 @@ impl Builder {
         let scheduler = BasicScheduler::new(
             driver,
             handle_inner,
-            self.before_park.clone(),
-            self.after_unpark.clone(),
-            self.global_queue_interval,
-            self.event_interval,
+            Config {
+                before_park: self.before_park.clone(),
+                after_unpark: self.after_unpark.clone(),
+                global_queue_interval: self.global_queue_interval,
+                event_interval: self.event_interval,
+            },
         );
         let spawner = Spawner::Basic(scheduler.spawner().clone());
 
