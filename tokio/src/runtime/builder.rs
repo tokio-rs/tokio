@@ -113,7 +113,7 @@ cfg_unstable! {
         ///
         /// # pub fn main() {
         /// let rt = runtime::Builder::new_current_thread()
-        ///     .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+        ///     .unhandled_panic(UnhandledPanic::Ignore)
         ///     .build()
         ///     .unwrap();
         ///
