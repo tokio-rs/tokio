@@ -113,7 +113,7 @@ fn worker_steal_count() {
             // scheduled" slot.
             tokio::spawn(async {});
 
-            // Blocking receive on the channe.
+            // Blocking receive on the channel.
             rx.recv().unwrap();
         })
         .await
