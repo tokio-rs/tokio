@@ -262,6 +262,11 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     fn yield_now(&self, task: Notified<Self>) {
         self.schedule(task);
     }
+
+    /// Polling the task resulted in a panic. Should the runtime shutdown?
+    fn unhandled_panic(&self) {
+        // By default, do nothing. This maintains the 1.0 behavior.
+    }
 }
 
 cfg_rt! {
