@@ -101,7 +101,7 @@ cfg_unstable! {
     pub enum UnhandledPanic {
         /// The runtime should ignore panics on spawned tasks.
         ///
-        /// The panic is forwarded to the task's `JoinHandle` and all spawned
+        /// The panic is forwarded to the task's [`JoinHandle`] and all spawned
         /// tasks continue running normally.
         ///
         /// This is the default behavior.
@@ -132,6 +132,8 @@ cfg_unstable! {
         /// })
         /// # }
         /// ```
+        ///
+        /// [`JoinHandle`]: struct@crate::task::JoinHandle
         Ignore,
 
         /// The runtime should immediately shutdown if a spawned task panics.
@@ -162,6 +164,8 @@ cfg_unstable! {
         /// })
         /// # }
         /// ```
+        ///
+        /// [`JoinHandle`]: struct@crate::task::JoinHandle
         ShutdownRuntime,
     }
 }
@@ -721,7 +725,7 @@ impl Builder {
         /// By default, an unhandled panic (i.e. a panic not caught by
         /// [`std::panic::catch_unwind`]) has no impact on the runtime's
         /// execution. The panic is error value is forwarded to the task's
-        /// [`Joinhandle`] and all other spawned tasks continue running.
+        /// [`JoinHandle`] and all other spawned tasks continue running.
         ///
         /// The `unhandled_panic` option enables configuring this behavior.
         ///
@@ -767,6 +771,8 @@ impl Builder {
         /// })
         /// # }
         /// ```
+        ///
+        /// [`JoinHandle`]: struct@crate::task::JoinHandle
         pub fn unhandled_panic(&mut self, behavior: UnhandledPanic) -> &mut Self {
             self.unhandled_panic = behavior;
             self

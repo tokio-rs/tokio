@@ -591,7 +591,7 @@ cfg_unstable! {
         /// By default, an unhandled panic (i.e. a panic not caught by
         /// [`std::panic::catch_unwind`]) has no impact on the `LocalSet`'s
         /// execution. The panic is error value is forwarded to the task's
-        /// [`Joinhandle`] and all other spawned tasks continue running.
+        /// [`JoinHandle`] and all other spawned tasks continue running.
         ///
         /// The `unhandled_panic` option enables configuring this behavior.
         ///
@@ -641,6 +641,8 @@ cfg_unstable! {
         ///     .await;
         /// # }
         /// ```
+        ///
+        /// [`JoinHandle`]: struct@crate::task::JoinHandle
         pub fn unhandled_panic(&mut self, behavior: crate::runtime::UnhandledPanic) -> &mut Self {
             // TODO: This should be set as a builder
             Arc::get_mut(&mut self.context.shared)
