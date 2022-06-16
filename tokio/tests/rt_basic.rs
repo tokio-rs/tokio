@@ -294,7 +294,7 @@ mod unstable {
 
     #[test]
     #[should_panic(
-        expected = "a spawned task panicked and the runtime is configured to shutdown on unhandled panic"
+        expected = "a spawned task panicked and the runtime is configured to shut down on unhandled panic"
     )]
     fn shutdown_on_panic() {
         let rt = Builder::new_current_thread()
