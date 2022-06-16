@@ -57,6 +57,7 @@ net = [
   "winapi/namedpipeapi",
   "winapi/winbase",
   "winapi/winnt",
+  "winapi/minwindef",
 ]
 process = [
   "bytes",
@@ -88,6 +89,7 @@ signal = [
   "signal-hook-registry",
   "winapi/consoleapi",
   "winapi/wincon",
+  "winapi/minwindef",
 ]
 sync = []
 test-util = ["rt", "sync", "time"]
