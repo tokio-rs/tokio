@@ -595,7 +595,7 @@ impl CoreGuard<'_> {
             Some(ret) => ret,
             None => {
                 // `block_on` panicked.
-                panic!("a spawned task panicked and the runtime is configured to shutdown on unhandled panic");
+                panic!("a spawned task panicked and the runtime is configured to shut down on unhandled panic");
             }
         }
     }
