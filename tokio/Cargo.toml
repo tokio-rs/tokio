@@ -52,7 +52,12 @@ net = [
   "mio/os-ext",
   "mio/net",
   "socket2",
+  "winapi/fileapi",
+  "winapi/handleapi",
   "winapi/namedpipeapi",
+  "winapi/winbase",
+  "winapi/winnt",
+  "winapi/minwindef",
 ]
 process = [
   "bytes",
@@ -62,7 +67,12 @@ process = [
   "mio/os-ext",
   "mio/net",
   "signal-hook-registry",
+  "winapi/handleapi",
+  "winapi/processthreadsapi",
   "winapi/threadpoollegacyapiset",
+  "winapi/winbase",
+  "winapi/winnt",
+  "winapi/minwindef",
 ]
 # Includes basic task execution capabilities
 rt = ["once_cell"]
@@ -78,6 +88,8 @@ signal = [
   "mio/os-ext",
   "signal-hook-registry",
   "winapi/consoleapi",
+  "winapi/wincon",
+  "winapi/minwindef",
 ]
 sync = []
 test-util = ["rt", "sync", "time"]
@@ -118,7 +130,7 @@ nix = { version = "0.24", default-features = false, features = ["fs", "socket"] 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"
 default-features = false
-features = ["std", "winsock2", "mswsock", "handleapi", "ws2ipdef", "ws2tcpip"]
+features = ["std"]
 optional = true
 
 [target.'cfg(windows)'.dev-dependencies.ntapi]
