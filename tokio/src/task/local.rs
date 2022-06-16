@@ -232,6 +232,10 @@ struct Context {
 
     /// State shared between threads.
     shared: Arc<Shared>,
+
+    /// True if a task panicked without being handled and the local set is
+    /// configured to shutdown on unhandled panic.
+    unhandled_panic: Cell<bool>,
 }
 
 /// LocalSet state shared between threads.
@@ -241,6 +245,10 @@ struct Shared {
 
     /// Wake the `LocalSet` task.
     waker: AtomicWaker,
+
+    /// How to respond to unhandled task panics.
+    #[cfg(tokio_unstable)]
+    pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
 }
 
 pin_project! {
@@ -330,7 +338,10 @@ impl LocalSet {
                 shared: Arc::new(Shared {
                     queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
                     waker: AtomicWaker::new(),
+                    #[cfg(tokio_unstable)]
+                    unhandled_panic: crate::runtime::UnhandledPanic::Ignore,
                 }),
+                unhandled_panic: Cell::new(false),
             },
             _not_send: PhantomData,
         }
@@ -516,6 +527,11 @@ impl LocalSet {
     /// notified again.
     fn tick(&self) -> bool {
         for _ in 0..MAX_TASKS_PER_TICK {
+            // Make sure we didn't hit an unhandled panic
+            if self.context.unhandled_panic.get() {
+                panic!("a spawned task panicked and the LocalSet is configured to shutdown on unhandled panic");
+            }
+
             match self.next_task() {
                 // Run the task
                 //
@@ -564,6 +580,76 @@ impl LocalSet {
 
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
         CURRENT.set(&self.context, f)
+    }
+}
+
+cfg_unstable! {
+    impl LocalSet {
+        /// Configure how the `LocalSet` responds to an unhandled panic on a
+        /// spawned task.
+        ///
+        /// By default, an unhandled panic (i.e. a panic not caught by
+        /// [`std::panic::catch_unwind`]) has no impact on the `LocalSet`'s
+        /// execution. The panic is error value is forwarded to the task's
+        /// [`JoinHandle`] and all other spawned tasks continue running.
+        ///
+        /// The `unhandled_panic` option enables configuring this behavior.
+        ///
+        /// * `UnhandledPanic::Ignore` is the default behavior. Panics on
+        ///   spawned tasks have no impact on the `LocalSet`'s execution.
+        /// * `UnhandledPanic::ShutdownRuntime` will force the `LocalSet` to
+        ///   shutdown immediately when a spawned task panics even if that
+        ///   task's `JoinHandle` has not been dropped. All other spawned tasks
+        ///   will immediatetly terminate and further calls to
+        ///   [`LocalSet::block_on`] and [`LocalSet::run_until`] will panic.
+        ///
+        /// # Panics
+        ///
+        /// This method panics if called after the `LocalSet` has started
+        /// running.
+        ///
+        /// # Unstable
+        ///
+        /// This option is currently unstable and its implementation is
+        /// incomplete. The API may change or be removed in the future. See
+        /// tokio-rs/tokio#4516 for more details.
+        ///
+        /// # Examples
+        ///
+        /// The following demonstrates a `LocalSet` configured to shutdown on
+        /// panic. The first spawned task panics and results in the `LocalSet`
+        /// shutting down. The second spawned task never has a chance to
+        /// execute. The call to `run_until` will panic due to the runtime being
+        /// forcibly shutdown.
+        ///
+        /// ```should_panic
+        /// use tokio::runtime::UnhandledPanic;
+        ///
+        /// # #[tokio::main]
+        /// # async fn main() {
+        /// tokio::task::LocalSet::new()
+        ///     .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+        ///     .run_until(async {
+        ///         tokio::task::spawn_local(async { panic!("boom"); });
+        ///         tokio::task::spawn_local(async {
+        ///             // This task never completes
+        ///         });
+        ///
+        ///         // Do some work, but `run_until` will panic before it completes
+        /// # loop { tokio::task::yield_now().await; }
+        ///     })
+        ///     .await;
+        /// # }
+        /// ```
+        ///
+        /// [`JoinHandle`]: struct@crate::task::JoinHandle
+        pub fn unhandled_panic(&mut self, behavior: crate::runtime::UnhandledPanic) -> &mut Self {
+            // TODO: This should be set as a builder
+            Arc::get_mut(&mut self.context.shared)
+                .expect("TODO: we shouldn't panic")
+                .unhandled_panic = behavior;
+            self
+        }
     }
 }
 
@@ -721,5 +807,29 @@ impl task::Schedule for Arc<Shared> {
 
     fn schedule(&self, task: task::Notified<Self>) {
         Shared::schedule(self, task);
+    }
+
+    cfg_unstable! {
+        fn unhandled_panic(&self) {
+            use crate::runtime::UnhandledPanic;
+
+            match self.unhandled_panic {
+                UnhandledPanic::Ignore => {
+                    // Do nothing
+                }
+                UnhandledPanic::ShutdownRuntime => {
+                    // This hook is only called from within the runtime, so
+                    // `CURRENT` should match with `&self`, i.e. there is no
+                    // opportunity for a nested scheduler to be called.
+                    CURRENT.with(|maybe_cx| match maybe_cx {
+                        Some(cx) if Arc::ptr_eq(self, &cx.shared) => {
+                            cx.unhandled_panic.set(true);
+                            cx.owned.close_and_shutdown_all();
+                        }
+                        _ => unreachable!("runtime core not set in CURRENT thread-local"),
+                    })
+                }
+            }
+        }
     }
 }

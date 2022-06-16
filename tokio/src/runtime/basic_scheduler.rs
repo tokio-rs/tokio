@@ -57,6 +57,10 @@ struct Core {
 
     /// Metrics batch
     metrics: MetricsBatch,
+
+    /// True if a task panicked without being handled and the runtime is
+    /// configured to shutdown on unhandled panic.
+    unhandled_panic: bool,
 }
 
 #[derive(Clone)]
@@ -76,6 +80,10 @@ pub(crate) struct Config {
 
     /// Callback for a worker unparking itself
     pub(crate) after_unpark: Option<Callback>,
+
+    #[cfg(tokio_unstable)]
+    /// How to respond to unhandled task panics.
+    pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
 }
 
 /// Scheduler state shared between threads.
@@ -144,6 +152,7 @@ impl BasicScheduler {
             tick: 0,
             driver: Some(driver),
             metrics: MetricsBatch::new(),
+            unhandled_panic: false,
         })));
 
         BasicScheduler {
@@ -158,6 +167,7 @@ impl BasicScheduler {
         &self.spawner
     }
 
+    #[track_caller]
     pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
         pin!(future);
 
@@ -465,6 +475,35 @@ impl Schedule for Arc<Shared> {
             }
         });
     }
+
+    cfg_unstable! {
+        fn unhandled_panic(&self) {
+            use crate::runtime::UnhandledPanic;
+
+            match self.config.unhandled_panic {
+                UnhandledPanic::Ignore => {
+                    // Do nothing
+                }
+                UnhandledPanic::ShutdownRuntime => {
+                    // This hook is only called from within the runtime, so
+                    // `CURRENT` should match with `&self`, i.e. there is no
+                    // opportunity for a nested scheduler to be called.
+                    CURRENT.with(|maybe_cx| match maybe_cx {
+                        Some(cx) if Arc::ptr_eq(self, &cx.spawner.shared) => {
+                            let mut core = cx.core.borrow_mut();
+
+                            // If `None`, the runtime is shutting down, so there is no need to signal shutdown
+                            if let Some(core) = core.as_mut() {
+                                core.unhandled_panic = true;
+                                self.owned.close_and_shutdown_all();
+                            }
+                        }
+                        _ => unreachable!("runtime core not set in CURRENT thread-local"),
+                    })
+                }
+            }
+        }
+    }
 }
 
 impl Wake for Shared {
@@ -489,8 +528,9 @@ struct CoreGuard<'a> {
 }
 
 impl CoreGuard<'_> {
+    #[track_caller]
     fn block_on<F: Future>(self, future: F) -> F::Output {
-        self.enter(|mut core, context| {
+        let ret = self.enter(|mut core, context| {
             let _enter = crate::runtime::enter(false);
             let waker = context.spawner.waker_ref();
             let mut cx = std::task::Context::from_waker(&waker);
@@ -506,11 +546,16 @@ impl CoreGuard<'_> {
                     core = c;
 
                     if let Ready(v) = res {
-                        return (core, v);
+                        return (core, Some(v));
                     }
                 }
 
                 for _ in 0..core.spawner.shared.config.event_interval {
+                    // Make sure we didn't hit an unhandled_panic
+                    if core.unhandled_panic {
+                        return (core, None);
+                    }
+
                     // Get and increment the current tick
                     let tick = core.tick;
                     core.tick = core.tick.wrapping_add(1);
@@ -544,7 +589,15 @@ impl CoreGuard<'_> {
                 // pending I/O events.
                 core = context.park_yield(core);
             }
-        })
+        });
+
+        match ret {
+            Some(ret) => ret,
+            None => {
+                // `block_on` panicked.
+                panic!("a spawned task panicked and the runtime is configured to shut down on unhandled panic");
+            }
+        }
     }
 
     /// Enters the scheduler context. This sets the queue and other necessary
