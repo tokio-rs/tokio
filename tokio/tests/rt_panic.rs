@@ -1,36 +1,38 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use lazy_static::lazy_static;
+use futures::future;
+use parking_lot::{const_mutex, Mutex};
 use std::error::Error;
 use std::panic;
-use std::sync::{Arc, Mutex, Once};
+use std::sync::Arc;
 use tokio::runtime::{Builder, Handle, Runtime};
 
 fn test_panic<Func: FnOnce() + panic::UnwindSafe>(func: Func) -> Option<String> {
-    lazy_static! {
-        static ref SET_UP_PANIC_HOOK: Once = Once::new();
-        static ref PANIC_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
-        static ref PANIC_FILE: Mutex<String> = Mutex::new(String::new());
-    }
-
-    SET_UP_PANIC_HOOK.call_once(|| {
-        panic::set_hook(Box::new(|panic_info| {
-            let panic_location = panic_info.location().unwrap();
-            PANIC_FILE
-                .lock()
-                .unwrap()
-                .clone_from(&panic_location.file().to_string());
-        }));
-    });
+    static PANIC_MUTEX: Mutex<()> = const_mutex(());
 
     {
         let _guard = PANIC_MUTEX.lock();
+        let panic_file: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+
+        let prev_hook = panic::take_hook();
+        {
+            let panic_file = panic_file.clone();
+            panic::set_hook(Box::new(move |panic_info| {
+                let panic_location = panic_info.location().unwrap();
+                panic_file
+                    .lock()
+                    .clone_from(&Some(panic_location.file().to_string()));
+            }));
+        }
 
         let result = panic::catch_unwind(func);
+        // Return to the previously set panic hook (maybe default) so that we get nice error
+        // messages in the tests.
+        panic::set_hook(prev_hook);
 
         if result.is_err() {
-            Some(PANIC_FILE.lock().ok()?.clone())
+            panic_file.lock().clone()
         } else {
             None
         }
@@ -54,9 +56,7 @@ fn test_into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(move || {
         let rt = basic();
         rt.block_on(async {
-            let handle = tokio::spawn(async {
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            });
+            let handle = tokio::spawn(async { future::pending::<()>() });
 
             handle.abort();
 
