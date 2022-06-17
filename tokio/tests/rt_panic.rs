@@ -56,7 +56,7 @@ fn test_into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(move || {
         let rt = basic();
         rt.block_on(async {
-            let handle = tokio::spawn(async { future::pending::<()>().await });
+            let handle = tokio::spawn(future::pending::<()>());
 
             handle.abort();
 
