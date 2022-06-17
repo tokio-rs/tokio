@@ -161,9 +161,9 @@ impl LocalPoolHandle {
     ///         })
     ///         .collect::<Vec<_>>();
     ///
-    ///     let _ = handles
-    ///         .into_iter()
-    ///         .map(|handle| async { handle.await.unwrap() });
+    ///     for handle in handles {
+    ///         handle.await.unwrap();
+    ///     }
     /// }
     /// ```
     ///
