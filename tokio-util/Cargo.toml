@@ -55,6 +55,7 @@ tokio-stream = { version = "0.1", path = "../tokio-stream" }
 async-stream = "0.3.0"
 futures = "0.3.0"
 futures-test = "0.3.5"
+parking_lot = "0.12.0"
 
 [package.metadata.docs.rs]
 all-features = true

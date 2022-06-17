@@ -57,7 +57,9 @@ impl LocalPoolHandle {
     /// pool via [`LocalPoolHandle::spawn_pinned`].
     ///
     /// # Panics
+    ///
     /// Panics if the pool size is less than one.
+    #[track_caller]
     pub fn new(pool_size: usize) -> LocalPoolHandle {
         assert!(pool_size > 0);
 
@@ -167,6 +169,7 @@ impl LocalPoolHandle {
     /// }
     /// ```
     ///
+    #[track_caller]
     pub fn spawn_pinned_by_idx<F, Fut>(&self, create_task: F, idx: usize) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut,
@@ -196,6 +199,7 @@ struct LocalPool {
 
 impl LocalPool {
     /// Spawn a `?Send` future onto a worker
+    #[track_caller]
     fn spawn_pinned<F, Fut>(
         &self,
         create_task: F,
@@ -324,6 +328,7 @@ impl LocalPool {
         }
     }
 
+    #[track_caller]
     fn find_worker_by_idx(&self, idx: usize) -> (&LocalWorkerHandle, JobCountGuard) {
         let worker = &self.workers[idx];
         worker.task_count.fetch_add(1, Ordering::SeqCst);
