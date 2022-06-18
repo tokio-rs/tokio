@@ -213,6 +213,18 @@ fn try_recv_after_completion() {
 }
 
 #[test]
+fn try_recv_after_completion_await() {
+    let (tx, rx) = oneshot::channel::<i32>();
+    let mut rx = task::spawn(rx);
+
+    tx.send(17).unwrap();
+
+    assert_eq!(Ok(17), assert_ready!(rx.poll()));
+    assert_eq!(Err(TryRecvError::Closed), rx.try_recv());
+    rx.close();
+}
+
+#[test]
 fn drops_tasks() {
     let (mut tx, mut rx) = oneshot::channel::<i32>();
     let mut tx_task = task::spawn(());
