@@ -1056,6 +1056,7 @@ pub trait StreamExt: Stream {
     /// ```
     #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    #[track_caller]
     fn chunks_timeout(self, max_size: usize, duration: Duration) -> ChunksTimeout<Self>
     where
         Self: Sized,
