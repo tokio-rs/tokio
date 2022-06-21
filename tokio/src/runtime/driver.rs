@@ -111,11 +111,12 @@ cfg_time! {
         enable: bool,
         io_stack: IoStack,
         clock: Clock,
+        poll_mode: bool,
     ) -> (TimeDriver, TimeHandle) {
         use crate::park::either::Either;
 
         if enable {
-            let driver = crate::time::driver::Driver::new(io_stack, clock);
+            let driver = crate::time::driver::Driver::new(io_stack, clock, poll_mode);
             let handle = driver.handle();
 
             (Either::A(driver), Some(handle))
@@ -139,6 +140,7 @@ cfg_not_time! {
         _enable: bool,
         io_stack: IoStack,
         _clock: Clock,
+        _poll_mode: bool,
     ) -> (TimeDriver, TimeHandle) {
         (io_stack, ())
     }
@@ -163,6 +165,7 @@ pub(crate) struct Cfg {
     pub(crate) enable_time: bool,
     pub(crate) enable_pause_time: bool,
     pub(crate) start_paused: bool,
+    pub(crate) poll_mode: bool,
 }
 
 impl Driver {
@@ -172,7 +175,7 @@ impl Driver {
         let clock = create_clock(cfg.enable_pause_time, cfg.start_paused);
 
         let (time_driver, time_handle) =
-            create_time_driver(cfg.enable_time, io_stack, clock.clone());
+            create_time_driver(cfg.enable_time, io_stack, clock.clone(), cfg.poll_mode);
 
         Ok((
             Self { inner: time_driver },
@@ -204,5 +207,9 @@ impl Park for Driver {
 
     fn shutdown(&mut self) {
         self.inner.shutdown()
+    }
+
+    fn idle(&self) {
+        self.inner.idle()
     }
 }

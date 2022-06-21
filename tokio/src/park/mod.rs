@@ -87,6 +87,10 @@ pub(crate) trait Park {
 
     /// Releases all resources held by the parker for proper leak-free shutdown.
     fn shutdown(&mut self);
+
+    /// Idle state set, label park_timeout with scheduler have nothing tasks to
+    /// run, used in the time driver for time pause with polling mode.
+    fn idle(&self) {}
 }
 
 /// Unblock a thread blocked by the associated `Park` instance.
@@ -102,6 +106,11 @@ pub(crate) trait Unpark: Sync + Send + 'static {
     /// an implementation detail. Refer to the documentation for the specific
     /// `Unpark` implementation.
     fn unpark(&self);
+
+    /// Wake state set, when curren thread scheduler have been wake by some time or
+    /// io event, then call the wake() to set woken= true ,used in the time driver
+    /// for time pause fn with polling mode.
+    fn wake(&self) {}
 }
 
 impl Unpark for Box<dyn Unpark> {

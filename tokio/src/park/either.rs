@@ -45,6 +45,13 @@ where
             Either::B(b) => b.shutdown(),
         }
     }
+
+    fn idle(&self) {
+        match self {
+            Either::A(a) => a.idle(),
+            Either::B(b) => b.idle(),
+        }
+    }
 }
 
 impl<A, B> Unpark for Either<A, B>
@@ -56,6 +63,12 @@ where
         match self {
             Either::A(a) => a.unpark(),
             Either::B(b) => b.unpark(),
+        }
+    }
+    fn wake(&self) {
+        match self {
+            Either::A(a) => a.wake(),
+            Either::B(b) => b.wake(),
         }
     }
 }

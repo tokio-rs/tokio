@@ -194,6 +194,34 @@ use proc_macro::TokenStream;
 ///         })
 /// }
 /// ```
+///
+/// ### Configure the runtime to start with poll_mode
+///
+/// ```rust
+/// #[tokio::main(flavor = "current_thread", poll_mode = true)]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .poll_mode()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
+/// Note that `poll_mode` current only support the current_thread runtime, later
+/// will support multi_thread runtime.
+/// poll_mode can use without enable_io/enable_all/enable_time.
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
@@ -418,6 +446,36 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///     println!("Hello world");
 /// }
 /// ```
+///
+/// ### Configure the runtime to start with poll_mode
+///
+/// ```no_run
+/// #[tokio::test(poll_mode = true)]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// #[test]
+/// fn my_test() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .poll_mode()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             assert!(true);
+///         })
+/// }
+/// ```
+///
+/// Note that `poll_mode` current only support the current_thread runtime, later
+/// will support multi_thread runtime.
+/// poll_mode can use without enable_io/enable_all/enable_time.
+///
 #[proc_macro_attribute]
 pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::test(args, item, true)

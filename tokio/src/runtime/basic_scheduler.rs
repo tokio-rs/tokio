@@ -84,6 +84,9 @@ pub(crate) struct Config {
     #[cfg(tokio_unstable)]
     /// How to respond to unhandled task panics.
     pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
+
+    /// Polling mode for the driver(io, time, parkthread), maybe 100% cpu usage.
+    pub(crate) poll_mode: bool,
 }
 
 /// Scheduler state shared between threads.
@@ -357,6 +360,22 @@ impl Context {
         core
     }
 
+    /// Checks the driver for new events without blocking the thread when no any
+    /// tasks to run.
+    fn park_yield_when_idle(&self, mut core: Box<Core>) -> Box<Core> {
+        let mut driver = core.driver.take().expect("driver missing");
+
+        core.metrics.submit(&core.spawner.shared.worker_metrics);
+        let (mut core, _) = self.enter(core, || {
+            driver.idle();
+            driver
+                .park_timeout(Duration::from_millis(0))
+                .expect("failed to park");
+        });
+
+        core.driver = Some(driver);
+        core
+    }
     fn enter<R>(&self, core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
         // Store the scheduler core in the thread-local context
         //
@@ -470,7 +489,9 @@ impl Schedule for Arc<Shared> {
                 if let Some(queue) = guard.as_mut() {
                     queue.push_back(task);
                     drop(guard);
-                    self.unpark.unpark();
+                    if !self.config.poll_mode {
+                        self.unpark.unpark();
+                    }
                 }
             }
         });
@@ -514,7 +535,12 @@ impl Wake for Shared {
     /// Wake by reference
     fn wake_by_ref(arc_self: &Arc<Self>) {
         arc_self.woken.store(true, Release);
-        arc_self.unpark.unpark();
+
+        if !arc_self.config.poll_mode {
+            arc_self.unpark.unpark();
+        } else {
+            arc_self.unpark.wake();
+        }
     }
 }
 
@@ -569,7 +595,13 @@ impl CoreGuard<'_> {
                     let task = match entry {
                         Some(entry) => entry,
                         None => {
-                            core = context.park(core);
+                            let c = if !core.spawner.shared.config.poll_mode {
+                                context.park(core)
+                            } else {
+                                context.park_yield_when_idle(core)
+                            };
+
+                            core = c;
 
                             // Try polling the `block_on` future next
                             continue 'outer;

@@ -42,7 +42,7 @@ async fn pause_time_in_spawn_threads() {
 }
 
 #[test]
-fn paused_time_is_deterministic() {
+fn paused_time_is_deterministic_with_polling() {
     let run_1 = paused_time_stress_run();
     let run_2 = paused_time_stress_run();
 
@@ -51,6 +51,28 @@ fn paused_time_is_deterministic() {
 
 #[tokio::main(flavor = "current_thread", start_paused = true)]
 async fn paused_time_stress_run() -> Vec<Duration> {
+    let mut rng = StdRng::seed_from_u64(1);
+
+    let mut times = vec![];
+    let start = Instant::now();
+    for _ in 0..10_000 {
+        let sleep = rng.gen_range(Duration::from_secs(0)..Duration::from_secs(1));
+        time::sleep(sleep).await;
+        times.push(start.elapsed());
+    }
+
+    times
+}
+#[test]
+fn paused_time_is_deterministic_without_polling() {
+    let run_1 = paused_time_stress_run_without_polling();
+    let run_2 = paused_time_stress_run_without_polling();
+
+    assert_eq!(run_1, run_2);
+}
+
+#[tokio::main(flavor = "current_thread", start_paused = true, poll_mode = true)]
+async fn paused_time_stress_run_without_polling() -> Vec<Duration> {
     let mut rng = StdRng::seed_from_u64(1);
 
     let mut times = vec![];

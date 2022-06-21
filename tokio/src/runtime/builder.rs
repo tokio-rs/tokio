@@ -87,6 +87,10 @@ pub struct Builder {
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
+
+    /// Whether or not to enable the poll mode.
+    /// Poll continuously maybe  100% cpu use
+    pub(super) poll_mode: bool,
 }
 
 cfg_unstable! {
@@ -250,6 +254,9 @@ impl Builder {
 
             #[cfg(tokio_unstable)]
             unhandled_panic: UnhandledPanic::Ignore,
+
+            // poll_mode  defaults to "off"
+            poll_mode: false,
         }
     }
 
@@ -526,7 +533,7 @@ impl Builder {
     /// # }
     /// ```
     /// ## Current thread executor
-    /// ```
+    /// ```ignore
     /// # use std::sync::Arc;
     /// # use std::sync::atomic::{AtomicBool, Ordering};
     /// # use tokio::runtime;
@@ -558,7 +565,9 @@ impl Builder {
     where
         F: Fn() + Send + Sync + 'static,
     {
-        self.before_park = Some(std::sync::Arc::new(f));
+        if !self.poll_mode {
+            self.before_park = Some(std::sync::Arc::new(f));
+        }
         self
     }
 
@@ -630,6 +639,11 @@ impl Builder {
             enable_io: self.enable_io,
             enable_time: self.enable_time,
             start_paused: self.start_paused,
+            poll_mode: match self.kind {
+                Kind::CurrentThread => self.poll_mode,
+                #[cfg(feature = "rt-multi-thread")]
+                Kind::MultiThread => false,
+            },
         }
     }
 
@@ -779,6 +793,29 @@ impl Builder {
         }
     }
 
+    /// The poll mode for any tokio current thread runtime with/without resources
+    /// driver.
+    ///
+    /// Doing this enables busy poll, not sleep wait for event.
+    ///
+    /// Default disable, call this enable poll mode.
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .poll_mode()
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    pub fn poll_mode(&mut self) -> &mut Self {
+        if matches!(self.kind, Kind::CurrentThread) {
+            self.poll_mode = true;
+        }
+        self
+    }
+
     fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::basic_scheduler::Config;
         use crate::runtime::{BasicScheduler, HandleInner, Kind};
@@ -811,6 +848,7 @@ impl Builder {
                 event_interval: self.event_interval,
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
+                poll_mode: self.poll_mode,
             },
         );
         let spawner = Spawner::Basic(scheduler.spawner().clone());
@@ -959,6 +997,7 @@ impl fmt::Debug for Builder {
             .field("before_stop", &self.before_stop.as_ref().map(|_| "..."))
             .field("before_park", &self.before_park.as_ref().map(|_| "..."))
             .field("after_unpark", &self.after_unpark.as_ref().map(|_| "..."))
+            .field("poll_mode", &self.poll_mode)
             .finish()
     }
 }

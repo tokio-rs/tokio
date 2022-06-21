@@ -30,6 +30,7 @@ struct FinalConfig {
     worker_threads: Option<usize>,
     start_paused: Option<bool>,
     crate_name: Option<String>,
+    poll_mode: Option<bool>,
 }
 
 /// Config used in case of the attribute not being able to build a valid config
@@ -38,6 +39,7 @@ const DEFAULT_ERROR_CONFIG: FinalConfig = FinalConfig {
     worker_threads: None,
     start_paused: None,
     crate_name: None,
+    poll_mode: None,
 };
 
 struct Configuration {
@@ -48,6 +50,7 @@ struct Configuration {
     start_paused: Option<(bool, Span)>,
     is_test: bool,
     crate_name: Option<String>,
+    poll_mode: Option<(bool, Span)>,
 }
 
 impl Configuration {
@@ -63,6 +66,7 @@ impl Configuration {
             start_paused: None,
             is_test,
             crate_name: None,
+            poll_mode: None,
         }
     }
 
@@ -117,6 +121,15 @@ impl Configuration {
         Ok(())
     }
 
+    fn set_poll_mode(&mut self, poll_mode: syn::Lit, span: Span) -> Result<(), syn::Error> {
+        if self.poll_mode.is_some() {
+            return Err(syn::Error::new(span, "`poll_mode` set multiple times."));
+        }
+
+        let poll_mode = parse_bool(poll_mode, span, "poll_mode")?;
+        self.poll_mode = Some((poll_mode, span));
+        Ok(())
+    }
     fn macro_name(&self) -> &'static str {
         if self.is_test {
             "tokio::test"
@@ -163,11 +176,17 @@ impl Configuration {
             (_, None) => None,
         };
 
+        let poll_mode = match (flavor, self.poll_mode) {
+            (_, Some((poll_mode, _))) => Some(poll_mode),
+            (_, None) => None,
+        };
+
         Ok(FinalConfig {
             crate_name: self.crate_name.clone(),
             flavor,
             worker_threads,
             start_paused,
+            poll_mode,
         })
     }
 }
@@ -284,9 +303,15 @@ fn build_config(
                             syn::spanned::Spanned::span(&namevalue.lit),
                         )?;
                     }
+                    "poll_mode" => {
+                        config.set_poll_mode(
+                            namevalue.lit.clone(),
+                            syn::spanned::Spanned::span(&namevalue.lit),
+                        )?;
+                    }
                     name => {
                         let msg = format!(
-                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`",
+                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `poll_mode`",
                             name,
                         );
                         return Err(syn::Error::new_spanned(namevalue, msg));
@@ -312,11 +337,11 @@ fn build_config(
                             macro_name
                         )
                     }
-                    "flavor" | "worker_threads" | "start_paused" => {
+                    "flavor" | "worker_threads" | "start_paused" | "poll_mode" => {
                         format!("The `{}` attribute requires an argument.", name)
                     }
                     name => {
-                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`", name)
+                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `poll_mode`", name)
                     }
                 };
                 return Err(syn::Error::new_spanned(path, msg));
@@ -373,6 +398,11 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
         rt = quote! { #rt.start_paused(#v) };
     }
 
+    if let Some(v) = config.poll_mode {
+        if v {
+            rt = quote! { #rt.poll_mode() };
+        }
+    }
     let header = if is_test {
         quote! {
             #[::core::prelude::v1::test]

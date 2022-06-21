@@ -100,6 +100,11 @@ pub(crate) struct Driver<P: Park + 'static> {
     // and pausing the clock is restricted to a single-threaded runtime.
     #[cfg(feature = "test-util")]
     did_wake: Arc<AtomicBool>,
+
+    #[cfg(feature = "test-util")]
+    idle: Arc<AtomicBool>,
+
+    poll_mode: bool,
 }
 
 /// A structure which handles conversion from Instants to u64 timestamps.
@@ -178,7 +183,7 @@ where
     /// thread and `time_source` to get the current time and convert to ticks.
     ///
     /// Specifying the source of time is useful when testing.
-    pub(crate) fn new(park: P, clock: Clock) -> Driver<P> {
+    pub(crate) fn new(park: P, clock: Clock, poll_mode: bool) -> Driver<P> {
         let time_source = ClockTime::new(clock);
 
         let inner = Inner::new(time_source.clone(), Box::new(park.unpark()));
@@ -189,6 +194,9 @@ where
             park,
             #[cfg(feature = "test-util")]
             did_wake: Arc::new(AtomicBool::new(false)),
+            #[cfg(feature = "test-util")]
+            idle: Arc::new(AtomicBool::new(false)),
+            poll_mode,
         }
     }
 
@@ -221,19 +229,45 @@ where
                 // might treat as zero-length.
                 let mut duration = self.time_source.tick_to_duration(when.saturating_sub(now));
 
+                // let dur;
                 if duration > Duration::from_millis(0) {
-                    if let Some(limit) = limit {
-                        duration = std::cmp::min(limit, duration);
+                    #[allow(unused_mut)]
+                    let mut idle = false;
+                    if self.poll_mode {
+                        #[cfg(not(feature = "test-util"))]
+                        if let Some(limit) = limit {
+                            duration = std::cmp::min(limit, duration);
+                        }
+                        #[cfg(feature = "test-util")]
+                        {
+                            let clock = &self.time_source.clock;
+                            if !clock.is_paused() {
+                                if let Some(limit) = limit {
+                                    duration = std::cmp::min(limit, duration);
+                                }
+                            } else {
+                                idle = self.did_idle();
+                                if !idle {
+                                    if let Some(limit) = limit {
+                                        duration = std::cmp::min(limit, duration);
+                                    }
+                                }
+                            }
+                        }
+                        self.park_timeout(duration, idle)?;
+                    } else {
+                        if let Some(limit) = limit {
+                            duration = std::cmp::min(limit, duration);
+                        }
+                        self.park_timeout(duration, false)?;
                     }
-
-                    self.park_timeout(duration)?;
                 } else {
                     self.park.park_timeout(Duration::from_secs(0))?;
                 }
             }
             None => {
                 if let Some(duration) = limit {
-                    self.park_timeout(duration)?;
+                    self.park_timeout(duration, false)?;
                 } else {
                     self.park.park()?;
                 }
@@ -247,7 +281,7 @@ where
     }
 
     cfg_test_util! {
-        fn park_timeout(&mut self, duration: Duration) -> Result<(), P::Error> {
+        fn park_timeout(&mut self, duration: Duration, idle: bool) -> Result<(), P::Error> {
             let clock = &self.time_source.clock;
 
             if clock.is_paused() {
@@ -257,9 +291,14 @@ where
                 // before the "duration" elapsed (usually caused by a
                 // yield in `Runtime::block_on`). In this case, we don't
                 // advance the clock.
-                if !self.did_wake() {
-                    // Simulate advancing time
-                    clock.advance(duration);
+                if self.poll_mode {
+                    if idle && !self.did_wake()  {
+                            // Simulate advancing time
+                            clock.advance(duration);
+                    }
+                } else if !self.did_wake()  {
+                        // Simulate advancing time
+                        clock.advance(duration);
                 }
             } else {
                 self.park.park_timeout(duration)?;
@@ -271,10 +310,14 @@ where
         fn did_wake(&self) -> bool {
             self.did_wake.swap(false, Ordering::SeqCst)
         }
+
+        fn did_idle(&self) -> bool {
+            self.idle.swap(false, Ordering::SeqCst)
+        }
     }
 
     cfg_not_test_util! {
-        fn park_timeout(&mut self, duration: Duration) -> Result<(), P::Error> {
+        fn park_timeout(&mut self, duration: Duration, _idle: bool) -> Result<(), P::Error> {
             self.park.park_timeout(duration)
         }
     }
@@ -453,6 +496,11 @@ where
 
         self.park.shutdown();
     }
+
+    fn idle(&self) {
+        #[cfg(feature = "test-util")]
+        self.idle.store(true, Ordering::SeqCst);
+    }
 }
 
 impl<P> Drop for Driver<P>
@@ -469,6 +517,8 @@ pub(crate) struct TimerUnpark<P: Park + 'static> {
 
     #[cfg(feature = "test-util")]
     did_wake: Arc<AtomicBool>,
+
+    poll_mode: bool,
 }
 
 impl<P: Park + 'static> TimerUnpark<P> {
@@ -478,6 +528,8 @@ impl<P: Park + 'static> TimerUnpark<P> {
 
             #[cfg(feature = "test-util")]
             did_wake: driver.did_wake.clone(),
+
+            poll_mode: driver.poll_mode,
         }
     }
 }
@@ -487,7 +539,14 @@ impl<P: Park + 'static> Unpark for TimerUnpark<P> {
         #[cfg(feature = "test-util")]
         self.did_wake.store(true, Ordering::SeqCst);
 
-        self.inner.unpark();
+        if !self.poll_mode {
+            self.inner.unpark();
+        }
+    }
+
+    fn wake(&self) {
+        #[cfg(feature = "test-util")]
+        self.did_wake.store(true, Ordering::SeqCst);
     }
 }
 
