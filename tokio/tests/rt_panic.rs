@@ -40,7 +40,7 @@ fn test_panic<Func: FnOnce() + panic::UnwindSafe>(func: Func) -> Option<String> 
 }
 
 #[test]
-fn test_current_handle_panic_caller() -> Result<(), Box<dyn Error>> {
+fn current_handle_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Handle::current();
     });
@@ -52,7 +52,7 @@ fn test_current_handle_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn test_into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
+fn into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(move || {
         let rt = basic();
         rt.block_on(async {
@@ -74,7 +74,7 @@ fn test_into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn test_builder_worker_threads_panic_caller() -> Result<(), Box<dyn Error>> {
+fn builder_worker_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Builder::new_multi_thread().worker_threads(0).build();
     });
@@ -86,7 +86,7 @@ fn test_builder_worker_threads_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn test_builder_max_blocking_threads_panic_caller() -> Result<(), Box<dyn Error>> {
+fn builder_max_blocking_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Builder::new_multi_thread().max_blocking_threads(0).build();
     });
