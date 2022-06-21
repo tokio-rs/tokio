@@ -229,6 +229,14 @@ pub struct Sender<T> {
 /// This channel has no `recv` method because the receiver itself implements the
 /// [`Future`] trait. To receive a value, `.await` the `Receiver` object directly.
 ///
+/// The `poll` method on the `Future` trait is allowed to spuriously return
+/// `Poll::Pending` even if the message has been sent. If such a spurious
+/// failure happens, then the caller will be woken when the spurious failure has
+/// been resolved so that the caller can attempt to receive the message again.
+/// Note that receiving such a wakeup does not guarantee that the next call will
+/// succeed — it could fail with another spurious failure. (A spurious failure
+/// does not mean that the message is lost. It is just delayed.)
+///
 /// [`Future`]: trait@std::future::Future
 ///
 /// # Examples
@@ -923,12 +931,16 @@ impl<T> Receiver<T> {
     /// This function is useful to call from outside the context of an
     /// asynchronous task.
     ///
+    /// Note that unlike the `poll` method, the `try_recv` method cannot fail
+    /// spuriously. Any send or close event that happens before this call to
+    /// `try_recv` will be correctly returned to the caller.
+    ///
     /// # Return
     ///
     /// - `Ok(T)` if a value is pending in the channel.
     /// - `Err(TryRecvError::Empty)` if no value has been sent yet.
     /// - `Err(TryRecvError::Closed)` if the sender has dropped without sending
-    ///   a value.
+    ///   a value, or if the message has already been received.
     ///
     /// # Examples
     ///
