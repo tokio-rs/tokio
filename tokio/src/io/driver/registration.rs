@@ -224,6 +224,9 @@ cfg_io_readiness! {
             pin!(fut);
 
             crate::future::poll_fn(|cx| {
+                // Keep track of task budget
+                let coop = ready!(crate::coop::poll_proceed(cx));
+
                 if self.handle.inner.is_shutdown() {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::Other,
@@ -231,7 +234,11 @@ cfg_io_readiness! {
                     )));
                 }
 
-                Pin::new(&mut fut).poll(cx).map(Ok)
+                let x = Pin::new(&mut fut).poll(cx).map(Ok);
+
+                coop.made_progress();
+
+                x
             }).await
         }
 
