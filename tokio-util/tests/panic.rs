@@ -14,6 +14,9 @@ use tokio_util::sync::PollSender;
 use tokio_util::task::LocalPoolHandle;
 use tokio_util::time::DelayQueue;
 
+// Taken from tokio-util::time::wheel, if that changes then
+const MAX_DURATION_MS: u64 = (1 << (36)) - 1;
+
 fn test_panic<Func: FnOnce() + panic::UnwindSafe>(func: Func) -> Option<String> {
     static PANIC_MUTEX: Mutex<()> = const_mutex(());
 
@@ -109,10 +112,10 @@ fn delay_queue_insert_at_panic_caller() -> Result<(), Box<dyn Error>> {
         rt.block_on(async {
             let mut queue = task::spawn(DelayQueue::with_capacity(3));
 
+            //let st = std::time::Instant::from(SystemTime::UNIX_EPOCH);
             let _k = queue.insert_at(
                 "1",
-                // ~24,855 days in the future
-                Instant::now() + Duration::from_secs(2_u64.pow(31)),
+                Instant::now() + Duration::from_millis(MAX_DURATION_MS + 1),
             );
         });
     });
@@ -130,11 +133,7 @@ fn delay_queue_insert_panic_caller() -> Result<(), Box<dyn Error>> {
         rt.block_on(async {
             let mut queue = task::spawn(DelayQueue::with_capacity(3));
 
-            let _k = queue.insert(
-                "1",
-                // ~24,855 days
-                Duration::from_secs(2_u64.pow(31)),
-            );
+            let _k = queue.insert("1", Duration::from_millis(MAX_DURATION_MS + 1));
         });
     });
 
@@ -173,8 +172,7 @@ fn delay_queue_reset_at_panic_caller() -> Result<(), Box<dyn Error>> {
             let key = queue.insert_at("1", Instant::now());
             queue.reset_at(
                 &key,
-                // ~24,855 days in the future
-                Instant::now() + Duration::from_secs(2_u64.pow(31)),
+                Instant::now() + Duration::from_millis(MAX_DURATION_MS + 1),
             );
         });
     });
@@ -193,11 +191,7 @@ fn delay_queue_reset_panic_caller() -> Result<(), Box<dyn Error>> {
             let mut queue = task::spawn(DelayQueue::with_capacity(3));
 
             let key = queue.insert_at("1", Instant::now());
-            queue.reset(
-                &key,
-                // ~24,855 days
-                Duration::from_secs(2_u64.pow(31)),
-            );
+            queue.reset(&key, Duration::from_millis(MAX_DURATION_MS + 1));
         });
     });
 
