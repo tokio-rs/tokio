@@ -252,6 +252,7 @@ cfg_not_trace! {
 
 impl Sleep {
     #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
+    #[track_caller]
     pub(crate) fn new_timeout(
         deadline: Instant,
         location: Option<&'static Location<'static>>,
