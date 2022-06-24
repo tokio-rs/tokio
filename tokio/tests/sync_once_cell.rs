@@ -272,3 +272,50 @@ fn from() {
     let cell = OnceCell::from(2);
     assert_eq!(*cell.get().unwrap(), 2);
 }
+
+#[test]
+fn wait() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
+
+    rt.block_on(async {
+        let handle1 = rt.spawn(async { ONCE.wait().await });
+        let handle2 = rt.spawn(async { ONCE.get_or_init(sleep_and_set).await });
+
+        let result1 = handle1.await.unwrap();
+        let result2 = handle2.await.unwrap();
+
+        assert_eq!(*result1, 5);
+        assert_eq!(*result2, 5);
+    });
+}
+
+#[test]
+fn wait_cancel() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    static NEVER: OnceCell<u32> = OnceCell::const_new();
+
+    rt.block_on(async {
+        let handle = rt.spawn(async { NEVER.wait().await });
+
+        let result = tokio::select! {
+            biased;
+            result = handle => {
+                Some(result.unwrap())
+            }
+            _ = time::sleep(Duration::from_millis(2)) => {
+                None::<&u32>
+            }
+        };
+
+        assert_eq!(result, None);
+    });
+}

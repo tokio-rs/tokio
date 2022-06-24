@@ -71,6 +71,7 @@ pub struct OnceCell<T> {
     value_set: AtomicBool,
     value: UnsafeCell<MaybeUninit<T>>,
     semaphore: Semaphore,
+    wait_broadcast: UnsafeCell<Option<crate::sync::broadcast::Sender<()>>>,
 }
 
 impl<T> Default for OnceCell<T> {
@@ -120,6 +121,7 @@ impl<T> From<T> for OnceCell<T> {
             value_set: AtomicBool::new(true),
             value: UnsafeCell::new(MaybeUninit::new(value)),
             semaphore,
+            wait_broadcast: UnsafeCell::new(None),
         }
     }
 }
@@ -131,6 +133,7 @@ impl<T> OnceCell<T> {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(MaybeUninit::uninit()),
             semaphore: Semaphore::new(1),
+            wait_broadcast: UnsafeCell::new(None),
         }
     }
 
@@ -178,6 +181,7 @@ impl<T> OnceCell<T> {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(MaybeUninit::uninit()),
             semaphore: Semaphore::const_new(1),
+            wait_broadcast: UnsafeCell::new(None),
         }
     }
 
@@ -214,11 +218,84 @@ impl<T> OnceCell<T> {
         // Using release ordering so any threads that read a true from this
         // atomic is able to read the value we just stored.
         self.value_set.store(true, Ordering::Release);
+
+        // Wake any tasks waiting on this OnceCell.
+        // SAFETY: Send the broadcast message only after the value is stored, since
+        // the other tasks take that to mean the value is initialized.
+        // SAFETY: We have a semaphore permit, so only we may access self.wait_broadcast.
+        let wait_broadcast = unsafe { self.wait_broadcast.with_mut(|ptr| (*ptr).take()) };
+        // If wait_broadcast is None, then wait was not called, so no tasks are
+        // waiting on the OnceCell
+        if let Some(wait_broadcast) = wait_broadcast {
+            // If wait was called at least once, but no tasks are currently waiting
+            // on this OnceCell, e.g. if all tasks that were waiting were canceled,
+            // then this will be Err. That is fine, ignore the error in that case.
+            let _ = wait_broadcast.send(());
+        }
+
         self.semaphore.close();
         permit.forget();
 
         // SAFETY: We just initialized the cell.
         unsafe { self.get_unchecked() }
+    }
+
+    /// Returns a reference to the value currently stored in the `OnceCell`,
+    /// waiting until the `OnceCell` is set if it is empty.
+    ///
+    /// This function is cancellation-safe.
+    pub async fn wait(&self) -> &T {
+        if self.initialized() {
+            unsafe { self.get_unchecked() }
+        } else {
+            // Here we try to acquire the semaphore permit. Holding the permit
+            // will allow us to access and subscribe to wait_broadcast,
+            // and prevents other tasks from initializing the OnceCell while we
+            // are holding it.
+            match self.semaphore.acquire().await {
+                Ok(permit) => {
+                    debug_assert!(!self.initialized());
+
+                    // SAFETY: We hold the semaphore permit, so only we can access the wait_broadcast field.
+                    // If the wait_broadcast sender has not been initialized, initialize it.
+                    // Subscribe to the wait_broadcast.
+                    let mut receiver = unsafe {
+                        self.wait_broadcast.with_mut(|ptr| match &*ptr {
+                            Some(sender) => sender.subscribe(),
+                            None => {
+                                let (sender, receiver) = crate::sync::broadcast::channel(1);
+                                *ptr = Some(sender);
+                                receiver
+                            }
+                        })
+                    };
+
+                    // We must release the permit, else waiting on the receiver would deadlock.
+                    // SAFETY: We have an owned receiver separate from self.wait_broadcast,
+                    // so we may release the semaphore permit.
+                    drop(permit);
+
+                    // Wait for the wait_broadcast
+                    match receiver.recv().await {
+                        Ok(()) => {
+                            debug_assert!(self.initialized());
+
+                            // SAFETY: The wait_broadcast sent a message. This only happens
+                            // when the OnceCell is initialized.
+                            unsafe { self.get_unchecked() }
+                        },
+                        Err(_) => unreachable!("The sender should not be dropped without sending a message while a reference to the OnceCell exists"),
+                    }
+                }
+                Err(_) => {
+                    debug_assert!(self.initialized());
+
+                    // SAFETY: The semaphore has been closed. This only happens
+                    // when the OnceCell is fully initialized.
+                    unsafe { self.get_unchecked() }
+                }
+            }
+        }
     }
 
     /// Returns a reference to the value currently stored in the `OnceCell`, or
