@@ -175,8 +175,8 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// # Panics
     ///
-    /// This function panics if there is no current reactor set and `rt` feature
-    /// flag is not enabled.
+    /// This function panics if there is no current reactor set, or if the `rt`
+    /// feature flag is not enabled.
     #[inline]
     #[track_caller]
     pub fn new(inner: T) -> io::Result<Self>
@@ -191,8 +191,8 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// # Panics
     ///
-    /// This function panics if there is no current reactor set and `rt` feature
-    /// flag is not enabled.
+    /// This function panics if there is no current reactor set, or if the `rt`
+    /// feature flag is not enabled.
     #[inline]
     #[track_caller]
     pub fn with_interest(inner: T, interest: Interest) -> io::Result<Self>

@@ -3,8 +3,7 @@
 
 use std::task::{Context, Poll};
 use std::{error::Error, pin::Pin};
-use tokio::io::{self, split, unix::AsyncFd, AsyncRead, AsyncWrite, ReadBuf};
-use tokio::runtime::Builder;
+use tokio::io::{self, split, AsyncRead, AsyncWrite, ReadBuf};
 
 mod support {
     pub mod panic;
@@ -134,8 +133,11 @@ fn unsplit_panic_caller() -> Result<(), Box<dyn Error>> {
 #[test]
 #[cfg(unix)]
 fn async_fd_new_panic_caller() -> Result<(), Box<dyn Error>> {
+    use tokio::io::unix::AsyncFd;
+    use tokio::runtime::Builder;
+
     let panic_location_file = test_panic(|| {
-        // Runtime without `enable_io` so it has no current timer set.
+        // Runtime without `enable_io` so it has no IO driver set.
         let rt = Builder::new_current_thread().build().unwrap();
         rt.block_on(async {
             let fd = unix::MockFd;
@@ -153,10 +155,12 @@ fn async_fd_new_panic_caller() -> Result<(), Box<dyn Error>> {
 #[test]
 #[cfg(unix)]
 fn async_fd_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
+    use tokio::io::unix::AsyncFd;
     use tokio::io::Interest;
+    use tokio::runtime::Builder;
 
     let panic_location_file = test_panic(|| {
-        // Runtime without `enable_io` so it has no current timer set.
+        // Runtime without `enable_io` so it has no IO driver set.
         let rt = Builder::new_current_thread().build().unwrap();
         rt.block_on(async {
             let fd = unix::MockFd;
