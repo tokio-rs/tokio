@@ -119,8 +119,7 @@ impl<'a, T> Ref<'a, T> {
     /// Indicates if the borrowed value is considered as _changed_ since the last
     /// time it has been marked as seen.
     ///
-    /// Other than [`Receiver::has_changed()`] it does not fail if the [`Receiver`]
-    /// is orphaned after the [`Sender`] has been dropped.
+    /// Unlike [`Receiver::has_changed()`], this method does not fail if the channel is closed.
     ///
     /// When borrowed from the [`Sender`] this function will always return `false`.
     ///
