@@ -686,7 +686,7 @@ cfg_unstable! {
         /// [`JoinHandle`]: struct@crate::task::JoinHandle
         pub fn unhandled_panic(&mut self, behavior: crate::runtime::UnhandledPanic) -> &mut Self {
             // TODO: This should be set as a builder
-            Arc::get_mut(&mut self.context.shared)
+            Arc::get_mut(&mut Rc::get_mut(&mut self.context).expect("TODO: context should not panic").shared)
                 .expect("TODO: we shouldn't panic")
                 .unhandled_panic = behavior;
             self
