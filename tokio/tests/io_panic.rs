@@ -1,7 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::task::{Context, Poll};
 use std::{error::Error, pin::Pin};
 use tokio::io::{self, split, unix::AsyncFd, AsyncRead, AsyncWrite, ReadBuf};
@@ -43,11 +42,16 @@ impl AsyncWrite for RW {
     }
 }
 
-struct MockFd;
+#[cfg(unix)]
+mod unix {
+    use std::os::unix::prelude::{AsRawFd, RawFd};
 
-impl AsRawFd for MockFd {
-    fn as_raw_fd(&self) -> RawFd {
-        0
+    pub struct MockFd;
+
+    impl AsRawFd for MockFd {
+        fn as_raw_fd(&self) -> RawFd {
+            0
+        }
     }
 }
 
@@ -134,7 +138,7 @@ fn async_fd_new_panic_caller() -> Result<(), Box<dyn Error>> {
         // Runtime without `enable_io` so it has no current timer set.
         let rt = Builder::new_current_thread().build().unwrap();
         rt.block_on(async {
-            let fd = MockFd;
+            let fd = unix::MockFd;
 
             let _ = AsyncFd::new(fd);
         });
@@ -155,7 +159,7 @@ fn async_fd_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
         // Runtime without `enable_io` so it has no current timer set.
         let rt = Builder::new_current_thread().build().unwrap();
         rt.block_on(async {
-            let fd = MockFd;
+            let fd = unix::MockFd;
 
             let _ = AsyncFd::with_interest(fd, Interest::READABLE);
         });
