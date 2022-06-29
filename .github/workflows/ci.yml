@@ -248,7 +248,6 @@ jobs:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
           override: true
-      - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
