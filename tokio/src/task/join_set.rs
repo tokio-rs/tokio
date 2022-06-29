@@ -43,7 +43,7 @@ use crate::util::IdleNotifiedSet;
 ///     }
 ///
 ///     let mut seen = [false; 10];
-///     while let Some(res) = set.join_one().await {
+///     while let Some(res) = set.join_next().await {
 ///         let idx = res.unwrap();
 ///         seen[idx] = true;
 ///     }
@@ -195,17 +195,24 @@ impl<T: 'static> JoinSet<T> {
         abort
     }
 
+    #[doc(hidden)]
+    #[deprecated(since = "1.20.0", note = "renamed to `JoinSet::join_next`.")]
+    pub async fn join_one(&mut self) -> Option<Result<T, JoinError>> {
+        self.join_next().await
+    }
+
     /// Waits until one of the tasks in the set completes and returns its output.
     ///
     /// Returns `None` if the set is empty.
     ///
     /// # Cancel Safety
     ///
-    /// This method is cancel safe. If `join_one` is used as the event in a `tokio::select!`
+    /// This method is cancel safe. If `join_next` is used as the event in a `tokio::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinSet`.
-    pub async fn join_one(&mut self) -> Option<Result<T, JoinError>> {
-        crate::future::poll_fn(|cx| self.poll_join_one(cx))
+    #[doc(alias = "join_one")]
+    pub async fn join_next(&mut self) -> Option<Result<T, JoinError>> {
+        crate::future::poll_fn(|cx| self.poll_join_next(cx))
             .await
             .map(|opt| opt.map(|(_, res)| res))
     }
@@ -220,35 +227,42 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// # Cancel Safety
     ///
-    /// This method is cancel safe. If `join_one_with_id` is used as the event in a `tokio::select!`
+    /// This method is cancel safe. If `join_next_with_id` is used as the event in a `tokio::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinSet`.
     ///
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
+    #[doc(alias = "join_one_with_id")]
+    pub async fn join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
+        crate::future::poll_fn(|cx| self.poll_join_next(cx)).await
+    }
+
+    #[doc(hidden)]
+    #[deprecated(since = "1.20.0", note = "renamed to `JoinSet::join_next_with_id`")]
     pub async fn join_one_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
-        crate::future::poll_fn(|cx| self.poll_join_one(cx)).await
+        self.join_next_with_id().await
     }
 
     /// Aborts all tasks and waits for them to finish shutting down.
     ///
-    /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_one`] in
+    /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_next`] in
     /// a loop until it returns `None`.
     ///
     /// This method ignores any panics in the tasks shutting down. When this call returns, the
     /// `JoinSet` will be empty.
     ///
     /// [`abort_all`]: fn@Self::abort_all
-    /// [`join_one`]: fn@Self::join_one
+    /// [`join_next`]: fn@Self::join_next
     pub async fn shutdown(&mut self) {
         self.abort_all();
-        while self.join_one().await.is_some() {}
+        while self.join_next().await.is_some() {}
     }
 
     /// Aborts all tasks on this `JoinSet`.
     ///
     /// This does not remove the tasks from the `JoinSet`. To wait for the tasks to complete
-    /// cancellation, you should call `join_one` in a loop until the `JoinSet` is empty.
+    /// cancellation, you should call `join_next` in a loop until the `JoinSet` is empty.
     pub fn abort_all(&mut self) {
         self.inner.for_each(|jh| jh.abort());
     }
@@ -267,7 +281,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided `Context` is scheduled
     /// to receive a wakeup when a task in the `JoinSet` completes. Note that on multiple calls to
-    /// `poll_join_one`, only the `Waker` from the `Context` passed to the most recent call is
+    /// `poll_join_next`, only the `Waker` from the `Context` passed to the most recent call is
     /// scheduled to receive a wakeup.
     ///
     /// # Returns
@@ -288,7 +302,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// [coop budget]: crate::task#cooperative-scheduling
     /// [task ID]: crate::task::Id
-    fn poll_join_one(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<(Id, T), JoinError>>> {
+    fn poll_join_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<(Id, T), JoinError>>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
         let mut entry = match self.inner.pop_notified(cx.waker()) {

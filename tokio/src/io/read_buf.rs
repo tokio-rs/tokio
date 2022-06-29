@@ -152,6 +152,7 @@ impl<'a> ReadBuf<'a> {
     ///
     /// Panics if `self.remaining()` is less than `n`.
     #[inline]
+    #[track_caller]
     pub fn initialize_unfilled_to(&mut self, n: usize) -> &mut [u8] {
         assert!(self.remaining() >= n, "n overflows remaining");
 
@@ -195,6 +196,7 @@ impl<'a> ReadBuf<'a> {
     ///
     /// Panics if the filled region of the buffer would become larger than the initialized region.
     #[inline]
+    #[track_caller]
     pub fn advance(&mut self, n: usize) {
         let new = self.filled.checked_add(n).expect("filled overflow");
         self.set_filled(new);
@@ -211,6 +213,7 @@ impl<'a> ReadBuf<'a> {
     ///
     /// Panics if the filled region of the buffer would become larger than the initialized region.
     #[inline]
+    #[track_caller]
     pub fn set_filled(&mut self, n: usize) {
         assert!(
             n <= self.initialized,
@@ -241,6 +244,7 @@ impl<'a> ReadBuf<'a> {
     ///
     /// Panics if `self.remaining()` is less than `buf.len()`.
     #[inline]
+    #[track_caller]
     pub fn put_slice(&mut self, buf: &[u8]) {
         assert!(
             self.remaining() >= buf.len(),

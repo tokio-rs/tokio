@@ -93,7 +93,7 @@ where
     }
 
     /// Consumes this `StreamReader`, returning a Tuple consisting
-    /// of the underlying stream and an Option of the interal buffer,
+    /// of the underlying stream and an Option of the internal buffer,
     /// which is Some in case the buffer contains elements.
     pub fn into_inner_with_chunk(self) -> (S, Option<B>) {
         if self.has_chunk() {

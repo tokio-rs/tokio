@@ -50,9 +50,9 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///
 ///     let mut seen = [false; 10];
 ///
-///     // When a task completes, `join_one` returns the task's key along
+///     // When a task completes, `join_next` returns the task's key along
 ///     // with its output.
-///     while let Some((key, res)) = map.join_one().await {
+///     while let Some((key, res)) = map.join_next().await {
 ///         seen[key] = true;
 ///         assert!(res.is_ok(), "task {} completed successfully!", key);
 ///     }
@@ -82,7 +82,7 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///     // provided key.
 ///     assert!(aborted);
 ///
-///     while let Some((key, res)) = map.join_one().await {
+///     while let Some((key, res)) = map.join_next().await {
 ///         if key == "goodbye world" {
 ///             // The aborted task should complete with a cancelled `JoinError`.
 ///             assert!(res.unwrap_err().is_cancelled());
@@ -277,14 +277,14 @@ where
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
     /// will be cancelled and replaced with the new one. The previous task will
-    /// be removed from the `JoinMap`; a subsequent call to [`join_one`] will
+    /// be removed from the `JoinMap`; a subsequent call to [`join_next`] will
     /// *not* return a cancelled [`JoinError`] for that task.
     ///
     /// # Panics
     ///
     /// This method panics if called outside of a Tokio runtime.
     ///
-    /// [`join_one`]: Self::join_one
+    /// [`join_next`]: Self::join_next
     #[track_caller]
     pub fn spawn<F>(&mut self, key: K, task: F)
     where
@@ -301,10 +301,10 @@ where
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
     /// will be cancelled and replaced with the new one. The previous task will
-    /// be removed from the `JoinMap`; a subsequent call to [`join_one`] will
+    /// be removed from the `JoinMap`; a subsequent call to [`join_next`] will
     /// *not* return a cancelled [`JoinError`] for that task.
     ///
-    /// [`join_one`]: Self::join_one
+    /// [`join_next`]: Self::join_next
     #[track_caller]
     pub fn spawn_on<F>(&mut self, key: K, task: F, handle: &Handle)
     where
@@ -321,7 +321,7 @@ where
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
     /// will be cancelled and replaced with the new one. The previous task will
-    /// be removed from the `JoinMap`; a subsequent call to [`join_one`] will
+    /// be removed from the `JoinMap`; a subsequent call to [`join_next`] will
     /// *not* return a cancelled [`JoinError`] for that task.
     ///
     /// # Panics
@@ -329,7 +329,7 @@ where
     /// This method panics if it is called outside of a `LocalSet`.
     ///
     /// [`LocalSet`]: tokio::task::LocalSet
-    /// [`join_one`]: Self::join_one
+    /// [`join_next`]: Self::join_next
     #[track_caller]
     pub fn spawn_local<F>(&mut self, key: K, task: F)
     where
@@ -345,11 +345,11 @@ where
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
     /// will be cancelled and replaced with the new one. The previous task will
-    /// be removed from the `JoinMap`; a subsequent call to [`join_one`] will
+    /// be removed from the `JoinMap`; a subsequent call to [`join_next`] will
     /// *not* return a cancelled [`JoinError`] for that task.
     ///
     /// [`LocalSet`]: tokio::task::LocalSet
-    /// [`join_one`]: Self::join_one
+    /// [`join_next`]: Self::join_next
     #[track_caller]
     pub fn spawn_local_on<F>(&mut self, key: K, task: F, local_set: &LocalSet)
     where
@@ -399,7 +399,7 @@ where
     ///
     /// # Cancel Safety
     ///
-    /// This method is cancel safe. If `join_one` is used as the event in a [`tokio::select!`]
+    /// This method is cancel safe. If `join_next` is used as the event in a [`tokio::select!`]
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinMap`.
     ///
@@ -416,8 +416,9 @@ where
     ///  * `None` if the `JoinMap` is empty.
     ///
     /// [`tokio::select!`]: tokio::select
-    pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
-        let (res, id) = match self.tasks.join_one_with_id().await {
+    #[doc(alias = "join_one")]
+    pub async fn join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
+        let (res, id) = match self.tasks.join_next_with_id().await {
             Some(Ok((id, output))) => (Ok(output), id),
             Some(Err(e)) => {
                 let id = e.id();
@@ -429,19 +430,25 @@ where
         Some((key, res))
     }
 
+    #[doc(hidden)]
+    #[deprecated(since = "0.7.4", note = "renamed to `JoinMap::join_next`.")]
+    pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
+        self.join_next().await
+    }
+
     /// Aborts all tasks and waits for them to finish shutting down.
     ///
-    /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_one`] in
+    /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_next`] in
     /// a loop until it returns `None`.
     ///
     /// This method ignores any panics in the tasks shutting down. When this call returns, the
     /// `JoinMap` will be empty.
     ///
     /// [`abort_all`]: fn@Self::abort_all
-    /// [`join_one`]: fn@Self::join_one
+    /// [`join_next`]: fn@Self::join_next
     pub async fn shutdown(&mut self) {
         self.abort_all();
-        while self.join_one().await.is_some() {}
+        while self.join_next().await.is_some() {}
     }
 
     /// Abort the task corresponding to the provided `key`.
@@ -467,7 +474,7 @@ where
     /// // Look up the "goodbye world" task in the map and abort it.
     /// map.abort("goodbye world");
     ///
-    /// while let Some((key, res)) = map.join_one().await {
+    /// while let Some((key, res)) = map.join_next().await {
     ///     if key == "goodbye world" {
     ///         // The aborted task should complete with a cancelled `JoinError`.
     ///         assert!(res.unwrap_err().is_cancelled());
@@ -548,7 +555,7 @@ where
     /// map.abort_matching(|key| key.starts_with("goodbye"));
     ///
     /// let mut seen = 0;
-    /// while let Some((key, res)) = map.join_one().await {
+    /// while let Some((key, res)) = map.join_next().await {
     ///     seen += 1;
     ///     if key.starts_with("goodbye") {
     ///         // The aborted task should complete with a cancelled `JoinError`.
@@ -567,7 +574,7 @@ where
     pub fn abort_matching(&mut self, mut predicate: impl FnMut(&K) -> bool) {
         // Note: this method iterates over the tasks and keys *without* removing
         // any entries, so that the keys from aborted tasks can still be
-        // returned when calling `join_one` in the future.
+        // returned when calling `join_next` in the future.
         for (Key { ref key, .. }, task) in &self.tasks_by_key {
             if predicate(key) {
                 task.abort();
@@ -578,9 +585,9 @@ where
     /// Returns `true` if this `JoinMap` contains a task for the provided key.
     ///
     /// If the task has completed, but its output hasn't yet been consumed by a
-    /// call to [`join_one`], this method will still return `true`.
+    /// call to [`join_next`], this method will still return `true`.
     ///
-    /// [`join_one`]: fn@Self::join_one
+    /// [`join_next`]: fn@Self::join_next
     pub fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
     where
         Q: Hash + Eq,
@@ -593,9 +600,9 @@ where
     /// [task ID].
     ///
     /// If the task has completed, but its output hasn't yet been consumed by a
-    /// call to [`join_one`], this method will still return `true`.
+    /// call to [`join_next`], this method will still return `true`.
     ///
-    /// [`join_one`]: fn@Self::join_one
+    /// [`join_next`]: fn@Self::join_next
     /// [task ID]: tokio::task::Id
     pub fn contains_task(&self, task: &Id) -> bool {
         self.get_by_id(task).is_some()
@@ -739,7 +746,7 @@ where
     /// Aborts all tasks on this `JoinMap`.
     ///
     /// This does not remove the tasks from the `JoinMap`. To wait for the tasks to complete
-    /// cancellation, you should call `join_one` in a loop until the `JoinMap` is empty.
+    /// cancellation, you should call `join_next` in a loop until the `JoinMap` is empty.
     pub fn abort_all(&mut self) {
         self.tasks.abort_all()
     }

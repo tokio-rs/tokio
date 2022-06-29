@@ -87,7 +87,7 @@ impl Handle {
 
     /// Returns a `Handle` view over the currently running `Runtime`.
     ///
-    /// # Panic
+    /// # Panics
     ///
     /// This will panic if called outside the context of a Tokio runtime. That means that you must
     /// call this on one of the threads **being run by the runtime**, or from a thread with an active
@@ -129,6 +129,7 @@ impl Handle {
     /// # });
     /// # }
     /// ```
+    #[track_caller]
     pub fn current() -> Self {
         context::current()
     }
