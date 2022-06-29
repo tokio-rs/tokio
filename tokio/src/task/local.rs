@@ -331,7 +331,6 @@ const MAX_TASKS_PER_TICK: usize = 61;
 const REMOTE_FIRST_INTERVAL: u8 = 31;
 
 /// Context guard for LocalSet
-#[allow(missing_debug_implementations)]
 pub struct LocalEnterGuard(Option<Rc<Context>>);
 
 impl Drop for LocalEnterGuard {
@@ -339,6 +338,12 @@ impl Drop for LocalEnterGuard {
         CURRENT.with(|ctx| {
             ctx.replace(self.0.take());
         })
+    }
+}
+
+impl fmt::Debug for LocalEnterGuard {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LocalEnterGuard").finish()
     }
 }
 
