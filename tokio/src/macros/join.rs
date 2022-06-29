@@ -12,7 +12,7 @@
 /// for **all** branches complete regardless if any complete with `Err`. Use
 /// [`try_join!`] to return early when `Err` is encountered.
 ///
-/// [`try_join!`]: macro@try_join
+/// [`try_join!`]: crate::try_join
 ///
 /// # Notes
 ///

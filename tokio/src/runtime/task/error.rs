@@ -82,6 +82,7 @@ impl JoinError {
     ///     }
     /// }
     /// ```
+    #[track_caller]
     pub fn into_panic(self) -> Box<dyn Any + Send + 'static> {
         self.try_into_panic()
             .expect("`JoinError` reason is not a panic.")

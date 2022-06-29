@@ -91,7 +91,9 @@ pub struct Sender<T> {
 ///
 /// Outstanding borrows hold a read lock on the inner value. This means that
 /// long lived borrows could cause the produce half to block. It is recommended
-/// to keep the borrow as short lived as possible.
+/// to keep the borrow as short lived as possible. Additionally, if you are
+/// running in an environment that allows `!Send` futures, you must ensure that
+/// the returned `Ref` type is never held alive across an `.await` point.
 ///
 /// The priority policy of the lock is dependent on the underlying lock
 /// implementation, and this type does not guarantee that any particular policy
@@ -301,7 +303,9 @@ impl<T> Receiver<T> {
     ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
     /// could cause the send half to block. It is recommended to keep the borrow
-    /// as short lived as possible.
+    /// as short lived as possible. Additionally, if you are running in an
+    /// environment that allows `!Send` futures, you must ensure that the
+    /// returned `Ref` type is never held alive across an `.await` point.
     ///
     /// The priority policy of the lock is dependent on the underlying lock
     /// implementation, and this type does not guarantee that any particular policy
@@ -344,7 +348,9 @@ impl<T> Receiver<T> {
     ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
     /// could cause the send half to block. It is recommended to keep the borrow
-    /// as short lived as possible.
+    /// as short lived as possible. Additionally, if you are running in an
+    /// environment that allows `!Send` futures, you must ensure that the
+    /// returned `Ref` type is never held alive across an `.await` point.
     ///
     /// The priority policy of the lock is dependent on the underlying lock
     /// implementation, and this type does not guarantee that any particular policy

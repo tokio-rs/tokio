@@ -21,7 +21,7 @@ use std::task::{self, Poll};
 /// value is returned. Otherwise, an error is returned and the future is
 /// canceled.
 ///
-/// # Cancelation
+/// # Cancellation
 ///
 /// Cancelling a timeout is done by dropping the future. No additional cleanup
 /// or other work is required.
@@ -87,7 +87,7 @@ where
 /// If the future completes before the instant is reached, then the completed
 /// value is returned. Otherwise, an error is returned.
 ///
-/// # Cancelation
+/// # Cancellation
 ///
 /// Cancelling a timeout is done by dropping the future. No additional cleanup
 /// or other work is required.

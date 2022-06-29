@@ -1,3 +1,67 @@
+# 1.19.2 (June 6, 2022)
+
+This release fixes another bug in `Notified::enable`. ([#4751])
+
+[#4751]: https://github.com/tokio-rs/tokio/pull/4751
+
+# 1.19.1 (June 5, 2022)
+
+This release fixes a bug in `Notified::enable`. ([#4747])
+
+[#4747]: https://github.com/tokio-rs/tokio/pull/4747
+
+# 1.19.0 (June 3, 2022)
+
+### Added
+
+- runtime: add `is_finished` method for `JoinHandle` and `AbortHandle` ([#4709])
+- runtime: make global queue and event polling intervals configurable ([#4671])
+- sync: add `Notified::enable` ([#4705])
+- sync: add `watch::Sender::send_if_modified` ([#4591])
+- sync: add resubscribe method to broadcast::Receiver ([#4607])
+- net: add `take_error` to `TcpSocket` and `TcpStream` ([#4739])
+
+### Changed
+
+- io: refactor out usage of Weak in the io handle ([#4656])
+
+### Fixed
+
+- macros: avoid starvation in `join!` and `try_join!` ([#4624])
+
+### Documented
+
+- runtime: clarify semantics of tasks outliving `block_on` ([#4729])
+- time: fix example for `MissedTickBehavior::Burst` ([#4713])
+
+### Unstable
+
+- metrics: correctly update atomics in `IoDriverMetrics` ([#4725])
+- metrics: fix compilation with unstable, process, and rt, but without net ([#4682])
+- task: add `#[track_caller]` to `JoinSet`/`JoinMap` ([#4697])
+- task: add `Builder::{spawn_on, spawn_local_on, spawn_blocking_on}` ([#4683])
+- task: add `consume_budget` for cooperative scheduling ([#4498])
+- task: add `join_set::Builder` for configuring `JoinSet` tasks ([#4687])
+- task: update return value of `JoinSet::join_one` ([#4726])
+
+[#4498]: https://github.com/tokio-rs/tokio/pull/4498
+[#4591]: https://github.com/tokio-rs/tokio/pull/4591
+[#4607]: https://github.com/tokio-rs/tokio/pull/4607
+[#4624]: https://github.com/tokio-rs/tokio/pull/4624
+[#4656]: https://github.com/tokio-rs/tokio/pull/4656
+[#4671]: https://github.com/tokio-rs/tokio/pull/4671
+[#4682]: https://github.com/tokio-rs/tokio/pull/4682
+[#4683]: https://github.com/tokio-rs/tokio/pull/4683
+[#4687]: https://github.com/tokio-rs/tokio/pull/4687
+[#4697]: https://github.com/tokio-rs/tokio/pull/4697
+[#4705]: https://github.com/tokio-rs/tokio/pull/4705
+[#4709]: https://github.com/tokio-rs/tokio/pull/4709
+[#4713]: https://github.com/tokio-rs/tokio/pull/4713
+[#4725]: https://github.com/tokio-rs/tokio/pull/4725
+[#4726]: https://github.com/tokio-rs/tokio/pull/4726
+[#4729]: https://github.com/tokio-rs/tokio/pull/4729
+[#4739]: https://github.com/tokio-rs/tokio/pull/4739
+
 # 1.18.2 (May 5, 2022)
 
 Add missing features for the `winapi` dependency. ([#4663])
@@ -27,8 +91,6 @@ task), as well as a number of bugfixes.
 
 ### Added
 
-- macros: support setting a custom crate name for `#[tokio::main]` and
-  `#[tokio::test]` ([#4613])
 - net: add `UdpSocket::peer_addr` ([#4611])
 - net: add `try_read_buf` method for named pipes ([#4626])
 - signal: add `SignalKind` `Hash`/`Eq` impls and `c_int` conversion ([#4540])
@@ -1173,7 +1235,7 @@ Biggest changes are:
 - Feature flags are simplified
   - `rt-core` and `rt-util` are combined to `rt`
   - `rt-threaded` is renamed to `rt-multi-thread` to match builder API
-  - `tcp`, `udp`, `uds`, `dns` are combied to `net`.
+  - `tcp`, `udp`, `uds`, `dns` are combined to `net`.
   - `parking_lot` is included with `full`
 
 ### Changes
@@ -1671,7 +1733,7 @@ Biggest changes are:
 - `net::lookup_host` maps a `T: ToSocketAddrs` to a stream of `SocketAddrs` ([#1870]).
 - `process::Child` fields are made public to match `std` ([#2014]).
 - impl `Stream` for `sync::broadcast::Receiver` ([#2012]).
-- `sync::RwLock` provides an asynchonous read-write lock ([#1699]).
+- `sync::RwLock` provides an asynchronous read-write lock ([#1699]).
 - `runtime::Handle::current` returns the handle for the current runtime ([#2040]).
 - `StreamExt::filter` filters stream values according to a predicate ([#2001]).
 - `StreamExt::filter_map` simultaneously filter and map stream values ([#2001]).
@@ -1780,7 +1842,7 @@ Biggest changes are:
 ### Fixes
 
 - calling `spawn_blocking` after runtime shutdown ([#1875]).
-- `LocalSet` drop inifinite loop ([#1892]).
+- `LocalSet` drop infinite loop ([#1892]).
 - `LocalSet` hang under load ([#1905]).
 - improved documentation ([#1865], [#1866], [#1868], [#1874], [#1876], [#1911]).
 

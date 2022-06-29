@@ -20,7 +20,7 @@ use std::io;
 /// it's possible to temporarily read 0 bytes by reaching EOF.
 ///
 /// In these cases `decode_eof` will be called until it signals
-/// fullfillment of all closing frames by returning `Ok(None)`.
+/// fulfillment of all closing frames by returning `Ok(None)`.
 /// After that, repeated attempts to read from the [`Framed`] or [`FramedRead`]
 /// will not invoke `decode` or `decode_eof` again, until data can be read
 /// during a retry.

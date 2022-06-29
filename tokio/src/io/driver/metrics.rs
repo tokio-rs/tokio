@@ -4,7 +4,7 @@
 //! these need to be available in the case when `net` is enabled but
 //! `rt` is not.
 
-cfg_not_rt_and_metrics! {
+cfg_not_rt_and_metrics_and_net! {
     #[derive(Default)]
     pub(crate) struct IoDriverMetrics {}
 
@@ -15,8 +15,10 @@ cfg_not_rt_and_metrics! {
     }
 }
 
-cfg_rt! {
-    cfg_metrics! {
-        pub(crate) use crate::runtime::IoDriverMetrics;
+cfg_net! {
+    cfg_rt! {
+        cfg_metrics! {
+            pub(crate) use crate::runtime::IoDriverMetrics;
+        }
     }
 }

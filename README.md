@@ -56,7 +56,7 @@ Make sure you activated the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.19.2", features = ["full"] }
 ```
 Then, on your main.rs:
 
@@ -163,6 +163,18 @@ several other libraries, including:
 
 ## Supported Rust Versions
 
+<!--
+When updating this, also update:
+- .github/workflows/ci.yml
+- CONTRIBUTING.md
+- README.md
+- tokio/README.md
+- tokio/Cargo.toml
+- tokio-util/Cargo.toml
+- tokio-test/Cargo.toml
+- tokio-stream/Cargo.toml
+-->
+
 Tokio will keep a rolling MSRV (minimum supported rust version) policy of **at
 least** 6 months. When increasing the MSRV, the new Rust version must have been
 released at least six months ago. The current MSRV is 1.49.0.
@@ -180,18 +192,18 @@ warrants a patch release with a fix for the bug, it will be backported and
 released as a new patch release for each LTS minor version. Our current LTS
 releases are:
 
- * `1.8.x` - LTS release until February 2022.
  * `1.14.x` - LTS release until June 2022.
+ * `1.18.x` - LTS release until January 2023
 
 Each LTS release will continue to receive backported fixes for at least half a
 year. If you wish to use a fixed minor release in your project, we recommend
 that you use an LTS release.
 
 To use a fixed minor version, you can specify the version with a tilde. For
-example, to specify that you wish to use the newest `1.8.x` patch release, you
+example, to specify that you wish to use the newest `1.14.x` patch release, you
 can use the following dependency specification:
 ```text
-tokio = { version = "~1.8", features = [...] }
+tokio = { version = "~1.14", features = [...] }
 ```
 
 ## License

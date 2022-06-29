@@ -203,6 +203,43 @@ impl<T> JoinHandle<T> {
         }
     }
 
+    /// Checks if the task associated with this `JoinHandle` has finished.
+    ///
+    /// Please note that this method can return `false` even if [`abort`] has been
+    /// called on the task. This is because the cancellation process may take
+    /// some time, and this method does not return `true` until it has
+    /// completed.
+    ///
+    /// ```rust
+    /// use tokio::time;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// # time::pause();
+    /// let handle1 = tokio::spawn(async {
+    ///     // do some stuff here
+    /// });
+    /// let handle2 = tokio::spawn(async {
+    ///     // do some other stuff here
+    ///     time::sleep(time::Duration::from_secs(10)).await;
+    /// });
+    /// // Wait for the task to finish
+    /// handle2.abort();
+    /// time::sleep(time::Duration::from_secs(1)).await;
+    /// assert!(handle1.is_finished());
+    /// assert!(handle2.is_finished());
+    /// # }
+    /// ```
+    /// [`abort`]: method@JoinHandle::abort
+    pub fn is_finished(&self) -> bool {
+        if let Some(raw) = self.raw {
+            let state = raw.header().state.load();
+            state.is_complete()
+        } else {
+            true
+        }
+    }
+
     /// Set the waker that is notified when the task completes.
     pub(crate) fn set_join_waker(&mut self, waker: &Waker) {
         if let Some(raw) = self.raw {

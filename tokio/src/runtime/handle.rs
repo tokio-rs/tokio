@@ -87,7 +87,7 @@ impl Handle {
 
     /// Returns a `Handle` view over the currently running `Runtime`.
     ///
-    /// # Panic
+    /// # Panics
     ///
     /// This will panic if called outside the context of a Tokio runtime. That means that you must
     /// call this on one of the threads **being run by the runtime**, or from a thread with an active
@@ -129,6 +129,7 @@ impl Handle {
     /// # });
     /// # }
     /// ```
+    #[track_caller]
     pub fn current() -> Self {
         context::current()
     }
@@ -175,10 +176,7 @@ impl Handle {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let id = crate::runtime::task::Id::next();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task", None, id.as_u64());
-        self.spawner.spawn(future, id)
+        self.spawn_named(future, None)
     }
 
     /// Runs the provided function on an executor dedicated to blocking.
@@ -299,6 +297,18 @@ impl Handle {
         blocking_enter
             .block_on(future)
             .expect("failed to park thread")
+    }
+
+    #[track_caller]
+    pub(crate) fn spawn_named<F>(&self, future: F, _name: Option<&str>) -> JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let id = crate::runtime::task::Id::next();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let future = crate::util::trace::task(future, "task", _name, id.as_u64());
+        self.spawner.spawn(future, id)
     }
 
     pub(crate) fn shutdown(mut self) {

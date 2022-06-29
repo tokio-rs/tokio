@@ -207,6 +207,9 @@ pub enum MissedTickBehavior {
     /// # async fn main() {
     /// let mut interval = interval(Duration::from_millis(50));
     ///
+    /// // First tick resolves immediately after creation
+    /// interval.tick().await;
+    ///
     /// task_that_takes_200_millis().await;
     /// // The `Interval` has missed a tick
     ///

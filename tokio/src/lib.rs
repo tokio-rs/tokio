@@ -114,7 +114,7 @@
 //! The [`tokio::sync`] module contains synchronization primitives to use when
 //! needing to communicate or share data. These include:
 //!
-//! * channels ([`oneshot`], [`mpsc`], and [`watch`]), for sending values
+//! * channels ([`oneshot`], [`mpsc`], [`watch`], and [`broadcast`]), for sending values
 //!   between tasks,
 //! * a non-blocking [`Mutex`], for controlling access to a shared, mutable
 //!   value,
@@ -130,6 +130,7 @@
 //! [`oneshot`]: crate::sync::oneshot
 //! [`mpsc`]: crate::sync::mpsc
 //! [`watch`]: crate::sync::watch
+//! [`broadcast`]: crate::sync::broadcast
 //!
 //! The [`tokio::time`] module provides utilities for tracking time and
 //! scheduling work. This includes functions for setting [timeouts][timeout] for

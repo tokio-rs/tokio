@@ -49,6 +49,22 @@ impl AbortHandle {
         }
     }
 
+    /// Checks if the task associated with this `AbortHandle` has finished.
+    ///
+    /// Please note that this method can return `false` even if `abort` has been
+    /// called on the task. This is because the cancellation process may take
+    /// some time, and this method does not return `true` until it has
+    /// completed.
+    #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+    pub fn is_finished(&self) -> bool {
+        if let Some(raw) = self.raw {
+            let state = raw.header().state.load();
+            state.is_complete()
+        } else {
+            true
+        }
+    }
+
     /// Returns a [task ID] that uniquely identifies this task relative to other
     /// currently spawned tasks.
     ///
