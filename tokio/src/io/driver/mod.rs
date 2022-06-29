@@ -168,6 +168,11 @@ impl Driver {
         match self.poll.poll(&mut events, max_wait) {
             Ok(_) => {}
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+            #[cfg(target_os = "wasi")]
+            Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
+                // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
+                // just return from the park, as there would be nothing, which wakes us up.
+            }
             Err(e) => return Err(e),
         }
 
