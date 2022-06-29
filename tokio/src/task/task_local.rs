@@ -48,6 +48,22 @@ macro_rules! task_local {
 }
 
 #[doc(hidden)]
+#[cfg(tokio_const_thread_local)]
+#[macro_export]
+macro_rules! __task_local_inner {
+    ($(#[$attr:meta])* $vis:vis $name:ident, $t:ty) => {
+        $vis static $name: $crate::task::LocalKey<$t> = {
+            std::thread_local! {
+                static __KEY: std::cell::RefCell<Option<$t>> = const { std::cell::RefCell::new(None) };
+            }
+
+            $crate::task::LocalKey { inner: __KEY }
+        };
+    };
+}
+
+#[doc(hidden)]
+#[cfg(not(tokio_const_thread_local))]
 #[macro_export]
 macro_rules! __task_local_inner {
     ($(#[$attr:meta])* $vis:vis $name:ident, $t:ty) => {
