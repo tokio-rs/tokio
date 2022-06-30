@@ -25,9 +25,7 @@ fn try_acquire() {
     assert!(p3.is_ok());
 }
 
-// https://github.com/tokio-rs/mio/pull/1580
 #[tokio::test]
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn acquire() {
     let sem = Arc::new(Semaphore::new(1));
@@ -41,7 +39,6 @@ async fn acquire() {
 }
 
 #[tokio::test]
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn add_permits() {
     let sem = Arc::new(Semaphore::new(0));
@@ -67,7 +64,6 @@ fn forget() {
 }
 
 #[tokio::test]
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn stresstest() {
     let sem = Arc::new(Semaphore::new(5));

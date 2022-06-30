@@ -18,7 +18,7 @@ macro_rules! rt_test {
             }
         }
 
-        #[cfg(not(target_os = "wasi"))]
+        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
         mod threaded_scheduler_4_threads {
             $($t)*
 
@@ -32,7 +32,7 @@ macro_rules! rt_test {
             }
         }
 
-        #[cfg(not(target_os = "wasi"))]
+        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
         mod threaded_scheduler_1_thread {
             $($t)*
 
@@ -116,8 +116,6 @@ rt_test! {
         assert_eq!(out, "ZOMG");
     }
 
-    // https://github.com/tokio-rs/mio/pull/1580
-    #[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
     #[test]
     fn spawn_one_bg() {
         let rt = rt();
@@ -135,7 +133,6 @@ rt_test! {
         assert_eq!(out, "ZOMG");
     }
 
-    #[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
     #[test]
     fn spawn_one_join() {
         let rt = rt();
@@ -159,7 +156,6 @@ rt_test! {
         assert_eq!(out, "ZOMG");
     }
 
-    #[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
     #[test]
     fn spawn_two() {
         let rt = rt();
@@ -183,7 +179,7 @@ rt_test! {
         assert_eq!(out, "ZOMG");
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_many_from_block_on() {
         use tokio::sync::mpsc;
@@ -234,7 +230,7 @@ rt_test! {
         }
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_many_from_task() {
         use tokio::sync::mpsc;
@@ -295,7 +291,6 @@ rt_test! {
         }
     }
 
-    #[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
     #[test]
     fn spawn_await_chain() {
         let rt = rt();
@@ -351,7 +346,7 @@ rt_test! {
         assert_eq!(out, "ZOMG");
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn complete_block_on_under_load() {
         let rt = rt();
@@ -375,7 +370,7 @@ rt_test! {
         });
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn complete_task_under_load() {
         let rt = rt();
@@ -405,7 +400,7 @@ rt_test! {
         });
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_from_other_thread_idle() {
         let rt = rt();
@@ -426,7 +421,7 @@ rt_test! {
         });
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_from_other_thread_under_load() {
         let rt = rt();
@@ -466,7 +461,6 @@ rt_test! {
         assert!(now.elapsed() >= dur);
     }
 
-    #[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
     #[test]
     fn sleep_in_spawn() {
         let rt = rt();
@@ -488,7 +482,7 @@ rt_test! {
         assert!(now.elapsed() >= dur);
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support bind
     #[test]
     fn block_on_socket() {
         let rt = rt();
@@ -509,7 +503,7 @@ rt_test! {
         });
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_from_blocking() {
         let rt = rt();
@@ -525,7 +519,7 @@ rt_test! {
         assert_eq!(out, "hello")
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_blocking_from_blocking() {
         let rt = rt();
@@ -541,7 +535,7 @@ rt_test! {
         assert_eq!(out, "hello")
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn sleep_from_blocking() {
         let rt = rt();
@@ -562,7 +556,7 @@ rt_test! {
         });
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support bind
     #[test]
     fn socket_from_blocking() {
         let rt = rt();
@@ -586,7 +580,7 @@ rt_test! {
         });
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn always_active_parker() {
         // This test it to show that we will always have
@@ -633,7 +627,7 @@ rt_test! {
     // concern. There also isn't a great/obvious solution to take. For now, the
     // test is disabled.
     #[cfg(not(windows))]
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support bind or threads
     fn io_driver_called_when_under_load() {
         let rt = rt();
 
@@ -669,7 +663,7 @@ rt_test! {
         });
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn client_server_block_on() {
         let rt = rt();
@@ -681,7 +675,7 @@ rt_test! {
         assert_err!(rx.try_recv());
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support threads or panic recovery")]
     #[test]
     fn panic_in_task() {
         let rt = rt();
@@ -710,12 +704,13 @@ rt_test! {
 
     #[test]
     #[should_panic]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
     fn panic_in_block_on() {
         let rt = rt();
         rt.block_on(async { panic!() });
     }
 
-    #[cfg(not(target_os = "wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     async fn yield_once() {
         let mut yielded = false;
         poll_fn(|cx| {
@@ -730,7 +725,6 @@ rt_test! {
         .await
     }
 
-    #[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
     #[test]
     fn enter_and_spawn() {
         let rt = rt();
@@ -742,7 +736,6 @@ rt_test! {
         assert_ok!(rt.block_on(handle));
     }
 
-    #[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
     #[test]
     fn eagerly_drops_futures_on_shutdown() {
         use std::sync::mpsc;
@@ -785,7 +778,6 @@ rt_test! {
         assert_ok!(drop_rx.recv());
     }
 
-    #[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
     #[test]
     fn wake_while_rt_is_dropping() {
         use tokio::sync::Barrier;
@@ -856,7 +848,7 @@ rt_test! {
         assert!(drop_triggered.load(Ordering::Relaxed));
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi doesn't support UDP or bind()
     #[test]
     fn io_notify_while_shutting_down() {
         use tokio::net::UdpSocket;
@@ -893,7 +885,7 @@ rt_test! {
         }
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn shutdown_timeout() {
         let (tx, rx) = oneshot::channel();
@@ -911,7 +903,7 @@ rt_test! {
         Arc::try_unwrap(runtime).unwrap().shutdown_timeout(Duration::from_millis(100));
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn shutdown_timeout_0() {
         let runtime = rt();
@@ -943,7 +935,7 @@ rt_test! {
     // See https://github.com/rust-lang/rust/issues/74875
     #[test]
     #[cfg(not(windows))]
-    #[cfg(not(target_os="wasi"))]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support threads")]
     fn runtime_in_thread_local() {
         use std::cell::RefCell;
         use std::thread;
@@ -963,7 +955,7 @@ rt_test! {
         }).join().unwrap();
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support bind
     async fn client_server(tx: mpsc::Sender<()>) {
         let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
@@ -988,7 +980,7 @@ rt_test! {
         tx.send(()).unwrap();
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
     #[test]
     fn local_set_block_on_socket() {
         let rt = rt();
@@ -1010,7 +1002,7 @@ rt_test! {
         });
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
     #[test]
     fn local_set_client_server_block_on() {
         let rt = rt();
@@ -1024,7 +1016,7 @@ rt_test! {
         assert_err!(rx.try_recv());
     }
 
-    #[cfg(not(target_os="wasi"))]
+    #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
     async fn client_server_local(tx: mpsc::Sender<()>) {
         let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
@@ -1130,7 +1122,6 @@ rt_test! {
 
     // Tests that the "next task" scheduler optimization is not able to starve
     // other tasks.
-    #[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
     #[test]
     fn ping_pong_saturation() {
         use std::sync::atomic::{Ordering, AtomicBool};

@@ -13,12 +13,14 @@ use tokio::time;
 
 #[cfg(not(target_os = "wasi"))]
 use std::cell::Cell;
-use std::sync::atomic::Ordering::{self, SeqCst};
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::AtomicBool;
+#[cfg(not(target_os = "wasi"))]
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+#[cfg(not(target_os = "wasi"))]
+use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
-// https://github.com/tokio-rs/mio/pull/1580
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test(flavor = "current_thread")]
 async fn local_basic_scheduler() {
     LocalSet::new()
@@ -28,7 +30,7 @@ async fn local_basic_scheduler() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool() {
     thread_local! {
@@ -49,7 +51,7 @@ async fn local_threadpool() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn localset_future_threadpool() {
     thread_local! {
@@ -65,7 +67,7 @@ async fn localset_future_threadpool() {
     local.await;
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn localset_future_timers() {
     static RAN1: AtomicBool = AtomicBool::new(false);
@@ -110,7 +112,7 @@ async fn localset_future_drives_all_local_futs() {
     assert!(RAN3.load(Ordering::SeqCst));
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool_timer() {
     // This test ensures that runtime services like the timer are properly
@@ -134,7 +136,7 @@ async fn local_threadpool_timer() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #[test]
 // This will panic, since the thread that calls `block_on` cannot use
 // in-place blocking inside of `block_on`.
@@ -161,7 +163,7 @@ fn local_threadpool_blocking_in_place() {
     });
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool_blocking_run() {
     thread_local! {
@@ -190,7 +192,7 @@ async fn local_threadpool_blocking_run() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn all_spawns_are_local() {
     use futures::future;
@@ -217,7 +219,7 @@ async fn all_spawns_are_local() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn nested_spawn_is_local() {
     thread_local! {
@@ -253,7 +255,7 @@ async fn nested_spawn_is_local() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[test]
 fn join_local_future_elsewhere() {
     thread_local! {
@@ -294,7 +296,6 @@ fn join_local_future_elsewhere() {
     });
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
 #[test]
 fn drop_cancels_tasks() {
     use std::rc::Rc;
@@ -413,7 +414,7 @@ fn local_tasks_wake_join_all() {
     });
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #[test]
 fn local_tasks_are_polled_after_tick() {
     // This test depends on timing, so we run it up to five times.
@@ -430,6 +431,7 @@ fn local_tasks_are_polled_after_tick() {
     local_tasks_are_polled_after_tick_inner();
 }
 
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #[tokio::main(flavor = "current_thread")]
 async fn local_tasks_are_polled_after_tick_inner() {
     // Reproduces issues #1899 and #1900
@@ -488,7 +490,6 @@ async fn local_tasks_are_polled_after_tick_inner() {
         .await;
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
 #[tokio::test]
 async fn acquire_mutex_in_drop() {
     use futures::future::pending;
@@ -526,7 +527,6 @@ async fn acquire_mutex_in_drop() {
 }
 
 #[tokio::test]
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 async fn spawn_wakes_localset() {
     let local = LocalSet::new();
     futures::select! {

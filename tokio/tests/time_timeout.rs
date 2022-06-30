@@ -17,7 +17,7 @@ async fn simultaneous_deadline_future_completion() {
     assert_ready_ok!(fut.poll());
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
+#[cfg_attr(target_os = "wasi", ignore = "Wasi does not support threads")]
 #[tokio::test]
 async fn completed_future_past_deadline() {
     // Wrap it with a deadline
@@ -102,9 +102,7 @@ async fn very_large_timeout() {
     assert_ready_ok!(fut.poll()).unwrap();
 }
 
-// https://github.com/tokio-rs/mio/pull/1580
 #[tokio::test]
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 async fn deadline_now_elapses() {
     use futures::future::pending;
 

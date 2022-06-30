@@ -18,8 +18,6 @@ async fn ping_pong() {
     assert_eq!(&buf, b"pong");
 }
 
-// https://github.com/tokio-rs/mio/pull/1580
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn across_tasks() {
     let (mut a, mut b) = duplex(32);
@@ -42,7 +40,6 @@ async fn across_tasks() {
     t2.await.unwrap();
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn disconnect() {
     let (mut a, mut b) = duplex(32);
@@ -65,7 +62,6 @@ async fn disconnect() {
     t2.await.unwrap();
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn disconnect_reader() {
     let (a, mut b) = duplex(2);
@@ -85,7 +81,6 @@ async fn disconnect_reader() {
     t1.await.unwrap();
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn max_write_size() {
     let (mut a, mut b) = duplex(32);
@@ -106,7 +101,6 @@ async fn max_write_size() {
     drop(b);
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[tokio::test]
 async fn duplex_is_cooperative() {
     let (mut tx, mut rx) = tokio::io::duplex(1024 * 8);

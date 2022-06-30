@@ -5,7 +5,6 @@ use tokio_stream::wrappers::WatchStream;
 use tokio_stream::StreamExt;
 
 #[tokio::test]
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 async fn message_not_twice() {
     let (tx, rx) = watch::channel("hello");
 

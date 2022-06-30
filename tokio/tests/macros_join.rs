@@ -82,7 +82,6 @@ fn join_size() {
     assert_eq!(mem::size_of_val(&fut), 32);
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
 async fn non_cooperative_task(permits: Arc<Semaphore>) -> usize {
     let mut exceeded_budget = 0;
 
@@ -98,7 +97,6 @@ async fn non_cooperative_task(permits: Arc<Semaphore>) -> usize {
     exceeded_budget
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
 async fn poor_little_task(permits: Arc<Semaphore>) -> usize {
     let mut how_many_times_i_got_to_run = 0;
 
@@ -110,7 +108,6 @@ async fn poor_little_task(permits: Arc<Semaphore>) -> usize {
     how_many_times_i_got_to_run
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
 #[tokio::test]
 async fn join_does_not_allow_tasks_to_starve() {
     let permits = Arc::new(Semaphore::new(1));
@@ -125,7 +122,6 @@ async fn join_does_not_allow_tasks_to_starve() {
     assert_eq!(5, little_task_result);
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
 #[tokio::test]
 async fn a_different_future_is_polled_first_every_time_poll_fn_is_polled() {
     let poll_order = Arc::new(std::sync::Mutex::new(vec![]));

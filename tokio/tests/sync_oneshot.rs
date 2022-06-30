@@ -93,9 +93,7 @@ fn close_rx() {
     assert_err!(tx.into_inner().send(1));
 }
 
-// https://github.com/tokio-rs/mio/pull/1580
 #[tokio::test]
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[cfg(feature = "full")]
 async fn async_rx_closed() {
     let (mut tx, rx) = oneshot::channel::<()>();

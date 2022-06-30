@@ -25,8 +25,6 @@ macro_rules! cfg_metrics {
     }
 }
 
-// https://github.com/tokio-rs/mio/pull/1580
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[test]
 fn spawned_task_does_not_progress_without_block_on() {
     let (tx, mut rx) = oneshot::channel();
@@ -46,7 +44,6 @@ fn spawned_task_does_not_progress_without_block_on() {
     assert_eq!(out, "hello");
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[test]
 fn no_extra_poll() {
     use pin_project_lite::pin_project;
@@ -115,7 +112,6 @@ fn no_extra_poll() {
     assert_eq!(npolls.load(SeqCst), 1 + 2 + 1);
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[test]
 fn acquire_mutex_in_drop() {
     use futures::future::pending;
@@ -182,6 +178,7 @@ fn drop_tasks_in_context() {
 }
 
 #[test]
+#[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
 #[should_panic(expected = "boom")]
 fn wake_in_drop_after_panic() {
     let (tx, rx) = oneshot::channel::<()>();
@@ -210,7 +207,6 @@ fn wake_in_drop_after_panic() {
     });
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: empty poll in park")]
 #[test]
 fn spawn_two() {
     let rt = rt();
@@ -280,6 +276,7 @@ fn spawn_remote() {
 }
 
 #[test]
+#[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
 #[should_panic(
     expected = "A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers."
 )]

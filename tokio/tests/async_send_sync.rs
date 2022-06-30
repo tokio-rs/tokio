@@ -200,6 +200,7 @@ async_assert_fn!(tokio::net::TcpStream::readable(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::TcpStream::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::TcpStream::writable(_): Send & Sync & !Unpin);
 
+// Wasi does not support UDP
 cfg_not_wasi! {
     mod udp_socket {
         use super::*;

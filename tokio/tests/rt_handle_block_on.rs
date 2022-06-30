@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 #[cfg(not(target_os = "wasi"))]
 use tokio::{net, time};
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 macro_rules! multi_threaded_rt_test {
     ($($t:tt)*) => {
         mod threaded_scheduler_4_threads_only {
@@ -126,7 +126,7 @@ fn unbounded_mpsc_channel() {
     })
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support file operations or bind
 rt_test! {
     use tokio::fs;
     // ==== spawn blocking futures ======

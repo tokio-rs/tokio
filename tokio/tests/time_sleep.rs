@@ -168,6 +168,7 @@ async fn reset_sleep_to_past() {
     assert_ready!(sleep.poll());
 }
 
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #[test]
 #[should_panic]
 fn creating_sleep_outside_of_context() {
