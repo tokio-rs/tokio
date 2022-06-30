@@ -276,44 +276,51 @@ impl Inner {
 
 
 impl Stream for Mock {
-    type Item = String;
+    type Item = Vec<u8>;
 
     fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
 
         loop {
             if let Some(ref mut sleep) = self.inner.sleep {
-                ready!(Pin::new(sleep).poll_next(_cx));
+                ready!(Pin::new(sleep).poll(_cx));
             }
 
 
             // If a sleep is set, it has already fired
             self.inner.sleep = None;
-            match ready!(self.inner.poll_action(_cx))  {
+ 
+            // match ready!
+            match ready!(self.inner.poll_action(_cx)) {
                 Some(Action::Read(data)) => {
-                    return Poll::Ready(Some(data.to_string()));
-                }
-                Some(Action::Write(data)) => {
-                    return Poll::Ready(Some(data.to_string()));
-                }
-                Some(Action::Next(data)) => {
                     return Poll::Ready(Some(data));
                 }
+                Some(Action::Write(data)) => {
+                    return Poll::Ready(Some(data));
+                }
+                Some(Action::Next(data)) => {
+                    return Poll::Ready(Some(data.as_bytes().to_vec()));
+                }
                 Some(Action::Wait(dur)) => {
-                    self.inner.sleep = Some(dur);
+                    self.inner.sleep = Some(delay_for(dur));
                 }
                 Some(Action::ReadError(error)) => {
-                    return Poll::Ready(Some(error.unwrap().to_string()));
+                    return Poll::Ready(None);
                 }
                 Some(Action::WriteError(error)) => {
-                    return Poll::Ready(Some(error.unwrap().to_string()));
+                    return Poll::Ready(None);
+                }
+                Some(_) => {
+                    continue;
                 }
                 None => {
                     return Poll::Ready(None);
                 }
+
             }
         }
 
     }
+
 
 }
 

@@ -99,14 +99,17 @@ async fn stream_read(){
         .build();
     let txt =  String::from("hello ");
     let res =  mock.next().await;
+    assert_eq!(res.unwrap(), txt);
     assert_eq!(res, Some(txt));
 }
 
 #[tokio::test]
 async fn stream_write(){
-    let _unit: u8 = 1;
-    let _mock  = StreamBuilder::new().write(b"hello ").write(b"world!").build();
-    //  let mut task = get task ?
-    //  mock.poll_write(task, unit ).assert(b"hello " or something like this ?
-    //
+    let mut mock = StreamBuilder::new()
+        .write_stream(String::from("hello "))
+        .build();
+    let txt =  String::from("hello ");
+    let res =  mock.next().await;
+    assert_eq!(res.unwrap(), txt);
+    assert_eq!(res, Some(txt));
 }
