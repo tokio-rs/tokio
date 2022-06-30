@@ -282,16 +282,30 @@ impl Stream for Mock {
 
         loop {
             if let Some(ref mut sleep) = self.inner.sleep {
-                ready!(Pin::new(sleep).poll(_cx));
+                ready!(Pin::new(sleep).poll_next(_cx));
             }
 
 
             // If a sleep is set, it has already fired
             self.inner.sleep = None;
             match ready!(self.inner.poll_action(_cx))  {
-                Some(action) => {
-                    self.inner.actions.push_back(action);
-                    continue;
+                Some(Action::Read(data)) => {
+                    return Poll::Ready(Some(data.to_string()));
+                }
+                Some(Action::Write(data)) => {
+                    return Poll::Ready(Some(data.to_string()));
+                }
+                Some(Action::Next(data)) => {
+                    return Poll::Ready(Some(data));
+                }
+                Some(Action::Wait(dur)) => {
+                    self.inner.sleep = Some(dur);
+                }
+                Some(Action::ReadError(error)) => {
+                    return Poll::Ready(Some(error.unwrap().to_string()));
+                }
+                Some(Action::WriteError(error)) => {
+                    return Poll::Ready(Some(error.unwrap().to_string()));
                 }
                 None => {
                     return Poll::Ready(None);
