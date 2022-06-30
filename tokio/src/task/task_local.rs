@@ -4,7 +4,7 @@ use std::future::Future;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{fmt, thread};
+use std::{fmt, mem, thread};
 
 /// Declares a new task-local key of type [`tokio::task::LocalKey`].
 ///
@@ -187,10 +187,10 @@ impl<T: 'static> LocalKey<T> {
         match self.scope_inner(&mut value, f) {
             Ok(res) => res,
             Err(ScopeInnerErr::BorrowError) => {
-                panic!("sync_scope called while Task Local Storage is borrowed")
+                panic!("`LocalKey::sync_scope` called while task-local storage is borrowed")
             }
             Err(ScopeInnerErr::AccessError) => {
-                panic!("cannot access a Task Local Storage value during or after destruction")
+                panic!("cannot access a task-local storage value during or after destruction")
             }
         }
     }
@@ -220,7 +220,7 @@ impl<T: 'static> LocalKey<T> {
                 // then.
                 self.local.inner.with(|inner| {
                     let mut ref_mut = inner.borrow_mut();
-                    std::mem::swap(self.slot, &mut *ref_mut);
+                    mem::swap(self.slot, &mut *ref_mut);
                 });
             }
         }
@@ -228,7 +228,7 @@ impl<T: 'static> LocalKey<T> {
         self.inner.try_with(|inner| {
             inner
                 .try_borrow_mut()
-                .map(|mut ref_mut| std::mem::swap(slot, &mut *ref_mut))
+                .map(|mut ref_mut| mem::swap(slot, &mut *ref_mut))
         })??;
 
         let guard = Guard { local: self, slot };
@@ -252,7 +252,7 @@ impl<T: 'static> LocalKey<T> {
     {
         match self.try_with(f) {
             Ok(res) => res,
-            Err(_) => panic!("cannot access a Task Local Storage value without setting it first"),
+            Err(_) => panic!("cannot access a task-local storage value without setting it first"),
         }
     }
 
@@ -358,12 +358,12 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
 
         match res {
             Ok(Some(res)) => res,
-            Ok(None) => panic!("TaskLocalFuture polled after completion"),
+            Ok(None) => panic!("`TaskLocalFuture` polled after completion"),
             Err(ScopeInnerErr::BorrowError) => {
-                panic!("TaskLocalFuture::poll called while task local is borrowed")
+                panic!("`TaskLocalFuture::poll` called while task-local storage is borrowed")
             }
             Err(ScopeInnerErr::AccessError) => {
-                panic!("cannot access a Task Local Storage value during or after destruction")
+                panic!("cannot access a task-local storage value during or after destruction")
             }
         }
     }
@@ -371,7 +371,7 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
 
 impl<T: 'static, F> Drop for TaskLocalFuture<T, F> {
     fn drop(&mut self) {
-        if std::mem::needs_drop::<F>() && self.future.is_some() {
+        if mem::needs_drop::<F>() && self.future.is_some() {
             // Drop the future while the task-local is set, if possible. Otherwise
             // the future is dropped normally when the `Option<F>` field drops.
             let future = &mut self.future;
