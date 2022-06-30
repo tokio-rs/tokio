@@ -51,7 +51,7 @@ async fn task_local_available_on_abort() {
 
         fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
             if let Some(tx_poll) = self.tx_poll.take() {
-                tx_poll.send(());
+                let _ = tx_poll.send(());
             }
             Poll::Pending
         }
