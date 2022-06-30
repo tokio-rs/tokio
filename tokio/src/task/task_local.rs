@@ -186,12 +186,7 @@ impl<T: 'static> LocalKey<T> {
         let mut value = Some(value);
         match self.scope_inner(&mut value, f) {
             Ok(res) => res,
-            Err(ScopeInnerErr::BorrowError) => {
-                panic!("`LocalKey::sync_scope` called while task-local storage is borrowed")
-            }
-            Err(ScopeInnerErr::AccessError) => {
-                panic!("cannot access a task-local storage value during or after destruction")
-            }
+            Err(err) => std::panic::panic_any(err.as_str()),
         }
     }
 
@@ -359,12 +354,7 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
         match res {
             Ok(Some(res)) => res,
             Ok(None) => panic!("`TaskLocalFuture` polled after completion"),
-            Err(ScopeInnerErr::BorrowError) => {
-                panic!("`TaskLocalFuture::poll` called while task-local storage is borrowed")
-            }
-            Err(ScopeInnerErr::AccessError) => {
-                panic!("cannot access a task-local storage value during or after destruction")
-            }
+            Err(err) => std::panic::panic_any(err.as_str()),
         }
     }
 }
@@ -430,6 +420,15 @@ impl Error for AccessError {}
 enum ScopeInnerErr {
     BorrowError,
     AccessError,
+}
+
+impl ScopeInnerErr {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::BorrowError => "cannot enter a task-local scope while the task-local storage is borrowed",
+            Self::AccessError => "cannot enter a task-local scope during or after destruction of the underlying thread-local",
+        }
+    }
 }
 
 impl From<std::cell::BorrowMutError> for ScopeInnerErr {
