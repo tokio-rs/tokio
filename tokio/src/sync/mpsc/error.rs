@@ -78,7 +78,7 @@ impl Error for TryRecvError {}
 // ===== RecvError =====
 
 /// Error returned by `Receiver`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[doc(hidden)]
 #[deprecated(note = "This type is unused because recv returns an Option.")]
 pub struct RecvError(());

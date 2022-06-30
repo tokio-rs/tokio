@@ -278,6 +278,28 @@ impl UdpSocket {
         self.io.local_addr()
     }
 
+    /// Returns the socket address of the remote peer this socket was connected to.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio::net::UdpSocket;
+    ///
+    /// # use std::{io, net::SocketAddr};
+    /// # #[tokio::main]
+    /// # async fn main() -> io::Result<()> {
+    /// let addr = "0.0.0.0:8080".parse::<SocketAddr>().unwrap();
+    /// let peer = "127.0.0.1:11100".parse::<SocketAddr>().unwrap();
+    /// let sock = UdpSocket::bind(addr).await?;
+    /// sock.connect(peer).await?;
+    /// assert_eq!(peer, sock.peer_addr()?);
+    /// #    Ok(())
+    /// # }
+    /// ```
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.io.peer_addr()
+    }
+
     /// Connects the UDP socket setting the default destination for send() and
     /// limiting packets that are read via recv from the address specified in
     /// `addr`.
@@ -1272,7 +1294,9 @@ impl UdpSocket {
         interest: Interest,
         f: impl FnOnce() -> io::Result<R>,
     ) -> io::Result<R> {
-        self.io.registration().try_io(interest, f)
+        self.io
+            .registration()
+            .try_io(interest, || self.io.try_io(f))
     }
 
     /// Receives data from the socket, without removing it from the input queue.

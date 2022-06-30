@@ -1,8 +1,8 @@
 freebsd_instance:
-  image: freebsd-12-2-release-amd64
+  image: freebsd-12-3-release-amd64
 env:
   RUST_STABLE: stable
-  RUST_NIGHTLY: nightly-2022-01-12
+  RUST_NIGHTLY: nightly-2022-03-21
   RUSTFLAGS: -D warnings
 
 # Test FreeBSD in a full VM on cirrus-ci.com.  Test the i686 target too, in the
@@ -26,8 +26,8 @@ task:
 task:
   name: FreeBSD docs
   env:
-    RUSTFLAGS: --cfg docsrs
-    RUSTDOCFLAGS: --cfg docsrs -Dwarnings
+    RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
+    RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh

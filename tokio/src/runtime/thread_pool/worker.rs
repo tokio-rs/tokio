@@ -63,10 +63,9 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
-use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
-use crate::runtime::thread_pool::Idle;
-use crate::runtime::{queue, task, Callback, MetricsBatch, SchedulerMetrics, WorkerMetrics};
+use crate::runtime::thread_pool::{queue, Idle, Parker, Unparker};
+use crate::runtime::{task, Callback, HandleInner, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::FastRand;
 
@@ -88,7 +87,7 @@ pub(super) struct Worker {
 /// Core data
 struct Core {
     /// Used to schedule bookkeeping tasks every so often.
-    tick: u8,
+    tick: u32,
 
     /// When a task is scheduled from a worker, it is stored in this slot. The
     /// worker will check this slot for a task **before** checking the run
@@ -118,15 +117,26 @@ struct Core {
 
     /// Fast random number generator.
     rand: FastRand,
+
+    /// How many ticks before pulling a task from the global/remote queue?
+    global_queue_interval: u32,
+
+    /// How many ticks before yielding to the driver for timer and I/O events?
+    event_interval: u32,
 }
 
 /// State shared across all workers
 pub(super) struct Shared {
+    /// Handle to the I/O driver, timer, blocking spawner, ...
+    handle_inner: HandleInner,
+
     /// Per-worker remote state. All other workers have access to this and is
     /// how they communicate between each other.
     remotes: Box<[Remote]>,
 
-    /// Submits work to the scheduler while **not** currently on a worker thread.
+    /// Global task queue used for:
+    ///  1. Submit work to the scheduler while **not** currently on a worker thread.
+    ///  2. Submit work to the scheduler when a worker run queue is saturated
     inject: Inject<Arc<Shared>>,
 
     /// Coordinates idle workers
@@ -191,12 +201,15 @@ scoped_thread_local!(static CURRENT: Context);
 pub(super) fn create(
     size: usize,
     park: Parker,
+    handle_inner: HandleInner,
     before_park: Option<Callback>,
     after_unpark: Option<Callback>,
+    global_queue_interval: u32,
+    event_interval: u32,
 ) -> (Arc<Shared>, Launch) {
-    let mut cores = vec![];
-    let mut remotes = vec![];
-    let mut worker_metrics = vec![];
+    let mut cores = Vec::with_capacity(size);
+    let mut remotes = Vec::with_capacity(size);
+    let mut worker_metrics = Vec::with_capacity(size);
 
     // Create the local queues
     for _ in 0..size {
@@ -214,6 +227,8 @@ pub(super) fn create(
             park: Some(park),
             metrics: MetricsBatch::new(),
             rand: FastRand::new(seed()),
+            global_queue_interval,
+            event_interval,
         }));
 
         remotes.push(Remote { steal, unpark });
@@ -221,6 +236,7 @@ pub(super) fn create(
     }
 
     let shared = Arc::new(Shared {
+        handle_inner,
         remotes: remotes.into_boxed_slice(),
         inject: Inject::new(),
         idle: Idle::new(size),
@@ -340,12 +356,6 @@ where
     }
 }
 
-/// After how many ticks is the global queue polled. This helps to ensure
-/// fairness.
-///
-/// The number is fairly arbitrary. I believe this value was copied from golang.
-const GLOBAL_POLL_INTERVAL: u8 = 61;
-
 impl Launch {
     pub(crate) fn launch(mut self) {
         for worker in self.0.drain(..) {
@@ -458,7 +468,7 @@ impl Context {
     }
 
     fn maintenance(&self, mut core: Box<Core>) -> Box<Core> {
-        if core.tick % GLOBAL_POLL_INTERVAL == 0 {
+        if core.tick % core.event_interval == 0 {
             // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
             // to run without actually putting the thread to sleep.
             core = self.park_timeout(core, Some(Duration::from_millis(0)));
@@ -470,6 +480,17 @@ impl Context {
         core
     }
 
+    /// Parks the worker thread while waiting for tasks to execute.
+    ///
+    /// This function checks if indeed there's no more work left to be done before parking.
+    /// Also important to notice that, before parking, the worker thread will try to take
+    /// ownership of the Driver (IO/Time) and dispatch any events that might have fired.
+    /// Whenever a worker thread executes the Driver loop, all waken tasks are scheduled
+    /// in its own local queue until the queue saturates (ntasks > LOCAL_QUEUE_CAPACITY).
+    /// When the local queue is saturated, the overflow tasks are added to the injection queue
+    /// from where other workers can pick them up.
+    /// Also, we rely on the workstealing algorithm to spread the tasks amongst workers
+    /// after all the IOs get dispatched
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
         if let Some(f) = &self.worker.shared.before_park {
             f();
@@ -534,7 +555,7 @@ impl Core {
 
     /// Return the next notified task available to this worker.
     fn next_task(&mut self, worker: &Worker) -> Option<Notified> {
-        if self.tick % GLOBAL_POLL_INTERVAL == 0 {
+        if self.tick % self.global_queue_interval == 0 {
             worker.inject().pop().or_else(|| self.next_local_task())
         } else {
             self.next_local_task().or_else(|| worker.inject().pop())
@@ -545,6 +566,11 @@ impl Core {
         self.lifo_slot.take().or_else(|| self.run_queue.pop())
     }
 
+    /// Function responsible for stealing tasks from another worker
+    ///
+    /// Note: Only if less than half the workers are searching for tasks to steal
+    /// a new worker will actually try to steal. The idea is to make sure not all
+    /// workers will be trying to steal at the same time.
     fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
         if !self.transition_to_searching(worker) {
             return None;
@@ -594,7 +620,7 @@ impl Core {
 
     /// Prepares the worker state for parking.
     ///
-    /// Returns true if the transition happend, false if there is work to do first.
+    /// Returns true if the transition happened, false if there is work to do first.
     fn transition_to_parked(&mut self, worker: &Worker) -> bool {
         // Workers should not park if they have work to do
         if self.lifo_slot.is_some() || self.run_queue.has_tasks() {
@@ -697,12 +723,20 @@ impl task::Schedule for Arc<Shared> {
 }
 
 impl Shared {
-    pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T) -> JoinHandle<T::Output>
+    pub(crate) fn as_handle_inner(&self) -> &HandleInner {
+        &self.handle_inner
+    }
+
+    pub(super) fn bind_new_task<T>(
+        me: &Arc<Self>,
+        future: T,
+        id: crate::runtime::task::Id,
+    ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (handle, notified) = me.owned.bind(future, me.clone());
+        let (handle, notified) = me.owned.bind(future, me.clone(), id);
 
         if let Some(notified) = notified {
             me.schedule(notified, false);
@@ -832,6 +866,19 @@ impl Shared {
 
     fn ptr_eq(&self, other: &Shared) -> bool {
         std::ptr::eq(self, other)
+    }
+}
+
+impl crate::runtime::ToHandle for Arc<Shared> {
+    fn to_handle(&self) -> crate::runtime::Handle {
+        use crate::runtime::thread_pool::Spawner;
+        use crate::runtime::{self, Handle};
+
+        Handle {
+            spawner: runtime::Spawner::ThreadPool(Spawner {
+                shared: self.clone(),
+            }),
+        }
     }
 }
 

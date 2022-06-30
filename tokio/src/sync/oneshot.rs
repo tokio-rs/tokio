@@ -229,6 +229,14 @@ pub struct Sender<T> {
 /// This channel has no `recv` method because the receiver itself implements the
 /// [`Future`] trait. To receive a value, `.await` the `Receiver` object directly.
 ///
+/// The `poll` method on the `Future` trait is allowed to spuriously return
+/// `Poll::Pending` even if the message has been sent. If such a spurious
+/// failure happens, then the caller will be woken when the spurious failure has
+/// been resolved so that the caller can attempt to receive the message again.
+/// Note that receiving such a wakeup does not guarantee that the next call will
+/// succeed — it could fail with another spurious failure. (A spurious failure
+/// does not mean that the message is lost. It is just delayed.)
+///
 /// [`Future`]: trait@std::future::Future
 ///
 /// # Examples
@@ -323,11 +331,11 @@ pub mod error {
     use std::fmt;
 
     /// Error returned by the `Future` implementation for `Receiver`.
-    #[derive(Debug, Eq, PartialEq)]
+    #[derive(Debug, Eq, PartialEq, Clone)]
     pub struct RecvError(pub(super) ());
 
     /// Error returned by the `try_recv` function on `Receiver`.
-    #[derive(Debug, Eq, PartialEq)]
+    #[derive(Debug, Eq, PartialEq, Clone)]
     pub enum TryRecvError {
         /// The send half of the channel has not yet sent a value.
         Empty,
@@ -526,7 +534,7 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let rx = Receiver {
         inner: Some(inner),
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        resource_span: resource_span,
+        resource_span,
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         async_op_span,
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -923,12 +931,16 @@ impl<T> Receiver<T> {
     /// This function is useful to call from outside the context of an
     /// asynchronous task.
     ///
+    /// Note that unlike the `poll` method, the `try_recv` method cannot fail
+    /// spuriously. Any send or close event that happens before this call to
+    /// `try_recv` will be correctly returned to the caller.
+    ///
     /// # Return
     ///
     /// - `Ok(T)` if a value is pending in the channel.
     /// - `Err(TryRecvError::Empty)` if no value has been sent yet.
     /// - `Err(TryRecvError::Closed)` if the sender has dropped without sending
-    ///   a value.
+    ///   a value, or if the message has already been received.
     ///
     /// # Examples
     ///

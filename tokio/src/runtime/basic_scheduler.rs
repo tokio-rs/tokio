@@ -5,7 +5,7 @@ use crate::park::{Park, Unpark};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::Driver;
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
-use crate::runtime::Callback;
+use crate::runtime::{Callback, HandleInner};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
@@ -48,7 +48,7 @@ struct Core {
     spawner: Spawner,
 
     /// Current tick
-    tick: u8,
+    tick: u32,
 
     /// Runtime driver
     ///
@@ -57,6 +57,10 @@ struct Core {
 
     /// Metrics batch
     metrics: MetricsBatch,
+
+    /// True if a task panicked without being handled and the runtime is
+    /// configured to shutdown on unhandled panic.
+    unhandled_panic: bool,
 }
 
 #[derive(Clone)]
@@ -64,23 +68,28 @@ pub(crate) struct Spawner {
     shared: Arc<Shared>,
 }
 
-/// A remote scheduler entry.
-///
-/// These are filled in by remote threads sending instructions to the scheduler.
-enum RemoteMsg {
-    /// A remote thread wants to spawn a task.
-    Schedule(task::Notified<Arc<Shared>>),
-}
+pub(crate) struct Config {
+    /// How many ticks before pulling a task from the global/remote queue?
+    pub(crate) global_queue_interval: u32,
 
-// Safety: Used correctly, the task header is "thread safe". Ultimately the task
-// is owned by the current thread executor, for which this instruction is being
-// sent.
-unsafe impl Send for RemoteMsg {}
+    /// How many ticks before yielding to the driver for timer and I/O events?
+    pub(crate) event_interval: u32,
+
+    /// Callback for a worker parking itself
+    pub(crate) before_park: Option<Callback>,
+
+    /// Callback for a worker unparking itself
+    pub(crate) after_unpark: Option<Callback>,
+
+    #[cfg(tokio_unstable)]
+    /// How to respond to unhandled task panics.
+    pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
+}
 
 /// Scheduler state shared between threads.
 struct Shared {
     /// Remote run queue. None if the `Runtime` has been dropped.
-    queue: Mutex<Option<VecDeque<RemoteMsg>>>,
+    queue: Mutex<Option<VecDeque<task::Notified<Arc<Shared>>>>>,
 
     /// Collection of all active tasks spawned onto this executor.
     owned: OwnedTasks<Arc<Shared>>,
@@ -91,11 +100,11 @@ struct Shared {
     /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
 
-    /// Callback for a worker parking itself
-    before_park: Option<Callback>,
+    /// Handle to I/O driver, timer, blocking pool, ...
+    handle_inner: HandleInner,
 
-    /// Callback for a worker unparking itself
-    after_unpark: Option<Callback>,
+    /// Scheduler configuration options
+    config: Config,
 
     /// Keeps track of various runtime metrics.
     scheduler_metrics: SchedulerMetrics,
@@ -117,24 +126,11 @@ struct Context {
 /// Initial queue capacity.
 const INITIAL_CAPACITY: usize = 64;
 
-/// Max number of tasks to poll per tick.
-#[cfg(loom)]
-const MAX_TASKS_PER_TICK: usize = 4;
-#[cfg(not(loom))]
-const MAX_TASKS_PER_TICK: usize = 61;
-
-/// How often to check the remote queue first.
-const REMOTE_FIRST_INTERVAL: u8 = 31;
-
 // Tracks the current BasicScheduler.
 scoped_thread_local!(static CURRENT: Context);
 
 impl BasicScheduler {
-    pub(crate) fn new(
-        driver: Driver,
-        before_park: Option<Callback>,
-        after_unpark: Option<Callback>,
-    ) -> BasicScheduler {
+    pub(crate) fn new(driver: Driver, handle_inner: HandleInner, config: Config) -> BasicScheduler {
         let unpark = driver.unpark();
 
         let spawner = Spawner {
@@ -143,8 +139,8 @@ impl BasicScheduler {
                 owned: OwnedTasks::new(),
                 unpark,
                 woken: AtomicBool::new(false),
-                before_park,
-                after_unpark,
+                handle_inner,
+                config,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics: WorkerMetrics::new(),
             }),
@@ -156,6 +152,7 @@ impl BasicScheduler {
             tick: 0,
             driver: Some(driver),
             metrics: MetricsBatch::new(),
+            unhandled_panic: false,
         })));
 
         BasicScheduler {
@@ -170,6 +167,7 @@ impl BasicScheduler {
         &self.spawner
     }
 
+    #[track_caller]
     pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
         pin!(future);
 
@@ -251,12 +249,8 @@ impl Drop for BasicScheduler {
             // Using `Option::take` to replace the shared queue with `None`.
             // We already shut down every task, so we just need to drop the task.
             if let Some(remote_queue) = remote_queue {
-                for entry in remote_queue {
-                    match entry {
-                        RemoteMsg::Schedule(task) => {
-                            drop(task);
-                        }
-                    }
+                for task in remote_queue {
+                    drop(task);
                 }
             }
 
@@ -313,7 +307,7 @@ impl Context {
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
         let mut driver = core.driver.take().expect("driver missing");
 
-        if let Some(f) = &self.spawner.shared.before_park {
+        if let Some(f) = &self.spawner.shared.config.before_park {
             // Incorrect lint, the closures are actually different types so `f`
             // cannot be passed as an argument to `enter`.
             #[allow(clippy::redundant_closure)]
@@ -336,7 +330,7 @@ impl Context {
             core.metrics.returned_from_park();
         }
 
-        if let Some(f) = &self.spawner.shared.after_unpark {
+        if let Some(f) = &self.spawner.shared.config.after_unpark {
             // Incorrect lint, the closures are actually different types so `f`
             // cannot be passed as an argument to `enter`.
             #[allow(clippy::redundant_closure)]
@@ -382,12 +376,12 @@ impl Context {
 
 impl Spawner {
     /// Spawns a future onto the basic scheduler
-    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(&self, future: F, id: super::task::Id) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (handle, notified) = self.shared.owned.bind(future, self.shared.clone());
+        let (handle, notified) = self.shared.owned.bind(future, self.shared.clone(), id);
 
         if let Some(notified) = notified {
             self.shared.schedule(notified);
@@ -396,7 +390,7 @@ impl Spawner {
         handle
     }
 
-    fn pop(&self) -> Option<RemoteMsg> {
+    fn pop(&self) -> Option<task::Notified<Arc<Shared>>> {
         match self.shared.queue.lock().as_mut() {
             Some(queue) => queue.pop_front(),
             None => None,
@@ -413,6 +407,10 @@ impl Spawner {
     // reset woken to false and return original value
     pub(crate) fn reset_woken(&self) -> bool {
         self.shared.woken.swap(false, AcqRel)
+    }
+
+    pub(crate) fn as_handle_inner(&self) -> &HandleInner {
+        &self.shared.handle_inner
     }
 }
 
@@ -470,12 +468,41 @@ impl Schedule for Arc<Shared> {
                 // don't need to do anything with the notification in that case.
                 let mut guard = self.queue.lock();
                 if let Some(queue) = guard.as_mut() {
-                    queue.push_back(RemoteMsg::Schedule(task));
+                    queue.push_back(task);
                     drop(guard);
                     self.unpark.unpark();
                 }
             }
         });
+    }
+
+    cfg_unstable! {
+        fn unhandled_panic(&self) {
+            use crate::runtime::UnhandledPanic;
+
+            match self.config.unhandled_panic {
+                UnhandledPanic::Ignore => {
+                    // Do nothing
+                }
+                UnhandledPanic::ShutdownRuntime => {
+                    // This hook is only called from within the runtime, so
+                    // `CURRENT` should match with `&self`, i.e. there is no
+                    // opportunity for a nested scheduler to be called.
+                    CURRENT.with(|maybe_cx| match maybe_cx {
+                        Some(cx) if Arc::ptr_eq(self, &cx.spawner.shared) => {
+                            let mut core = cx.core.borrow_mut();
+
+                            // If `None`, the runtime is shutting down, so there is no need to signal shutdown
+                            if let Some(core) = core.as_mut() {
+                                core.unhandled_panic = true;
+                                self.owned.close_and_shutdown_all();
+                            }
+                        }
+                        _ => unreachable!("runtime core not set in CURRENT thread-local"),
+                    })
+                }
+            }
+        }
     }
 }
 
@@ -501,8 +528,9 @@ struct CoreGuard<'a> {
 }
 
 impl CoreGuard<'_> {
+    #[track_caller]
     fn block_on<F: Future>(self, future: F) -> F::Output {
-        self.enter(|mut core, context| {
+        let ret = self.enter(|mut core, context| {
             let _enter = crate::runtime::enter(false);
             let waker = context.spawner.waker_ref();
             let mut cx = std::task::Context::from_waker(&waker);
@@ -518,27 +546,27 @@ impl CoreGuard<'_> {
                     core = c;
 
                     if let Ready(v) = res {
-                        return (core, v);
+                        return (core, Some(v));
                     }
                 }
 
-                for _ in 0..MAX_TASKS_PER_TICK {
+                for _ in 0..core.spawner.shared.config.event_interval {
+                    // Make sure we didn't hit an unhandled_panic
+                    if core.unhandled_panic {
+                        return (core, None);
+                    }
+
                     // Get and increment the current tick
                     let tick = core.tick;
                     core.tick = core.tick.wrapping_add(1);
 
-                    let entry = if tick % REMOTE_FIRST_INTERVAL == 0 {
-                        core.spawner
-                            .pop()
-                            .or_else(|| core.tasks.pop_front().map(RemoteMsg::Schedule))
+                    let entry = if tick % core.spawner.shared.config.global_queue_interval == 0 {
+                        core.spawner.pop().or_else(|| core.tasks.pop_front())
                     } else {
-                        core.tasks
-                            .pop_front()
-                            .map(RemoteMsg::Schedule)
-                            .or_else(|| core.spawner.pop())
+                        core.tasks.pop_front().or_else(|| core.spawner.pop())
                     };
 
-                    let entry = match entry {
+                    let task = match entry {
                         Some(entry) => entry,
                         None => {
                             core = context.park(core);
@@ -548,24 +576,28 @@ impl CoreGuard<'_> {
                         }
                     };
 
-                    match entry {
-                        RemoteMsg::Schedule(task) => {
-                            let task = context.spawner.shared.owned.assert_owner(task);
+                    let task = context.spawner.shared.owned.assert_owner(task);
 
-                            let (c, _) = context.run_task(core, || {
-                                task.run();
-                            });
+                    let (c, _) = context.run_task(core, || {
+                        task.run();
+                    });
 
-                            core = c;
-                        }
-                    }
+                    core = c;
                 }
 
                 // Yield to the driver, this drives the timer and pulls any
                 // pending I/O events.
                 core = context.park_yield(core);
             }
-        })
+        });
+
+        match ret {
+            Some(ret) => ret,
+            None => {
+                // `block_on` panicked.
+                panic!("a spawned task panicked and the runtime is configured to shut down on unhandled panic");
+            }
+        }
     }
 
     /// Enters the scheduler context. This sets the queue and other necessary

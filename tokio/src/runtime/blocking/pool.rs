@@ -7,7 +7,7 @@ use crate::runtime::blocking::shutdown;
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{Builder, Callback, Handle};
+use crate::runtime::{Builder, Callback, ToHandle};
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -104,6 +104,7 @@ const KEEP_ALIVE: Duration = Duration::from_secs(10);
 /// Runs the provided function on an executor dedicated to blocking operations.
 /// Tasks will be scheduled as non-mandatory, meaning they may not get executed
 /// in case of runtime shutdown.
+#[track_caller]
 pub(crate) fn spawn_blocking<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
@@ -128,7 +129,7 @@ cfg_fs! {
         R: Send + 'static,
     {
         let rt = context::current();
-        rt.spawn_mandatory_blocking(func)
+        rt.as_inner().spawn_mandatory_blocking(&rt, func)
     }
 }
 
@@ -219,7 +220,7 @@ impl fmt::Debug for BlockingPool {
 // ===== impl Spawner =====
 
 impl Spawner {
-    pub(crate) fn spawn(&self, task: Task, rt: &Handle) -> Result<(), ()> {
+    pub(crate) fn spawn(&self, task: Task, rt: &dyn ToHandle) -> Result<(), ()> {
         let mut shared = self.inner.shared.lock();
 
         if shared.shutdown {
@@ -240,17 +241,29 @@ impl Spawner {
             if shared.num_th == self.inner.thread_cap {
                 // At max number of threads
             } else {
-                shared.num_th += 1;
                 assert!(shared.shutdown_tx.is_some());
                 let shutdown_tx = shared.shutdown_tx.clone();
 
                 if let Some(shutdown_tx) = shutdown_tx {
                     let id = shared.worker_thread_index;
-                    shared.worker_thread_index += 1;
 
-                    let handle = self.spawn_thread(shutdown_tx, rt, id);
-
-                    shared.worker_threads.insert(id, handle);
+                    match self.spawn_thread(shutdown_tx, rt, id) {
+                        Ok(handle) => {
+                            shared.num_th += 1;
+                            shared.worker_thread_index += 1;
+                            shared.worker_threads.insert(id, handle);
+                        }
+                        Err(ref e) if is_temporary_os_thread_error(e) && shared.num_th > 0 => {
+                            // OS temporarily failed to spawn a new thread.
+                            // The task will be picked up eventually by a currently
+                            // busy thread.
+                        }
+                        Err(e) => {
+                            // The OS refused to spawn the thread and there is no thread
+                            // to pick up the task that has just been pushed to the queue.
+                            panic!("OS can't spawn worker thread: {}", e)
+                        }
+                    }
                 }
             }
         } else {
@@ -270,26 +283,30 @@ impl Spawner {
     fn spawn_thread(
         &self,
         shutdown_tx: shutdown::Sender,
-        rt: &Handle,
+        rt: &dyn ToHandle,
         id: usize,
-    ) -> thread::JoinHandle<()> {
+    ) -> std::io::Result<thread::JoinHandle<()>> {
         let mut builder = thread::Builder::new().name((self.inner.thread_name)());
 
         if let Some(stack_size) = self.inner.stack_size {
             builder = builder.stack_size(stack_size);
         }
 
-        let rt = rt.clone();
+        let rt = rt.to_handle();
 
-        builder
-            .spawn(move || {
-                // Only the reference should be moved into the closure
-                let _enter = crate::runtime::context::enter(rt.clone());
-                rt.blocking_spawner.inner.run(id);
-                drop(shutdown_tx);
-            })
-            .expect("OS can't spawn a new worker thread")
+        builder.spawn(move || {
+            // Only the reference should be moved into the closure
+            let _enter = crate::runtime::context::enter(rt.clone());
+            rt.as_inner().blocking_spawner.inner.run(id);
+            drop(shutdown_tx);
+        })
     }
+}
+
+// Tells whether the error when spawning a thread is temporary.
+#[inline]
+fn is_temporary_os_thread_error(error: &std::io::Error) -> bool {
+    matches!(error.kind(), std::io::ErrorKind::WouldBlock)
 }
 
 impl Inner {

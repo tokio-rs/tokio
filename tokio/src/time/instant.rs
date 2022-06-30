@@ -67,13 +67,10 @@ impl Instant {
         self.std
     }
 
-    /// Returns the amount of time elapsed from another instant to this one.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if `earlier` is later than `self`.
+    /// Returns the amount of time elapsed from another instant to this one, or
+    /// zero duration if that instant is later than this one.
     pub fn duration_since(&self, earlier: Instant) -> Duration {
-        self.std.duration_since(earlier.std)
+        self.std.saturating_duration_since(earlier.std)
     }
 
     /// Returns the amount of time elapsed from another instant to this one, or
@@ -118,13 +115,8 @@ impl Instant {
         self.std.saturating_duration_since(earlier.std)
     }
 
-    /// Returns the amount of time elapsed since this instant was created.
-    ///
-    /// # Panics
-    ///
-    /// This function may panic if the current time is earlier than this
-    /// instant, which is something that can happen if an `Instant` is
-    /// produced synthetically.
+    /// Returns the amount of time elapsed since this instant was created,
+    /// or zero duration if that this instant is in the future.
     ///
     /// # Examples
     ///
@@ -140,7 +132,7 @@ impl Instant {
     /// }
     /// ```
     pub fn elapsed(&self) -> Duration {
-        Instant::now() - *self
+        Instant::now().saturating_duration_since(*self)
     }
 
     /// Returns `Some(t)` where `t` is the time `self + duration` if `t` can be
@@ -188,7 +180,7 @@ impl ops::Sub for Instant {
     type Output = Duration;
 
     fn sub(self, rhs: Instant) -> Duration {
-        self.std - rhs.std
+        self.std.saturating_duration_since(rhs.std)
     }
 }
 

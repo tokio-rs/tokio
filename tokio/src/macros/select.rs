@@ -101,6 +101,7 @@
 ///  * [`tokio::sync::watch::Receiver::changed`](crate::sync::watch::Receiver::changed)
 ///  * [`tokio::net::TcpListener::accept`](crate::net::TcpListener::accept)
 ///  * [`tokio::net::UnixListener::accept`](crate::net::UnixListener::accept)
+///  * [`tokio::signal::unix::Signal::recv`](crate::signal::unix::Signal::recv)
 ///  * [`tokio::io::AsyncReadExt::read`](crate::io::AsyncReadExt::read) on any `AsyncRead`
 ///  * [`tokio::io::AsyncReadExt::read_buf`](crate::io::AsyncReadExt::read_buf) on any `AsyncRead`
 ///  * [`tokio::io::AsyncWriteExt::write`](crate::io::AsyncWriteExt::write) on any `AsyncWrite`
@@ -429,7 +430,8 @@ macro_rules! select {
         //
         // This module is defined within a scope and should not leak out of this
         // macro.
-        mod util {
+        #[doc(hidden)]
+        mod __tokio_select_util {
             // Generate an enum with one variant per select branch
             $crate::select_priv_declare_output_enum!( ( $($count)* ) );
         }
@@ -442,13 +444,13 @@ macro_rules! select {
 
         const BRANCHES: u32 = $crate::count!( $($count)* );
 
-        let mut disabled: util::Mask = Default::default();
+        let mut disabled: __tokio_select_util::Mask = Default::default();
 
         // First, invoke all the pre-conditions. For any that return true,
         // set the appropriate bit in `disabled`.
         $(
             if !$c {
-                let mask: util::Mask = 1 << $crate::count!( $($skip)* );
+                let mask: __tokio_select_util::Mask = 1 << $crate::count!( $($skip)* );
                 disabled |= mask;
             }
         )*
@@ -525,7 +527,7 @@ macro_rules! select {
                                 }
 
                                 // The select is complete, return the value
-                                return Ready($crate::select_variant!(util::Out, ($($skip)*))(out));
+                                return Ready($crate::select_variant!(__tokio_select_util::Out, ($($skip)*))(out));
                             }
                         )*
                         _ => unreachable!("reaching this means there probably is an off by one bug"),
@@ -536,16 +538,16 @@ macro_rules! select {
                     Pending
                 } else {
                     // All branches have been disabled.
-                    Ready(util::Out::Disabled)
+                    Ready(__tokio_select_util::Out::Disabled)
                 }
             }).await
         };
 
         match output {
             $(
-                $crate::select_variant!(util::Out, ($($skip)*) ($bind)) => $handle,
+                $crate::select_variant!(__tokio_select_util::Out, ($($skip)*) ($bind)) => $handle,
             )*
-            util::Out::Disabled => $else,
+            __tokio_select_util::Out::Disabled => $else,
             _ => unreachable!("failed to match bind"),
         }
     }};
@@ -800,6 +802,9 @@ macro_rules! count {
     };
     (_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
         63
+    };
+    (_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        64
     };
 }
 

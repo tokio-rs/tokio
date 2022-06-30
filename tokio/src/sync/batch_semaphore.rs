@@ -582,7 +582,7 @@ impl<'a> Acquire<'a> {
 
                 tracing::trace!(
                     target: "runtime::resource::async_op::state_update",
-                    permits_obtained = 0 as usize,
+                    permits_obtained = 0usize,
                     permits.op = "override",
                 );
 

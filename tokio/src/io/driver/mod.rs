@@ -14,13 +14,17 @@ pub(crate) use registration::Registration;
 mod scheduled_io;
 use scheduled_io::ScheduledIo;
 
+mod metrics;
+
 use crate::park::{Park, Unpark};
 use crate::util::slab::{self, Slab};
-use crate::{loom::sync::Mutex, util::bit};
+use crate::{loom::sync::RwLock, util::bit};
+
+use metrics::IoDriverMetrics;
 
 use std::fmt;
 use std::io;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use std::time::Duration;
 
 /// I/O driver, backed by Mio.
@@ -33,10 +37,8 @@ pub(crate) struct Driver {
     events: Option<mio::Events>,
 
     /// Primary slab handle containing the state for each resource registered
-    /// with this driver. During Drop this is moved into the Inner structure, so
-    /// this is an Option to allow it to be vacated (until Drop this is always
-    /// Some).
-    resources: Option<Slab<ScheduledIo>>,
+    /// with this driver.
+    resources: Slab<ScheduledIo>,
 
     /// The system event queue.
     poll: mio::Poll,
@@ -48,7 +50,7 @@ pub(crate) struct Driver {
 /// A reference to an I/O driver.
 #[derive(Clone)]
 pub(crate) struct Handle {
-    inner: Weak<Inner>,
+    pub(super) inner: Arc<Inner>,
 }
 
 #[derive(Debug)]
@@ -57,23 +59,22 @@ pub(crate) struct ReadyEvent {
     pub(crate) ready: Ready,
 }
 
-pub(super) struct Inner {
-    /// Primary slab handle containing the state for each resource registered
-    /// with this driver.
-    ///
-    /// The ownership of this slab is moved into this structure during
-    /// `Driver::drop`, so that `Inner::drop` can notify all outstanding handles
-    /// without risking new ones being registered in the meantime.
-    resources: Mutex<Option<Slab<ScheduledIo>>>,
+struct IoDispatcher {
+    allocator: slab::Allocator<ScheduledIo>,
+    is_shutdown: bool,
+}
 
+pub(super) struct Inner {
     /// Registers I/O resources.
     registry: mio::Registry,
 
     /// Allocates `ScheduledIo` handles when creating new resources.
-    pub(super) io_dispatch: slab::Allocator<ScheduledIo>,
+    io_dispatch: RwLock<IoDispatcher>,
 
     /// Used to wake up the reactor from a call to `turn`.
     waker: mio::Waker,
+
+    metrics: IoDriverMetrics,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
@@ -124,12 +125,12 @@ impl Driver {
             tick: 0,
             events: Some(mio::Events::with_capacity(1024)),
             poll,
-            resources: Some(slab),
+            resources: slab,
             inner: Arc::new(Inner {
-                resources: Mutex::new(None),
                 registry,
-                io_dispatch: allocator,
+                io_dispatch: RwLock::new(IoDispatcher::new(allocator)),
                 waker,
+                metrics: IoDriverMetrics::default(),
             }),
         })
     }
@@ -142,7 +143,7 @@ impl Driver {
     /// to bind them to this event loop.
     pub(crate) fn handle(&self) -> Handle {
         Handle {
-            inner: Arc::downgrade(&self.inner),
+            inner: Arc::clone(&self.inner),
         }
     }
 
@@ -153,7 +154,7 @@ impl Driver {
         self.tick = self.tick.wrapping_add(1);
 
         if self.tick == COMPACT_INTERVAL {
-            self.resources.as_mut().unwrap().compact()
+            self.resources.compact()
         }
 
         let mut events = self.events.take().expect("i/o driver event store missing");
@@ -167,13 +168,17 @@ impl Driver {
         }
 
         // Process all the events that came in, dispatching appropriately
+        let mut ready_count = 0;
         for event in events.iter() {
             let token = event.token();
 
             if token != TOKEN_WAKEUP {
                 self.dispatch(token, Ready::from_mio(event));
+                ready_count += 1;
             }
         }
+
+        self.inner.metrics.incr_ready_count_by(ready_count);
 
         self.events = Some(events);
 
@@ -183,7 +188,7 @@ impl Driver {
     fn dispatch(&mut self, token: mio::Token, ready: Ready) {
         let addr = slab::Address::from_usize(ADDRESS.unpack(token.0));
 
-        let resources = self.resources.as_mut().unwrap();
+        let resources = &mut self.resources;
 
         let io = match resources.get(addr) {
             Some(io) => io,
@@ -203,22 +208,7 @@ impl Driver {
 
 impl Drop for Driver {
     fn drop(&mut self) {
-        (*self.inner.resources.lock()) = self.resources.take();
-    }
-}
-
-impl Drop for Inner {
-    fn drop(&mut self) {
-        let resources = self.resources.lock().take();
-
-        if let Some(mut slab) = resources {
-            slab.for_each(|io| {
-                // If a task is waiting on the I/O resource, notify it. The task
-                // will then attempt to use the I/O resource and fail due to the
-                // driver being shutdown.
-                io.shutdown();
-            });
-        }
+        self.shutdown();
     }
 }
 
@@ -240,7 +230,16 @@ impl Park for Driver {
         Ok(())
     }
 
-    fn shutdown(&mut self) {}
+    fn shutdown(&mut self) {
+        if self.inner.shutdown() {
+            self.resources.for_each(|io| {
+                // If a task is waiting on the I/O resource, notify it. The task
+                // will then attempt to use the I/O resource and fail due to the
+                // driver being shutdown. And shutdown will clear all wakers.
+                io.shutdown();
+            });
+        }
+    }
 }
 
 impl fmt::Debug for Driver {
@@ -259,6 +258,7 @@ cfg_rt! {
         ///
         /// This function panics if there is no current reactor set and `rt` feature
         /// flag is not enabled.
+        #[track_caller]
         pub(super) fn current() -> Self {
             crate::runtime::context::io_handle().expect("A Tokio 1.x context was found, but IO is disabled. Call `enable_io` on the runtime builder to enable IO.")
         }
@@ -279,6 +279,16 @@ cfg_not_rt! {
     }
 }
 
+cfg_net! {
+    cfg_metrics! {
+        impl Handle {
+            pub(crate) fn metrics(&self) -> &IoDriverMetrics {
+                &self.inner.metrics
+            }
+        }
+    }
+}
+
 impl Handle {
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
@@ -290,13 +300,7 @@ impl Handle {
     /// blocked in `turn`, then the next call to `turn` will not block and
     /// return immediately.
     fn wakeup(&self) {
-        if let Some(inner) = self.inner() {
-            inner.waker.wake().expect("failed to wake I/O driver");
-        }
-    }
-
-    pub(super) fn inner(&self) -> Option<Arc<Inner>> {
-        self.inner.upgrade()
+        self.inner.waker.wake().expect("failed to wake I/O driver");
     }
 }
 
@@ -312,6 +316,17 @@ impl fmt::Debug for Handle {
     }
 }
 
+// ===== impl IoDispatcher =====
+
+impl IoDispatcher {
+    fn new(allocator: slab::Allocator<ScheduledIo>) -> Self {
+        Self {
+            allocator,
+            is_shutdown: false,
+        }
+    }
+}
+
 // ===== impl Inner =====
 
 impl Inner {
@@ -323,24 +338,55 @@ impl Inner {
         source: &mut impl mio::event::Source,
         interest: Interest,
     ) -> io::Result<slab::Ref<ScheduledIo>> {
-        let (address, shared) = self.io_dispatch.allocate().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                "reactor at max registered I/O resources",
-            )
-        })?;
+        let (address, shared) = self.allocate()?;
 
         let token = GENERATION.pack(shared.generation(), ADDRESS.pack(address.as_usize(), 0));
 
         self.registry
             .register(source, mio::Token(token), interest.to_mio())?;
 
+        self.metrics.incr_fd_count();
+
         Ok(shared)
     }
 
     /// Deregisters an I/O resource from the reactor.
     pub(super) fn deregister_source(&self, source: &mut impl mio::event::Source) -> io::Result<()> {
-        self.registry.deregister(source)
+        self.registry.deregister(source)?;
+
+        self.metrics.dec_fd_count();
+
+        Ok(())
+    }
+
+    /// shutdown the dispatcher.
+    fn shutdown(&self) -> bool {
+        let mut io = self.io_dispatch.write().unwrap();
+        if io.is_shutdown {
+            return false;
+        }
+        io.is_shutdown = true;
+        true
+    }
+
+    fn is_shutdown(&self) -> bool {
+        return self.io_dispatch.read().unwrap().is_shutdown;
+    }
+
+    fn allocate(&self) -> io::Result<(slab::Address, slab::Ref<ScheduledIo>)> {
+        let io = self.io_dispatch.read().unwrap();
+        if io.is_shutdown {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to find event loop",
+            ));
+        }
+        io.allocator.allocate().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "reactor at max registered I/O resources",
+            )
+        })
     }
 }
 

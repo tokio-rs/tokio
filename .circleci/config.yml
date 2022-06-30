@@ -5,7 +5,7 @@ jobs:
       image: ubuntu-2004:202101-01
     resource_class: arm.medium
     environment:
-      # Change to pin rust versino
+      # Change to pin rust version
       RUST_STABLE: stable
     steps:
       - checkout

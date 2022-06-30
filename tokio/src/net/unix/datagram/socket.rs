@@ -1241,7 +1241,9 @@ impl UnixDatagram {
         interest: Interest,
         f: impl FnOnce() -> io::Result<R>,
     ) -> io::Result<R> {
-        self.io.registration().try_io(interest, f)
+        self.io
+            .registration()
+            .try_io(interest, || self.io.try_io(f))
     }
 
     /// Returns the local address that this socket is bound to.

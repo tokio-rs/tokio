@@ -32,7 +32,7 @@
 use std::cell::Cell;
 
 thread_local! {
-    static CURRENT: Cell<Budget> = Cell::new(Budget::unconstrained());
+    static CURRENT: Cell<Budget> = const { Cell::new(Budget::unconstrained()) };
 }
 
 /// Opaque type tracking the amount of "work" a task may still do before

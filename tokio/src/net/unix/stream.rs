@@ -685,7 +685,9 @@ impl UnixStream {
         interest: Interest,
         f: impl FnOnce() -> io::Result<R>,
     ) -> io::Result<R> {
-        self.io.registration().try_io(interest, f)
+        self.io
+            .registration()
+            .try_io(interest, || self.io.try_io(f))
     }
 
     /// Creates new `UnixStream` from a `std::os::unix::net::UnixStream`.

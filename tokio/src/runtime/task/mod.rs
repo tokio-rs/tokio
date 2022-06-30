@@ -135,6 +135,10 @@
 //! poll call will notice it when the poll finishes, and the task is cancelled
 //! at that point.
 
+// Some task infrastructure is here to support `JoinSet`, which is currently
+// unstable. This should be removed once `JoinSet` is stabilized.
+#![cfg_attr(not(tokio_unstable), allow(dead_code))]
+
 mod core;
 use self::core::Cell;
 use self::core::Header;
@@ -151,7 +155,14 @@ cfg_rt_multi_thread! {
     pub(super) use self::inject::Inject;
 }
 
+#[cfg(all(feature = "rt", any(tokio_unstable, test)))]
+mod abort;
 mod join;
+
+#[cfg(all(feature = "rt", any(tokio_unstable, test)))]
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+pub use self::abort::AbortHandle;
+
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
 
@@ -172,6 +183,27 @@ use crate::util::linked_list;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{fmt, mem};
+
+/// An opaque ID that uniquely identifies a task relative to all other currently
+/// running tasks.
+///
+/// # Notes
+///
+/// - Task IDs are unique relative to other *currently running* tasks. When a
+///   task completes, the same ID may be used for another task.
+/// - Task IDs are *not* sequential, and do not indicate the order in which
+///   tasks are spawned, what runtime a task is spawned on, or any other data.
+///
+/// **Note**: This is an [unstable API][unstable]. The public API of this type
+/// may break in 1.x releases. See [the documentation on unstable
+/// features][unstable] for details.
+///
+/// [unstable]: crate#unstable-features
+#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+// TODO(eliza): there's almost certainly no reason not to make this `Copy` as well...
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct Id(u64);
 
 /// An owned handle to the task, tracked by ref count.
 #[repr(transparent)]
@@ -230,6 +262,11 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     fn yield_now(&self, task: Notified<Self>) {
         self.schedule(task);
     }
+
+    /// Polling the task resulted in a panic. Should the runtime shutdown?
+    fn unhandled_panic(&self) {
+        // By default, do nothing. This maintains the 1.0 behavior.
+    }
 }
 
 cfg_rt! {
@@ -239,14 +276,15 @@ cfg_rt! {
     /// notification.
     fn new_task<T, S>(
         task: T,
-        scheduler: S
+        scheduler: S,
+        id: Id,
     ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let raw = RawTask::new::<T, S>(task, scheduler);
+        let raw = RawTask::new::<T, S>(task, scheduler, id.clone());
         let task = Task {
             raw,
             _p: PhantomData,
@@ -255,7 +293,7 @@ cfg_rt! {
             raw,
             _p: PhantomData,
         });
-        let join = JoinHandle::new(raw);
+        let join = JoinHandle::new(raw, id);
 
         (task, notified, join)
     }
@@ -264,13 +302,13 @@ cfg_rt! {
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.
-    pub(crate) fn unowned<T, S>(task: T, scheduler: S) -> (UnownedTask<S>, JoinHandle<T::Output>)
+    pub(crate) fn unowned<T, S>(task: T, scheduler: S, id: Id) -> (UnownedTask<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Send + Future + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) = new_task(task, scheduler);
+        let (task, notified, join) = new_task(task, scheduler, id);
 
         // This transfers the ref-count of task and notified into an UnownedTask.
         // This is valid because an UnownedTask holds two ref-counts.
@@ -313,7 +351,7 @@ cfg_rt_multi_thread! {
 
     impl<S: 'static> Task<S> {
         fn into_raw(self) -> NonNull<Header> {
-            let ret = self.header().into();
+            let ret = self.raw.header_ptr();
             mem::forget(self);
             ret
         }
@@ -427,7 +465,7 @@ unsafe impl<S> linked_list::Link for Task<S> {
     type Target = Header;
 
     fn as_raw(handle: &Task<S>) -> NonNull<Header> {
-        handle.header().into()
+        handle.raw.header_ptr()
     }
 
     unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
@@ -437,5 +475,48 @@ unsafe impl<S> linked_list::Link for Task<S> {
     unsafe fn pointers(target: NonNull<Header>) -> NonNull<linked_list::Pointers<Header>> {
         // Not super great as it avoids some of looms checking...
         NonNull::from(target.as_ref().owned.with_mut(|ptr| &mut *ptr))
+    }
+}
+
+impl fmt::Display for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Id {
+    // When 64-bit atomics are available, use a static `AtomicU64` counter to
+    // generate task IDs.
+    //
+    // Note(eliza): we _could_ just use `crate::loom::AtomicU64`, which switches
+    // between an atomic and mutex-based implementation here, rather than having
+    // two separate functions for targets with and without 64-bit atomics.
+    // However, because we can't use the mutex-based implementation in a static
+    // initializer directly, the 32-bit impl also has to use a `OnceCell`, and I
+    // thought it was nicer to avoid the `OnceCell` overhead on 64-bit
+    // platforms...
+    cfg_has_atomic_u64! {
+        pub(crate) fn next() -> Self {
+            use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+            static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+            Self(NEXT_ID.fetch_add(1, Relaxed))
+        }
+    }
+
+    cfg_not_has_atomic_u64! {
+        pub(crate) fn next() -> Self {
+            use once_cell::sync::Lazy;
+            use crate::loom::sync::Mutex;
+
+            static NEXT_ID: Lazy<Mutex<u64>> = Lazy::new(|| Mutex::new(1));
+            let mut lock = NEXT_ID.lock();
+            let id = *lock;
+            *lock += 1;
+            Self(id)
+        }
+    }
+
+    pub(crate) fn as_u64(&self) -> u64 {
+        self.0
     }
 }

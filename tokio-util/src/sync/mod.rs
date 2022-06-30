@@ -3,10 +3,8 @@
 mod cancellation_token;
 pub use cancellation_token::{guard::DropGuard, CancellationToken, WaitForCancellationFuture};
 
-mod intrusive_double_linked_list;
-
 mod mpsc;
-pub use mpsc::PollSender;
+pub use mpsc::{PollSendError, PollSender};
 
 mod poll_semaphore;
 pub use poll_semaphore::PollSemaphore;

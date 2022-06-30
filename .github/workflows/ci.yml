@@ -11,8 +11,16 @@ env:
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2022-01-12
+  rust_nightly: nightly-2022-04-18
   rust_clippy: 1.52.0
+  # When updating this, also update:
+  # - README.md
+  # - tokio/README.md
+  # - CONTRIBUTING.md
+  # - tokio/Cargo.toml
+  # - tokio-util/Cargo.toml
+  # - tokio-test/Cargo.toml
+  # - tokio-stream/Cargo.toml
   rust_min: 1.49.0
 
 defaults:
@@ -53,7 +61,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
@@ -103,7 +111,7 @@ jobs:
     name: compile tests with parking lot send guards
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
@@ -120,7 +128,7 @@ jobs:
     name: valgrind
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
@@ -161,7 +169,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
@@ -174,12 +182,15 @@ jobs:
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          # in order to run doctests for unstable features, we must also pass
+          # the unstable cfg to RustDoc
+          RUSTDOCFLAGS: --cfg tokio_unstable
 
   miri:
     name: miri
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
@@ -188,17 +199,22 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: miri
-        run: |
-          set -e
-          rm -rf tests
-          cargo miri test --features rt,rt-multi-thread,sync task
+        # Many of tests in tokio/tests and doctests use #[tokio::test] or
+        # #[tokio::main] that calls epoll_create1 that Miri does not support.
+        run: cargo miri test --features full --lib --no-fail-fast
         working-directory: tokio
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-tag-raw-pointers
+          PROPTEST_CASES: 10
 
-  san:
-    name: san
+  asan:
+    name: asan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - name: Install llvm
+        # Required to resolve symbols in sanitizer output
+        run: sudo apt-get install -y llvm
       - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
@@ -206,11 +222,11 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: asan
-        run: cargo test --all-features --target x86_64-unknown-linux-gnu --lib -- --test-threads 1
-        working-directory: tokio
+        run: cargo test --workspace --all-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1
         env:
           RUSTFLAGS: -Z sanitizer=address
-          ASAN_OPTIONS: detect_leaks=0
+          # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
+          TRYBUILD: overwrite
 
   cross:
     name: cross
@@ -223,26 +239,33 @@ jobs:
           - powerpc64-unknown-linux-gnu
           - mips-unknown-linux-gnu
           - arm-linux-androideabi
+          - mipsel-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
           override: true
-      - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: check
-          args: --workspace --target ${{ matrix.target }}
+          args: --workspace --all-features --target ${{ matrix.target }}
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: check
+          args: --workspace --all-features --target ${{ matrix.target }}
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   features:
     name: features
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
@@ -264,7 +287,7 @@ jobs:
     name: minrust
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_min }}
         uses: actions-rs/toolchain@v1
         with:
@@ -278,7 +301,7 @@ jobs:
     name: minimal-versions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
@@ -310,7 +333,7 @@ jobs:
     name: fmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
@@ -331,7 +354,7 @@ jobs:
     name: clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_clippy }}
         uses: actions-rs/toolchain@v1
         with:
@@ -347,7 +370,7 @@ jobs:
     name: docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
@@ -357,14 +380,14 @@ jobs:
       - name: "doc --lib --all-features"
         run: cargo doc --lib --no-deps --all-features --document-private-items
         env:
-          RUSTFLAGS: --cfg docsrs
-          RUSTDOCFLAGS: --cfg docsrs -Dwarnings
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
 
   loom-compile:
     name: build loom tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
@@ -381,7 +404,7 @@ jobs:
     name: Check README
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Verify that both READMEs are identical
         run: diff README.md tokio/README.md
 
@@ -399,7 +422,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
@@ -427,7 +450,7 @@ jobs:
     name: test tokio for wasm32-unknown-unknown
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
