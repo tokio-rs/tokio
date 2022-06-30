@@ -186,7 +186,7 @@ impl<T: 'static> LocalKey<T> {
         let mut value = Some(value);
         match self.scope_inner(&mut value, f) {
             Ok(res) => res,
-            Err(err) => std::panic::panic_any(err.as_str()),
+            Err(err) => err.panic(),
         }
     }
 
@@ -354,7 +354,7 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
         match res {
             Ok(Some(res)) => res,
             Ok(None) => panic!("`TaskLocalFuture` polled after completion"),
-            Err(err) => std::panic::panic_any(err.as_str()),
+            Err(err) => err.panic(),
         }
     }
 }
@@ -423,10 +423,10 @@ enum ScopeInnerErr {
 }
 
 impl ScopeInnerErr {
-    fn as_str(&self) -> &'static str {
+    fn panic(&self) -> ! {
         match self {
-            Self::BorrowError => "cannot enter a task-local scope while the task-local storage is borrowed",
-            Self::AccessError => "cannot enter a task-local scope during or after destruction of the underlying thread-local",
+            Self::BorrowError => panic!("cannot enter a task-local scope while the task-local storage is borrowed"),
+            Self::AccessError => panic!("cannot enter a task-local scope during or after destruction of the underlying thread-local"),
         }
     }
 }
