@@ -423,7 +423,7 @@ enum ScopeInnerErr {
 }
 
 impl ScopeInnerErr {
-    fn as_str(self) -> &'static str {
+    fn as_str(&self) -> &'static str {
         match self {
             Self::BorrowError => "cannot enter a task-local scope while the task-local storage is borrowed",
             Self::AccessError => "cannot enter a task-local scope during or after destruction of the underlying thread-local",
