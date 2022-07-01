@@ -1,20 +1,14 @@
 //! A cat-like utility that can be used as a subprocess to test I/O
 //! stream communication.
 
-use std::io;
-use std::io::Write;
+use tokio::io::AsyncWriteExt;
 
-fn main() {
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
-    let mut line = String::new();
-    loop {
-        line.clear();
-        stdin.read_line(&mut line).unwrap();
-        if line.is_empty() {
-            break;
-        }
-        stdout.write_all(line.as_bytes()).unwrap();
-    }
-    stdout.flush().unwrap();
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    let mut stdin = tokio::io::stdin();
+    let mut stdout = tokio::io::stdout();
+
+    tokio::io::copy(&mut stdin, &mut stdout).await.unwrap();
+
+    stdout.flush().await.unwrap();
 }
