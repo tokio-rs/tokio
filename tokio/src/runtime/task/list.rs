@@ -11,6 +11,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::Mutex;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
+use crate::util::OwningPtr;
 
 use std::marker::PhantomData;
 
@@ -82,7 +83,7 @@ impl<S: 'static> OwnedTasks<S> {
     /// OwnedTasks has been closed.
     pub(crate) fn bind<T>(
         &self,
-        task: T,
+        task: OwningPtr<'_, T>,
         scheduler: S,
         id: super::Id,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
@@ -186,7 +187,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
 
     pub(crate) fn bind<T>(
         &self,
-        task: T,
+        task: OwningPtr<'_, T>,
         scheduler: S,
         id: super::Id,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)

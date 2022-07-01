@@ -58,6 +58,9 @@ cfg_rt! {
 
     mod vec_deque_cell;
     pub(crate) use vec_deque_cell::VecDequeCell;
+
+    mod owning_ptr;
+    pub(crate) use owning_ptr::OwningPtr;
 }
 
 cfg_rt_multi_thread! {

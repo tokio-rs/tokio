@@ -9,7 +9,7 @@ use crate::runtime::{Callback, HandleInner};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
-use crate::util::{waker_ref, Wake, WakerRef};
+use crate::util::{waker_ref, OwningPtr, Wake, WakerRef};
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -376,7 +376,7 @@ impl Context {
 
 impl Spawner {
     /// Spawns a future onto the basic scheduler
-    pub(crate) fn spawn<F>(&self, future: F, id: super::task::Id) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(&self, future: OwningPtr<'_, F>, id: super::task::Id) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,

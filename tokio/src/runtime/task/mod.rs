@@ -178,7 +178,7 @@ use self::state::State;
 mod waker;
 
 use crate::future::Future;
-use crate::util::linked_list;
+use crate::util::{linked_list, OwningPtr};
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -275,7 +275,7 @@ cfg_rt! {
     /// immediately. The Notified is sent to the scheduler as an ordinary
     /// notification.
     fn new_task<T, S>(
-        task: T,
+        task: OwningPtr<'_, T>,
         scheduler: S,
         id: Id,
     ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
@@ -302,7 +302,7 @@ cfg_rt! {
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.
-    pub(crate) fn unowned<T, S>(task: T, scheduler: S, id: Id) -> (UnownedTask<S>, JoinHandle<T::Output>)
+    pub(crate) fn unowned<T, S>(task: OwningPtr<'_, T>, scheduler: S, id: Id) -> (UnownedTask<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Send + Future + 'static,

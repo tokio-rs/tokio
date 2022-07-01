@@ -14,8 +14,9 @@ use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule};
-use crate::util::linked_list;
+use crate::util::{linked_list, OwningPtr};
 
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
@@ -105,10 +106,39 @@ pub(super) enum Stage<T: Future> {
 impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
-    pub(super) fn new(future: T, scheduler: S, state: State, task_id: Id) -> Box<Cell<T, S>> {
+    pub(super) fn new(future: OwningPtr<'_, T>, scheduler: S, state: State, task_id: Id) -> Box<Cell<T, S>> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let id = future.id();
-        Box::new(Cell {
+        let tracing_id = future.id();
+
+        // Using `Box::new` to allocate memory executes the operations in the following order:
+        //
+        //  1. Create value on the stack.
+        //  2. Allocate memory for the Box.
+        //  3. Move value into allocation.
+        //
+        // Unfortunately, this ordering optimizes poorly. If the allocation panics, then the value
+        // must run its destructor. By allocating the memory before creating the value, there's a
+        // good chance that the compiler can optimize away the value on the stack.
+        let uninit_box: Box<MaybeUninit<Cell<T, S>>> = {
+            let layout = std::alloc::Layout::new::<Cell<T, S>>();
+            // safety: This is safe because the layout has a non-zero size. This is true even if T
+            // and S are zero-sized because of the header.
+            let alloc = unsafe { std::alloc::alloc(layout) };
+
+            if alloc.is_null() {
+                std::alloc::handle_alloc_error(layout);
+            }
+
+            // safety: The pointer was allocated using the correct memory layout, and we checked
+            // that the allocation did not fail.
+            //
+            // We do not need to initialize the memory because the type is MaybeUninit.
+            unsafe {
+                Box::from_raw(alloc as *mut MaybeUninit<Cell<T, S>>)
+            }
+        };
+
+        *uninit_box = MaybeUninit::new(Cell {
             header: Header {
                 state,
                 owned: UnsafeCell::new(linked_list::Pointers::new()),
@@ -116,19 +146,26 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 vtable: raw::vtable::<T, S>(),
                 owner_id: UnsafeCell::new(0),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
-                id,
+                id: tracing_id,
             },
             core: Core {
                 scheduler,
                 stage: CoreStage {
-                    stage: UnsafeCell::new(Stage::Running(future)),
+                    stage: UnsafeCell::new(Stage::Running(future.into_inner())),
                 },
                 task_id,
             },
             trailer: Trailer {
                 waker: UnsafeCell::new(None),
-            },
-        })
+            }
+        });
+
+        // safety: We just initialized the value.
+        let init_box: Box<Cell<T, S>> = unsafe {
+            Box::from_raw(Box::into_raw(uninit_box).cast())
+        };
+
+        init_box
     }
 }
 

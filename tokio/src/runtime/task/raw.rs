@@ -1,5 +1,6 @@
 use crate::future::Future;
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
+use crate::util::OwningPtr;
 
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
@@ -52,7 +53,7 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
 }
 
 impl RawTask {
-    pub(super) fn new<T, S>(task: T, scheduler: S, id: Id) -> RawTask
+    pub(super) fn new<T, S>(task: OwningPtr<'_, T>, scheduler: S, id: Id) -> RawTask
     where
         T: Future,
         S: Schedule,

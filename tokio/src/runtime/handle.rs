@@ -2,9 +2,11 @@ use crate::runtime::blocking::{BlockingTask, NoopSchedule};
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
+use crate::util::OwningPtr;
 
 use std::future::Future;
 use std::marker::PhantomData;
+use std::mem::ManuallyDrop;
 use std::{error, fmt};
 
 /// Handle to the runtime.
@@ -171,6 +173,7 @@ impl Handle {
     /// # }
     /// ```
     #[track_caller]
+    #[inline(always)]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
@@ -199,6 +202,7 @@ impl Handle {
     /// });
     /// # }
     #[track_caller]
+    #[inline(always)]
     pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -300,6 +304,7 @@ impl Handle {
     }
 
     #[track_caller]
+    #[inline(always)]
     pub(crate) fn spawn_named<F>(&self, future: F, _name: Option<&str>) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
@@ -336,20 +341,13 @@ cfg_metrics! {
 
 impl HandleInner {
     #[track_caller]
+    #[inline(always)]
     pub(crate) fn spawn_blocking<F, R>(&self, rt: &dyn ToHandle, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        let (join_handle, _was_spawned) = if cfg!(debug_assertions)
-            && std::mem::size_of::<F>() > 2048
-        {
-            self.spawn_blocking_inner(Box::new(func), blocking::Mandatory::NonMandatory, None, rt)
-        } else {
-            self.spawn_blocking_inner(func, blocking::Mandatory::NonMandatory, None, rt)
-        };
-
-        join_handle
+        self.spawn_blocking_inner(func, blocking::Mandatory::NonMandatory, None, rt)
     }
 
     cfg_fs! {
@@ -363,21 +361,7 @@ impl HandleInner {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            let (join_handle, was_spawned) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
-                self.spawn_blocking_inner(
-                    Box::new(func),
-                    blocking::Mandatory::Mandatory,
-                    None,
-                    rt,
-                )
-            } else {
-                self.spawn_blocking_inner(
-                    func,
-                    blocking::Mandatory::Mandatory,
-                    None,
-                    rt,
-                )
-            };
+            let (join_handle, was_spawned) = self.spawn_blocking_inner( func, blocking::Mandatory::Mandatory, None, rt);
 
             if was_spawned {
                 Some(join_handle)
@@ -388,6 +372,7 @@ impl HandleInner {
     }
 
     #[track_caller]
+    #[inline(always)]
     pub(crate) fn spawn_blocking_inner<F, R>(
         &self,
         func: F,
@@ -416,6 +401,10 @@ impl HandleInner {
             );
             fut.instrument(span)
         };
+
+        // safety: We don't touch `fut_storage` after passing it to OwningPtr.
+        let mut fut_storage = ManuallyDrop::new(fut);
+        let fut = unsafe { OwningPtr::new(&mut fut_storage) };
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
