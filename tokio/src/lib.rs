@@ -516,7 +516,7 @@ pub(crate) use self::doc::winapi;
 #[allow(unused)]
 pub(crate) use winapi;
 
-cfg_macros! {
+cfg_macros_proc! {
     /// Implementation detail of the `select!` macro. This macro is **not**
     /// intended to be used as part of the public API and is permitted to
     /// change.
@@ -532,12 +532,12 @@ cfg_macros! {
     cfg_rt! {
         #[cfg(feature = "rt-multi-thread")]
         #[cfg(not(test))] // Work around for rust-lang/rust#62127
-        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "macros-proc")))]
         #[doc(inline)]
         pub use tokio_macros::main;
 
         #[cfg(feature = "rt-multi-thread")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "macros-proc")))]
         #[doc(inline)]
         pub use tokio_macros::test;
 

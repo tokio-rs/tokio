@@ -1,8 +1,8 @@
-#![cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
+#![cfg_attr(not(feature = "macros-decl"), allow(unreachable_pub))]
 
 //! Asynchronous values.
 
-#[cfg(any(feature = "macros", feature = "process"))]
+#[cfg(any(feature = "macros-decl", feature = "process"))]
 pub(crate) mod maybe_done;
 
 mod poll_fn;

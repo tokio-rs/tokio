@@ -52,9 +52,9 @@ impl FastRand {
 }
 
 // Used by the select macro and `StreamMap`
-#[cfg(any(feature = "macros"))]
+#[cfg(any(feature = "macros-decl"))]
 #[doc(hidden)]
-#[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
+#[cfg_attr(not(feature = "macros-decl"), allow(unreachable_pub))]
 pub fn thread_rng_n(n: u32) -> u32 {
     thread_local! {
         static THREAD_RNG: FastRand = FastRand::new(crate::loom::rand::seed());

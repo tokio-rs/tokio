@@ -24,7 +24,7 @@ cfg_trace! {
 #[cfg(feature = "rt")]
 pub(crate) mod scoped_tls;
 
-cfg_macros! {
+cfg_macros_decl! {
     #[macro_use]
     mod select;
 

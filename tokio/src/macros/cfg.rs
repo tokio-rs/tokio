@@ -164,11 +164,21 @@ macro_rules! cfg_not_loom {
     }
 }
 
-macro_rules! cfg_macros {
+macro_rules! cfg_macros_decl {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "macros")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+            #[cfg(feature = "macros-decl")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "macros-decl")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_macros_proc {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "macros-proc")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "macros-proc")))]
             $item
         )*
     }

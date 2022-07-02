@@ -40,7 +40,7 @@ pub(crate) use wake_list::WakeList;
 ))]
 pub(crate) mod linked_list;
 
-#[cfg(any(feature = "rt-multi-thread", feature = "macros"))]
+#[cfg(any(feature = "rt-multi-thread", feature = "macros-decl"))]
 mod rand;
 
 cfg_rt! {
@@ -69,8 +69,8 @@ cfg_rt_multi_thread! {
 
 pub(crate) mod trace;
 
-#[cfg(any(feature = "macros"))]
-#[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
+#[cfg(any(feature = "macros-decl"))]
+#[cfg_attr(not(feature = "macros-decl"), allow(unreachable_pub))]
 pub use self::rand::thread_rng_n;
 
 #[cfg(any(
