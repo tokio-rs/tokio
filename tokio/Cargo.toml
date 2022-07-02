@@ -45,7 +45,11 @@ fs = []
 io-util = ["memchr", "bytes"]
 # stdin, stdout, stderr
 io-std = []
-macros = ["tokio-macros"]
+
+macros = ["macros-decl", "macros-proc"]
+macros-decl = []               # Declarative Macros
+macros-proc = ["tokio-macros"] # Procedural Marcos
+
 net = [
   "libc",
   "mio/os-poll",
