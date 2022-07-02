@@ -320,7 +320,9 @@
 //! - `time`: Enables `tokio::time` types and allows the schedulers to enable
 //!           the built in timer.
 //! - `process`: Enables `tokio::process` types.
-//! - `macros`: Enables `#[tokio::main]` and `#[tokio::test]` macros.
+//! - `macros`: Enables both `macros-decl` and `macros-proc` features (for convenience).
+//! - `macros-decl`: Enables the `join!`, `try_join!`, and `select!` declarative macros.
+//! - `macros-proc`: Enables `#[tokio::main]` and `#[tokio::test]` attribute macros.
 //! - `sync`: Enables all `tokio::sync` types.
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
