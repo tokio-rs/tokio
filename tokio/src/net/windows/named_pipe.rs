@@ -2020,6 +2020,7 @@ impl ServerOptions {
     /// let builder = ServerOptions::new().max_instances(255);
     /// # Ok(()) }
     /// ```
+    #[track_caller]
     pub fn max_instances(&mut self, instances: usize) -> &mut Self {
         assert!(instances < 255, "cannot specify more than 254 instances");
         self.max_instances = instances as DWORD;

@@ -165,7 +165,7 @@ fn unix_datagram_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
 
 #[test]
 #[cfg(windows)]
-fn named_pipe_count_panic_caller() -> Result<(), Box<dyn Error>> {
+fn server_options_max_instances_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::net::windows::named_pipe::ServerOptions;
 
     let panic_location_file = test_panic(move || {
