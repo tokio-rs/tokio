@@ -170,6 +170,7 @@ impl UdpSocket {
         UdpSocket::new(sys)
     }
 
+    #[track_caller]
     fn new(socket: mio::net::UdpSocket) -> io::Result<UdpSocket> {
         let io = PollEvented::new(socket)?;
         Ok(UdpSocket { io })
@@ -210,6 +211,7 @@ impl UdpSocket {
     /// # Ok(())
     /// # }
     /// ```
+    #[track_caller]
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_std(socket);
         UdpSocket::new(io)
