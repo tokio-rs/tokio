@@ -204,6 +204,7 @@ cfg_rt! {
 
     mod blocking;
     use blocking::BlockingPool;
+    #[cfg_attr(target_os = "wasi", allow(unused_imports))]
     pub(crate) use blocking::spawn_blocking;
 
     cfg_trace! {

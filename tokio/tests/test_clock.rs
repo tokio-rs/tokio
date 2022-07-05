@@ -28,7 +28,6 @@ async fn can_pause_after_resume() {
     assert!(Instant::now() - start < Duration::from_secs(21));
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi does not support panic recovery
 #[tokio::test]
 #[should_panic]
 async fn freezing_time_while_frozen_panics() {
@@ -36,14 +35,12 @@ async fn freezing_time_while_frozen_panics() {
     time::pause();
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi does not support panic recovery
 #[tokio::test]
 #[should_panic]
 async fn advancing_time_when_time_is_not_frozen_panics() {
     time::advance(Duration::from_secs(1)).await;
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi does not support panic recovery
 #[tokio::test]
 #[should_panic]
 async fn resuming_time_when_not_frozen_panics() {

@@ -369,7 +369,10 @@ fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
     thread.join().expect("test thread should not panic!")
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "`unwrap()` in `with_timeout()` panics on Wasi"
+)]
 #[test]
 fn drop_cancels_remote_tasks() {
     // This test reproduces issue #1885.
@@ -392,7 +395,10 @@ fn drop_cancels_remote_tasks() {
     });
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "FIXME: `task::spawn_local().await.unwrap()` panics on Wasi"
+)]
 #[test]
 fn local_tasks_wake_join_all() {
     // This test reproduces issue #2460.

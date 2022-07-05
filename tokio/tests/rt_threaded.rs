@@ -1,17 +1,12 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(target_os = "wasi")))]
 
-#[cfg(not(target_os = "wasi"))]
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-#[cfg(not(target_os = "wasi"))]
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime;
 use tokio::sync::oneshot;
-#[cfg(not(target_os = "wasi"))]
-use tokio_test::assert_err;
-use tokio_test::assert_ok;
+use tokio_test::{assert_err, assert_ok};
 
-#[cfg(not(target_os = "wasi"))]
 use futures::future::poll_fn;
 use std::future::Future;
 use std::pin::Pin;
@@ -29,7 +24,6 @@ macro_rules! cfg_metrics {
     }
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[test]
 fn single_thread() {
     // No panic when starting a runtime w/ a single thread
@@ -39,10 +33,6 @@ fn single_thread() {
         .build();
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "WASI: std::mpsc without thread parking not working"
-)]
 #[test]
 fn many_oneshot_futures() {
     // used for notifying the main thread
@@ -170,7 +160,6 @@ fn many_multishot_futures() {
     }
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[test]
 fn spawn_shutdown() {
     let rt = rt();
@@ -190,7 +179,6 @@ fn spawn_shutdown() {
     assert_err!(rx.try_recv());
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support bind
 async fn client_server(tx: mpsc::Sender<()>) {
     let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
@@ -215,7 +203,6 @@ async fn client_server(tx: mpsc::Sender<()>) {
     tx.send(()).unwrap();
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[test]
 fn drop_threadpool_drops_futures() {
     for _ in 0..1_000 {
@@ -272,7 +259,6 @@ fn drop_threadpool_drops_futures() {
     }
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[test]
 fn start_stop_callbacks_called() {
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -307,7 +293,6 @@ fn start_stop_callbacks_called() {
     assert!(before_stop.load(Ordering::Relaxed) > 0);
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[test]
 fn blocking() {
     // used for notifying the main thread
@@ -353,7 +338,6 @@ fn blocking() {
     }
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[test]
 fn multi_threadpool() {
     use tokio::sync::oneshot;
@@ -382,7 +366,6 @@ fn multi_threadpool() {
 //
 // The test ensures that, when this happens, attempting to consume from a
 // channel yields occasionally even if there are values ready to receive.
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[test]
 fn coop_and_block_in_place() {
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -433,7 +416,6 @@ fn coop_and_block_in_place() {
 }
 
 // Testing this does not panic
-#[cfg(not(target_os = "wasi"))] // Wasi does not support threads
 #[test]
 fn max_blocking_threads() {
     let _rt = tokio::runtime::Builder::new_multi_thread()
@@ -442,7 +424,6 @@ fn max_blocking_threads() {
         .unwrap();
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi does not support threads
 #[test]
 #[should_panic]
 fn max_blocking_threads_set_to_zero() {
@@ -452,7 +433,6 @@ fn max_blocking_threads_set_to_zero() {
         .unwrap();
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi does not support threads
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn hang_on_shutdown() {
     let (sync_tx, sync_rx) = std::sync::mpsc::channel::<()>();
@@ -521,15 +501,8 @@ fn wake_during_shutdown() {
         }
     }
 
-    #[cfg(not(target_os = "wasi"))]
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
-        .enable_all()
-        .build()
-        .unwrap();
-
-    #[cfg(target_os = "wasi")]
-    let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
@@ -542,20 +515,17 @@ fn wake_during_shutdown() {
     rt.block_on(async { tokio::time::sleep(tokio::time::Duration::from_millis(20)).await });
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #[should_panic]
 #[tokio::test]
 async fn test_block_in_place1() {
     tokio::task::block_in_place(|| {});
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #[tokio::test(flavor = "multi_thread")]
 async fn test_block_in_place2() {
     tokio::task::block_in_place(|| {});
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #[should_panic]
 #[tokio::main(flavor = "current_thread")]
 #[test]
@@ -563,20 +533,12 @@ async fn test_block_in_place3() {
     tokio::task::block_in_place(|| {});
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #[tokio::main]
 #[test]
 async fn test_block_in_place4() {
     tokio::task::block_in_place(|| {});
 }
 
-#[cfg(not(target_os = "wasi"))]
 fn rt() -> runtime::Runtime {
     runtime::Runtime::new().unwrap()
-}
-
-#[cfg(target_os = "wasi")]
-fn rt() -> runtime::Runtime {
-    use runtime::Builder;
-    Builder::new_current_thread().enable_all().build().unwrap()
 }

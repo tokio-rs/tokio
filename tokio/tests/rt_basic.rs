@@ -315,6 +315,7 @@ mod unstable {
     }
 
     #[test]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
     fn spawns_do_nothing() {
         use std::sync::Arc;
 
@@ -343,6 +344,7 @@ mod unstable {
     }
 
     #[test]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
     fn shutdown_all_concurrent_block_on() {
         const N: usize = 2;
         use std::sync::{mpsc, Arc};

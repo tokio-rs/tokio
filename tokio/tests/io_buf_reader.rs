@@ -277,6 +277,7 @@ async fn maybe_pending_buf_read() {
     assert_eq!(v, []);
 }
 
+// https://github.com/rust-lang/futures-rs/pull/1573#discussion_r281162309
 #[tokio::test]
 async fn maybe_pending_seek() {
     struct MaybePendingSeek<'a> {
