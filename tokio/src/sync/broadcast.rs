@@ -430,6 +430,7 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 ///
 /// This will panic if `capacity` is equal to `0` or larger
 /// than `usize::MAX / 2`.
+#[track_caller]
 pub fn channel<T: Clone>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
     assert!(capacity > 0, "capacity is empty");
     assert!(capacity <= usize::MAX >> 1, "requested capacity too large");
