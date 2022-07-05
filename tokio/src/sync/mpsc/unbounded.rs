@@ -206,6 +206,7 @@ impl<T> UnboundedReceiver<T> {
     ///     sync_code.join().unwrap();
     /// }
     /// ```
+    #[track_caller]
     #[cfg(feature = "sync")]
     pub fn blocking_recv(&mut self) -> Option<T> {
         crate::future::block_on(self.recv())
