@@ -367,7 +367,12 @@ impl LocalSet {
         }
     }
 
-    /// Enter current LocalSet context
+    /// Enters the context of this `LocalSet`.
+    ///
+    /// The [`spawn_local`] method will spawn tasks on the `LocalSet` whose
+    /// context you are inside.
+    ///
+    /// [`spawn_local`]: fn@crate::task::spawn_local
     pub fn enter(&self) -> LocalEnterGuard {
         CURRENT.with(|ctx| {
             let old = ctx.replace(Some(self.context.clone()));
