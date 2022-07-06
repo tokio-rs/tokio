@@ -182,6 +182,7 @@ cfg_rt! {
         /// # Panics
         ///
         /// This function panics if there is no current signal driver set.
+        #[track_caller]
         pub(super) fn current() -> Self {
             crate::runtime::context::signal_handle().expect(
                 "there is no signal driver running, must be called from the context of Tokio runtime",
@@ -197,6 +198,7 @@ cfg_not_rt! {
         /// # Panics
         ///
         /// This function panics if there is no current signal driver set.
+        #[track_caller]
         pub(super) fn current() -> Self {
             panic!(
                 "there is no signal driver running, must be called from the context of Tokio runtime or with\
