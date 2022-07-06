@@ -1052,6 +1052,7 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap();
     /// }
     /// ```
+    #[track_caller]
     #[cfg(feature = "sync")]
     pub fn blocking_recv(self) -> Result<T, RecvError> {
         crate::future::block_on(self)

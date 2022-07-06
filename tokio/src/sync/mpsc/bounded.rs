@@ -105,6 +105,7 @@ pub struct Receiver<T> {
 ///     }
 /// }
 /// ```
+#[track_caller]
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
     assert!(buffer > 0, "mpsc bounded channel requires buffer > 0");
     let semaphore = (semaphore::Semaphore::new(buffer), buffer);
@@ -281,6 +282,7 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
+    #[track_caller]
     #[cfg(feature = "sync")]
     pub fn blocking_recv(&mut self) -> Option<T> {
         crate::future::block_on(self.recv())
@@ -650,6 +652,7 @@ impl<T> Sender<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
+    #[track_caller]
     #[cfg(feature = "sync")]
     pub fn blocking_send(&self, value: T) -> Result<(), SendError<T>> {
         crate::future::block_on(self.send(value))
