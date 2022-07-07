@@ -493,13 +493,6 @@ impl LengthDelimitedCodec {
                 src.get_uint_le(field_len)
             };
 
-            if n > self.builder.max_frame_len as u64 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    LengthDelimitedCodecError { _priv: () },
-                ));
-            }
-
             // The check above ensures there is no overflow
             let n = n as usize;
 
@@ -512,7 +505,15 @@ impl LengthDelimitedCodec {
 
             // Error handling
             match n {
-                Some(n) => n,
+                Some(n) => {
+                    if n > self.builder.max_frame_len as usize {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            LengthDelimitedCodecError { _priv: () },
+                        ));
+                    }
+                    n
+                },
                 None => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
