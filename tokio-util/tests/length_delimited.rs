@@ -392,6 +392,26 @@ fn read_single_frame_length_adjusted() {
 }
 
 #[test]
+fn read_single_frame_negative_length_adjusted_and_max_sized() {
+    let mut d: Vec<u8> = vec![];
+    d.extend_from_slice(b"\x00\x00\x00\x0fHello world");
+
+    let io = length_delimited::Builder::new()
+        .length_field_offset(0)
+        .length_field_length(4)
+        .max_frame_length(11)
+        .length_adjustment(-4)
+        .num_skip(4)
+        .new_read(mock! {
+            data(&d),
+        });
+    pin_mut!(io);
+
+    assert_next_eq!(io, b"Hello world");
+    assert_done!(io);
+}
+
+#[test]
 fn read_single_multi_frame_one_packet_length_includes_head() {
     let mut d: Vec<u8> = vec![];
     d.extend_from_slice(b"\x00\x0babcdefghi");
