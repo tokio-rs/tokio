@@ -380,6 +380,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
 use std::{cmp, fmt, mem};
+use std::convert::TryFrom;
 
 /// Configure length delimited `LengthDelimitedCodec`s.
 ///
@@ -493,7 +494,17 @@ impl LengthDelimitedCodec {
                 src.get_uint_le(field_len)
             };
 
-            let n = usize::try_from(n).ok();
+            let n = match usize::try_from(n) {
+                Ok(n) => n,
+                Err(_) => {
+                    // `max_frame_len` is a usize, if `n` is larger than `usize::MAX`, 
+                    // it is definitely larger than `max_frame_len`
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        LengthDelimitedCodecError { _priv: () }
+                    ))
+                },
+            };
 
             // Adjust `n` with bounds checking
             let n = if self.builder.length_adjustment < 0 {
@@ -506,7 +517,7 @@ impl LengthDelimitedCodec {
             match n {
                 Some(n) => {
                     // Ensure there is no overflow
-                    if n > self.builder.max_frame_len as usize {
+                    if n > self.builder.max_frame_len {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidData,
                             LengthDelimitedCodecError { _priv: () },
