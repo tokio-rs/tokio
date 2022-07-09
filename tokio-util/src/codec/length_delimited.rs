@@ -493,7 +493,7 @@ impl LengthDelimitedCodec {
                 src.get_uint_le(field_len)
             };
 
-            let n = n as usize;
+            let n = usize::try_from(n).ok();
 
             // Adjust `n` with bounds checking
             let n = if self.builder.length_adjustment < 0 {
