@@ -1,5 +1,5 @@
-use tokio::task;
 use tokio::sync::oneshot;
+use tokio::task;
 
 async fn spawn_send() {
     let (tx, rx) = oneshot::channel();
