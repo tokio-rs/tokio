@@ -483,8 +483,8 @@ jobs:
       - name: Install wasm32-wasi target
         run: rustup target add wasm32-wasi
 
-      - name: Install wasmtime
-        run: cargo install wasmtime-cli
+      - name: Install cargo-wasi
+        run: cargo install cargo-wasi
 
       # TODO: Expand this when full WASI support lands.
       #   Currently, this is a bare bones regression test
