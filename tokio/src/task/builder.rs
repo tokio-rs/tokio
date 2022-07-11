@@ -99,7 +99,11 @@ impl<'a> Builder<'a> {
     /// [runtime handle]: crate::runtime::Handle
     /// [`Handle::spawn`]: crate::runtime::Handle::spawn
     #[track_caller]
-    pub fn spawn_on<Fut>(&mut self, future: Fut, handle: &Handle) -> io::Result<JoinHandle<Fut::Output>>
+    pub fn spawn_on<Fut>(
+        &mut self,
+        future: Fut,
+        handle: &Handle,
+    ) -> io::Result<JoinHandle<Fut::Output>>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
@@ -138,7 +142,11 @@ impl<'a> Builder<'a> {
     /// [`LocalSet::spawn_local`]: crate::task::LocalSet::spawn_local
     /// [`LocalSet`]: crate::task::LocalSet
     #[track_caller]
-    pub fn spawn_local_on<Fut>(self, future: Fut, local_set: &LocalSet) -> io::Result<JoinHandle<Fut::Output>>
+    pub fn spawn_local_on<Fut>(
+        self,
+        future: Fut,
+        local_set: &LocalSet,
+    ) -> io::Result<JoinHandle<Fut::Output>>
     where
         Fut: Future + 'static,
         Fut::Output: 'static,
@@ -155,7 +163,10 @@ impl<'a> Builder<'a> {
     /// See [`task::spawn_blocking`](crate::task::spawn_blocking)
     /// for more details.
     #[track_caller]
-    pub fn spawn_blocking<Function, Output>(self, function: Function) -> io::Result<JoinHandle<Output>>
+    pub fn spawn_blocking<Function, Output>(
+        self,
+        function: Function,
+    ) -> io::Result<JoinHandle<Output>>
     where
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
@@ -180,13 +191,13 @@ impl<'a> Builder<'a> {
         Output: Send + 'static,
     {
         use crate::runtime::Mandatory;
-        let (join_handle, _was_spawned) = handle.as_inner().spawn_blocking_inner(
+        let (join_handle, spawn_result) = handle.as_inner().spawn_blocking_inner(
             function,
             Mandatory::NonMandatory,
             self.name,
             handle,
         );
 
-        Ok(join_handle)
+        spawn_result.map(|()| join_handle).map_err(Into::into)
     }
 }
