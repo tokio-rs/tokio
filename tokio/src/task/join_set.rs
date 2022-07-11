@@ -6,7 +6,6 @@
 //! details.
 use std::fmt;
 use std::future::Future;
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -102,13 +101,15 @@ impl<T: 'static> JoinSet<T> {
     /// use tokio::task::JoinSet;
     ///
     /// #[tokio::main]
-    /// async fn main() {
+    /// async fn main() -> std::io::Result<()> {
     ///     let mut set = JoinSet::new();
     ///
     ///     // Use the builder to configure a task's name before spawning it.
     ///     set.build_task()
     ///         .name("my_task")
-    ///         .spawn(async { /* ... */ });
+    ///         .spawn(async { /* ... */ })?;
+    ///
+    ///     Ok(())
     /// }
     /// ```
     #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -378,7 +379,7 @@ impl<'a, T: 'static> Builder<'a, T> {
     ///
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
-    pub fn spawn<F>(self, future: F) -> io::Result<AbortHandle>
+    pub fn spawn<F>(self, future: F) -> std::io::Result<AbortHandle>
     where
         F: Future<Output = T>,
         F: Send + 'static,
@@ -398,7 +399,7 @@ impl<'a, T: 'static> Builder<'a, T> {
     /// [`AbortHandle`]: crate::task::AbortHandle
     /// [runtime handle]: crate::runtime::Handle
     #[track_caller]
-    pub fn spawn_on<F>(mut self, future: F, handle: &Handle) -> io::Result<AbortHandle>
+    pub fn spawn_on<F>(mut self, future: F, handle: &Handle) -> std::io::Result<AbortHandle>
     where
         F: Future<Output = T>,
         F: Send + 'static,
@@ -421,7 +422,7 @@ impl<'a, T: 'static> Builder<'a, T> {
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
-    pub fn spawn_local<F>(self, future: F) -> io::Result<AbortHandle>
+    pub fn spawn_local<F>(self, future: F) -> std::io::Result<AbortHandle>
     where
         F: Future<Output = T>,
         F: 'static,
@@ -439,7 +440,7 @@ impl<'a, T: 'static> Builder<'a, T> {
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
-    pub fn spawn_local_on<F>(self, future: F, local_set: &LocalSet) -> io::Result<AbortHandle>
+    pub fn spawn_local_on<F>(self, future: F, local_set: &LocalSet) -> std::io::Result<AbortHandle>
     where
         F: Future<Output = T>,
         F: 'static,

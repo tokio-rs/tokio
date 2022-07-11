@@ -91,14 +91,13 @@ pub(crate) enum SpawnError {
     NoThreads(io::Error),
 }
 
-#[allow(clippy::from_over_into)] // Orphan rules
-impl Into<io::Error> for SpawnError {
-    fn into(self) -> io::Error {
-        match self {
-            Self::ShuttingDown => {
+impl From<SpawnError> for io::Error {
+    fn from(e: SpawnError) -> Self {
+        match e {
+            SpawnError::ShuttingDown => {
                 io::Error::new(io::ErrorKind::Other, "blocking pool shutting down")
             }
-            Self::NoThreads(e) => e,
+            SpawnError::NoThreads(e) => e,
         }
     }
 }

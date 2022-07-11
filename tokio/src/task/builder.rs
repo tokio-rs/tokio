@@ -48,7 +48,7 @@ use std::{future::Future, io};
 ///             .spawn(async move {
 ///                 // Process each socket concurrently.
 ///                 process(socket).await
-///             });
+///             })?;
 ///     }
 /// }
 /// ```
@@ -198,6 +198,7 @@ impl<'a> Builder<'a> {
             handle,
         );
 
-        spawn_result.map(|()| join_handle).map_err(Into::into)
+        spawn_result?;
+        Ok(join_handle)
     }
 }
