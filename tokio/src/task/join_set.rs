@@ -6,6 +6,7 @@
 //! details.
 use std::fmt;
 use std::future::Future;
+use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -377,13 +378,13 @@ impl<'a, T: 'static> Builder<'a, T> {
     ///
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
-    pub fn spawn<F>(self, future: F) -> AbortHandle
+    pub fn spawn<F>(self, future: F) -> io::Result<AbortHandle>
     where
         F: Future<Output = T>,
         F: Send + 'static,
         T: Send,
     {
-        self.joinset.insert(self.builder.spawn(future))
+        Ok(self.joinset.insert(self.builder.spawn(future)?))
     }
 
     /// Spawn the provided task on the provided [runtime handle] with this
@@ -397,13 +398,13 @@ impl<'a, T: 'static> Builder<'a, T> {
     /// [`AbortHandle`]: crate::task::AbortHandle
     /// [runtime handle]: crate::runtime::Handle
     #[track_caller]
-    pub fn spawn_on<F>(mut self, future: F, handle: &Handle) -> AbortHandle
+    pub fn spawn_on<F>(mut self, future: F, handle: &Handle) -> io::Result<AbortHandle>
     where
         F: Future<Output = T>,
         F: Send + 'static,
         T: Send,
     {
-        self.joinset.insert(self.builder.spawn_on(future, handle))
+        Ok(self.joinset.insert(self.builder.spawn_on(future, handle)?))
     }
 
     /// Spawn the provided task on the current [`LocalSet`] with this builder's
@@ -420,12 +421,12 @@ impl<'a, T: 'static> Builder<'a, T> {
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
-    pub fn spawn_local<F>(self, future: F) -> AbortHandle
+    pub fn spawn_local<F>(self, future: F) -> io::Result<AbortHandle>
     where
         F: Future<Output = T>,
         F: 'static,
     {
-        self.joinset.insert(self.builder.spawn_local(future))
+        Ok(self.joinset.insert(self.builder.spawn_local(future)?))
     }
 
     /// Spawn the provided task on the provided [`LocalSet`] with this builder's
@@ -438,13 +439,14 @@ impl<'a, T: 'static> Builder<'a, T> {
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
-    pub fn spawn_local_on<F>(self, future: F, local_set: &LocalSet) -> AbortHandle
+    pub fn spawn_local_on<F>(self, future: F, local_set: &LocalSet) -> io::Result<AbortHandle>
     where
         F: Future<Output = T>,
         F: 'static,
     {
-        self.joinset
-            .insert(self.builder.spawn_local_on(future, local_set))
+        Ok(self
+            .joinset
+            .insert(self.builder.spawn_local_on(future, local_set)?))
     }
 }
 
