@@ -272,7 +272,11 @@ impl Builder {
     ///     .unwrap();
     /// ```
     pub fn enable_all(&mut self) -> &mut Self {
-        #[cfg(any(feature = "net", feature = "process", all(unix, feature = "signal")))]
+        #[cfg(any(
+            feature = "net",
+            all(unix, feature = "process"),
+            all(unix, feature = "signal")
+        ))]
         self.enable_io();
         #[cfg(feature = "time")]
         self.enable_time();

@@ -23,7 +23,11 @@ pub struct Handle {
 pub(crate) struct HandleInner {
     /// Handles to the I/O drivers
     #[cfg_attr(
-        not(any(feature = "net", feature = "process", all(unix, feature = "signal"))),
+        not(any(
+            feature = "net",
+            all(unix, feature = "process"),
+            all(unix, feature = "signal"),
+        )),
         allow(dead_code)
     )]
     pub(super) io_handle: driver::IoHandle,
