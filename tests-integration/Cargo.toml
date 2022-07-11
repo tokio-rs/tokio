@@ -17,12 +17,30 @@ required-features = ["rt-net"]
 name = "test-process-signal"
 required-features = ["rt-process-signal"]
 
+[[test]]
+name = "macros_main"
+
+[[test]]
+name = "macros_pin"
+
+[[test]]
+name = "macros_select"
+
+[[test]]
+name = "rt_yield"
+required-features = ["rt", "macros", "sync"]
+
 [features]
 rt-process-io-util = ["tokio/rt", "tokio/macros", "tokio/process", "tokio/io-util", "tokio/io-std"]
 # For mem check
 rt-net = ["tokio/rt", "tokio/rt-multi-thread", "tokio/net"]
 # For test-process-signal
 rt-process-signal = ["rt-net", "tokio/process", "tokio/signal"]
+# For testing wasi + rt/macros/sync features
+#
+# This is an explicit feature so we can use `cargo hack` testing single features
+# instead of all possible permutations.
+wasi-rt = ["rt", "macros", "sync"]
 
 full = [
     "macros",
