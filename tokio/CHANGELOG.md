@@ -31,7 +31,7 @@
 [#4767]: https://github.com/tokio-rs/tokio/pull/4767
 [#4762]: https://github.com/tokio-rs/tokio/pull/4762
 [#4769]: https://github.com/tokio-rs/tokio/pull/4769
-[#4762]: https://github.com/tokio-rs/tokio/pull/4764
+[#4764]: https://github.com/tokio-rs/tokio/pull/4764
 [#4770]: https://github.com/tokio-rs/tokio/pull/4770
 [#4777]: https://github.com/tokio-rs/tokio/pull/4777
 [#4772]: https://github.com/tokio-rs/tokio/pull/4772
