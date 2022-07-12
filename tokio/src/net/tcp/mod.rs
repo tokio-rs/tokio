@@ -2,7 +2,9 @@
 
 pub(crate) mod listener;
 
-pub(crate) mod socket;
+cfg_not_wasi! {
+    pub(crate) mod socket;
+}
 
 mod split;
 pub use split::{ReadHalf, WriteHalf};

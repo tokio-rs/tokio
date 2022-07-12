@@ -1,4 +1,8 @@
-#![cfg(all(feature = "macros", feature = "rt-multi-thread"))]
+#![cfg(all(
+    feature = "macros",
+    feature = "rt-multi-thread",
+    not(target_os = "wasi")
+))]
 
 #[tokio::main]
 async fn basic_main() -> usize {

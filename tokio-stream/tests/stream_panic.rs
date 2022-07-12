@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "time")]
+#![cfg(all(feature = "time", not(target_os = "wasi")))] // Wasi does not support panic recovery
 
 use parking_lot::{const_mutex, Mutex};
 use std::error::Error;
