@@ -393,6 +393,20 @@ compile_error! {
     "Tokio requires the platform pointer width to be 32, 64, or 128 bits"
 }
 
+#[cfg(all(
+    not(tokio_unstable),
+    target_arch = "wasm32",
+    any(
+        feature = "fs",
+        feature = "io-std",
+        feature = "net",
+        feature = "process",
+        feature = "rt-multi-thread",
+        feature = "signal"
+    )
+))]
+compile_error!("Only features sync,macros,io-util,rt are supported on wasm.");
+
 // Includes re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any
