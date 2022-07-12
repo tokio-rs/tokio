@@ -5,8 +5,10 @@ use std::fmt;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::ops::Drop;
+use std::pin::Pin;
 use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::task::{Context, Poll};
 
 // This file contains an implementation of an OnceCell. The principle
 // behind the safety the of the cell is that any thread with an `&OnceCell` may
@@ -398,6 +400,44 @@ impl<T> OnceCell<T> {
     /// `None` if the cell is empty.
     pub fn take(&mut self) -> Option<T> {
         std::mem::take(self).into_inner()
+    }
+
+    #[inline(always)]
+    /// Returns a future that resolves once a value has been written to the `OnceCell`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio::sync::OnceCell;
+    ///
+    /// static LIFE: OnceCell<u8> = OnceCell::const_new();
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     tokio::task::spawn(async {
+    ///         let life: &u8 = LIFE.wait().await;
+    ///         assert_eq!(*life, 42);
+    ///     });
+    ///
+    ///     assert!(LIFE.set(42).is_ok());
+    /// }
+    /// ```
+    pub fn wait(&self) -> impl Future<Output = &T> {
+        self
+    }
+}
+
+// Future that resolves once a value has been written to the `OnceCell`.
+// Used in `OnceCell::wait`.
+impl<'a, T> Future for &'a OnceCell<T> {
+    type Output = &'a T;
+
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.initialized() {
+            Poll::Ready(unsafe { self.get_unchecked() })
+        } else {
+            Poll::Pending
+        }
     }
 }
 
