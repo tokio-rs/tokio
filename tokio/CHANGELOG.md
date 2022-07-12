@@ -26,7 +26,7 @@
 - joinset: rename `join_one` to `join_next` ([#4755])
 - rt: unhandled panic config for current thread rt ([#4770])
 
-[#4751]: https://github.com/tokio-rs/tokio/pull/4755
+[#4755]: https://github.com/tokio-rs/tokio/pull/4755
 [#4766]: https://github.com/tokio-rs/tokio/pull/4766
 [#4767]: https://github.com/tokio-rs/tokio/pull/4767
 [#4762]: https://github.com/tokio-rs/tokio/pull/4762
