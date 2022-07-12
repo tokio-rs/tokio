@@ -427,8 +427,33 @@ impl<T> OnceCell<T> {
     /// }
     /// ```
     pub async fn wait(&self) -> &T {
-        self.waiters.notified().await;
-        unsafe { self.get_unchecked() }
+        // Try to acquire a permit, so that we don't step on the toes of
+        // another thread trying to initialize the value
+        match self.semaphore.acquire().await {
+            // Check for Err first, which is the most likely branch
+            Err(_) => {
+                debug_assert!(self.initialized());
+
+                // SAFETY: The semaphore has been closed. This only happens
+                // when the OnceCell is fully initialized.
+                unsafe { self.get_unchecked() }
+            }
+
+            Ok(permit) => {
+                debug_assert!(!self.initialized()); // at this point, we should not be initialized
+
+                let notified = self.waiters.notified(); // set up a future that will resolve when the value is initialized
+
+                drop(permit); // release the permit, allowing other tasks to initialize the value
+
+                notified.await; // wait for the value to be initialized
+
+                debug_assert!(self.initialized());
+
+                // SAFETY: We've been notified that the value has been initialized.
+                unsafe { self.get_unchecked() }
+            }
+        }
     }
 }
 
