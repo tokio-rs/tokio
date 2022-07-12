@@ -195,7 +195,7 @@ jobs:
       - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: nightly-2022-07-10
           components: miri
           override: true
       - uses: Swatinem/rust-cache@v1
