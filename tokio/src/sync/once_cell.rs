@@ -1,14 +1,12 @@
-use super::{Semaphore, SemaphorePermit, TryAcquireError};
+use super::{Notify, Semaphore, SemaphorePermit, TryAcquireError};
 use crate::loom::cell::UnsafeCell;
 use std::error::Error;
 use std::fmt;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::ops::Drop;
-use std::pin::Pin;
 use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::task::{Context, Poll};
 
 // This file contains an implementation of an OnceCell. The principle
 // behind the safety the of the cell is that any thread with an `&OnceCell` may
@@ -73,6 +71,7 @@ pub struct OnceCell<T> {
     value_set: AtomicBool,
     value: UnsafeCell<MaybeUninit<T>>,
     semaphore: Semaphore,
+    waiters: Notify,
 }
 
 impl<T> Default for OnceCell<T> {
@@ -122,6 +121,7 @@ impl<T> From<T> for OnceCell<T> {
             value_set: AtomicBool::new(true),
             value: UnsafeCell::new(MaybeUninit::new(value)),
             semaphore,
+            waiters: Notify::new(),
         }
     }
 }
@@ -133,6 +133,7 @@ impl<T> OnceCell<T> {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(MaybeUninit::uninit()),
             semaphore: Semaphore::new(1),
+            waiters: Notify::new(),
         }
     }
 
@@ -180,6 +181,7 @@ impl<T> OnceCell<T> {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(MaybeUninit::uninit()),
             semaphore: Semaphore::const_new(1),
+            waiters: Notify::const_new(),
         }
     }
 
@@ -218,6 +220,8 @@ impl<T> OnceCell<T> {
         self.value_set.store(true, Ordering::Release);
         self.semaphore.close();
         permit.forget();
+
+        self.waiters.notify_waiters();
 
         // SAFETY: We just initialized the cell.
         unsafe { self.get_unchecked() }
@@ -402,42 +406,29 @@ impl<T> OnceCell<T> {
         std::mem::take(self).into_inner()
     }
 
-    #[inline(always)]
-    /// Returns a future that resolves once a value has been written to the `OnceCell`.
+    /// Waits for a value to be initialized, then returns a reference to it.
     ///
     /// # Example
     ///
     /// ```
-    /// use tokio::sync::OnceCell;
-    ///
-    /// static LIFE: OnceCell<u8> = OnceCell::const_new();
+    /// static LIFE: tokio::sync::OnceCell<u32> = tokio::sync::OnceCell::const_new();
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     tokio::task::spawn(async {
-    ///         let life: &u8 = LIFE.wait().await;
-    ///         assert_eq!(*life, 42);
+    ///     let task = tokio::task::spawn(async {
+    ///         *LIFE.wait().await
     ///     });
     ///
-    ///     assert!(LIFE.set(42).is_ok());
+    ///     tokio::time::sleep(core::time::Duration::from_secs(1)).await;
+    ///
+    ///     LIFE.set(42).unwrap();
+    ///
+    ///     assert_eq!(task.await.unwrap(), 42);
     /// }
     /// ```
-    pub fn wait(&self) -> impl Future<Output = &T> {
-        self
-    }
-}
-
-// Future that resolves once a value has been written to the `OnceCell`.
-// Used in `OnceCell::wait`.
-impl<'a, T> Future for &'a OnceCell<T> {
-    type Output = &'a T;
-
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.initialized() {
-            Poll::Ready(unsafe { self.get_unchecked() })
-        } else {
-            Poll::Pending
-        }
+    pub async fn wait(&self) -> &T {
+        self.waiters.notified().await;
+        unsafe { self.get_unchecked() }
     }
 }
 

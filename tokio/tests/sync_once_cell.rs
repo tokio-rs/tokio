@@ -3,7 +3,10 @@
 
 use std::mem;
 use std::ops::Drop;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{
+    atomic::{AtomicU32, Ordering},
+    Arc,
+};
 use std::time::Duration;
 use tokio::runtime;
 use tokio::sync::{OnceCell, SetError};
@@ -271,4 +274,23 @@ fn drop_into_inner_new_with() {
 fn from() {
     let cell = OnceCell::from(2);
     assert_eq!(*cell.get().unwrap(), 2);
+}
+
+#[test]
+fn cancel_while_waiting() {
+    let rt = runtime::Builder::new_current_thread()
+        .start_paused(true)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        static CELL: OnceCell<()> = OnceCell::const_new();
+
+        let task = tokio::task::spawn(async { *CELL.wait().await });
+
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+
+        CELL.set(()).unwrap();
+    });
 }
