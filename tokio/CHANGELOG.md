@@ -26,20 +26,20 @@
 - joinset: rename `join_one` to `join_next` ([#4755])
 - rt: unhandled panic config for current thread rt ([#4770])
 
+[#4677]: https://github.com/tokio-rs/tokio/pull/4677
+[#4741]: https://github.com/tokio-rs/tokio/pull/4741
 [#4755]: https://github.com/tokio-rs/tokio/pull/4755
+[#4758]: https://github.com/tokio-rs/tokio/pull/4758
+[#4762]: https://github.com/tokio-rs/tokio/pull/4762
+[#4764]: https://github.com/tokio-rs/tokio/pull/4764
 [#4766]: https://github.com/tokio-rs/tokio/pull/4766
 [#4767]: https://github.com/tokio-rs/tokio/pull/4767
-[#4762]: https://github.com/tokio-rs/tokio/pull/4762
 [#4769]: https://github.com/tokio-rs/tokio/pull/4769
-[#4764]: https://github.com/tokio-rs/tokio/pull/4764
 [#4770]: https://github.com/tokio-rs/tokio/pull/4770
-[#4777]: https://github.com/tokio-rs/tokio/pull/4777
 [#4772]: https://github.com/tokio-rs/tokio/pull/4772
+[#4777]: https://github.com/tokio-rs/tokio/pull/4777
 [#4791]: https://github.com/tokio-rs/tokio/pull/4791
 [#4793]: https://github.com/tokio-rs/tokio/pull/4793
-[#4741]: https://github.com/tokio-rs/tokio/pull/4741
-[#4758]: https://github.com/tokio-rs/tokio/pull/4758
-[#4677]: https://github.com/tokio-rs/tokio/pull/4677
 [#4795]: https://github.com/tokio-rs/tokio/pull/4795
 [#4798]: https://github.com/tokio-rs/tokio/pull/4798
 [#4806]: https://github.com/tokio-rs/tokio/pull/4806
