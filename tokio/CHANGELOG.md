@@ -1,11 +1,7 @@
 # 1.20.0 (July 12, 2022)
 ### Added
-- add track_caller to public APIs ([#4772])
-- time: add track_caller to public APIs ([#4791])
-- io: add track_caller to public APIs ([#4793])
+- tokio: add track_caller to public APIs ([#4772], [#4791], [#4793], [#4806], [#4808])
 - sync: Add `has_changed` method to `watch::Ref` ([#4758])
-- signal: add track_caller to public APIs ([#4806])
-- sync: add track_caller to public APIs ([#4808])
 
 ### Changed
 
