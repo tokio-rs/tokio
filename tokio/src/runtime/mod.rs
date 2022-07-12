@@ -576,7 +576,7 @@ cfg_rt! {
         /// may result in a resource leak (in that any blocking tasks are still running until they
         /// return.
         ///
-        /// This function is equivalent to calling `shutdown_timeout(Duration::of_nanos(0))`.
+        /// This function is equivalent to calling `shutdown_timeout(Duration::from_nanos(0))`.
         ///
         /// ```
         /// use tokio::runtime::Runtime;
