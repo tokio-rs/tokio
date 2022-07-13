@@ -299,7 +299,7 @@ cfg_rt! {
     }
 
     mod local;
-    pub use local::{spawn_local, LocalSet};
+    pub use local::{spawn_local, LocalSet, LocalEnterGuard};
 
     mod task_local;
     pub use task_local::LocalKey;
