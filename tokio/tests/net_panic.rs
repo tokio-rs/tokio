@@ -11,6 +11,7 @@ mod support {
 use support::panic::test_panic;
 
 #[test]
+#[cfg(not(target_os = "wasi"))]
 fn udp_socket_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     use std::net::SocketAddr;
     use tokio::net::UdpSocket;
