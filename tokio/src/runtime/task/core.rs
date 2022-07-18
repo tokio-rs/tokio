@@ -60,7 +60,7 @@ pub(crate) struct Header {
     /// Task state.
     pub(super) state: State,
 
-    pub(super) owned: UnsafeCell<linked_list::Pointers<Header>>,
+    pub(super) owned: linked_list::Pointers<Header>,
 
     /// Pointer to next task, used with the injection queue.
     pub(super) queue_next: UnsafeCell<Option<NonNull<Header>>>,
@@ -84,6 +84,14 @@ pub(crate) struct Header {
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) id: Option<tracing::Id>,
+}
+
+generate_addr_of_methods! {
+    impl<> Header {
+        pub(super) unsafe fn addr_of_owned(self: NonNull<Self>) -> NonNull<linked_list::Pointers<Header>> {
+            &self.owned
+        }
+    }
 }
 
 unsafe impl Send for Header {}
@@ -111,7 +119,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         Box::new(Cell {
             header: Header {
                 state,
-                owned: UnsafeCell::new(linked_list::Pointers::new()),
+                owned: linked_list::Pointers::new(),
                 queue_next: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
                 owner_id: UnsafeCell::new(0),

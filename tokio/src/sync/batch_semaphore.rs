@@ -112,6 +112,14 @@ struct Waiter {
     _p: PhantomPinned,
 }
 
+generate_addr_of_methods! {
+    impl<> Waiter {
+        unsafe fn addr_of_pointers(self: NonNull<Self>) -> NonNull<linked_list::Pointers<Waiter>> {
+            &self.pointers
+        }
+    }
+}
+
 impl Semaphore {
     /// The maximum number of permits which a semaphore can hold.
     ///
@@ -704,12 +712,6 @@ impl std::error::Error for TryAcquireError {}
 ///
 /// `Waiter` is forced to be !Unpin.
 unsafe impl linked_list::Link for Waiter {
-    // XXX: ideally, we would be able to use `Pin` here, to enforce the
-    // invariant that list entries may not move while in the list. However, we
-    // can't do this currently, as using `Pin<&'a mut Waiter>` as the `Handle`
-    // type would require `Semaphore` to be generic over a lifetime. We can't
-    // use `Pin<*mut Waiter>`, as raw pointers are `Unpin` regardless of whether
-    // or not they dereference to an `!Unpin` target.
     type Handle = NonNull<Waiter>;
     type Target = Waiter;
 
@@ -721,7 +723,7 @@ unsafe impl linked_list::Link for Waiter {
         ptr
     }
 
-    unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
-        NonNull::from(&mut target.as_mut().pointers)
+    unsafe fn pointers(target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
+        Waiter::addr_of_pointers(target)
     }
 }

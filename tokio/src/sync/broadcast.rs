@@ -361,6 +361,14 @@ struct Waiter {
     _p: PhantomPinned,
 }
 
+generate_addr_of_methods! {
+    impl<> Waiter {
+        unsafe fn addr_of_pointers(self: NonNull<Self>) -> NonNull<linked_list::Pointers<Waiter>> {
+            &self.pointers
+        }
+    }
+}
+
 struct RecvGuard<'a, T> {
     slot: RwLockReadGuard<'a, Slot<T>>,
 }
@@ -1140,8 +1148,8 @@ unsafe impl linked_list::Link for Waiter {
         ptr
     }
 
-    unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
-        NonNull::from(&mut target.as_mut().pointers)
+    unsafe fn pointers(target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
+        Waiter::addr_of_pointers(target)
     }
 }
 
