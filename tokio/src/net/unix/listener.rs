@@ -55,7 +55,7 @@ impl UnixListener {
     /// # Panics
     ///
     /// This function panics if it is not called from within a runtime with
-    /// IO enabled or if the thread-local runtime is not set.
+    /// IO enabled.
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
@@ -80,7 +80,7 @@ impl UnixListener {
     /// # Panics
     ///
     /// This function panics if it is not called from within a runtime with
-    /// IO enabled or if the thread-local runtime is not set.
+    /// IO enabled.
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
