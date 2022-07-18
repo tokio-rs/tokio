@@ -1,4 +1,4 @@
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threading
 
 #[allow(unused_imports)]
 use std as tokio;

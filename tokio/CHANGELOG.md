@@ -1,3 +1,50 @@
+# 1.20.0 (July 12, 2022)
+### Added
+- tokio: add track_caller to public APIs ([#4772], [#4791], [#4793], [#4806], [#4808])
+- sync: Add `has_changed` method to `watch::Ref` ([#4758])
+
+### Changed
+
+- time: remove `src/time/driver/wheel/stack.rs` ([#4766])
+- rt: clean up arguments passed to basic scheduler ([#4767])
+- net: be more specific about winapi features ([#4764])
+- tokio: use const initialized thread locals where possible ([#4677])
+- task: various small improvements to LocalKey ([#4795])
+
+### Fixed
+
+### Documented
+
+- fs: warn about performance pitfall ([#4762])
+- chore: fix spelling ([#4769])
+- sync: document spurious failures in oneshot ([#4777])
+- sync: add warning for watch in non-Send futures ([#4741])
+- chore: fix typo ([#4798])
+
+### Unstable
+
+- joinset: rename `join_one` to `join_next` ([#4755])
+- rt: unhandled panic config for current thread rt ([#4770])
+
+[#4677]: https://github.com/tokio-rs/tokio/pull/4677
+[#4741]: https://github.com/tokio-rs/tokio/pull/4741
+[#4755]: https://github.com/tokio-rs/tokio/pull/4755
+[#4758]: https://github.com/tokio-rs/tokio/pull/4758
+[#4762]: https://github.com/tokio-rs/tokio/pull/4762
+[#4764]: https://github.com/tokio-rs/tokio/pull/4764
+[#4766]: https://github.com/tokio-rs/tokio/pull/4766
+[#4767]: https://github.com/tokio-rs/tokio/pull/4767
+[#4769]: https://github.com/tokio-rs/tokio/pull/4769
+[#4770]: https://github.com/tokio-rs/tokio/pull/4770
+[#4772]: https://github.com/tokio-rs/tokio/pull/4772
+[#4777]: https://github.com/tokio-rs/tokio/pull/4777
+[#4791]: https://github.com/tokio-rs/tokio/pull/4791
+[#4793]: https://github.com/tokio-rs/tokio/pull/4793
+[#4795]: https://github.com/tokio-rs/tokio/pull/4795
+[#4798]: https://github.com/tokio-rs/tokio/pull/4798
+[#4806]: https://github.com/tokio-rs/tokio/pull/4806
+[#4808]: https://github.com/tokio-rs/tokio/pull/4808
+
 # 1.19.2 (June 6, 2022)
 
 This release fixes another bug in `Notified::enable`. ([#4751])

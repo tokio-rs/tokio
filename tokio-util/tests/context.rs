@@ -1,4 +1,5 @@
 #![cfg(feature = "rt")]
+#![cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #![warn(rust_2018_idioms)]
 
 use tokio::runtime::Builder;

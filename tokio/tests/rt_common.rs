@@ -18,6 +18,7 @@ macro_rules! rt_test {
             }
         }
 
+        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
         mod threaded_scheduler_4_threads {
             $($t)*
 
@@ -31,6 +32,7 @@ macro_rules! rt_test {
             }
         }
 
+        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
         mod threaded_scheduler_1_thread {
             $($t)*
 
@@ -55,18 +57,30 @@ fn send_sync_bound() {
 }
 
 rt_test! {
-    use tokio::net::{TcpListener, TcpStream, UdpSocket};
+    #[cfg(not(target_os="wasi"))]
+    use tokio::net::{TcpListener, TcpStream};
+    #[cfg(not(target_os="wasi"))]
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
     use tokio::runtime::Runtime;
     use tokio::sync::oneshot;
     use tokio::{task, time};
-    use tokio_test::{assert_err, assert_ok};
+
+    #[cfg(not(target_os="wasi"))]
+    use tokio_test::assert_err;
+    use tokio_test::assert_ok;
 
     use futures::future::poll_fn;
     use std::future::Future;
     use std::pin::Pin;
-    use std::sync::{mpsc, Arc};
+
+    #[cfg(not(target_os="wasi"))]
+    use std::sync::mpsc;
+
+    use std::sync::Arc;
     use std::task::{Context, Poll};
+
+    #[cfg(not(target_os="wasi"))]
     use std::thread;
     use std::time::{Duration, Instant};
 
@@ -83,6 +97,7 @@ rt_test! {
     }
 
 
+    #[cfg(not(target_os="wasi"))]
     #[test]
     fn block_on_async() {
         let rt = rt();
@@ -164,6 +179,7 @@ rt_test! {
         assert_eq!(out, "ZOMG");
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_many_from_block_on() {
         use tokio::sync::mpsc;
@@ -214,6 +230,7 @@ rt_test! {
         }
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_many_from_task() {
         use tokio::sync::mpsc;
@@ -329,6 +346,7 @@ rt_test! {
         assert_eq!(out, "ZOMG");
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn complete_block_on_under_load() {
         let rt = rt();
@@ -352,6 +370,7 @@ rt_test! {
         });
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn complete_task_under_load() {
         let rt = rt();
@@ -381,6 +400,7 @@ rt_test! {
         });
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_from_other_thread_idle() {
         let rt = rt();
@@ -401,6 +421,7 @@ rt_test! {
         });
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_from_other_thread_under_load() {
         let rt = rt();
@@ -461,6 +482,7 @@ rt_test! {
         assert!(now.elapsed() >= dur);
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support bind
     #[test]
     fn block_on_socket() {
         let rt = rt();
@@ -481,6 +503,7 @@ rt_test! {
         });
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_from_blocking() {
         let rt = rt();
@@ -496,6 +519,7 @@ rt_test! {
         assert_eq!(out, "hello")
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn spawn_blocking_from_blocking() {
         let rt = rt();
@@ -511,6 +535,7 @@ rt_test! {
         assert_eq!(out, "hello")
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn sleep_from_blocking() {
         let rt = rt();
@@ -531,6 +556,7 @@ rt_test! {
         });
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support bind
     #[test]
     fn socket_from_blocking() {
         let rt = rt();
@@ -554,6 +580,7 @@ rt_test! {
         });
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn always_active_parker() {
         // This test it to show that we will always have
@@ -600,6 +627,7 @@ rt_test! {
     // concern. There also isn't a great/obvious solution to take. For now, the
     // test is disabled.
     #[cfg(not(windows))]
+    #[cfg(not(target_os="wasi"))] // Wasi does not support bind or threads
     fn io_driver_called_when_under_load() {
         let rt = rt();
 
@@ -635,6 +663,7 @@ rt_test! {
         });
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn client_server_block_on() {
         let rt = rt();
@@ -646,6 +675,7 @@ rt_test! {
         assert_err!(rx.try_recv());
     }
 
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support threads or panic recovery")]
     #[test]
     fn panic_in_task() {
         let rt = rt();
@@ -674,11 +704,13 @@ rt_test! {
 
     #[test]
     #[should_panic]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
     fn panic_in_block_on() {
         let rt = rt();
         rt.block_on(async { panic!() });
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     async fn yield_once() {
         let mut yielded = false;
         poll_fn(|cx| {
@@ -816,8 +848,10 @@ rt_test! {
         assert!(drop_triggered.load(Ordering::Relaxed));
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi doesn't support UDP or bind()
     #[test]
     fn io_notify_while_shutting_down() {
+        use tokio::net::UdpSocket;
         use std::net::Ipv6Addr;
         use std::sync::Arc;
 
@@ -851,6 +885,7 @@ rt_test! {
         }
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn shutdown_timeout() {
         let (tx, rx) = oneshot::channel();
@@ -868,6 +903,7 @@ rt_test! {
         Arc::try_unwrap(runtime).unwrap().shutdown_timeout(Duration::from_millis(100));
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
     fn shutdown_timeout_0() {
         let runtime = rt();
@@ -899,6 +935,7 @@ rt_test! {
     // See https://github.com/rust-lang/rust/issues/74875
     #[test]
     #[cfg(not(windows))]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support threads")]
     fn runtime_in_thread_local() {
         use std::cell::RefCell;
         use std::thread;
@@ -918,6 +955,7 @@ rt_test! {
         }).join().unwrap();
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support bind
     async fn client_server(tx: mpsc::Sender<()>) {
         let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
@@ -942,6 +980,7 @@ rt_test! {
         tx.send(()).unwrap();
     }
 
+    #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
     #[test]
     fn local_set_block_on_socket() {
         let rt = rt();
@@ -963,6 +1002,7 @@ rt_test! {
         });
     }
 
+    #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
     #[test]
     fn local_set_client_server_block_on() {
         let rt = rt();
@@ -976,6 +1016,7 @@ rt_test! {
         assert_err!(rx.try_recv());
     }
 
+    #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
     async fn client_server_local(tx: mpsc::Sender<()>) {
         let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 

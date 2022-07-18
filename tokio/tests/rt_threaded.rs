@@ -1,9 +1,9 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::runtime::{self, Runtime};
+use tokio::runtime;
 use tokio::sync::oneshot;
 use tokio_test::{assert_err, assert_ok};
 
@@ -539,6 +539,6 @@ async fn test_block_in_place4() {
     tokio::task::block_in_place(|| {});
 }
 
-fn rt() -> Runtime {
-    Runtime::new().unwrap()
+fn rt() -> runtime::Runtime {
+    runtime::Runtime::new().unwrap()
 }

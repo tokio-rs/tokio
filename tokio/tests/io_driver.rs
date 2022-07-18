@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+// Wasi does not support panic recovery or threading
+#![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 use tokio::net::TcpListener;
 use tokio::runtime;

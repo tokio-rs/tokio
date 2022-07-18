@@ -48,6 +48,7 @@ jobs:
       - check-readme
       - test-hyper
       - wasm32-unknown-unknown
+      - wasm32-wasi
     steps:
       - run: exit 0
 
@@ -194,7 +195,7 @@ jobs:
       - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: nightly
           components: miri
           override: true
       - uses: Swatinem/rust-cache@v1
@@ -462,3 +463,51 @@ jobs:
       - name: test tokio
         run: wasm-pack test --node -- --features "macros sync"
         working-directory: tokio
+
+  wasm32-wasi:
+    name: wasm32-wasi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust_stable }}
+          override: true
+      - uses: Swatinem/rust-cache@v1
+
+      # Install dependencies
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
+
+      - name: Install wasm32-wasi target
+        run: rustup target add wasm32-wasi
+
+      - name: Install wasmtime
+        run: cargo install wasmtime-cli
+
+      - name: Install cargo-wasi
+        run: cargo install cargo-wasi
+
+      - name: WASI test tokio full
+        run: cargo test -p tokio --target wasm32-wasi --features full
+        env:
+          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+
+      - name: WASI test tokio-util full
+        run: cargo test -p tokio-util --target wasm32-wasi --features full
+        env:
+          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+
+      - name: WASI test tokio-stream
+        run: cargo test -p tokio-stream --target wasm32-wasi --features time,net,io-util,sync
+        env:
+          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+
+      - name: test tests-integration --features wasi-rt
+        # TODO: this should become: `cargo hack wasi test --each-feature`
+        run: cargo wasi test --test rt_yield --features wasi-rt
+        working-directory: tests-integration

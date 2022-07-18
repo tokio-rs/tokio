@@ -204,6 +204,7 @@ cfg_rt! {
 
     mod blocking;
     use blocking::BlockingPool;
+    #[cfg_attr(target_os = "wasi", allow(unused_imports))]
     pub(crate) use blocking::spawn_blocking;
 
     cfg_trace! {
@@ -303,7 +304,7 @@ cfg_rt! {
         CurrentThread(BasicScheduler),
 
         /// Execute tasks across multiple threads.
-        #[cfg(feature = "rt-multi-thread")]
+        #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
         ThreadPool(ThreadPool),
     }
 
@@ -311,39 +312,41 @@ cfg_rt! {
     type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
 
     impl Runtime {
-        /// Creates a new runtime instance with default configuration values.
-        ///
-        /// This results in the multi threaded scheduler, I/O driver, and time driver being
-        /// initialized.
-        ///
-        /// Most applications will not need to call this function directly. Instead,
-        /// they will use the  [`#[tokio::main]` attribute][main]. When a more complex
-        /// configuration is necessary, the [runtime builder] may be used.
-        ///
-        /// See [module level][mod] documentation for more details.
-        ///
-        /// # Examples
-        ///
-        /// Creating a new `Runtime` with default configuration values.
-        ///
-        /// ```
-        /// use tokio::runtime::Runtime;
-        ///
-        /// let rt = Runtime::new()
-        ///     .unwrap();
-        ///
-        /// // Use the runtime...
-        /// ```
-        ///
-        /// [mod]: index.html
-        /// [main]: ../attr.main.html
-        /// [threaded scheduler]: index.html#threaded-scheduler
-        /// [basic scheduler]: index.html#basic-scheduler
-        /// [runtime builder]: crate::runtime::Builder
-        #[cfg(feature = "rt-multi-thread")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
-        pub fn new() -> std::io::Result<Runtime> {
-            Builder::new_multi_thread().enable_all().build()
+        cfg_not_wasi! {
+            /// Creates a new runtime instance with default configuration values.
+            ///
+            /// This results in the multi threaded scheduler, I/O driver, and time driver being
+            /// initialized.
+            ///
+            /// Most applications will not need to call this function directly. Instead,
+            /// they will use the  [`#[tokio::main]` attribute][main]. When a more complex
+            /// configuration is necessary, the [runtime builder] may be used.
+            ///
+            /// See [module level][mod] documentation for more details.
+            ///
+            /// # Examples
+            ///
+            /// Creating a new `Runtime` with default configuration values.
+            ///
+            /// ```
+            /// use tokio::runtime::Runtime;
+            ///
+            /// let rt = Runtime::new()
+            ///     .unwrap();
+            ///
+            /// // Use the runtime...
+            /// ```
+            ///
+            /// [mod]: index.html
+            /// [main]: ../attr.main.html
+            /// [threaded scheduler]: index.html#threaded-scheduler
+            /// [basic scheduler]: index.html#basic-scheduler
+            /// [runtime builder]: crate::runtime::Builder
+            #[cfg(feature = "rt-multi-thread")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+            pub fn new() -> std::io::Result<Runtime> {
+                Builder::new_multi_thread().enable_all().build()
+            }
         }
 
         /// Returns a handle to the runtime's spawner.
@@ -480,7 +483,7 @@ cfg_rt! {
 
             match &self.kind {
                 Kind::CurrentThread(exec) => exec.block_on(future),
-                #[cfg(feature = "rt-multi-thread")]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Kind::ThreadPool(exec) => exec.block_on(future),
             }
         }
@@ -573,7 +576,7 @@ cfg_rt! {
         /// may result in a resource leak (in that any blocking tasks are still running until they
         /// return.
         ///
-        /// This function is equivalent to calling `shutdown_timeout(Duration::of_nanos(0))`.
+        /// This function is equivalent to calling `shutdown_timeout(Duration::from_nanos(0))`.
         ///
         /// ```
         /// use tokio::runtime::Runtime;
@@ -610,7 +613,7 @@ cfg_rt! {
                         },
                     }
                 },
-                #[cfg(feature = "rt-multi-thread")]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Kind::ThreadPool(_) => {
                     // The threaded scheduler drops its tasks on its worker threads, which is
                     // already in the runtime's context.

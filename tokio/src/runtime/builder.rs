@@ -174,7 +174,7 @@ pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync +
 
 pub(crate) enum Kind {
     CurrentThread,
-    #[cfg(feature = "rt-multi-thread")]
+    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
     MultiThread,
 }
 
@@ -197,14 +197,16 @@ impl Builder {
         Builder::new(Kind::CurrentThread, 31, EVENT_INTERVAL)
     }
 
-    /// Returns a new builder with the multi thread scheduler selected.
-    ///
-    /// Configuration methods can be chained on the return value.
-    #[cfg(feature = "rt-multi-thread")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
-    pub fn new_multi_thread() -> Builder {
-        // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-        Builder::new(Kind::MultiThread, 61, 61)
+    cfg_not_wasi! {
+        /// Returns a new builder with the multi thread scheduler selected.
+        ///
+        /// Configuration methods can be chained on the return value.
+        #[cfg(feature = "rt-multi-thread")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+        pub fn new_multi_thread() -> Builder {
+            // The number `61` is fairly arbitrary. I believe this value was copied from golang.
+            Builder::new(Kind::MultiThread, 61, 61)
+        }
     }
 
     /// Returns a new runtime builder initialized with default configuration
@@ -617,7 +619,7 @@ impl Builder {
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
             Kind::CurrentThread => self.build_basic_runtime(),
-            #[cfg(feature = "rt-multi-thread")]
+            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
             Kind::MultiThread => self.build_threaded_runtime(),
         }
     }
@@ -626,7 +628,7 @@ impl Builder {
         driver::Cfg {
             enable_pause_time: match self.kind {
                 Kind::CurrentThread => true,
-                #[cfg(feature = "rt-multi-thread")]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Kind::MultiThread => false,
             },
             enable_io: self.enable_io,

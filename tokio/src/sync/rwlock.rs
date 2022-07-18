@@ -506,6 +506,7 @@ impl<T: ?Sized> RwLock<T> {
     ///     assert!(rwlock.try_write().is_ok());
     /// }
     /// ```
+    #[track_caller]
     #[cfg(feature = "sync")]
     pub fn blocking_read(&self) -> RwLockReadGuard<'_, T> {
         crate::future::block_on(self.read())
@@ -840,6 +841,7 @@ impl<T: ?Sized> RwLock<T> {
     ///     assert_eq!(*read_lock, 2);
     /// }
     /// ```
+    #[track_caller]
     #[cfg(feature = "sync")]
     pub fn blocking_write(&self) -> RwLockWriteGuard<'_, T> {
         crate::future::block_on(self.write())

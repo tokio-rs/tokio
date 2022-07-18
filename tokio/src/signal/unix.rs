@@ -384,6 +384,12 @@ pub struct Signal {
 /// * If the previous initialization of this specific signal failed.
 /// * If the signal is one of
 ///   [`signal_hook::FORBIDDEN`](fn@signal_hook_registry::register#panics)
+///
+/// # Panics
+///
+/// This function panics if there is no current reactor set, or if the `rt`
+/// feature flag is not enabled.
+#[track_caller]
 pub fn signal(kind: SignalKind) -> io::Result<Signal> {
     let rx = signal_with_handle(kind, &Handle::current())?;
 
