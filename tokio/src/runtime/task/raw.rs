@@ -1,5 +1,6 @@
 use crate::future::Future;
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
+use crate::runtime::task::core::Trailer;
 
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
@@ -35,6 +36,9 @@ pub(super) struct Vtable {
 
     /// Scheduler is being shutdown.
     pub(super) shutdown: unsafe fn(NonNull<Header>),
+
+    /// The number of bytes that the `trailer` field is offset from the header.
+    pub(super) trailer_offset: usize,
 }
 
 /// Get the vtable for the requested `T` and `S` generics.
@@ -48,7 +52,46 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
         drop_abort_handle: drop_abort_handle::<T, S>,
         remote_abort: remote_abort::<T, S>,
         shutdown: shutdown::<T, S>,
+        trailer_offset: TrailerOffsetHelper::<T, S>::OFFSET,
     }
+}
+
+/// Calling `get_trailer_offset` directly in vtable doesn't work because it
+/// prevents the vtable from being promoted to a static reference.
+///
+/// See this thread for more info:
+/// <https://users.rust-lang.org/t/custom-vtables-with-integers/78508>
+struct TrailerOffsetHelper<T, S>(T, S);
+impl<T: Future, S: Schedule> TrailerOffsetHelper<T, S> {
+    const OFFSET: usize = get_trailer_offset::<T, S>();
+}
+
+/// Compute the offset of the `Trailer` field in `Cell<T, S>` using the
+/// `#[repr(C)]` algorithm.
+///
+/// Pseudo-code for the `#[repr(C)]` algorithm can be found here:
+/// <https://doc.rust-lang.org/reference/type-layout.html#reprc-structs>
+const fn get_trailer_offset<T: Future, S: Schedule>() -> usize {
+    use crate::runtime::task::core::Core;
+
+    let mut offset = std::mem::size_of::<Header>();
+
+    let core_size = std::mem::size_of::<Core<T, S>>();
+    let core_align = std::mem::align_of::<Core<T, S>>();
+    let core_misalign = offset % core_align;
+
+    if core_misalign > 0 {
+        offset += core_align - core_misalign;
+    }
+    offset += core_size;
+
+    let trailer_align = std::mem::align_of::<Trailer>();
+    let trailer_misalign = offset % trailer_align;
+    if trailer_misalign > 0 {
+        offset += trailer_align - trailer_misalign;
+    }
+
+    offset
 }
 
 impl RawTask {
