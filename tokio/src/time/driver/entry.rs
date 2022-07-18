@@ -326,7 +326,7 @@ pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, Ti
 ///
 /// Note that this structure is located inside the `TimerEntry` structure.
 #[derive(Debug)]
-#[repr(C)] // required by `link_list::Link` impl
+#[repr(C)]
 pub(crate) struct TimerShared {
     /// Data manipulated by the driver thread itself, only.
     driver_state: CachePadded<TimerSharedPadded>,
