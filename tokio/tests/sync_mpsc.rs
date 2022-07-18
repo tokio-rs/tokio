@@ -867,11 +867,38 @@ async fn test_msgs_dropped_on_rx_drop() {
 
         // This msg will not be put onto `Tx` list anymore, since `Rx` is closed.
         time::sleep(ms(1)).await;
-        let _ = tx.send(Msg {}).await.unwrap();
+        assert!(tx.send(Msg {}).await.is_err());
 
         // Ensure that third message isn't put onto the channel anymore
         assert_eq!(NUM_DROPPED.load(Acquire), 4);
     });
 
     let (_, _) = join!(rx_handle, tx_handle);
+}
+
+#[tokio::test]
+// Tests that a `WeakSender` is upgradeable when other `Sender`s exist.
+async fn downgrade_upgrade_sender_success() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+    let weak_tx = tx.clone().downgrade();
+    assert!(weak_tx.upgrade().is_some());
+}
+
+#[tokio::test]
+// Tests that a `WeakSender` fails to upgrade when no other `Sender` exists.
+async fn downgrade_upgrade_sender_failure() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+    let weak_tx = tx.downgrade();
+    assert!(weak_tx.upgrade().is_none());
+}
+
+#[tokio::test]
+// Tests that a `WeakSender` cannot be upgraded after a `Sender` was dropped,
+// which existed at the time of the `downgrade` call.
+async fn downgrade_drop_upgrade() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+
+    let weak_tx = tx.clone().downgrade();
+    drop(tx);
+    assert!(weak_tx.upgrade().is_none());
 }
