@@ -146,29 +146,19 @@ impl<T, S> Tx<T, S> {
     pub(super) fn upgrade(self) -> Option<Self> {
         let mut tx_count = self.inner.tx_count.load(Acquire);
 
-        if tx_count == 0 {
-            // channel is closed
-            return None;
-        }
-
         loop {
+            if tx_count == 0 {
+                // channel is closed
+                return None;
+            }
+
             match self
                 .inner
                 .tx_count
-                .compare_exchange(tx_count, tx_count + 1, AcqRel, Acquire)
+                .compare_exchange_weak(tx_count, tx_count + 1, AcqRel, Acquire)
             {
-                Ok(prev_count) => {
-                    assert!(prev_count != 0);
-
-                    return Some(self);
-                }
-                Err(prev_count) => {
-                    if prev_count == 0 {
-                        return None;
-                    }
-
-                    tx_count = prev_count;
-                }
+                Ok(_) => return Some(self),
+                Err(prev_count) => tx_count = prev_count,
             }
         }
     }

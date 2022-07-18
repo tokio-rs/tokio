@@ -1079,7 +1079,7 @@ impl<T> WeakSender<T> {
     /// if there are other `Sender` instances alive and the channel wasn't
     /// previously dropped, otherwise `None` is returned.
     pub fn upgrade(self) -> Option<Sender<T>> {
-        self.chan.upgrade().map(|tx| Sender::new(tx))
+        self.chan.upgrade().map(Sender::new)
     }
 }
 
