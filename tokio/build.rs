@@ -7,6 +7,10 @@ fn main() {
             if ac.probe_rustc_version(1, 59) {
                 autocfg::emit("tokio_const_thread_local")
             }
+
+            if !ac.probe_rustc_version(1, 51) {
+                autocfg::emit("tokio_no_addr_of")
+            }
         }
 
         Err(e) => {
