@@ -24,6 +24,7 @@ pub(crate) fn current() -> Handle {
 }
 
 cfg_io_driver! {
+    #[track_caller]
     pub(crate) fn io_handle() -> crate::runtime::driver::IoHandle {
         match CONTEXT.try_with(|ctx| {
             let ctx = ctx.borrow();

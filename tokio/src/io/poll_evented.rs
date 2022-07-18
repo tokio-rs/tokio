@@ -77,6 +77,7 @@ impl<E: Source> PollEvented<E> {
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[track_caller]
     #[cfg_attr(feature = "signal", allow(unused))]
     pub(crate) fn new(io: E) -> io::Result<Self> {
         PollEvented::new_with_interest(io, Interest::READABLE | Interest::WRITABLE)
@@ -97,6 +98,7 @@ impl<E: Source> PollEvented<E> {
     /// a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter)
     /// function.
+    #[track_caller]
     #[cfg_attr(feature = "signal", allow(unused))]
     pub(crate) fn new_with_interest(io: E, interest: Interest) -> io::Result<Self> {
         Self::new_with_interest_and_handle(io, interest, Handle::current())
