@@ -1,6 +1,6 @@
 use crate::future::Future;
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
-use crate::runtime::task::core::Trailer;
+use crate::runtime::task::core::{Core, Trailer};
 
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
@@ -63,7 +63,15 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
 /// <https://users.rust-lang.org/t/custom-vtables-with-integers/78508>
 struct TrailerOffsetHelper<T, S>(T, S);
 impl<T: Future, S: Schedule> TrailerOffsetHelper<T, S> {
-    const OFFSET: usize = get_trailer_offset::<T, S>();
+    // Pass `size_of`/`align_of` as arguments rather than calling them directly
+    // inside `get_trailer_offset` because trait bounds on generic parameters
+    // of const fn are unstable on our MSRV.
+    const OFFSET: usize = get_trailer_offset(
+        std::mem::size_of::<Header>(),
+        std::mem::size_of::<Core<T, S>>(),
+        std::mem::align_of::<Core<T, S>>(),
+        std::mem::align_of::<Trailer>(),
+    );
 }
 
 /// Compute the offset of the `Trailer` field in `Cell<T, S>` using the
@@ -71,21 +79,20 @@ impl<T: Future, S: Schedule> TrailerOffsetHelper<T, S> {
 ///
 /// Pseudo-code for the `#[repr(C)]` algorithm can be found here:
 /// <https://doc.rust-lang.org/reference/type-layout.html#reprc-structs>
-const fn get_trailer_offset<T: Future, S: Schedule>() -> usize {
-    use crate::runtime::task::core::Core;
+const fn get_trailer_offset(
+    header_size: usize,
+    core_size: usize,
+    core_align: usize,
+    trailer_align: usize,
+) -> usize {
+    let mut offset = header_size;
 
-    let mut offset = std::mem::size_of::<Header>();
-
-    let core_size = std::mem::size_of::<Core<T, S>>();
-    let core_align = std::mem::align_of::<Core<T, S>>();
     let core_misalign = offset % core_align;
-
     if core_misalign > 0 {
         offset += core_align - core_misalign;
     }
     offset += core_size;
 
-    let trailer_align = std::mem::align_of::<Trailer>();
     let trailer_misalign = offset % trailer_align;
     if trailer_misalign > 0 {
         offset += trailer_align - trailer_misalign;
