@@ -142,9 +142,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         #[cfg(debug_assertions)]
         {
             let trailer_addr = (&result.trailer) as *const Trailer as usize;
-            let trailer_ptr = unsafe {
-                Header::get_trailer(NonNull::from(&result.header))
-            };
+            let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(&result.header)) };
 
             assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
         }
