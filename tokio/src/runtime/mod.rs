@@ -475,6 +475,7 @@ cfg_rt! {
         /// ```
         ///
         /// [handle]: fn@Handle::block_on
+        #[track_caller]
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             let future = crate::util::trace::task(future, "block_on", None, task::Id::next().as_u64());
