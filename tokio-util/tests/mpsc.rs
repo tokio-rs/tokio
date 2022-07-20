@@ -1,5 +1,4 @@
 use futures::future::poll_fn;
-
 use tokio::sync::mpsc::channel;
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok};

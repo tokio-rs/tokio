@@ -17,10 +17,8 @@ use tokio::sync::oneshot;
 use tokio::time;
 use tokio_test::*;
 
-use std::sync::atomic::{
-    AtomicUsize,
-    Ordering::{Acquire, Release},
-};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::Arc;
 use std::time::Duration;
 
