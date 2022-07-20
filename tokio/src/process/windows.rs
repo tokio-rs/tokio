@@ -30,8 +30,8 @@ use std::pin::Pin;
 use std::process::Stdio;
 use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
 use std::ptr;
-use std::task::Context;
-use std::task::Poll;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 use winapi::shared::minwindef::{DWORD, FALSE};
 use winapi::um::handleapi::{DuplicateHandle, INVALID_HANDLE_VALUE};
 use winapi::um::processthreadsapi::GetCurrentProcess;
@@ -168,14 +168,33 @@ unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
     let _ = complete.take().unwrap().send(());
 }
 
+#[derive(Debug)]
+struct ArcFile(Arc<StdFile>);
+
+impl io::Read for ArcFile {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        (&*self.0).read(bytes)
+    }
+}
+
+impl io::Write for ArcFile {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        (&*self.0).write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        (&*self.0).flush()
+    }
+}
+
 pin_project! {
     #[derive(Debug)]
     pub(crate) struct ChildStdio {
         // Used for accessing the raw handle, even if the io version is busy
-        raw: StdFile,
+        raw: Arc<StdFile>,
         // For doing I/O operations asynchronously
         #[pin]
-        io: Blocking<StdFile>,
+        io: Blocking<ArcFile>,
     }
 }
 
@@ -219,13 +238,18 @@ where
 {
     use std::os::windows::prelude::FromRawHandle;
 
-    let raw = unsafe { StdFile::from_raw_handle(io.into_raw_handle()) };
-    let io = Blocking::new(duplicate_handle(&raw)?);
+    let raw = Arc::new(unsafe { StdFile::from_raw_handle(io.into_raw_handle()) });
+    let io = Blocking::new(ArcFile(raw.clone()));
     Ok(ChildStdio { raw, io })
 }
 
-pub(crate) fn convert_to_stdio(io: ChildStdio) -> io::Result<Stdio> {
-    Ok(Stdio::from(io.raw))
+pub(crate) fn convert_to_stdio(child_stdio: ChildStdio) -> io::Result<Stdio> {
+    let ChildStdio { raw, io } = child_stdio;
+    drop(io); // Try to drop the Arc count here
+
+    Arc::try_unwrap(raw)
+        .or_else(|raw| duplicate_handle(&*raw))
+        .map(Stdio::from)
 }
 
 fn duplicate_handle<T: AsRawHandle>(io: &T) -> io::Result<StdFile> {
