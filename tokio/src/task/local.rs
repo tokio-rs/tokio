@@ -487,6 +487,7 @@ impl LocalSet {
     /// [`Runtime::block_on`]: method@crate::runtime::Runtime::block_on
     /// [in-place blocking]: fn@crate::task::block_in_place
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
+    #[track_caller]
     #[cfg(feature = "rt")]
     #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
     pub fn block_on<F>(&self, rt: &crate::runtime::Runtime, future: F) -> F::Output
