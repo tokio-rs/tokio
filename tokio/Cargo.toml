@@ -57,6 +57,8 @@ net = [
   "winapi/winbase",
   "winapi/winnt",
   "winapi/minwindef",
+  "winapi/accctrl",
+  "winapi/aclapi"
 ]
 process = [
   "bytes",
