@@ -20,7 +20,6 @@ use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::sync::oneshot;
 
-use pin_project_lite::pin_project;
 use std::fmt;
 use std::fs::File as StdFile;
 use std::future::Future;
@@ -187,15 +186,12 @@ impl io::Write for ArcFile {
     }
 }
 
-pin_project! {
-    #[derive(Debug)]
-    pub(crate) struct ChildStdio {
-        // Used for accessing the raw handle, even if the io version is busy
-        raw: Arc<StdFile>,
-        // For doing I/O operations asynchronously
-        #[pin]
-        io: Blocking<ArcFile>,
-    }
+#[derive(Debug)]
+pub(crate) struct ChildStdio {
+    // Used for accessing the raw handle, even if the io version is busy
+    raw: Arc<StdFile>,
+    // For doing I/O operations asynchronously
+    io: Blocking<ArcFile>,
 }
 
 impl AsRawHandle for ChildStdio {
@@ -206,29 +202,29 @@ impl AsRawHandle for ChildStdio {
 
 impl AsyncRead for ChildStdio {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.project().io.poll_read(cx, buf)
+        Pin::new(&mut self.io).poll_read(cx, buf)
     }
 }
 
 impl AsyncWrite for ChildStdio {
     fn poll_write(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.project().io.poll_write(cx, buf)
+        Pin::new(&mut self.io).poll_write(cx, buf)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.project().io.poll_flush(cx)
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.io).poll_flush(cx)
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.project().io.poll_shutdown(cx)
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.io).poll_shutdown(cx)
     }
 }
 
