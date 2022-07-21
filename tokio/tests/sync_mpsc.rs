@@ -874,29 +874,50 @@ async fn test_msgs_dropped_on_rx_drop() {
     let (_, _) = join!(rx_handle, tx_handle);
 }
 
-#[tokio::test]
 // Tests that a `WeakSender` is upgradeable when other `Sender`s exist.
+#[tokio::test]
 async fn downgrade_upgrade_sender_success() {
     let (tx, _rx) = mpsc::channel::<i32>(1);
     let weak_tx = tx.clone().downgrade();
     assert!(weak_tx.upgrade().is_some());
 }
 
-#[tokio::test]
 // Tests that a `WeakSender` fails to upgrade when no other `Sender` exists.
+#[tokio::test]
 async fn downgrade_upgrade_sender_failure() {
     let (tx, _rx) = mpsc::channel::<i32>(1);
     let weak_tx = tx.downgrade();
     assert!(weak_tx.upgrade().is_none());
 }
 
-#[tokio::test]
 // Tests that a `WeakSender` cannot be upgraded after a `Sender` was dropped,
 // which existed at the time of the `downgrade` call.
+#[tokio::test]
 async fn downgrade_drop_upgrade() {
     let (tx, _rx) = mpsc::channel::<i32>(1);
 
     let weak_tx = tx.clone().downgrade();
     drop(tx);
     assert!(weak_tx.upgrade().is_none());
+}
+
+// Tests that we can upgrade a weak sender with an outstanding permit
+// but no other strong senders.
+#[tokio::test]
+async fn downgrade_get_permit_upgrade_no_senders() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+    let weak_tx = tx.clone().downgrade();
+    let _permit = tx.reserve_owned().await.unwrap();
+    assert!(weak_tx.upgrade().is_some());
+}
+
+// Tests that you can downgrade and upgrade a sender with an outstanding permit
+// but no other senders left.
+#[tokio::test]
+async fn downgrade_upgrade_get_permit_no_senders() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+    let tx2 = tx.clone();
+    let _permit = tx.reserve_owned().await.unwrap();
+    let weak_tx = tx2.downgrade();
+    assert!(weak_tx.upgrade().is_some());
 }
