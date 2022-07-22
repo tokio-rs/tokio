@@ -22,43 +22,34 @@ pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
 
-/// A Sender that does not influence RAII semantics, i.e. if all [`Sender`]
-/// instances of a channel were dropped and only `WeakSender` instances remain,
-/// the channel is closed.
+/// A sender that does not prevent the channel from being closed.
+///
+/// If all [`Sender`] instances of a channel were dropped and only `WeakSender`
+/// instances remain, the channel is closed.
 ///
 /// In order to send messages, the `WeakSender` needs to be upgraded using
-/// [`WeakSender::upgrade`], which returns `Option<Sender>`, `None` if all
-/// `Sender`s were already dropped, otherwise `Some` (at which point it does
-/// influence RAII semantics again).
+/// [`WeakSender::upgrade`], which returns `Option<Sender>`. It returns `None`
+/// if all `Sender`s have been dropped, and otherwise it returns a `Sender`.
 ///
 /// [`Sender`]: Sender
 /// [`WeakSender::upgrade`]: WeakSender::upgrade
 ///
 /// #Examples
 ///
-/// ```rust
-/// use tokio;
+/// ```
 /// use tokio::sync::mpsc::channel;
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let (tx, mut rx) = channel(15);
-///     let _ = tx.send(1).await;
-///     let tx_weak = tx.downgrade();
-///
-///     let _ = tokio::spawn(async move {
-///         for i in 0..2 {
-///             if i == 0 {
-///                 assert_eq!(rx.recv().await.unwrap(), 1);
-///             } else if i == 1 {
-///                 // only WeakSender instance remains -> channel is dropped
-///                 assert!(rx.recv().await.is_none());
-///             }
-///         }
-///     })
-///     .await;
-///
-///     assert!(tx_weak.upgrade().is_none());
+///     let (tx, _rx) = channel::<i32>(15);
+///     let tx_weak = tx.clone().downgrade();
+///   
+///     // Upgrading will succeed because `tx` still exists.
+///     assert!(tx_weak.clone().upgrade().is_some());
+///   
+///     // If we drop `tx`, then it will fail.
+///     drop(tx);
+///     assert!(tx_weak.clone().upgrade().is_none());
 /// }
 ///
 /// ```

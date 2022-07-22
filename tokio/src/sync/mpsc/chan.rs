@@ -142,7 +142,7 @@ impl<T, S> Tx<T, S> {
         self
     }
 
-    // Returns a boolean that indicates whether the channel is closed.
+    // Returns the upgraded channel or None if the upgrade failed.
     pub(super) fn upgrade(self) -> Option<Self> {
         let mut tx_count = self.inner.tx_count.load(Acquire);
 
