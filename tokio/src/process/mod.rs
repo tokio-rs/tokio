@@ -245,7 +245,6 @@ mod kill;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::process::kill::Kill;
 
-use pin_project_lite::pin_project;
 use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::future::Future;
@@ -1212,40 +1211,31 @@ impl Child {
     }
 }
 
-pin_project! {
-    /// The standard input stream for spawned children.
-    ///
-    /// This type implements the `AsyncWrite` trait to pass data to the stdin handle of
-    /// handle of a child process asynchronously.
-    #[derive(Debug)]
-    pub struct ChildStdin {
-        #[pin]
-        inner: imp::ChildStdio,
-    }
+/// The standard input stream for spawned children.
+///
+/// This type implements the `AsyncWrite` trait to pass data to the stdin handle of
+/// handle of a child process asynchronously.
+#[derive(Debug)]
+pub struct ChildStdin {
+    inner: imp::ChildStdio,
 }
 
-pin_project! {
-    /// The standard output stream for spawned children.
-    ///
-    /// This type implements the `AsyncRead` trait to read data from the stdout
-    /// handle of a child process asynchronously.
-    #[derive(Debug)]
-    pub struct ChildStdout {
-        #[pin]
-        inner: imp::ChildStdio,
-    }
+/// The standard output stream for spawned children.
+///
+/// This type implements the `AsyncRead` trait to read data from the stdout
+/// handle of a child process asynchronously.
+#[derive(Debug)]
+pub struct ChildStdout {
+    inner: imp::ChildStdio,
 }
 
-pin_project! {
-    /// The standard error stream for spawned children.
-    ///
-    /// This type implements the `AsyncRead` trait to read data from the stderr
-    /// handle of a child process asynchronously.
-    #[derive(Debug)]
-    pub struct ChildStderr {
-        #[pin]
-        inner: imp::ChildStdio,
-    }
+/// The standard error stream for spawned children.
+///
+/// This type implements the `AsyncRead` trait to read data from the stderr
+/// handle of a child process asynchronously.
+#[derive(Debug)]
+pub struct ChildStderr {
+    inner: imp::ChildStdio,
 }
 
 impl ChildStdin {
@@ -1295,39 +1285,39 @@ impl ChildStderr {
 
 impl AsyncWrite for ChildStdin {
     fn poll_write(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.project().inner.poll_write(cx, buf)
+        Pin::new(&mut self.inner).poll_write(cx, buf)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.project().inner.poll_flush(cx)
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.project().inner.poll_shutdown(cx)
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }
 
 impl AsyncRead for ChildStdout {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.project().inner.poll_read(cx, buf)
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 
 impl AsyncRead for ChildStderr {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.project().inner.poll_read(cx, buf)
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 
