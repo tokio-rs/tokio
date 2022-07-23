@@ -7,7 +7,6 @@ publish = false
 
 [[bin]]
 name = "test-cat"
-required-features = ["rt-process-io-util"]
 
 [[bin]]
 name = "test-mem"
@@ -31,7 +30,6 @@ name = "rt_yield"
 required-features = ["rt", "macros", "sync"]
 
 [features]
-rt-process-io-util = ["tokio/rt", "tokio/macros", "tokio/process", "tokio/io-util", "tokio/io-std"]
 # For mem check
 rt-net = ["tokio/rt", "tokio/rt-multi-thread", "tokio/net"]
 # For test-process-signal
