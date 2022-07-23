@@ -431,7 +431,12 @@ cfg_process! {
     pub mod process;
 }
 
-#[cfg(any(feature = "net", feature = "fs", feature = "io-std"))]
+#[cfg(any(
+    feature = "fs",
+    feature = "io-std",
+    feature = "net",
+    all(windows, feature = "process"),
+))]
 mod blocking;
 
 cfg_rt! {
