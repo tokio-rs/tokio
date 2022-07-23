@@ -293,11 +293,7 @@ impl Builder {
     ///
     /// The default value is the number of cores available to the system.
     ///
-    /// # Panics
-    ///
-    /// When using the `current_thread` runtime this method will panic, since
-    /// those variants do not allow setting worker thread counts.
-    ///
+    /// When using the `current_thread` runtime this method has no effect.
     ///
     /// # Examples
     ///
