@@ -8,22 +8,12 @@ use tokio_test::assert_ok;
 
 use futures::future::{self, FutureExt};
 use std::convert::TryInto;
+use std::env;
 use std::io;
 use std::process::{ExitStatus, Stdio};
 
-// so, we need to change this back as a test, but for now this doesn't work because of:
-// https://github.com/rust-lang/rust/pull/95469
-//
-// undo when this is closed: https://github.com/tokio-rs/tokio/issues/4802
-
-// fn cat() -> Command {
-//     let mut cmd = Command::new(std::env!("CARGO_BIN_EXE_test-cat"));
-//     cmd.stdin(Stdio::piped()).stdout(Stdio::piped());
-//     cmd
-// }
-
 fn cat() -> Command {
-    let mut cmd = Command::new("cat");
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_test-cat"));
     cmd.stdin(Stdio::piped()).stdout(Stdio::piped());
     cmd
 }
