@@ -160,7 +160,7 @@ cfg_rt! {
     ///                     tokio::task::spawn_local(run_task(new_task));
     ///                 }
     ///                 // If the while loop returns, then all the LocalSpawner
-    ///                 // objects have have been dropped.
+    ///                 // objects have been dropped.
     ///             });
     ///
     ///             // This will return once all senders are dropped and all
