@@ -7,6 +7,7 @@ on:
 jobs:
   triage:
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'tokio-rs'
     steps:
     - uses: actions/labeler@v3
       with:
