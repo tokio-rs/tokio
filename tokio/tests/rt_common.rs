@@ -1137,7 +1137,7 @@ rt_test! {
             let (spawned_tx, mut spawned_rx) = mpsc::unbounded_channel();
 
             let mut tasks = vec![];
-            // Spawn a bunch of tasks that ping ping between each other to
+            // Spawn a bunch of tasks that ping-pong between each other to
             // saturate the runtime.
             for _ in 0..NUM {
                 let (tx1, mut rx1) = mpsc::unbounded_channel();
