@@ -12,7 +12,7 @@ env:
   rust_stable: stable
 
 jobs:
-  stess-test:
+  stress-test:
     name: Stress Test
     runs-on: ubuntu-latest
     strategy:
