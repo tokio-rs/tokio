@@ -13,7 +13,7 @@ pub(super) struct WakerRef<'a, S: 'static> {
     _p: PhantomData<(&'a Header, S)>,
 }
 
-/// Returns a `WakerRef` which avoids having to pre-emptively increase the
+/// Returns a `WakerRef` which avoids having to preemptively increase the
 /// refcount if there is no need to do so.
 pub(super) fn waker_ref<T, S>(header: &NonNull<Header>) -> WakerRef<'_, S>
 where
