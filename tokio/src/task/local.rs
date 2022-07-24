@@ -652,7 +652,7 @@ cfg_unstable! {
         /// * `UnhandledPanic::ShutdownRuntime` will force the `LocalSet` to
         ///   shutdown immediately when a spawned task panics even if that
         ///   task's `JoinHandle` has not been dropped. All other spawned tasks
-        ///   will immediatetly terminate and further calls to
+        ///   will immediately terminate and further calls to
         ///   [`LocalSet::block_on`] and [`LocalSet::run_until`] will panic.
         ///
         /// # Panics
