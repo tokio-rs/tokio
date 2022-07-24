@@ -36,7 +36,7 @@
 //! point than it was originally scheduled for.
 //!
 //! This is accomplished by lazily rescheduling timers. That is, we update the
-//! state field field with the true expiration of the timer from the holder of
+//! state field with the true expiration of the timer from the holder of
 //! the [`TimerEntry`]. When the driver services timers (ie, whenever it's
 //! walking lists of timers), it checks this "true when" value, and reschedules
 //! based on it.
