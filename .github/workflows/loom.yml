@@ -17,7 +17,7 @@ jobs:
   loom:
     name: loom
     # base_ref is null when it's not a pull request
-    if: contains(github.event.pull_request.labels.*.name, 'R-loom') || (github.base_ref == null)
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom') || (github.base_ref == null))
     runs-on: ubuntu-latest
     strategy:
       matrix:
