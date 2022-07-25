@@ -665,7 +665,7 @@ impl<T> Sender<T> {
     ///
     /// The `modify` closure must return `true` if the value has actually
     /// been modified during the mutable borrow. It should only return `false`
-    /// if the value is guaranteed to be unnmodified despite the mutable
+    /// if the value is guaranteed to be unmodified despite the mutable
     /// borrow.
     ///
     /// Receivers are only notified if the closure returned `true`. If the

@@ -215,7 +215,7 @@ mod test {
     }
 
     #[test]
-    fn bugeting() {
+    fn budgeting() {
         use futures::future::poll_fn;
         use tokio_test::*;
 

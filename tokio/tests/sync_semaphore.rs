@@ -65,7 +65,7 @@ fn forget() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
-async fn stresstest() {
+async fn stress_test() {
     let sem = Arc::new(Semaphore::new(5));
     let mut join_handles = Vec::new();
     for _ in 0..1000 {

@@ -291,11 +291,11 @@ fn balanced_incr_and_decr() {
         let incr_inner = inner.clone();
         let decr_inner = inner.clone();
 
-        let incr_hndle = thread::spawn(move || incr(incr_inner));
-        let decr_hndle = thread::spawn(move || decr(decr_inner));
+        let incr_handle = thread::spawn(move || incr(incr_inner));
+        let decr_handle = thread::spawn(move || decr(decr_inner));
 
-        incr_hndle.join().expect("should never fail");
-        decr_hndle.join().expect("should never fail");
+        incr_handle.join().expect("should never fail");
+        decr_handle.join().expect("should never fail");
 
         assert_eq!(inner.num(Ordering::SeqCst), 0);
     })

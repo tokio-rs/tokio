@@ -4,7 +4,7 @@ use std::task::Poll;
 /// runtime *if* the task's coop budget was exhausted.
 ///
 /// The task will only yield if its entire coop budget has been exhausted.
-/// This function can can be used in order to insert optional yield points into long
+/// This function can be used in order to insert optional yield points into long
 /// computations that do not use Tokio resources like sockets or semaphores,
 /// without redundantly yielding to the runtime each time.
 ///

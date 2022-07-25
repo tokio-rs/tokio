@@ -130,7 +130,7 @@ fn write_hits_backpressure() {
             _ => unreachable!(),
         }
 
-        // Push a new new chunk
+        // Push a new chunk
         mock.calls.push_back(Ok(b[..].to_vec()));
     }
     // 1 'wouldblock', 4 * 2KB buffers, 1 b-byte buffer

@@ -190,7 +190,7 @@ impl<T> SlabStorage<T> {
         let key_contained = self.key_map.contains_key(&key.into());
 
         if key_contained {
-            // It's possible that a `compact` call creates capacitiy in `self.inner` in
+            // It's possible that a `compact` call creates capacity in `self.inner` in
             // such a way that a `self.inner.insert` call creates a `key` which was
             // previously given out during an `insert` call prior to the `compact` call.
             // If `key` is contained in `self.key_map`, we have encountered this exact situation,

@@ -562,7 +562,7 @@ Tokio ≥1.0.0 comes with LTS guarantees:
 
 The goal of these guarantees is to provide stability to the ecosystem.
 
-## Mininum Supported Rust Version (MSRV)
+## Minimum Supported Rust Version (MSRV)
 
  * All Tokio ≥1.0.0 releases will support at least a 6-month old Rust
    compiler release.

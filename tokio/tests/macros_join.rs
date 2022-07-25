@@ -86,7 +86,7 @@ async fn non_cooperative_task(permits: Arc<Semaphore>) -> usize {
     let mut exceeded_budget = 0;
 
     for _ in 0..5 {
-        // Another task should run after after this task uses its whole budget
+        // Another task should run after this task uses its whole budget
         for _ in 0..128 {
             let _permit = permits.clone().acquire_owned().await.unwrap();
         }

@@ -738,7 +738,7 @@ impl Builder {
         /// * `UnhandledPanic::ShutdownRuntime` will force the runtime to
         ///   shutdown immediately when a spawned task panics even if that
         ///   task's `JoinHandle` has not been dropped. All other spawned tasks
-        ///   will immediatetly terminate and further calls to
+        ///   will immediately terminate and further calls to
         ///   [`Runtime::block_on`] will panic.
         ///
         /// # Unstable
