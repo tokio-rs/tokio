@@ -4,8 +4,8 @@ fn main() {
     match AutoCfg::new() {
         Ok(ac) => {
             // Const-initialized thread locals were stabilized in 1.59
-            if ac.probe_rustc_version(1, 59) {
-                autocfg::emit("tokio_const_thread_local")
+            if !ac.probe_rustc_version(1, 59) {
+                autocfg::emit("tokio_no_const_thread_local")
             }
 
             if !ac.probe_rustc_version(1, 51) {

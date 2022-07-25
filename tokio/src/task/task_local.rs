@@ -47,7 +47,7 @@ macro_rules! task_local {
 }
 
 #[doc(hidden)]
-#[cfg(tokio_const_thread_local)]
+#[cfg(not(tokio_no_const_thread_local))]
 #[macro_export]
 macro_rules! __task_local_inner {
     ($(#[$attr:meta])* $vis:vis $name:ident, $t:ty) => {
@@ -63,7 +63,7 @@ macro_rules! __task_local_inner {
 }
 
 #[doc(hidden)]
-#[cfg(not(tokio_const_thread_local))]
+#[cfg(tokio_no_const_thread_local)]
 #[macro_export]
 macro_rules! __task_local_inner {
     ($(#[$attr:meta])* $vis:vis $name:ident, $t:ty) => {
