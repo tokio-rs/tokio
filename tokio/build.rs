@@ -10,8 +10,16 @@ const CONST_THREAD_LOCAL_PROBE: &str = r#"
 }
 "#;
 
+const ADDR_OF_PROBE: &str = r#"
+{
+    let my_var = 10;
+    ::std::ptr::addr_of!(my_var)
+}
+"#;
+
 fn main() {
     let mut enable_const_thread_local = false;
+    let mut enable_addr_of = false;
 
     match AutoCfg::new() {
         Ok(ac) => {
@@ -35,8 +43,19 @@ fn main() {
                 }
             }
 
-            if !ac.probe_rustc_version(1, 51) {
-                autocfg::emit("tokio_no_addr_of")
+            // The `addr_of` and `addr_of_mut` macros were stabilized in 1.51.
+            if ac.probe_rustc_version(1, 52) {
+                enable_addr_of = true;
+            } else if ac.probe_rustc_version(1, 51) {
+                // This compiler claims to be 1.51, but there are some nightly
+                // compilers that claim to be 1.51 without supporting the
+                // feature. Explicitly probe to check if code using them
+                // compiles.
+                //
+                // The oldest nightly that supports the feature is 2021-01-31.
+                if ac.probe_expression(ADDR_OF_PROBE) {
+                    enable_addr_of = true;
+                }
             }
         }
 
@@ -57,5 +76,13 @@ fn main() {
         //
         // RUSTFLAGS="--cfg tokio_no_const_thread_local"
         autocfg::emit("tokio_no_const_thread_local")
+    }
+
+    if !enable_addr_of {
+        // To disable this feature on compilers that support it, you can
+        // explicitly pass this flag with the following environment variable:
+        //
+        // RUSTFLAGS="--cfg tokio_no_addr_of"
+        autocfg::emit("tokio_no_addr_of")
     }
 }
