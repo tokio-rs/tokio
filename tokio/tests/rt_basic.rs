@@ -178,6 +178,7 @@ fn drop_tasks_in_context() {
 }
 
 #[test]
+#[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
 #[should_panic(expected = "boom")]
 fn wake_in_drop_after_panic() {
     let (tx, rx) = oneshot::channel::<()>();
@@ -238,6 +239,7 @@ fn spawn_two() {
     }
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI: std::thread::spawn not supported")]
 #[test]
 fn spawn_remote() {
     let rt = rt();
@@ -274,6 +276,7 @@ fn spawn_remote() {
 }
 
 #[test]
+#[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
 #[should_panic(
     expected = "A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers."
 )]
@@ -312,6 +315,7 @@ mod unstable {
     }
 
     #[test]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
     fn spawns_do_nothing() {
         use std::sync::Arc;
 
@@ -340,6 +344,7 @@ mod unstable {
     }
 
     #[test]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
     fn shutdown_all_concurrent_block_on() {
         const N: usize = 2;
         use std::sync::{mpsc, Arc};

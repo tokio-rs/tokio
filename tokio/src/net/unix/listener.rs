@@ -54,11 +54,13 @@ impl UnixListener {
     ///
     /// # Panics
     ///
-    /// This function panics if thread-local runtime is not set.
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[track_caller]
     pub fn bind<P>(path: P) -> io::Result<UnixListener>
     where
         P: AsRef<Path>,
@@ -77,11 +79,13 @@ impl UnixListener {
     ///
     /// # Panics
     ///
-    /// This function panics if thread-local runtime is not set.
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[track_caller]
     pub fn from_std(listener: net::UnixListener) -> io::Result<UnixListener> {
         let listener = mio::net::UnixListener::from_std(listener);
         let io = PollEvented::new(listener)?;

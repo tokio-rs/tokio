@@ -699,11 +699,13 @@ impl UnixStream {
     ///
     /// # Panics
     ///
-    /// This function panics if thread-local runtime is not set.
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[track_caller]
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
         let stream = mio::net::UnixStream::from_std(stream);
         let io = PollEvented::new(stream)?;

@@ -1285,41 +1285,39 @@ impl ChildStderr {
 
 impl AsyncWrite for ChildStdin {
     fn poll_write(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.inner.poll_write(cx, buf)
+        Pin::new(&mut self.inner).poll_write(cx, buf)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }
 
 impl AsyncRead for ChildStdout {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 
 impl AsyncRead for ChildStderr {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 

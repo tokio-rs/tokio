@@ -36,7 +36,7 @@
 //! point than it was originally scheduled for.
 //!
 //! This is accomplished by lazily rescheduling timers. That is, we update the
-//! state field field with the true expiration of the timer from the holder of
+//! state field with the true expiration of the timer from the holder of
 //! the [`TimerEntry`]. When the driver services timers (ie, whenever it's
 //! walking lists of timers), it checks this "true when" value, and reschedules
 //! based on it.
@@ -326,7 +326,7 @@ pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, Ti
 ///
 /// Note that this structure is located inside the `TimerEntry` structure.
 #[derive(Debug)]
-#[repr(C)] // required by `link_list::Link` impl
+#[repr(C)]
 pub(crate) struct TimerShared {
     /// Data manipulated by the driver thread itself, only.
     driver_state: CachePadded<TimerSharedPadded>,
@@ -337,6 +337,14 @@ pub(crate) struct TimerShared {
     state: StateCell,
 
     _p: PhantomPinned,
+}
+
+generate_addr_of_methods! {
+    impl<> TimerShared {
+        unsafe fn addr_of_pointers(self: NonNull<Self>) -> NonNull<linked_list::Pointers<TimerShared>> {
+            &self.driver_state.0.pointers
+        }
+    }
 }
 
 impl TimerShared {
@@ -421,7 +429,6 @@ impl TimerShared {
 /// padded. This contains the information that the driver thread accesses most
 /// frequently to minimize contention. In particular, we move it away from the
 /// waker, as the waker is updated on every poll.
-#[repr(C)] // required by `link_list::Link` impl
 struct TimerSharedPadded {
     /// A link within the doubly-linked list of timers on a particular level and
     /// slot. Valid only if state is equal to Registered.
@@ -476,7 +483,7 @@ unsafe impl linked_list::Link for TimerShared {
     unsafe fn pointers(
         target: NonNull<Self::Target>,
     ) -> NonNull<linked_list::Pointers<Self::Target>> {
-        target.cast()
+        TimerShared::addr_of_pointers(target)
     }
 }
 

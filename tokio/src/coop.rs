@@ -207,7 +207,7 @@ cfg_coop! {
 mod test {
     use super::*;
 
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     fn get() -> Budget {
@@ -215,7 +215,7 @@ mod test {
     }
 
     #[test]
-    fn bugeting() {
+    fn budgeting() {
         use futures::future::poll_fn;
         use tokio_test::*;
 

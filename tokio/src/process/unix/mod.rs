@@ -29,7 +29,7 @@ use orphan::{OrphanQueue, OrphanQueueImpl, Wait};
 mod reap;
 use reap::Reaper;
 
-use crate::io::PollEvented;
+use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::signal::unix::driver::Handle as SignalHandle;
@@ -177,8 +177,8 @@ impl AsRawFd for Pipe {
     }
 }
 
-pub(crate) fn convert_to_stdio(io: PollEvented<Pipe>) -> io::Result<Stdio> {
-    let mut fd = io.into_inner()?.fd;
+pub(crate) fn convert_to_stdio(io: ChildStdio) -> io::Result<Stdio> {
+    let mut fd = io.inner.into_inner()?.fd;
 
     // Ensure that the fd to be inherited is set to *blocking* mode, as this
     // is the default that virtually all programs expect to have. Those
@@ -213,7 +213,50 @@ impl Source for Pipe {
     }
 }
 
-pub(crate) type ChildStdio = PollEvented<Pipe>;
+pub(crate) struct ChildStdio {
+    inner: PollEvented<Pipe>,
+}
+
+impl fmt::Debug for ChildStdio {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.inner.fmt(fmt)
+    }
+}
+
+impl AsRawFd for ChildStdio {
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner.as_raw_fd()
+    }
+}
+
+impl AsyncWrite for ChildStdio {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        self.inner.poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncRead for ChildStdio {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        // Safety: pipes support reading into uninitialized memory
+        unsafe { self.inner.poll_read(cx, buf) }
+    }
+}
 
 fn set_nonblocking<T: AsRawFd>(fd: &mut T, nonblocking: bool) -> io::Result<()> {
     unsafe {
@@ -238,7 +281,7 @@ fn set_nonblocking<T: AsRawFd>(fd: &mut T, nonblocking: bool) -> io::Result<()> 
     Ok(())
 }
 
-pub(super) fn stdio<T>(io: T) -> io::Result<PollEvented<Pipe>>
+pub(super) fn stdio<T>(io: T) -> io::Result<ChildStdio>
 where
     T: IntoRawFd,
 {
@@ -246,5 +289,5 @@ where
     let mut pipe = Pipe::from(io);
     set_nonblocking(&mut pipe, true)?;
 
-    PollEvented::new(pipe)
+    PollEvented::new(pipe).map(|inner| ChildStdio { inner })
 }

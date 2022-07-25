@@ -3,7 +3,7 @@ use crate::{
     runtime::{context, Handle},
     task::{JoinHandle, LocalSet},
 };
-use std::future::Future;
+use std::{future::Future, io};
 
 /// Factory which is used to configure the properties of a new task.
 ///
@@ -48,7 +48,7 @@ use std::future::Future;
 ///             .spawn(async move {
 ///                 // Process each socket concurrently.
 ///                 process(socket).await
-///             });
+///             })?;
 ///     }
 /// }
 /// ```
@@ -83,12 +83,12 @@ impl<'a> Builder<'a> {
     /// See [`task::spawn`](crate::task::spawn) for
     /// more details.
     #[track_caller]
-    pub fn spawn<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
+    pub fn spawn<Fut>(self, future: Fut) -> io::Result<JoinHandle<Fut::Output>>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        super::spawn::spawn_inner(future, self.name)
+        Ok(super::spawn::spawn_inner(future, self.name))
     }
 
     /// Spawn a task with this builder's settings on the provided [runtime
@@ -99,12 +99,16 @@ impl<'a> Builder<'a> {
     /// [runtime handle]: crate::runtime::Handle
     /// [`Handle::spawn`]: crate::runtime::Handle::spawn
     #[track_caller]
-    pub fn spawn_on<Fut>(&mut self, future: Fut, handle: &Handle) -> JoinHandle<Fut::Output>
+    pub fn spawn_on<Fut>(
+        &mut self,
+        future: Fut,
+        handle: &Handle,
+    ) -> io::Result<JoinHandle<Fut::Output>>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        handle.spawn_named(future, self.name)
+        Ok(handle.spawn_named(future, self.name))
     }
 
     /// Spawns `!Send` a task on the current [`LocalSet`] with this builder's
@@ -122,12 +126,12 @@ impl<'a> Builder<'a> {
     /// [`task::spawn_local`]: crate::task::spawn_local
     /// [`LocalSet`]: crate::task::LocalSet
     #[track_caller]
-    pub fn spawn_local<Fut>(self, future: Fut) -> JoinHandle<Fut::Output>
+    pub fn spawn_local<Fut>(self, future: Fut) -> io::Result<JoinHandle<Fut::Output>>
     where
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        super::local::spawn_local_inner(future, self.name)
+        Ok(super::local::spawn_local_inner(future, self.name))
     }
 
     /// Spawns `!Send` a task on the provided [`LocalSet`] with this builder's
@@ -138,12 +142,16 @@ impl<'a> Builder<'a> {
     /// [`LocalSet::spawn_local`]: crate::task::LocalSet::spawn_local
     /// [`LocalSet`]: crate::task::LocalSet
     #[track_caller]
-    pub fn spawn_local_on<Fut>(self, future: Fut, local_set: &LocalSet) -> JoinHandle<Fut::Output>
+    pub fn spawn_local_on<Fut>(
+        self,
+        future: Fut,
+        local_set: &LocalSet,
+    ) -> io::Result<JoinHandle<Fut::Output>>
     where
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        local_set.spawn_named(future, self.name)
+        Ok(local_set.spawn_named(future, self.name))
     }
 
     /// Spawns blocking code on the blocking threadpool.
@@ -155,7 +163,10 @@ impl<'a> Builder<'a> {
     /// See [`task::spawn_blocking`](crate::task::spawn_blocking)
     /// for more details.
     #[track_caller]
-    pub fn spawn_blocking<Function, Output>(self, function: Function) -> JoinHandle<Output>
+    pub fn spawn_blocking<Function, Output>(
+        self,
+        function: Function,
+    ) -> io::Result<JoinHandle<Output>>
     where
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
@@ -174,18 +185,20 @@ impl<'a> Builder<'a> {
         self,
         function: Function,
         handle: &Handle,
-    ) -> JoinHandle<Output>
+    ) -> io::Result<JoinHandle<Output>>
     where
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
         use crate::runtime::Mandatory;
-        let (join_handle, _was_spawned) = handle.as_inner().spawn_blocking_inner(
+        let (join_handle, spawn_result) = handle.as_inner().spawn_blocking_inner(
             function,
             Mandatory::NonMandatory,
             self.name,
             handle,
         );
-        join_handle
+
+        spawn_result?;
+        Ok(join_handle)
     }
 }

@@ -51,6 +51,7 @@ macro_rules! task_local {
 #[macro_export]
 macro_rules! __task_local_inner {
     ($(#[$attr:meta])* $vis:vis $name:ident, $t:ty) => {
+        $(#[$attr])*
         $vis static $name: $crate::task::LocalKey<$t> = {
             std::thread_local! {
                 static __KEY: std::cell::RefCell<Option<$t>> = const { std::cell::RefCell::new(None) };
@@ -66,6 +67,7 @@ macro_rules! __task_local_inner {
 #[macro_export]
 macro_rules! __task_local_inner {
     ($(#[$attr:meta])* $vis:vis $name:ident, $t:ty) => {
+        $(#[$attr])*
         $vis static $name: $crate::task::LocalKey<$t> = {
             std::thread_local! {
                 static __KEY: std::cell::RefCell<Option<$t>> = std::cell::RefCell::new(None);
@@ -285,6 +287,7 @@ impl<T: Copy + 'static> LocalKey<T> {
     /// # Panics
     ///
     /// This function will panic if the task local doesn't have a value set.
+    #[track_caller]
     pub fn get(&'static self) -> T {
         self.with(|v| *v)
     }
@@ -423,6 +426,7 @@ enum ScopeInnerErr {
 }
 
 impl ScopeInnerErr {
+    #[track_caller]
     fn panic(&self) -> ! {
         match self {
             Self::BorrowError => panic!("cannot enter a task-local scope while the task-local storage is borrowed"),

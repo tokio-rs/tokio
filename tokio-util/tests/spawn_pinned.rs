@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 
 use std::rc::Rc;
 use std::sync::Arc;

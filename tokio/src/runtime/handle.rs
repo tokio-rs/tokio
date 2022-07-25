@@ -23,7 +23,11 @@ pub struct Handle {
 pub(crate) struct HandleInner {
     /// Handles to the I/O drivers
     #[cfg_attr(
-        not(any(feature = "net", feature = "process", all(unix, feature = "signal"))),
+        not(any(
+            feature = "net",
+            all(unix, feature = "process"),
+            all(unix, feature = "signal"),
+        )),
         allow(dead_code)
     )]
     pub(super) io_handle: driver::IoHandle,
@@ -341,7 +345,7 @@ impl HandleInner {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        let (join_handle, _was_spawned) = if cfg!(debug_assertions)
+        let (join_handle, spawn_result) = if cfg!(debug_assertions)
             && std::mem::size_of::<F>() > 2048
         {
             self.spawn_blocking_inner(Box::new(func), blocking::Mandatory::NonMandatory, None, rt)
@@ -349,7 +353,14 @@ impl HandleInner {
             self.spawn_blocking_inner(func, blocking::Mandatory::NonMandatory, None, rt)
         };
 
-        join_handle
+        match spawn_result {
+            Ok(()) => join_handle,
+            // Compat: do not panic here, return the join_handle even though it will never resolve
+            Err(blocking::SpawnError::ShuttingDown) => join_handle,
+            Err(blocking::SpawnError::NoThreads(e)) => {
+                panic!("OS can't spawn worker thread: {}", e)
+            }
+        }
     }
 
     cfg_fs! {
@@ -363,7 +374,7 @@ impl HandleInner {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            let (join_handle, was_spawned) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
                 self.spawn_blocking_inner(
                     Box::new(func),
                     blocking::Mandatory::Mandatory,
@@ -379,7 +390,7 @@ impl HandleInner {
                 )
             };
 
-            if was_spawned {
+            if spawn_result.is_ok() {
                 Some(join_handle)
             } else {
                 None
@@ -394,7 +405,7 @@ impl HandleInner {
         is_mandatory: blocking::Mandatory,
         name: Option<&str>,
         rt: &dyn ToHandle,
-    ) -> (JoinHandle<R>, bool)
+    ) -> (JoinHandle<R>, Result<(), blocking::SpawnError>)
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -424,7 +435,7 @@ impl HandleInner {
         let spawned = self
             .blocking_spawner
             .spawn(blocking::Task::new(task, is_mandatory), rt);
-        (handle, spawned.is_ok())
+        (handle, spawned)
     }
 }
 

@@ -334,6 +334,10 @@ impl<S: 'static> Task<S> {
     fn header(&self) -> &Header {
         self.raw.header()
     }
+
+    fn header_ptr(&self) -> NonNull<Header> {
+        self.raw.header_ptr()
+    }
 }
 
 impl<S: 'static> Notified<S> {
@@ -365,7 +369,7 @@ cfg_rt_multi_thread! {
 }
 
 impl<S: Schedule> Task<S> {
-    /// Pre-emptively cancels the task as part of the shutdown process.
+    /// Preemptively cancels the task as part of the shutdown process.
     pub(crate) fn shutdown(self) {
         let raw = self.raw;
         mem::forget(self);
@@ -473,8 +477,7 @@ unsafe impl<S> linked_list::Link for Task<S> {
     }
 
     unsafe fn pointers(target: NonNull<Header>) -> NonNull<linked_list::Pointers<Header>> {
-        // Not super great as it avoids some of looms checking...
-        NonNull::from(target.as_ref().owned.with_mut(|ptr| &mut *ptr))
+        self::core::Trailer::addr_of_owned(Header::get_trailer(target))
     }
 }
 

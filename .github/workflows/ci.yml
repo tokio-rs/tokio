@@ -34,16 +34,18 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - test
-      - test-unstable
       - test-parking_lot
+      - valgrind
+      - test-unstable
       - miri
+      - asan
       - cross
       - features
       - minrust
+      - minimal-versions
       - fmt
       - clippy
       - docs
-      - valgrind
       - loom-compile
       - check-readme
       - test-hyper
@@ -195,7 +197,7 @@ jobs:
       - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-07-10
+          toolchain: nightly
           components: miri
           override: true
       - uses: Swatinem/rust-cache@v1
@@ -489,9 +491,23 @@ jobs:
       - name: Install cargo-wasi
         run: cargo install cargo-wasi
 
-      # TODO: Expand this when full WASI support lands.
-      #   Currently, this is a bare bones regression test
-      #   for features that work today with wasi.
+      - name: WASI test tokio full
+        run: cargo test -p tokio --target wasm32-wasi --features full
+        env:
+          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+
+      - name: WASI test tokio-util full
+        run: cargo test -p tokio-util --target wasm32-wasi --features full
+        env:
+          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+
+      - name: WASI test tokio-stream
+        run: cargo test -p tokio-stream --target wasm32-wasi --features time,net,io-util,sync
+        env:
+          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`

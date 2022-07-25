@@ -164,7 +164,7 @@ impl<S: 'static> OwnedTasks<S> {
 
         // safety: We just checked that the provided task is not in some other
         // linked list.
-        unsafe { self.inner.lock().list.remove(task.header().into()) }
+        unsafe { self.inner.lock().list.remove(task.header_ptr()) }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
