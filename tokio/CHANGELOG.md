@@ -1,6 +1,15 @@
+# 1.20.1 (July 25, 2022)
+
+### Fixed
+
+- chore: fix version detection in build script ([#4860])
+
+[#4860]: https://github.com/tokio-rs/tokio/pull/4860
+
 # 1.20.0 (July 12, 2022)
+
 ### Added
-- tokio: add track_caller to public APIs ([#4772], [#4791], [#4793], [#4806], [#4808])
+- tokio: add `track_caller` to public APIs ([#4772], [#4791], [#4793], [#4806], [#4808])
 - sync: Add `has_changed` method to `watch::Ref` ([#4758])
 
 ### Changed
@@ -10,8 +19,6 @@
 - net: be more specific about winapi features ([#4764])
 - tokio: use const initialized thread locals where possible ([#4677])
 - task: various small improvements to LocalKey ([#4795])
-
-### Fixed
 
 ### Documented
 
