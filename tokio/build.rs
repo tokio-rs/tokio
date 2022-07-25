@@ -1,6 +1,6 @@
 use autocfg::AutoCfg;
 
-const TASK_LOCAL_PROBE: &str = r#"
+const CONST_THREAD_LOCAL_PROBE: &str = r#"
 {
     thread_local! {
         static MY_PROBE: usize = const { 10 };
@@ -30,7 +30,7 @@ fn main() {
                 // compiles.
                 //
                 // The oldest nightly that supports the feature is 2021-12-06.
-                if ac.probe_expression(TASK_LOCAL_PROBE) {
+                if ac.probe_expression(CONST_THREAD_LOCAL_PROBE) {
                     enable_const_thread_local = true;
                 }
             }
