@@ -384,10 +384,7 @@ fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
     thread.join().expect("test thread should not panic!")
 }
 
-#[cfg_attr(
-    tokio_wasi,
-    ignore = "`unwrap()` in `with_timeout()` panics on Wasi"
-)]
+#[cfg_attr(tokio_wasi, ignore = "`unwrap()` in `with_timeout()` panics on Wasi")]
 #[test]
 fn drop_cancels_remote_tasks() {
     // This test reproduces issue #1885.

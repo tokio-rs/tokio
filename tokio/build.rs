@@ -86,8 +86,8 @@ fn main() {
         autocfg::emit("tokio_no_addr_of")
     }
 
-    let target = ::std::env::var("TARGET").unwrap_or(String::new());
-    
+    let target = ::std::env::var("TARGET").unwrap_or_default();
+
     if target.starts_with("wasm") {
         autocfg::emit("tokio_wasm");
         if target.contains("wasi") {
