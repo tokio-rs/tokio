@@ -1,2 +1,2 @@
-#![cfg(not(any(feature = "full", target_family = "wasm")))]
+#![cfg(not(any(feature = "full", target_arch = "wasm32")))]
 compile_error!("run main Tokio tests with `--features full`");

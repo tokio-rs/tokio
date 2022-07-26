@@ -623,7 +623,7 @@ mod tests {
         }
     }
 
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(not(target_arch = "wasm32"))]
     proptest::proptest! {
         #[test]
         fn fuzz_linked_list(ops: Vec<usize>) {
@@ -631,7 +631,7 @@ mod tests {
         }
     }
 
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(not(target_arch = "wasm32"))]
     fn run_fuzz(ops: Vec<usize>) {
         use std::collections::VecDeque;
 
