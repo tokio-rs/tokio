@@ -5,7 +5,7 @@ use tokio::time::*;
 
 use std::sync::mpsc;
 
-#[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))] // Wasi doesn't support threads
+#[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))] // Wasi doesn't support threads
 #[test]
 fn timer_with_threaded_runtime() {
     use tokio::runtime::Runtime;

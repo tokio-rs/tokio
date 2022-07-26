@@ -85,4 +85,17 @@ fn main() {
         // RUSTFLAGS="--cfg tokio_no_addr_of"
         autocfg::emit("tokio_no_addr_of")
     }
+
+    let target = ::std::env::var("TARGET").unwrap_or_default();
+
+    // We emit cfgs instead of using `target_family = "wasm"` that requires Rust 1.54.
+    // Note that these cfgs are unavailable in `Cargo.toml`.
+    if target.starts_with("wasm") {
+        autocfg::emit("tokio_wasm");
+        if target.contains("wasi") {
+            autocfg::emit("tokio_wasi");
+        } else {
+            autocfg::emit("tokio_wasm_not_wasi");
+        }
+    }
 }

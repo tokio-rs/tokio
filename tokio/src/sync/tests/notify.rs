@@ -4,7 +4,7 @@ use std::mem::ManuallyDrop;
 use std::sync::Arc;
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 #[test]
@@ -63,7 +63,7 @@ fn notify_simple() {
 }
 
 #[test]
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(tokio_wasm))]
 fn watch_test() {
     let rt = crate::runtime::Builder::new_current_thread()
         .build()

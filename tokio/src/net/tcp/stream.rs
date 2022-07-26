@@ -252,7 +252,7 @@ impl TcpStream {
                 .map(|raw_socket| unsafe { std::net::TcpStream::from_raw_socket(raw_socket) })
         }
 
-        #[cfg(target_os = "wasi")]
+        #[cfg(tokio_wasi)]
         {
             use std::os::wasi::io::{FromRawFd, IntoRawFd};
             self.io
@@ -1334,7 +1334,7 @@ mod sys {
     }
 }
 
-#[cfg(all(tokio_unstable, target_os = "wasi"))]
+#[cfg(all(tokio_unstable, tokio_wasi))]
 mod sys {
     use super::TcpStream;
     use std::os::wasi::prelude::*;

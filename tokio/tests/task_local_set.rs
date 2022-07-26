@@ -11,13 +11,13 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::{self, LocalSet};
 use tokio::time;
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(tokio_wasi))]
 use std::cell::Cell;
 use std::sync::atomic::AtomicBool;
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(tokio_wasi))]
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(tokio_wasi))]
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
@@ -30,7 +30,7 @@ async fn local_basic_scheduler() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool() {
     thread_local! {
@@ -51,7 +51,7 @@ async fn local_threadpool() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn localset_future_threadpool() {
     thread_local! {
@@ -67,7 +67,7 @@ async fn localset_future_threadpool() {
     local.await;
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn localset_future_timers() {
     static RAN1: AtomicBool = AtomicBool::new(false);
@@ -112,7 +112,7 @@ async fn localset_future_drives_all_local_futs() {
     assert!(RAN3.load(Ordering::SeqCst));
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool_timer() {
     // This test ensures that runtime services like the timer are properly
@@ -151,7 +151,7 @@ fn enter_guard_spawn() {
     });
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
+#[cfg(not(tokio_wasi))] // Wasi doesn't support panic recovery
 #[test]
 // This will panic, since the thread that calls `block_on` cannot use
 // in-place blocking inside of `block_on`.
@@ -178,7 +178,7 @@ fn local_threadpool_blocking_in_place() {
     });
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool_blocking_run() {
     thread_local! {
@@ -207,7 +207,7 @@ async fn local_threadpool_blocking_run() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn all_spawns_are_local() {
     use futures::future;
@@ -234,7 +234,7 @@ async fn all_spawns_are_local() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread")]
 async fn nested_spawn_is_local() {
     thread_local! {
@@ -270,7 +270,7 @@ async fn nested_spawn_is_local() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
 #[test]
 fn join_local_future_elsewhere() {
     thread_local! {
@@ -384,10 +384,7 @@ fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
     thread.join().expect("test thread should not panic!")
 }
 
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "`unwrap()` in `with_timeout()` panics on Wasi"
-)]
+#[cfg_attr(tokio_wasi, ignore = "`unwrap()` in `with_timeout()` panics on Wasi")]
 #[test]
 fn drop_cancels_remote_tasks() {
     // This test reproduces issue #1885.
@@ -411,7 +408,7 @@ fn drop_cancels_remote_tasks() {
 }
 
 #[cfg_attr(
-    target_os = "wasi",
+    tokio_wasi,
     ignore = "FIXME: `task::spawn_local().await.unwrap()` panics on Wasi"
 )]
 #[test]
@@ -435,7 +432,7 @@ fn local_tasks_wake_join_all() {
     });
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
+#[cfg(not(tokio_wasi))] // Wasi doesn't support panic recovery
 #[test]
 fn local_tasks_are_polled_after_tick() {
     // This test depends on timing, so we run it up to five times.
@@ -452,7 +449,7 @@ fn local_tasks_are_polled_after_tick() {
     local_tasks_are_polled_after_tick_inner();
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
+#[cfg(not(tokio_wasi))] // Wasi doesn't support panic recovery
 #[tokio::main(flavor = "current_thread")]
 async fn local_tasks_are_polled_after_tick_inner() {
     // Reproduces issues #1899 and #1900

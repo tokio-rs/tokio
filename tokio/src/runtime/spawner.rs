@@ -10,13 +10,13 @@ cfg_rt_multi_thread! {
 #[derive(Debug, Clone)]
 pub(crate) enum Spawner {
     Basic(basic_scheduler::Spawner),
-    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
     ThreadPool(thread_pool::Spawner),
 }
 
 impl Spawner {
     pub(crate) fn shutdown(&mut self) {
-        #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+        #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
         {
             if let Spawner::ThreadPool(spawner) = self {
                 spawner.shutdown();
@@ -31,7 +31,7 @@ impl Spawner {
     {
         match self {
             Spawner::Basic(spawner) => spawner.spawn(future, id),
-            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
             Spawner::ThreadPool(spawner) => spawner.spawn(future, id),
         }
     }
@@ -39,7 +39,7 @@ impl Spawner {
     pub(crate) fn as_handle_inner(&self) -> &HandleInner {
         match self {
             Spawner::Basic(spawner) => spawner.as_handle_inner(),
-            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
             Spawner::ThreadPool(spawner) => spawner.as_handle_inner(),
         }
     }
@@ -52,7 +52,7 @@ cfg_metrics! {
         pub(crate) fn num_workers(&self) -> usize {
             match self {
                 Spawner::Basic(_) => 1,
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Spawner::ThreadPool(spawner) => spawner.num_workers(),
             }
         }
@@ -60,7 +60,7 @@ cfg_metrics! {
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             match self {
                 Spawner::Basic(spawner) => spawner.scheduler_metrics(),
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Spawner::ThreadPool(spawner) => spawner.scheduler_metrics(),
             }
         }
@@ -68,7 +68,7 @@ cfg_metrics! {
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             match self {
                 Spawner::Basic(spawner) => spawner.worker_metrics(worker),
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Spawner::ThreadPool(spawner) => spawner.worker_metrics(worker),
             }
         }
@@ -76,7 +76,7 @@ cfg_metrics! {
         pub(crate) fn injection_queue_depth(&self) -> usize {
             match self {
                 Spawner::Basic(spawner) => spawner.injection_queue_depth(),
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Spawner::ThreadPool(spawner) => spawner.injection_queue_depth(),
             }
         }
@@ -84,7 +84,7 @@ cfg_metrics! {
         pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
             match self {
                 Spawner::Basic(spawner) => spawner.worker_metrics(worker).queue_depth(),
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Spawner::ThreadPool(spawner) => spawner.worker_local_queue_depth(worker),
             }
         }

@@ -10,10 +10,10 @@
 use std::time::Duration;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(tokio_wasi))]
 use tokio::{net, time};
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
 macro_rules! multi_threaded_rt_test {
     ($($t:tt)*) => {
         mod threaded_scheduler_4_threads_only {
@@ -46,7 +46,7 @@ macro_rules! multi_threaded_rt_test {
     }
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(tokio_wasi))]
 macro_rules! rt_test {
     ($($t:tt)*) => {
         mod current_thread_scheduler {
@@ -126,7 +126,7 @@ fn unbounded_mpsc_channel() {
     })
 }
 
-#[cfg(not(target_os = "wasi"))] // Wasi doesn't support file operations or bind
+#[cfg(not(tokio_wasi))] // Wasi doesn't support file operations or bind
 rt_test! {
     use tokio::fs;
     // ==== spawn blocking futures ======
@@ -419,7 +419,7 @@ rt_test! {
     }
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(tokio_wasi))]
 multi_threaded_rt_test! {
     #[cfg(unix)]
     #[test]
@@ -482,7 +482,7 @@ multi_threaded_rt_test! {
 // ==== utils ======
 
 /// Create a new multi threaded runtime
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(tokio_wasi))]
 fn new_multi_thread(n: usize) -> Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(n)
@@ -516,7 +516,7 @@ where
         f();
     }
 
-    #[cfg(not(target_os = "wasi"))]
+    #[cfg(not(tokio_wasi))]
     {
         println!("multi thread (1 thread) runtime");
 
@@ -529,7 +529,7 @@ where
         f();
     }
 
-    #[cfg(not(target_os = "wasi"))]
+    #[cfg(not(tokio_wasi))]
     {
         println!("multi thread (4 threads) runtime");
 
