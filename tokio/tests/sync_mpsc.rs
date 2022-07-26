@@ -667,9 +667,10 @@ fn recv_timeout_panic() {
 #[tokio::test]
 async fn weak_sender() {
     let (tx, mut rx) = channel(11);
-    let tx_weak = tx.clone().downgrade();
 
     let tx_weak = tokio::spawn(async move {
+        let tx_weak = tx.clone().downgrade();
+
         for i in 0..10 {
             if tx.send(i).await.is_err() {
                 return None;
@@ -703,10 +704,9 @@ async fn weak_sender() {
         }
     }
 
-    if let Some(tx_weak) = tx_weak {
-        let upgraded = tx_weak.upgrade();
-        assert!(upgraded.is_none());
-    }
+    let tx_weak = tx_weak.unwrap();
+    let upgraded = tx_weak.upgrade();
+    assert!(upgraded.is_none());
 }
 
 #[tokio::test]
@@ -887,6 +887,7 @@ async fn downgrade_upgrade_sender_success() {
 async fn downgrade_upgrade_sender_failure() {
     let (tx, _rx) = mpsc::channel::<i32>(1);
     let weak_tx = tx.downgrade();
+    drop(tx);
     assert!(weak_tx.upgrade().is_none());
 }
 
@@ -920,4 +921,15 @@ async fn downgrade_upgrade_get_permit_no_senders() {
     let _permit = tx.reserve_owned().await.unwrap();
     let weak_tx = tx2.downgrade();
     assert!(weak_tx.upgrade().is_some());
+}
+
+// Tests that `Clone` of `WeakSender` doesn't decrement `tx_count`.
+#[tokio::test]
+async fn test_weak_sender_clone() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+    let tx_weak = tx.downgrade();
+    let tx_weak2 = tx.downgrade();
+    drop(tx);
+
+    assert!(tx_weak.upgrade().is_none() && tx_weak2.upgrade().is_none());
 }

@@ -1,3 +1,4 @@
+use crate::loom::sync::Arc;
 use crate::sync::batch_semaphore::{self as semaphore, TryAcquireError};
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{SendError, TryRecvError, TrySendError};
@@ -54,7 +55,7 @@ pub struct Sender<T> {
 ///
 /// ```
 pub struct WeakSender<T> {
-    chan: chan::Tx<T, Semaphore>,
+    chan: Arc<chan::Chan<T, Semaphore>>,
 }
 
 /// Permits to send one value into the channel.
@@ -1031,7 +1032,7 @@ impl<T> Sender<T> {
     /// towards RAII semantics, i.e. if all `Sender` instances of the
     /// channel were dropped and only `WeakSender` instances remain,
     /// the channel is closed.
-    pub fn downgrade(self) -> WeakSender<T> {
+    pub fn downgrade(&self) -> WeakSender<T> {
         // Note: If this is the last `Sender` instance we want to close the
         // channel when downgrading, so it's important to move into `self` here.
 
@@ -1069,8 +1070,8 @@ impl<T> WeakSender<T> {
     /// Tries to convert a WeakSender into a [`Sender`]. This will return `Some`
     /// if there are other `Sender` instances alive and the channel wasn't
     /// previously dropped, otherwise `None` is returned.
-    pub fn upgrade(self) -> Option<Sender<T>> {
-        self.chan.upgrade().map(Sender::new)
+    pub fn upgrade(&self) -> Option<Sender<T>> {
+        chan::Tx::upgrade(self.chan.clone()).map(Sender::new)
     }
 }
 

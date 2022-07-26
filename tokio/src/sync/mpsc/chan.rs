@@ -47,7 +47,7 @@ pub(crate) trait Semaphore {
     fn is_closed(&self) -> bool;
 }
 
-struct Chan<T, S> {
+pub(crate) struct Chan<T, S> {
     /// Notifies all tasks listening for the receiver being dropped.
     notify_rx_closed: Notify,
 
@@ -130,21 +130,13 @@ impl<T, S> Tx<T, S> {
         Tx { inner: chan }
     }
 
-    pub(super) fn downgrade(self) -> Self {
-        if self.inner.tx_count.fetch_sub(1, AcqRel) == 1 {
-            // Close the list, which sends a `Close` message
-            self.inner.tx.close();
-
-            // Notify the receiver
-            self.wake_rx();
-        }
-
-        self
+    pub(super) fn downgrade(&self) -> Arc<Chan<T, S>> {
+        self.inner.clone()
     }
 
     // Returns the upgraded channel or None if the upgrade failed.
-    pub(super) fn upgrade(self) -> Option<Self> {
-        let mut tx_count = self.inner.tx_count.load(Acquire);
+    pub(super) fn upgrade(chan: Arc<Chan<T, S>>) -> Option<Self> {
+        let mut tx_count = chan.tx_count.load(Acquire);
 
         loop {
             if tx_count == 0 {
@@ -152,12 +144,11 @@ impl<T, S> Tx<T, S> {
                 return None;
             }
 
-            match self
-                .inner
+            match chan
                 .tx_count
                 .compare_exchange_weak(tx_count, tx_count + 1, AcqRel, Acquire)
             {
-                Ok(_) => return Some(self),
+                Ok(_) => return Some(Tx { inner: chan }),
                 Err(prev_count) => tx_count = prev_count,
             }
         }
