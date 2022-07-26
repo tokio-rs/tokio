@@ -459,7 +459,7 @@ macro_rules! cfg_has_atomic_u64 {
                     target_arch = "mips",
                     target_arch = "powerpc",
                     target_arch = "riscv32",
-                    target_arch = "wasm32"
+                    target_family = "wasm"
                     )))]
             $item
         )*
@@ -474,7 +474,7 @@ macro_rules! cfg_not_has_atomic_u64 {
                     target_arch = "mips",
                     target_arch = "powerpc",
                     target_arch = "riscv32",
-                    target_arch = "wasm32"
+                    target_family = "wasm"
                     ))]
             $item
         )*
@@ -493,7 +493,7 @@ macro_rules! cfg_not_wasi {
 macro_rules! cfg_is_wasm_not_wasi {
     ($($item:item)*) => {
         $(
-            #[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+            #[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
             $item
         )*
     }

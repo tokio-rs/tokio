@@ -174,7 +174,7 @@
 
 // At the top due to macros
 #[cfg(test)]
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 #[macro_use]
 mod tests;
 

@@ -395,7 +395,7 @@ compile_error! {
 
 #[cfg(all(
     not(tokio_unstable),
-    target_arch = "wasm32",
+    target_family = "wasm",
     any(
         feature = "fs",
         feature = "io-std",

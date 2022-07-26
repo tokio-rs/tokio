@@ -12,7 +12,7 @@ impl AssertSync for AtomicWaker {}
 impl AssertSend for Waker {}
 impl AssertSync for Waker {}
 
-#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 #[test]
@@ -37,7 +37,7 @@ fn wake_without_register() {
 }
 
 #[test]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn atomic_waker_panic_safe() {
     use std::panic;
     use std::ptr;

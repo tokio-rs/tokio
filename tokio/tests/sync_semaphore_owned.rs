@@ -1,6 +1,6 @@
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use std::sync::Arc;
