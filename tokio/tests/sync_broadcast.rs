@@ -47,7 +47,7 @@ macro_rules! assert_closed {
     ($e:expr) => {
         match assert_err!($e) {
             broadcast::error::TryRecvError::Closed => {}
-            _ => panic!("did not lag"),
+            _ => panic!("is not closed"),
         }
     };
 }
@@ -516,4 +516,13 @@ fn resubscribe_lagged() {
     assert_eq!(assert_recv!(rx), 2);
     assert_empty!(rx);
     assert_empty!(rx_resub);
+}
+
+#[test]
+fn resubscribe_to_closed_channel() {
+    let (tx, rx) = tokio::sync::broadcast::channel::<u32>(2);
+    drop(tx);
+
+    let mut rx_resub = rx.resubscribe();
+    assert_closed!(rx_resub.try_recv());
 }
