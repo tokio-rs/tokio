@@ -153,16 +153,32 @@ feature! {
         {
             use std::io::Read;
 
-            let n = ready!(self.registration.poll_read_io(cx, || {
-                let b = &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]);
-                self.io.as_ref().unwrap().read(b)
-            }))?;
+            loop {
+                let evt = ready!(self.registration.poll_read_ready(cx))?;
 
-            // Safety: We trust `TcpStream::read` to have filled up `n` bytes in the
-            // buffer.
-            buf.assume_init(n);
-            buf.advance(n);
-            Poll::Ready(Ok(()))
+                let b = &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]);
+                let len = b.len();
+
+                match self.io.as_ref().unwrap().read(b) {
+                    Ok(n) => {
+                        // if we read a partially full buffer, this is sufficient on unix to show
+                        // that the socket buffer has been drained
+                        if n > 0 && (!cfg!(windows) && n < len) {
+                            self.registration.clear_readiness(evt);
+                        }
+
+                        // Safety: We trust `TcpStream::read` to have filled up `n` bytes in the
+                        // buffer.
+                        buf.assume_init(n);
+                        buf.advance(n);
+                        return Poll::Ready(Ok(()));
+                    },
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        self.registration.clear_readiness(evt);
+                    }
+                    Err(e) => return Poll::Ready(Err(e)),
+                }
+            }
         }
 
         pub(crate) fn poll_write<'a>(&'a self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>>
