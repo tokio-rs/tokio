@@ -424,10 +424,6 @@ compile_error!("Tokio's build script has incorrectly detected wasm.");
 ))]
 compile_error!("Only features sync,macros,io-util,rt are supported on wasm.");
 
-// See <https://github.com/tokio-rs/tokio/pull/4865> for more info.
-#[cfg(target_arch = "wasm64")]
-compile_error!("Only wasm32 is currently supported.");
-
 // Includes re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any
