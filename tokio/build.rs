@@ -85,4 +85,15 @@ fn main() {
         // RUSTFLAGS="--cfg tokio_no_addr_of"
         autocfg::emit("tokio_no_addr_of")
     }
+
+    let target = ::std::env::var("TARGET").unwrap_or(String::new());
+    
+    if target.starts_with("wasm") {
+        autocfg::emit("tokio_wasm");
+        if target.contains("wasi") {
+            autocfg::emit("tokio_wasi");
+        } else {
+            autocfg::emit("tokio_wasm_not_wasi");
+        }
+    }
 }

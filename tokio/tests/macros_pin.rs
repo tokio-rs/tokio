@@ -1,9 +1,9 @@
 #![cfg(feature = "macros")]
 
-#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(all(target_arch = "wasm32", not(target_os = "wasi"))))]
+#[cfg(not(tokio_wasm_not_wasi))]
 use tokio::test as maybe_tokio_test;
 
 async fn one() {}

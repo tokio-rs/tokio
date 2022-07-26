@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", tokio_unstable, not(target_os = "wasi")))]
+#![cfg(all(feature = "full", tokio_unstable, not(tokio_wasi)))]
 
 use tokio::runtime::Runtime;
 use tokio::time::{self, Duration};

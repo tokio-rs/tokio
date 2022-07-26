@@ -174,7 +174,7 @@
 
 // At the top due to macros
 #[cfg(test)]
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(tokio_wasm))]
 #[macro_use]
 mod tests;
 
@@ -204,7 +204,7 @@ cfg_rt! {
 
     mod blocking;
     use blocking::BlockingPool;
-    #[cfg_attr(target_os = "wasi", allow(unused_imports))]
+    #[cfg_attr(tokio_wasi, allow(unused_imports))]
     pub(crate) use blocking::spawn_blocking;
 
     cfg_trace! {
@@ -304,7 +304,7 @@ cfg_rt! {
         CurrentThread(BasicScheduler),
 
         /// Execute tasks across multiple threads.
-        #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+        #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
         ThreadPool(ThreadPool),
     }
 
@@ -484,7 +484,7 @@ cfg_rt! {
 
             match &self.kind {
                 Kind::CurrentThread(exec) => exec.block_on(future),
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Kind::ThreadPool(exec) => exec.block_on(future),
             }
         }
@@ -614,7 +614,7 @@ cfg_rt! {
                         },
                     }
                 },
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Kind::ThreadPool(_) => {
                     // The threaded scheduler drops its tasks on its worker threads, which is
                     // already in the runtime's context.

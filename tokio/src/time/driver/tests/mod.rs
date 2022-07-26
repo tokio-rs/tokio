@@ -1,4 +1,4 @@
-#![cfg(not(target_os = "wasi"))]
+#![cfg(not(tokio_wasi))]
 
 use std::{task::Context, time::Duration};
 

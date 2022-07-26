@@ -61,7 +61,7 @@ macro_rules! cfg_fs {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "fs")]
-            #[cfg(not(target_os = "wasi"))]
+            #[cfg(not(tokio_wasi))]
             #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
             $item
         )*
@@ -252,7 +252,7 @@ macro_rules! cfg_process {
             #[cfg(feature = "process")]
             #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
-            #[cfg(not(target_os = "wasi"))]
+            #[cfg(not(tokio_wasi))]
             $item
         )*
     }
@@ -281,7 +281,7 @@ macro_rules! cfg_signal {
             #[cfg(feature = "signal")]
             #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
             #[cfg(not(loom))]
-            #[cfg(not(target_os = "wasi"))]
+            #[cfg(not(tokio_wasi))]
             $item
         )*
     }
@@ -341,7 +341,7 @@ macro_rules! cfg_not_rt {
 macro_rules! cfg_rt_multi_thread {
     ($($item:item)*) => {
         $(
-            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
             #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
             $item
         )*
@@ -459,7 +459,7 @@ macro_rules! cfg_has_atomic_u64 {
                     target_arch = "mips",
                     target_arch = "powerpc",
                     target_arch = "riscv32",
-                    target_arch = "wasm32"
+                    tokio_wasm
                     )))]
             $item
         )*
@@ -474,7 +474,7 @@ macro_rules! cfg_not_has_atomic_u64 {
                     target_arch = "mips",
                     target_arch = "powerpc",
                     target_arch = "riscv32",
-                    target_arch = "wasm32"
+                    tokio_wasm
                     ))]
             $item
         )*
@@ -484,7 +484,7 @@ macro_rules! cfg_not_has_atomic_u64 {
 macro_rules! cfg_not_wasi {
     ($($item:item)*) => {
         $(
-            #[cfg(not(target_os = "wasi"))]
+            #[cfg(not(tokio_wasi))]
             $item
         )*
     }
@@ -493,7 +493,7 @@ macro_rules! cfg_not_wasi {
 macro_rules! cfg_is_wasm_not_wasi {
     ($($item:item)*) => {
         $(
-            #[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+            #[cfg(tokio_wasm_not_wasi)]
             $item
         )*
     }

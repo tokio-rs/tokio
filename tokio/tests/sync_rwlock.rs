@@ -1,12 +1,12 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(all(target_arch = "wasm32", not(target_os = "wasi"))))]
+#[cfg(not(tokio_wasm_not_wasi))]
 use tokio::test as maybe_tokio_test;
 
 use std::task::Poll;
@@ -172,7 +172,7 @@ async fn write_order() {
 }
 
 // A single RwLock is contested by tasks in multiple threads
-#[cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threads
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn multithreaded() {
     use futures::stream::{self, StreamExt};

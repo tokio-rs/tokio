@@ -1,12 +1,12 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(all(target_arch = "wasm32", not(target_os = "wasi"))))]
+#[cfg(not(tokio_wasm_not_wasi))]
 use tokio::test as maybe_tokio_test;
 
 use tokio::sync::oneshot;
@@ -179,7 +179,7 @@ fn explicit_close_try_recv() {
 
 #[test]
 #[should_panic]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn close_try_recv_poll() {
     let (_tx, rx) = oneshot::channel::<i32>();
     let mut rx = task::spawn(rx);

@@ -1,6 +1,6 @@
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use std::sync::Arc;
@@ -93,7 +93,7 @@ fn add_max_amount_permits() {
     assert_eq!(s.available_permits(), usize::MAX >> 3);
 }
 
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 #[test]
 #[should_panic]
 fn add_more_than_max_amount_permits() {

@@ -1,7 +1,7 @@
 use crate::sync::batch_semaphore::Semaphore;
 use tokio_test::*;
 
-#[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 #[test]
@@ -170,7 +170,7 @@ fn poll_acquire_one_zero_permits() {
 
 #[test]
 #[should_panic]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn validates_max_permits() {
     use std::usize;
     Semaphore::new((usize::MAX >> 2) + 1);

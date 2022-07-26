@@ -211,11 +211,11 @@ cfg_io_driver_impl! {
         pub use driver::{Interest, Ready};
     }
 
-    #[cfg_attr(target_os = "wasi", allow(unused_imports))]
+    #[cfg_attr(tokio_wasi, allow(unused_imports))]
     mod poll_evented;
 
     #[cfg(not(loom))]
-    #[cfg_attr(target_os = "wasi", allow(unused_imports))]
+    #[cfg_attr(tokio_wasi, allow(unused_imports))]
     pub(crate) use poll_evented::PollEvented;
 }
 

@@ -174,7 +174,7 @@ pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync +
 
 pub(crate) enum Kind {
     CurrentThread,
-    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
     MultiThread,
 }
 
@@ -619,7 +619,7 @@ impl Builder {
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
             Kind::CurrentThread => self.build_basic_runtime(),
-            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
             Kind::MultiThread => self.build_threaded_runtime(),
         }
     }
@@ -628,7 +628,7 @@ impl Builder {
         driver::Cfg {
             enable_pause_time: match self.kind {
                 Kind::CurrentThread => true,
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Kind::MultiThread => false,
             },
             enable_io: self.enable_io,
