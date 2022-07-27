@@ -1,3 +1,4 @@
+use crate::loom::sync::Arc;
 use crate::sync::batch_semaphore::{self as semaphore, TryAcquireError};
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{SendError, TryRecvError, TrySendError};
@@ -20,6 +21,40 @@ use std::task::{Context, Poll};
 /// [`PollSender`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSender.html
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
+}
+
+/// A sender that does not prevent the channel from being closed.
+///
+/// If all [`Sender`] instances of a channel were dropped and only `WeakSender`
+/// instances remain, the channel is closed.
+///
+/// In order to send messages, the `WeakSender` needs to be upgraded using
+/// [`WeakSender::upgrade`], which returns `Option<Sender>`. It returns `None`
+/// if all `Sender`s have been dropped, and otherwise it returns a `Sender`.
+///
+/// [`Sender`]: Sender
+/// [`WeakSender::upgrade`]: WeakSender::upgrade
+///
+/// #Examples
+///
+/// ```
+/// use tokio::sync::mpsc::channel;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (tx, _rx) = channel::<i32>(15);
+///     let tx_weak = tx.downgrade();
+///   
+///     // Upgrading will succeed because `tx` still exists.
+///     assert!(tx_weak.upgrade().is_some());
+///   
+///     // If we drop `tx`, then it will fail.
+///     drop(tx);
+///     assert!(tx_weak.clone().upgrade().is_none());
+/// }
+/// ```
+pub struct WeakSender<T> {
+    chan: Arc<chan::Chan<T, Semaphore>>,
 }
 
 /// Permits to send one value into the channel.
@@ -991,6 +1026,16 @@ impl<T> Sender<T> {
     pub fn capacity(&self) -> usize {
         self.chan.semaphore().0.available_permits()
     }
+
+    /// Converts the `Sender` to a [`WeakSender`] that does not count
+    /// towards RAII semantics, i.e. if all `Sender` instances of the
+    /// channel were dropped and only `WeakSender` instances remain,
+    /// the channel is closed.
+    pub fn downgrade(&self) -> WeakSender<T> {
+        WeakSender {
+            chan: self.chan.downgrade(),
+        }
+    }
 }
 
 impl<T> Clone for Sender<T> {
@@ -1006,6 +1051,29 @@ impl<T> fmt::Debug for Sender<T> {
         fmt.debug_struct("Sender")
             .field("chan", &self.chan)
             .finish()
+    }
+}
+
+impl<T> Clone for WeakSender<T> {
+    fn clone(&self) -> Self {
+        WeakSender {
+            chan: self.chan.clone(),
+        }
+    }
+}
+
+impl<T> WeakSender<T> {
+    /// Tries to convert a WeakSender into a [`Sender`]. This will return `Some`
+    /// if there are other `Sender` instances alive and the channel wasn't
+    /// previously dropped, otherwise `None` is returned.
+    pub fn upgrade(&self) -> Option<Sender<T>> {
+        chan::Tx::upgrade(self.chan.clone()).map(Sender::new)
+    }
+}
+
+impl<T> fmt::Debug for WeakSender<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("WeakSender").finish()
     }
 }
 

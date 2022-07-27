@@ -10,9 +10,10 @@ use crate::sync::notify::Notify;
 
 use std::fmt;
 use std::process;
-use std::sync::atomic::Ordering::{AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
+use std::usize;
 
 /// Channel sender.
 pub(crate) struct Tx<T, S> {
@@ -46,7 +47,7 @@ pub(crate) trait Semaphore {
     fn is_closed(&self) -> bool;
 }
 
-struct Chan<T, S> {
+pub(super) struct Chan<T, S> {
     /// Notifies all tasks listening for the receiver being dropped.
     notify_rx_closed: Notify,
 
@@ -127,6 +128,30 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
 impl<T, S> Tx<T, S> {
     fn new(chan: Arc<Chan<T, S>>) -> Tx<T, S> {
         Tx { inner: chan }
+    }
+
+    pub(super) fn downgrade(&self) -> Arc<Chan<T, S>> {
+        self.inner.clone()
+    }
+
+    // Returns the upgraded channel or None if the upgrade failed.
+    pub(super) fn upgrade(chan: Arc<Chan<T, S>>) -> Option<Self> {
+        let mut tx_count = chan.tx_count.load(Acquire);
+
+        loop {
+            if tx_count == 0 {
+                // channel is closed
+                return None;
+            }
+
+            match chan
+                .tx_count
+                .compare_exchange_weak(tx_count, tx_count + 1, AcqRel, Acquire)
+            {
+                Ok(_) => return Some(Tx { inner: chan }),
+                Err(prev_count) => tx_count = prev_count,
+            }
+        }
     }
 
     pub(super) fn semaphore(&self) -> &S {
@@ -377,9 +402,6 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
 }
 
 // ===== impl Semaphore for AtomicUsize =====
-
-use std::sync::atomic::Ordering::{Acquire, Release};
-use std::usize;
 
 impl Semaphore for AtomicUsize {
     fn add_permit(&self) {
