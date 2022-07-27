@@ -52,7 +52,6 @@ pub struct Sender<T> {
 ///     drop(tx);
 ///     assert!(tx_weak.clone().upgrade().is_none());
 /// }
-///
 /// ```
 pub struct WeakSender<T> {
     chan: Arc<chan::Chan<T, Semaphore>>,
@@ -1033,9 +1032,6 @@ impl<T> Sender<T> {
     /// channel were dropped and only `WeakSender` instances remain,
     /// the channel is closed.
     pub fn downgrade(&self) -> WeakSender<T> {
-        // Note: If this is the last `Sender` instance we want to close the
-        // channel when downgrading, so it's important to move into `self` here.
-
         WeakSender {
             chan: self.chan.downgrade(),
         }

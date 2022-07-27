@@ -47,7 +47,7 @@ pub(crate) trait Semaphore {
     fn is_closed(&self) -> bool;
 }
 
-pub(crate) struct Chan<T, S> {
+pub(super) struct Chan<T, S> {
     /// Notifies all tasks listening for the receiver being dropped.
     notify_rx_closed: Notify,
 
