@@ -43,10 +43,10 @@ pub struct Sender<T> {
 /// #[tokio::main]
 /// async fn main() {
 ///     let (tx, _rx) = channel::<i32>(15);
-///     let tx_weak = tx.clone().downgrade();
+///     let tx_weak = tx.downgrade();
 ///   
 ///     // Upgrading will succeed because `tx` still exists.
-///     assert!(tx_weak.clone().upgrade().is_some());
+///     assert!(tx_weak.upgrade().is_some());
 ///   
 ///     // If we drop `tx`, then it will fail.
 ///     drop(tx);
