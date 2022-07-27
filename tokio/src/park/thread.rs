@@ -65,9 +65,9 @@ impl Park for ParkThread {
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
         // Wasi doesn't have threads, so just sleep.
-        #[cfg(not(tokio_wasi))]
+        #[cfg(not(tokio_wasm))]
         self.inner.park_timeout(duration);
-        #[cfg(tokio_wasi)]
+        #[cfg(tokio_wasm)]
         std::thread::sleep(duration);
         Ok(())
     }
