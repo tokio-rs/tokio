@@ -145,7 +145,8 @@ use self::core::Header;
 
 mod error;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::error::JoinError;
+pub use self::error::{JoinError, SpawnBlockingError, SpawnError, SpawnLocalError};
+pub(crate) use self::error::{SpawnBlockingErrorKind, SpawnFailure, SpawnResult};
 
 mod harness;
 use self::harness::Harness;
@@ -247,6 +248,9 @@ unsafe impl<S> Sync for UnownedTask<S> {}
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
 pub(crate) trait Schedule: Sync + Sized + 'static {
+    /// Error type representing spawn failures
+    type Error;
+
     /// The task has completed work and is ready to be released. The scheduler
     /// should release it immediately and return it. The task module will batch
     /// the ref-dec with setting other options.
@@ -255,12 +259,12 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>>;
 
     /// Schedule the task
-    fn schedule(&self, task: Notified<Self>);
+    fn schedule(&self, task: Notified<Self>) -> std::result::Result<(), Self::Error>;
 
     /// Schedule the task to run in the near future, yielding the thread to
     /// other tasks.
     fn yield_now(&self, task: Notified<Self>) {
-        self.schedule(task);
+        let _ = self.schedule(task);
     }
 
     /// Polling the task resulted in a panic. Should the runtime shutdown?

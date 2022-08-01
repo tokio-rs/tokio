@@ -1,7 +1,6 @@
 use crate::future::Future;
 use crate::runtime::scheduler::current_thread;
-use crate::runtime::task::Id;
-use crate::task::JoinHandle;
+use crate::runtime::task::{Id, SpawnError, SpawnResult};
 
 cfg_rt_multi_thread! {
     use crate::runtime::scheduler::multi_thread;
@@ -24,7 +23,7 @@ impl Spawner {
         }
     }
 
-    pub(crate) fn spawn<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(&self, future: F, id: Id) -> SpawnResult<F::Output, SpawnError>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,

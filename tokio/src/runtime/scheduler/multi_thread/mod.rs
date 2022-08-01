@@ -14,7 +14,7 @@ pub(crate) use worker::Launch;
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
-use crate::runtime::task::{self, JoinHandle};
+use crate::runtime::task::{self, SpawnError, SpawnResult};
 use crate::runtime::{Config, Driver};
 
 use std::fmt;
@@ -91,7 +91,7 @@ impl Drop for MultiThread {
 
 impl Spawner {
     /// Spawns a future onto the thread pool
-    pub(crate) fn spawn<F>(&self, future: F, id: task::Id) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(&self, future: F, id: task::Id) -> SpawnResult<F::Output, SpawnError>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,

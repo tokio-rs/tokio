@@ -3,7 +3,9 @@ use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::{Driver, Unpark};
-use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::task::{
+    self, OwnedTasks, Schedule, SpawnError, SpawnFailure, SpawnResult, Task,
+};
 use crate::runtime::Config;
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
@@ -356,18 +358,24 @@ impl Context {
 
 impl Spawner {
     /// Spawns a future onto the `CurrentThread` scheduler
-    pub(crate) fn spawn<F>(&self, future: F, id: crate::runtime::task::Id) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(
+        &self,
+        future: F,
+        id: crate::runtime::task::Id,
+    ) -> SpawnResult<F::Output, SpawnError>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
         let (handle, notified) = self.shared.owned.bind(future, self.shared.clone(), id);
 
-        if let Some(notified) = notified {
-            self.shared.schedule(notified);
+        match notified {
+            Some(notified) => match self.shared.schedule(notified) {
+                Ok(()) => Ok(handle),
+                Err(e) => Err(SpawnFailure::new(handle, e)),
+            },
+            None => Err(SpawnFailure::new(handle, SpawnError::shutdown())),
         }
-
-        handle
     }
 
     fn pop(&self) -> Option<task::Notified<Arc<Shared>>> {
@@ -421,35 +429,39 @@ impl fmt::Debug for Spawner {
 // ===== impl Shared =====
 
 impl Schedule for Arc<Shared> {
+    type Error = SpawnError;
+
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
         self.owned.remove(task)
     }
 
-    fn schedule(&self, task: task::Notified<Self>) {
+    fn schedule(&self, task: task::Notified<Self>) -> Result<(), Self::Error> {
         CURRENT.with(|maybe_cx| match maybe_cx {
             Some(cx) if Arc::ptr_eq(self, &cx.spawner.shared) => {
                 let mut core = cx.core.borrow_mut();
-
-                // If `None`, the runtime is shutting down, so there is no need
-                // to schedule the task.
-                if let Some(core) = core.as_mut() {
-                    core.push_task(task);
+                match core.as_mut() {
+                    Some(core) => {
+                        core.push_task(task);
+                        Ok(())
+                    }
+                    None => Err(SpawnError::shutdown()),
                 }
             }
             _ => {
                 // Track that a task was scheduled from **outside** of the runtime.
                 self.scheduler_metrics.inc_remote_schedule_count();
-
-                // If the queue is None, then the runtime has shut down. We
-                // don't need to do anything with the notification in that case.
                 let mut guard = self.queue.lock();
-                if let Some(queue) = guard.as_mut() {
-                    queue.push_back(task);
-                    drop(guard);
-                    self.unpark.unpark();
+                match guard.as_mut() {
+                    Some(queue) => {
+                        queue.push_back(task);
+                        drop(guard);
+                        self.unpark.unpark();
+                        Ok(())
+                    }
+                    None => Err(SpawnError::shutdown()),
                 }
             }
-        });
+        })
     }
 
     cfg_unstable! {

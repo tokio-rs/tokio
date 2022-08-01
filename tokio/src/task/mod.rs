@@ -276,7 +276,7 @@
 //! [`poll`]: method@std::future::Future::poll
 
 cfg_rt! {
-    pub use crate::runtime::task::{JoinError, JoinHandle};
+    pub use crate::runtime::task::{JoinError, JoinHandle, SpawnError, SpawnBlockingError, SpawnLocalError};
 
     cfg_not_wasi! {
         mod blocking;

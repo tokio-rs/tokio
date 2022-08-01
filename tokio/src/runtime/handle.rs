@@ -61,7 +61,7 @@ pub(crate) struct HandleInner {
 }
 
 cfg_rt! {
-    use crate::runtime::task::JoinHandle;
+    use crate::runtime::task::{JoinHandle, SpawnResult, SpawnError};
     use crate::runtime::{blocking, context, Spawner};
     use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
@@ -190,6 +190,7 @@ cfg_rt! {
             F::Output: Send + 'static,
         {
             self.spawn_named(future, None)
+                .unwrap_or_else(|e| e.handle)
         }
 
         /// Runs the provided function on an executor dedicated to blocking.
@@ -313,7 +314,7 @@ cfg_rt! {
         }
 
         #[track_caller]
-        pub(crate) fn spawn_named<F>(&self, future: F, _name: Option<&str>) -> JoinHandle<F::Output>
+        pub(crate) fn spawn_named<F>(&self, future: F, _name: Option<&str>) -> SpawnResult<F::Output, SpawnError>
         where
             F: Future + Send + 'static,
             F::Output: Send + 'static,

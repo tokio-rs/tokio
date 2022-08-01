@@ -6,12 +6,13 @@ use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::context;
-use crate::runtime::task::{self, JoinHandle};
+use crate::runtime::task::{
+    self, JoinHandle, SpawnBlockingError, SpawnBlockingErrorKind, SpawnFailure, SpawnResult,
+};
 use crate::runtime::{Builder, Callback, Handle};
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
-use std::io;
 use std::time::Duration;
 
 pub(crate) struct BlockingPool {
@@ -81,25 +82,6 @@ pub(crate) enum Mandatory {
     #[cfg_attr(not(fs), allow(dead_code))]
     Mandatory,
     NonMandatory,
-}
-
-pub(crate) enum SpawnError {
-    /// Pool is shutting down and the task was not scheduled
-    ShuttingDown,
-    /// There are no worker threads available to take the task
-    /// and the OS failed to spawn a new one
-    NoThreads(io::Error),
-}
-
-impl From<SpawnError> for io::Error {
-    fn from(e: SpawnError) -> Self {
-        match e {
-            SpawnError::ShuttingDown => {
-                io::Error::new(io::ErrorKind::Other, "blocking pool shutting down")
-            }
-            SpawnError::NoThreads(e) => e,
-        }
-    }
 }
 
 impl Task {
@@ -247,20 +229,21 @@ impl Spawner {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        let (join_handle, spawn_result) =
-            if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
-                self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, None, rt)
-            } else {
-                self.spawn_blocking_inner(func, Mandatory::NonMandatory, None, rt)
-            };
+        let spawn_result = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+            self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, None, rt)
+        } else {
+            self.spawn_blocking_inner(func, Mandatory::NonMandatory, None, rt)
+        };
 
         match spawn_result {
-            Ok(()) => join_handle,
-            // Compat: do not panic here, return the join_handle even though it will never resolve
-            Err(SpawnError::ShuttingDown) => join_handle,
-            Err(SpawnError::NoThreads(e)) => {
-                panic!("OS can't spawn worker thread: {}", e)
-            }
+            Ok(join_handle) => join_handle,
+            Err(e) => match e.inner.kind {
+                // Compat: do not panic here, return the join_handle even though it will never resolve
+                SpawnBlockingErrorKind::Shutdown => e.handle,
+                SpawnBlockingErrorKind::NoBlockingThreads(e) => {
+                    panic!("OS can't spawn worker thread: {}", e)
+                }
+            },
         }
     }
 
@@ -275,7 +258,7 @@ impl Spawner {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+            let spawn_result = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
                 self.spawn_blocking_inner(
                     Box::new(func),
                     Mandatory::Mandatory,
@@ -291,11 +274,7 @@ impl Spawner {
                 )
             };
 
-            if spawn_result.is_ok() {
-                Some(join_handle)
-            } else {
-                None
-            }
+            spawn_result.ok()
         }
     }
 
@@ -306,7 +285,7 @@ impl Spawner {
         is_mandatory: Mandatory,
         name: Option<&str>,
         rt: &Handle,
-    ) -> (JoinHandle<R>, Result<(), SpawnError>)
+    ) -> SpawnResult<R, SpawnBlockingError>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -333,11 +312,13 @@ impl Spawner {
         let _ = name;
 
         let (task, handle) = task::unowned(fut, NoopSchedule, id);
-        let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
-        (handle, spawned)
+        match self.spawn_task(Task::new(task, is_mandatory), rt) {
+            Ok(()) => Ok(handle),
+            Err(e) => Err(SpawnFailure::new(handle, e)),
+        }
     }
 
-    fn spawn_task(&self, task: Task, rt: &Handle) -> Result<(), SpawnError> {
+    fn spawn_task(&self, task: Task, rt: &Handle) -> Result<(), SpawnBlockingError> {
         let mut shared = self.inner.shared.lock();
 
         if shared.shutdown {
@@ -347,7 +328,7 @@ impl Spawner {
             task.task.shutdown();
 
             // no need to even push this task; it would never get picked up
-            return Err(SpawnError::ShuttingDown);
+            return Err(SpawnBlockingError::shutdown());
         }
 
         shared.queue.push_back(task);
@@ -378,7 +359,7 @@ impl Spawner {
                         Err(e) => {
                             // The OS refused to spawn the thread and there is no thread
                             // to pick up the task that has just been pushed to the queue.
-                            return Err(SpawnError::NoThreads(e));
+                            return Err(SpawnBlockingError::no_blocking_threads(e));
                         }
                     }
                 }

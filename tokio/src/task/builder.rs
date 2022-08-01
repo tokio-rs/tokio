@@ -1,9 +1,13 @@
 #![allow(unreachable_pub)]
 use crate::{
-    runtime::{context, Handle},
+    runtime::{
+        context,
+        task::{SpawnBlockingError, SpawnError, SpawnLocalError},
+        Handle,
+    },
     task::{JoinHandle, LocalSet},
 };
-use std::{future::Future, io};
+use std::future::Future;
 
 /// Factory which is used to configure the properties of a new task.
 ///
@@ -83,12 +87,12 @@ impl<'a> Builder<'a> {
     /// See [`task::spawn`](crate::task::spawn) for
     /// more details.
     #[track_caller]
-    pub fn spawn<Fut>(self, future: Fut) -> io::Result<JoinHandle<Fut::Output>>
+    pub fn spawn<Fut>(self, future: Fut) -> Result<JoinHandle<Fut::Output>, SpawnError>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        Ok(super::spawn::spawn_inner(future, self.name))
+        super::spawn::spawn_inner(future, self.name).map_err(|e| e.inner)
     }
 
     /// Spawn a task with this builder's settings on the provided [runtime
@@ -99,12 +103,16 @@ impl<'a> Builder<'a> {
     /// [runtime handle]: crate::runtime::Handle
     /// [`Handle::spawn`]: crate::runtime::Handle::spawn
     #[track_caller]
-    pub fn spawn_on<Fut>(self, future: Fut, handle: &Handle) -> io::Result<JoinHandle<Fut::Output>>
+    pub fn spawn_on<Fut>(
+        self,
+        future: Fut,
+        handle: &Handle,
+    ) -> Result<JoinHandle<Fut::Output>, SpawnError>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        Ok(handle.spawn_named(future, self.name))
+        handle.spawn_named(future, self.name).map_err(|e| e.inner)
     }
 
     /// Spawns `!Send` a task on the current [`LocalSet`] with this builder's
@@ -122,12 +130,12 @@ impl<'a> Builder<'a> {
     /// [`task::spawn_local`]: crate::task::spawn_local
     /// [`LocalSet`]: crate::task::LocalSet
     #[track_caller]
-    pub fn spawn_local<Fut>(self, future: Fut) -> io::Result<JoinHandle<Fut::Output>>
+    pub fn spawn_local<Fut>(self, future: Fut) -> Result<JoinHandle<Fut::Output>, SpawnLocalError>
     where
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        Ok(super::local::spawn_local_inner(future, self.name))
+        super::local::spawn_local_inner(future, self.name).map_err(|e| e.inner)
     }
 
     /// Spawns `!Send` a task on the provided [`LocalSet`] with this builder's
@@ -142,12 +150,14 @@ impl<'a> Builder<'a> {
         self,
         future: Fut,
         local_set: &LocalSet,
-    ) -> io::Result<JoinHandle<Fut::Output>>
+    ) -> Result<JoinHandle<Fut::Output>, SpawnLocalError>
     where
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        Ok(local_set.spawn_named(future, self.name))
+        local_set
+            .spawn_named(future, self.name)
+            .map_err(|e| e.inner)
     }
 
     /// Spawns blocking code on the blocking threadpool.
@@ -162,7 +172,7 @@ impl<'a> Builder<'a> {
     pub fn spawn_blocking<Function, Output>(
         self,
         function: Function,
-    ) -> io::Result<JoinHandle<Output>>
+    ) -> Result<JoinHandle<Output>, SpawnBlockingError>
     where
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
@@ -181,20 +191,16 @@ impl<'a> Builder<'a> {
         self,
         function: Function,
         handle: &Handle,
-    ) -> io::Result<JoinHandle<Output>>
+    ) -> Result<JoinHandle<Output>, SpawnBlockingError>
     where
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
         use crate::runtime::Mandatory;
-        let (join_handle, spawn_result) = handle.as_inner().blocking_spawner.spawn_blocking_inner(
-            function,
-            Mandatory::NonMandatory,
-            self.name,
-            handle,
-        );
-
-        spawn_result?;
-        Ok(join_handle)
+        handle
+            .as_inner()
+            .blocking_spawner
+            .spawn_blocking_inner(function, Mandatory::NonMandatory, self.name, handle)
+            .map_err(|e| e.inner)
     }
 }

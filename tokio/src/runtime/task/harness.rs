@@ -221,7 +221,8 @@ where
             // Since the caller holds a ref-count, the task cannot be destroyed
             // before the call to `schedule` returns even if the call drops the
             // `Notified` internally.
-            self.core()
+            let _ = self
+                .core()
                 .scheduler
                 .schedule(Notified(self.get_new_task()));
         }
@@ -246,7 +247,8 @@ where
                 // The old ref-count is retained for now to ensure that the task
                 // is not dropped during the call to `schedule` if the call
                 // drops the task it was given.
-                self.core()
+                let _ = self
+                    .core()
                     .scheduler
                     .schedule(Notified(self.get_new_task()));
 
@@ -273,7 +275,8 @@ where
                 // and the caller also holds a ref-count. The caller's ref-count
                 // ensures that the task is not destroyed even if the new task
                 // is dropped before `schedule` returns.
-                self.core()
+                let _ = self
+                    .core()
                     .scheduler
                     .schedule(Notified(self.get_new_task()));
             }

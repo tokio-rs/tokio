@@ -2,6 +2,7 @@ use crate::runtime::scheduler::multi_thread::queue;
 use crate::runtime::task::{self, Inject, Schedule, Task};
 use crate::runtime::MetricsBatch;
 
+use std::convert::Infallible;
 use std::thread;
 use std::time::Duration;
 
@@ -238,11 +239,13 @@ fn stress2() {
 struct Runtime;
 
 impl Schedule for Runtime {
+    type Error = Infallible;
+
     fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
         None
     }
 
-    fn schedule(&self, _task: task::Notified<Self>) {
+    fn schedule(&self, _task: task::Notified<Self>) -> Result<(), Self::Error> {
         unreachable!();
     }
 }

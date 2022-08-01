@@ -3,6 +3,7 @@ use crate::runtime::task::{self, unowned, Id, JoinHandle, OwnedTasks, Schedule, 
 use crate::util::TryLock;
 
 use std::collections::VecDeque;
+use std::convert::Infallible;
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -275,7 +276,7 @@ impl Runtime {
         let (handle, notified) = self.0.owned.bind(future, self.clone(), Id::next());
 
         if let Some(notified) = notified {
-            self.schedule(notified);
+            let _ = self.schedule(notified);
         }
 
         handle
@@ -322,11 +323,14 @@ impl Runtime {
 }
 
 impl Schedule for Runtime {
+    type Error = Infallible;
+
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
         self.0.owned.remove(task)
     }
 
-    fn schedule(&self, task: task::Notified<Self>) {
+    fn schedule(&self, task: task::Notified<Self>) -> Result<(), Self::Error> {
         self.0.core.try_lock().unwrap().queue.push_back(task);
+        Ok(())
     }
 }
