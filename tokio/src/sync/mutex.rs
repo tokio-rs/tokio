@@ -141,6 +141,8 @@ pub struct Mutex<T: ?Sized> {
 ///
 /// The lock is automatically released whenever the guard is dropped, at which
 /// point `lock` will succeed yet again.
+#[must_use = "if unused the Mutex will immediately unlock"]
+#[clippy::has_significant_drop]
 pub struct MutexGuard<'a, T: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
