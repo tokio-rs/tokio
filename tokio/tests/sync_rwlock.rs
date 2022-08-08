@@ -31,7 +31,7 @@ fn read_shared() {
     let mut t1 = spawn(rwlock.read());
     let _g1 = assert_ready!(t1.poll());
     let mut t2 = spawn(rwlock.read());
-    assert_ready!(t2.poll());
+    let _g2 = assert_ready!(t2.poll());
 }
 
 // When there is an active shared owner, exclusive access should not be possible
@@ -75,7 +75,7 @@ fn exhaust_reading() {
     let g2 = reads.pop().unwrap();
     drop(g2);
     assert!(t1.is_woken());
-    assert_ready!(t1.poll());
+    let _g1 = assert_ready!(t1.poll());
 }
 
 // When there is an active exclusive owner, subsequent exclusive access should not be possible
@@ -100,7 +100,7 @@ fn write_shared_drop() {
     assert_pending!(t2.poll());
     drop(g1);
     assert!(t2.is_woken());
-    assert_ready!(t2.poll());
+    let _g2 = assert_ready!(t2.poll());
 }
 
 // when there is an active shared owner, and exclusive access is triggered,
@@ -112,7 +112,7 @@ fn write_read_shared_pending() {
     let _g1 = assert_ready!(t1.poll());
 
     let mut t2 = spawn(rwlock.read());
-    assert_ready!(t2.poll());
+    let _g2 = assert_ready!(t2.poll());
 
     let mut t3 = spawn(rwlock.write());
     assert_pending!(t3.poll());
@@ -137,7 +137,7 @@ fn write_read_shared_drop_pending() {
     drop(t2);
 
     assert!(t3.is_woken());
-    assert_ready!(t3.poll());
+    let _t3 = assert_ready!(t3.poll());
 }
 
 // Acquire an RwLock nonexclusively by a single task
