@@ -767,7 +767,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
     /// # async fn main() {
     /// #     let mutex = Mutex::new(0u32);
     /// #     let guard = mutex.lock().await;
-    /// #     unlock_and_relock(guard).await;
+    /// #     let _guard = unlock_and_relock(guard).await;
     /// # }
     /// ```
     #[inline]
