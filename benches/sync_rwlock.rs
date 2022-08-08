@@ -14,7 +14,7 @@ fn read_uncontended(b: &mut Bencher) {
         rt.block_on(async move {
             for _ in 0..6 {
                 let read = lock.read().await;
-                black_box(read);
+                let _read = black_box(read);
             }
         })
     });
@@ -28,7 +28,7 @@ fn read_concurrent_uncontended_multi(b: &mut Bencher) {
 
     async fn task(lock: Arc<RwLock<()>>) {
         let read = lock.read().await;
-        black_box(read);
+        let _read = black_box(read);
     }
 
     let lock = Arc::new(RwLock::new(()));
@@ -55,7 +55,7 @@ fn read_concurrent_uncontended(b: &mut Bencher) {
 
     async fn task(lock: Arc<RwLock<()>>) {
         let read = lock.read().await;
-        black_box(read);
+        let _read = black_box(read);
     }
 
     let lock = Arc::new(RwLock::new(()));
@@ -82,7 +82,7 @@ fn read_concurrent_contended_multi(b: &mut Bencher) {
 
     async fn task(lock: Arc<RwLock<()>>) {
         let read = lock.read().await;
-        black_box(read);
+        let _read = black_box(read);
     }
 
     let lock = Arc::new(RwLock::new(()));
@@ -110,7 +110,7 @@ fn read_concurrent_contended(b: &mut Bencher) {
 
     async fn task(lock: Arc<RwLock<()>>) {
         let read = lock.read().await;
-        black_box(read);
+        let _read = black_box(read);
     }
 
     let lock = Arc::new(RwLock::new(()));
