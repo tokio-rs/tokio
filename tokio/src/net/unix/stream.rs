@@ -2,6 +2,7 @@ use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
 use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
+#[cfg(not(target_os = "espidf"))]
 use crate::net::unix::ucred::{self, UCred};
 use crate::net::unix::SocketAddr;
 
@@ -817,6 +818,7 @@ impl UnixStream {
     }
 
     /// Returns effective credentials of the process which called `connect` or `pair`.
+    #[cfg(not(target_os = "espidf"))]
     pub fn peer_cred(&self) -> io::Result<UCred> {
         ucred::get_peer_cred(self)
     }

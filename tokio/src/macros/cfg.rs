@@ -253,6 +253,7 @@ macro_rules! cfg_process {
             #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
             #[cfg(not(tokio_wasi))]
+            #[cfg(not(target_os = "espidf"))]
             $item
         )*
     }
@@ -269,7 +270,10 @@ macro_rules! cfg_process_driver {
 macro_rules! cfg_not_process_driver {
     ($($item:item)*) => {
         $(
-            #[cfg(not(all(unix, not(loom), feature = "process")))]
+            #[cfg(any(
+                not(all(unix, not(loom), feature = "process")),
+                target_os = "espidf"
+            ))]
             $item
         )*
     }
@@ -282,6 +286,7 @@ macro_rules! cfg_signal {
             #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
             #[cfg(not(loom))]
             #[cfg(not(tokio_wasi))]
+            #[cfg(not(target_os = "espidf"))]
             $item
         )*
     }
@@ -292,6 +297,7 @@ macro_rules! cfg_signal_internal {
         $(
             #[cfg(any(feature = "signal", all(unix, feature = "process")))]
             #[cfg(not(loom))]
+            #[cfg(not(target_os = "espidf"))]
             $item
         )*
     }
@@ -300,7 +306,12 @@ macro_rules! cfg_signal_internal {
 macro_rules! cfg_not_signal_internal {
     ($($item:item)*) => {
         $(
-            #[cfg(any(loom, not(unix), not(any(feature = "signal", all(unix, feature = "process")))))]
+            #[cfg(any(
+                loom,
+                not(unix),
+                not(any(feature = "signal", all(unix, feature = "process"))),
+                target_os = "espidf"
+            ))]
             $item
         )*
     }

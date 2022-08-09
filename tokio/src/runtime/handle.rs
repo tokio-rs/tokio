@@ -38,6 +38,7 @@ pub(crate) struct HandleInner {
             loom,
             not(all(unix, feature = "signal")),
             not(all(unix, feature = "process")),
+            target_os = "espidf"
         ),
         allow(dead_code)
     )]
