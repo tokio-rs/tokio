@@ -146,7 +146,7 @@ When updating this, also update:
 -->
 
 ```
-cargo +1.49.0 clippy --all-features
+cargo +1.49.0 clippy --all --tests --all-features
 ```
 
 When building documentation normally, the markers that list the features
