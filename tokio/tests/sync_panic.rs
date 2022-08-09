@@ -30,7 +30,7 @@ fn mutex_blocking_lock_panic_caller() -> Result<(), Box<dyn Error>> {
         let rt = basic();
         rt.block_on(async {
             let mutex = Mutex::new(5_u32);
-            mutex.blocking_lock();
+            let _g = mutex.blocking_lock();
         });
     });
 
