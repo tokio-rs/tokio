@@ -176,6 +176,8 @@ impl Driver {
             Err(e) => return Err(e),
         }
 
+        self.inner.waker.did_wake();
+
         // Process all the events that came in, dispatching appropriately
         let mut ready_count = 0;
         for event in events.iter() {
