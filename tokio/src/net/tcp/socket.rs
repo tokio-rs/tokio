@@ -453,6 +453,34 @@ impl TcpSocket {
         self.inner.set_tos(tos)
     }
 
+    /// Gets the value for the `SO_BINDTODEVICE` option on this socket
+    ///
+    /// This value gets the socket binded device's interface name.
+    #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux",))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux",)))
+    )]
+    pub fn device(&self) -> io::Result<Option<Vec<u8>>> {
+        self.inner.device()
+    }
+
+    /// Sets the value for the `SO_BINDTODEVICE` option on this socket
+    ///
+    /// If a socket is bound to an interface, only packets received from that
+    /// particular interface are processed by the socket. Note that this only
+    /// works for some socket types, particularly `AF_INET` sockets.
+    ///
+    /// If `interface` is `None` or an empty string it removes the binding.
+    #[cfg(all(any(target_os = "android", target_os = "fuchsia", target_os = "linux")))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))))
+    )]
+    pub fn bind_device(&self, interface: Option<&[u8]>) -> io::Result<()> {
+        self.inner.bind_device(interface)
+    }
+
     /// Gets the local address of this socket.
     ///
     /// Will fail on windows if called before `bind`.
