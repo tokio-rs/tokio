@@ -557,7 +557,7 @@ impl<T> Sender<T> {
         slot.rem.with_mut(|v| *v = rem);
 
         // Write the value
-        slot.val.with_mut(|ptr| unsafe { *ptr = Some(value) });
+        slot.val = UnsafeCell::new(Some(value));
 
         // Release the slot lock before notifying the receivers.
         drop(slot);
