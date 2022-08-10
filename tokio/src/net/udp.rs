@@ -1571,7 +1571,7 @@ impl UdpSocket {
 
     /// Gets the value for the `SO_BINDTODEVICE` option on this socket
     ///
-    /// This value gets the socket binded device's interface name.
+    /// This value gets the socket-bound device's interface name.
     #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux",))]
     #[cfg_attr(
         docsrs,
