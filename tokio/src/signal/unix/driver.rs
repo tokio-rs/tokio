@@ -76,7 +76,7 @@ impl Driver {
         let receiver = UnixStream::from_std(original.try_clone()?);
         let receiver = PollEvented::new_with_interest_and_handle(
             receiver,
-            Interest::READABLE,
+            Interest::READABLE | Interest::WRITABLE,
             park.handle(),
         )?;
 
