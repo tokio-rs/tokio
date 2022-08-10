@@ -424,6 +424,13 @@ compile_error!("Tokio's build script has incorrectly detected wasm.");
 ))]
 compile_error!("Only features sync,macros,io-util,rt are supported on wasm.");
 
+#[cfg(target_os = "espidf")]
+#[cfg(any(
+    feature = "process",
+    feature = "signal"
+))]
+compile_error!("Target espidf does not support the process or signal features");
+
 // Includes re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any

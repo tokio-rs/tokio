@@ -114,7 +114,7 @@ bytes = { version = "1.0.0", optional = true }
 once_cell = { version = "1.5.2", optional = true }
 memchr = { version = "2.2", optional = true }
 # mio = { version = "0.8.4", optional = true }
-mio = { git = "https://github.com/Janrupf/mio", rev = "f1a0c78a25f267d35d91f8db475298e3ec107c17" }
+mio = { git = "https://github.com/Janrupf/mio", rev = "f40a111c7d00a452c92d1ef1937c7f42be9c95d1" }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.12.0", optional = true }
 
@@ -128,8 +128,6 @@ tracing = { version = "0.1.25", default-features = false, features = ["std"], op
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.42", optional = true }
-
-[target.'cfg(all(unix, not(target_os = "espidf")))'.dependencies]
 signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
