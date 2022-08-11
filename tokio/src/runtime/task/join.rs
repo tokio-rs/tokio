@@ -21,7 +21,7 @@ cfg_rt! {
     /// functions.
     ///
     /// # Cancel safety
-    /// 
+    ///
     /// The `&mut JoinHandle<T>` type is cancel safe. If it is used as the event
     /// in a `tokio::select!` statement and some other branch completes first,
     /// then it is guaranteed that the output of the task is not lost.
