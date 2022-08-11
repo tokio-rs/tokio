@@ -1036,6 +1036,36 @@ impl<T> Sender<T> {
             chan: self.chan.downgrade(),
         }
     }
+
+    /// Returns the max buffer capacity of the channel.
+    ///
+    /// The max capacity is the buffer capacity you initially specified with [`channel`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel::<()>(5);
+    ///      
+    ///     // both max capacity and capacity are the same at first
+    ///     assert_eq!(tx.max_capacity(), 5);
+    ///     assert_eq!(tx.capacity(), 5);
+    ///
+    ///     // Making a reservation doesn't change the max capacity.
+    ///     let permit = tx.reserve().await.unwrap();
+    ///     assert_eq!(tx.max_capacity(), 5);
+    ///     // but drops the capacity by one
+    ///     assert_eq!(tx.capacity(), 4);
+    /// }
+    /// ```
+    ///
+    /// [`channel`]: channel
+    pub fn max_capacity(&self) -> usize {
+        self.chan.semaphore().1
+    }
 }
 
 impl<T> Clone for Sender<T> {
