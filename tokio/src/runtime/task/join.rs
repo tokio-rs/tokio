@@ -20,6 +20,15 @@ cfg_rt! {
     /// This `struct` is created by the [`task::spawn`] and [`task::spawn_blocking`]
     /// functions.
     ///
+    /// # Cancel safety
+    ///
+    /// The `&mut JoinHandle<T>` type is cancel safe. If it is used as the event
+    /// in a `tokio::select!` statement and some other branch completes first,
+    /// then it is guaranteed that the output of the task is not lost.
+    ///
+    /// If a `JoinHandle` is dropped, then the task continues running in the
+    /// background and its return value is lost.
+    ///
     /// # Examples
     ///
     /// Creation from [`task::spawn`]:
