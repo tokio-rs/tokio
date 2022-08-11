@@ -631,7 +631,7 @@ impl OwnedSemaphorePermit {
     }
 }
 
-impl<'a> Drop for SemaphorePermit<'_> {
+impl Drop for SemaphorePermit<'_> {
     fn drop(&mut self) {
         self.sem.add_permits(self.permits as usize);
     }
