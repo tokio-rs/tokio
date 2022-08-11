@@ -11,7 +11,7 @@ env:
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2022-04-18
+  rust_nightly: nightly-2022-07-25
   rust_clippy: 1.52.0
   # When updating this, also update:
   # - README.md
