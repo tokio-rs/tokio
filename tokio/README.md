@@ -161,6 +161,16 @@ several other libraries, including:
 [`mio`]: https://github.com/tokio-rs/mio
 [`bytes`]: https://github.com/tokio-rs/bytes
 
+## Changelog
+
+The Tokio repository contains multiple crates. Each crate has its own changelog.
+
+ * `tokio` - [view changelog](https://github.com/tokio-rs/tokio/blob/master/tokio/CHANGELOG.md)
+ * `tokio-util` - [view changelog](https://github.com/tokio-rs/tokio/blob/master/tokio-util/CHANGELOG.md)
+ * `tokio-stream` - [view changelog](https://github.com/tokio-rs/tokio/blob/master/tokio-stream/CHANGELOG.md)
+ * `tokio-macros` - [view changelog](https://github.com/tokio-rs/tokio/blob/master/tokio-macros/CHANGELOG.md)
+ * `tokio-test` - [view changelog](https://github.com/tokio-rs/tokio/blob/master/tokio-test/CHANGELOG.md)
+
 ## Supported Rust Versions
 
 <!--
