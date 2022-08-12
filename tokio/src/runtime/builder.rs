@@ -1,5 +1,6 @@
 use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, Runtime, Spawner};
+use crate::util::reset_thread_rng;
 
 use std::fmt;
 use std::io;
@@ -84,6 +85,9 @@ pub struct Builder {
 
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
+
+    /// Specify a random number generator seed to provide deterministic results
+    pub(super) rng_seed: Option<u64>,
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
@@ -249,6 +253,8 @@ impl Builder {
             // as parameters.
             global_queue_interval,
             event_interval,
+
+            rng_seed: None,
 
             #[cfg(tokio_unstable)]
             unhandled_panic: UnhandledPanic::Ignore,
@@ -722,6 +728,30 @@ impl Builder {
         self
     }
 
+    /// Specifies the random number generation seed to use within all threads associated
+    /// with the runtime being built.
+    ///
+    /// This option is intended to make certain parts of the runtime deterministic.
+    /// Specifically, this will ensure that the order that branches are polled by the
+    /// [`tokio::select!`] macro is deterministic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .rng_seed(42)
+    ///     .build();
+    /// # }
+    /// ```
+    ///
+    /// [`tokio::select!`]: crate::select
+    pub fn rng_seed(&mut self, seed: u64) -> &mut Self {
+        self.rng_seed = Some(seed);
+        self
+    }
+
     cfg_unstable! {
         /// Configure how the runtime responds to an unhandled panic on a
         /// spawned task.
@@ -788,6 +818,10 @@ impl Builder {
         use crate::runtime::{BasicScheduler, HandleInner, Kind};
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
+
+        if let Some(seed) = self.rng_seed {
+            reset_thread_rng(seed);
+        }
 
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
@@ -908,6 +942,10 @@ cfg_rt_multi_thread! {
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
+
+            if let Some(seed) = self.rng_seed {
+                reset_thread_rng(seed);
+            }
 
             // Create the blocking pool
             let blocking_pool =

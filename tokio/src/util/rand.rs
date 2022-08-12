@@ -16,6 +16,15 @@ pub(crate) struct FastRand {
 impl FastRand {
     /// Initializes a new, thread-local, fast random number generator.
     pub(crate) fn new(seed: u64) -> FastRand {
+        let (one, two) = FastRand::split_seed(seed);
+
+        FastRand {
+            one: Cell::new(one),
+            two: Cell::new(two),
+        }
+    }
+
+    fn split_seed(seed: u64) -> (u32, u32) {
         let one = (seed >> 32) as u32;
         let mut two = seed as u32;
 
@@ -24,10 +33,14 @@ impl FastRand {
             two = 1;
         }
 
-        FastRand {
-            one: Cell::new(one),
-            two: Cell::new(two),
-        }
+        (one, two)
+    }
+
+    pub(crate) fn reset_seed(&self, seed: u64) {
+        let (one, two) = FastRand::split_seed(seed);
+
+        self.one.replace(one);
+        self.two.replace(two);
     }
 
     pub(crate) fn fastrand_n(&self, n: u32) -> u32 {
@@ -51,14 +64,18 @@ impl FastRand {
     }
 }
 
+thread_local! {
+    static THREAD_RNG: FastRand = FastRand::new(crate::loom::rand::seed());
+}
+
+pub(crate) fn reset_thread_rng(seed: u64) {
+    THREAD_RNG.with(|rng| rng.reset_seed(seed));
+}
+
 // Used by the select macro and `StreamMap`
 #[cfg(any(feature = "macros"))]
 #[doc(hidden)]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub fn thread_rng_n(n: u32) -> u32 {
-    thread_local! {
-        static THREAD_RNG: FastRand = FastRand::new(crate::loom::rand::seed());
-    }
-
     THREAD_RNG.with(|rng| rng.fastrand_n(n))
 }

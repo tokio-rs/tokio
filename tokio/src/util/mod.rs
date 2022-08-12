@@ -73,6 +73,8 @@ pub(crate) mod trace;
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub use self::rand::thread_rng_n;
 
+pub(crate) use self::rand::reset_thread_rng;
+
 #[cfg(any(
     feature = "rt",
     feature = "time",

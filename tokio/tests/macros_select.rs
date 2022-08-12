@@ -599,3 +599,54 @@ async fn mut_ref_patterns() {
         },
     };
 }
+
+#[test]
+#[cfg(feature = "rt-multi-thread")]
+fn deterministic_select_multi_thread() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .rng_seed(4_318_314_286_557_880_373)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let _ = tokio::spawn(async {
+            let num = select_0_to_9().await;
+            assert_eq!(num, 4);
+
+            let num = select_0_to_9().await;
+            assert_eq!(num, 1);
+        })
+        .await;
+    });
+}
+
+#[test]
+fn deterministic_select_current_thread() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .rng_seed(4_318_314_286_557_880_373)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let num = select_0_to_9().await;
+        assert_eq!(num, 4);
+
+        let num = select_0_to_9().await;
+        assert_eq!(num, 1);
+    });
+}
+
+async fn select_0_to_9() -> u32 {
+    tokio::select!(
+        x = async { 0 } => x,
+        x = async { 1 } => x,
+        x = async { 2 } => x,
+        x = async { 3 } => x,
+        x = async { 4 } => x,
+        x = async { 5 } => x,
+        x = async { 6 } => x,
+        x = async { 7 } => x,
+        x = async { 8 } => x,
+        x = async { 9 } => x,
+    )
+}

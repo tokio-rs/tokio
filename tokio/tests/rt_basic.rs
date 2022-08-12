@@ -291,6 +291,22 @@ fn timeout_panics_when_no_time_handle() {
     });
 }
 
+#[test]
+fn rng_seed() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .rng_seed(4_318_314_286_557_880_373)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let random = tokio::macros::support::thread_rng_n(100);
+        assert_eq!(random, 44);
+
+        let random = tokio::macros::support::thread_rng_n(100);
+        assert_eq!(random, 15);
+    });
+}
+
 #[cfg(tokio_unstable)]
 mod unstable {
     use tokio::runtime::{Builder, UnhandledPanic};

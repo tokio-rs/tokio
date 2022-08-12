@@ -539,6 +539,27 @@ async fn test_block_in_place4() {
     tokio::task::block_in_place(|| {});
 }
 
+#[test]
+fn rng_seed() {
+    let seed: u64 = 4_318_314_286_557_880_373;
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .rng_seed(seed)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let random = tokio::macros::support::thread_rng_n(100);
+        assert_eq!(random, 44);
+
+        let _ = tokio::spawn(async {
+            let random = tokio::macros::support::thread_rng_n(100);
+            assert_eq!(random, 44);
+        })
+        .await;
+    });
+}
+
 fn rt() -> runtime::Runtime {
     runtime::Runtime::new().unwrap()
 }
