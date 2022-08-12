@@ -1039,7 +1039,8 @@ impl<T> Sender<T> {
 
     /// Returns the max buffer capacity of the channel.
     ///
-    /// The max capacity is the buffer capacity you initially specified with [`channel`]
+    /// The max capacity is the buffer capacity initially specified when calling
+    /// [`channel`]
     ///
     /// # Examples
     ///
