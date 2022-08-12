@@ -69,7 +69,7 @@ cfg_io_util! {
 
         /// Creates a future which will rewind to the beginning of the stream.
         ///
-        /// This is convenience method, equivalent to to `self.seek(SeekFrom::Start(0))`.
+        /// This is convenience method, equivalent to `self.seek(SeekFrom::Start(0))`.
         fn rewind(&mut self) -> Seek<'_, Self>
         where
             Self: Unpin,
