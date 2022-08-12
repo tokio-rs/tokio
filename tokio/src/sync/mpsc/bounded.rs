@@ -998,6 +998,8 @@ impl<T> Sender<T> {
     ///
     /// The capacity goes down when sending a value by calling [`send`] or by reserving capacity
     /// with [`reserve`]. The capacity goes up when values are received by the [`Receiver`].
+    /// This is distinct from [`max_capacity`], which always returns buffer capacity initially
+    /// specified when calling [`channel`]
     ///
     /// # Examples
     ///
@@ -1023,6 +1025,8 @@ impl<T> Sender<T> {
     ///
     /// [`send`]: Sender::send
     /// [`reserve`]: Sender::reserve
+    /// [`channel`]: channel
+    /// [`max_capacity`]: Sender::max_capacity
     pub fn capacity(&self) -> usize {
         self.chan.semaphore().0.available_permits()
     }
@@ -1037,10 +1041,14 @@ impl<T> Sender<T> {
         }
     }
 
-    /// Returns the max buffer capacity of the channel.
+    /// Returns the maximum buffer capacity of the channel.
     ///
-    /// The max capacity is the buffer capacity initially specified when calling
-    /// [`channel`].
+    /// The maximum capacity is the buffer capacity initially specified when calling
+    /// [`channel`]. This is distinct from [`capacity`], which returns the *current*
+    /// available buffer capacity: as messages are sent and received, the
+    /// value returned by [`capacity`] will go up or down, while `max_capacity`
+    /// will always return maximum capacity that was set when the channel was
+    /// created.
     ///
     /// # Examples
     ///
@@ -1064,6 +1072,8 @@ impl<T> Sender<T> {
     /// ```
     ///
     /// [`channel`]: channel
+    /// [`max_capacity`]: Sender::max_capacity
+    /// [`capacity`]: Sender::capacity
     pub fn max_capacity(&self) -> usize {
         self.chan.semaphore().1
     }

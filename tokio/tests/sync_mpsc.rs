@@ -934,4 +934,9 @@ async fn test_tx_capacity() {
     // after reserve, only capacity should drop by one
     assert_eq!(tx.capacity(), 9);
     assert_eq!(tx.max_capacity(), 10);
+
+    let _sent = tx.send(()).await.unwrap();
+    // after send, capacity should drop by one again
+    assert_eq!(tx.capacity(), 8);
+    assert_eq!(tx.max_capacity(), 10);
 }
