@@ -1057,7 +1057,7 @@ impl<T> Sender<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let (tx, rx) = mpsc::channel::<()>(5);
+    ///     let (tx, _rx) = mpsc::channel::<()>(5);
     ///      
     ///     // both max capacity and capacity are the same at first
     ///     assert_eq!(tx.max_capacity(), 5);
