@@ -1,0 +1,4 @@
+contact_links:
+  - name: Question
+    url: https://github.com/tokio-rs/tokio/discussions
+    about: Questions about Tokio should be posted as a GitHub discussion.
