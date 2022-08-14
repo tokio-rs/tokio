@@ -1046,9 +1046,8 @@ impl<T> Sender<T> {
     /// The maximum capacity is the buffer capacity initially specified when calling
     /// [`channel`]. This is distinct from [`capacity`], which returns the *current*
     /// available buffer capacity: as messages are sent and received, the
-    /// value returned by [`capacity`] will go up or down, while `max_capacity`
-    /// will always return maximum capacity that was set when the channel was
-    /// created.
+    /// value returned by [`capacity`] will go up or down, whereas the value
+    /// returned by `max_capacity` will remain constant.
     ///
     /// # Examples
     ///
