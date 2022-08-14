@@ -921,3 +921,22 @@ async fn test_tx_count_weak_sender() {
 
     assert!(tx_weak.upgrade().is_none() && tx_weak2.upgrade().is_none());
 }
+
+// Tests that channel `capacity` changes and `max_capacity` stays the same
+#[tokio::test]
+async fn test_tx_capacity() {
+    let (tx, _rx) = mpsc::channel::<()>(10);
+    // both capacities are same before
+    assert_eq!(tx.capacity(), 10);
+    assert_eq!(tx.max_capacity(), 10);
+
+    let _permit = tx.reserve().await.unwrap();
+    // after reserve, only capacity should drop by one
+    assert_eq!(tx.capacity(), 9);
+    assert_eq!(tx.max_capacity(), 10);
+
+    let _sent = tx.send(()).await.unwrap();
+    // after send, capacity should drop by one again
+    assert_eq!(tx.capacity(), 8);
+    assert_eq!(tx.max_capacity(), 10);
+}
