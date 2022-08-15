@@ -11,7 +11,7 @@ env:
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2022-07-25
+  rust_nightly: nightly-2022-07-26
   rust_clippy: 1.52.0
   # When updating this, also update:
   # - README.md
@@ -197,7 +197,7 @@ jobs:
       - name: Install Rust ${{ env.rust_nightly }}
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: ${{ env.rust_nightly }}
           components: miri
           override: true
       - uses: Swatinem/rust-cache@v1
