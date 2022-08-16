@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::runtime::Runtime;
+use tokio::runtime::{Runtime, RngSeed};
 use tokio::sync::oneshot;
 use tokio::time::{timeout, Duration};
 use tokio_test::{assert_err, assert_ok};
@@ -293,17 +293,19 @@ fn timeout_panics_when_no_time_handle() {
 
 #[test]
 fn rng_seed() {
+    let seed = 4_318_314_286_557_880_373_u64.to_le_bytes();
+
     let rt = tokio::runtime::Builder::new_current_thread()
-        .rng_seed(4_318_314_286_557_880_373)
+        .rng_seed(RngSeed::from_bytes(&seed))
         .build()
         .unwrap();
 
     rt.block_on(async {
         let random = tokio::macros::support::thread_rng_n(100);
-        assert_eq!(random, 44);
+        assert_eq!(random, 89);
 
         let random = tokio::macros::support::thread_rng_n(100);
-        assert_eq!(random, 15);
+        assert_eq!(random, 47);
     });
 }
 

@@ -541,20 +541,24 @@ async fn test_block_in_place4() {
 
 #[test]
 fn rng_seed() {
-    let seed: u64 = 4_318_314_286_557_880_373;
+    use tokio::runtime::RngSeed;
+    let seed = 4_318_314_286_557_880_373_u64.to_le_bytes();
 
     let rt = tokio::runtime::Builder::new_multi_thread()
-        .rng_seed(seed)
+        .worker_threads(1)
+        .rng_seed(RngSeed::from_bytes(&seed))
         .build()
         .unwrap();
 
     rt.block_on(async {
         let random = tokio::macros::support::thread_rng_n(100);
-        assert_eq!(random, 44);
+        assert_eq!(random, 89);
 
         let _ = tokio::spawn(async {
+            // Because we only have a single worker thread, the
+            // RNG will be deterministic here as well.
             let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 44);
+            assert_eq!(random, 60);
         })
         .await;
     });

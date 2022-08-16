@@ -1,4 +1,31 @@
-use std::cell::Cell;
+use std::{cell::Cell, collections::hash_map::DefaultHasher, hash::Hasher};
+
+/// TODO(hds): Add public docs
+#[derive(Clone, Debug)]
+pub struct RngSeed {
+    pub(crate) seed: u64,
+}
+
+impl RngSeed {
+    /// TODO(hds): Add public docs
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let mut hasher = DefaultHasher::default();
+        hasher.write(bytes);
+        Self {
+            seed: hasher.finish()
+        }
+    }
+
+    pub(crate) fn seed_with_index(&self, idx: usize) -> Self {
+        let mut hasher = DefaultHasher::default();
+        hasher.write(&self.seed.to_le_bytes());
+        hasher.write(&idx.to_le_bytes());
+
+        Self {
+            seed: hasher.finish()
+        }
+    }
+}
 
 /// Fast random number generate.
 ///
@@ -68,8 +95,8 @@ thread_local! {
     static THREAD_RNG: FastRand = FastRand::new(crate::loom::rand::seed());
 }
 
-pub(crate) fn reset_thread_rng(seed: u64) {
-    THREAD_RNG.with(|rng| rng.reset_seed(seed));
+pub(crate) fn reset_thread_rng(rng_seed: &RngSeed) {
+    THREAD_RNG.with(|rng| rng.reset_seed(rng_seed.seed));
 }
 
 // Used by the select macro and `StreamMap`

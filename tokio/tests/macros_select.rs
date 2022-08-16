@@ -603,18 +603,22 @@ async fn mut_ref_patterns() {
 #[test]
 #[cfg(feature = "rt-multi-thread")]
 fn deterministic_select_multi_thread() {
+    use tokio::runtime::RngSeed;
+    let seed = 4_318_314_286_557_880_373_u64.to_le_bytes();
+
     let rt = tokio::runtime::Builder::new_multi_thread()
-        .rng_seed(4_318_314_286_557_880_373)
+        .worker_threads(1)
+        .rng_seed(RngSeed::from_bytes(&seed))
         .build()
         .unwrap();
 
     rt.block_on(async {
         let _ = tokio::spawn(async {
             let num = select_0_to_9().await;
-            assert_eq!(num, 4);
+            assert_eq!(num, 6);
 
             let num = select_0_to_9().await;
-            assert_eq!(num, 1);
+            assert_eq!(num, 3);
         })
         .await;
     });
@@ -622,17 +626,20 @@ fn deterministic_select_multi_thread() {
 
 #[test]
 fn deterministic_select_current_thread() {
+    use tokio::runtime::RngSeed;
+    let seed = 4_318_314_286_557_880_373_u64.to_le_bytes();
+
     let rt = tokio::runtime::Builder::new_current_thread()
-        .rng_seed(4_318_314_286_557_880_373)
+        .rng_seed(RngSeed::from_bytes(&seed))
         .build()
         .unwrap();
 
     rt.block_on(async {
         let num = select_0_to_9().await;
-        assert_eq!(num, 4);
+        assert_eq!(num, 8);
 
         let num = select_0_to_9().await;
-        assert_eq!(num, 1);
+        assert_eq!(num, 4);
     });
 }
 

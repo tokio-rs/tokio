@@ -1,6 +1,7 @@
 use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, Runtime, Spawner};
 use crate::util::reset_thread_rng;
+pub use crate::util::RngSeed;
 
 use std::fmt;
 use std::io;
@@ -87,7 +88,7 @@ pub struct Builder {
     pub(super) event_interval: u32,
 
     /// Specify a random number generator seed to provide deterministic results
-    pub(super) rng_seed: Option<u64>,
+    pub(super) rng_seed: Option<RngSeed>,
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
@@ -747,7 +748,7 @@ impl Builder {
     /// ```
     ///
     /// [`tokio::select!`]: crate::select
-    pub fn rng_seed(&mut self, seed: u64) -> &mut Self {
+    pub fn rng_seed(&mut self, seed: RngSeed) -> &mut Self {
         self.rng_seed = Some(seed);
         self
     }
@@ -819,7 +820,7 @@ impl Builder {
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
-        if let Some(seed) = self.rng_seed {
+        if let Some(seed) = &self.rng_seed {
             reset_thread_rng(seed);
         }
 
@@ -943,7 +944,7 @@ cfg_rt_multi_thread! {
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
-            if let Some(seed) = self.rng_seed {
+            if let Some(seed) = &self.rng_seed {
                 reset_thread_rng(seed);
             }
 

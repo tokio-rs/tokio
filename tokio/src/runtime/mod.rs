@@ -217,6 +217,7 @@ cfg_rt! {
 
     mod builder;
     pub use self::builder::Builder;
+    pub use self::builder::RngSeed;
     cfg_unstable! {
         pub use self::builder::UnhandledPanic;
     }

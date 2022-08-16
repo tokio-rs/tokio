@@ -8,7 +8,7 @@ use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, ToHandle};
-use crate::util::reset_thread_rng;
+use crate::util::{reset_thread_rng, RngSeed};
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -51,7 +51,7 @@ struct Inner {
     keep_alive: Duration,
 
     // Random number seed
-    rng_seed: Option<u64>,
+    rng_seed: Option<RngSeed>,
 }
 
 struct Shared {
@@ -186,7 +186,7 @@ impl BlockingPool {
                     before_stop: builder.before_stop.clone(),
                     thread_cap,
                     keep_alive,
-                    rng_seed: builder.rng_seed,
+                    rng_seed: builder.rng_seed.clone(),
                 }),
             },
             shutdown_rx,
@@ -341,8 +341,8 @@ impl Inner {
             f()
         }
 
-        if let Some(rng_seed) = self.rng_seed {
-            reset_thread_rng(rng_seed);
+        if let Some(rng_seed) = &self.rng_seed {
+            reset_thread_rng(&rng_seed.seed_with_index(worker_thread_id));
         }
 
         let mut shared = self.shared.lock();
