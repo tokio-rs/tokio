@@ -307,11 +307,13 @@ cfg_rt! {
     mod unconstrained;
     pub use unconstrained::{unconstrained, Unconstrained};
 
+    pub mod join_set;
+    #[doc(inline)]
+    pub use join_set::JoinSet;
+    pub use crate::runtime::task::AbortHandle;
+
     cfg_unstable! {
-        pub mod join_set;
-        #[doc(inline)]
-        pub use join_set::JoinSet;
-        pub use crate::runtime::task::{Id, AbortHandle};
+        pub use crate::runtime::task::Id;
     }
 
     cfg_trace! {
