@@ -20,15 +20,15 @@
 //! use tokio::sync::watch;
 //!
 //! # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-//!     let (tx, mut rx) = watch::channel("hello");
+//! let (tx, mut rx) = watch::channel("hello");
 //!
-//!     tokio::spawn(async move {
-//!         while rx.changed().await.is_ok() {
-//!             println!("received = {:?}", *rx.borrow());
-//!         }
-//!     });
+//! tokio::spawn(async move {
+//!     while rx.changed().await.is_ok() {
+//!         println!("received = {:?}", *rx.borrow());
+//!     }
+//! });
 //!
-//!     tx.send("world")?;
+//! tx.send("world")?;
 //! # Ok(())
 //! # }
 //! ```
