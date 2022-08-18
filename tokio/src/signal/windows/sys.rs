@@ -7,14 +7,26 @@ use crate::signal::RxFuture;
 
 use winapi::shared::minwindef::{BOOL, DWORD, FALSE, TRUE};
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
-use winapi::um::wincon::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
-
-pub(super) fn ctrl_c() -> io::Result<RxFuture> {
-    new(CTRL_C_EVENT)
-}
+use winapi::um::wincon;
 
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
-    new(CTRL_BREAK_EVENT)
+    new(wincon::CTRL_BREAK_EVENT)
+}
+
+pub(super) fn crtl_close() -> io::Result<RxFuture> {
+    new(wincon::CTRL_CLOSE_EVENT)
+}
+
+pub(super) fn ctrl_c() -> io::Result<RxFuture> {
+    new(wincon::CTRL_C_EVENT)
+}
+
+pub(super) fn crtl_log_off() -> io::Result<RxFuture> {
+    new(wincon::CTRL_LOGOFF_EVENT)
+}
+
+pub(super) fn crtl_shutdown() -> io::Result<RxFuture> {
+    new(wincon::CTRL_SHUTDOWN_EVENT)
 }
 
 fn new(signum: DWORD) -> io::Result<RxFuture> {
@@ -121,7 +133,7 @@ mod tests {
         // like sending signals on Unix, so we'll stub out the actual OS
         // integration and test that our handling works.
         unsafe {
-            super::handler(CTRL_C_EVENT);
+            super::handler(wincon::CTRL_C_EVENT);
         }
 
         assert_ready_ok!(ctrl_c.poll());
@@ -138,10 +150,28 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                super::handler(CTRL_BREAK_EVENT);
+                super::handler(wincon::CTRL_BREAK_EVENT);
             }
 
             ctrl_break.recv().await.unwrap();
+        });
+    }
+
+    #[test]
+    fn ctrl_close() {
+        let rt = rt();
+
+        rt.block_on(async {
+            let mut ctrl_close = assert_ok!(crate::signal::windows::ctrl_close());
+
+            // Windows doesn't have a good programmatic way of sending events
+            // like sending signals on Unix, so we'll stub out the actual OS
+            // integration and test that our handling works.
+            unsafe {
+                super::handler(wincon::CTRL_CLOSE_EVENT);
+            }
+
+            ctrl_close.recv().await.unwrap();
         });
     }
 
