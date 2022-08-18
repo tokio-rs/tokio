@@ -1,6 +1,7 @@
 use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, Runtime, Spawner};
-use crate::util::reset_thread_rng;
+use crate::util::RngSeedGenerator;
+
 pub use crate::util::RngSeed;
 
 use std::fmt;
@@ -88,7 +89,7 @@ pub struct Builder {
     pub(super) event_interval: u32,
 
     /// Specify a random number generator seed to provide deterministic results
-    pub(super) rng_seed: Option<RngSeed>,
+    pub(super) seed_generator: RngSeedGenerator,
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
@@ -255,7 +256,7 @@ impl Builder {
             global_queue_interval,
             event_interval,
 
-            rng_seed: None,
+            seed_generator: RngSeedGenerator::new(RngSeed::new()),
 
             #[cfg(tokio_unstable)]
             unhandled_panic: UnhandledPanic::Ignore,
@@ -739,17 +740,18 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::runtime;
+    /// # use tokio::runtime::{self, RngSeed};
     /// # pub fn main() {
+    /// let seed = RngSeed::from_bytes(b"place your seed here");
     /// let rt = runtime::Builder::new_current_thread()
-    ///     .rng_seed(42)
+    ///     .rng_seed(seed)
     ///     .build();
     /// # }
     /// ```
     ///
     /// [`tokio::select!`]: crate::select
     pub fn rng_seed(&mut self, seed: RngSeed) -> &mut Self {
-        self.rng_seed = Some(seed);
+        self.seed_generator = RngSeedGenerator::new(seed);
         self
     }
 
@@ -820,10 +822,6 @@ impl Builder {
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
-        if let Some(seed) = &self.rng_seed {
-            reset_thread_rng(seed);
-        }
-
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
@@ -834,6 +832,7 @@ impl Builder {
             signal_handle: resources.signal_handle,
             clock: resources.clock,
             blocking_spawner,
+            seed_generator: self.seed_generator.next_generator(),
         };
 
         // And now put a single-threaded scheduler on top of the timer. When
@@ -944,10 +943,6 @@ cfg_rt_multi_thread! {
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
-            if let Some(seed) = &self.rng_seed {
-                reset_thread_rng(seed);
-            }
-
             // Create the blocking pool
             let blocking_pool =
                 blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
@@ -959,6 +954,7 @@ cfg_rt_multi_thread! {
                 signal_handle: resources.signal_handle,
                 clock: resources.clock,
                 blocking_spawner,
+                seed_generator: self.seed_generator.next_generator(),
             };
 
             let (scheduler, launch) = ThreadPool::new(

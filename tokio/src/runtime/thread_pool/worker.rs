@@ -58,7 +58,6 @@
 
 use crate::coop;
 use crate::future::Future;
-use crate::loom::rand::seed;
 use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
@@ -67,7 +66,7 @@ use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::{queue, Idle, Parker, Unparker};
 use crate::runtime::{task, Callback, HandleInner, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
-use crate::util::FastRand;
+use crate::util::{FastRand, RngSeed};
 
 use std::cell::RefCell;
 use std::time::Duration;
@@ -226,7 +225,7 @@ pub(super) fn create(
             is_shutdown: false,
             park: Some(park),
             metrics: MetricsBatch::new(),
-            rand: FastRand::new(seed()),
+            rand: FastRand::new(RngSeed::new()),
             global_queue_interval,
             event_interval,
         }));

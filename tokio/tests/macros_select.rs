@@ -7,6 +7,7 @@ use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 #[cfg(not(tokio_wasm_not_wasi))]
 use tokio::test as maybe_tokio_test;
 
+use tokio::runtime::RngSeed;
 use tokio::sync::oneshot;
 use tokio_test::{assert_ok, assert_pending, assert_ready};
 
@@ -601,14 +602,29 @@ async fn mut_ref_patterns() {
 }
 
 #[test]
+fn deterministic_select_current_thread() {
+    let seed = b"bytes used to generate seed";
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .rng_seed(RngSeed::from_bytes(seed))
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let num = select_0_to_9().await;
+        assert_eq!(num, 5);
+
+        let num = select_0_to_9().await;
+        assert_eq!(num, 8);
+    });
+}
+
+#[test]
 #[cfg(feature = "rt-multi-thread")]
 fn deterministic_select_multi_thread() {
-    use tokio::runtime::RngSeed;
-    let seed = 4_318_314_286_557_880_373_u64.to_le_bytes();
-
+    let seed = b"bytes used to generate seed";
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
-        .rng_seed(RngSeed::from_bytes(&seed))
+        .rng_seed(RngSeed::from_bytes(seed))
         .build()
         .unwrap();
 
@@ -618,28 +634,9 @@ fn deterministic_select_multi_thread() {
             assert_eq!(num, 6);
 
             let num = select_0_to_9().await;
-            assert_eq!(num, 3);
+            assert_eq!(num, 9);
         })
         .await;
-    });
-}
-
-#[test]
-fn deterministic_select_current_thread() {
-    use tokio::runtime::RngSeed;
-    let seed = 4_318_314_286_557_880_373_u64.to_le_bytes();
-
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .rng_seed(RngSeed::from_bytes(&seed))
-        .build()
-        .unwrap();
-
-    rt.block_on(async {
-        let num = select_0_to_9().await;
-        assert_eq!(num, 8);
-
-        let num = select_0_to_9().await;
-        assert_eq!(num, 4);
     });
 }
 

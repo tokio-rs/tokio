@@ -2,6 +2,7 @@ use crate::runtime::blocking::{BlockingTask, NoopSchedule};
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
+use crate::util::RngSeedGenerator;
 
 use std::future::Future;
 use std::marker::PhantomData;
@@ -53,6 +54,9 @@ pub(crate) struct HandleInner {
 
     /// Blocking pool spawner
     pub(super) blocking_spawner: blocking::Spawner,
+
+    /// Current random number generator seed (when no)
+    pub(super) seed_generator: RngSeedGenerator,
 }
 
 /// Create a new runtime handle.

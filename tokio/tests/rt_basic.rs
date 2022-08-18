@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::runtime::{Runtime, RngSeed};
+use tokio::runtime::{RngSeed, Runtime};
 use tokio::sync::oneshot;
 use tokio::time::{timeout, Duration};
 use tokio_test::{assert_err, assert_ok};
@@ -293,19 +293,43 @@ fn timeout_panics_when_no_time_handle() {
 
 #[test]
 fn rng_seed() {
-    let seed = 4_318_314_286_557_880_373_u64.to_le_bytes();
-
+    let seed = b"bytes used to generate seed";
     let rt = tokio::runtime::Builder::new_current_thread()
-        .rng_seed(RngSeed::from_bytes(&seed))
+        .rng_seed(RngSeed::from_bytes(seed))
         .build()
         .unwrap();
 
     rt.block_on(async {
         let random = tokio::macros::support::thread_rng_n(100);
-        assert_eq!(random, 89);
+        assert_eq!(random, 58);
 
         let random = tokio::macros::support::thread_rng_n(100);
-        assert_eq!(random, 47);
+        assert_eq!(random, 84);
+    });
+}
+
+#[test]
+fn rng_seed_multi_enter() {
+    let seed = b"bytes used to generate seed";
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .rng_seed(RngSeed::from_bytes(seed))
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let random = tokio::macros::support::thread_rng_n(100);
+        assert_eq!(random, 58);
+
+        let random = tokio::macros::support::thread_rng_n(100);
+        assert_eq!(random, 84);
+    });
+
+    rt.block_on(async {
+        let random = tokio::macros::support::thread_rng_n(100);
+        assert_eq!(random, 11);
+
+        let random = tokio::macros::support::thread_rng_n(100);
+        assert_eq!(random, 11);
     });
 }
 

@@ -1,29 +1,91 @@
-use std::{cell::Cell, collections::hash_map::DefaultHasher, hash::Hasher};
+use std::{cell::Cell, collections::hash_map::DefaultHasher, hash::Hasher, sync::Mutex};
 
-/// TODO(hds): Add public docs
-#[derive(Clone, Debug)]
-pub struct RngSeed {
-    pub(crate) seed: u64,
+/// A deterministic generator for seeds (and other generators).
+///
+/// Given the same initial seed, the generator will output the same sequence of seeds.
+///
+/// Since the seed generator will be kept in a runtime handle, we need to wrap `FastRand`
+/// in a Mutex to make it thread safe. Different to the `FastRand` that we keep in a
+/// thread local store, the expectation is that seed generation will not need to happen
+/// very frequently, so the cost of the mutex should be minimal.
+#[derive(Debug)]
+pub(crate) struct RngSeedGenerator {
+    /// Internal state for the seed generator. We keep it in a Mutex so that we can safely
+    /// use it across multiple threads.
+    state: Mutex<FastRand>,
 }
 
-impl RngSeed {
-    /// TODO(hds): Add public docs
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        let mut hasher = DefaultHasher::default();
-        hasher.write(bytes);
+impl RngSeedGenerator {
+    /// Returns a new generator from the provided seed.
+    pub(crate) fn new(seed: RngSeed) -> Self {
         Self {
-            seed: hasher.finish()
+            state: Mutex::new(FastRand::new(seed)),
         }
     }
 
-    pub(crate) fn seed_with_index(&self, idx: usize) -> Self {
-        let mut hasher = DefaultHasher::default();
-        hasher.write(&self.seed.to_le_bytes());
-        hasher.write(&idx.to_le_bytes());
+    /// Returns the next seed in the sequence.
+    pub(crate) fn next_seed(&self) -> RngSeed {
+        let rng = self
+            .state
+            .lock()
+            .expect("RNG seed generator is internally corrupt");
 
-        Self {
-            seed: hasher.finish()
+        let s = rng.fastrand();
+        let r = rng.fastrand();
+
+        RngSeed::from_pair(s, r)
+    }
+
+    /// Directly creates a generator using the next seed.
+    pub(crate) fn next_generator(&self) -> Self {
+        RngSeedGenerator::new(self.next_seed())
+    }
+}
+
+/// A seed for random numnber generation.
+///
+/// In order to make certain functions within a runtime deterministic, a seed
+/// can be specified at the time of creation.
+#[derive(Clone, Debug)]
+pub struct RngSeed {
+    s: u32,
+    r: u32,
+}
+
+impl RngSeed {
+    /// Creates a random seed using loom internally.
+    pub(crate) fn new() -> Self {
+        Self::from_u64(crate::loom::rand::seed())
+    }
+
+    /// Generates a seed from the provided byte slice.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use tokio::runtime::RngSeed;
+    /// let seed = RngSeed::from_bytes(b"make me a seed");
+    /// ```
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let mut hasher = DefaultHasher::default();
+        hasher.write(bytes);
+        Self::from_u64(hasher.finish())
+    }
+
+    fn from_u64(seed: u64) -> Self {
+        let one = (seed >> 32) as u32;
+        let mut two = seed as u32;
+
+        if two == 0 {
+            // This value cannot be zero
+            two = 1;
         }
+
+        Self::from_pair(one, two)
+    }
+
+    fn from_pair(s: u32, r: u32) -> Self {
+        Self { s, r }
     }
 }
 
@@ -42,32 +104,25 @@ pub(crate) struct FastRand {
 
 impl FastRand {
     /// Initializes a new, thread-local, fast random number generator.
-    pub(crate) fn new(seed: u64) -> FastRand {
-        let (one, two) = FastRand::split_seed(seed);
-
+    pub(crate) fn new(seed: RngSeed) -> FastRand {
         FastRand {
-            one: Cell::new(one),
-            two: Cell::new(two),
+            one: Cell::new(seed.s),
+            two: Cell::new(seed.r),
         }
     }
 
-    fn split_seed(seed: u64) -> (u32, u32) {
-        let one = (seed >> 32) as u32;
-        let mut two = seed as u32;
+    /// Replaces the state of the random number generator with the provided seed, returning
+    /// the seed that represents the previous state of the random number generator.
+    ///
+    /// The random number generator will become equivalent to one created with
+    /// the same seed.
+    pub(crate) fn replace_seed(&self, seed: RngSeed) -> RngSeed {
+        let old_seed = RngSeed::from_pair(self.one.get(), self.two.get());
 
-        if two == 0 {
-            // This value cannot be zero
-            two = 1;
-        }
+        self.one.replace(seed.s);
+        self.two.replace(seed.r);
 
-        (one, two)
-    }
-
-    pub(crate) fn reset_seed(&self, seed: u64) {
-        let (one, two) = FastRand::split_seed(seed);
-
-        self.one.replace(one);
-        self.two.replace(two);
+        old_seed
     }
 
     pub(crate) fn fastrand_n(&self, n: u32) -> u32 {
@@ -92,11 +147,16 @@ impl FastRand {
 }
 
 thread_local! {
-    static THREAD_RNG: FastRand = FastRand::new(crate::loom::rand::seed());
+    static THREAD_RNG: FastRand = FastRand::new(RngSeed::new());
 }
 
-pub(crate) fn reset_thread_rng(rng_seed: &RngSeed) {
-    THREAD_RNG.with(|rng| rng.reset_seed(rng_seed.seed));
+/// Seeds the thread local random number generator with the provided seed and
+/// return the previously stored seed.
+///
+/// The returned seed can be later used to return the thread local random number
+/// generator to its previous state.
+pub(crate) fn replace_thread_rng(rng_seed: RngSeed) -> RngSeed {
+    THREAD_RNG.with(|rng| rng.replace_seed(rng_seed))
 }
 
 // Used by the select macro and `StreamMap`
