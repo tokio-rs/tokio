@@ -16,7 +16,7 @@ pub(super) fn ctrl_c() -> io::Result<RxFuture> {
     panic!()
 }
 
-pub(super) fn ctrl_log_off() -> io::Result<RxFuture> {
+pub(super) fn ctrl_logoff() -> io::Result<RxFuture> {
     panic!()
 }
 

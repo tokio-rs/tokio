@@ -21,7 +21,7 @@ pub(super) fn ctrl_c() -> io::Result<RxFuture> {
     new(wincon::CTRL_C_EVENT)
 }
 
-pub(super) fn ctrl_log_off() -> io::Result<RxFuture> {
+pub(super) fn ctrl_logoff() -> io::Result<RxFuture> {
     new(wincon::CTRL_LOGOFF_EVENT)
 }
 
