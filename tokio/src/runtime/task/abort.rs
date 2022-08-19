@@ -11,14 +11,8 @@ use std::panic::{RefUnwindSafe, UnwindSafe};
 /// Dropping an `AbortHandle` releases the permission to terminate the task
 /// --- it does *not* abort the task.
 ///
-/// **Note**: This is an [unstable API][unstable]. The public API of this type
-/// may break in 1.x releases. See [the documentation on unstable
-/// features][unstable] for details.
-///
-/// [unstable]: crate#unstable-features
 /// [`JoinHandle`]: crate::task::JoinHandle
-#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub struct AbortHandle {
     raw: Option<RawTask>,
     id: Id,
@@ -40,9 +34,6 @@ impl AbortHandle {
     ///
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     /// [`JoinHandle::abort`]: method@super::JoinHandle::abort
-    // the `AbortHandle` type is only publicly exposed when `tokio_unstable` is
-    // enabled, but it is still defined for testing purposes.
-    #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
     pub fn abort(&self) {
         if let Some(ref raw) = self.raw {
             raw.remote_abort();
@@ -55,7 +46,6 @@ impl AbortHandle {
     /// called on the task. This is because the cancellation process may take
     /// some time, and this method does not return `true` until it has
     /// completed.
-    #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
     pub fn is_finished(&self) -> bool {
         if let Some(raw) = self.raw {
             let state = raw.header().state.load();
