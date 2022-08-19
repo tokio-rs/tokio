@@ -307,7 +307,7 @@ cfg_rt! {
     mod unconstrained;
     pub use unconstrained::{unconstrained, Unconstrained};
 
-    pub mod join_set;
+    mod join_set;
     #[doc(inline)]
     pub use join_set::JoinSet;
     pub use crate::runtime::task::AbortHandle;
