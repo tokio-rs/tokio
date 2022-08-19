@@ -8,7 +8,7 @@ pub(super) fn ctrl_break() -> io::Result<RxFuture> {
     panic!()
 }
 
-pub(super) fn crtl_close() -> io::Result<RxFuture> {
+pub(super) fn ctrl_close() -> io::Result<RxFuture> {
     panic!()
 }
 
@@ -16,10 +16,10 @@ pub(super) fn ctrl_c() -> io::Result<RxFuture> {
     panic!()
 }
 
-pub(super) fn crtl_log_off() -> io::Result<RxFuture> {
+pub(super) fn ctrl_log_off() -> io::Result<RxFuture> {
     panic!()
 }
 
-pub(super) fn crtl_shutdown() -> io::Result<RxFuture> {
+pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
     panic!()
 }

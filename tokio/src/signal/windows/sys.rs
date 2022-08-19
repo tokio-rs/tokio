@@ -13,7 +13,7 @@ pub(super) fn ctrl_break() -> io::Result<RxFuture> {
     new(wincon::CTRL_BREAK_EVENT)
 }
 
-pub(super) fn crtl_close() -> io::Result<RxFuture> {
+pub(super) fn ctrl_close() -> io::Result<RxFuture> {
     new(wincon::CTRL_CLOSE_EVENT)
 }
 
@@ -21,11 +21,11 @@ pub(super) fn ctrl_c() -> io::Result<RxFuture> {
     new(wincon::CTRL_C_EVENT)
 }
 
-pub(super) fn crtl_log_off() -> io::Result<RxFuture> {
+pub(super) fn ctrl_log_off() -> io::Result<RxFuture> {
     new(wincon::CTRL_LOGOFF_EVENT)
 }
 
-pub(super) fn crtl_shutdown() -> io::Result<RxFuture> {
+pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
     new(wincon::CTRL_SHUTDOWN_EVENT)
 }
 
