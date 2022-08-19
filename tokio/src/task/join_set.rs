@@ -223,6 +223,7 @@ impl<T: 'static> JoinSet<T> {
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
     #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub async fn join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         crate::future::poll_fn(|cx| self.poll_join_next_with_id(cx)).await
     }
