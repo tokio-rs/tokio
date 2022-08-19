@@ -302,8 +302,6 @@ impl<T: 'static> JoinSet<T> {
 
         if let Poll::Ready(res) = res {
             let _entry = entry.remove();
-            // If the task succeeded, add the task ID to the output. Otherwise, the
-            // `JoinError` will already have the task's ID.
             Poll::Ready(Some(res))
         } else {
             // A JoinHandle generally won't emit a wakeup without being ready unless
