@@ -205,6 +205,20 @@ use std::{fmt, mem};
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Id(u64);
 
+/// Returns the `Id` of the currently executing task.
+///
+/// # Panics
+///
+/// This function panics if called from outside a task context
+///
+#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[allow(dead_code)]
+pub fn current_id() -> Id {
+    use crate::runtime::context;
+    context::current_task_id()
+}
+
 /// An owned handle to the task, tracked by ref count.
 #[repr(transparent)]
 pub(crate) struct Task<S: 'static> {

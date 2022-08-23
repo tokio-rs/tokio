@@ -1,4 +1,3 @@
-use crate::runtime::task::Id;
 use std::cell::RefCell;
 use std::error::Error;
 use std::future::Future;
@@ -446,18 +445,4 @@ impl From<std::thread::AccessError> for ScopeInnerErr {
     fn from(_: std::thread::AccessError) -> Self {
         Self::AccessError
     }
-}
-
-/// Returns the `Id` of the currently executing task.
-///
-/// # Panics
-///
-/// This function panics if called from outside a task context
-///
-#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-#[allow(dead_code)]
-pub fn current_id() -> Id {
-    use crate::runtime::context;
-    context::current_task_id()
 }

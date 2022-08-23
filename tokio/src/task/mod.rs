@@ -319,7 +319,7 @@ cfg_rt! {
 
     cfg_unstable! {
         pub use crate::runtime::task::Id;
-        pub use task_local::current_id;
+        pub use crate::runtime::task::current_id;
     }
 
 
