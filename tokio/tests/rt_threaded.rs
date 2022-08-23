@@ -542,3 +542,27 @@ async fn test_block_in_place4() {
 fn rt() -> runtime::Runtime {
     runtime::Runtime::new().unwrap()
 }
+
+#[cfg(tokio_unstable)]
+mod unstable {
+    use super::*;
+
+    #[test]
+    fn test_disable_lifo_slot() {
+        let rt = runtime::Builder::new_multi_thread()
+            .disable_lifo_slot()
+            .worker_threads(2)
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            tokio::spawn(async {
+                // Spawn another task and block the thread until completion. If the LIFO slot
+                // is used then the test doesn't complete.
+                futures::executor::block_on(tokio::spawn(async {})).unwrap();
+            })
+            .await
+            .unwrap();
+        })
+    }
+}

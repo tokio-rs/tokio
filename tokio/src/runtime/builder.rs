@@ -87,6 +87,11 @@ pub struct Builder {
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
+
+    /// When true, the multi-threade scheduler LIFO slot should not be used.
+    ///
+    /// This option should only be exposed as unstable.
+    pub(super) disable_lifo_slot: bool,
 }
 
 cfg_unstable! {
@@ -252,6 +257,8 @@ impl Builder {
 
             #[cfg(tokio_unstable)]
             unhandled_panic: UnhandledPanic::Ignore,
+
+            disable_lifo_slot: false,
         }
     }
 
@@ -781,6 +788,37 @@ impl Builder {
             self.unhandled_panic = behavior;
             self
         }
+
+        /// Disables the LIFO task scheduler heuristic.
+        ///
+        /// The multi-threaded scheduler includes a heuristic for optimizing
+        /// message-passing patterns. This heuristic results in the **last**
+        /// scheduled task being polled first.
+        ///
+        /// To implement this heuristic, each worker thread has a slot which
+        /// holds the task that should be polled next. However, this slot cannot
+        /// be stolen by other worker threads, which can result in lower total
+        /// throughput when tasks tend to have longer poll times.
+        ///
+        /// This configuration option will disable this heuristic resulting in
+        /// all scheduled tasks being pushed into the worker-local queue, which
+        /// is stealable.
+        ///
+        /// Eventually, the LIFO slot will become stealable and this option will
+        /// probably go away.
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_threaded()
+        ///     .disable_lifo_slot
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn disable_lifo_slot(&mut self) -> &mut Self {
+            self.disable_lifo_slot = true;
+            self
+        }
     }
 
     fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
@@ -814,6 +852,7 @@ impl Builder {
                 event_interval: self.event_interval,
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
+                disable_lifo_slot: self.disable_lifo_slot,
             },
         );
         let spawner = Spawner::Basic(scheduler.spawner().clone());
@@ -932,6 +971,7 @@ cfg_rt_multi_thread! {
                     event_interval: self.event_interval,
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
+                    disable_lifo_slot: self.disable_lifo_slot,
                 },
             );
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
