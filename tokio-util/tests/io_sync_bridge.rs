@@ -2,8 +2,8 @@
 #![cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 
 use std::error::Error;
-use std::io::{Cursor, Read, Result as IoResult};
-use tokio::io::AsyncRead;
+use std::io::{Cursor, Read, Result as IoResult, Write};
+use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio_util::io::SyncIoBridge;
 
 async fn test_reader_len(
@@ -40,5 +40,23 @@ async fn test_async_write_to_sync() -> Result<(), Box<dyn Error>> {
     })
     .await??;
     assert_eq!(dest.as_slice(), src);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_shutdown() -> Result<(), Box<dyn Error>> {
+    let (s1, mut s2) = tokio::io::duplex(1024);
+    let (_rh, wh) = tokio::io::split(s1);
+    tokio::task::spawn_blocking(move || -> std::io::Result<_> {
+        let mut wh = SyncIoBridge::new(wh);
+        wh.write_all(b"hello")?;
+        wh.shutdown()?;
+        assert!(wh.write_all(b" world").is_err());
+        Ok(())
+    })
+    .await??;
+    let mut buf = vec![];
+    s2.read_to_end(&mut buf).await?;
+    assert_eq!(buf, b"hello");
     Ok(())
 }
