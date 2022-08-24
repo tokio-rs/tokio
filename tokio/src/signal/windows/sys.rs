@@ -37,15 +37,21 @@ fn new(signum: DWORD) -> io::Result<RxFuture> {
 
 #[derive(Debug)]
 pub(crate) struct OsStorage {
-    ctrl_c: EventInfo,
     ctrl_break: EventInfo,
+    ctrl_close: EventInfo,
+    ctrl_c: EventInfo,
+    ctrl_logoff: EventInfo,
+    ctrl_shutdown: EventInfo,
 }
 
 impl Init for OsStorage {
     fn init() -> Self {
         Self {
-            ctrl_c: EventInfo::default(),
-            ctrl_break: EventInfo::default(),
+            ctrl_break: Default::default(),
+            ctrl_close: Default::default(),
+            ctrl_c: Default::default(),
+            ctrl_logoff: Default::default(),
+            ctrl_shutdown: Default::default(),
         }
     }
 }
@@ -53,8 +59,11 @@ impl Init for OsStorage {
 impl Storage for OsStorage {
     fn event_info(&self, id: EventId) -> Option<&EventInfo> {
         match DWORD::try_from(id) {
-            Ok(CTRL_C_EVENT) => Some(&self.ctrl_c),
             Ok(CTRL_BREAK_EVENT) => Some(&self.ctrl_break),
+            Ok(CTRL_CLOSE_EVENT) => Some(&self.ctrl_close),
+            Ok(CTRL_C_EVENT) => Some(&self.ctrl_c),
+            Ok(CTRL_LOGOFF_EVENT) => Some(&self.ctrl_logoff),
+            Ok(CTRL_SHUTDOWN_EVENT) => Some(&self.ctrl_shutdown),
             _ => None,
         }
     }
@@ -63,8 +72,11 @@ impl Storage for OsStorage {
     where
         F: FnMut(&'a EventInfo),
     {
-        f(&self.ctrl_c);
         f(&self.ctrl_break);
+        f(&self.ctrl_close);
+        f(&self.ctrl_c);
+        f(&self.ctrl_logoff);
+        f(&self.ctrl_shutdown);
     }
 }
 
