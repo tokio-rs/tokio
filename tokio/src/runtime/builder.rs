@@ -85,13 +85,13 @@ pub struct Builder {
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
 
-    #[cfg(tokio_unstable)]
-    pub(super) unhandled_panic: UnhandledPanic,
-
     /// When true, the multi-threade scheduler LIFO slot should not be used.
     ///
     /// This option should only be exposed as unstable.
     pub(super) disable_lifo_slot: bool,
+
+    #[cfg(tokio_unstable)]
+    pub(super) unhandled_panic: UnhandledPanic,
 }
 
 cfg_unstable! {
