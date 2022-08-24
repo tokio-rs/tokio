@@ -51,6 +51,7 @@ jobs:
       - test-hyper
       - wasm32-unknown-unknown
       - wasm32-wasi
+      - check-external-types
     steps:
       - run: exit 0
 
@@ -513,3 +514,27 @@ jobs:
         # TODO: this should become: `cargo hack wasi test --each-feature`
         run: cargo wasi test --test rt_yield --features wasi-rt
         working-directory: tests-integration
+
+  check-external-types:
+    name: check-external-types
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust_nightly }}
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - name: check-external-types
+        run: |
+          set -x
+          cargo install cargo-check-external-types --locked --version 0.1.3
+          cargo check-external-types --all-features --config external-types.toml
+        working-directory: tokio
+
