@@ -182,6 +182,10 @@ pub(crate) mod enter;
 
 pub(crate) mod task;
 
+cfg_io_driver_impl! {
+    pub(crate) mod io;
+}
+
 cfg_metrics! {
     mod metrics;
     pub use metrics::RuntimeMetrics;

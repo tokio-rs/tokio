@@ -8,9 +8,9 @@ use std::time::Duration;
 // ===== io driver =====
 
 cfg_io_driver! {
-    type IoDriver = crate::io::driver::Driver;
+    type IoDriver = crate::runtime::io::Driver;
     type IoStack = crate::park::either::Either<ProcessDriver, ParkThread>;
-    pub(crate) type IoHandle = Option<crate::io::driver::Handle>;
+    pub(crate) type IoHandle = Option<crate::runtime::io::Handle>;
 
     fn create_io_stack(enabled: bool) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         use crate::park::either::Either;
@@ -19,7 +19,7 @@ cfg_io_driver! {
         assert!(!enabled);
 
         let ret = if enabled {
-            let io_driver = crate::io::driver::Driver::new()?;
+            let io_driver = crate::runtime::io::Driver::new()?;
             let io_handle = io_driver.handle();
 
             let (signal_driver, signal_handle) = create_signal_driver(io_driver)?;

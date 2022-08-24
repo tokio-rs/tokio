@@ -205,13 +205,11 @@ pub use self::read_buf::ReadBuf;
 pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 
 cfg_io_driver_impl! {
-    pub(crate) mod driver;
+    pub(crate) mod interest;
+    pub(crate) mod ready;
 
     cfg_net! {
-        mod interest;
         pub use interest::Interest;
-
-        mod ready;
         pub use ready::Ready;
     }
 
