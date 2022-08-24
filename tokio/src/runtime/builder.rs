@@ -784,8 +784,7 @@ impl Builder {
     }
 
     fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::basic_scheduler::Config;
-        use crate::runtime::{BasicScheduler, HandleInner, Kind};
+        use crate::runtime::{BasicScheduler, Config, HandleInner, Kind};
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
@@ -903,7 +902,7 @@ cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
-            use crate::runtime::{HandleInner, Kind, ThreadPool};
+            use crate::runtime::{Config, HandleInner, Kind, ThreadPool};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
@@ -926,10 +925,14 @@ cfg_rt_multi_thread! {
                 core_threads,
                 driver,
                 handle_inner,
-                self.before_park.clone(),
-                self.after_unpark.clone(),
-                self.global_queue_interval,
-                self.event_interval,
+                Config {
+                    before_park: self.before_park.clone(),
+                    after_unpark: self.after_unpark.clone(),
+                    global_queue_interval: self.global_queue_interval,
+                    event_interval: self.event_interval,
+                    #[cfg(tokio_unstable)]
+                    unhandled_panic: self.unhandled_panic.clone(),
+                },
             );
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
