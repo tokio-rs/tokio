@@ -1,13 +1,5 @@
 #![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
-mod interest;
-#[allow(unreachable_pub)]
-pub use interest::Interest;
-
-mod ready;
-#[allow(unreachable_pub)]
-pub use ready::Ready;
-
 mod registration;
 pub(crate) use registration::Registration;
 
@@ -16,6 +8,7 @@ use scheduled_io::ScheduledIo;
 
 mod metrics;
 
+use crate::io::{Interest, Ready};
 use crate::park::{Park, Unpark};
 use crate::util::slab::{self, Slab};
 use crate::{loom::sync::RwLock, util::bit};

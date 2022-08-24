@@ -208,7 +208,11 @@ cfg_io_driver_impl! {
     pub(crate) mod driver;
 
     cfg_net! {
-        pub use driver::{Interest, Ready};
+        mod interest;
+        pub use interest::Interest;
+
+        mod ready;
+        pub use ready::Ready;
     }
 
     #[cfg_attr(tokio_wasi, allow(unused_imports))]

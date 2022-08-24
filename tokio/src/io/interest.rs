@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "net"), allow(dead_code, unreachable_pub))]
 
-use crate::io::driver::Ready;
+use crate::io::Ready;
 
 use std::fmt;
 use std::ops;
