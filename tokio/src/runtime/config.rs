@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "full"), allow(dead_code))]
 use crate::runtime::Callback;
 
 pub(crate) struct Config {

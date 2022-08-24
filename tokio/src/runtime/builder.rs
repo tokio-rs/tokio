@@ -804,8 +804,18 @@ impl Builder {
         /// all scheduled tasks being pushed into the worker-local queue, which
         /// is stealable.
         ///
-        /// Eventually, the LIFO slot will become stealable and this option will
-        /// probably go away.
+        /// Consider trying this option when the task "scheduled" time is high
+        /// but the runtime is underutilized. Use tokio-rs/tokio-metrics to
+        /// collect this data.
+        ///
+        /// # Unstable
+        ///
+        /// This configuration option is considered a workaround for the LIFO
+        /// slot not being stealable. When the slot becomes stealable, we will
+        /// revisit whther or not this option is necessary. See
+        /// tokio-rs/tokio#4941.
+        ///
+        /// # Examples
         ///
         /// ```
         /// use tokio::runtime;
