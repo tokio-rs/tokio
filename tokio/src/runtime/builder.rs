@@ -820,7 +820,7 @@ impl Builder {
         /// ```
         /// use tokio::runtime;
         ///
-        /// let rt = runtime::Builder::new_multi_threaded()
+        /// let rt = runtime::Builder::new_multi_thread()
         ///     .disable_lifo_slot
         ///     .build()
         ///     .unwrap();
