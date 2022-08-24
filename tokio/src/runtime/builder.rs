@@ -737,7 +737,7 @@ impl Builder {
     /// Specifically, it affects the [`tokio::select!`] macro and the work stealing
     /// algorithm. In the case of [`tokio::select!`] it will ensure that the order that
     /// branches are polled is deterministic.
-    /// 
+    ///
     /// In the case of work stealing, it's a little more complicated. Each worker will
     /// be given a deterministic seed so that the starting peer for each work stealing
     /// search will be deterministic.
