@@ -551,7 +551,7 @@ fn rng_seed() {
 
     rt.block_on(async {
         let random = tokio::macros::support::thread_rng_n(100);
-        assert_eq!(random, 11);
+        assert_eq!(random, 25);
 
         let _ = tokio::spawn(async {
             // Because we only have a single worker thread, the

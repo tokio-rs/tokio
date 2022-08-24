@@ -40,9 +40,6 @@ pub(crate) use wake_list::WakeList;
 ))]
 pub(crate) mod linked_list;
 
-#[cfg(any(feature = "rt-multi-thread", feature = "macros"))]
-mod rand;
-
 cfg_rt! {
     cfg_unstable! {
         mod idle_notified_set;
@@ -60,22 +57,20 @@ cfg_rt! {
     pub(crate) use vec_deque_cell::VecDequeCell;
 }
 
-cfg_rt_multi_thread! {
-    pub(crate) use self::rand::FastRand;
-
-    mod try_lock;
-    pub(crate) use try_lock::TryLock;
-}
-
-pub(crate) mod trace;
+mod rand;
+pub use self::rand::RngSeed;
+pub(crate) use self::rand::{replace_thread_rng, FastRand, RngSeedGenerator};
 
 #[cfg(any(feature = "macros"))]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub use self::rand::thread_rng_n;
 
-pub(crate) use self::rand::replace_thread_rng;
-pub use self::rand::RngSeed;
-pub(crate) use self::rand::RngSeedGenerator;
+cfg_rt_multi_thread! {
+    mod try_lock;
+    pub(crate) use try_lock::TryLock;
+}
+
+pub(crate) mod trace;
 
 #[cfg(any(
     feature = "rt",

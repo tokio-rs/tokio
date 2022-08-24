@@ -66,7 +66,7 @@ use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
 use crate::runtime::thread_pool::{queue, Idle, Parker, Unparker};
 use crate::runtime::{task, Callback, HandleInner, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
-use crate::util::{FastRand, RngSeed};
+use crate::util::FastRand;
 
 use std::cell::RefCell;
 use std::time::Duration;
@@ -225,7 +225,7 @@ pub(super) fn create(
             is_shutdown: false,
             park: Some(park),
             metrics: MetricsBatch::new(),
-            rand: FastRand::new(RngSeed::new()),
+            rand: FastRand::new(handle_inner.seed_generator.next_seed()),
             global_queue_interval,
             event_interval,
         }));
