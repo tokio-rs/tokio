@@ -48,6 +48,7 @@ impl<S> StreamNotifyClose<S> {
     }
 
     /// Get back the inner `Stream`.
+    ///
     /// Returns `None` if the stream has reached its end.
     pub fn into_inner(self) -> Option<S> {
         self.inner
@@ -83,10 +84,8 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         if let Some(inner) = &self.inner {
             // We always return +1 because when there's stream there's atleast one more item.
-            match inner.size_hint() {
-                (lower, Some(upper)) => (lower + 1, Some(upper + 1)),
-                (lower, None) => (lower + 1, None),
-            }
+            let (l, u) = inner.size_hint();
+            (l.saturating_add(1), u.and_then(|u| u.checked_add(1)))
         } else {
             (0, Some(0))
         }
