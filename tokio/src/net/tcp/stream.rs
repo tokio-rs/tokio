@@ -552,7 +552,7 @@ impl TcpStream {
     /// 1. The stream's read half is closed and will no longer yield data.
     /// 2. The buffer specified was 0 bytes in length.
     /// 
-    /// If the stream is not ready to read data
+    /// If the stream is not ready to read data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
     /// # Examples
