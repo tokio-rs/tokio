@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "full"), allow(dead_code))]
+#![cfg_attr(any(not(feature = "full"), tokio_wasm), allow(dead_code))]
 use crate::runtime::Callback;
 
 pub(crate) struct Config {
