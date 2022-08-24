@@ -40,7 +40,13 @@ pub(crate) use wake_list::WakeList;
 ))]
 pub(crate) mod linked_list;
 
+#[cfg(any(feature = "rt", feature = "macros", feature = "stream"))]
+mod rand;
+
 cfg_rt! {
+    pub use self::rand::RngSeed;
+    pub(crate) use self::rand::{replace_thread_rng, RngSeedGenerator};
+
     mod idle_notified_set;
     pub(crate) use idle_notified_set::IdleNotifiedSet;
 
@@ -55,9 +61,6 @@ cfg_rt! {
     pub(crate) use vec_deque_cell::VecDequeCell;
 }
 
-mod rand;
-pub use self::rand::RngSeed;
-pub(crate) use self::rand::{replace_thread_rng, RngSeedGenerator};
 
 #[cfg(any(feature = "macros"))]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
