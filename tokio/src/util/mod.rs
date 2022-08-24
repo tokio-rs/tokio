@@ -57,13 +57,15 @@ cfg_rt! {
 
 mod rand;
 pub use self::rand::RngSeed;
-pub(crate) use self::rand::{replace_thread_rng, FastRand, RngSeedGenerator};
+pub(crate) use self::rand::{replace_thread_rng, RngSeedGenerator};
 
 #[cfg(any(feature = "macros"))]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub use self::rand::thread_rng_n;
 
 cfg_rt_multi_thread! {
+    pub(crate) use self::rand::FastRand;
+
     mod try_lock;
     pub(crate) use try_lock::TryLock;
 }
