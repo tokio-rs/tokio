@@ -178,9 +178,9 @@ use std::task::{Context, Poll};
 ///     }
 /// }
 /// ```
-/// 
+///
 /// Using `StreamNotifyClose` to handle closed streams with `StreamMap`.
-/// 
+///
 /// ```
 /// use tokio_stream::{StreamExt, StreamMap, StreamNotifyClose};
 ///
