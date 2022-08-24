@@ -416,7 +416,6 @@ where
     ///  * `None` if the `JoinMap` is empty.
     ///
     /// [`tokio::select!`]: tokio::select
-    #[doc(alias = "join_one")]
     pub async fn join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
         let (res, id) = match self.tasks.join_next_with_id().await {
             Some(Ok((id, output))) => (Ok(output), id),
@@ -428,12 +427,6 @@ where
         };
         let key = self.remove_by_id(id)?;
         Some((key, res))
-    }
-
-    #[doc(hidden)]
-    #[deprecated(since = "0.7.4", note = "renamed to `JoinMap::join_next`.")]
-    pub async fn join_one(&mut self) -> Option<(K, Result<V, JoinError>)> {
-        self.join_next().await
     }
 
     /// Aborts all tasks and waits for them to finish shutting down.

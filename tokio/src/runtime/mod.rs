@@ -202,6 +202,9 @@ cfg_rt! {
     mod basic_scheduler;
     use basic_scheduler::BasicScheduler;
 
+    mod config;
+    use config::Config;
+
     mod blocking;
     use blocking::BlockingPool;
     #[cfg_attr(tokio_wasi, allow(unused_imports))]

@@ -260,7 +260,6 @@ impl<T> JoinHandle<T> {
     }
 
     /// Returns a new `AbortHandle` that can be used to remotely abort this task.
-    #[cfg(any(tokio_unstable, test))]
     pub(crate) fn abort_handle(&self) -> super::AbortHandle {
         let raw = self.raw.map(|raw| {
             raw.ref_inc();

@@ -15,7 +15,7 @@ pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{Callback, Driver, HandleInner};
+use crate::runtime::{Config, Driver, HandleInner};
 
 use std::fmt;
 use std::future::Future;
@@ -49,21 +49,10 @@ impl ThreadPool {
         size: usize,
         driver: Driver,
         handle_inner: HandleInner,
-        before_park: Option<Callback>,
-        after_unpark: Option<Callback>,
-        global_queue_interval: u32,
-        event_interval: u32,
+        config: Config,
     ) -> (ThreadPool, Launch) {
         let parker = Parker::new(driver);
-        let (shared, launch) = worker::create(
-            size,
-            parker,
-            handle_inner,
-            before_park,
-            after_unpark,
-            global_queue_interval,
-            event_interval,
-        );
+        let (shared, launch) = worker::create(size, parker, handle_inner, config);
         let spawner = Spawner { shared };
         let thread_pool = ThreadPool { spawner };
 

@@ -998,6 +998,8 @@ impl<T> Sender<T> {
     ///
     /// The capacity goes down when sending a value by calling [`send`] or by reserving capacity
     /// with [`reserve`]. The capacity goes up when values are received by the [`Receiver`].
+    /// This is distinct from [`max_capacity`], which always returns buffer capacity initially
+    /// specified when calling [`channel`]
     ///
     /// # Examples
     ///
@@ -1023,6 +1025,8 @@ impl<T> Sender<T> {
     ///
     /// [`send`]: Sender::send
     /// [`reserve`]: Sender::reserve
+    /// [`channel`]: channel
+    /// [`max_capacity`]: Sender::max_capacity
     pub fn capacity(&self) -> usize {
         self.chan.semaphore().0.available_permits()
     }
@@ -1035,6 +1039,42 @@ impl<T> Sender<T> {
         WeakSender {
             chan: self.chan.downgrade(),
         }
+    }
+
+    /// Returns the maximum buffer capacity of the channel.
+    ///
+    /// The maximum capacity is the buffer capacity initially specified when calling
+    /// [`channel`]. This is distinct from [`capacity`], which returns the *current*
+    /// available buffer capacity: as messages are sent and received, the
+    /// value returned by [`capacity`] will go up or down, whereas the value
+    /// returned by `max_capacity` will remain constant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, _rx) = mpsc::channel::<()>(5);
+    ///      
+    ///     // both max capacity and capacity are the same at first
+    ///     assert_eq!(tx.max_capacity(), 5);
+    ///     assert_eq!(tx.capacity(), 5);
+    ///
+    ///     // Making a reservation doesn't change the max capacity.
+    ///     let permit = tx.reserve().await.unwrap();
+    ///     assert_eq!(tx.max_capacity(), 5);
+    ///     // but drops the capacity by one
+    ///     assert_eq!(tx.capacity(), 4);
+    /// }
+    /// ```
+    ///
+    /// [`channel`]: channel
+    /// [`max_capacity`]: Sender::max_capacity
+    /// [`capacity`]: Sender::capacity
+    pub fn max_capacity(&self) -> usize {
+        self.chan.semaphore().1
     }
 }
 

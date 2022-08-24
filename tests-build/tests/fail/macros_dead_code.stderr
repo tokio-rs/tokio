@@ -1,4 +1,4 @@
-error: function is never used: `f`
+error: function `f` is never used
  --> $DIR/macros_dead_code.rs:6:10
   |
 6 | async fn f() {}

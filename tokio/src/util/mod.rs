@@ -41,10 +41,8 @@ pub(crate) use wake_list::WakeList;
 pub(crate) mod linked_list;
 
 cfg_rt! {
-    cfg_unstable! {
-        mod idle_notified_set;
-        pub(crate) use idle_notified_set::IdleNotifiedSet;
-    }
+    mod idle_notified_set;
+    pub(crate) use idle_notified_set::IdleNotifiedSet;
 
     mod wake;
     pub(crate) use wake::WakerRef;

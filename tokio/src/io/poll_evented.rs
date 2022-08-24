@@ -11,7 +11,7 @@ cfg_io_driver! {
     /// [`std::io::Write`] traits with the reactor that drives it.
     ///
     /// `PollEvented` uses [`Registration`] internally to take a type that
-    /// implements [`mio::event::Source`] as well as [`std::io::Read`] and or
+    /// implements [`mio::event::Source`] as well as [`std::io::Read`] and/or
     /// [`std::io::Write`] and associate it with a reactor that will drive it.
     ///
     /// Once the [`mio::event::Source`] type is wrapped by `PollEvented`, it can be
@@ -41,12 +41,12 @@ cfg_io_driver! {
     /// [`poll_read_ready`] again will also indicate read readiness.
     ///
     /// When the operation is attempted and is unable to succeed due to the I/O
-    /// resource not being ready, the caller must call `clear_readiness`.
+    /// resource not being ready, the caller must call [`clear_readiness`].
     /// This clears the readiness state until a new readiness event is received.
     ///
     /// This allows the caller to implement additional functions. For example,
     /// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
-    /// `clear_read_ready`.
+    /// [`clear_readiness`].
     ///
     /// ## Platform-specific events
     ///
@@ -57,6 +57,7 @@ cfg_io_driver! {
     /// [`AsyncRead`]: crate::io::AsyncRead
     /// [`AsyncWrite`]: crate::io::AsyncWrite
     /// [`TcpListener`]: crate::net::TcpListener
+    /// [`clear_readiness`]: Registration::clear_readiness
     /// [`poll_read_ready`]: Registration::poll_read_ready
     /// [`poll_write_ready`]: Registration::poll_write_ready
     pub(crate) struct PollEvented<E: Source> {
