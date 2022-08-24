@@ -21,7 +21,6 @@ pub(crate) struct Config {
     ///
     /// Eventually, the LIFO slot **will** become stealable, however as a
     /// stop-gap, this unstable option lets users disable the LIFO task.
-    #[cfg(not(tokio_wasm))]
     pub(crate) disable_lifo_slot: bool,
 
     #[cfg(tokio_unstable)]
