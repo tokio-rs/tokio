@@ -66,6 +66,21 @@ impl<T: AsyncWrite> SyncIoBridge<T> {
     }
 }
 
+impl<T: AsyncWrite + Unpin> SyncIoBridge<T> {
+    /// Shutdown this writer. This method provides a way to call the [`AsyncWriteExt::shutdown`]
+    /// function of the inner [`tokio::io::AsyncWrite`] instance.
+    ///
+    /// # Errors
+    ///
+    /// This method returns the same errors as [`AsyncWriteExt::shutdown`].
+    ///
+    /// [`AsyncWriteExt::shutdown`]: tokio::io::AsyncWriteExt::shutdown
+    pub fn shutdown(&mut self) -> std::io::Result<()> {
+        let src = &mut self.src;
+        self.rt.block_on(src.shutdown())
+    }
+}
+
 impl<T: Unpin> SyncIoBridge<T> {
     /// Use a [`tokio::io::AsyncRead`] synchronously as a [`std::io::Read`] or
     /// a [`tokio::io::AsyncWrite`] as a [`std::io::Write`].
