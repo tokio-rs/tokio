@@ -61,7 +61,6 @@ cfg_rt! {
     pub(crate) use vec_deque_cell::VecDequeCell;
 }
 
-
 #[cfg(any(feature = "macros"))]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub use self::rand::thread_rng_n;
