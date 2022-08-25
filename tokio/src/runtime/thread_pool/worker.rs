@@ -758,7 +758,7 @@ impl Shared {
         // task must always be pushed to the back of the queue, enabling other
         // tasks to be executed. If **not** a yield, then there is more
         // flexibility and the task may go to the front of the queue.
-        let should_notify = if is_yield {
+        let should_notify = if is_yield || self.config.disable_lifo_slot {
             core.run_queue
                 .push_back(task, &self.inject, &mut core.metrics);
             true
