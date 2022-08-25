@@ -1,5 +1,3 @@
-#![cfg_attr(loom, allow(dead_code, unreachable_pub))]
-
 //! Traits, helpers, and type definitions for asynchronous I/O functionality.
 //!
 //! This module is the asynchronous version of `std::io`. Primarily, it
