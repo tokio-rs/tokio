@@ -2,9 +2,10 @@
 
 //! Signal driver
 
-use crate::io::driver::{Driver as IoDriver, Interest};
+use crate::io::interest::Interest;
 use crate::io::PollEvented;
 use crate::park::Park;
+use crate::runtime::io::Driver as IoDriver;
 use crate::signal::registry::globals;
 
 use mio::net::UnixStream;

@@ -1,4 +1,5 @@
-use crate::io::driver::{Handle, Interest, Registration};
+use crate::io::interest::Interest;
+use crate::runtime::io::{Handle, Registration};
 
 use mio::event::Source;
 use std::fmt;

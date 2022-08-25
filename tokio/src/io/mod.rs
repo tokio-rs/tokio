@@ -1,5 +1,3 @@
-#![cfg_attr(loom, allow(dead_code, unreachable_pub))]
-
 //! Traits, helpers, and type definitions for asynchronous I/O functionality.
 //!
 //! This module is the asynchronous version of `std::io`. Primarily, it
@@ -205,10 +203,12 @@ pub use self::read_buf::ReadBuf;
 pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 
 cfg_io_driver_impl! {
-    pub(crate) mod driver;
+    pub(crate) mod interest;
+    pub(crate) mod ready;
 
     cfg_net! {
-        pub use driver::{Interest, Ready};
+        pub use interest::Interest;
+        pub use ready::Ready;
     }
 
     #[cfg_attr(tokio_wasi, allow(unused_imports))]

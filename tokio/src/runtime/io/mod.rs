@@ -1,13 +1,5 @@
 #![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
-mod interest;
-#[allow(unreachable_pub)]
-pub use interest::Interest;
-
-mod ready;
-#[allow(unreachable_pub)]
-pub use ready::Ready;
-
 mod registration;
 pub(crate) use registration::Registration;
 
@@ -16,6 +8,8 @@ use scheduled_io::ScheduledIo;
 
 mod metrics;
 
+use crate::io::interest::Interest;
+use crate::io::ready::Ready;
 use crate::park::{Park, Unpark};
 use crate::util::slab::{self, Slab};
 use crate::{loom::sync::RwLock, util::bit};
@@ -268,7 +262,7 @@ cfg_rt! {
         /// This function panics if there is no current reactor set and `rt` feature
         /// flag is not enabled.
         #[track_caller]
-        pub(super) fn current() -> Self {
+        pub(crate) fn current() -> Self {
             crate::runtime::context::io_handle().expect("A Tokio 1.x context was found, but IO is disabled. Call `enable_io` on the runtime builder to enable IO.")
         }
     }
@@ -283,7 +277,7 @@ cfg_not_rt! {
         /// This function panics if there is no current reactor set, or if the `rt`
         /// feature flag is not enabled.
         #[track_caller]
-        pub(super) fn current() -> Self {
+        pub(crate) fn current() -> Self {
             panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
         }
     }

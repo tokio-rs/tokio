@@ -16,6 +16,7 @@
 ))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(docsrs, allow(unused_attributes))]
+#![cfg_attr(loom, allow(dead_code, unreachable_pub))]
 
 //! A runtime for writing reliable network applications without compromising speed.
 //!
@@ -457,6 +458,11 @@ mod blocking;
 
 cfg_rt! {
     pub mod runtime;
+}
+cfg_not_rt! {
+    cfg_io_driver_impl! {
+        pub(crate) mod runtime;
+    }
 }
 
 pub(crate) mod coop;
