@@ -403,8 +403,12 @@ impl NamedPipeServer {
     /// # Return
     ///
     /// If data is successfully read, `Ok(n)` is returned, where `n` is the
-    /// number of bytes read. `Ok(0)` indicates the pipe's read half is closed
-    /// and will no longer yield data. If the pipe is not ready to read data
+    /// number of bytes read. If `n` is `0`, then it can indicate one of two scenarios:
+    ///
+    /// 1. The pipe's read half is closed and will no longer yield data.
+    /// 2. The specified buffer was 0 bytes in length.
+    ///
+    /// If the pipe is not ready to read data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
     /// # Examples
@@ -1143,8 +1147,12 @@ impl NamedPipeClient {
     /// # Return
     ///
     /// If data is successfully read, `Ok(n)` is returned, where `n` is the
-    /// number of bytes read. `Ok(0)` indicates the pipe's read half is closed
-    /// and will no longer yield data. If the pipe is not ready to read data
+    /// number of bytes read. If `n` is `0`, then it can indicate one of two scenarios:
+    ///
+    /// 1. The pipe's read half is closed and will no longer yield data.
+    /// 2. The specified buffer was 0 bytes in length.
+    ///
+    /// If the pipe is not ready to read data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
     /// # Examples

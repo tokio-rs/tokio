@@ -1,3 +1,7 @@
+// Enable dead_code / unreachable_pub here. It has been disabled in lib.rs for
+// other code when running loom tests.
+#![cfg_attr(loom, warn(dead_code, unreachable_pub))]
+
 use self::unowned_wrapper::unowned;
 
 mod unowned_wrapper {

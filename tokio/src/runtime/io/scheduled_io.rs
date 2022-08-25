@@ -1,4 +1,6 @@
-use super::{Interest, Ready, ReadyEvent, Tick};
+use super::{ReadyEvent, Tick};
+use crate::io::interest::Interest;
+use crate::io::ready::Ready;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::bit;

@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "net"), allow(dead_code, unreachable_pub))]
 
-use crate::io::driver::Ready;
+use crate::io::ready::Ready;
 
 use std::fmt;
 use std::ops;
@@ -100,7 +100,7 @@ impl Interest {
         self.0
     }
 
-    pub(super) fn mask(self) -> Ready {
+    pub(crate) fn mask(self) -> Ready {
         match self {
             Interest::READABLE => Ready::READABLE | Ready::READ_CLOSED,
             Interest::WRITABLE => Ready::WRITABLE | Ready::WRITE_CLOSED,

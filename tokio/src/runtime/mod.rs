@@ -178,27 +178,15 @@
 #[macro_use]
 mod tests;
 
-pub(crate) mod enter;
-
-pub(crate) mod task;
-
-cfg_metrics! {
-    mod metrics;
-    pub use metrics::RuntimeMetrics;
-
-    pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
-
-    cfg_net! {
-       pub(crate) use metrics::IoDriverMetrics;
-    }
-}
-
-cfg_not_metrics! {
-    pub(crate) mod metrics;
-    pub(crate) use metrics::{SchedulerMetrics, WorkerMetrics, MetricsBatch};
+cfg_io_driver_impl! {
+    pub(crate) mod io;
 }
 
 cfg_rt! {
+    pub(crate) mod enter;
+
+    pub(crate) mod task;
+
     mod basic_scheduler;
     use basic_scheduler::BasicScheduler;
 
@@ -235,6 +223,22 @@ cfg_rt! {
 
     mod spawner;
     use self::spawner::Spawner;
+
+    cfg_metrics! {
+        mod metrics;
+        pub use metrics::RuntimeMetrics;
+
+        pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
+
+        cfg_net! {
+        pub(crate) use metrics::IoDriverMetrics;
+        }
+    }
+
+    cfg_not_metrics! {
+        pub(crate) mod metrics;
+        pub(crate) use metrics::{SchedulerMetrics, WorkerMetrics, MetricsBatch};
+    }
 }
 
 cfg_rt_multi_thread! {
