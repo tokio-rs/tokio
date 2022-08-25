@@ -63,8 +63,8 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
+use crate::runtime::scheduler::multi_thread::{queue, Idle, Parker, Unparker};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
-use crate::runtime::thread_pool::{queue, Idle, Parker, Unparker};
 use crate::runtime::{task, Config, HandleInner, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::FastRand;
@@ -288,7 +288,7 @@ where
                     had_entered = true;
                     return;
                 } else {
-                    // This probably means we are on the basic_scheduler or in a
+                    // This probably means we are on the current_thread runtime or in a
                     // LocalSet, where it is _not_ okay to block.
                     panic!("can call blocking only when running on the multi-threaded runtime");
                 }
@@ -857,11 +857,11 @@ impl Shared {
 
 impl crate::runtime::ToHandle for Arc<Shared> {
     fn to_handle(&self) -> crate::runtime::Handle {
-        use crate::runtime::thread_pool::Spawner;
+        use crate::runtime::scheduler::multi_thread::Spawner;
         use crate::runtime::{self, Handle};
 
         Handle {
-            spawner: runtime::Spawner::ThreadPool(Spawner {
+            spawner: runtime::Spawner::MultiThread(Spawner {
                 shared: self.clone(),
             }),
         }

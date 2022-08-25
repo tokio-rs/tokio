@@ -137,7 +137,7 @@
 //! use tokio::runtime;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let basic_rt = runtime::Builder::new_current_thread()
+//! let rt = runtime::Builder::new_current_thread()
 //!     .build()?;
 //! # Ok(()) }
 //! ```
@@ -166,7 +166,6 @@
 //! [`tokio::main`]: ../attr.main.html
 //! [runtime builder]: crate::runtime::Builder
 //! [`Runtime::new`]: crate::runtime::Runtime::new
-//! [`Builder::basic_scheduler`]: crate::runtime::Builder::basic_scheduler
 //! [`Builder::threaded_scheduler`]: crate::runtime::Builder::threaded_scheduler
 //! [`Builder::enable_io`]: crate::runtime::Builder::enable_io
 //! [`Builder::enable_time`]: crate::runtime::Builder::enable_time
@@ -187,8 +186,8 @@ cfg_rt! {
 
     pub(crate) mod task;
 
-    mod basic_scheduler;
-    use basic_scheduler::BasicScheduler;
+    pub(crate) mod scheduler;
+    use scheduler::CurrentThread;
 
     mod config;
     use config::Config;
@@ -244,8 +243,7 @@ cfg_rt! {
 cfg_rt_multi_thread! {
     use driver::Driver;
 
-    pub(crate) mod thread_pool;
-    use self::thread_pool::ThreadPool;
+    use scheduler::MultiThread;
 }
 
 cfg_rt! {
@@ -304,15 +302,15 @@ cfg_rt! {
         blocking_pool: BlockingPool,
     }
 
-    /// The runtime executor is either a thread-pool or a current-thread executor.
+    /// The runtime executor is either a multi-thread or a current-thread executor.
     #[derive(Debug)]
     enum Kind {
         /// Execute all tasks on the current-thread.
-        CurrentThread(BasicScheduler),
+        CurrentThread(CurrentThread),
 
         /// Execute tasks across multiple threads.
         #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-        ThreadPool(ThreadPool),
+        MultiThread(MultiThread),
     }
 
     /// After thread starts / before thread stops
@@ -347,7 +345,6 @@ cfg_rt! {
             /// [mod]: index.html
             /// [main]: ../attr.main.html
             /// [threaded scheduler]: index.html#threaded-scheduler
-            /// [basic scheduler]: index.html#basic-scheduler
             /// [runtime builder]: crate::runtime::Builder
             #[cfg(feature = "rt-multi-thread")]
             #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
@@ -492,7 +489,7 @@ cfg_rt! {
             match &self.kind {
                 Kind::CurrentThread(exec) => exec.block_on(future),
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                Kind::ThreadPool(exec) => exec.block_on(future),
+                Kind::MultiThread(exec) => exec.block_on(future),
             }
         }
 
@@ -608,11 +605,11 @@ cfg_rt! {
     impl Drop for Runtime {
         fn drop(&mut self) {
             match &mut self.kind {
-                Kind::CurrentThread(basic) => {
-                    // This ensures that tasks spawned on the basic runtime are dropped inside the
-                    // runtime's context.
+                Kind::CurrentThread(current_thread) => {
+                    // This ensures that tasks spawned on the current-thread
+                    // runtime are dropped inside the runtime's context.
                     match self::context::try_enter(self.handle.clone()) {
-                        Some(guard) => basic.set_context_guard(guard),
+                        Some(guard) => current_thread.set_context_guard(guard),
                         None => {
                             // The context thread-local has already been destroyed.
                             //
@@ -622,7 +619,7 @@ cfg_rt! {
                     }
                 },
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                Kind::ThreadPool(_) => {
+                Kind::MultiThread(_) => {
                     // The threaded scheduler drops its tasks on its worker threads, which is
                     // already in the runtime's context.
                 },

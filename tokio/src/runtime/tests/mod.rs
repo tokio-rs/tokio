@@ -33,8 +33,8 @@ mod unowned_wrapper {
 }
 
 cfg_loom! {
-    mod loom_basic_scheduler;
     mod loom_blocking;
+    mod loom_current_thread_scheduler;
     mod loom_local;
     mod loom_oneshot;
     mod loom_pool;

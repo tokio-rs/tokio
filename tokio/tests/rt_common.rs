@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-// Tests to run on both current-thread & thread-pool runtime variants.
+// Tests to run on both current-thread & multi-thread runtime variants.
 
 macro_rules! rt_test {
     ($($t:tt)*) => {
