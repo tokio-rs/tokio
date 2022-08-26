@@ -119,7 +119,7 @@ cfg_rt! {
     /// is not guaranteed.
     ///
     /// Note that if you are using the single threaded runtime, this function will
-    /// still spawn additional threads for blocking operations. The current thread
+    /// still spawn additional threads for blocking operations. The current-thread
     /// scheduler's single thread is only used for asynchronous code.
     ///
     /// # Related APIs and patterns for bridging asynchronous and blocking code
