@@ -322,7 +322,6 @@ cfg_rt! {
         pub use crate::runtime::task::current_id;
     }
 
-
     cfg_trace! {
         mod builder;
         pub use builder::Builder;
@@ -332,6 +331,4 @@ cfg_rt! {
     pub mod futures {
         pub use super::task_local::TaskLocalFuture;
     }
-
-
 }
