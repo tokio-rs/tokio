@@ -22,7 +22,7 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
 #[tokio::test(flavor = "current_thread")]
-async fn local_basic_scheduler() {
+async fn local_current_thread_scheduler() {
     LocalSet::new()
         .run_until(async {
             task::spawn_local(async {}).await.unwrap();

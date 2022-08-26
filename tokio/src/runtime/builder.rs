@@ -625,7 +625,7 @@ impl Builder {
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
-            Kind::CurrentThread => self.build_basic_runtime(),
+            Kind::CurrentThread => self.build_current_thread_runtime(),
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
             Kind::MultiThread => self.build_threaded_runtime(),
         }
@@ -831,8 +831,8 @@ impl Builder {
         }
     }
 
-    fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::{BasicScheduler, Config, HandleInner, Kind};
+    fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
+        use crate::runtime::{Config, CurrentThread, HandleInner, Kind};
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
@@ -852,7 +852,7 @@ impl Builder {
         // there are no futures ready to do something, it'll let the timer or
         // the reactor to generate some new stimuli for the futures to continue
         // in their life.
-        let scheduler = BasicScheduler::new(
+        let scheduler = CurrentThread::new(
             driver,
             handle_inner,
             Config {
@@ -865,7 +865,7 @@ impl Builder {
                 disable_lifo_slot: self.disable_lifo_slot,
             },
         );
-        let spawner = Spawner::Basic(scheduler.spawner().clone());
+        let spawner = Spawner::CurrentThread(scheduler.spawner().clone());
 
         Ok(Runtime {
             kind: Kind::CurrentThread(scheduler),
@@ -951,7 +951,7 @@ cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
-            use crate::runtime::{Config, HandleInner, Kind, ThreadPool};
+            use crate::runtime::{Config, HandleInner, Kind, MultiThread};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
@@ -970,7 +970,7 @@ cfg_rt_multi_thread! {
                 blocking_spawner,
             };
 
-            let (scheduler, launch) = ThreadPool::new(
+            let (scheduler, launch) = MultiThread::new(
                 core_threads,
                 driver,
                 handle_inner,
@@ -984,7 +984,7 @@ cfg_rt_multi_thread! {
                     disable_lifo_slot: self.disable_lifo_slot,
                 },
             );
-            let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
+            let spawner = Spawner::MultiThread(scheduler.spawner().clone());
 
             // Create the runtime handle
             let handle = Handle { spawner };
@@ -994,7 +994,7 @@ cfg_rt_multi_thread! {
             launch.launch();
 
             Ok(Runtime {
-                kind: Kind::ThreadPool(scheduler),
+                kind: Kind::MultiThread(scheduler),
                 handle,
                 blocking_pool,
             })
