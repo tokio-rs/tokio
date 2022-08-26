@@ -33,7 +33,7 @@ pub(crate) struct CurrentThread {
 
     /// This is usually None, but right before dropping the CurrentThread
     /// scheduler, it is changed to `Some` with the context being the runtime's
-    /// own context. This ensures that any tasks dropped in the `CurrentThread`s
+    /// own context. This ensures that any tasks dropped in the `CurrentThread`'s
     /// destructor run in that runtime's context.
     context_guard: Option<EnterGuard>,
 }
