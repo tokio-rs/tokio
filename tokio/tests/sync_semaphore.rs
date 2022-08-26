@@ -63,6 +63,20 @@ fn forget() {
     assert!(sem.try_acquire().is_err());
 }
 
+#[test]
+fn merge() {
+    let sem = Arc::new(Semaphore::new(3));
+    {
+        let mut p1 = sem.try_acquire().unwrap();
+        assert_eq!(sem.available_permits(), 2);
+        let p2 = sem.try_acquire_many(2).unwrap();
+        assert_eq!(sem.available_permits(), 0);
+        p1.merge(p2);
+        assert_eq!(sem.available_permits(), 0);
+    }
+    assert_eq!(sem.available_permits(), 3);
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn stress_test() {

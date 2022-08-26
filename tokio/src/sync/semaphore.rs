@@ -620,6 +620,15 @@ impl<'a> SemaphorePermit<'a> {
     pub fn forget(mut self) {
         self.permits = 0;
     }
+
+    /// Merge two [`SemaphorePermit`] instances together, consuming `other`
+    /// without releasing the permits it holds.
+    ///
+    /// Permits held by both `self` and `other` are released when `self` drops.
+    pub fn merge(&mut self, mut other: Self) {
+        self.permits += other.permits;
+        other.permits = 0;
+    }
 }
 
 impl OwnedSemaphorePermit {
@@ -628,6 +637,15 @@ impl OwnedSemaphorePermit {
     /// semaphore.
     pub fn forget(mut self) {
         self.permits = 0;
+    }
+
+    /// Merge two [`OwnedSemaphorePermit`] instances together, consuming `other`
+    /// without releasing the permits it holds.
+    ///
+    /// Permits held by both `self` and `other` are released when `self` drops.
+    pub fn merge(&mut self, mut other: Self) {
+        self.permits += other.permits;
+        other.permits = 0;
     }
 }
 
