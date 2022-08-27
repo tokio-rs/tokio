@@ -157,6 +157,9 @@ impl Driver {
 
         let mut events = self.events.take().expect("i/o driver event store missing");
 
+        // Flush io_uring SQEs before waiting on poll.
+        crate::runtime::context::flush_io_uring();
+
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.poll.poll(&mut events, max_wait) {
@@ -184,6 +187,8 @@ impl Driver {
         self.inner.metrics.incr_ready_count_by(ready_count);
 
         self.events = Some(events);
+
+        crate::runtime::context::try_tick_io_uring();
 
         Ok(())
     }
