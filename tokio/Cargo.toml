@@ -95,6 +95,7 @@ signal = [
 sync = []
 test-util = ["rt", "sync", "time"]
 time = []
+uring = ["slab", "io-uring", "scoped-tls"]
 
 # Technically, removing this is a breaking change even though it only ever did
 # anything with the unstable flag on. It is probably safe to get rid of it after
@@ -103,6 +104,7 @@ stats = []
 
 [build-dependencies]
 autocfg = "1.1"
+tempfile = "3.2.0"
 
 [dependencies]
 tokio-macros = { version = "1.7.0", path = "../tokio-macros", optional = true }
@@ -116,6 +118,9 @@ memchr = { version = "2.2", optional = true }
 mio = { version = "0.8.4", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.12.0", optional = true }
+scoped-tls = { version = "1.0.0", optional = true}
+slab = { version = "0.4.2", optional = true}
+io-uring = { version = "0.5.0", features = [ "unstable" ], optional = true}
 
 [target.'cfg(not(any(target_arch = "wasm32", target_arch = "wasm64")))'.dependencies]
 socket2 = { version = "0.4.4", features = [ "all" ] }
@@ -126,7 +131,7 @@ socket2 = { version = "0.4.4", features = [ "all" ] }
 tracing = { version = "0.1.25", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.42", optional = true }
+libc = { version = "0.2.80", optional = true }
 signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]

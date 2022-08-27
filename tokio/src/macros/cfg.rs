@@ -386,6 +386,22 @@ macro_rules! cfg_not_time {
     }
 }
 
+macro_rules! cfg_io_uring {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(feature = "uring"))]
+            #[cfg_attr(docsrs, doc(cfg(all(feature = "uring"))))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_io_uring {
+    ($($item:item)*) => {
+        $( #[cfg(not(feature = "uring"))] $item )*
+    }
+}
+
 macro_rules! cfg_trace {
     ($($item:item)*) => {
         $(

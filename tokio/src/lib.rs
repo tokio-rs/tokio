@@ -494,6 +494,8 @@ cfg_time! {
     pub mod time;
 }
 
+pub mod platform;
+
 mod util;
 
 /// Due to the `Stream` trait's inclusion in `std` landing later than Tokio's 1.0
