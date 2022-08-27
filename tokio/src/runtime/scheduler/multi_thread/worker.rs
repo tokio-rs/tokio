@@ -462,6 +462,10 @@ impl Context {
             // Run regularly scheduled maintenance
             core.maintenance(&self.worker);
         }
+        if core.tick % self.worker.shared.config.io_uring_interval == 0 {
+            // Try to flush io_uring driver submission queue entries.
+            crate::runtime::context::try_flush_io_uring();
+        }
 
         core
     }

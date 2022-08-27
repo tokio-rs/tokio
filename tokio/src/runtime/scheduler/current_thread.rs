@@ -542,6 +542,10 @@ impl CoreGuard<'_> {
                     let tick = core.tick;
                     core.tick = core.tick.wrapping_add(1);
 
+                    if tick % core.spawner.shared.config.io_uring_interval == 0 {
+                        crate::runtime::context::flush_io_uring();
+                    }
+
                     let entry = if tick % core.spawner.shared.config.global_queue_interval == 0 {
                         core.spawner.pop().or_else(|| core.tasks.pop_front())
                     } else {

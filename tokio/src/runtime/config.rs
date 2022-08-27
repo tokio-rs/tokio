@@ -8,6 +8,9 @@ pub(crate) struct Config {
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(crate) event_interval: u32,
 
+    /// How many ticks before yielding to the io_uring driver?
+    pub(crate) io_uring_interval: u32,
+
     /// Callback for a worker parking itself
     pub(crate) before_park: Option<Callback>,
 

@@ -85,6 +85,9 @@ pub struct Builder {
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
 
+    /// How many ticks before yielding to the io_uring driver?
+    pub(super) io_uring_interval: u32,
+
     /// When true, the multi-threade scheduler LIFO slot should not be used.
     ///
     /// This option should only be exposed as unstable.
@@ -199,7 +202,9 @@ impl Builder {
         #[cfg(not(loom))]
         const EVENT_INTERVAL: u32 = 61;
 
-        Builder::new(Kind::CurrentThread, 31, EVENT_INTERVAL)
+        const IO_URING_INTERVAL: u32 = 31;
+
+        Builder::new(Kind::CurrentThread, 31, EVENT_INTERVAL, IO_URING_INTERVAL)
     }
 
     cfg_not_wasi! {
@@ -210,7 +215,7 @@ impl Builder {
         #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
         pub fn new_multi_thread() -> Builder {
             // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-            Builder::new(Kind::MultiThread, 61, 61)
+            Builder::new(Kind::MultiThread, 61, 61, 31)
         }
     }
 
@@ -218,7 +223,7 @@ impl Builder {
     /// values.
     ///
     /// Configuration methods can be chained on the return value.
-    pub(crate) fn new(kind: Kind, global_queue_interval: u32, event_interval: u32) -> Builder {
+    pub(crate) fn new(kind: Kind, global_queue_interval: u32, event_interval: u32, io_uring_interval: u32) -> Builder {
         Builder {
             kind,
 
@@ -254,6 +259,7 @@ impl Builder {
             // as parameters.
             global_queue_interval,
             event_interval,
+            io_uring_interval,
 
             #[cfg(tokio_unstable)]
             unhandled_panic: UnhandledPanic::Ignore,
@@ -861,6 +867,7 @@ impl Builder {
                 after_unpark: self.after_unpark.clone(),
                 global_queue_interval: self.global_queue_interval,
                 event_interval: self.event_interval,
+                io_uring_interval: self.io_uring_interval,
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
@@ -981,6 +988,7 @@ cfg_rt_multi_thread! {
                     after_unpark: self.after_unpark.clone(),
                     global_queue_interval: self.global_queue_interval,
                     event_interval: self.event_interval,
+                    io_uring_interval: self.io_uring_interval,
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
