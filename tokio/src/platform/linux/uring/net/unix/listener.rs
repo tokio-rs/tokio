@@ -59,3 +59,10 @@ impl UnixListener {
         Ok(stream)
     }
 }
+
+impl std::fmt::Debug for UnixListener {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO: Provide better debug information
+        f.debug_struct("UnixListener").finish()
+    }
+}

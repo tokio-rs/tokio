@@ -193,3 +193,10 @@ impl UdpSocket {
         self.inner.write(buf).await
     }
 }
+
+impl std::fmt::Debug for UdpSocket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO: Provide better debug information
+        f.debug_struct("UdpSocket").finish()
+    }
+}

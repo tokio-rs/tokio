@@ -153,9 +153,15 @@ impl Handle {
     }
 }
 
+impl std::fmt::Debug for Driver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("io_uring Driver").finish()
+    }
+}
+
 impl std::fmt::Debug for Handle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Handle").finish()
+        f.debug_struct("io_uring Handle").finish()
     }
 }
 

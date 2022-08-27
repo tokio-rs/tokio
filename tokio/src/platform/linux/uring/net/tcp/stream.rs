@@ -61,6 +61,13 @@ impl TcpStream {
     }
 }
 
+impl std::fmt::Debug for TcpStream {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO: Provide better debug information
+        f.debug_struct("TcpStream").finish()
+    }
+}
+
 impl AsRawFd for TcpStream {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()

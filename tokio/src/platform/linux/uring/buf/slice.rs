@@ -124,6 +124,13 @@ impl<T> Slice<T> {
     }
 }
 
+impl<T> std::fmt::Debug for Slice<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO: Provide better debug information
+        f.debug_struct("Slice").finish()
+    }
+}
+
 impl<T: IoBuf> ops::Deref for Slice<T> {
     type Target = [u8];
 
