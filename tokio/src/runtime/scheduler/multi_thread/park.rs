@@ -136,6 +136,9 @@ impl Inner {
         if let Some(mut driver) = self.shared.driver.try_lock() {
             self.park_driver(&mut driver);
         } else {
+            // Flush io_uring SQEs before going to sleep.
+            crate::runtime::context::flush_io_uring();
+
             self.park_condvar();
         }
     }

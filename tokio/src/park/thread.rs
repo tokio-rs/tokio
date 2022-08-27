@@ -282,6 +282,9 @@ impl Park for CachedParkThread {
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
+        // Flush io_uring SQEs before going to sleep.
+        crate::runtime::context::flush_io_uring();
+
         self.with_current(|park_thread| park_thread.inner.park())?;
         Ok(())
     }
