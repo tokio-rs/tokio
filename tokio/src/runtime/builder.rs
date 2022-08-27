@@ -844,6 +844,7 @@ impl Builder {
             io_handle: resources.io_handle,
             time_handle: resources.time_handle,
             signal_handle: resources.signal_handle,
+            io_uring_handle: resources.io_uring_handle,
             clock: resources.clock,
             blocking_spawner,
         };
@@ -966,6 +967,7 @@ cfg_rt_multi_thread! {
                 io_handle: resources.io_handle,
                 time_handle: resources.time_handle,
                 signal_handle: resources.signal_handle,
+                io_uring_handle: resources.io_uring_handle,
                 clock: resources.clock,
                 blocking_spawner,
             };

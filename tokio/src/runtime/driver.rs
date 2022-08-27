@@ -1,8 +1,10 @@
 //! Abstracts out the entire chain of runtime sub-drivers into common types.
+
 use crate::park::thread::ParkThread;
 use crate::park::Park;
 
 use std::io;
+
 use std::time::Duration;
 
 // ===== io driver =====
@@ -144,17 +146,55 @@ cfg_not_time! {
     }
 }
 
+// ===== io_uring driver =====
+
+cfg_io_uring! {
+    type IoUringDriver = crate::park::either::Either<crate::platform::linux::uring::driver::Driver, ()>;
+    pub(crate) type IoUringHandle = Option<crate::platform::linux::uring::driver::Handle>;
+    pub(crate) fn create_io_uring_driver(enable: bool, io_driver_handle: &IoHandle) -> io::Result<(IoUringDriver, IoUringHandle)> {
+        use crate::park::either::Either;
+        if enable {
+            let driver = crate::platform::linux::uring::driver::Driver::new(io_driver_handle
+                .as_ref()
+                .expect("io uring only works with reactor enables")
+                .clone(),
+            )?;
+            let handle = driver.handle();
+            Ok((Either::A(driver), Some(handle)))
+        } else {
+            Ok((Either::B(()), None))
+        }
+    }
+}
+
+cfg_not_io_uring! {
+    type IoUringDriver = ();
+    pub(crate) type IoUringHandle = ();
+    pub(crate) fn create_io_uring_driver(_enable: bool, _io_driver_handle: &IoHandle) -> io::Result<(IoUringDriver, IoUringHandle)> {
+        Ok(((), ()))
+    }
+}
+
 // ===== runtime driver =====
 
 #[derive(Debug)]
 pub(crate) struct Driver {
-    inner: TimeDriver,
+    inner: Inner,
+}
+
+#[derive(Debug)]
+struct Inner {
+    time_driver: TimeDriver,
+
+    #[allow(dead_code)]
+    io_uring_driver: IoUringDriver,
 }
 
 pub(crate) struct Resources {
     pub(crate) io_handle: IoHandle,
     pub(crate) signal_handle: SignalHandle,
     pub(crate) time_handle: TimeHandle,
+    pub(crate) io_uring_handle: IoUringHandle,
     pub(crate) clock: Clock,
 }
 
@@ -174,12 +214,23 @@ impl Driver {
         let (time_driver, time_handle) =
             create_time_driver(cfg.enable_time, io_stack, clock.clone());
 
+        let (io_uring_driver, io_uring_handle) = create_io_uring_driver(
+            cfg.enable_io,
+            &io_handle
+        )?;
+
         Ok((
-            Self { inner: time_driver },
+            Self {
+                inner: Inner {
+                    time_driver,
+                    io_uring_driver,
+                },
+            },
             Resources {
                 io_handle,
                 signal_handle,
                 time_handle,
+                io_uring_handle,
                 clock,
             },
         ))
@@ -191,18 +242,18 @@ impl Park for Driver {
     type Error = <TimeDriver as Park>::Error;
 
     fn unpark(&self) -> Self::Unpark {
-        self.inner.unpark()
+        self.inner.time_driver.unpark()
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
-        self.inner.park()
+        self.inner.time_driver.park()
     }
 
     fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.inner.park_timeout(duration)
+        self.inner.time_driver.park_timeout(duration)
     }
 
     fn shutdown(&mut self) {
-        self.inner.shutdown()
+        self.inner.time_driver.shutdown()
     }
 }
