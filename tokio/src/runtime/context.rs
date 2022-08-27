@@ -36,6 +36,54 @@ cfg_io_driver! {
     }
 }
 
+cfg_io_uring! {
+    #[track_caller]
+    pub(crate) fn io_uring_handle() -> crate::runtime::driver::IoUringHandle {
+        match CONTEXT.try_with(|ctx| {
+            let ctx = ctx.borrow();
+            if let Some(ctx_ref) = ctx.as_ref() {
+                ctx_ref.as_inner().io_uring_handle.clone()
+            } else {
+                None
+            }
+        }) {
+            Ok(io_uring_handle) => io_uring_handle,
+            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+        }
+    }
+
+    pub(crate) fn flush_io_uring() {
+        if let Some(io_uring_driver) = crate::runtime::context::io_uring_handle() {
+            io_uring_driver.flush();
+        }
+    }
+
+    pub(crate) fn try_flush_io_uring() {
+        let io_uring_driver =
+            crate::runtime::context::io_uring_handle().expect("No io_uring driver found.");
+        io_uring_driver.try_flush();
+    }
+
+    pub(crate) fn try_tick_io_uring() {
+        let io_uring_driver =
+            crate::runtime::context::io_uring_handle().expect("No io_uring driver found.");
+        io_uring_driver.try_tick();
+    }
+}
+
+cfg_not_io_uring! {
+    pub(crate) fn flush_io_uring() {
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn try_flush_io_uring() {
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn try_tick_io_uring() {
+    }
+}
+
 cfg_signal_internal! {
     #[cfg(unix)]
     pub(crate) fn signal_handle() -> crate::runtime::driver::SignalHandle {
