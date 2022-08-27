@@ -422,8 +422,9 @@ impl Interval {
     /// async fn main() {
     ///     let mut interval = time::interval(Duration::from_millis(10));
     ///
-    ///     interval.tick().await;
-    ///     interval.tick().await;
+    ///     interval.tick().await; 
+    ///     // approximately 0ms have elapsed. The first tick completes immediately.
+    ///     interval.tick().await; 
     ///     interval.tick().await;
     ///
     ///     // approximately 20ms have elapsed.
