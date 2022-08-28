@@ -103,6 +103,16 @@ fn merge() {
     assert_eq!(sem.available_permits(), 3);
 }
 
+#[test]
+#[should_panic]
+fn merge_unrelated_permits() {
+    let sem1 = Arc::new(Semaphore::new(3));
+    let sem2 = Arc::new(Semaphore::new(3));
+    let mut p1 = sem1.try_acquire_owned().unwrap();
+    let p2 = sem2.try_acquire_owned().unwrap();
+    p1.merge(p2)
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn stress_test() {

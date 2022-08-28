@@ -626,6 +626,10 @@ impl<'a> SemaphorePermit<'a> {
     ///
     /// Permits held by both `self` and `other` are released when `self` drops.
     pub fn merge(&mut self, mut other: Self) {
+        assert!(
+            std::ptr::eq(self.sem, other.sem),
+            "merging permits from different semaphore instances"
+        );
         self.permits += other.permits;
         other.permits = 0;
     }
@@ -644,6 +648,10 @@ impl OwnedSemaphorePermit {
     ///
     /// Permits held by both `self` and `other` are released when `self` drops.
     pub fn merge(&mut self, mut other: Self) {
+        assert!(
+            Arc::ptr_eq(&self.sem, &other.sem),
+            "merging permits from different semaphore instances"
+        );
         self.permits += other.permits;
         other.permits = 0;
     }
