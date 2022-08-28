@@ -1,5 +1,5 @@
-use crate::platform::linux::uring::driver::{Close, Op};
 use crate::future::poll_fn;
+use crate::platform::linux::uring::driver::{Close, Op};
 
 use std::cell::RefCell;
 use std::os::unix::io::{FromRawFd, RawFd};

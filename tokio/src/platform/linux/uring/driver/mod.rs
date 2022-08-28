@@ -40,9 +40,9 @@ use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::Arc;
 
-use crate::runtime::io::Registration;
 use crate::io::Interest;
 use crate::loom::sync::Mutex;
+use crate::runtime::io::Registration;
 
 pub(crate) struct Driver {
     inner: Arc<Inner>,

@@ -10,11 +10,7 @@ pub struct SliceMut<T> {
 
 impl<T> SliceMut<T> {
     pub(crate) fn new(buf: T, begin: usize, end: usize) -> SliceMut<T> {
-        SliceMut {
-            buf,
-            begin,
-            end,
-        }
+        SliceMut { buf, begin, end }
     }
 
     /// Offset in the underlying buffer at which this slice starts.

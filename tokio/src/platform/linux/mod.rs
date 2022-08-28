@@ -1,5 +1,5 @@
 //! Linux specific components.
 
 cfg_io_uring! {
-    pub mod uring; 
+    pub mod uring;
 }

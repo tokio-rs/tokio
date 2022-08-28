@@ -161,7 +161,11 @@ impl File {
     ///         Ok(())
     /// }
     /// ```
-    pub async fn read_at<T: IoBufMut>(&self, buf: T, pos: u64) -> crate::platform::linux::uring::BufResult<usize, T> {
+    pub async fn read_at<T: IoBufMut>(
+        &self,
+        buf: T,
+        pos: u64,
+    ) -> crate::platform::linux::uring::BufResult<usize, T> {
         // Submit the read operation
         let op = Op::read_at(&self.fd, buf, pos).unwrap();
         op.read().await
@@ -212,7 +216,11 @@ impl File {
     /// ```
     ///
     /// [`Ok(n)`]: Ok
-    pub async fn write_at<T: IoBuf>(&self, buf: T, pos: u64) -> crate::platform::linux::uring::BufResult<usize, T> {
+    pub async fn write_at<T: IoBuf>(
+        &self,
+        buf: T,
+        pos: u64,
+    ) -> crate::platform::linux::uring::BufResult<usize, T> {
         let op = Op::write_at(&self.fd, buf, pos).unwrap();
         op.write().await
     }

@@ -50,13 +50,19 @@ impl TcpStream {
 
     /// Read some data from the stream into the buffer, returning the original buffer and
     /// quantity of data read.
-    pub async fn read<T: IoBufMut>(&self, buf: T) -> crate::platform::linux::uring::BufResult<usize, T> {
+    pub async fn read<T: IoBufMut>(
+        &self,
+        buf: T,
+    ) -> crate::platform::linux::uring::BufResult<usize, T> {
         self.inner.read(buf).await
     }
 
     /// Write some data to the stream from the buffer, returning the original buffer and
     /// quantity of data written.
-    pub async fn write<T: IoBuf>(&self, buf: T) -> crate::platform::linux::uring::BufResult<usize, T> {
+    pub async fn write<T: IoBuf>(
+        &self,
+        buf: T,
+    ) -> crate::platform::linux::uring::BufResult<usize, T> {
         self.inner.write(buf).await
     }
 }

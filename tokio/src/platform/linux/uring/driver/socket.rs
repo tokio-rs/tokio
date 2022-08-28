@@ -39,7 +39,10 @@ impl Socket {
         Ok(Socket { fd })
     }
 
-    pub(crate) async fn write<T: IoBuf>(&self, buf: T) -> crate::platform::linux::uring::BufResult<usize, T> {
+    pub(crate) async fn write<T: IoBuf>(
+        &self,
+        buf: T,
+    ) -> crate::platform::linux::uring::BufResult<usize, T> {
         let op = Op::write_at(&self.fd, buf, 0).unwrap();
         op.write().await
     }
@@ -53,7 +56,10 @@ impl Socket {
         op.send().await
     }
 
-    pub(crate) async fn read<T: IoBufMut>(&self, buf: T) -> crate::platform::linux::uring::BufResult<usize, T> {
+    pub(crate) async fn read<T: IoBufMut>(
+        &self,
+        buf: T,
+    ) -> crate::platform::linux::uring::BufResult<usize, T> {
         let op = Op::read_at(&self.fd, buf, 0).unwrap();
         op.read().await
     }

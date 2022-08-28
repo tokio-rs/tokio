@@ -214,10 +214,7 @@ impl Driver {
         let (time_driver, time_handle) =
             create_time_driver(cfg.enable_time, io_stack, clock.clone());
 
-        let (io_uring_driver, io_uring_handle) = create_io_uring_driver(
-            cfg.enable_io,
-            &io_handle
-        )?;
+        let (io_uring_driver, io_uring_handle) = create_io_uring_driver(cfg.enable_io, &io_handle)?;
 
         Ok((
             Self {

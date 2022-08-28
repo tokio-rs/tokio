@@ -223,7 +223,12 @@ impl Builder {
     /// values.
     ///
     /// Configuration methods can be chained on the return value.
-    pub(crate) fn new(kind: Kind, global_queue_interval: u32, event_interval: u32, io_uring_interval: u32) -> Builder {
+    pub(crate) fn new(
+        kind: Kind,
+        global_queue_interval: u32,
+        event_interval: u32,
+        io_uring_interval: u32,
+    ) -> Builder {
         Builder {
             kind,
 

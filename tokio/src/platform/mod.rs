@@ -1,3 +1,3 @@
 //! Platform specific components.
 
-pub mod linux; 
+pub mod linux;

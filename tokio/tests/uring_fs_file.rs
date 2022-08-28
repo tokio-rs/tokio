@@ -124,7 +124,9 @@ async fn rename() {
 
     let new_path = old_path.with_file_name(new_file_name);
 
-    tokio::platform::linux::uring::fs::rename(&old_path, &new_path).await.unwrap();
+    tokio::platform::linux::uring::fs::rename(&old_path, &new_path)
+        .await
+        .unwrap();
 
     let new_file = File::open(&new_path).await.unwrap();
     read_hello(&new_file).await;
