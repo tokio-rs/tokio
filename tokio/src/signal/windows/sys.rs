@@ -59,11 +59,11 @@ impl Init for OsStorage {
 impl Storage for OsStorage {
     fn event_info(&self, id: EventId) -> Option<&EventInfo> {
         match DWORD::try_from(id) {
-            Ok(CTRL_BREAK_EVENT) => Some(&self.ctrl_break),
-            Ok(CTRL_CLOSE_EVENT) => Some(&self.ctrl_close),
-            Ok(CTRL_C_EVENT) => Some(&self.ctrl_c),
-            Ok(CTRL_LOGOFF_EVENT) => Some(&self.ctrl_logoff),
-            Ok(CTRL_SHUTDOWN_EVENT) => Some(&self.ctrl_shutdown),
+            Ok(wincon::CTRL_BREAK_EVENT) => Some(&self.ctrl_break),
+            Ok(wincon::CTRL_CLOSE_EVENT) => Some(&self.ctrl_close),
+            Ok(wincon::CTRL_C_EVENT) => Some(&self.ctrl_c),
+            Ok(wincon::CTRL_LOGOFF_EVENT) => Some(&self.ctrl_logoff),
+            Ok(wincon::CTRL_SHUTDOWN_EVENT) => Some(&self.ctrl_shutdown),
             _ => None,
         }
     }
