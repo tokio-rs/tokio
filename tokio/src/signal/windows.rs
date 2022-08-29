@@ -279,6 +279,7 @@ impl CtrlClose {
     ///     let mut stream = ctrl_close()?;
     ///
     ///     // Print whenever a CTRL-CLOSE event is received.
+    ///     stream.recv().await;
     ///     println!("got CTRL-CLOSE. Cleaning up before exiting");
     ///
     ///     Ok(())
@@ -375,6 +376,7 @@ impl CtrlShutdown {
     ///     let mut stream = ctrl_shutdown()?;
     ///
     ///     // Print whenever a CTRL-SHUTDOWN event is received.
+    ///     stream.recv().await;
     ///     println!("got CTRL-SHUTDOWN. Cleaning up before exiting");
     ///
     ///     Ok(())
