@@ -84,7 +84,7 @@ impl SignalKind {
     // unlikely to change to other types, but technically libc can change this
     // in the future minor version.
     // See https://github.com/tokio-rs/tokio/issues/3767 for more.
-    pub fn from_raw(signum: std::os::raw::c_int) -> Self {
+    pub const fn from_raw(signum: std::os::raw::c_int) -> Self {
         Self(signum as libc::c_int)
     }
 
@@ -95,7 +95,7 @@ impl SignalKind {
     /// let kind = SignalKind::interrupt();
     /// assert_eq!(kind.as_raw_value(), libc::SIGINT);
     /// ```
-    pub fn as_raw_value(&self) -> std::os::raw::c_int {
+    pub const fn as_raw_value(&self) -> std::os::raw::c_int {
         self.0
     }
 
@@ -103,7 +103,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when a real-time timer has expired.
     /// By default, the process is terminated by this signal.
-    pub fn alarm() -> Self {
+    pub const fn alarm() -> Self {
         Self(libc::SIGALRM)
     }
 
@@ -111,7 +111,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when the status of a child process
     /// has changed. By default, this signal is ignored.
-    pub fn child() -> Self {
+    pub const fn child() -> Self {
         Self(libc::SIGCHLD)
     }
 
@@ -119,7 +119,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when the terminal is disconnected.
     /// By default, the process is terminated by this signal.
-    pub fn hangup() -> Self {
+    pub const fn hangup() -> Self {
         Self(libc::SIGHUP)
     }
 
@@ -134,7 +134,7 @@ impl SignalKind {
         target_os = "netbsd",
         target_os = "openbsd"
     ))]
-    pub fn info() -> Self {
+    pub const fn info() -> Self {
         Self(libc::SIGINFO)
     }
 
@@ -142,7 +142,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent to interrupt a program.
     /// By default, the process is terminated by this signal.
-    pub fn interrupt() -> Self {
+    pub const fn interrupt() -> Self {
         Self(libc::SIGINT)
     }
 
@@ -150,7 +150,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when I/O operations are possible
     /// on some file descriptor. By default, this signal is ignored.
-    pub fn io() -> Self {
+    pub const fn io() -> Self {
         Self(libc::SIGIO)
     }
 
@@ -159,7 +159,7 @@ impl SignalKind {
     /// On Unix systems this signal is sent when the process attempts to write
     /// to a pipe which has no reader. By default, the process is terminated by
     /// this signal.
-    pub fn pipe() -> Self {
+    pub const fn pipe() -> Self {
         Self(libc::SIGPIPE)
     }
 
@@ -168,7 +168,7 @@ impl SignalKind {
     /// On Unix systems this signal is sent to issue a shutdown of the
     /// process, after which the OS will dump the process core.
     /// By default, the process is terminated by this signal.
-    pub fn quit() -> Self {
+    pub const fn quit() -> Self {
         Self(libc::SIGQUIT)
     }
 
@@ -176,7 +176,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent to issue a shutdown of the
     /// process. By default, the process is terminated by this signal.
-    pub fn terminate() -> Self {
+    pub const fn terminate() -> Self {
         Self(libc::SIGTERM)
     }
 
@@ -184,7 +184,7 @@ impl SignalKind {
     ///
     /// On Unix systems this is a user defined signal.
     /// By default, the process is terminated by this signal.
-    pub fn user_defined1() -> Self {
+    pub const fn user_defined1() -> Self {
         Self(libc::SIGUSR1)
     }
 
@@ -192,7 +192,7 @@ impl SignalKind {
     ///
     /// On Unix systems this is a user defined signal.
     /// By default, the process is terminated by this signal.
-    pub fn user_defined2() -> Self {
+    pub const fn user_defined2() -> Self {
         Self(libc::SIGUSR2)
     }
 
@@ -200,7 +200,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when the terminal window is resized.
     /// By default, this signal is ignored.
-    pub fn window_change() -> Self {
+    pub const fn window_change() -> Self {
         Self(libc::SIGWINCH)
     }
 }
