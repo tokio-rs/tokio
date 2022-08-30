@@ -260,7 +260,7 @@ pub fn ctrl_close() -> io::Result<CtrlClose> {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct CtrlClose {
-    inner: RxFuture
+    inner: RxFuture,
 }
 
 impl CtrlClose {
@@ -357,7 +357,7 @@ pub fn ctrl_shutdown() -> io::Result<CtrlShutdown> {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct CtrlShutdown {
-    inner: RxFuture
+    inner: RxFuture,
 }
 
 impl CtrlShutdown {
@@ -454,7 +454,7 @@ pub fn ctrl_logoff() -> io::Result<CtrlLogoff> {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct CtrlLogoff {
-    inner: RxFuture
+    inner: RxFuture,
 }
 
 impl CtrlLogoff {
