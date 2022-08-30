@@ -613,7 +613,7 @@ impl<T> Sender<T> {
     /// To always make a new value available for future receivers, even if no
     /// receiver currently exists, one of the other send methods
     /// ([`send_if_modified`], [`send_modify`], or [`send_replace`]) can be
-    /// used.
+    /// used instead.
     ///
     /// [`subscribe`]: Sender::subscribe
     /// [`SendError`]: error::SendError
