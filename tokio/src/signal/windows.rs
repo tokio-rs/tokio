@@ -1,9 +1,9 @@
 //! Windows-specific types for signal handling.
 //!
-//! This module is only defined on Windows and allows receiving "ctrl-c"
-//! and "ctrl-break" notifications. These events are listened for via the
-//! `SetConsoleCtrlHandler` function which receives events of the type
-//! `CTRL_C_EVENT` and `CTRL_BREAK_EVENT`.
+//! This module is only defined on Windows and allows receiving "ctrl-c",
+//! "ctrl-break", "ctrl-logoff", "ctrl-shutdown", and "ctrl-close"
+//! notifications. These events are listened for via the `SetConsoleCtrlHandler`
+//! function which receives the corresponding winapi event type.
 
 #![cfg(any(windows, docsrs))]
 #![cfg_attr(docsrs, doc(cfg(all(windows, feature = "signal"))))]
@@ -419,7 +419,7 @@ impl CtrlShutdown {
     }
 }
 
-/// Creates a new stream which receives "ctrl-c" notifications sent to the
+/// Creates a new stream which receives "ctrl-logoff" notifications sent to the
 /// process.
 ///
 /// # Examples
