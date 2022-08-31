@@ -1,10 +1,10 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))]
 
-use std::error::Error;
+use std::{error::Error, sync::Arc};
 use tokio::{
     runtime::{Builder, Runtime},
-    sync::{broadcast, mpsc, oneshot, Mutex, RwLock},
+    sync::{broadcast, mpsc, oneshot, Mutex, RwLock, Semaphore},
 };
 
 mod support {
@@ -152,6 +152,38 @@ fn mpsc_unbounded_receiver_blocking_recv_panic_caller() -> Result<(), Box<dyn Er
         rt.block_on(async {
             let _ = rx.blocking_recv();
         });
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn semaphore_merge_unrelated_owned_permits() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let sem1 = Arc::new(Semaphore::new(42));
+        let sem2 = Arc::new(Semaphore::new(42));
+        let mut p1 = sem1.try_acquire_owned().unwrap();
+        let p2 = sem2.try_acquire_owned().unwrap();
+        p1.merge(p2);
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn semaphore_merge_unrelated_permits() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let sem1 = Semaphore::new(42);
+        let sem2 = Semaphore::new(42);
+        let mut p1 = sem1.try_acquire().unwrap();
+        let p2 = sem2.try_acquire().unwrap();
+        p1.merge(p2);
     });
 
     // The panic location should be in this file
