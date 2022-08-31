@@ -188,40 +188,40 @@ mod tests {
     }
 
     #[test]
-     fn ctrl_shutdown() {
-         let rt = rt();
+    fn ctrl_shutdown() {
+        let rt = rt();
 
-         rt.block_on(async {
-             let mut ctrl_shutdown = assert_ok!(crate::signal::windows::ctrl_shutdown());
+        rt.block_on(async {
+            let mut ctrl_shutdown = assert_ok!(crate::signal::windows::ctrl_shutdown());
 
-             // Windows doesn't have a good programmatic way of sending events
-             // like sending signals on Unix, so we'll stub out the actual OS
-             // integration and test that our handling works.
-             unsafe {
-                 super::handler(wincon::CTRL_SHUTDOWN_EVENT);
-             }
+            // Windows doesn't have a good programmatic way of sending events
+            // like sending signals on Unix, so we'll stub out the actual OS
+            // integration and test that our handling works.
+            unsafe {
+                super::handler(wincon::CTRL_SHUTDOWN_EVENT);
+            }
 
-             ctrl_shutdown.recv().await.unwrap();
-         });
-     }
+            ctrl_shutdown.recv().await.unwrap();
+        });
+    }
 
     #[test]
-     fn ctrl_logoff() {
-         let rt = rt();
+    fn ctrl_logoff() {
+        let rt = rt();
 
-         rt.block_on(async {
-             let mut ctrl_logoff = assert_ok!(crate::signal::windows::ctrl_logoff());
+        rt.block_on(async {
+            let mut ctrl_logoff = assert_ok!(crate::signal::windows::ctrl_logoff());
 
-             // Windows doesn't have a good programmatic way of sending events
-             // like sending signals on Unix, so we'll stub out the actual OS
-             // integration and test that our handling works.
-             unsafe {
-                 super::handler(wincon::CTRL_LOGOFF_EVENT);
-             }
+            // Windows doesn't have a good programmatic way of sending events
+            // like sending signals on Unix, so we'll stub out the actual OS
+            // integration and test that our handling works.
+            unsafe {
+                super::handler(wincon::CTRL_LOGOFF_EVENT);
+            }
 
-             ctrl_logoff.recv().await.unwrap();
-         });
-     }
+            ctrl_logoff.recv().await.unwrap();
+        });
+    }
 
     fn rt() -> Runtime {
         crate::runtime::Builder::new_current_thread()
