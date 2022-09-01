@@ -120,3 +120,16 @@ fn local_key_get_panic_caller() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+#[cfg(tokio_unstable)]
+#[test]
+fn current_id_handle_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = task::current_id();
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}

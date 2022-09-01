@@ -213,6 +213,7 @@ pub struct Id(u64);
 ///
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[track_caller]
 pub fn current_id() -> Id {
     use crate::runtime::context;
     context::current_task_id()

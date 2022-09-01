@@ -37,10 +37,15 @@ pub(crate) fn set_current_task_id(id: Option<Id>) -> Option<Id> {
     CONTEXT.with(|ctxt| ctxt.task_id.replace(id))
 }
 
+#[track_caller]
 pub(crate) fn current_task_id() -> Id {
-    match CONTEXT.with(|ctxt| ctxt.task_id.get()) {
-        Some(id) => id,
-        _ => panic!("tried to get current task id from outside of task"),
+    match CONTEXT.try_with(|ctxt| ctxt.task_id.get()) {
+        Ok(Some(id)) => id,
+        Ok(None) => panic!("tried to get current task id from outside of task"),
+        Err(e) => panic!(
+            "tried to get current task id from outside of task failed with error {:?}",
+            e
+        ),
     }
 }
 
@@ -110,7 +115,9 @@ pub(crate) fn enter(new: Handle) -> EnterGuard {
 /// [`Handle`]: Handle
 pub(crate) fn try_enter(new: Handle) -> Option<EnterGuard> {
     let rng_seed = new.inner.seed_generator().next_seed();
-    let old_handle = CONTEXT.try_with(|ctx| ctx.handle.borrow_mut().replace(new)).ok()?;
+    let old_handle = CONTEXT
+        .try_with(|ctx| ctx.handle.borrow_mut().replace(new))
+        .ok()?;
 
     let old_seed = replace_thread_rng(rng_seed);
 
