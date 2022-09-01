@@ -9,7 +9,6 @@ wasm32-wasi target is given unstable support for the `net` feature.
 - net: add `device` and `bind_device` methods to TCP/UDP sockets ([#4882])
 - net: add `tos` and `set_tos` methods to TCP and UDP sockets ([#4877])
 - net: add security flags to named pipe `ServerOptions` ([#4845])
-- rt: add unstable option to disable the LIFO slot ([#4936])
 - signal: add more windows signal handlers ([#4924])
 - sync: add `mpsc::Sender::max_capacity` method ([#4904])
 - sync: implement Weak version of `mpsc::Sender` ([#4595])
@@ -52,6 +51,7 @@ wasm32-wasi target is given unstable support for the `net` feature.
 
 ### Unstable
 
+- rt: add unstable option to disable the LIFO slot ([#4936])
 - task: fix incorrect signature in `Builder::spawn_on` ([#4953])
 - task: make `task::Builder::spawn*` methods fallible ([#4823])
 
