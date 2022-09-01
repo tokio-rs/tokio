@@ -23,6 +23,7 @@ wasm32-wasi target is given unstable support for the `net` feature.
 - signal: don't register write interest on signal pipe ([#4898])
 - sync: add `#[must_use]` to lock guards ([#4886])
 - task: propagate attributes on task-locals ([#4837])
+- sync: fix hang when calling `recv` on closed and reopened broadcast channel ([#4867])
 
 ### Changed
 
@@ -36,7 +37,6 @@ wasm32-wasi target is given unstable support for the `net` feature.
 - rt: extract `basic_scheduler::Config` ([#4935])
 - rt: move I/O driver into `runtime` module ([#4942])
 - rt: rename internal scheduler types ([#4945])
-- sync: simplify broadcast channel implementation ([#4867])
 
 ### Documented
 
