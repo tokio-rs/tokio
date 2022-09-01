@@ -20,7 +20,7 @@ use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
 
 /// Executes tasks on the current thread
-pub(crate) struct BasicScheduler {
+pub(crate) struct CurrentThread {
     /// Core scheduler data is acquired by a thread entering `block_on`.
     core: AtomicCell<Core>,
 
@@ -31,10 +31,10 @@ pub(crate) struct BasicScheduler {
     /// Sendable task spawner
     spawner: Spawner,
 
-    /// This is usually None, but right before dropping the BasicScheduler, it
-    /// is changed to `Some` with the context being the runtime's own context.
-    /// This ensures that any tasks dropped in the `BasicScheduler`s destructor
-    /// run in that runtime's context.
+    /// This is usually None, but right before dropping the CurrentThread
+    /// scheduler, it is changed to `Some` with the context being the runtime's
+    /// own context. This ensures that any tasks dropped in the `CurrentThread`'s
+    /// destructor run in that runtime's context.
     context_guard: Option<EnterGuard>,
 }
 
@@ -108,11 +108,11 @@ struct Context {
 /// Initial queue capacity.
 const INITIAL_CAPACITY: usize = 64;
 
-// Tracks the current BasicScheduler.
+// Tracks the current CurrentThread.
 scoped_thread_local!(static CURRENT: Context);
 
-impl BasicScheduler {
-    pub(crate) fn new(driver: Driver, handle_inner: HandleInner, config: Config) -> BasicScheduler {
+impl CurrentThread {
+    pub(crate) fn new(driver: Driver, handle_inner: HandleInner, config: Config) -> CurrentThread {
         let unpark = driver.unpark();
 
         let spawner = Spawner {
@@ -137,7 +137,7 @@ impl BasicScheduler {
             unhandled_panic: false,
         })));
 
-        BasicScheduler {
+        CurrentThread {
             core,
             notify: Notify::new(),
             spawner,
@@ -193,16 +193,16 @@ impl BasicScheduler {
                 spawner: self.spawner.clone(),
                 core: RefCell::new(Some(core)),
             },
-            basic_scheduler: self,
+            scheduler: self,
         })
     }
 
-    pub(super) fn set_context_guard(&mut self, guard: EnterGuard) {
+    pub(crate) fn set_context_guard(&mut self, guard: EnterGuard) {
         self.context_guard = Some(guard);
     }
 }
 
-impl Drop for BasicScheduler {
+impl Drop for CurrentThread {
     fn drop(&mut self) {
         // Avoid a double panic if we are currently panicking and
         // the lock may be poisoned.
@@ -246,9 +246,9 @@ impl Drop for BasicScheduler {
     }
 }
 
-impl fmt::Debug for BasicScheduler {
+impl fmt::Debug for CurrentThread {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("BasicScheduler").finish()
+        fmt.debug_struct("CurrentThread").finish()
     }
 }
 
@@ -357,8 +357,8 @@ impl Context {
 // ===== impl Spawner =====
 
 impl Spawner {
-    /// Spawns a future onto the basic scheduler
-    pub(crate) fn spawn<F>(&self, future: F, id: super::task::Id) -> JoinHandle<F::Output>
+    /// Spawns a future onto the `CurrentThread` scheduler
+    pub(crate) fn spawn<F>(&self, future: F, id: crate::runtime::task::Id) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
@@ -503,10 +503,10 @@ impl Wake for Shared {
 // ===== CoreGuard =====
 
 /// Used to ensure we always place the `Core` value back into its slot in
-/// `BasicScheduler`, even if the future panics.
+/// `CurrentThread`, even if the future panics.
 struct CoreGuard<'a> {
     context: Context,
-    basic_scheduler: &'a BasicScheduler,
+    scheduler: &'a CurrentThread,
 }
 
 impl CoreGuard<'_> {
@@ -605,10 +605,10 @@ impl Drop for CoreGuard<'_> {
         if let Some(core) = self.context.core.borrow_mut().take() {
             // Replace old scheduler back into the state to allow
             // other threads to pick it up and drive it.
-            self.basic_scheduler.core.set(core);
+            self.scheduler.core.set(core);
 
             // Wake up other possible threads that could steal the driver.
-            self.basic_scheduler.notify.notify_one()
+            self.scheduler.notify.notify_one()
         }
     }
 }

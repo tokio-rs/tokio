@@ -6,7 +6,7 @@ use tokio::time::{self, Duration};
 
 #[test]
 fn num_workers() {
-    let rt = basic();
+    let rt = current_thread();
     assert_eq!(1, rt.metrics().num_workers());
 
     let rt = threaded();
@@ -17,7 +17,7 @@ fn num_workers() {
 fn remote_schedule_count() {
     use std::thread;
 
-    let rt = basic();
+    let rt = current_thread();
     let handle = rt.handle().clone();
     let task = thread::spawn(move || {
         handle.spawn(async {
@@ -48,7 +48,7 @@ fn remote_schedule_count() {
 
 #[test]
 fn worker_park_count() {
-    let rt = basic();
+    let rt = current_thread();
     let metrics = rt.metrics();
     rt.block_on(async {
         time::sleep(Duration::from_millis(1)).await;
@@ -71,7 +71,7 @@ fn worker_noop_count() {
     // There isn't really a great way to generate no-op parks as they happen as
     // false-positive events under concurrency.
 
-    let rt = basic();
+    let rt = current_thread();
     let metrics = rt.metrics();
     rt.block_on(async {
         time::sleep(Duration::from_millis(1)).await;
@@ -133,7 +133,7 @@ fn worker_steal_count() {
 fn worker_poll_count() {
     const N: u64 = 5;
 
-    let rt = basic();
+    let rt = current_thread();
     let metrics = rt.metrics();
     rt.block_on(async {
         for _ in 0..N {
@@ -165,7 +165,7 @@ fn worker_total_busy_duration() {
 
     let zero = Duration::from_millis(0);
 
-    let rt = basic();
+    let rt = current_thread();
     let metrics = rt.metrics();
 
     rt.block_on(async {
@@ -204,7 +204,7 @@ fn worker_total_busy_duration() {
 
 #[test]
 fn worker_local_schedule_count() {
-    let rt = basic();
+    let rt = current_thread();
     let metrics = rt.metrics();
     rt.block_on(async {
         tokio::spawn(async {}).await.unwrap();
@@ -280,7 +280,7 @@ fn worker_overflow_count() {
 fn injection_queue_depth() {
     use std::thread;
 
-    let rt = basic();
+    let rt = current_thread();
     let handle = rt.handle().clone();
     let metrics = rt.metrics();
 
@@ -321,7 +321,7 @@ fn injection_queue_depth() {
 fn worker_local_queue_depth() {
     const N: usize = 100;
 
-    let rt = basic();
+    let rt = current_thread();
     let metrics = rt.metrics();
     rt.block_on(async {
         for _ in 0..N {
@@ -372,7 +372,7 @@ fn worker_local_queue_depth() {
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[test]
 fn io_driver_fd_count() {
-    let rt = basic();
+    let rt = current_thread();
     let metrics = rt.metrics();
 
     // Since this is enabled w/ the process driver we always
@@ -394,7 +394,7 @@ fn io_driver_fd_count() {
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[test]
 fn io_driver_ready_count() {
-    let rt = basic();
+    let rt = current_thread();
     let metrics = rt.metrics();
 
     let stream = tokio::net::TcpStream::connect("google.com:80");
@@ -403,7 +403,7 @@ fn io_driver_ready_count() {
     assert_eq!(metrics.io_driver_ready_count(), 1);
 }
 
-fn basic() -> Runtime {
+fn current_thread() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

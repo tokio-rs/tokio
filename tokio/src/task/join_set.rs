@@ -439,7 +439,7 @@ impl<'a, T: 'static> Builder<'a, T> {
     /// [`AbortHandle`]: crate::task::AbortHandle
     /// [runtime handle]: crate::runtime::Handle
     #[track_caller]
-    pub fn spawn_on<F>(mut self, future: F, handle: &Handle) -> std::io::Result<AbortHandle>
+    pub fn spawn_on<F>(self, future: F, handle: &Handle) -> std::io::Result<AbortHandle>
     where
         F: Future<Output = T>,
         F: Send + 'static,

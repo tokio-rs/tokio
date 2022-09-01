@@ -99,11 +99,7 @@ impl<'a> Builder<'a> {
     /// [runtime handle]: crate::runtime::Handle
     /// [`Handle::spawn`]: crate::runtime::Handle::spawn
     #[track_caller]
-    pub fn spawn_on<Fut>(
-        &mut self,
-        future: Fut,
-        handle: &Handle,
-    ) -> io::Result<JoinHandle<Fut::Output>>
+    pub fn spawn_on<Fut>(self, future: Fut, handle: &Handle) -> io::Result<JoinHandle<Fut::Output>>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,

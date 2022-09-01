@@ -16,6 +16,7 @@
 ))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(docsrs, allow(unused_attributes))]
+#![cfg_attr(loom, allow(dead_code, unreachable_pub))]
 
 //! A runtime for writing reliable network applications without compromising speed.
 //!
@@ -152,7 +153,7 @@
 //! provide the functionality you need.
 //!
 //! Using the runtime requires the "rt" or "rt-multi-thread" feature flags, to
-//! enable the basic [single-threaded scheduler][rt] and the [thread-pool
+//! enable the current-thread [single-threaded scheduler][rt] and the [multi-thread
 //! scheduler][rt-multi-thread], respectively. See the [`runtime` module
 //! documentation][rt-features] for details. In addition, the "macros" feature
 //! flag enables the `#[tokio::main]` and `#[tokio::test]` attributes.
@@ -309,7 +310,7 @@
 //! need.
 //!
 //! - `full`: Enables all features listed below except `test-util` and `tracing`.
-//! - `rt`: Enables `tokio::spawn`, the basic (current thread) scheduler,
+//! - `rt`: Enables `tokio::spawn`, the current-thread scheduler,
 //!         and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
@@ -457,6 +458,11 @@ mod blocking;
 
 cfg_rt! {
     pub mod runtime;
+}
+cfg_not_rt! {
+    cfg_io_driver_impl! {
+        pub(crate) mod runtime;
+    }
 }
 
 pub(crate) mod coop;

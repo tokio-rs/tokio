@@ -77,7 +77,7 @@ async fn block_in_block() {
 
 #[tokio::test(flavor = "current_thread")]
 #[should_panic]
-async fn no_block_in_basic_scheduler() {
+async fn no_block_in_current_thread_scheduler() {
     task::block_in_place(|| {});
 }
 
@@ -91,7 +91,7 @@ fn yes_block_in_threaded_block_on() {
 
 #[test]
 #[should_panic]
-fn no_block_in_basic_block_on() {
+fn no_block_in_current_thread_block_on() {
     let rt = runtime::Builder::new_current_thread().build().unwrap();
     rt.block_on(async {
         task::block_in_place(|| {});
@@ -99,7 +99,7 @@ fn no_block_in_basic_block_on() {
 }
 
 #[test]
-fn can_enter_basic_rt_from_within_block_in_place() {
+fn can_enter_current_thread_rt_from_within_block_in_place() {
     let outer = tokio::runtime::Runtime::new().unwrap();
 
     outer.block_on(async {

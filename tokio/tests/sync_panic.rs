@@ -27,7 +27,7 @@ fn broadcast_channel_panic_caller() -> Result<(), Box<dyn Error>> {
 #[test]
 fn mutex_blocking_lock_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
-        let rt = basic();
+        let rt = current_thread();
         rt.block_on(async {
             let mutex = Mutex::new(5_u32);
             let _g = mutex.blocking_lock();
@@ -43,7 +43,7 @@ fn mutex_blocking_lock_panic_caller() -> Result<(), Box<dyn Error>> {
 #[test]
 fn oneshot_blocking_recv_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
-        let rt = basic();
+        let rt = current_thread();
         rt.block_on(async {
             let (_tx, rx) = oneshot::channel::<u8>();
             let _ = rx.blocking_recv();
@@ -71,7 +71,7 @@ fn rwlock_with_max_readers_panic_caller() -> Result<(), Box<dyn Error>> {
 #[test]
 fn rwlock_blocking_read_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
-        let rt = basic();
+        let rt = current_thread();
         rt.block_on(async {
             let lock = RwLock::<u8>::new(0);
             let _ = lock.blocking_read();
@@ -87,7 +87,7 @@ fn rwlock_blocking_read_panic_caller() -> Result<(), Box<dyn Error>> {
 #[test]
 fn rwlock_blocking_write_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
-        let rt = basic();
+        let rt = current_thread();
         rt.block_on(async {
             let lock = RwLock::<u8>::new(0);
             let _ = lock.blocking_write();
@@ -115,7 +115,7 @@ fn mpsc_bounded_channel_panic_caller() -> Result<(), Box<dyn Error>> {
 #[test]
 fn mpsc_bounded_receiver_blocking_recv_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
-        let rt = basic();
+        let rt = current_thread();
         let (_tx, mut rx) = mpsc::channel::<u8>(1);
         rt.block_on(async {
             let _ = rx.blocking_recv();
@@ -131,7 +131,7 @@ fn mpsc_bounded_receiver_blocking_recv_panic_caller() -> Result<(), Box<dyn Erro
 #[test]
 fn mpsc_bounded_sender_blocking_send_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
-        let rt = basic();
+        let rt = current_thread();
         let (tx, _rx) = mpsc::channel::<u8>(1);
         rt.block_on(async {
             let _ = tx.blocking_send(3);
@@ -147,7 +147,7 @@ fn mpsc_bounded_sender_blocking_send_panic_caller() -> Result<(), Box<dyn Error>
 #[test]
 fn mpsc_unbounded_receiver_blocking_recv_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
-        let rt = basic();
+        let rt = current_thread();
         let (_tx, mut rx) = mpsc::unbounded_channel::<u8>();
         rt.block_on(async {
             let _ = rx.blocking_recv();
@@ -160,6 +160,6 @@ fn mpsc_unbounded_receiver_blocking_recv_panic_caller() -> Result<(), Box<dyn Er
     Ok(())
 }
 
-fn basic() -> Runtime {
+fn current_thread() -> Runtime {
     Builder::new_current_thread().enable_all().build().unwrap()
 }

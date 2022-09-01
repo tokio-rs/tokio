@@ -26,7 +26,7 @@ fn current_handle_panic_caller() -> Result<(), Box<dyn Error>> {
 #[test]
 fn into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(move || {
-        let rt = basic();
+        let rt = current_thread();
         rt.block_on(async {
             let handle = tokio::spawn(future::pending::<()>());
 
@@ -69,7 +69,7 @@ fn builder_max_blocking_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn basic() -> Runtime {
+fn current_thread() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
