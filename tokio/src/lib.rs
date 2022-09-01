@@ -349,7 +349,11 @@
 //! Likewise, some parts of the API are only available with the same flag:
 //!
 //! - [`task::Builder`]
-//!  
+//! - Some methods on [`task::JoinSet`]
+//! - [`runtime::RuntimeMetrics`]
+//! - [`runtime::Builder::unhandled_panic`]
+//! - [`task::Id`]
+//!
 //! This flag enables **unstable** features. The public API of these features
 //! may break in 1.x releases. To enable these features, the `--cfg
 //! tokio_unstable` argument must be passed to `rustc` when compiling. This
