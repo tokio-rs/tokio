@@ -422,7 +422,7 @@ compile_error!("Tokio's build script has incorrectly detected wasm.");
         feature = "signal"
     )
 ))]
-compile_error!("Only features sync,macros,io-util,rt are supported on wasm.");
+compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
 // Includes re-exports used by macros.
 //
