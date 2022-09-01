@@ -409,7 +409,7 @@
 //!
 //! Using this flag enables the use of `tokio::net` on the wasm32-wasi target.
 //! However, not all methods are available on the networking types as WASI
-//! currently does not support the creation of new sockets from within wasm.
+//! currently does not support the creation of new sockets from within WASM.
 //! Because of this, sockets must currently be created via the `FromRawFd`
 //! trait.
 
