@@ -1,3 +1,98 @@
+# 1.21.0 (September 2, 2022)
+
+This release is the first release of Tokio to intentionally support WASM. The
+`sync,macros,io-util,rt,time` features are stabilized on WASM. Additionally the
+wasm32-wasi target is given unstable support for the `net` feature.
+
+### Added
+
+- net: add `device` and `bind_device` methods to TCP/UDP sockets ([#4882])
+- net: add `tos` and `set_tos` methods to TCP and UDP sockets ([#4877])
+- net: add security flags to named pipe `ServerOptions` ([#4845])
+- signal: add more windows signal handlers ([#4924])
+- sync: add `mpsc::Sender::max_capacity` method ([#4904])
+- sync: implement Weak version of `mpsc::Sender` ([#4595])
+- task: add `LocalSet::enter` ([#4765])
+- task: stabilize `JoinSet` and `AbortHandle` ([#4920])
+- tokio: add `track_caller` to public APIs ([#4805], [#4848], [#4852])
+- wasm: initial support for `wasm32-wasi` target ([#4716])
+
+### Fixed
+
+- miri: improve miri compatibility by avoiding temporary references in `linked_list::Link` impls ([#4841])
+- signal: don't register write interest on signal pipe ([#4898])
+- sync: add `#[must_use]` to lock guards ([#4886])
+- sync: fix hang when calling `recv` on closed and reopened broadcast channel ([#4867])
+- task: propagate attributes on task-locals ([#4837])
+
+### Changed
+
+- fs: change panic to error in `File::start_seek` ([#4897])
+- io: reduce syscalls in `poll_read` ([#4840])
+- process: use blocking threadpool for child stdio I/O ([#4824])
+- signal: make `SignalKind` methods const ([#4956])
+
+### Internal changes
+
+- rt: extract `basic_scheduler::Config` ([#4935])
+- rt: move I/O driver into `runtime` module ([#4942])
+- rt: rename internal scheduler types ([#4945])
+
+### Documented
+
+- chore: fix typos and grammar ([#4858], [#4894], [#4928])
+- io: fix typo in `AsyncSeekExt::rewind` docs ([#4893])
+- net: add documentation to `try_read()` for zero-length buffers ([#4937])
+- runtime: remove incorrect panic section for `Builder::worker_threads` ([#4849])
+- sync: doc of `watch::Sender::send` improved ([#4959])
+- task: add cancel safety docs to `JoinHandle` ([#4901])
+- task: expand on cancellation of `spawn_blocking` ([#4811])
+- time: clarify that the first tick of `Interval::tick` happens immediately ([#4951])
+
+### Unstable
+
+- rt: add unstable option to disable the LIFO slot ([#4936])
+- task: fix incorrect signature in `Builder::spawn_on` ([#4953])
+- task: make `task::Builder::spawn*` methods fallible ([#4823])
+
+[#4595]: https://github.com/tokio-rs/tokio/pull/4595
+[#4716]: https://github.com/tokio-rs/tokio/pull/4716
+[#4765]: https://github.com/tokio-rs/tokio/pull/4765
+[#4805]: https://github.com/tokio-rs/tokio/pull/4805
+[#4811]: https://github.com/tokio-rs/tokio/pull/4811
+[#4823]: https://github.com/tokio-rs/tokio/pull/4823
+[#4824]: https://github.com/tokio-rs/tokio/pull/4824
+[#4837]: https://github.com/tokio-rs/tokio/pull/4837
+[#4840]: https://github.com/tokio-rs/tokio/pull/4840
+[#4841]: https://github.com/tokio-rs/tokio/pull/4841
+[#4845]: https://github.com/tokio-rs/tokio/pull/4845
+[#4848]: https://github.com/tokio-rs/tokio/pull/4848
+[#4849]: https://github.com/tokio-rs/tokio/pull/4849
+[#4852]: https://github.com/tokio-rs/tokio/pull/4852
+[#4858]: https://github.com/tokio-rs/tokio/pull/4858
+[#4867]: https://github.com/tokio-rs/tokio/pull/4867
+[#4877]: https://github.com/tokio-rs/tokio/pull/4877
+[#4882]: https://github.com/tokio-rs/tokio/pull/4882
+[#4886]: https://github.com/tokio-rs/tokio/pull/4886
+[#4893]: https://github.com/tokio-rs/tokio/pull/4893
+[#4894]: https://github.com/tokio-rs/tokio/pull/4894
+[#4897]: https://github.com/tokio-rs/tokio/pull/4897
+[#4898]: https://github.com/tokio-rs/tokio/pull/4898
+[#4901]: https://github.com/tokio-rs/tokio/pull/4901
+[#4904]: https://github.com/tokio-rs/tokio/pull/4904
+[#4920]: https://github.com/tokio-rs/tokio/pull/4920
+[#4924]: https://github.com/tokio-rs/tokio/pull/4924
+[#4928]: https://github.com/tokio-rs/tokio/pull/4928
+[#4935]: https://github.com/tokio-rs/tokio/pull/4935
+[#4936]: https://github.com/tokio-rs/tokio/pull/4936
+[#4937]: https://github.com/tokio-rs/tokio/pull/4937
+[#4942]: https://github.com/tokio-rs/tokio/pull/4942
+[#4945]: https://github.com/tokio-rs/tokio/pull/4945
+[#4951]: https://github.com/tokio-rs/tokio/pull/4951
+[#4953]: https://github.com/tokio-rs/tokio/pull/4953
+[#4956]: https://github.com/tokio-rs/tokio/pull/4956
+[#4959]: https://github.com/tokio-rs/tokio/pull/4959
+
 # 1.20.1 (July 25, 2022)
 
 ### Fixed
