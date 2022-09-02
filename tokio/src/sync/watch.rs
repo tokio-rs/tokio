@@ -604,8 +604,22 @@ impl<T> Drop for Receiver<T> {
 impl<T> Sender<T> {
     /// Sends a new value via the channel, notifying all receivers.
     ///
-    /// This method fails if the channel has been closed, which happens when
-    /// every receiver has been dropped.
+    /// This method fails if the channel is closed, which is the case when
+    /// every receiver has been dropped. It is possible to reopen the channel
+    /// using the [`subscribe`] method. However, when `send` fails, the value
+    /// isn't made available for future receivers (but returned with the
+    /// [`SendError`]).
+    ///
+    /// To always make a new value available for future receivers, even if no
+    /// receiver currently exists, one of the other send methods
+    /// ([`send_if_modified`], [`send_modify`], or [`send_replace`]) can be
+    /// used instead.
+    ///
+    /// [`subscribe`]: Sender::subscribe
+    /// [`SendError`]: error::SendError
+    /// [`send_if_modified`]: Sender::send_if_modified
+    /// [`send_modify`]: Sender::send_modify
+    /// [`send_replace`]: Sender::send_replace
     pub fn send(&self, value: T) -> Result<(), error::SendError<T>> {
         // This is pretty much only useful as a hint anyway, so synchronization isn't critical.
         if 0 == self.receiver_count() {
