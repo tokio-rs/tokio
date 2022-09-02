@@ -22,8 +22,8 @@ wasm32-wasi target is given unstable support for the `net` feature.
 - miri: improve miri compatibility by avoiding temporary references in `linked_list::Link` impls ([#4841])
 - signal: don't register write interest on signal pipe ([#4898])
 - sync: add `#[must_use]` to lock guards ([#4886])
-- task: propagate attributes on task-locals ([#4837])
 - sync: fix hang when calling `recv` on closed and reopened broadcast channel ([#4867])
+- task: propagate attributes on task-locals ([#4837])
 
 ### Changed
 
