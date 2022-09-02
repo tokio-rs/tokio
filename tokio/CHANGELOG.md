@@ -1,4 +1,4 @@
-# 1.21.0 (September 1, 2022)
+# 1.21.0 (September 2, 2022)
 
 This release is the first release of Tokio to intentionally support WASM. The
 `sync,macros,io-util,rt,time` features are stabilized on WASM. Additionally the
