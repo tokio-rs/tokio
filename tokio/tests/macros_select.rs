@@ -619,7 +619,7 @@ fn deterministic_select_current_thread() {
 }
 
 #[test]
-#[cfg(feature = "rt-multi-thread")]
+#[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
 fn deterministic_select_multi_thread() {
     let seed = b"bytes used to generate seed";
     let rt = tokio::runtime::Builder::new_multi_thread()
