@@ -17,6 +17,7 @@ async fn make_socketpair() -> (TcpStream, TcpStream) {
     (c1.unwrap(), c2.unwrap().0)
 }
 
+/// Writes data until TCP's back pressure is hit.
 async fn block_write(s: &mut TcpStream) -> usize {
     static BUF: [u8; 2048] = [0; 2048];
 
@@ -26,7 +27,10 @@ async fn block_write(s: &mut TcpStream) -> usize {
             result = s.write(&BUF) => {
                 copied += result.expect("write error")
             },
-            _ = tokio::time::sleep(Duration::from_millis(10)) => {
+            // Timer must be long enough to prevent it from preempting the
+            // `write`, otherwise the receiving buffer will not be filled
+            // entirely.
+            _ = tokio::time::sleep(Duration::from_millis(100)) => {
                 break;
             }
         }
