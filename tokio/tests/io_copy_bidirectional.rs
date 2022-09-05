@@ -117,11 +117,9 @@ async fn blocking_one_side_does_not_block_other() {
 #[tokio::test]
 async fn immediate_exit_on_error() {
     symmetric(|handle, mut a, mut b| async move {
-        block_write(&mut a).await;
-
-        // Fill up the b->copy->a path. We expect that this will _not_ drain
+        // Fill up the receiving buffers. We expect that this will _not_ drain
         // before we exit the copy task.
-        let _bytes_written = block_write(&mut b).await;
+        tokio::join!(block_write(&mut a), block_write(&mut b));
 
         // Drop b. We should not wait for a to consume the data buffered in the
         // copy loop, since b will be failing writes.
