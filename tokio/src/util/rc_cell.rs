@@ -9,7 +9,16 @@ pub(crate) struct RcCell<T> {
 }
 
 impl<T> RcCell<T> {
+    #[cfg(not(loom))]
     pub(crate) const fn new() -> Self {
+        Self {
+            inner: UnsafeCell::new(None),
+        }
+    }
+
+    // The UnsafeCell in loom does not have a const `new` fn.
+    #[cfg(loom)]
+    pub(crate) fn new() -> Self {
         Self {
             inner: UnsafeCell::new(None),
         }
