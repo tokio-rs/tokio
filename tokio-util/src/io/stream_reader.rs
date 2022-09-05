@@ -14,12 +14,18 @@ pin_project! {
     /// # Example
     ///
     /// ```
+    /// use reqwest;
     /// use bytes::Bytes;
     /// use tokio::io::{AsyncReadExt, Result};
     /// use tokio_util::io::StreamReader;
+    ///
+    /// // How to convert to an io::Error type.
+    /// fn reqwest_to_io_error(err: reqwest::Error) -> std::io::Error {
+    ///     todo!()
+    /// }
+    ///
     /// # #[tokio::main]
     /// # async fn main() -> std::io::Result<()> {
-    ///
     /// // Create a stream from an iterator.
     /// let stream = tokio_stream::iter(vec![
     ///     Result::Ok(Bytes::from_static(&[0, 1, 2, 3])),
