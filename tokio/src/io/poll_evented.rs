@@ -188,7 +188,26 @@ feature! {
             &'a E: io::Write + 'a,
         {
             use std::io::Write;
-            self.registration.poll_write_io(cx, || self.io.as_ref().unwrap().write(buf))
+
+            loop {
+                let evt = ready!(self.registration.poll_write_ready(cx))?;
+
+                match self.io.as_ref().unwrap().write(buf) {
+                    Ok(n) => {
+                        // if we write only part of our buffer, this is sufficient on unix to show
+                        // that the socket buffer is full
+                        if n > 0 && (!cfg!(windows) && n < buf.len()) {
+                            self.registration.clear_readiness(evt);
+                        }
+
+                        return Poll::Ready(Ok(n));
+                    },
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        self.registration.clear_readiness(evt);
+                    }
+                    Err(e) => return Poll::Ready(Err(e)),
+                }
+            }
         }
 
         #[cfg(feature = "net")]
