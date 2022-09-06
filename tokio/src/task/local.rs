@@ -2,7 +2,7 @@
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
 use crate::sync::AtomicWaker;
-use crate::util::VecDequeCell;
+use crate::util::{RcCell, VecDequeCell};
 
 use std::cell::Cell;
 use std::collections::VecDeque;
@@ -261,7 +261,11 @@ pin_project! {
     }
 }
 
-thread_local!(static CURRENT: Cell<Option<Rc<Context>>> = Cell::new(None));
+#[cfg(any(loom, tokio_no_const_thread_local))]
+thread_local!(static CURRENT: RcCell<Context> = RcCell::new());
+
+#[cfg(not(any(loom, tokio_no_const_thread_local)))]
+thread_local!(static CURRENT: RcCell<Context> = const { RcCell::new() });
 
 cfg_rt! {
     /// Spawns a `!Send` future on the local task set.
@@ -311,12 +315,10 @@ cfg_rt! {
           F::Output: 'static
     {
         CURRENT.with(|maybe_cx| {
-            let ctx = clone_rc(maybe_cx);
-            match ctx {
+            match maybe_cx.get() {
                 None => panic!("`spawn_local` called from outside of a `task::LocalSet`"),
                 Some(cx) => cx.spawn(future, name)
             }
-
         })
     }
 }
@@ -336,7 +338,7 @@ pub struct LocalEnterGuard(Option<Rc<Context>>);
 impl Drop for LocalEnterGuard {
     fn drop(&mut self) {
         CURRENT.with(|ctx| {
-            ctx.replace(self.0.take());
+            ctx.set(self.0.take());
         })
     }
 }
@@ -615,12 +617,12 @@ impl LocalSet {
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
         CURRENT.with(|ctx| {
             struct Reset<'a> {
-                ctx_ref: &'a Cell<Option<Rc<Context>>>,
+                ctx_ref: &'a RcCell<Context>,
                 val: Option<Rc<Context>>,
             }
             impl<'a> Drop for Reset<'a> {
                 fn drop(&mut self) {
-                    self.ctx_ref.replace(self.val.take());
+                    self.ctx_ref.set(self.val.take());
                 }
             }
             let old = ctx.replace(Some(self.context.clone()));
@@ -822,19 +824,11 @@ impl<T: Future> Future for RunUntil<'_, T> {
     }
 }
 
-fn clone_rc<T>(rc: &Cell<Option<Rc<T>>>) -> Option<Rc<T>> {
-    let value = rc.take();
-    let cloned = value.clone();
-    rc.set(value);
-    cloned
-}
-
 impl Shared {
     /// Schedule the provided task on the scheduler.
     fn schedule(&self, task: task::Notified<Arc<Self>>) {
         CURRENT.with(|maybe_cx| {
-            let ctx = clone_rc(maybe_cx);
-            match ctx {
+            match maybe_cx.get() {
                 Some(cx) if cx.shared.ptr_eq(self) => {
                     cx.queue.push_back(task);
                 }
@@ -861,14 +855,11 @@ impl Shared {
 
 impl task::Schedule for Arc<Shared> {
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
-        CURRENT.with(|maybe_cx| {
-            let ctx = clone_rc(maybe_cx);
-            match ctx {
-                None => panic!("scheduler context missing"),
-                Some(cx) => {
-                    assert!(cx.shared.ptr_eq(self));
-                    cx.owned.remove(task)
-                }
+        CURRENT.with(|maybe_cx| match maybe_cx.get() {
+            None => panic!("scheduler context missing"),
+            Some(cx) => {
+                assert!(cx.shared.ptr_eq(self));
+                cx.owned.remove(task)
             }
         })
     }
@@ -889,15 +880,13 @@ impl task::Schedule for Arc<Shared> {
                     // This hook is only called from within the runtime, so
                     // `CURRENT` should match with `&self`, i.e. there is no
                     // opportunity for a nested scheduler to be called.
-                    CURRENT.with(|maybe_cx| {
-                        let ctx = clone_rc(maybe_cx);
-                        match ctx {
+                    CURRENT.with(|maybe_cx| match maybe_cx.get() {
                         Some(cx) if Arc::ptr_eq(self, &cx.shared) => {
                             cx.unhandled_panic.set(true);
                             cx.owned.close_and_shutdown_all();
                         }
                         _ => unreachable!("runtime core not set in CURRENT thread-local"),
-                    }})
+                    })
                 }
             }
         }
