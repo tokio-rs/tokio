@@ -181,6 +181,10 @@ cfg_io_driver_impl! {
     pub(crate) mod io;
 }
 
+cfg_time! {
+    pub(crate) mod time;
+}
+
 cfg_rt! {
     pub(crate) mod enter;
 
