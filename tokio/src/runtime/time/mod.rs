@@ -7,14 +7,13 @@
 //! Time driver.
 
 mod entry;
-pub(self) use self::entry::{EntryList, TimerEntry, TimerHandle, TimerShared};
+pub(crate) use entry::TimerEntry;
+use entry::{EntryList, TimerHandle, TimerShared};
 
 mod handle;
 pub(crate) use self::handle::Handle;
 
 mod wheel;
-
-pub(super) mod sleep;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex};
@@ -104,8 +103,8 @@ pub(crate) struct Driver<P: Park + 'static> {
 
 /// A structure which handles conversion from Instants to u64 timestamps.
 #[derive(Debug, Clone)]
-pub(self) struct ClockTime {
-    clock: super::clock::Clock,
+pub(crate) struct ClockTime {
+    clock: crate::time::Clock,
     start_time: Instant,
 }
 
@@ -117,7 +116,7 @@ impl ClockTime {
         }
     }
 
-    pub(self) fn deadline_to_tick(&self, t: Instant) -> u64 {
+    pub(crate) fn deadline_to_tick(&self, t: Instant) -> u64 {
         // Round up to the end of a ms
         self.instant_to_tick(t + Duration::from_nanos(999_999))
     }
@@ -136,7 +135,7 @@ impl ClockTime {
         Duration::from_millis(t)
     }
 
-    pub(self) fn now(&self) -> u64 {
+    pub(crate) fn now(&self) -> u64 {
         self.instant_to_tick(self.clock.now())
     }
 }
@@ -403,7 +402,7 @@ impl Handle {
 
                         None
                     }
-                    Err((entry, super::error::InsertError::Elapsed)) => unsafe {
+                    Err((entry, crate::time::error::InsertError::Elapsed)) => unsafe {
                         entry.fire(Ok(()))
                     },
                 }

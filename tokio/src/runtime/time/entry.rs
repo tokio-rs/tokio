@@ -283,7 +283,7 @@ impl StateCell {
 /// timer. As this participates in intrusive data structures, it must be pinned
 /// before polling.
 #[derive(Debug)]
-pub(super) struct TimerEntry {
+pub(crate) struct TimerEntry {
     /// Arc reference to the driver. We can only free the driver after
     /// deregistering everything from their respective timer wheels.
     driver: Handle,

@@ -1,5 +1,5 @@
 use crate::loom::sync::Arc;
-use crate::time::driver::ClockTime;
+use crate::runtime::time::ClockTime;
 use std::fmt;
 
 /// Handle to time driver instance.
@@ -17,7 +17,7 @@ impl Handle {
     }
 
     /// Returns the time source associated with this handle.
-    pub(super) fn time_source(&self) -> &ClockTime {
+    pub(crate) fn time_source(&self) -> &ClockTime {
         &self.time_source
     }
 
