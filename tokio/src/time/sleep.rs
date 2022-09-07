@@ -239,7 +239,7 @@ cfg_trace! {
     struct Inner {
         deadline: Instant,
         ctx: trace::AsyncOpTracingCtx,
-        time_source: ClockTime,
+        time_source: TimeSource,
     }
 }
 
