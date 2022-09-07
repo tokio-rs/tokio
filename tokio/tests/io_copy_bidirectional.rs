@@ -132,13 +132,9 @@ async fn immediate_exit_on_write_error() {
 async fn immediate_exit_on_read_error() {
     let error = || io::Error::new(io::ErrorKind::Other, "got nothing!");
 
-    let mut a = tokio_test::io::Builder::new()
-        .read_error(error())
-        .build();
+    let mut a = tokio_test::io::Builder::new().read_error(error()).build();
 
-    let mut b = tokio_test::io::Builder::new()
-        .read_error(error())
-        .build();
+    let mut b = tokio_test::io::Builder::new().read_error(error()).build();
 
     assert!(copy_bidirectional(&mut a, &mut b).await.is_err());
 }
