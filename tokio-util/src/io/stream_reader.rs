@@ -99,7 +99,6 @@ pin_project! {
     /// # }
     /// ```
     ///
-    ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`Stream`]: futures_core::Stream
     /// [`ReaderStream`]: crate::io::ReaderStream
