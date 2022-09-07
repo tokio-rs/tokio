@@ -331,6 +331,45 @@ impl<T> OnceCell<T> {
         }
     }
 
+    /// Gets the mutable value reference currently in the `OnceCell`, or initialize it with the
+    /// given asynchronous operation.
+    pub async fn get_or_init_mut<F, Fut>(&mut self, f: F) -> &mut T
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = T>,
+    {
+        if self.initialized() {
+            // SAFETY: The OnceCell has been fully initialized.
+            unsafe { self.get_unchecked_mut() }
+        } else {
+            // Here we try to acquire the semaphore permit. Holding the permit
+            // will allow us to set the value of the OnceCell, and prevents
+            // other tasks from initializing the OnceCell while we are holding
+            // it.
+            match self.semaphore.acquire().await {
+                Ok(permit) => {
+                    debug_assert!(!self.initialized());
+
+                    // If `f()` panics or `select!` is called, this
+                    // `get_or_init` call is aborted and the semaphore permit is
+                    // dropped.
+                    let value = f().await;
+
+                    self.set_value(value, permit);
+
+                    unsafe { self.get_unchecked_mut() }
+                }
+                Err(_) => {
+                    debug_assert!(self.initialized());
+
+                    // SAFETY: The semaphore has been closed. This only happens
+                    // when the OnceCell is fully initialized.
+                    unsafe { self.get_unchecked_mut() }
+                }
+            }
+        }
+    }
+
     /// Gets the value currently in the `OnceCell`, or initialize it with the
     /// given asynchronous operation.
     ///
