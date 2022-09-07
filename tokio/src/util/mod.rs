@@ -44,6 +44,7 @@ pub(crate) mod linked_list;
 mod rand;
 
 cfg_rt! {
+    #[allow(unreachable_pub)]
     pub use self::rand::RngSeed;
     pub(crate) use self::rand::{replace_thread_rng, RngSeedGenerator};
 

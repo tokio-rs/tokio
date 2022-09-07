@@ -2,6 +2,7 @@ use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, Runtime, Spawner};
 use crate::util::RngSeedGenerator;
 
+#[allow(unreachable_pub)]
 pub use crate::util::RngSeed;
 
 use std::fmt;
@@ -737,36 +738,6 @@ impl Builder {
         self
     }
 
-    /// Specifies the random number generation seed to use within all threads associated
-    /// with the runtime being built.
-    ///
-    /// This option is intended to make certain parts of the runtime deterministic.
-    /// Specifically, it affects the [`tokio::select!`] macro and the work stealing
-    /// algorithm. In the case of [`tokio::select!`] it will ensure that the order that
-    /// branches are polled is deterministic.
-    ///
-    /// In the case of work stealing, it's a little more complicated. Each worker will
-    /// be given a deterministic seed so that the starting peer for each work stealing
-    /// search will be deterministic.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use tokio::runtime::{self, RngSeed};
-    /// # pub fn main() {
-    /// let seed = RngSeed::from_bytes(b"place your seed here");
-    /// let rt = runtime::Builder::new_current_thread()
-    ///     .rng_seed(seed)
-    ///     .build();
-    /// # }
-    /// ```
-    ///
-    /// [`tokio::select!`]: crate::select
-    pub fn rng_seed(&mut self, seed: RngSeed) -> &mut Self {
-        self.seed_generator = RngSeedGenerator::new(seed);
-        self
-    }
-
     cfg_unstable! {
         /// Configure how the runtime responds to an unhandled panic on a
         /// spawned task.
@@ -865,6 +836,36 @@ impl Builder {
         /// ```
         pub fn disable_lifo_slot(&mut self) -> &mut Self {
             self.disable_lifo_slot = true;
+            self
+        }
+
+                /// Specifies the random number generation seed to use within all threads associated
+        /// with the runtime being built.
+        ///
+        /// This option is intended to make certain parts of the runtime deterministic.
+        /// Specifically, it affects the [`tokio::select!`] macro and the work stealing
+        /// algorithm. In the case of [`tokio::select!`] it will ensure that the order that
+        /// branches are polled is deterministic.
+        ///
+        /// In the case of work stealing, it's a little more complicated. Each worker will
+        /// be given a deterministic seed so that the starting peer for each work stealing
+        /// search will be deterministic.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # use tokio::runtime::{self, RngSeed};
+        /// # pub fn main() {
+        /// let seed = RngSeed::from_bytes(b"place your seed here");
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .rng_seed(seed)
+        ///     .build();
+        /// # }
+        /// ```
+        ///
+        /// [`tokio::select!`]: crate::select
+        pub fn rng_seed(&mut self, seed: RngSeed) -> &mut Self {
+            self.seed_generator = RngSeedGenerator::new(seed);
             self
         }
     }

@@ -63,21 +63,23 @@ impl RngSeed {
         Self::from_u64(crate::loom::rand::seed())
     }
 
-    /// Generates a seed from the provided byte slice.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use tokio::runtime::RngSeed;
-    /// let seed = RngSeed::from_bytes(b"make me a seed");
-    /// ```
-    #[cfg(feature = "rt")]
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        use std::{collections::hash_map::DefaultHasher, hash::Hasher};
+    cfg_unstable! {
+        /// Generates a seed from the provided byte slice.
+        ///
+        /// # Example
+        ///
+        /// ```
+        /// # use tokio::runtime::RngSeed;
+        /// let seed = RngSeed::from_bytes(b"make me a seed");
+        /// ```
+        #[cfg(feature = "rt")]
+        pub fn from_bytes(bytes: &[u8]) -> Self {
+            use std::{collections::hash_map::DefaultHasher, hash::Hasher};
 
-        let mut hasher = DefaultHasher::default();
-        hasher.write(bytes);
-        Self::from_u64(hasher.finish())
+            let mut hasher = DefaultHasher::default();
+            hasher.write(bytes);
+            Self::from_u64(hasher.finish())
+        }
     }
 
     fn from_u64(seed: u64) -> Self {
