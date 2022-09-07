@@ -102,7 +102,7 @@ pub(crate) mod thread {
 
     #[allow(unused_imports)]
     pub(crate) use std::thread::{
-        current, panicking, park, park_timeout, sleep, spawn, Builder, JoinHandle, LocalKey,
-        Result, Thread, ThreadId,
+        current, panicking, park, park_timeout, sleep, spawn, AccessError, Builder, JoinHandle,
+        LocalKey, Result, Thread, ThreadId,
     };
 }

@@ -2,11 +2,10 @@
 
 //! Process driver.
 
-use crate::park::Park;
 use crate::process::unix::GlobalOrphanQueue;
+use crate::runtime::io::Handle;
 use crate::signal::unix::driver::{Driver as SignalDriver, Handle as SignalHandle};
 
-use std::io;
 use std::time::Duration;
 
 /// Responsible for cleaning up orphaned child processes on Unix platforms.
@@ -28,31 +27,22 @@ impl Driver {
             signal_handle,
         }
     }
-}
 
-// ===== impl Park for Driver =====
-
-impl Park for Driver {
-    type Unpark = <SignalDriver as Park>::Unpark;
-    type Error = io::Error;
-
-    fn unpark(&self) -> Self::Unpark {
-        self.park.unpark()
+    pub(crate) fn handle(&self) -> Handle {
+        self.park.io_handle()
     }
 
-    fn park(&mut self) -> Result<(), Self::Error> {
-        self.park.park()?;
+    pub(crate) fn park(&mut self) {
+        self.park.park();
         GlobalOrphanQueue::reap_orphans(&self.signal_handle);
-        Ok(())
     }
 
-    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.park.park_timeout(duration)?;
+    pub(crate) fn park_timeout(&mut self, duration: Duration) {
+        self.park.park_timeout(duration);
         GlobalOrphanQueue::reap_orphans(&self.signal_handle);
-        Ok(())
     }
 
-    fn shutdown(&mut self) {
+    pub(crate) fn shutdown(&mut self) {
         self.park.shutdown()
     }
 }

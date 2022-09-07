@@ -1,9 +1,8 @@
 use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::{Arc, Mutex};
-use crate::park::{Park, Unpark};
 use crate::runtime::context::EnterGuard;
-use crate::runtime::driver::Driver;
+use crate::runtime::driver::{Driver, Unpark};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::{Config, HandleInner};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
@@ -77,7 +76,7 @@ struct Shared {
     owned: OwnedTasks<Arc<Shared>>,
 
     /// Unpark the blocked thread.
-    unpark: <Driver as Park>::Unpark,
+    unpark: Unpark,
 
     /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
@@ -305,7 +304,7 @@ impl Context {
             core.metrics.submit(&core.spawner.shared.worker_metrics);
 
             let (c, _) = self.enter(core, || {
-                driver.park().expect("failed to park");
+                driver.park();
             });
 
             core = c;
@@ -330,9 +329,7 @@ impl Context {
 
         core.metrics.submit(&core.spawner.shared.worker_metrics);
         let (mut core, _) = self.enter(core, || {
-            driver
-                .park_timeout(Duration::from_millis(0))
-                .expect("failed to park");
+            driver.park_timeout(Duration::from_millis(0));
         });
 
         core.driver = Some(driver);

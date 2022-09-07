@@ -20,9 +20,21 @@ mod wheel;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex};
-use crate::park::{Park, Unpark};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
+
+// This duplication should be cleaned up in a later refactor
+cfg_io_driver! {
+    cfg_rt! {
+        use crate::runtime::driver::{IoStack, IoUnpark};
+    }
+    cfg_not_rt! {
+        use crate::runtime::io::{Driver as IoStack, Handle as IoUnpark};
+    }
+}
+cfg_not_io_driver! {
+    use crate::park::thread::{ParkThread as IoStack, UnparkThread as IoUnpark};
+}
 
 use std::fmt;
 use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
@@ -83,7 +95,7 @@ use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
 /// [timeout]: crate::time::Timeout
 /// [interval]: crate::time::Interval
 #[derive(Debug)]
-pub(crate) struct Driver<P: Park + 'static> {
+pub(crate) struct Driver {
     /// Timing backend in use.
     time_source: TimeSource,
 
@@ -91,7 +103,7 @@ pub(crate) struct Driver<P: Park + 'static> {
     handle: Handle,
 
     /// Parker to delegate to.
-    park: P,
+    park: IoStack,
 
     // When `true`, a call to `park_timeout` should immediately return and time
     // should not advance. One reason for this to be `true` is if the task
@@ -112,7 +124,7 @@ struct Inner {
     pub(super) is_shutdown: AtomicBool,
 
     /// Unparker that can be used to wake the time driver.
-    unpark: Box<dyn Unpark>,
+    unpark: IoUnpark,
 }
 
 /// Time state shared which must be protected by a `Mutex`
@@ -132,18 +144,15 @@ struct InnerState {
 
 // ===== impl Driver =====
 
-impl<P> Driver<P>
-where
-    P: Park + 'static,
-{
+impl Driver {
     /// Creates a new `Driver` instance that uses `park` to block the current
     /// thread and `time_source` to get the current time and convert to ticks.
     ///
     /// Specifying the source of time is useful when testing.
-    pub(crate) fn new(park: P, clock: Clock) -> Driver<P> {
+    pub(crate) fn new(park: IoStack, clock: Clock) -> Driver {
         let time_source = TimeSource::new(clock);
 
-        let inner = Inner::new(time_source.clone(), Box::new(park.unpark()));
+        let inner = Inner::new(time_source.clone(), park.unpark());
 
         Driver {
             time_source,
@@ -164,7 +173,33 @@ where
         self.handle.clone()
     }
 
-    fn park_internal(&mut self, limit: Option<Duration>) -> Result<(), P::Error> {
+    pub(crate) fn unpark(&self) -> TimerUnpark {
+        TimerUnpark::new(self)
+    }
+
+    pub(crate) fn park(&mut self) {
+        self.park_internal(None)
+    }
+
+    pub(crate) fn park_timeout(&mut self, duration: Duration) {
+        self.park_internal(Some(duration))
+    }
+
+    pub(crate) fn shutdown(&mut self) {
+        if self.handle.is_shutdown() {
+            return;
+        }
+
+        self.handle.get().is_shutdown.store(true, Ordering::SeqCst);
+
+        // Advance time forward to the end of time.
+
+        self.handle.process_at_time(u64::MAX);
+
+        self.park.shutdown();
+    }
+
+    fn park_internal(&mut self, limit: Option<Duration>) {
         let mut lock = self.handle.get().state.lock();
 
         assert!(!self.handle.is_shutdown());
@@ -188,32 +223,30 @@ where
                         duration = std::cmp::min(limit, duration);
                     }
 
-                    self.park_timeout(duration)?;
+                    self.park_thread_timeout(duration);
                 } else {
-                    self.park.park_timeout(Duration::from_secs(0))?;
+                    self.park.park_timeout(Duration::from_secs(0));
                 }
             }
             None => {
                 if let Some(duration) = limit {
-                    self.park_timeout(duration)?;
+                    self.park_thread_timeout(duration);
                 } else {
-                    self.park.park()?;
+                    self.park.park();
                 }
             }
         }
 
         // Process pending timers after waking up
         self.handle.process();
-
-        Ok(())
     }
 
     cfg_test_util! {
-        fn park_timeout(&mut self, duration: Duration) -> Result<(), P::Error> {
+        fn park_thread_timeout(&mut self, duration: Duration) {
             let clock = &self.time_source.clock;
 
             if clock.is_paused() {
-                self.park.park_timeout(Duration::from_secs(0))?;
+                self.park.park_timeout(Duration::from_secs(0));
 
                 // If the time driver was woken, then the park completed
                 // before the "duration" elapsed (usually caused by a
@@ -224,10 +257,8 @@ where
                     clock.advance(duration);
                 }
             } else {
-                self.park.park_timeout(duration)?;
+                self.park.park_timeout(duration);
             }
-
-            Ok(())
         }
 
         fn did_wake(&self) -> bool {
@@ -236,8 +267,8 @@ where
     }
 
     cfg_not_test_util! {
-        fn park_timeout(&mut self, duration: Duration) -> Result<(), P::Error> {
-            self.park.park_timeout(duration)
+        fn park_thread_timeout(&mut self, duration: Duration) {
+            self.park.park_timeout(duration);
         }
     }
 }
@@ -383,58 +414,21 @@ impl Handle {
     }
 }
 
-impl<P> Park for Driver<P>
-where
-    P: Park + 'static,
-{
-    type Unpark = TimerUnpark<P>;
-    type Error = P::Error;
-
-    fn unpark(&self) -> Self::Unpark {
-        TimerUnpark::new(self)
-    }
-
-    fn park(&mut self) -> Result<(), Self::Error> {
-        self.park_internal(None)
-    }
-
-    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.park_internal(Some(duration))
-    }
-
-    fn shutdown(&mut self) {
-        if self.handle.is_shutdown() {
-            return;
-        }
-
-        self.handle.get().is_shutdown.store(true, Ordering::SeqCst);
-
-        // Advance time forward to the end of time.
-
-        self.handle.process_at_time(u64::MAX);
-
-        self.park.shutdown();
-    }
-}
-
-impl<P> Drop for Driver<P>
-where
-    P: Park + 'static,
-{
+impl Drop for Driver {
     fn drop(&mut self) {
         self.shutdown();
     }
 }
 
-pub(crate) struct TimerUnpark<P: Park + 'static> {
-    inner: P::Unpark,
+pub(crate) struct TimerUnpark {
+    inner: IoUnpark,
 
     #[cfg(feature = "test-util")]
     did_wake: Arc<AtomicBool>,
 }
 
-impl<P: Park + 'static> TimerUnpark<P> {
-    fn new(driver: &Driver<P>) -> TimerUnpark<P> {
+impl TimerUnpark {
+    fn new(driver: &Driver) -> TimerUnpark {
         TimerUnpark {
             inner: driver.park.unpark(),
 
@@ -442,10 +436,8 @@ impl<P: Park + 'static> TimerUnpark<P> {
             did_wake: driver.did_wake.clone(),
         }
     }
-}
 
-impl<P: Park + 'static> Unpark for TimerUnpark<P> {
-    fn unpark(&self) {
+    pub(crate) fn unpark(&self) {
         #[cfg(feature = "test-util")]
         self.did_wake.store(true, Ordering::SeqCst);
 
@@ -456,7 +448,7 @@ impl<P: Park + 'static> Unpark for TimerUnpark<P> {
 // ===== impl Inner =====
 
 impl Inner {
-    pub(self) fn new(time_source: TimeSource, unpark: Box<dyn Unpark>) -> Self {
+    pub(self) fn new(time_source: TimeSource, unpark: IoUnpark) -> Self {
         Inner {
             state: Mutex::new(InnerState {
                 time_source,
