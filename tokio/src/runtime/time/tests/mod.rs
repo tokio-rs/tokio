@@ -49,7 +49,7 @@ fn model(f: impl Fn() + Send + Sync + 'static) {
 fn single_timer() {
     model(|| {
         let clock = crate::time::Clock::new(true, false);
-        let time_source = super::ClockTime::new(clock.clone());
+        let time_source = super::TimeSource::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
         let handle = Handle::new(Arc::new(inner));
@@ -80,7 +80,7 @@ fn single_timer() {
 fn drop_timer() {
     model(|| {
         let clock = crate::time::Clock::new(true, false);
-        let time_source = super::ClockTime::new(clock.clone());
+        let time_source = super::TimeSource::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
         let handle = Handle::new(Arc::new(inner));
@@ -111,7 +111,7 @@ fn drop_timer() {
 fn change_waker() {
     model(|| {
         let clock = crate::time::Clock::new(true, false);
-        let time_source = super::ClockTime::new(clock.clone());
+        let time_source = super::TimeSource::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
         let handle = Handle::new(Arc::new(inner));
@@ -146,7 +146,7 @@ fn reset_future() {
         let finished_early = Arc::new(AtomicBool::new(false));
 
         let clock = crate::time::Clock::new(true, false);
-        let time_source = super::ClockTime::new(clock.clone());
+        let time_source = super::TimeSource::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
         let handle = Handle::new(Arc::new(inner));
@@ -204,7 +204,7 @@ fn poll_process_levels() {
     let clock = crate::time::Clock::new(true, false);
     clock.pause();
 
-    let time_source = super::ClockTime::new(clock.clone());
+    let time_source = super::TimeSource::new(clock.clone());
 
     let inner = super::Inner::new(time_source, MockUnpark::mock());
     let handle = Handle::new(Arc::new(inner));
@@ -245,7 +245,7 @@ fn poll_process_levels_targeted() {
     let clock = crate::time::Clock::new(true, false);
     clock.pause();
 
-    let time_source = super::ClockTime::new(clock.clone());
+    let time_source = super::TimeSource::new(clock.clone());
 
     let inner = super::Inner::new(time_source, MockUnpark::mock());
     let handle = Handle::new(Arc::new(inner));
