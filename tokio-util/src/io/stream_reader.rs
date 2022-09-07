@@ -50,9 +50,58 @@ pin_project! {
     /// # }
     /// ```
     ///
+    /// If the stream produces errors which are not [std::io::Error],
+    /// the errors can be converted using [`StreamExt`] to map each
+    /// element.
+    ///
+    /// ```
+    /// use bytes::Bytes;
+    /// use tokio::io::AsyncReadExt;
+    /// use tokio_util::io::StreamReader;
+    /// use tokio_stream::StreamExt;
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    ///
+    /// // Create a stream from an iterator, including an error.
+    /// let stream = tokio_stream::iter(vec![
+    ///     Result::Ok(Bytes::from_static(&[0, 1, 2, 3])),
+    ///     Result::Ok(Bytes::from_static(&[4, 5, 6, 7])),
+    ///     Result::Err("Something bad happened!")
+    /// ]);
+    ///
+    /// // Use StreamExt to map the stream and error to a std::io::Error
+    /// let stream = stream.map(|result| result.map_err(|err| {
+    ///     std::io::Error::new(std::io::ErrorKind::Other, err)
+    /// }));
+    ///
+    /// // Convert it to an AsyncRead.
+    /// let mut read = StreamReader::new(stream);
+    ///
+    /// // Read five bytes from the stream.
+    /// let mut buf = [0; 5];
+    /// read.read_exact(&mut buf).await?;
+    /// assert_eq!(buf, [0, 1, 2, 3, 4]);
+    ///
+    /// // Read the rest of the current chunk.
+    /// assert_eq!(read.read(&mut buf).await?, 3);
+    /// assert_eq!(&buf[..3], [5, 6, 7]);
+    ///
+    /// // Reading the next chunk will produce an error
+    /// let error = read.read(&mut buf).await.unwrap_err();
+    /// assert_eq!(error.kind(), std::io::ErrorKind::Other);
+    /// assert_eq!(error.into_inner().unwrap().to_string(), "Something bad happened!");
+    ///
+    /// // We have now reached the end.
+    /// assert_eq!(read.read(&mut buf).await?, 0);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`Stream`]: futures_core::Stream
     /// [`ReaderStream`]: crate::io::ReaderStream
+    /// [`StreamExt`]: tokio_stream::StreamExt
     #[derive(Debug)]
     pub struct StreamReader<S, B> {
         #[pin]
