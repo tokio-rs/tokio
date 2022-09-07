@@ -1,12 +1,12 @@
 use crate::loom::sync::Arc;
-use crate::runtime::time::ClockTime;
+use crate::runtime::time::TimeSource;
 use std::fmt;
 
 /// Handle to time driver instance.
 #[derive(Clone)]
 pub(crate) struct Handle {
-    time_source: ClockTime,
-    inner: Arc<super::Inner>,
+    time_source: TimeSource,
+    pub(super) inner: Arc<super::Inner>,
 }
 
 impl Handle {
@@ -17,7 +17,7 @@ impl Handle {
     }
 
     /// Returns the time source associated with this handle.
-    pub(crate) fn time_source(&self) -> &ClockTime {
+    pub(crate) fn time_source(&self) -> &TimeSource {
         &self.time_source
     }
 

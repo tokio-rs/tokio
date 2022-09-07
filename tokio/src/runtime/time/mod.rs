@@ -13,15 +13,17 @@ use entry::{EntryList, TimerHandle, TimerShared};
 mod handle;
 pub(crate) use self::handle::Handle;
 
+mod source;
+pub(crate) use source::TimeSource;
+
 mod wheel;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::time::error::Error;
-use crate::time::{Clock, Duration, Instant};
+use crate::time::{Clock, Duration};
 
-use std::convert::TryInto;
 use std::fmt;
 use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
 
@@ -83,7 +85,7 @@ use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
 #[derive(Debug)]
 pub(crate) struct Driver<P: Park + 'static> {
     /// Timing backend in use.
-    time_source: ClockTime,
+    time_source: TimeSource,
 
     /// Shared state.
     handle: Handle,
@@ -101,45 +103,6 @@ pub(crate) struct Driver<P: Park + 'static> {
     did_wake: Arc<AtomicBool>,
 }
 
-/// A structure which handles conversion from Instants to u64 timestamps.
-#[derive(Debug, Clone)]
-pub(crate) struct ClockTime {
-    clock: crate::time::Clock,
-    start_time: Instant,
-}
-
-impl ClockTime {
-    pub(self) fn new(clock: Clock) -> Self {
-        Self {
-            start_time: clock.now(),
-            clock,
-        }
-    }
-
-    pub(crate) fn deadline_to_tick(&self, t: Instant) -> u64 {
-        // Round up to the end of a ms
-        self.instant_to_tick(t + Duration::from_nanos(999_999))
-    }
-
-    pub(self) fn instant_to_tick(&self, t: Instant) -> u64 {
-        // round up
-        let dur: Duration = t
-            .checked_duration_since(self.start_time)
-            .unwrap_or_else(|| Duration::from_secs(0));
-        let ms = dur.as_millis();
-
-        ms.try_into().unwrap_or(u64::MAX)
-    }
-
-    pub(self) fn tick_to_duration(&self, t: u64) -> Duration {
-        Duration::from_millis(t)
-    }
-
-    pub(crate) fn now(&self) -> u64 {
-        self.instant_to_tick(self.clock.now())
-    }
-}
-
 /// Timer state shared between `Driver`, `Handle`, and `Registration`.
 struct Inner {
     // The state is split like this so `Handle` can access `is_shutdown` without locking the mutex
@@ -147,12 +110,15 @@ struct Inner {
 
     /// True if the driver is being shutdown.
     pub(super) is_shutdown: AtomicBool,
+
+    /// Unparker that can be used to wake the time driver.
+    unpark: Box<dyn Unpark>,
 }
 
 /// Time state shared which must be protected by a `Mutex`
 struct InnerState {
     /// Timing backend in use.
-    time_source: ClockTime,
+    time_source: TimeSource,
 
     /// The last published timer `elapsed` value.
     elapsed: u64,
@@ -162,9 +128,6 @@ struct InnerState {
 
     /// Timer wheel.
     wheel: wheel::Wheel,
-
-    /// Unparker that can be used to wake the time driver.
-    unpark: Box<dyn Unpark>,
 }
 
 // ===== impl Driver =====
@@ -178,7 +141,7 @@ where
     ///
     /// Specifying the source of time is useful when testing.
     pub(crate) fn new(park: P, clock: Clock) -> Driver<P> {
-        let time_source = ClockTime::new(clock);
+        let time_source = TimeSource::new(clock);
 
         let inner = Inner::new(time_source.clone(), Box::new(park.unpark()));
 
@@ -397,7 +360,7 @@ impl Handle {
                             .map(|next_wake| when < next_wake.get())
                             .unwrap_or(true)
                         {
-                            lock.unpark.unpark();
+                            self.inner.unpark.unpark();
                         }
 
                         None
@@ -493,15 +456,15 @@ impl<P: Park + 'static> Unpark for TimerUnpark<P> {
 // ===== impl Inner =====
 
 impl Inner {
-    pub(self) fn new(time_source: ClockTime, unpark: Box<dyn Unpark>) -> Self {
+    pub(self) fn new(time_source: TimeSource, unpark: Box<dyn Unpark>) -> Self {
         Inner {
             state: Mutex::new(InnerState {
                 time_source,
                 elapsed: 0,
                 next_wake: None,
-                unpark,
                 wheel: wheel::Wheel::new(),
             }),
+            unpark,
             is_shutdown: AtomicBool::new(false),
         }
     }
