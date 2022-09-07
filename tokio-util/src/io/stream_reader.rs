@@ -91,7 +91,6 @@ pin_project! {
     /// assert_eq!(error.kind(), std::io::ErrorKind::Other);
     /// assert_eq!(error.into_inner().unwrap().to_string(), "Something bad happened!");
     ///
-    ///
     /// // We have now reached the end.
     /// assert_eq!(read.read(&mut buf).await?, 0);
     ///
