@@ -59,6 +59,9 @@ cfg_rt! {
 
     mod vec_deque_cell;
     pub(crate) use vec_deque_cell::VecDequeCell;
+
+    mod rc_cell;
+    pub(crate) use rc_cell::RcCell;
 }
 
 #[cfg(any(feature = "macros"))]

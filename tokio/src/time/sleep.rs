@@ -1,6 +1,6 @@
 #[cfg(all(tokio_unstable, feature = "tracing"))]
-use crate::time::driver::ClockTime;
-use crate::time::driver::{Handle, TimerEntry};
+use crate::runtime::time::ClockTime;
+use crate::runtime::time::{Handle, TimerEntry};
 use crate::time::{error::Error, Duration, Instant};
 use crate::util::trace;
 

@@ -98,10 +98,10 @@ cfg_not_process_driver! {
 // ===== time driver =====
 
 cfg_time! {
-    type TimeDriver = crate::park::either::Either<crate::time::driver::Driver<IoStack>, IoStack>;
+    type TimeDriver = crate::park::either::Either<crate::runtime::time::Driver<IoStack>, IoStack>;
 
     pub(crate) type Clock = crate::time::Clock;
-    pub(crate) type TimeHandle = Option<crate::time::driver::Handle>;
+    pub(crate) type TimeHandle = Option<crate::runtime::time::Handle>;
 
     fn create_clock(enable_pausing: bool, start_paused: bool) -> Clock {
         crate::time::Clock::new(enable_pausing, start_paused)
@@ -115,7 +115,7 @@ cfg_time! {
         use crate::park::either::Either;
 
         if enable {
-            let driver = crate::time::driver::Driver::new(io_stack, clock);
+            let driver = crate::runtime::time::Driver::new(io_stack, clock);
             let handle = driver.handle();
 
             (Either::A(driver), Some(handle))

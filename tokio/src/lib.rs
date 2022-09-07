@@ -497,9 +497,8 @@ cfg_rt! {
     pub mod runtime;
 }
 cfg_not_rt! {
-    cfg_io_driver_impl! {
-        pub(crate) mod runtime;
-    }
+    // The `runtime` module is used when the IO or time driver is needed.
+    pub(crate) mod runtime;
 }
 
 pub(crate) mod coop;
