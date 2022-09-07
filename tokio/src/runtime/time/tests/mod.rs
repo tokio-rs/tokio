@@ -33,9 +33,16 @@ fn model(f: impl Fn() + Send + Sync + 'static) {
     f();
 }
 
+#[cfg(not(tokio_wasm))]
 fn unpark() -> IoUnpark {
     use crate::park::thread::ParkThread;
     IoUnpark::Disabled(ParkThread::new().unpark())
+}
+
+#[cfg(tokio_wasm)]
+fn unpark() -> IoUnpark {
+    use crate::park::thread::ParkThread;
+    ParkThread::new().unpark()
 }
 
 #[test]
