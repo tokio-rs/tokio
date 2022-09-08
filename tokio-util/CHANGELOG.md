@@ -1,4 +1,4 @@
-# 0.7.4 (September 7, 2022)
+# 0.7.4 (September 8, 2022)
 
 ### Added
 
