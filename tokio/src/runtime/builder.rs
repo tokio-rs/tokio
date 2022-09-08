@@ -1,9 +1,6 @@
 use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, Runtime, Spawner};
-use crate::util::RngSeedGenerator;
-
-#[allow(unreachable_pub)]
-pub use crate::util::RngSeed;
+use crate::util::{RngSeed, RngSeedGenerator};
 
 use std::fmt;
 use std::io;
