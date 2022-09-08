@@ -99,9 +99,6 @@ pub(crate) struct Driver {
     /// Timing backend in use.
     time_source: TimeSource,
 
-    /// Shared state.
-    handle: Handle,
-
     /// Parker to delegate to.
     park: IoStack,
 
@@ -149,60 +146,52 @@ impl Driver {
     /// thread and `time_source` to get the current time and convert to ticks.
     ///
     /// Specifying the source of time is useful when testing.
-    pub(crate) fn new(park: IoStack, clock: Clock) -> Driver {
+    pub(crate) fn new(park: IoStack, clock: Clock) -> (Driver, Handle) {
         let time_source = TimeSource::new(clock);
 
         let inner = Inner::new(time_source.clone(), park.unpark());
+        let handle = Handle::new(Arc::new(inner));
 
-        Driver {
+        let driver = Driver {
             time_source,
-            handle: Handle::new(Arc::new(inner)),
             park,
             #[cfg(feature = "test-util")]
             did_wake: Arc::new(AtomicBool::new(false)),
-        }
-    }
+        };
 
-    /// Returns a handle to the timer.
-    ///
-    /// The `Handle` is how `Sleep` instances are created. The `Sleep` instances
-    /// can either be created directly or the `Handle` instance can be passed to
-    /// `with_default`, setting the timer as the default timer for the execution
-    /// context.
-    pub(crate) fn handle(&self) -> Handle {
-        self.handle.clone()
+        (driver, handle)
     }
 
     pub(crate) fn unpark(&self) -> TimerUnpark {
         TimerUnpark::new(self)
     }
 
-    pub(crate) fn park(&mut self) {
-        self.park_internal(None)
+    pub(crate) fn park(&mut self, handle: &Handle) {
+        self.park_internal(handle, None)
     }
 
-    pub(crate) fn park_timeout(&mut self, duration: Duration) {
-        self.park_internal(Some(duration))
+    pub(crate) fn park_timeout(&mut self, handle: &Handle, duration: Duration) {
+        self.park_internal(handle, Some(duration))
     }
 
-    pub(crate) fn shutdown(&mut self) {
-        if self.handle.is_shutdown() {
+    pub(crate) fn shutdown(&mut self, handle: &Handle) {
+        if handle.is_shutdown() {
             return;
         }
 
-        self.handle.get().is_shutdown.store(true, Ordering::SeqCst);
+        handle.get().is_shutdown.store(true, Ordering::SeqCst);
 
         // Advance time forward to the end of time.
 
-        self.handle.process_at_time(u64::MAX);
+        handle.process_at_time(u64::MAX);
 
         self.park.shutdown();
     }
 
-    fn park_internal(&mut self, limit: Option<Duration>) {
-        let mut lock = self.handle.get().state.lock();
+    fn park_internal(&mut self, handle: &Handle, limit: Option<Duration>) {
+        let mut lock = handle.get().state.lock();
 
-        assert!(!self.handle.is_shutdown());
+        assert!(!handle.is_shutdown());
 
         let next_wake = lock.wheel.next_expiration_time();
         lock.next_wake =
@@ -238,7 +227,7 @@ impl Driver {
         }
 
         // Process pending timers after waking up
-        self.handle.process();
+        handle.process();
     }
 
     cfg_test_util! {
@@ -411,12 +400,6 @@ impl Handle {
         if let Some(waker) = waker {
             waker.wake();
         }
-    }
-}
-
-impl Drop for Driver {
-    fn drop(&mut self) {
-        self.shutdown();
     }
 }
 

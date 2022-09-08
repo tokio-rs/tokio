@@ -147,7 +147,10 @@ cfg_not_process_driver! {
 cfg_time! {
     #[derive(Debug)]
     pub(crate) enum TimeDriver {
-        Enabled(crate::runtime::time::Driver),
+        Enabled {
+            driver: crate::runtime::time::Driver,
+            handle: crate::runtime::time::Handle,
+        },
         Disabled(IoStack),
     }
 
@@ -169,10 +172,9 @@ cfg_time! {
         clock: Clock,
     ) -> (TimeDriver, TimeHandle) {
         if enable {
-            let driver = crate::runtime::time::Driver::new(io_stack, clock);
-            let handle = driver.handle();
+            let (driver, handle) = crate::runtime::time::Driver::new(io_stack, clock);
 
-            (TimeDriver::Enabled(driver), Some(handle))
+            (TimeDriver::Enabled { driver, handle: handle.clone() }, Some(handle))
         } else {
             (TimeDriver::Disabled(io_stack), None)
         }
@@ -181,21 +183,21 @@ cfg_time! {
     impl TimeDriver {
         pub(crate) fn unpark(&self) -> TimerUnpark {
             match self {
-                TimeDriver::Enabled(v) => TimerUnpark::Enabled(v.unpark()),
+                TimeDriver::Enabled { driver, .. } => TimerUnpark::Enabled(driver.unpark()),
                 TimeDriver::Disabled(v) => TimerUnpark::Disabled(v.unpark()),
             }
         }
 
         pub(crate) fn park(&mut self) {
             match self {
-                TimeDriver::Enabled(v) => v.park(),
+                TimeDriver::Enabled { driver, handle } => driver.park(handle),
                 TimeDriver::Disabled(v) => v.park(),
             }
         }
 
         pub(crate) fn park_timeout(&mut self, duration: Duration) {
             match self {
-                TimeDriver::Enabled(v) => v.park_timeout(duration),
+                TimeDriver::Enabled { driver, handle } => driver.park_timeout(handle, duration),
                 TimeDriver::Disabled(v) => v.park_timeout(duration),
             }
         }
@@ -204,9 +206,17 @@ cfg_time! {
         cfg_rt_multi_thread! {
             pub(crate) fn shutdown(&mut self) {
                 match self {
-                    TimeDriver::Enabled(v) => v.shutdown(),
+                    TimeDriver::Enabled { driver, handle } => driver.shutdown(handle),
                     TimeDriver::Disabled(v) => v.shutdown(),
                 }
+            }
+        }
+    }
+
+    impl Drop for TimeDriver {
+        fn drop(&mut self) {
+            if let TimeDriver::Enabled { driver, handle } = self {
+                driver.shutdown(handle);
             }
         }
     }
