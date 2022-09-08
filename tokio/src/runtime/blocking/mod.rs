@@ -13,6 +13,8 @@ cfg_fs! {
 mod schedule;
 mod shutdown;
 mod task;
+#[cfg(test)]
+pub(crate) use schedule::NoopSchedule;
 pub(crate) use task::BlockingTask;
 
 use crate::runtime::Builder;
