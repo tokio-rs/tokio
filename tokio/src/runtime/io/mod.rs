@@ -10,7 +10,6 @@ mod metrics;
 
 use crate::io::interest::Interest;
 use crate::io::ready::Ready;
-use crate::park::{Park, Unpark};
 use crate::util::slab::{self, Slab};
 use crate::{loom::sync::RwLock, util::bit};
 
@@ -145,7 +144,35 @@ impl Driver {
         }
     }
 
-    fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
+    // TODO: remove this in a later refactor
+    cfg_not_rt! {
+        cfg_time! {
+            pub(crate) fn unpark(&self) -> Handle {
+                self.handle()
+            }
+        }
+    }
+
+    pub(crate) fn park(&mut self) {
+        self.turn(None);
+    }
+
+    pub(crate) fn park_timeout(&mut self, duration: Duration) {
+        self.turn(Some(duration));
+    }
+
+    pub(crate) fn shutdown(&mut self) {
+        if self.inner.shutdown() {
+            self.resources.for_each(|io| {
+                // If a task is waiting on the I/O resource, notify it. The task
+                // will then attempt to use the I/O resource and fail due to the
+                // driver being shutdown. And shutdown will clear all wakers.
+                io.shutdown();
+            });
+        }
+    }
+
+    fn turn(&mut self, max_wait: Option<Duration>) {
         // How often to call `compact()` on the resource slab
         const COMPACT_INTERVAL: u8 = 255;
 
@@ -167,7 +194,7 @@ impl Driver {
                 // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
                 // just return from the park, as there would be nothing, which wakes us up.
             }
-            Err(e) => return Err(e),
+            Err(e) => panic!("unexpected error when polling the I/O driver: {:?}", e),
         }
 
         // Process all the events that came in, dispatching appropriately
@@ -184,8 +211,6 @@ impl Driver {
         self.inner.metrics.incr_ready_count_by(ready_count);
 
         self.events = Some(events);
-
-        Ok(())
     }
 
     fn dispatch(&mut self, token: mio::Token, ready: Ready) {
@@ -212,36 +237,6 @@ impl Driver {
 impl Drop for Driver {
     fn drop(&mut self) {
         self.shutdown();
-    }
-}
-
-impl Park for Driver {
-    type Unpark = Handle;
-    type Error = io::Error;
-
-    fn unpark(&self) -> Self::Unpark {
-        self.handle()
-    }
-
-    fn park(&mut self) -> io::Result<()> {
-        self.turn(None)?;
-        Ok(())
-    }
-
-    fn park_timeout(&mut self, duration: Duration) -> io::Result<()> {
-        self.turn(Some(duration))?;
-        Ok(())
-    }
-
-    fn shutdown(&mut self) {
-        if self.inner.shutdown() {
-            self.resources.for_each(|io| {
-                // If a task is waiting on the I/O resource, notify it. The task
-                // will then attempt to use the I/O resource and fail due to the
-                // driver being shutdown. And shutdown will clear all wakers.
-                io.shutdown();
-            });
-        }
     }
 }
 
@@ -303,15 +298,9 @@ impl Handle {
     /// after this method has been called. If the reactor is not currently
     /// blocked in `turn`, then the next call to `turn` will not block and
     /// return immediately.
-    fn wakeup(&self) {
+    pub(crate) fn unpark(&self) {
         #[cfg(not(tokio_wasi))]
         self.inner.waker.wake().expect("failed to wake I/O driver");
-    }
-}
-
-impl Unpark for Handle {
-    fn unpark(&self) {
-        self.wakeup();
     }
 }
 

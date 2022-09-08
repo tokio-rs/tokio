@@ -60,7 +60,6 @@ use crate::coop;
 use crate::future::Future;
 use crate::loom::rand::seed;
 use crate::loom::sync::{Arc, Mutex};
-use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::scheduler::multi_thread::{queue, Idle, Parker, Unparker};
@@ -512,9 +511,9 @@ impl Context {
 
         // Park thread
         if let Some(timeout) = duration {
-            park.park_timeout(timeout).expect("park failed");
+            park.park_timeout(timeout);
         } else {
-            park.park().expect("park failed");
+            park.park();
         }
 
         // Remove `core` from context
