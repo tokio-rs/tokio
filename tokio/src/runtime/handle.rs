@@ -51,7 +51,7 @@ pub(crate) struct HandleInner {
     pub(super) clock: driver::Clock,
 
     /// Blocking pool spawner
-    pub(super) blocking_spawner: blocking::Spawner,
+    pub(crate) blocking_spawner: blocking::Spawner,
 }
 
 /// Create a new runtime handle.

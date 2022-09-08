@@ -300,7 +300,7 @@ impl Spawner {
     }
 
     #[track_caller]
-    fn spawn_blocking_inner<F, R>(
+    pub(crate) fn spawn_blocking_inner<F, R>(
         &self,
         func: F,
         is_mandatory: Mandatory,

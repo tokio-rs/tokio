@@ -10,6 +10,10 @@ cfg_fs! {
     pub(crate) use pool::spawn_mandatory_blocking;
 }
 
+cfg_unstable! {
+    pub(crate) use pool::Mandatory;
+}
+
 mod schedule;
 mod shutdown;
 mod task;
