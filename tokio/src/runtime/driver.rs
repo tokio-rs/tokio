@@ -1,6 +1,5 @@
 //! Abstracts out the entire chain of runtime sub-drivers into common types.
-use crate::park::thread::ParkThread;
-use crate::park::Park;
+use crate::park::thread::{ParkThread, UnparkThread};
 
 use std::io;
 use std::time::Duration;
@@ -8,13 +7,21 @@ use std::time::Duration;
 // ===== io driver =====
 
 cfg_io_driver! {
-    type IoDriver = crate::runtime::io::Driver;
-    type IoStack = crate::park::either::Either<ProcessDriver, ParkThread>;
+    pub(crate) type IoDriver = crate::runtime::io::Driver;
     pub(crate) type IoHandle = Option<crate::runtime::io::Handle>;
 
-    fn create_io_stack(enabled: bool) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
-        use crate::park::either::Either;
+    #[derive(Debug)]
+    pub(crate) enum IoStack {
+        Enabled(ProcessDriver),
+        Disabled(ParkThread),
+    }
 
+    pub(crate) enum IoUnpark {
+        Enabled(crate::runtime::io::Handle),
+        Disabled(UnparkThread),
+    }
+
+    fn create_io_stack(enabled: bool) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         #[cfg(loom)]
         assert!(!enabled);
 
@@ -25,18 +32,58 @@ cfg_io_driver! {
             let (signal_driver, signal_handle) = create_signal_driver(io_driver)?;
             let process_driver = create_process_driver(signal_driver);
 
-            (Either::A(process_driver), Some(io_handle), signal_handle)
+            (IoStack::Enabled(process_driver), Some(io_handle), signal_handle)
         } else {
-            (Either::B(ParkThread::new()), Default::default(), Default::default())
+            (IoStack::Disabled(ParkThread::new()), Default::default(), Default::default())
         };
 
         Ok(ret)
+    }
+
+    impl IoStack {
+        pub(crate) fn unpark(&self) -> IoUnpark {
+            match self {
+                IoStack::Enabled(v) => IoUnpark::Enabled(v.handle()),
+                IoStack::Disabled(v) => IoUnpark::Disabled(v.unpark()),
+            }
+        }
+
+        pub(crate) fn park(&mut self) {
+            match self {
+                IoStack::Enabled(v) => v.park(),
+                IoStack::Disabled(v) => v.park(),
+            }
+        }
+
+        pub(crate) fn park_timeout(&mut self, duration: Duration) {
+            match self {
+                IoStack::Enabled(v) => v.park_timeout(duration),
+                IoStack::Disabled(v) => v.park_timeout(duration),
+            }
+        }
+
+        pub(crate) fn shutdown(&mut self) {
+            match self {
+                IoStack::Enabled(v) => v.shutdown(),
+                IoStack::Disabled(v) => v.shutdown(),
+            }
+        }
+    }
+
+    impl IoUnpark {
+        pub(crate) fn unpark(&self) {
+            match self {
+                IoUnpark::Enabled(v) => v.unpark(),
+                IoUnpark::Disabled(v) => v.unpark(),
+            }
+        }
     }
 }
 
 cfg_not_io_driver! {
     pub(crate) type IoHandle = ();
-    type IoStack = ParkThread;
+    pub(crate) type IoStack = ParkThread;
+    pub(crate) type IoUnpark = UnparkThread;
 
     fn create_io_stack(_enabled: bool) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         Ok((ParkThread::new(), Default::default(), Default::default()))
@@ -98,7 +145,16 @@ cfg_not_process_driver! {
 // ===== time driver =====
 
 cfg_time! {
-    type TimeDriver = crate::park::either::Either<crate::runtime::time::Driver<IoStack>, IoStack>;
+    #[derive(Debug)]
+    pub(crate) enum TimeDriver {
+        Enabled(crate::runtime::time::Driver),
+        Disabled(IoStack),
+    }
+
+    pub(crate) enum TimerUnpark {
+        Enabled(crate::runtime::time::TimerUnpark),
+        Disabled(IoUnpark),
+    }
 
     pub(crate) type Clock = crate::time::Clock;
     pub(crate) type TimeHandle = Option<crate::runtime::time::Handle>;
@@ -112,21 +168,62 @@ cfg_time! {
         io_stack: IoStack,
         clock: Clock,
     ) -> (TimeDriver, TimeHandle) {
-        use crate::park::either::Either;
-
         if enable {
             let driver = crate::runtime::time::Driver::new(io_stack, clock);
             let handle = driver.handle();
 
-            (Either::A(driver), Some(handle))
+            (TimeDriver::Enabled(driver), Some(handle))
         } else {
-            (Either::B(io_stack), None)
+            (TimeDriver::Disabled(io_stack), None)
+        }
+    }
+
+    impl TimeDriver {
+        pub(crate) fn unpark(&self) -> TimerUnpark {
+            match self {
+                TimeDriver::Enabled(v) => TimerUnpark::Enabled(v.unpark()),
+                TimeDriver::Disabled(v) => TimerUnpark::Disabled(v.unpark()),
+            }
+        }
+
+        pub(crate) fn park(&mut self) {
+            match self {
+                TimeDriver::Enabled(v) => v.park(),
+                TimeDriver::Disabled(v) => v.park(),
+            }
+        }
+
+        pub(crate) fn park_timeout(&mut self, duration: Duration) {
+            match self {
+                TimeDriver::Enabled(v) => v.park_timeout(duration),
+                TimeDriver::Disabled(v) => v.park_timeout(duration),
+            }
+        }
+
+        // TODO: tokio-rs/tokio#4990, should the `current_thread` scheduler call this?
+        cfg_rt_multi_thread! {
+            pub(crate) fn shutdown(&mut self) {
+                match self {
+                    TimeDriver::Enabled(v) => v.shutdown(),
+                    TimeDriver::Disabled(v) => v.shutdown(),
+                }
+            }
+        }
+    }
+
+    impl TimerUnpark {
+        pub(crate) fn unpark(&self) {
+            match self {
+                TimerUnpark::Enabled(v) => v.unpark(),
+                TimerUnpark::Disabled(v) => v.unpark(),
+            }
         }
     }
 }
 
 cfg_not_time! {
     type TimeDriver = IoStack;
+    type TimerUnpark = IoUnpark;
 
     pub(crate) type Clock = ();
     pub(crate) type TimeHandle = ();
@@ -150,6 +247,8 @@ cfg_not_time! {
 pub(crate) struct Driver {
     inner: TimeDriver,
 }
+
+pub(crate) type Unpark = TimerUnpark;
 
 pub(crate) struct Resources {
     pub(crate) io_handle: IoHandle,
@@ -184,25 +283,23 @@ impl Driver {
             },
         ))
     }
-}
 
-impl Park for Driver {
-    type Unpark = <TimeDriver as Park>::Unpark;
-    type Error = <TimeDriver as Park>::Error;
-
-    fn unpark(&self) -> Self::Unpark {
+    pub(crate) fn unpark(&self) -> TimerUnpark {
         self.inner.unpark()
     }
 
-    fn park(&mut self) -> Result<(), Self::Error> {
+    pub(crate) fn park(&mut self) {
         self.inner.park()
     }
 
-    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
+    pub(crate) fn park_timeout(&mut self, duration: Duration) {
         self.inner.park_timeout(duration)
     }
 
-    fn shutdown(&mut self) {
-        self.inner.shutdown()
+    // TODO: tokio-rs/tokio#4990, should the `current_thread` scheduler call this?
+    cfg_rt_multi_thread! {
+        pub(crate) fn shutdown(&mut self) {
+            self.inner.shutdown()
+        }
     }
 }

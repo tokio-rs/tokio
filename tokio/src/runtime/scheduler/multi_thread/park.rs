@@ -5,8 +5,7 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
-use crate::park::{Park, Unpark};
-use crate::runtime::driver::Driver;
+use crate::runtime::driver::{Driver, Unpark};
 use crate::util::TryLock;
 
 use std::sync::atomic::Ordering::SeqCst;
@@ -45,7 +44,7 @@ struct Shared {
     driver: TryLock<Driver>,
 
     /// Unpark handle
-    handle: <Driver as Park>::Unpark,
+    handle: Unpark,
 }
 
 impl Parker {
@@ -64,6 +63,29 @@ impl Parker {
             }),
         }
     }
+
+    pub(crate) fn unpark(&self) -> Unparker {
+        Unparker {
+            inner: self.inner.clone(),
+        }
+    }
+
+    pub(crate) fn park(&mut self) {
+        self.inner.park();
+    }
+
+    pub(crate) fn park_timeout(&mut self, duration: Duration) {
+        // Only parking with zero is supported...
+        assert_eq!(duration, Duration::from_millis(0));
+
+        if let Some(mut driver) = self.inner.shared.driver.try_lock() {
+            driver.park_timeout(duration)
+        }
+    }
+
+    pub(crate) fn shutdown(&mut self) {
+        self.inner.shutdown();
+    }
 }
 
 impl Clone for Parker {
@@ -79,39 +101,8 @@ impl Clone for Parker {
     }
 }
 
-impl Park for Parker {
-    type Unpark = Unparker;
-    type Error = ();
-
-    fn unpark(&self) -> Unparker {
-        Unparker {
-            inner: self.inner.clone(),
-        }
-    }
-
-    fn park(&mut self) -> Result<(), Self::Error> {
-        self.inner.park();
-        Ok(())
-    }
-
-    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        // Only parking with zero is supported...
-        assert_eq!(duration, Duration::from_millis(0));
-
-        if let Some(mut driver) = self.inner.shared.driver.try_lock() {
-            driver.park_timeout(duration).map_err(|_| ())
-        } else {
-            Ok(())
-        }
-    }
-
-    fn shutdown(&mut self) {
-        self.inner.shutdown();
-    }
-}
-
-impl Unpark for Unparker {
-    fn unpark(&self) {
+impl Unparker {
+    pub(crate) fn unpark(&self) {
         self.inner.unpark();
     }
 }
@@ -201,8 +192,7 @@ impl Inner {
             Err(actual) => panic!("inconsistent park state; actual = {}", actual),
         }
 
-        // TODO: don't unwrap
-        driver.park().unwrap();
+        driver.park();
 
         match self.state.swap(EMPTY, SeqCst) {
             NOTIFIED => {}      // got a notification, hurray!

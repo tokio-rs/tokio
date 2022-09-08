@@ -5,24 +5,12 @@ use std::{task::Context, time::Duration};
 #[cfg(not(loom))]
 use futures::task::noop_waker_ref;
 
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Arc;
 use crate::loom::thread;
-use crate::{
-    loom::sync::atomic::{AtomicBool, Ordering},
-    park::Unpark,
-};
+use crate::runtime::driver::IoUnpark;
 
 use super::{Handle, TimerEntry};
-
-struct MockUnpark {}
-impl Unpark for MockUnpark {
-    fn unpark(&self) {}
-}
-impl MockUnpark {
-    fn mock() -> Box<dyn Unpark> {
-        Box::new(Self {})
-    }
-}
 
 fn block_on<T>(f: impl std::future::Future<Output = T>) -> T {
     #[cfg(loom)]
@@ -45,13 +33,25 @@ fn model(f: impl Fn() + Send + Sync + 'static) {
     f();
 }
 
+#[cfg(not(tokio_wasm))]
+fn unpark() -> IoUnpark {
+    use crate::park::thread::ParkThread;
+    IoUnpark::Disabled(ParkThread::new().unpark())
+}
+
+#[cfg(tokio_wasm)]
+fn unpark() -> IoUnpark {
+    use crate::park::thread::ParkThread;
+    ParkThread::new().unpark()
+}
+
 #[test]
 fn single_timer() {
     model(|| {
         let clock = crate::time::Clock::new(true, false);
         let time_source = super::TimeSource::new(clock.clone());
 
-        let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
+        let inner = super::Inner::new(time_source.clone(), unpark());
         let handle = Handle::new(Arc::new(inner));
 
         let handle_ = handle.clone();
@@ -82,7 +82,7 @@ fn drop_timer() {
         let clock = crate::time::Clock::new(true, false);
         let time_source = super::TimeSource::new(clock.clone());
 
-        let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
+        let inner = super::Inner::new(time_source.clone(), unpark());
         let handle = Handle::new(Arc::new(inner));
 
         let handle_ = handle.clone();
@@ -113,7 +113,7 @@ fn change_waker() {
         let clock = crate::time::Clock::new(true, false);
         let time_source = super::TimeSource::new(clock.clone());
 
-        let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
+        let inner = super::Inner::new(time_source.clone(), unpark());
         let handle = Handle::new(Arc::new(inner));
 
         let handle_ = handle.clone();
@@ -148,7 +148,7 @@ fn reset_future() {
         let clock = crate::time::Clock::new(true, false);
         let time_source = super::TimeSource::new(clock.clone());
 
-        let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
+        let inner = super::Inner::new(time_source.clone(), unpark());
         let handle = Handle::new(Arc::new(inner));
 
         let handle_ = handle.clone();
@@ -206,7 +206,7 @@ fn poll_process_levels() {
 
     let time_source = super::TimeSource::new(clock.clone());
 
-    let inner = super::Inner::new(time_source, MockUnpark::mock());
+    let inner = super::Inner::new(time_source, unpark());
     let handle = Handle::new(Arc::new(inner));
 
     let mut entries = vec![];
@@ -247,7 +247,7 @@ fn poll_process_levels_targeted() {
 
     let time_source = super::TimeSource::new(clock.clone());
 
-    let inner = super::Inner::new(time_source, MockUnpark::mock());
+    let inner = super::Inner::new(time_source, unpark());
     let handle = Handle::new(Arc::new(inner));
 
     let e1 = TimerEntry::new(&handle, clock.now() + Duration::from_millis(193));
