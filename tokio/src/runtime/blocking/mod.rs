@@ -10,7 +10,7 @@ cfg_fs! {
     pub(crate) use pool::spawn_mandatory_blocking;
 }
 
-cfg_unstable! {
+cfg_trace! {
     pub(crate) use pool::Mandatory;
 }
 
