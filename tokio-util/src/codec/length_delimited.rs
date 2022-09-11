@@ -522,15 +522,11 @@ impl LengthDelimitedCodec {
             }
         };
 
-        let num_skip = self.builder.get_num_skip();
-
-        if num_skip > 0 {
-            src.advance(num_skip);
-        }
+        src.advance(self.builder.get_num_skip());
 
         // Ensure that the buffer has enough space to read the incoming
         // payload
-        src.reserve(n);
+        src.reserve(n.saturating_sub(src.len()));
 
         Ok(Some(n))
     }
@@ -568,7 +564,7 @@ impl Decoder for LengthDelimitedCodec {
                 self.state = DecodeState::Head;
 
                 // Make sure the buffer has enough space to read the next head
-                src.reserve(self.builder.num_head_bytes());
+                src.reserve(self.builder.num_head_bytes().saturating_sub(src.len()));
 
                 Ok(Some(data))
             }
