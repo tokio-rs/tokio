@@ -854,19 +854,6 @@ impl Shared {
     }
 }
 
-impl crate::runtime::ToHandle for Arc<Shared> {
-    fn to_handle(&self) -> crate::runtime::Handle {
-        use crate::runtime::scheduler::multi_thread::Spawner;
-        use crate::runtime::{self, Handle};
-
-        Handle {
-            spawner: runtime::Spawner::MultiThread(Spawner {
-                shared: self.clone(),
-            }),
-        }
-    }
-}
-
 cfg_metrics! {
     impl Shared {
         pub(super) fn injection_queue_depth(&self) -> usize {

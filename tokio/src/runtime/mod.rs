@@ -222,7 +222,7 @@ cfg_rt! {
 
     mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};
-    pub(crate) use handle::{HandleInner, ToHandle};
+    pub(crate) use handle::HandleInner;
 
     mod spawner;
     use self::spawner::Spawner;

@@ -54,11 +54,6 @@ pub(crate) struct HandleInner {
     pub(crate) blocking_spawner: blocking::Spawner,
 }
 
-/// Create a new runtime handle.
-pub(crate) trait ToHandle {
-    fn to_handle(&self) -> Handle;
-}
-
 /// Runtime context guard.
 ///
 /// Returned by [`Runtime::enter`] and [`Handle::enter`], the context guard exits
@@ -316,12 +311,6 @@ impl Handle {
 
     pub(crate) fn shutdown(mut self) {
         self.spawner.shutdown();
-    }
-}
-
-impl ToHandle for Handle {
-    fn to_handle(&self) -> Handle {
-        self.clone()
     }
 }
 
