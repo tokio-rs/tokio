@@ -11,6 +11,7 @@ env:
 # the system's binaries, so the environment shouldn't matter.
 task:
   name: FreeBSD 64-bit
+  auto_cancellation: $CIRRUS_BRANCH != 'master' && $CIRRUS_BRANCH !=~ 'tokio-.*'
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -25,6 +26,7 @@ task:
 
 task:
   name: FreeBSD docs
+  auto_cancellation: $CIRRUS_BRANCH != 'master' && $CIRRUS_BRANCH !=~ 'tokio-.*'
   env:
     RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
     RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
@@ -42,6 +44,7 @@ task:
 
 task:
   name: FreeBSD 32-bit
+  auto_cancellation: $CIRRUS_BRANCH != 'master' && $CIRRUS_BRANCH !=~ 'tokio-.*'
   setup_script:
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
