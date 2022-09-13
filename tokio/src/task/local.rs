@@ -635,6 +635,37 @@ impl LocalSet {
             f()
         })
     }
+
+    /// This method is like `with`, but it just calls `f` without setting the thread-local if that
+    /// fails.
+    fn with_if_possible<T>(&self, f: impl FnOnce() -> T) -> T {
+        let mut f = Some(f);
+
+        let res = CURRENT.try_with(|ctx| {
+            struct Reset<'a> {
+                ctx_ref: &'a RcCell<Context>,
+                val: Option<Rc<Context>>,
+            }
+            impl<'a> Drop for Reset<'a> {
+                fn drop(&mut self) {
+                    self.ctx_ref.replace(self.val.take());
+                }
+            }
+            let old = ctx.replace(Some(self.context.clone()));
+
+            let _reset = Reset {
+                ctx_ref: ctx,
+                val: old,
+            };
+
+            (f.take().unwrap())()
+        });
+
+        match res {
+            Ok(res) => res,
+            Err(_access_error) => (f.take().unwrap())(),
+        }
+    }
 }
 
 cfg_unstable! {
@@ -746,7 +777,7 @@ impl Default for LocalSet {
 
 impl Drop for LocalSet {
     fn drop(&mut self) {
-        self.with(|| {
+        self.with_if_possible(|| {
             // Shut down all tasks in the LocalOwnedTasks and close it to
             // prevent new tasks from ever being added.
             self.context.owned.close_and_shutdown_all();

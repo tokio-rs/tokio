@@ -311,6 +311,27 @@ fn join_local_future_elsewhere() {
     });
 }
 
+// Tests for <https://github.com/tokio-rs/tokio/issues/4973>
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
+#[tokio::test(flavor = "multi_thread")]
+async fn localset_in_thread_local() {
+    thread_local! {
+        static LOCAL_SET: LocalSet = LocalSet::new();
+    }
+
+    // holds runtime thread until end of main fn.
+    let (_tx, rx) = oneshot::channel::<()>();
+    let handle = tokio::runtime::Handle::current();
+
+    std::thread::spawn(move || {
+        LOCAL_SET.with(|local_set| {
+            handle.block_on(local_set.run_until(async move {
+                let _ = rx.await;
+            }))
+        });
+    });
+}
+
 #[test]
 fn drop_cancels_tasks() {
     use std::rc::Rc;
