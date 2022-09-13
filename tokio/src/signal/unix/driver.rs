@@ -92,8 +92,8 @@ impl Driver {
         }
     }
 
-    pub(crate) fn io_handle(&self) -> io::Handle {
-        self.park.handle()
+    pub(crate) fn unpark(&self) -> io::Handle {
+        self.park.unpark()
     }
 
     pub(crate) fn park(&mut self) {

@@ -43,7 +43,7 @@ cfg_io_driver! {
     impl IoStack {
         pub(crate) fn unpark(&self) -> IoUnpark {
             match self {
-                IoStack::Enabled(v) => IoUnpark::Enabled(v.handle()),
+                IoStack::Enabled(v) => IoUnpark::Enabled(v.unpark()),
                 IoStack::Disabled(v) => IoUnpark::Disabled(v.unpark()),
             }
         }
