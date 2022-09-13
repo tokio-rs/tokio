@@ -280,10 +280,10 @@ jobs:
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
       - name: check --feature-powerset
-        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
       # Try with unstable feature flags
       - name: check --feature-powerset --unstable
-        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
