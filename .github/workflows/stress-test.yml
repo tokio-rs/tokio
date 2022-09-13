@@ -28,9 +28,7 @@ jobs:
             override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install Valgrind
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y valgrind
+        uses: taiki-e/install-action@valgrind
 
       # Compiles each of the stress test examples.
       - name: Compile stress test examples
