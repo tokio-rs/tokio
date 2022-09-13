@@ -62,12 +62,10 @@ cfg_io_driver! {
             }
         }
 
-        cfg_rt_multi_thread! {
-            pub(crate) fn shutdown(&mut self) {
-                match self {
-                    IoStack::Enabled(v) => v.shutdown(),
-                    IoStack::Disabled(v) => v.shutdown(),
-                }
+        pub(crate) fn shutdown(&mut self) {
+            match self {
+                IoStack::Enabled(v) => v.shutdown(),
+                IoStack::Disabled(v) => v.shutdown(),
             }
         }
     }
