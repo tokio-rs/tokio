@@ -4,7 +4,7 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::{Driver, Unpark};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
-use crate::runtime::{Config, HandleInner};
+use crate::runtime::Config;
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
@@ -81,9 +81,6 @@ struct Shared {
     /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
 
-    /// Handle to I/O driver, timer, blocking pool, ...
-    handle_inner: HandleInner,
-
     /// Scheduler configuration options
     config: Config,
 
@@ -111,7 +108,7 @@ const INITIAL_CAPACITY: usize = 64;
 scoped_thread_local!(static CURRENT: Context);
 
 impl CurrentThread {
-    pub(crate) fn new(driver: Driver, handle_inner: HandleInner, config: Config) -> CurrentThread {
+    pub(crate) fn new(driver: Driver, config: Config) -> CurrentThread {
         let unpark = driver.unpark();
 
         let spawner = Spawner {
@@ -120,7 +117,6 @@ impl CurrentThread {
                 owned: OwnedTasks::new(),
                 unpark,
                 woken: AtomicBool::new(false),
-                handle_inner,
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics: WorkerMetrics::new(),
@@ -386,10 +382,6 @@ impl Spawner {
     // reset woken to false and return original value
     pub(crate) fn reset_woken(&self) -> bool {
         self.shared.woken.swap(false, AcqRel)
-    }
-
-    pub(crate) fn as_handle_inner(&self) -> &HandleInner {
-        &self.shared.handle_inner
     }
 }
 

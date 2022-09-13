@@ -833,6 +833,7 @@ impl Builder {
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::{Config, CurrentThread, HandleInner, Kind};
+        use std::sync::Arc;
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
@@ -840,21 +841,12 @@ impl Builder {
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
 
-        let handle_inner = HandleInner {
-            io_handle: resources.io_handle,
-            time_handle: resources.time_handle,
-            signal_handle: resources.signal_handle,
-            clock: resources.clock,
-            blocking_spawner,
-        };
-
         // And now put a single-threaded scheduler on top of the timer. When
         // there are no futures ready to do something, it'll let the timer or
         // the reactor to generate some new stimuli for the futures to continue
         // in their life.
         let scheduler = CurrentThread::new(
             driver,
-            handle_inner,
             Config {
                 before_park: self.before_park.clone(),
                 after_unpark: self.after_unpark.clone(),
@@ -867,9 +859,18 @@ impl Builder {
         );
         let spawner = Spawner::CurrentThread(scheduler.spawner().clone());
 
+        let inner = Arc::new(HandleInner {
+            spawner,
+            io_handle: resources.io_handle,
+            time_handle: resources.time_handle,
+            signal_handle: resources.signal_handle,
+            clock: resources.clock,
+            blocking_spawner,
+        });
+
         Ok(Runtime {
             kind: Kind::CurrentThread(scheduler),
-            handle: Handle { spawner },
+            handle: Handle { inner },
             blocking_pool,
         })
     }
@@ -952,6 +953,7 @@ cfg_rt_multi_thread! {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
             use crate::runtime::{Config, HandleInner, Kind, MultiThread};
+            use std::sync::Arc;
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
@@ -962,18 +964,9 @@ cfg_rt_multi_thread! {
                 blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
-            let handle_inner = HandleInner {
-                io_handle: resources.io_handle,
-                time_handle: resources.time_handle,
-                signal_handle: resources.signal_handle,
-                clock: resources.clock,
-                blocking_spawner,
-            };
-
             let (scheduler, launch) = MultiThread::new(
                 core_threads,
                 driver,
-                handle_inner,
                 Config {
                     before_park: self.before_park.clone(),
                     after_unpark: self.after_unpark.clone(),
@@ -986,8 +979,17 @@ cfg_rt_multi_thread! {
             );
             let spawner = Spawner::MultiThread(scheduler.spawner().clone());
 
+            let inner = Arc::new(HandleInner {
+                spawner,
+                io_handle: resources.io_handle,
+                time_handle: resources.time_handle,
+                signal_handle: resources.signal_handle,
+                clock: resources.clock,
+                blocking_spawner,
+            });
+
             // Create the runtime handle
-            let handle = Handle { spawner };
+            let handle = Handle { inner };
 
             // Spawn the thread pool workers
             let _enter = crate::runtime::context::enter(handle.clone());
