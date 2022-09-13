@@ -279,13 +279,11 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
-      - name: check --each-feature
-        run: cargo hack check --all --each-feature -Z avoid-dev-deps
-      - name: check net,time
-        run: cargo check -p tokio --no-default-features --features net,time -Z avoid-dev-deps
+      - name: check --feature-powerset
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps
       # Try with unstable feature flags
-      - name: check --each-feature --unstable
-        run: cargo hack check --all --each-feature -Z avoid-dev-deps
+      - name: check --feature-powerset --unstable
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
