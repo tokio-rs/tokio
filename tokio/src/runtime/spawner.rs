@@ -1,7 +1,6 @@
 use crate::future::Future;
 use crate::runtime::scheduler::current_thread;
 use crate::runtime::task::Id;
-use crate::runtime::HandleInner;
 use crate::task::JoinHandle;
 
 cfg_rt_multi_thread! {
@@ -16,7 +15,7 @@ pub(crate) enum Spawner {
 }
 
 impl Spawner {
-    pub(crate) fn shutdown(&mut self) {
+    pub(crate) fn shutdown(&self) {
         #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
         {
             if let Spawner::MultiThread(spawner) = self {
@@ -34,14 +33,6 @@ impl Spawner {
             Spawner::CurrentThread(spawner) => spawner.spawn(future, id),
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
             Spawner::MultiThread(spawner) => spawner.spawn(future, id),
-        }
-    }
-
-    pub(crate) fn as_handle_inner(&self) -> &HandleInner {
-        match self {
-            Spawner::CurrentThread(spawner) => spawner.as_handle_inner(),
-            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-            Spawner::MultiThread(spawner) => spawner.as_handle_inner(),
         }
     }
 }

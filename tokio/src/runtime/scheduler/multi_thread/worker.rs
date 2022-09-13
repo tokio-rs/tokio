@@ -64,7 +64,7 @@ use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::scheduler::multi_thread::{queue, Idle, Parker, Unparker};
 use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
-use crate::runtime::{task, Config, HandleInner, MetricsBatch, SchedulerMetrics, WorkerMetrics};
+use crate::runtime::{task, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::FastRand;
 
@@ -120,9 +120,6 @@ struct Core {
 
 /// State shared across all workers
 pub(super) struct Shared {
-    /// Handle to the I/O driver, timer, blocking spawner, ...
-    handle_inner: HandleInner,
-
     /// Per-worker remote state. All other workers have access to this and is
     /// how they communicate between each other.
     remotes: Box<[Remote]>,
@@ -189,12 +186,7 @@ type Notified = task::Notified<Arc<Shared>>;
 // Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
 
-pub(super) fn create(
-    size: usize,
-    park: Parker,
-    handle_inner: HandleInner,
-    config: Config,
-) -> (Arc<Shared>, Launch) {
+pub(super) fn create(size: usize, park: Parker, config: Config) -> (Arc<Shared>, Launch) {
     let mut cores = Vec::with_capacity(size);
     let mut remotes = Vec::with_capacity(size);
     let mut worker_metrics = Vec::with_capacity(size);
@@ -222,7 +214,6 @@ pub(super) fn create(
     }
 
     let shared = Arc::new(Shared {
-        handle_inner,
         remotes: remotes.into_boxed_slice(),
         inject: Inject::new(),
         idle: Idle::new(size),
@@ -708,10 +699,6 @@ impl task::Schedule for Arc<Shared> {
 }
 
 impl Shared {
-    pub(crate) fn as_handle_inner(&self) -> &HandleInner {
-        &self.handle_inner
-    }
-
     pub(super) fn bind_new_task<T>(
         me: &Arc<Self>,
         future: T,
