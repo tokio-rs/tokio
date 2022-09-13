@@ -145,12 +145,8 @@ impl Driver {
     }
 
     // TODO: remove this in a later refactor
-    cfg_not_rt! {
-        cfg_time! {
-            pub(crate) fn unpark(&self) -> Handle {
-                self.handle()
-            }
-        }
+    pub(crate) fn unpark(&self) -> Handle {
+        self.handle()
     }
 
     pub(crate) fn park(&mut self) {

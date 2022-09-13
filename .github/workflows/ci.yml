@@ -76,7 +76,7 @@ jobs:
         run: rustup update stable
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
 
       # Run `tokio` with `full` features. This excludes testing utilities which
       # can alter the runtime behavior of Tokio.
@@ -279,14 +279,12 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
-      - name: check --each-feature
-        run: cargo hack check --all --each-feature -Z avoid-dev-deps
-      - name: check net,time
-        run: cargo check -p tokio --no-default-features --features net,time -Z avoid-dev-deps
+        uses: taiki-e/install-action@cargo-hack
+      - name: check --feature-powerset
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
       # Try with unstable feature flags
-      - name: check --each-feature --unstable
-        run: cargo hack check --all --each-feature -Z avoid-dev-deps
+      - name: check --feature-powerset --unstable
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -316,7 +314,7 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       - name: "check --all-features -Z minimal-versions"
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
@@ -501,13 +499,13 @@ jobs:
 
       # Install dependencies
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
 
       - name: Install wasm32-wasi target
         run: rustup target add wasm32-wasi
 
       - name: Install wasmtime
-        run: cargo install wasmtime-cli
+        uses: taiki-e/install-action@wasmtime
 
       - name: Install cargo-wasi
         run: cargo install cargo-wasi
@@ -557,4 +555,3 @@ jobs:
           cargo install cargo-check-external-types --locked --version 0.1.3
           cargo check-external-types --all-features --config external-types.toml
         working-directory: tokio
-
