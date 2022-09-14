@@ -28,9 +28,7 @@ jobs:
             override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install Valgrind
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y valgrind
+        uses: taiki-e/install-action@valgrind
 
       # Compiles each of the stress test examples.
       - name: Compile stress test examples
@@ -38,4 +36,4 @@ jobs:
 
       # Runs each of the examples using Valgrind. Detects leaks and displays them.
       - name: Run valgrind
-        run: valgrind  --leak-check=full --show-leak-kinds=all ./target/release/examples/${{ matrix.stress-test }}
+        run: valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all ./target/release/examples/${{ matrix.stress-test }}
