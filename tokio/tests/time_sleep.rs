@@ -189,10 +189,7 @@ async fn greater_than_max() {
 
 #[tokio::test]
 async fn short_sleeps() {
-    for i in 0..10000 {
-        if (i % 10) == 0 {
-            eprintln!("=== {}", i);
-        }
+    for _ in 0..10000 {
         tokio::time::sleep(std::time::Duration::from_millis(0)).await;
     }
 }

@@ -284,14 +284,12 @@ fn join_local_future_elsewhere() {
     local.block_on(&rt, async move {
         let (tx, rx) = oneshot::channel();
         let join = task::spawn_local(async move {
-            println!("hello world running...");
             assert!(
                 ON_RT_THREAD.with(|cell| cell.get()),
                 "local task must run on local thread, no matter where it is awaited"
             );
             rx.await.unwrap();
 
-            println!("hello world task done");
             "hello world"
         });
         let join2 = task::spawn(async move {
@@ -301,11 +299,8 @@ fn join_local_future_elsewhere() {
             );
 
             tx.send(()).expect("task shouldn't have ended yet");
-            println!("waking up hello world...");
 
             join.await.expect("task should complete successfully");
-
-            println!("hello world task joined");
         });
         join2.await.unwrap()
     });
@@ -395,9 +390,7 @@ fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
         ),
         // Did the test thread panic? We'll find out for sure when we `join`
         // with it.
-        Err(RecvTimeoutError::Disconnected) => {
-            println!("done_rx dropped, did the test thread panic?");
-        }
+        Err(RecvTimeoutError::Disconnected) => {}
         // Test completed successfully!
         Ok(()) => {}
     }
@@ -510,7 +503,6 @@ async fn local_tasks_are_polled_after_tick_inner() {
                 time::sleep(Duration::from_millis(20)).await;
                 let rx1 = RX1.load(SeqCst);
                 let rx2 = RX2.load(SeqCst);
-                println!("EXPECT = {}; RX1 = {}; RX2 = {}", EXPECTED, rx1, rx2);
                 assert_eq!(EXPECTED, rx1);
                 assert_eq!(EXPECTED, rx2);
             });
