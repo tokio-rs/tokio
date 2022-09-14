@@ -8,9 +8,8 @@ use futures::task::noop_waker_ref;
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Arc;
 use crate::loom::thread;
-use crate::runtime::driver::IoUnpark;
 
-use super::{Handle, TimerEntry};
+use super::TimerEntry;
 
 fn block_on<T>(f: impl std::future::Future<Output = T>) -> T {
     #[cfg(loom)]
@@ -33,30 +32,24 @@ fn model(f: impl Fn() + Send + Sync + 'static) {
     f();
 }
 
-#[cfg(not(tokio_wasm))]
-fn unpark() -> IoUnpark {
-    use crate::park::thread::ParkThread;
-    IoUnpark::Disabled(ParkThread::new().unpark())
-}
-
-#[cfg(tokio_wasm)]
-fn unpark() -> IoUnpark {
-    use crate::park::thread::ParkThread;
-    ParkThread::new().unpark()
+fn rt(start_paused: bool) -> crate::runtime::Runtime {
+    crate::runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(start_paused)
+        .build()
+        .unwrap()
 }
 
 #[test]
 fn single_timer() {
     model(|| {
-        let clock = crate::time::Clock::new(true, false);
-        let time_source = super::TimeSource::new(clock.clone());
-
-        let inner = super::Inner::new(time_source.clone(), unpark());
-        let handle = Handle::new(Arc::new(inner));
+        let rt = rt(false);
+        let handle = rt.handle();
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(&handle_, clock.now() + Duration::from_secs(1));
+            let entry =
+                TimerEntry::new(&handle_, handle_.inner.clock.now() + Duration::from_secs(1));
             pin!(entry);
 
             block_on(futures::future::poll_fn(|cx| {
@@ -67,10 +60,12 @@ fn single_timer() {
 
         thread::yield_now();
 
+        let handle = handle.as_time_handle();
+
         // This may or may not return Some (depending on how it races with the
         // thread). If it does return None, however, the timer should complete
         // synchronously.
-        handle.process_at_time(time_source.now() + 2_000_000_000);
+        handle.process_at_time(handle.time_source().now() + 2_000_000_000);
 
         jh.join().unwrap();
     })
@@ -79,15 +74,13 @@ fn single_timer() {
 #[test]
 fn drop_timer() {
     model(|| {
-        let clock = crate::time::Clock::new(true, false);
-        let time_source = super::TimeSource::new(clock.clone());
-
-        let inner = super::Inner::new(time_source.clone(), unpark());
-        let handle = Handle::new(Arc::new(inner));
+        let rt = rt(false);
+        let handle = rt.handle();
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(&handle_, clock.now() + Duration::from_secs(1));
+            let entry =
+                TimerEntry::new(&handle_, handle_.inner.clock.now() + Duration::from_secs(1));
             pin!(entry);
 
             let _ = entry
@@ -100,8 +93,10 @@ fn drop_timer() {
 
         thread::yield_now();
 
+        let handle = handle.as_time_handle();
+
         // advance 2s in the future.
-        handle.process_at_time(time_source.now() + 2_000_000_000);
+        handle.process_at_time(handle.time_source().now() + 2_000_000_000);
 
         jh.join().unwrap();
     })
@@ -110,15 +105,13 @@ fn drop_timer() {
 #[test]
 fn change_waker() {
     model(|| {
-        let clock = crate::time::Clock::new(true, false);
-        let time_source = super::TimeSource::new(clock.clone());
-
-        let inner = super::Inner::new(time_source.clone(), unpark());
-        let handle = Handle::new(Arc::new(inner));
+        let rt = rt(false);
+        let handle = rt.handle();
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(&handle_, clock.now() + Duration::from_secs(1));
+            let entry =
+                TimerEntry::new(&handle_, handle_.inner.clock.now() + Duration::from_secs(1));
             pin!(entry);
 
             let _ = entry
@@ -133,8 +126,10 @@ fn change_waker() {
 
         thread::yield_now();
 
+        let handle = handle.as_time_handle();
+
         // advance 2s
-        handle.process_at_time(time_source.now() + 2_000_000_000);
+        handle.process_at_time(handle.time_source().now() + 2_000_000_000);
 
         jh.join().unwrap();
     })
@@ -145,15 +140,12 @@ fn reset_future() {
     model(|| {
         let finished_early = Arc::new(AtomicBool::new(false));
 
-        let clock = crate::time::Clock::new(true, false);
-        let time_source = super::TimeSource::new(clock.clone());
-
-        let inner = super::Inner::new(time_source.clone(), unpark());
-        let handle = Handle::new(Arc::new(inner));
+        let rt = rt(false);
+        let handle = rt.handle();
 
         let handle_ = handle.clone();
         let finished_early_ = finished_early.clone();
-        let start = clock.now();
+        let start = handle.inner.clock.now();
 
         let jh = thread::spawn(move || {
             let entry = TimerEntry::new(&handle_, start + Duration::from_secs(1));
@@ -176,12 +168,22 @@ fn reset_future() {
 
         thread::yield_now();
 
+        let handle = handle.as_time_handle();
+
         // This may or may not return a wakeup time.
-        handle.process_at_time(time_source.instant_to_tick(start + Duration::from_millis(1500)));
+        handle.process_at_time(
+            handle
+                .time_source()
+                .instant_to_tick(start + Duration::from_millis(1500)),
+        );
 
         assert!(!finished_early.load(Ordering::Relaxed));
 
-        handle.process_at_time(time_source.instant_to_tick(start + Duration::from_millis(2500)));
+        handle.process_at_time(
+            handle
+                .time_source()
+                .instant_to_tick(start + Duration::from_millis(2500)),
+        );
 
         jh.join().unwrap();
 
@@ -201,20 +203,15 @@ fn normal_or_miri<T>(normal: T, miri: T) -> T {
 #[test]
 #[cfg(not(loom))]
 fn poll_process_levels() {
-    let clock = crate::time::Clock::new(true, false);
-    clock.pause();
-
-    let time_source = super::TimeSource::new(clock.clone());
-
-    let inner = super::Inner::new(time_source, unpark());
-    let handle = Handle::new(Arc::new(inner));
+    let rt = rt(true);
+    let handle = rt.handle();
 
     let mut entries = vec![];
 
     for i in 0..normal_or_miri(1024, 64) {
         let mut entry = Box::pin(TimerEntry::new(
             &handle,
-            clock.now() + Duration::from_millis(i),
+            handle.inner.clock.now() + Duration::from_millis(i),
         ));
 
         let _ = entry
@@ -225,7 +222,8 @@ fn poll_process_levels() {
     }
 
     for t in 1..normal_or_miri(1024, 64) {
-        handle.process_at_time(t as u64);
+        handle.as_time_handle().process_at_time(t as u64);
+
         for (deadline, future) in entries.iter_mut().enumerate() {
             let mut context = Context::from_waker(noop_waker_ref());
             if deadline <= t {
@@ -242,16 +240,16 @@ fn poll_process_levels() {
 fn poll_process_levels_targeted() {
     let mut context = Context::from_waker(noop_waker_ref());
 
-    let clock = crate::time::Clock::new(true, false);
-    clock.pause();
+    let rt = rt(true);
+    let handle = rt.handle();
 
-    let time_source = super::TimeSource::new(clock.clone());
-
-    let inner = super::Inner::new(time_source, unpark());
-    let handle = Handle::new(Arc::new(inner));
-
-    let e1 = TimerEntry::new(&handle, clock.now() + Duration::from_millis(193));
+    let e1 = TimerEntry::new(
+        &handle,
+        handle.inner.clock.now() + Duration::from_millis(193),
+    );
     pin!(e1);
+
+    let handle = handle.as_time_handle();
 
     handle.process_at_time(62);
     assert!(e1.as_mut().poll_elapsed(&mut context).is_pending());

@@ -1,4 +1,9 @@
 //! Abstracts out the entire chain of runtime sub-drivers into common types.
+
+// Eventually, this file will see significant refactoring / cleanup. For now, we
+// don't need to worry much about dead code with certain feature permutations.
+#![cfg_attr(not(feature = "rt"), allow(dead_code))]
+
 use crate::park::thread::{ParkThread, UnparkThread};
 
 use std::io;
