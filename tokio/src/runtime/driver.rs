@@ -62,7 +62,6 @@ cfg_io_driver! {
             }
         }
 
-        #[cfg_attr(not(feature = "rt-multi-thread"), allow(dead_code))] // some features use this
         pub(crate) fn shutdown(&mut self) {
             match self {
                 IoStack::Enabled(v) => v.shutdown(),
@@ -203,21 +202,10 @@ cfg_time! {
             }
         }
 
-        // TODO: tokio-rs/tokio#4990, should the `current_thread` scheduler call this?
-        cfg_rt_multi_thread! {
-            pub(crate) fn shutdown(&mut self) {
-                match self {
-                    TimeDriver::Enabled { driver, handle } => driver.shutdown(handle),
-                    TimeDriver::Disabled(v) => v.shutdown(),
-                }
-            }
-        }
-    }
-
-    impl Drop for TimeDriver {
-        fn drop(&mut self) {
-            if let TimeDriver::Enabled { driver, handle } = self {
-                driver.shutdown(handle);
+        pub(crate) fn shutdown(&mut self) {
+            match self {
+                TimeDriver::Enabled { driver, handle } => driver.shutdown(handle),
+                TimeDriver::Disabled(v) => v.shutdown(),
             }
         }
     }
@@ -307,10 +295,7 @@ impl Driver {
         self.inner.park_timeout(duration)
     }
 
-    // TODO: tokio-rs/tokio#4990, should the `current_thread` scheduler call this?
-    cfg_rt_multi_thread! {
-        pub(crate) fn shutdown(&mut self) {
-            self.inner.shutdown()
-        }
+    pub(crate) fn shutdown(&mut self) {
+        self.inner.shutdown()
     }
 }

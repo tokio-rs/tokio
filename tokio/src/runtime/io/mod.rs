@@ -230,12 +230,6 @@ impl Driver {
     }
 }
 
-impl Drop for Driver {
-    fn drop(&mut self) {
-        self.shutdown();
-    }
-}
-
 impl fmt::Debug for Driver {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Driver")
