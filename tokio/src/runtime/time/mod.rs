@@ -20,21 +20,9 @@ mod wheel;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex};
+use crate::runtime::driver::{IoStack, IoUnpark};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
-
-// This duplication should be cleaned up in a later refactor
-cfg_io_driver! {
-    cfg_rt! {
-        use crate::runtime::driver::{IoStack, IoUnpark};
-    }
-    cfg_not_rt! {
-        use crate::runtime::io::{Driver as IoStack, Handle as IoUnpark};
-    }
-}
-cfg_not_io_driver! {
-    use crate::park::thread::{ParkThread as IoStack, UnparkThread as IoUnpark};
-}
 
 use std::fmt;
 use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
