@@ -1,42 +1,45 @@
 use futures_sink::Sink;
-
 use pin_project_lite::pin_project;
 use std::io;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncWrite;
 
 pin_project! {
     /// Convert a [`Sink`] of byte chunks into an [`AsyncWrite`].
-    /// Bytes are sent into the sink and the sink is flushed once all bytes are sent. If an error occurs during the sending progress,
-    /// the number of sent but unflushed bytes are saved in case the flushing operation stays unsuccessful.
-    /// For the inverse operation of defining an [`AsyncWrite`] from a [`Sink`] you need to define a [`codec`].
+    ///
+    /// For the inverse operation define a [`codec`].
     ///
     /// # Example
     ///
     /// ```
+    /// use crate::sync::PollSender;
     /// use futures_util::SinkExt;
-    /// use std::io::{Error, ErrorKind};
     /// use tokio::io::AsyncWriteExt;
-    /// use tokio_util::io::SinkWriter;
-    /// use tokio_util::sync::PollSender;
-    ///
+    /// use std::io::{Error, ErrorKind};
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Error> {
-    ///  // Construct a channel pair to send data across and wrap a pollable sink.
-    ///  // Note that the sink must mimic a writable object, e.g. have `std::io::Error`
-    ///  // as its error type.
-    /// let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(1);
-    ///  let mut writer = SinkWriter::new(
-    ///    PollSender::new(tx).sink_map_err(|_| Error::from(ErrorKind::BrokenPipe)),
-    /// );
-    ///  // Write data to our interface...
-    ///  let data: [u8; 4] = [1, 2, 3, 4];
-    ///  let _ = writer.write(&data).await?;
-    ///  // ... and receive it.
-    ///  assert_eq!(data.to_vec(), rx.recv().await.unwrap());
+    ///    // Construct a channel pair to send data across and wrap a pollable sink.
+    ///    // Note that the sink must mimic a writable object, e.g. have `std::io::Error`
+    ///    // as its error type.
+    ///    let (tx, mut rx) = tokio::sync::mpsc::channel::<u8>(10);
+    ///    let mut writer = SinkWriter::new(
+    ///        PollSender::new(tx).sink_map_err(|_| Error::from(ErrorKind::Other)),
+    ///    );
     ///
-    /// #  Ok(())
+    ///    // Write data to our interface...
+    ///    let data: [u8; 4] = [1, 2, 3, 4];
+    ///    writer.write(&data).await?;
+    ///
+    ///    // ... and receive it.
+    ///    let mut received = Vec::new();
+    ///    for _ in 0..4 {
+    ///        received.push(rx.recv().await.unwrap());
+    ///    }
+    ///    assert_eq!(&data, received.as_slice());
+    ///
+    ///    # Ok(())
     /// # }
     /// ```
     ///
@@ -45,20 +48,22 @@ pin_project! {
     /// [`Sink`]: futures_sink::Sink
     /// [`codec`]: tokio_util::codec
     #[derive(Debug)]
-    pub struct SinkWriter<S>
-    {
+    struct SinkWriter<S, T> {
         #[pin]
         inner: S,
+        phantom: PhantomData<T>
     }
 }
-
-impl<S> SinkWriter<S>
+impl<S, T> SinkWriter<S, T>
 where
-    S: Sink<Vec<u8>, Error = io::Error>,
+    S: Sink<T>,
+    T: From<u8>,
 {
-    /// Creates a new [`SinkWriter`].
-    pub fn new(sink: S) -> Self {
-        Self { inner: sink }
+    fn new(sink: S) -> Self {
+        Self {
+            inner: sink,
+            phantom: PhantomData,
+        }
     }
 
     /// Gets a reference to the underlying sink.
@@ -75,6 +80,13 @@ where
         &mut self.inner
     }
 
+    /// Gets a pinned mutable reference to the underlying sink.
+    ///
+    /// It is inadvisable to directly write to the underlying sink.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut S> {
+        self.project().inner
+    }
+
     /// Consumes this `SinkWriter`, returning the underlying sink.
     ///
     /// It is inadvisable to directly write to the underlying sink.
@@ -83,37 +95,42 @@ where
     }
 }
 
-impl<S, E> AsyncWrite for SinkWriter<S>
+impl<S, E, T> AsyncWrite for SinkWriter<S, T>
 where
-    S: Sink<Vec<u8>, Error = E>,
-    E: Into<io::Error>
+    S: Sink<T, Error = E>,
+    E: Into<io::Error>,
+    T: From<u8>,
 {
     fn poll_write(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        match self.as_mut().project().inner.poll_ready(cx) {
+        let sink = self.get_pin_mut();
+        match sink.poll_ready(cx) {
             Poll::Ready(Ok(())) => {
-                if let Err(e) = self.as_mut().project().inner.start_send(buf.to_vec()) {
-                    Poll::Ready(Err(e.into()))
-                } else {
+                let p = {
+                    for (i, b) in buf.into_iter().enumerate() {
+                        if let Err(_) = sink.start_send(From::from(*b)) {
+                            return Poll::Ready(Ok(i + 1));
+                        };
+                    }
                     Poll::Ready(Ok(buf.len()))
-                }
+                };
+
+                sink.poll_flush(cx);
+                p
             }
             Poll::Ready(Err(e)) => Poll::Ready(Err(e.into())),
-            Poll::Pending => {
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
+            Poll::Pending => Poll::Pending,
         }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.project().inner.poll_flush(cx).map_err(Into::into)
+        self.get_pin_mut().poll_flush(cx).map_err(Into::into)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.project().inner.poll_close(cx).map_err(Into::into)
+        self.get_pin_mut().poll_close(cx).map_err(Into::into)
     }
 }
