@@ -489,6 +489,7 @@ unsafe impl linked_list::Link for TimerShared {
 // ===== impl Entry =====
 
 impl TimerEntry {
+    #[track_caller]
     pub(crate) fn new(handle: &Handle, deadline: Instant) -> Self {
         // Panic if the time driver is not enabled
         let _ = handle.as_time_handle();
