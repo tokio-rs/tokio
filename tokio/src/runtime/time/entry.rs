@@ -549,7 +549,8 @@ impl TimerEntry {
         }
 
         unsafe {
-            self.driver().reregister(tick, self.inner().into());
+            self.driver()
+                .reregister(&self.driver.inner.io_handle, tick, self.inner().into());
         }
     }
 
