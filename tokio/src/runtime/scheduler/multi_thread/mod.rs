@@ -15,7 +15,7 @@ pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{Config, Driver, HandleInner};
+use crate::runtime::{Config, Driver};
 
 use std::fmt;
 use std::future::Future;
@@ -45,14 +45,9 @@ pub(crate) struct Spawner {
 // ===== impl MultiThread =====
 
 impl MultiThread {
-    pub(crate) fn new(
-        size: usize,
-        driver: Driver,
-        handle_inner: HandleInner,
-        config: Config,
-    ) -> (MultiThread, Launch) {
+    pub(crate) fn new(size: usize, driver: Driver, config: Config) -> (MultiThread, Launch) {
         let parker = Parker::new(driver);
-        let (shared, launch) = worker::create(size, parker, handle_inner, config);
+        let (shared, launch) = worker::create(size, parker, config);
         let spawner = Spawner { shared };
         let multi_thread = MultiThread { spawner };
 
@@ -104,12 +99,8 @@ impl Spawner {
         worker::Shared::bind_new_task(&self.shared, future, id)
     }
 
-    pub(crate) fn shutdown(&mut self) {
+    pub(crate) fn shutdown(&self) {
         self.shared.close();
-    }
-
-    pub(crate) fn as_handle_inner(&self) -> &HandleInner {
-        self.shared.as_handle_inner()
     }
 }
 

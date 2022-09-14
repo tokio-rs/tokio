@@ -43,7 +43,7 @@ cfg_io_driver! {
     impl IoStack {
         pub(crate) fn unpark(&self) -> IoUnpark {
             match self {
-                IoStack::Enabled(v) => IoUnpark::Enabled(v.handle()),
+                IoStack::Enabled(v) => IoUnpark::Enabled(v.unpark()),
                 IoStack::Disabled(v) => IoUnpark::Disabled(v.unpark()),
             }
         }
@@ -62,6 +62,7 @@ cfg_io_driver! {
             }
         }
 
+        #[cfg_attr(not(feature = "rt-multi-thread"), allow(dead_code))] // some features use this
         pub(crate) fn shutdown(&mut self) {
             match self {
                 IoStack::Enabled(v) => v.shutdown(),

@@ -28,8 +28,8 @@ impl Driver {
         }
     }
 
-    pub(crate) fn handle(&self) -> Handle {
-        self.park.io_handle()
+    pub(crate) fn unpark(&self) -> Handle {
+        self.park.unpark()
     }
 
     pub(crate) fn park(&mut self) {

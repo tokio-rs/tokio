@@ -4,6 +4,7 @@ use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
 use std::future::Future;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::{error, fmt};
 
 /// Handle to the runtime.
@@ -14,12 +15,14 @@ use std::{error, fmt};
 /// [`Runtime::handle`]: crate::runtime::Runtime::handle()
 #[derive(Debug, Clone)]
 pub struct Handle {
-    pub(super) spawner: Spawner,
+    pub(super) inner: Arc<HandleInner>,
 }
 
 /// All internal handles that are *not* the scheduler's spawner.
 #[derive(Debug)]
 pub(crate) struct HandleInner {
+    pub(super) spawner: Spawner,
+
     /// Handles to the I/O drivers
     #[cfg_attr(
         not(any(
@@ -206,7 +209,7 @@ impl Handle {
     }
 
     pub(crate) fn as_inner(&self) -> &HandleInner {
-        self.spawner.as_handle_inner()
+        &self.inner
     }
 
     /// Runs a future to completion on this `Handle`'s associated `Runtime`.
@@ -306,11 +309,11 @@ impl Handle {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", _name, id.as_u64());
-        self.spawner.spawn(future, id)
+        self.inner.spawner.spawn(future, id)
     }
 
-    pub(crate) fn shutdown(mut self) {
-        self.spawner.shutdown();
+    pub(crate) fn shutdown(&self) {
+        self.inner.spawner.shutdown();
     }
 }
 
