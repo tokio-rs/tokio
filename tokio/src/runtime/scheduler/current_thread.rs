@@ -236,6 +236,11 @@ impl Drop for CurrentThread {
             // Submit metrics
             core.metrics.submit(&core.spawner.shared.worker_metrics);
 
+            // Shutdown the resource drivers
+            if let Some(driver) = core.driver.as_mut() {
+                driver.shutdown();
+            }
+
             (core, ())
         });
     }

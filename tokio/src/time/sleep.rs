@@ -1,6 +1,7 @@
+use crate::runtime::handle::Handle;
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::runtime::time::TimeSource;
-use crate::runtime::time::{Handle, TimerEntry};
+use crate::runtime::time::TimerEntry;
 use crate::time::{error::Error, Duration, Instant};
 use crate::util::trace;
 
@@ -262,6 +263,7 @@ impl Sleep {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
+            let handle = &handle.as_time_handle();
             let time_source = handle.time_source().clone();
             let deadline_tick = time_source.deadline_to_tick(deadline);
             let duration = deadline_tick.saturating_sub(time_source.now());

@@ -50,16 +50,6 @@ cfg_signal_internal! {
 }
 
 cfg_time! {
-    pub(crate) fn time_handle() -> crate::runtime::driver::TimeHandle {
-        match CONTEXT.try_with(|ctx| {
-            let ctx = ctx.borrow();
-            ctx.as_ref().expect(crate::util::error::CONTEXT_MISSING_ERROR).as_inner().time_handle.clone()
-        }) {
-            Ok(time_handle) => time_handle,
-            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
-        }
-    }
-
     cfg_test_util! {
         pub(crate) fn clock() -> Option<crate::runtime::driver::Clock> {
             match CONTEXT.try_with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.as_inner().clock.clone())) {

@@ -498,6 +498,12 @@ cfg_rt! {
 }
 cfg_not_rt! {
     // The `runtime` module is used when the IO or time driver is needed.
+    #[cfg(any(
+        feature = "net",
+        feature = "time",
+        all(unix, feature = "process"),
+        all(unix, feature = "signal"),
+    ))]
     pub(crate) mod runtime;
 }
 

@@ -177,6 +177,9 @@
 #[macro_use]
 mod tests;
 
+mod driver;
+pub(crate) mod handle;
+
 cfg_io_driver_impl! {
     pub(crate) mod io;
 }
@@ -216,11 +219,9 @@ cfg_rt! {
     }
 
     pub(crate) mod context;
-    mod driver;
 
     use self::enter::enter;
 
-    mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};
     pub(crate) use handle::HandleInner;
 
