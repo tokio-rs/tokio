@@ -2,7 +2,7 @@
 
 // Eventually, this file will see significant refactoring / cleanup. For now, we
 // don't need to worry much about dead code with certain feature permutations.
-#![cfg_attr(not(feature = "rt"), allow(dead_code))]
+#![cfg_attr(not(feature = "full"), allow(dead_code))]
 
 use crate::park::thread::{ParkThread, UnparkThread};
 
@@ -13,7 +13,7 @@ use std::time::Duration;
 
 cfg_io_driver! {
     pub(crate) type IoDriver = crate::runtime::io::Driver;
-    pub(crate) type IoHandle = Option<crate::runtime::io::Handle>;
+    pub(crate) type IoHandle = IoUnpark;
 
     #[derive(Debug)]
     pub(crate) enum IoStack {
@@ -21,6 +21,7 @@ cfg_io_driver! {
         Disabled(ParkThread),
     }
 
+    #[derive(Debug, Clone)]
     pub(crate) enum IoUnpark {
         Enabled(crate::runtime::io::Handle),
         Disabled(UnparkThread),
@@ -37,9 +38,11 @@ cfg_io_driver! {
             let (signal_driver, signal_handle) = create_signal_driver(io_driver)?;
             let process_driver = create_process_driver(signal_driver);
 
-            (IoStack::Enabled(process_driver), Some(io_handle), signal_handle)
+            (IoStack::Enabled(process_driver), IoUnpark::Enabled(io_handle), signal_handle)
         } else {
-            (IoStack::Disabled(ParkThread::new()), Default::default(), Default::default())
+            let park_thread = ParkThread::new();
+            let unpark_thread = park_thread.unpark();
+            (IoStack::Disabled(park_thread), IoUnpark::Disabled(unpark_thread), Default::default())
         };
 
         Ok(ret)
@@ -83,16 +86,35 @@ cfg_io_driver! {
                 IoUnpark::Disabled(v) => v.unpark(),
             }
         }
+
+        #[track_caller]
+        pub(crate) fn expect(self, msg: &'static str) -> crate::runtime::io::Handle {
+            match self {
+                IoUnpark::Enabled(v) => v,
+                IoUnpark::Disabled(..) => panic!("{}", msg),
+            }
+        }
+
+        cfg_unstable! {
+            pub(crate) fn as_ref(&self) -> Option<&crate::runtime::io::Handle> {
+                match self {
+                    IoUnpark::Enabled(v) => Some(v),
+                    IoUnpark::Disabled(..) => None,
+                }
+            }
+        }
     }
 }
 
 cfg_not_io_driver! {
-    pub(crate) type IoHandle = ();
+    pub(crate) type IoHandle = IoUnpark;
     pub(crate) type IoStack = ParkThread;
     pub(crate) type IoUnpark = UnparkThread;
 
     fn create_io_stack(_enabled: bool) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
-        Ok((ParkThread::new(), Default::default(), Default::default()))
+        let park_thread = ParkThread::new();
+        let unpark_thread = park_thread.unpark();
+        Ok((park_thread, unpark_thread, Default::default()))
     }
 }
 
