@@ -891,6 +891,7 @@ impl Builder {
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
+                seed_generator: self.seed_generator.next_generator(),
             },
         );
         let spawner = Spawner::CurrentThread(scheduler.spawner().clone());
@@ -1012,6 +1013,7 @@ cfg_rt_multi_thread! {
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
+                    seed_generator: self.seed_generator.next_generator(),
                 },
             );
             let spawner = Spawner::MultiThread(scheduler.spawner().clone());

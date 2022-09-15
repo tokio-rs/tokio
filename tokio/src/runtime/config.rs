@@ -1,5 +1,6 @@
 #![cfg_attr(any(not(feature = "full"), tokio_wasm), allow(dead_code))]
 use crate::runtime::Callback;
+use crate::util::RngSeedGenerator;
 
 pub(crate) struct Config {
     /// How many ticks before pulling a task from the global/remote queue?
@@ -22,6 +23,10 @@ pub(crate) struct Config {
     /// Eventually, the LIFO slot **will** become stealable, however as a
     /// stop-gap, this unstable option lets users disable the LIFO task.
     pub(crate) disable_lifo_slot: bool,
+
+    /// Random number generator seed to configure runtimes to act in a
+    /// deterministic way.
+    pub(crate) seed_generator: RngSeedGenerator,
 
     #[cfg(tokio_unstable)]
     /// How to respond to unhandled task panics.

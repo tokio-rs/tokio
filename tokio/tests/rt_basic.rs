@@ -392,10 +392,10 @@ mod unstable {
 
         rt.block_on(async {
             let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 58);
+            assert_eq!(random, 59);
 
             let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 84);
+            assert_eq!(random, 10);
         });
     }
 
@@ -409,18 +409,18 @@ mod unstable {
 
         rt.block_on(async {
             let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 58);
+            assert_eq!(random, 59);
 
             let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 84);
+            assert_eq!(random, 10);
         });
 
         rt.block_on(async {
             let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 11);
+            assert_eq!(random, 86);
 
             let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 11);
+            assert_eq!(random, 1);
         });
     }
 }

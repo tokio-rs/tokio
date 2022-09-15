@@ -617,7 +617,7 @@ mod unstable {
             assert_eq!(num, 5);
 
             let num = select_0_to_9().await;
-            assert_eq!(num, 8);
+            assert_eq!(num, 1);
         });
     }
 
