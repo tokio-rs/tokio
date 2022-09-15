@@ -122,7 +122,6 @@ impl FastRand {
     ///
     /// The random number generator will become equivalent to one created with
     /// the same seed.
-    #[cfg(feature = "rt")]
     pub(crate) fn replace_seed(&self, seed: RngSeed) -> RngSeed {
         let old_seed = RngSeed::from_pair(self.one.get(), self.two.get());
 
