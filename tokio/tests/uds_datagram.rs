@@ -29,9 +29,7 @@ async fn echo() -> io::Result<()> {
     let server_socket = UnixDatagram::bind(server_path.clone())?;
 
     tokio::spawn(async move {
-        if let Err(e) = echo_server(server_socket).await {
-            eprintln!("Error in echo server: {}", e);
-        }
+        let _ = echo_server(server_socket).await;
     });
 
     {
@@ -55,9 +53,7 @@ async fn echo_from() -> io::Result<()> {
     let server_socket = UnixDatagram::bind(server_path.clone())?;
 
     tokio::spawn(async move {
-        if let Err(e) = echo_server(server_socket).await {
-            eprintln!("Error in echo server: {}", e);
-        }
+        let _ = echo_server(server_socket).await;
     });
 
     {
