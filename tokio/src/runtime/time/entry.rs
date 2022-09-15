@@ -550,7 +550,7 @@ impl TimerEntry {
 
         unsafe {
             self.driver()
-                .reregister(&self.driver.inner.io_handle, tick, self.inner().into());
+                .reregister(&self.driver.inner.driver.io, tick, self.inner().into());
         }
     }
 
@@ -573,7 +573,7 @@ impl TimerEntry {
 
     fn driver(&self) -> &super::Handle {
         // At this point, we know the time_handle is Some.
-        self.driver.inner.time_handle.as_ref().unwrap()
+        self.driver.inner.driver.time.as_ref().unwrap()
     }
 }
 

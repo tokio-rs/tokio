@@ -9,6 +9,74 @@ use crate::park::thread::{ParkThread, UnparkThread};
 use std::io;
 use std::time::Duration;
 
+#[derive(Debug)]
+pub(crate) struct Driver {
+    inner: TimeDriver,
+}
+
+#[derive(Debug)]
+pub(crate) struct Handle {
+    /// IO driver handle
+    pub(crate) io: IoHandle,
+
+    /// Signal driver handle
+    #[cfg_attr(any(not(unix), loom), allow(dead_code))]
+    pub(crate) signal: SignalHandle,
+
+    /// Time driver handle
+    pub(crate) time: TimeHandle,
+
+    /// Source of `Instant::now()`
+    #[cfg_attr(not(all(feature = "time", feature = "test-util")), allow(dead_code))]
+    pub(crate) clock: Clock,
+}
+
+pub(crate) struct Cfg {
+    pub(crate) enable_io: bool,
+    pub(crate) enable_time: bool,
+    pub(crate) enable_pause_time: bool,
+    pub(crate) start_paused: bool,
+}
+
+pub(crate) type Unpark = TimerUnpark;
+
+impl Driver {
+    pub(crate) fn new(cfg: Cfg) -> io::Result<(Self, Handle)> {
+        let (io_stack, io_handle, signal_handle) = create_io_stack(cfg.enable_io)?;
+
+        let clock = create_clock(cfg.enable_pause_time, cfg.start_paused);
+
+        let (time_driver, time_handle) =
+            create_time_driver(cfg.enable_time, io_stack, clock.clone());
+
+        Ok((
+            Self { inner: time_driver },
+            Handle {
+                io: io_handle,
+                signal: signal_handle,
+                time: time_handle,
+                clock,
+            },
+        ))
+    }
+
+    pub(crate) fn unpark(&self) -> TimerUnpark {
+        self.inner.unpark()
+    }
+
+    pub(crate) fn park(&mut self) {
+        self.inner.park()
+    }
+
+    pub(crate) fn park_timeout(&mut self, duration: Duration) {
+        self.inner.park_timeout(duration)
+    }
+
+    pub(crate) fn shutdown(&mut self) {
+        self.inner.shutdown()
+    }
+}
+
 // ===== io driver =====
 
 cfg_io_driver! {
@@ -264,65 +332,5 @@ cfg_not_time! {
         _clock: Clock,
     ) -> (TimeDriver, TimeHandle) {
         (io_stack, ())
-    }
-}
-
-// ===== runtime driver =====
-
-#[derive(Debug)]
-pub(crate) struct Driver {
-    inner: TimeDriver,
-}
-
-pub(crate) type Unpark = TimerUnpark;
-
-pub(crate) struct Resources {
-    pub(crate) io_handle: IoHandle,
-    pub(crate) signal_handle: SignalHandle,
-    pub(crate) time_handle: TimeHandle,
-    pub(crate) clock: Clock,
-}
-
-pub(crate) struct Cfg {
-    pub(crate) enable_io: bool,
-    pub(crate) enable_time: bool,
-    pub(crate) enable_pause_time: bool,
-    pub(crate) start_paused: bool,
-}
-
-impl Driver {
-    pub(crate) fn new(cfg: Cfg) -> io::Result<(Self, Resources)> {
-        let (io_stack, io_handle, signal_handle) = create_io_stack(cfg.enable_io)?;
-
-        let clock = create_clock(cfg.enable_pause_time, cfg.start_paused);
-
-        let (time_driver, time_handle) =
-            create_time_driver(cfg.enable_time, io_stack, clock.clone());
-
-        Ok((
-            Self { inner: time_driver },
-            Resources {
-                io_handle,
-                signal_handle,
-                time_handle,
-                clock,
-            },
-        ))
-    }
-
-    pub(crate) fn unpark(&self) -> TimerUnpark {
-        self.inner.unpark()
-    }
-
-    pub(crate) fn park(&mut self) {
-        self.inner.park()
-    }
-
-    pub(crate) fn park_timeout(&mut self, duration: Duration) {
-        self.inner.park_timeout(duration)
-    }
-
-    pub(crate) fn shutdown(&mut self) {
-        self.inner.shutdown()
     }
 }

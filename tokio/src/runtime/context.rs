@@ -28,7 +28,12 @@ cfg_io_driver! {
     pub(crate) fn io_handle() -> crate::runtime::driver::IoHandle {
         match CONTEXT.try_with(|ctx| {
             let ctx = ctx.borrow();
-            ctx.as_ref().expect(crate::util::error::CONTEXT_MISSING_ERROR).as_inner().io_handle.clone()
+            ctx.as_ref()
+                .expect(crate::util::error::CONTEXT_MISSING_ERROR)
+                .as_inner()
+                .driver
+                .io
+                .clone()
         }) {
             Ok(io_handle) => io_handle,
             Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
@@ -41,7 +46,12 @@ cfg_signal_internal! {
     pub(crate) fn signal_handle() -> crate::runtime::driver::SignalHandle {
         match CONTEXT.try_with(|ctx| {
             let ctx = ctx.borrow();
-            ctx.as_ref().expect(crate::util::error::CONTEXT_MISSING_ERROR).as_inner().signal_handle.clone()
+            ctx.as_ref()
+                .expect(crate::util::error::CONTEXT_MISSING_ERROR)
+                .as_inner()
+                .driver
+                .signal
+                .clone()
         }) {
             Ok(signal_handle) => signal_handle,
             Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
@@ -52,7 +62,13 @@ cfg_signal_internal! {
 cfg_time! {
     cfg_test_util! {
         pub(crate) fn clock() -> Option<crate::runtime::driver::Clock> {
-            match CONTEXT.try_with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.as_inner().clock.clone())) {
+            match CONTEXT.try_with(|ctx| {
+                let ctx = ctx.borrow();
+                ctx.as_ref()
+                    .map(|ctx| {
+                        ctx.as_inner().driver.clock.clone()
+                     })
+            }) {
                 Ok(clock) => clock,
                 Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
             }

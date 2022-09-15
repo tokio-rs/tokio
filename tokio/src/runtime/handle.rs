@@ -25,35 +25,9 @@ pub(crate) struct HandleInner {
     #[cfg(feature = "rt")]
     pub(super) spawner: Spawner,
 
-    /// Handles to the I/O drivers
-    #[cfg_attr(
-        not(any(
-            feature = "net",
-            all(unix, feature = "process"),
-            all(unix, feature = "signal"),
-        )),
-        allow(dead_code)
-    )]
-    pub(super) io_handle: driver::IoHandle,
-
-    /// Handles to the signal drivers
-    #[cfg_attr(
-        any(
-            loom,
-            not(all(unix, feature = "signal")),
-            not(all(unix, feature = "process")),
-        ),
-        allow(dead_code)
-    )]
-    pub(super) signal_handle: driver::SignalHandle,
-
-    /// Handles to the time drivers
-    #[cfg_attr(not(feature = "time"), allow(dead_code))]
-    pub(super) time_handle: driver::TimeHandle,
-
-    /// Source of `Instant::now()`
-    #[cfg_attr(not(all(feature = "time", feature = "test-util")), allow(dead_code))]
-    pub(super) clock: driver::Clock,
+    /// Resource driver handles
+    #[cfg_attr(not(feature = "full"), allow(dead_code))]
+    pub(super) driver: driver::Handle,
 
     /// Blocking pool spawner
     #[cfg(feature = "rt")]
@@ -414,7 +388,7 @@ cfg_time! {
     impl Handle {
         #[track_caller]
         pub(crate) fn as_time_handle(&self) -> &crate::runtime::time::Handle {
-            self.inner.time_handle.as_ref()
+            self.inner.driver.time.as_ref()
                 .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
         }
     }
