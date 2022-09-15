@@ -832,7 +832,7 @@ impl Builder {
     }
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::{Config, CurrentThread, HandleInner, Kind};
+        use crate::runtime::{Config, CurrentThread, HandleInner, Scheduler};
         use std::sync::Arc;
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
@@ -869,7 +869,7 @@ impl Builder {
         });
 
         Ok(Runtime {
-            kind: Kind::CurrentThread(scheduler),
+            scheduler: Scheduler::CurrentThread(scheduler),
             handle: Handle { inner },
             blocking_pool,
         })
@@ -952,7 +952,7 @@ cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
-            use crate::runtime::{Config, HandleInner, Kind, MultiThread};
+            use crate::runtime::{Config, HandleInner, Scheduler, MultiThread};
             use std::sync::Arc;
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
@@ -996,7 +996,7 @@ cfg_rt_multi_thread! {
             launch.launch();
 
             Ok(Runtime {
-                kind: Kind::MultiThread(scheduler),
+                scheduler: Scheduler::MultiThread(scheduler),
                 handle,
                 blocking_pool,
             })
