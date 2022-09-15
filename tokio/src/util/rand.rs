@@ -163,7 +163,6 @@ thread_local! {
 ///
 /// The returned seed can be later used to return the thread local random number
 /// generator to its previous state.
-#[cfg(feature = "rt")]
 pub(crate) fn replace_thread_rng(rng_seed: RngSeed) -> RngSeed {
     THREAD_RNG.with(|rng| rng.replace_seed(rng_seed))
 }

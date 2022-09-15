@@ -1,8 +1,6 @@
 //! Thread local runtime context
-use crate::{
-    runtime::{Handle, TryCurrentError},
-    util::{replace_thread_rng, RngSeed},
-};
+use crate::runtime::{Handle, TryCurrentError};
+use crate::util::{replace_thread_rng, RngSeed};
 
 use std::cell::RefCell;
 
