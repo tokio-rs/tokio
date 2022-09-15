@@ -61,7 +61,7 @@ cfg_rt! {
     pub(crate) use rc_cell::RcCell;
 }
 
-#[allow(unreachable_pub)]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 pub use self::rand::RngSeed;
 pub(crate) use self::rand::{replace_thread_rng, RngSeedGenerator};
 
