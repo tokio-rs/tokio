@@ -836,7 +836,7 @@ impl Builder {
             self
         }
 
-                /// Specifies the random number generation seed to use within all threads associated
+        /// Specifies the random number generation seed to use within all threads associated
         /// with the runtime being built.
         ///
         /// This option is intended to make certain parts of the runtime deterministic.

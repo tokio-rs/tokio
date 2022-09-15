@@ -60,7 +60,7 @@ cfg_rt! {
 
 mod rand;
 
-#[allow(unreachable_pub)]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 pub use self::rand::RngSeed;
 pub(crate) use self::rand::{replace_thread_rng, RngSeedGenerator};
 
