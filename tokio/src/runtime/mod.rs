@@ -177,6 +177,9 @@
 #[macro_use]
 mod tests;
 
+mod driver;
+pub(crate) mod handle;
+
 cfg_io_driver_impl! {
     pub(crate) mod io;
 }
@@ -217,13 +220,11 @@ cfg_rt! {
     }
 
     pub(crate) mod context;
-    mod driver;
 
     use self::enter::enter;
 
-    mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};
-    pub(crate) use handle::{HandleInner, ToHandle};
+    pub(crate) use handle::HandleInner;
 
     mod spawner;
     use self::spawner::Spawner;
@@ -571,7 +572,7 @@ cfg_rt! {
         /// ```
         pub fn shutdown_timeout(mut self, duration: Duration) {
             // Wakeup and shutdown all the worker threads
-            self.handle.clone().shutdown();
+            self.handle.shutdown();
             self.blocking_pool.shutdown(Some(duration));
         }
 

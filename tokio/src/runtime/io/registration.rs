@@ -57,10 +57,8 @@ unsafe impl Sync for Registration {}
 // ===== impl Registration =====
 
 impl Registration {
-    /// Registers the I/O resource with the default reactor, for a specific
-    /// `Interest`. `new_with_interest` should be used over `new` when you need
-    /// control over the readiness state, such as when a file descriptor only
-    /// allows reads. This does not add `hup` or `error` so if you are
+    /// Registers the I/O resource with the reactor for the provided handle, for
+    /// a specific `Interest`. This does not add `hup` or `error` so if you are
     /// interested in those states, you will need to add them to the readiness
     /// state passed to this function.
     ///

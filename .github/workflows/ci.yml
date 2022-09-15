@@ -49,6 +49,7 @@ jobs:
       - loom-compile
       - check-readme
       - test-hyper
+      - x86_64-fortanix-unknown-sgx
       - wasm32-unknown-unknown
       - wasm32-wasi
       - check-external-types
@@ -75,7 +76,7 @@ jobs:
         run: rustup update stable
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
 
       # Run `tokio` with `full` features. This excludes testing utilities which
       # can alter the runtime behavior of Tokio.
@@ -141,9 +142,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
 
       - name: Install Valgrind
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y valgrind
+        uses: taiki-e/install-action@valgrind
 
       # Compile tests
       - name: cargo build test-mem
@@ -278,14 +277,12 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
-      - name: check --each-feature
-        run: cargo hack check --all --each-feature -Z avoid-dev-deps
-      - name: check net,time
-        run: cargo check -p tokio --no-default-features --features net,time -Z avoid-dev-deps
+        uses: taiki-e/install-action@cargo-hack
+      - name: check --feature-powerset
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
       # Try with unstable feature flags
-      - name: check --each-feature --unstable
-        run: cargo hack check --all --each-feature -Z avoid-dev-deps
+      - name: check --feature-powerset --unstable
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -315,7 +312,7 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       - name: "check --all-features -Z minimal-versions"
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
@@ -452,6 +449,23 @@ jobs:
           git diff
           cargo test --features full
 
+  x86_64-fortanix-unknown-sgx:
+    name: build tokio for x86_64-fortanix-unknown-sgx
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust_nightly }}
+          target: x86_64-fortanix-unknown-sgx
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      # NOTE: Currently the only test we can run is to build tokio with rt and sync features.
+      - name: build tokio
+        run: cargo build --target x86_64-fortanix-unknown-sgx --features rt,sync
+        working-directory: tokio
+
   wasm32-unknown-unknown:
     name: test tokio for wasm32-unknown-unknown
     runs-on: ubuntu-latest
@@ -483,13 +497,13 @@ jobs:
 
       # Install dependencies
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
 
       - name: Install wasm32-wasi target
         run: rustup target add wasm32-wasi
 
       - name: Install wasmtime
-        run: cargo install wasmtime-cli
+        uses: taiki-e/install-action@wasmtime
 
       - name: Install cargo-wasi
         run: cargo install cargo-wasi
@@ -539,4 +553,3 @@ jobs:
           cargo install cargo-check-external-types --locked --version 0.1.3
           cargo check-external-types --all-features --config external-types.toml
         working-directory: tokio
-

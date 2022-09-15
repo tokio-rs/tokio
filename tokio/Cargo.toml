@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.0.x" git tag.
-version = "1.21.0"
+version = "1.21.1"
 edition = "2018"
 rust-version = "1.49"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -51,6 +51,7 @@ net = [
   "mio/os-poll",
   "mio/os-ext",
   "mio/net",
+  "socket2",
   "winapi/fileapi",
   "winapi/handleapi",
   "winapi/namedpipeapi",
@@ -58,7 +59,7 @@ net = [
   "winapi/winnt",
   "winapi/minwindef",
   "winapi/accctrl",
-  "winapi/aclapi"
+  "winapi/aclapi",
 ]
 process = [
   "bytes",
@@ -118,7 +119,7 @@ num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.12.0", optional = true }
 
 [target.'cfg(not(any(target_arch = "wasm32", target_arch = "wasm64")))'.dependencies]
-socket2 = { version = "0.4.4", features = [ "all" ] }
+socket2 = { version = "0.4.4", optional = true, features = [ "all" ] }
 
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.

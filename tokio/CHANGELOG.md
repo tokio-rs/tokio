@@ -1,3 +1,13 @@
+# 1.21.1 (September 13, 2022)
+
+### Fixed
+
+- net: fix dependency resolution for socket2 ([#5000])
+- task: ignore failure to set TLS in `LocalSet` Drop ([#4976])
+
+[#4976]: https://github.com/tokio-rs/tokio/pull/4976
+[#5000]: https://github.com/tokio-rs/tokio/pull/5000
+
 # 1.21.0 (September 2, 2022)
 
 This release is the first release of Tokio to intentionally support WASM. The

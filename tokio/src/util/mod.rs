@@ -44,10 +44,6 @@ pub(crate) mod linked_list;
 mod rand;
 
 cfg_rt! {
-    #[allow(unreachable_pub)]
-    pub use self::rand::RngSeed;
-    pub(crate) use self::rand::{replace_thread_rng, RngSeedGenerator};
-
     mod idle_notified_set;
     pub(crate) use idle_notified_set::IdleNotifiedSet;
 
@@ -65,6 +61,10 @@ cfg_rt! {
     pub(crate) use rc_cell::RcCell;
 }
 
+#[allow(unreachable_pub)]
+pub use self::rand::RngSeed;
+pub(crate) use self::rand::{replace_thread_rng, RngSeedGenerator};
+
 #[cfg(any(feature = "macros"))]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub use self::rand::thread_rng_n;
@@ -78,11 +78,4 @@ cfg_rt_multi_thread! {
 
 pub(crate) mod trace;
 
-#[cfg(any(
-    feature = "rt",
-    feature = "time",
-    feature = "net",
-    feature = "process",
-    all(unix, feature = "signal")
-))]
 pub(crate) mod error;
