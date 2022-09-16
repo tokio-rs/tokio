@@ -58,7 +58,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::atomic::Ordering;
 
-use crate::runtime::handle::Handle;
+use crate::runtime::scheduler;
 use crate::sync::AtomicWaker;
 use crate::time::Instant;
 use crate::util::linked_list;
@@ -285,7 +285,7 @@ impl StateCell {
 pub(crate) struct TimerEntry {
     /// Arc reference to the runtime handle. We can only free the driver after
     /// deregistering everything from their respective timer wheels.
-    driver: Handle,
+    driver: scheduler::Handle,
     /// Shared inner structure; this is part of an intrusive linked list, and
     /// therefore other references can exist to it while mutable references to
     /// Entry exist.
@@ -490,9 +490,9 @@ unsafe impl linked_list::Link for TimerShared {
 
 impl TimerEntry {
     #[track_caller]
-    pub(crate) fn new(handle: &Handle, deadline: Instant) -> Self {
+    pub(crate) fn new(handle: &scheduler::Handle, deadline: Instant) -> Self {
         // Panic if the time driver is not enabled
-        let _ = handle.as_time_handle();
+        let _ = handle.time();
 
         let driver = handle.clone();
 
@@ -550,7 +550,7 @@ impl TimerEntry {
 
         unsafe {
             self.driver()
-                .reregister(&self.driver.inner.driver.io, tick, self.inner().into());
+                .reregister(&self.driver.driver().io, tick, self.inner().into());
         }
     }
 
@@ -572,8 +572,7 @@ impl TimerEntry {
     }
 
     fn driver(&self) -> &super::Handle {
-        // At this point, we know the time_handle is Some.
-        self.driver.inner.driver.time.as_ref().unwrap()
+        self.driver.time()
     }
 }
 

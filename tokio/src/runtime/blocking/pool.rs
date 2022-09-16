@@ -154,7 +154,7 @@ cfg_fs! {
         R: Send + 'static,
     {
         let rt = context::current();
-        rt.as_inner().blocking_spawner.spawn_mandatory_blocking(&rt, func)
+        rt.inner.blocking_spawner().spawn_mandatory_blocking(&rt, func)
     }
 }
 
@@ -419,7 +419,7 @@ impl Spawner {
         builder.spawn(move || {
             // Only the reference should be moved into the closure
             let _enter = crate::runtime::context::enter(rt.clone());
-            rt.as_inner().blocking_spawner.inner.run(id);
+            rt.inner.blocking_spawner().inner.run(id);
             drop(shutdown_tx);
         })
     }

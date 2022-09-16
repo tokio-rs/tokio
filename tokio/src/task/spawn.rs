@@ -1,4 +1,5 @@
-use crate::{task::JoinHandle, util::error::CONTEXT_MISSING_ERROR};
+use crate::runtime::Handle;
+use crate::task::JoinHandle;
 
 use std::future::Future;
 
@@ -142,10 +143,10 @@ cfg_rt! {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        use crate::runtime::{task, context};
+        use crate::runtime::task;
         let id = task::Id::next();
-        let spawn_handle = context::spawn_handle().expect(CONTEXT_MISSING_ERROR);
         let task = crate::util::trace::task(future, "task", name, id.as_u64());
-        spawn_handle.spawn(task, id)
+        let handle = Handle::current();
+        handle.inner.spawn(task, id)
     }
 }
