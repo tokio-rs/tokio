@@ -1,5 +1,5 @@
 use crate::runtime::handle::Handle;
-use crate::runtime::{blocking, driver, Callback, Runtime, Spawner};
+use crate::runtime::{blocking, driver, Callback, Runtime};
 use crate::util::{RngSeed, RngSeedGenerator};
 
 use std::fmt;
@@ -874,7 +874,8 @@ impl Builder {
     }
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::{Config, CurrentThread, HandleInner, Scheduler};
+        use crate::runtime::scheduler::{self, current_thread, CurrentThread};
+        use crate::runtime::{Config, Scheduler};
         use std::sync::Arc;
 
         let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
@@ -900,14 +901,13 @@ impl Builder {
                 seed_generator: self.seed_generator.next_generator(),
             },
         );
-        let spawner = Spawner::CurrentThread(scheduler.spawner().clone());
-
-        let inner = Arc::new(HandleInner {
-            spawner,
+        let inner = Arc::new(current_thread::Handle {
+            spawner: scheduler.spawner().clone(),
             driver: driver_handle,
             blocking_spawner,
             seed_generator: self.seed_generator.next_generator(),
         });
+        let inner = scheduler::Handle::CurrentThread(inner);
 
         Ok(Runtime {
             scheduler: Scheduler::CurrentThread(scheduler),
@@ -993,7 +993,8 @@ cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
-            use crate::runtime::{Config, HandleInner, Scheduler, MultiThread};
+            use crate::runtime::{Config, Scheduler};
+            use crate::runtime::scheduler::{self, multi_thread, MultiThread};
             use std::sync::Arc;
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
@@ -1019,14 +1020,14 @@ cfg_rt_multi_thread! {
                     seed_generator: self.seed_generator.next_generator(),
                 },
             );
-            let spawner = Spawner::MultiThread(scheduler.spawner().clone());
 
-            let inner = Arc::new(HandleInner {
-                spawner,
+            let inner = Arc::new(multi_thread::Handle {
+                spawner: scheduler.spawner().clone(),
                 driver: driver_handle,
                 blocking_spawner,
                 seed_generator: self.seed_generator.next_generator(),
             });
+            let inner = scheduler::Handle::MultiThread(inner);
 
             // Create the runtime handle
             let handle = Handle { inner };

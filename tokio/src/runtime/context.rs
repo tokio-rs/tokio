@@ -31,8 +31,8 @@ cfg_io_driver! {
             let ctx = ctx.borrow();
             ctx.as_ref()
                 .expect(crate::util::error::CONTEXT_MISSING_ERROR)
-                .as_inner()
-                .driver
+                .inner
+                .driver()
                 .io
                 .clone()
         }) {
@@ -49,9 +49,8 @@ cfg_signal_internal! {
             let ctx = ctx.borrow();
             ctx.as_ref()
                 .expect(crate::util::error::CONTEXT_MISSING_ERROR)
-                .as_inner()
-                .driver
-                .signal
+                .inner
+                .signal()
                 .clone()
         }) {
             Ok(signal_handle) => signal_handle,
@@ -65,23 +64,13 @@ cfg_time! {
         pub(crate) fn clock() -> Option<crate::runtime::driver::Clock> {
             match CONTEXT.try_with(|ctx| {
                 let ctx = ctx.borrow();
-                ctx.as_ref()
-                    .map(|ctx| {
-                        ctx.as_inner().driver.clock.clone()
-                     })
+                ctx
+                    .as_ref()
+                    .map(|ctx| ctx.inner.clock().clone())
             }) {
                 Ok(clock) => clock,
                 Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
             }
-        }
-    }
-}
-
-cfg_rt! {
-    pub(crate) fn spawn_handle() -> Option<crate::runtime::Spawner> {
-        match CONTEXT.try_with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.inner.spawner.clone())) {
-            Ok(spawner) => spawner,
-            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
         }
     }
 }
@@ -100,7 +89,7 @@ pub(crate) fn enter(new: Handle) -> EnterGuard {
 ///
 /// [`Handle`]: Handle
 pub(crate) fn try_enter(new: Handle) -> Option<EnterGuard> {
-    let rng_seed = new.as_inner().seed_generator.next_seed();
+    let rng_seed = new.inner.seed_generator().next_seed();
     let old_handle = CONTEXT.try_with(|ctx| ctx.borrow_mut().replace(new)).ok()?;
 
     let old_seed = replace_thread_rng(rng_seed);
