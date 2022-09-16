@@ -535,7 +535,8 @@ cfg_net! {
             // thus this breaks that guarantee.
             self.handle
                 .as_inner()
-                .io_handle
+                .driver
+                .io
                 .as_ref()
                 .map(|h| f(h.metrics()))
                 .unwrap_or(0)
