@@ -106,6 +106,7 @@ cfg_rt! {
             }
         }
 
+        #[cfg(unix)]
         cfg_signal_internal! {
             pub(crate) fn signal(&self) -> &driver::SignalHandle {
                 &self.driver().signal
