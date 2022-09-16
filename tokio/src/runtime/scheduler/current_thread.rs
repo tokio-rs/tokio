@@ -372,7 +372,7 @@ impl Context {
 impl Handle {
     /// Spawns a future onto the `CurrentThread` scheduler
     pub(crate) fn spawn<F>(
-        self: &Arc<Self>,
+        me: &Arc<Self>,
         future: F,
         id: crate::runtime::task::Id,
     ) -> JoinHandle<F::Output>
@@ -380,10 +380,10 @@ impl Handle {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (handle, notified) = self.shared.owned.bind(future, self.clone(), id);
+        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
 
         if let Some(notified) = notified {
-            self.schedule(notified);
+            me.schedule(notified);
         }
 
         handle
@@ -396,11 +396,11 @@ impl Handle {
         }
     }
 
-    fn waker_ref<'a>(self: &'a Arc<Self>) -> WakerRef<'a> {
+    fn waker_ref(me: &Arc<Self>) -> WakerRef<'_> {
         // Set woken to true when enter block_on, ensure outer future
         // be polled for the first time when enter loop
-        self.shared.woken.store(true, Release);
-        waker_ref(self)
+        me.shared.woken.store(true, Release);
+        waker_ref(me)
     }
 
     // reset woken to false and return original value
@@ -529,7 +529,7 @@ impl CoreGuard<'_> {
     fn block_on<F: Future>(self, future: F) -> F::Output {
         let ret = self.enter(|mut core, context| {
             let _enter = crate::runtime::enter(false);
-            let waker = context.handle.waker_ref();
+            let waker = Handle::waker_ref(&context.handle);
             let mut cx = std::task::Context::from_waker(&waker);
 
             pin!(future);

@@ -993,10 +993,10 @@ cfg_test_util! {
 cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
+            use crate::loom::sync::Arc;
             use crate::loom::sys::num_cpus;
             use crate::runtime::{Config, Scheduler};
             use crate::runtime::scheduler::{self, multi_thread, MultiThread};
-            use std::sync::Arc;
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
