@@ -1,5 +1,6 @@
 //! Thread local runtime context
 use crate::runtime::{Handle, TryCurrentError};
+use crate::util::{replace_thread_rng, RngSeed};
 
 use std::cell::RefCell;
 
@@ -99,21 +100,29 @@ pub(crate) fn enter(new: Handle) -> EnterGuard {
 ///
 /// [`Handle`]: Handle
 pub(crate) fn try_enter(new: Handle) -> Option<EnterGuard> {
-    CONTEXT
-        .try_with(|ctx| {
-            let old = ctx.borrow_mut().replace(new);
-            EnterGuard(old)
-        })
-        .ok()
+    let rng_seed = new.as_inner().seed_generator.next_seed();
+    let old_handle = CONTEXT.try_with(|ctx| ctx.borrow_mut().replace(new)).ok()?;
+
+    let old_seed = replace_thread_rng(rng_seed);
+
+    Some(EnterGuard {
+        old_handle,
+        old_seed,
+    })
 }
 
 #[derive(Debug)]
-pub(crate) struct EnterGuard(Option<Handle>);
+pub(crate) struct EnterGuard {
+    old_handle: Option<Handle>,
+    old_seed: RngSeed,
+}
 
 impl Drop for EnterGuard {
     fn drop(&mut self) {
         CONTEXT.with(|ctx| {
-            *ctx.borrow_mut() = self.0.take();
+            *ctx.borrow_mut() = self.old_handle.take();
         });
+        // We discard the RngSeed associated with this guard
+        let _ = replace_thread_rng(self.old_seed.clone());
     }
 }

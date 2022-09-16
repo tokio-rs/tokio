@@ -58,7 +58,6 @@
 
 use crate::coop;
 use crate::future::Future;
-use crate::loom::rand::seed;
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
@@ -206,7 +205,7 @@ pub(super) fn create(size: usize, park: Parker, config: Config) -> (Arc<Shared>,
             is_shutdown: false,
             park: Some(park),
             metrics: MetricsBatch::new(),
-            rand: FastRand::new(seed()),
+            rand: FastRand::new(config.seed_generator.next_seed()),
         }));
 
         remotes.push(Remote { steal, unpark });

@@ -3,6 +3,9 @@
 
 use crate::runtime::driver;
 
+#[cfg(feature = "rt")]
+use crate::util::RngSeedGenerator;
+
 use std::sync::Arc;
 
 /// Handle to the runtime.
@@ -32,6 +35,10 @@ pub(crate) struct HandleInner {
     /// Blocking pool spawner
     #[cfg(feature = "rt")]
     pub(crate) blocking_spawner: blocking::Spawner,
+
+    /// Current random number generator seed
+    #[cfg(feature = "rt")]
+    pub(super) seed_generator: RngSeedGenerator,
 }
 
 cfg_rt! {
