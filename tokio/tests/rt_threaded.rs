@@ -542,6 +542,7 @@ fn rt() -> runtime::Runtime {
 #[cfg(tokio_unstable)]
 mod unstable {
     use super::*;
+    use tokio::runtime::RngSeed;
 
     #[test]
     fn test_disable_lifo_slot() {
@@ -560,5 +561,28 @@ mod unstable {
             .await
             .unwrap();
         })
+    }
+
+    #[test]
+    fn rng_seed() {
+        let seed = b"bytes used to generate seed";
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            let random = tokio::macros::support::thread_rng_n(100);
+            assert_eq!(random, 86);
+
+            let _ = tokio::spawn(async {
+                // Because we only have a single worker thread, the
+                // RNG will be deterministic here as well.
+                let random = tokio::macros::support::thread_rng_n(100);
+                assert_eq!(random, 64);
+            })
+            .await;
+        });
     }
 }

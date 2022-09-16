@@ -216,6 +216,7 @@ cfg_rt! {
     pub use self::builder::Builder;
     cfg_unstable! {
         pub use self::builder::UnhandledPanic;
+        pub use crate::util::RngSeed;
     }
 
     pub(crate) mod context;
