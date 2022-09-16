@@ -20,21 +20,9 @@ mod wheel;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex};
+use crate::runtime::driver::{IoStack, IoUnpark};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
-
-// This duplication should be cleaned up in a later refactor
-cfg_io_driver! {
-    cfg_rt! {
-        use crate::runtime::driver::{IoStack, IoUnpark};
-    }
-    cfg_not_rt! {
-        use crate::runtime::io::{Driver as IoStack, Handle as IoUnpark};
-    }
-}
-cfg_not_io_driver! {
-    use crate::park::thread::{ParkThread as IoStack, UnparkThread as IoUnpark};
-}
 
 use std::fmt;
 use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
@@ -119,9 +107,6 @@ struct Inner {
 
     /// True if the driver is being shutdown.
     pub(super) is_shutdown: AtomicBool,
-
-    /// Unparker that can be used to wake the time driver.
-    unpark: IoUnpark,
 }
 
 /// Time state shared which must be protected by a `Mutex`
@@ -149,7 +134,7 @@ impl Driver {
     pub(crate) fn new(park: IoStack, clock: Clock) -> (Driver, Handle) {
         let time_source = TimeSource::new(clock);
 
-        let inner = Inner::new(time_source.clone(), park.unpark());
+        let inner = Inner::new(time_source.clone());
         let handle = Handle::new(Arc::new(inner));
 
         let driver = Driver {
@@ -352,7 +337,12 @@ impl Handle {
     /// driver. No other threads are allowed to concurrently manipulate the
     /// timer at all (the current thread should hold an exclusive reference to
     /// the `TimerEntry`)
-    pub(self) unsafe fn reregister(&self, new_tick: u64, entry: NonNull<TimerShared>) {
+    pub(self) unsafe fn reregister(
+        &self,
+        unpark: &IoUnpark,
+        new_tick: u64,
+        entry: NonNull<TimerShared>,
+    ) {
         let waker = unsafe {
             let mut lock = self.get().lock();
 
@@ -380,7 +370,7 @@ impl Handle {
                             .map(|next_wake| when < next_wake.get())
                             .unwrap_or(true)
                         {
-                            self.inner.unpark.unpark();
+                            unpark.unpark();
                         }
 
                         None
@@ -431,7 +421,7 @@ impl TimerUnpark {
 // ===== impl Inner =====
 
 impl Inner {
-    pub(self) fn new(time_source: TimeSource, unpark: IoUnpark) -> Self {
+    pub(self) fn new(time_source: TimeSource) -> Self {
         Inner {
             state: Mutex::new(InnerState {
                 time_source,
@@ -439,7 +429,6 @@ impl Inner {
                 next_wake: None,
                 wheel: wheel::Wheel::new(),
             }),
-            unpark,
             is_shutdown: AtomicBool::new(false),
         }
     }

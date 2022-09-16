@@ -177,6 +177,9 @@
 #[macro_use]
 mod tests;
 
+mod driver;
+pub(crate) mod handle;
+
 cfg_io_driver_impl! {
     pub(crate) mod io;
 }
@@ -216,13 +219,11 @@ cfg_rt! {
     }
 
     pub(crate) mod context;
-    mod driver;
 
     use self::enter::enter;
 
-    mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};
-    pub(crate) use handle::{HandleInner, ToHandle};
+    pub(crate) use handle::HandleInner;
 
     mod spawner;
     use self::spawner::Spawner;
@@ -296,8 +297,8 @@ cfg_rt! {
     /// [`Builder`]: struct@Builder
     #[derive(Debug)]
     pub struct Runtime {
-        /// Task executor
-        kind: Kind,
+        /// Task scheduler
+        scheduler: Scheduler,
 
         /// Handle to runtime, also contains driver handles
         handle: Handle,
@@ -306,9 +307,9 @@ cfg_rt! {
         blocking_pool: BlockingPool,
     }
 
-    /// The runtime executor is either a multi-thread or a current-thread executor.
+    /// The runtime scheduler is either a multi-thread or a current-thread executor.
     #[derive(Debug)]
-    enum Kind {
+    enum Scheduler {
         /// Execute all tasks on the current-thread.
         CurrentThread(CurrentThread),
 
@@ -490,10 +491,10 @@ cfg_rt! {
 
             let _enter = self.enter();
 
-            match &self.kind {
-                Kind::CurrentThread(exec) => exec.block_on(future),
+            match &self.scheduler {
+                Scheduler::CurrentThread(exec) => exec.block_on(future),
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                Kind::MultiThread(exec) => exec.block_on(future),
+                Scheduler::MultiThread(exec) => exec.block_on(future),
             }
         }
 
@@ -570,7 +571,7 @@ cfg_rt! {
         /// ```
         pub fn shutdown_timeout(mut self, duration: Duration) {
             // Wakeup and shutdown all the worker threads
-            self.handle.clone().shutdown();
+            self.handle.shutdown();
             self.blocking_pool.shutdown(Some(duration));
         }
 
@@ -608,8 +609,8 @@ cfg_rt! {
     #[allow(clippy::single_match)] // there are comments in the error branch, so we don't want if-let
     impl Drop for Runtime {
         fn drop(&mut self) {
-            match &mut self.kind {
-                Kind::CurrentThread(current_thread) => {
+            match &mut self.scheduler {
+                Scheduler::CurrentThread(current_thread) => {
                     // This ensures that tasks spawned on the current-thread
                     // runtime are dropped inside the runtime's context.
                     match self::context::try_enter(self.handle.clone()) {
@@ -623,7 +624,7 @@ cfg_rt! {
                     }
                 },
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                Kind::MultiThread(_) => {
+                Scheduler::MultiThread(_) => {
                     // The threaded scheduler drops its tasks on its worker threads, which is
                     // already in the runtime's context.
                 },

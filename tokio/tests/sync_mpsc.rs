@@ -15,6 +15,7 @@ use tokio::sync::mpsc::{self, channel};
 use tokio::sync::oneshot;
 use tokio_test::*;
 
+use std::fmt;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::Arc;
@@ -220,9 +221,9 @@ async fn no_t_bounds_buffer() {
     let (tx, mut rx) = mpsc::channel(100);
 
     // sender should be Debug even though T isn't Debug
-    println!("{:?}", tx);
+    is_debug(&tx);
     // same with Receiver
-    println!("{:?}", rx);
+    is_debug(&rx);
     // and sender should be Clone even though T isn't Clone
     assert!(tx.clone().try_send(NoImpls).is_ok());
 
@@ -236,9 +237,9 @@ async fn no_t_bounds_unbounded() {
     let (tx, mut rx) = mpsc::unbounded_channel();
 
     // sender should be Debug even though T isn't Debug
-    println!("{:?}", tx);
+    is_debug(&tx);
     // same with Receiver
-    println!("{:?}", rx);
+    is_debug(&rx);
     // and sender should be Clone even though T isn't Clone
     assert!(tx.clone().send(NoImpls).is_ok());
 
@@ -940,3 +941,5 @@ async fn test_tx_capacity() {
     assert_eq!(tx.capacity(), 8);
     assert_eq!(tx.max_capacity(), 10);
 }
+
+fn is_debug<T: fmt::Debug>(_: &T) {}

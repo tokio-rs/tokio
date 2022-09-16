@@ -832,21 +832,14 @@ impl Builder {
     }
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::{Config, CurrentThread, HandleInner, Kind};
+        use crate::runtime::{Config, CurrentThread, HandleInner, Scheduler};
+        use std::sync::Arc;
 
-        let (driver, resources) = driver::Driver::new(self.get_cfg())?;
+        let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
-
-        let handle_inner = HandleInner {
-            io_handle: resources.io_handle,
-            time_handle: resources.time_handle,
-            signal_handle: resources.signal_handle,
-            clock: resources.clock,
-            blocking_spawner,
-        };
 
         // And now put a single-threaded scheduler on top of the timer. When
         // there are no futures ready to do something, it'll let the timer or
@@ -854,7 +847,6 @@ impl Builder {
         // in their life.
         let scheduler = CurrentThread::new(
             driver,
-            handle_inner,
             Config {
                 before_park: self.before_park.clone(),
                 after_unpark: self.after_unpark.clone(),
@@ -867,9 +859,15 @@ impl Builder {
         );
         let spawner = Spawner::CurrentThread(scheduler.spawner().clone());
 
+        let inner = Arc::new(HandleInner {
+            spawner,
+            driver: driver_handle,
+            blocking_spawner,
+        });
+
         Ok(Runtime {
-            kind: Kind::CurrentThread(scheduler),
-            handle: Handle { spawner },
+            scheduler: Scheduler::CurrentThread(scheduler),
+            handle: Handle { inner },
             blocking_pool,
         })
     }
@@ -951,29 +949,21 @@ cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
-            use crate::runtime::{Config, HandleInner, Kind, MultiThread};
+            use crate::runtime::{Config, HandleInner, Scheduler, MultiThread};
+            use std::sync::Arc;
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
-            let (driver, resources) = driver::Driver::new(self.get_cfg())?;
+            let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
             // Create the blocking pool
             let blocking_pool =
                 blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
-            let handle_inner = HandleInner {
-                io_handle: resources.io_handle,
-                time_handle: resources.time_handle,
-                signal_handle: resources.signal_handle,
-                clock: resources.clock,
-                blocking_spawner,
-            };
-
             let (scheduler, launch) = MultiThread::new(
                 core_threads,
                 driver,
-                handle_inner,
                 Config {
                     before_park: self.before_park.clone(),
                     after_unpark: self.after_unpark.clone(),
@@ -986,15 +976,21 @@ cfg_rt_multi_thread! {
             );
             let spawner = Spawner::MultiThread(scheduler.spawner().clone());
 
+            let inner = Arc::new(HandleInner {
+                spawner,
+                driver: driver_handle,
+                blocking_spawner,
+            });
+
             // Create the runtime handle
-            let handle = Handle { spawner };
+            let handle = Handle { inner };
 
             // Spawn the thread pool workers
             let _enter = crate::runtime::context::enter(handle.clone());
             launch.launch();
 
             Ok(Runtime {
-                kind: Kind::MultiThread(scheduler),
+                scheduler: Scheduler::MultiThread(scheduler),
                 handle,
                 blocking_pool,
             })

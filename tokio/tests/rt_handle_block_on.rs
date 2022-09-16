@@ -505,39 +505,30 @@ where
     F: Fn(),
 {
     {
-        println!("current thread runtime");
-
         let rt = new_current_thread();
         let _enter = rt.enter();
         f();
 
-        println!("current thread runtime after shutdown");
         rt.shutdown_timeout(Duration::from_secs(1000));
         f();
     }
 
     #[cfg(not(tokio_wasi))]
     {
-        println!("multi thread (1 thread) runtime");
-
         let rt = new_multi_thread(1);
         let _enter = rt.enter();
         f();
 
-        println!("multi thread runtime after shutdown");
         rt.shutdown_timeout(Duration::from_secs(1000));
         f();
     }
 
     #[cfg(not(tokio_wasi))]
     {
-        println!("multi thread (4 threads) runtime");
-
         let rt = new_multi_thread(4);
         let _enter = rt.enter();
         f();
 
-        println!("multi thread runtime after shutdown");
         rt.shutdown_timeout(Duration::from_secs(1000));
         f();
     }
