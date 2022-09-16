@@ -223,6 +223,22 @@ impl<T> UnboundedReceiver<T> {
         self.chan.close();
     }
 
+    /// Checks if the channel has been closed. This happens when the
+    /// [`UnboundedReceiver::close`] method is called.
+    ///
+    /// [`UnboundedReceiver::close`]: crate::sync::mpsc::UnboundedReceiver::close
+    ///
+    /// ```
+    /// let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+    /// assert!(!rx.is_closed());
+    ///
+    /// rx.close();
+    /// assert!(rx.is_closed());
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.chan.is_closed()
+    }
+
     /// Polls to receive the next message on this channel.
     ///
     /// This method returns:

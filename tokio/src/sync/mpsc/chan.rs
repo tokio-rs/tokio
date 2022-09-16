@@ -239,6 +239,14 @@ impl<T, S: Semaphore> Rx<T, S> {
         self.inner.notify_rx_closed.notify_waiters();
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    pub(crate) fn is_closed(&self) -> bool {
+        self.inner.semaphore.is_closed()
+    }
+
     /// Receive the next value
     pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         use super::block::Read::*;
@@ -362,6 +370,15 @@ impl<T, S> Chan<T, S> {
 
         // Notify the rx task
         self.rx_waker.wake();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        let tail_position = self.tx.tail_position.load(Acquire);
+        let index = self.rx_fields.with_mut(|rx_fields_ptr| {
+            let rx_fields = unsafe { &mut *rx_fields_ptr };
+            return rx_fields.list.index
+        });
+        tail_position == index
     }
 }
 

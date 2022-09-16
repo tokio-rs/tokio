@@ -15,7 +15,7 @@ pub(crate) struct Tx<T> {
 
     /// Position to push the next message. This references a block and offset
     /// into the block.
-    tail_position: AtomicUsize,
+    pub(crate) tail_position: AtomicUsize,
 }
 
 /// List queue receive handle
@@ -24,7 +24,7 @@ pub(crate) struct Rx<T> {
     head: NonNull<Block<T>>,
 
     /// Next slot index to process.
-    index: usize,
+    pub index: usize,
 
     /// Pointer to the next block pending release.
     free_head: NonNull<Block<T>>,

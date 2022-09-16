@@ -367,6 +367,39 @@ impl<T> Receiver<T> {
         self.chan.close();
     }
 
+    /// Checks if the channel has been closed. This happens when the
+    /// [`Receiver::close`] method is called.
+    ///
+    /// [`Receiver::close`]: crate::sync::mpsc::Receiver::close
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(42);
+    ///
+    ///     assert!(!rx.is_closed());
+    ///
+    ///     tx.send(100).await.unwrap();
+    ///     tx.send(200).await.unwrap();
+    ///
+    ///     rx.close();
+    ///     assert!(!rx.is_closed());
+    ///     assert_eq!(rx.recv().await, Some(100));
+    ///
+    ///     assert!(!rx.is_closed());
+    ///     assert_eq!(rx.recv().await, Some(200));
+    ///
+    ///     assert!(rx.is_closed())
+    /// }
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.chan.is_closed() && self.chan.is_empty()
+    }
+
     /// Polls to receive the next message on this channel.
     ///
     /// This method returns:
