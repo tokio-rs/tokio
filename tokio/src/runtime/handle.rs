@@ -2,6 +2,8 @@
 #![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
 use crate::runtime::driver;
+
+#[cfg(feature = "rt")]
 use crate::util::RngSeedGenerator;
 
 use std::sync::Arc;
@@ -61,6 +63,7 @@ pub(crate) struct HandleInner {
     pub(crate) blocking_spawner: blocking::Spawner,
 
     /// Current random number generator seed (when no)
+    #[cfg(feature = "rt")]
     pub(super) seed_generator: RngSeedGenerator,
 }
 
