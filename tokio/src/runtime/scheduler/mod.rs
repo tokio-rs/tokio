@@ -81,7 +81,7 @@ cfg_rt! {
             F::Output: Send + 'static,
         {
             match self {
-                Handle::CurrentThread(h) => h.spawner.spawn(future, id),
+                Handle::CurrentThread(h) => h.spawn(future, id),
 
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Handle::MultiThread(h) => h.spawner.spawn(future, id),
