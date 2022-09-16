@@ -2,6 +2,7 @@
 //!
 //! The stream types are often used in combination with hyper or reqwest, as they
 //! allow converting between a hyper [`Body`] and [`AsyncRead`].
+//! The sink wrappers are helpful to treat sink-like interfaces as file-like objects with [`AsyncWrite`].
 //!
 //! The [`SyncIoBridge`] type converts from the world of async I/O
 //! to synchronous I/O; this may often come up when using synchronous APIs
@@ -9,11 +10,12 @@
 //!
 //! [`Body`]: https://docs.rs/hyper/0.13/hyper/struct.Body.html
 //! [`AsyncRead`]: tokio::io::AsyncRead
+//! [`AsyncWrite`]: tokio::io::AsyncWrite
 
 mod read_buf;
 mod reader_stream;
+mod sink_writer;
 mod stream_reader;
-pub mod sink_writer;
 cfg_io_util! {
     mod sync_bridge;
     pub use self::sync_bridge::SyncIoBridge;
@@ -21,6 +23,6 @@ cfg_io_util! {
 
 pub use self::read_buf::read_buf;
 pub use self::reader_stream::ReaderStream;
-pub use self::stream_reader::StreamReader;
 pub use self::sink_writer::SinkWriter;
+pub use self::stream_reader::StreamReader;
 pub use crate::util::{poll_read_buf, poll_write_buf};
