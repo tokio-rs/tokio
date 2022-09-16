@@ -56,9 +56,10 @@ impl CachedState {
         !self.unsent_items.is_empty()
     }
 
-    fn get_unsent_items_as_slice(&self) -> &[u8] {
+    /// Returns the cached items of this [`CachedState`].
+    fn get_unsent_items(&self) -> Vec<u8> {
         let (b, f) = self.unsent_items.as_slices();
-        [b, f].concat().as_slice()
+        [b, f].concat()
     }
 }
 
@@ -151,8 +152,9 @@ where
         self.inner
     }
 
-    pub fn remaining_unsent_buffer(&self) -> &[u8] {
-        self.cache.get_unsent_items_as_slice()
+    /// Returns the remaining unsent buffer of this [`SinkWriter<S, T>`].
+    pub fn remaining_unsent_buffer(&self) -> Vec<u8> {
+        self.cache.get_unsent_items()
     }
 }
 

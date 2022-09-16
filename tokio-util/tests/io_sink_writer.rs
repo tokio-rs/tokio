@@ -23,7 +23,6 @@ async fn test_sink_writer() -> Result<(), Error> {
     let mut received = Vec::new();
     for _ in 0..4 {
         if let Some(b) = rx.recv().await {
-            println!("{}", b);
             received.push(b);
         }
     }
