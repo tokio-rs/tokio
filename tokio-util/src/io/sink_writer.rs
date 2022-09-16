@@ -55,6 +55,11 @@ impl CachedState {
     fn has_cached_elements(&self) -> bool {
         !self.unsent_items.is_empty()
     }
+
+    fn get_unsent_items_as_slice(&self) -> &[u8] {
+        let (b, f) = self.unsent_items.as_slices();
+        [b, f].concat().as_slice()
+    }
 }
 
 pin_project! {
@@ -144,6 +149,10 @@ where
     /// It is inadvisable to directly write to the underlying sink.
     pub fn into_inner(self) -> S {
         self.inner
+    }
+
+    pub fn remaining_unsent_buffer(&self) -> &[u8] {
+        self.cache.get_unsent_items_as_slice()
     }
 }
 
