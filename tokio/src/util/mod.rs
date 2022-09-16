@@ -64,7 +64,7 @@ cfg_rt! {
 }
 
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-#[cfg(any(feature = "rt", feature = "macros"))]
+#[cfg(feature = "rt")]
 pub use self::rand::RngSeed;
 
 #[cfg(any(feature = "macros"))]
