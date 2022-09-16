@@ -1,7 +1,6 @@
 use futures_sink::Sink;
 use pin_project_lite::pin_project;
 use std::collections::VecDeque;
-use std::fmt::Display;
 use std::io;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -161,7 +160,7 @@ where
 impl<S, E, T> AsyncWrite for SinkWriter<S, T>
 where
     S: Sink<T, Error = E>,
-    E: Into<io::Error> + std::fmt::Debug,
+    E: Into<io::Error>,
     T: From<u8>,
 {
     fn poll_write(
