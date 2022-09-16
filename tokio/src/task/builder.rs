@@ -187,7 +187,7 @@ impl<'a> Builder<'a> {
         Output: Send + 'static,
     {
         use crate::runtime::Mandatory;
-        let (join_handle, spawn_result) = handle.as_inner().blocking_spawner.spawn_blocking_inner(
+        let (join_handle, spawn_result) = handle.inner.blocking_spawner().spawn_blocking_inner(
             function,
             Mandatory::NonMandatory,
             self.name,

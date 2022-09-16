@@ -2,13 +2,13 @@ use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::context::EnterGuard;
-use crate::runtime::driver::{Driver, Unpark};
+use crate::runtime::driver::{self, Driver, Unpark};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
-use crate::runtime::Config;
+use crate::runtime::{blocking, Config};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
-use crate::util::{waker_ref, Wake, WakerRef};
+use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -35,6 +35,22 @@ pub(crate) struct CurrentThread {
     /// own context. This ensures that any tasks dropped in the `CurrentThread`'s
     /// destructor run in that runtime's context.
     context_guard: Option<EnterGuard>,
+}
+
+/// Handle to the current thread scheduler
+#[derive(Debug)]
+pub(crate) struct Handle {
+    /// Task spawner
+    pub(crate) spawner: Spawner,
+
+    /// Resource driver handles
+    pub(crate) driver: driver::Handle,
+
+    /// Blocking pool spawner
+    pub(crate) blocking_spawner: blocking::Spawner,
+
+    /// Current random number generator seed
+    pub(crate) seed_generator: RngSeedGenerator,
 }
 
 /// Data required for executing the scheduler. The struct is passed around to
@@ -391,15 +407,18 @@ impl Spawner {
 }
 
 cfg_metrics! {
-    impl Spawner {
+    impl Handle {
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
-            &self.shared.scheduler_metrics
+            &self.spawner.shared.scheduler_metrics
         }
 
         pub(crate) fn injection_queue_depth(&self) -> usize {
             // TODO: avoid having to lock. The multi-threaded injection queue
             // could probably be used here.
-            self.shared.queue.lock()
+            self.spawner
+                .shared
+                .queue
+                .lock()
                 .as_ref()
                 .map(|queue| queue.len())
                 .unwrap_or(0)
@@ -407,7 +426,7 @@ cfg_metrics! {
 
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             assert_eq!(0, worker);
-            &self.shared.worker_metrics
+            &self.spawner.shared.worker_metrics
         }
     }
 }

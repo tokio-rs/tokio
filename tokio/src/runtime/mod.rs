@@ -178,7 +178,7 @@
 mod tests;
 
 mod driver;
-pub(crate) mod handle;
+pub(crate) mod scheduler;
 
 cfg_io_driver_impl! {
     pub(crate) mod io;
@@ -193,7 +193,6 @@ cfg_rt! {
 
     pub(crate) mod task;
 
-    pub(crate) mod scheduler;
     use scheduler::CurrentThread;
 
     mod config;
@@ -223,11 +222,8 @@ cfg_rt! {
 
     use self::enter::enter;
 
+    mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};
-    pub(crate) use handle::HandleInner;
-
-    mod spawner;
-    use self::spawner::Spawner;
 
     cfg_metrics! {
         mod metrics;
@@ -572,7 +568,7 @@ cfg_rt! {
         /// ```
         pub fn shutdown_timeout(mut self, duration: Duration) {
             // Wakeup and shutdown all the worker threads
-            self.handle.shutdown();
+            self.handle.inner.shutdown();
             self.blocking_pool.shutdown(Some(duration));
         }
 
