@@ -848,6 +848,12 @@ impl Builder {
         /// be given a deterministic seed so that the starting peer for each work stealing
         /// search will be deterministic.
         ///
+        /// In addition to the code specifying `rng_seed` and interacting with the runtime,
+        /// the internals of Tokio and the Rust compiler may affect the sequences of random
+        /// numbers. In order to ensure repeatable results, the version of Tokio, the versions
+        /// of all other dependencies that interact with Tokio, and the Rust compiler version
+        /// should also all remain constant.
+        ///
         /// # Examples
         ///
         /// ```

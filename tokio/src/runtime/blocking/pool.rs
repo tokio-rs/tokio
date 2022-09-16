@@ -436,7 +436,7 @@ impl Inner {
         if let Some(f) = &self.after_start {
             f()
         }
-        // We own this thread so thee is no need to replace the RngSeed once we're done.
+        // We own this thread so there is no need to replace the RngSeed once we're done.
         let _ = replace_thread_rng(self.seed_generator.next_seed());
 
         let mut shared = self.shared.lock();

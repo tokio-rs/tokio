@@ -36,7 +36,7 @@ pub(crate) struct HandleInner {
     #[cfg(feature = "rt")]
     pub(crate) blocking_spawner: blocking::Spawner,
 
-    /// Current random number generator seed (when no)
+    /// Current random number generator seed
     #[cfg(feature = "rt")]
     pub(super) seed_generator: RngSeedGenerator,
 }
