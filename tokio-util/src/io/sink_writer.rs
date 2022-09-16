@@ -167,9 +167,7 @@ where
                     loop {
                         // In case the sink is ready to receive items, try to send the next item through.
                         // If not, add remaining items to the buffer and return immediately.
-                        let p = self.as_mut().project().inner.poll_ready(cx);
-                        println!("Sink ready for cache? {:#?}", p);
-                        match p {
+                        match self.as_mut().project().inner.poll_ready(cx) {
                             Poll::Ready(Ok(())) => {
                                 if let Some(b) = self.as_mut().project().cache.next_cache_element()
                                 {
