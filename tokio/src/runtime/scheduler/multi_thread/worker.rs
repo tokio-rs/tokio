@@ -124,6 +124,9 @@ pub(super) struct Shared {
     /// how they communicate between each other.
     remotes: Box<[Remote]>,
 
+    /// Used to unpark threads blocked on the I/O driver
+    driver: driver::Unpark,
+
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
@@ -190,6 +193,7 @@ pub(super) fn create(
     size: usize,
     park: Parker,
     driver_handle: driver::Handle,
+    driver_unpark: driver::Unpark,
     blocking_spawner: blocking::Spawner,
     seed_generator: RngSeedGenerator,
     config: Config,
@@ -223,6 +227,7 @@ pub(super) fn create(
     let handle = Arc::new(Handle {
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
+            driver: driver_unpark,
             inject: Inject::new(),
             idle: Idle::new(size),
             owned: OwnedTasks::new(),
@@ -774,13 +779,13 @@ impl Shared {
 
     fn notify_parked(&self) {
         if let Some(index) = self.idle.worker_to_notify() {
-            self.remotes[index].unpark.unpark();
+            self.remotes[index].unpark.unpark(&self.driver);
         }
     }
 
     fn notify_all(&self) {
         for remote in &self.remotes[..] {
-            remote.unpark.unpark();
+            remote.unpark.unpark(&self.driver);
         }
     }
 
