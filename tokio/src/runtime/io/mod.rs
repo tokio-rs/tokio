@@ -144,11 +144,6 @@ impl Driver {
         }
     }
 
-    // TODO: remove this in a later refactor
-    pub(crate) fn unpark(&self) -> Handle {
-        self.handle()
-    }
-
     pub(crate) fn park(&mut self) {
         self.turn(None);
     }

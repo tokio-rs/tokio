@@ -92,10 +92,6 @@ impl Driver {
         }
     }
 
-    pub(crate) fn unpark(&self) -> io::Handle {
-        self.park.unpark()
-    }
-
     pub(crate) fn park(&mut self) {
         self.park.park();
         self.process();

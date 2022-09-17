@@ -20,7 +20,7 @@ mod wheel;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime::driver::{IoStack, IoUnpark};
+use crate::runtime::driver::{IoHandle, IoStack};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
 
@@ -107,6 +107,9 @@ struct Inner {
 
     /// True if the driver is being shutdown.
     pub(super) is_shutdown: AtomicBool,
+
+    #[cfg(feature = "test-util")]
+    did_wake: Arc<AtomicBool>,
 }
 
 /// Time state shared which must be protected by a `Mutex`
@@ -134,21 +137,32 @@ impl Driver {
     pub(crate) fn new(park: IoStack, clock: Clock) -> (Driver, Handle) {
         let time_source = TimeSource::new(clock);
 
-        let inner = Inner::new(time_source.clone());
-        let handle = Handle::new(Arc::new(inner));
+        #[cfg(feature = "test-util")]
+        let did_wake = Arc::new(AtomicBool::new(false));
+
+        let inner = Arc::new(Inner {
+            state: Mutex::new(InnerState {
+                time_source: time_source.clone(),
+                elapsed: 0,
+                next_wake: None,
+                wheel: wheel::Wheel::new(),
+            }),
+            is_shutdown: AtomicBool::new(false),
+
+            #[cfg(feature = "test-util")]
+            did_wake: did_wake.clone(),
+        });
+
+        let handle = Handle::new(inner);
 
         let driver = Driver {
             time_source,
             park,
             #[cfg(feature = "test-util")]
-            did_wake: Arc::new(AtomicBool::new(false)),
+            did_wake,
         };
 
         (driver, handle)
-    }
-
-    pub(crate) fn unpark(&self) -> TimerUnpark {
-        TimerUnpark::new(self)
     }
 
     pub(crate) fn park(&mut self, handle: &Handle) {
@@ -339,7 +353,7 @@ impl Handle {
     /// the `TimerEntry`)
     pub(self) unsafe fn reregister(
         &self,
-        unpark: &IoUnpark,
+        unpark: &IoHandle,
         new_tick: u64,
         entry: NonNull<TimerShared>,
     ) {
@@ -393,46 +407,9 @@ impl Handle {
     }
 }
 
-pub(crate) struct TimerUnpark {
-    inner: IoUnpark,
-
-    #[cfg(feature = "test-util")]
-    did_wake: Arc<AtomicBool>,
-}
-
-impl TimerUnpark {
-    fn new(driver: &Driver) -> TimerUnpark {
-        TimerUnpark {
-            inner: driver.park.unpark(),
-
-            #[cfg(feature = "test-util")]
-            did_wake: driver.did_wake.clone(),
-        }
-    }
-
-    pub(crate) fn unpark(&self) {
-        #[cfg(feature = "test-util")]
-        self.did_wake.store(true, Ordering::SeqCst);
-
-        self.inner.unpark();
-    }
-}
-
 // ===== impl Inner =====
 
 impl Inner {
-    pub(self) fn new(time_source: TimeSource) -> Self {
-        Inner {
-            state: Mutex::new(InnerState {
-                time_source,
-                elapsed: 0,
-                next_wake: None,
-                wheel: wheel::Wheel::new(),
-            }),
-            is_shutdown: AtomicBool::new(false),
-        }
-    }
-
     /// Locks the driver's inner structure
     pub(super) fn lock(&self) -> crate::loom::sync::MutexGuard<'_, InnerState> {
         self.state.lock()

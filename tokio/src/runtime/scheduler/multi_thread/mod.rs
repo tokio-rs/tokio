@@ -39,13 +39,11 @@ impl MultiThread {
         seed_generator: RngSeedGenerator,
         config: Config,
     ) -> (MultiThread, Launch) {
-        let driver_unpark = driver.unpark();
         let parker = Parker::new(driver);
         let (handle, launch) = worker::create(
             size,
             parker,
             driver_handle,
-            driver_unpark,
             blocking_spawner,
             seed_generator,
             config,

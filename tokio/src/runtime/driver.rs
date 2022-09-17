@@ -38,8 +38,6 @@ pub(crate) struct Cfg {
     pub(crate) start_paused: bool,
 }
 
-pub(crate) type Unpark = TimerUnpark;
-
 impl Driver {
     pub(crate) fn new(cfg: Cfg) -> io::Result<(Self, Handle)> {
         let (io_stack, io_handle, signal_handle) = create_io_stack(cfg.enable_io)?;
@@ -60,10 +58,6 @@ impl Driver {
         ))
     }
 
-    pub(crate) fn unpark(&self) -> TimerUnpark {
-        self.inner.unpark()
-    }
-
     pub(crate) fn park(&mut self) {
         self.inner.park()
     }
@@ -77,11 +71,21 @@ impl Driver {
     }
 }
 
+impl Handle {
+    pub(crate) fn unpark(&self) {
+        #[cfg(feature = "time")]
+        if let Some(handle) = &self.time {
+            handle.unpark();
+        }
+
+        self.io.unpark();
+    }
+}
+
 // ===== io driver =====
 
 cfg_io_driver! {
     pub(crate) type IoDriver = crate::runtime::io::Driver;
-    pub(crate) type IoHandle = IoUnpark;
 
     #[derive(Debug)]
     pub(crate) enum IoStack {
@@ -90,7 +94,7 @@ cfg_io_driver! {
     }
 
     #[derive(Debug, Clone)]
-    pub(crate) enum IoUnpark {
+    pub(crate) enum IoHandle {
         Enabled(crate::runtime::io::Handle),
         Disabled(UnparkThread),
     }
@@ -106,23 +110,25 @@ cfg_io_driver! {
             let (signal_driver, signal_handle) = create_signal_driver(io_driver)?;
             let process_driver = create_process_driver(signal_driver);
 
-            (IoStack::Enabled(process_driver), IoUnpark::Enabled(io_handle), signal_handle)
+            (IoStack::Enabled(process_driver), IoHandle::Enabled(io_handle), signal_handle)
         } else {
             let park_thread = ParkThread::new();
             let unpark_thread = park_thread.unpark();
-            (IoStack::Disabled(park_thread), IoUnpark::Disabled(unpark_thread), Default::default())
+            (IoStack::Disabled(park_thread), IoHandle::Disabled(unpark_thread), Default::default())
         };
 
         Ok(ret)
     }
 
     impl IoStack {
-        pub(crate) fn unpark(&self) -> IoUnpark {
+        /*
+        pub(crate) fn handle(&self) -> IoHandle {
             match self {
-                IoStack::Enabled(v) => IoUnpark::Enabled(v.unpark()),
-                IoStack::Disabled(v) => IoUnpark::Disabled(v.unpark()),
+                IoStack::Enabled(v) => IoHandle::Enabled(v.handle()),
+                IoStack::Disabled(v) => IoHandle::Disabled(v.unpark()),
             }
-        }
+        }]
+        */
 
         pub(crate) fn park(&mut self) {
             match self {
@@ -146,27 +152,27 @@ cfg_io_driver! {
         }
     }
 
-    impl IoUnpark {
+    impl IoHandle {
         pub(crate) fn unpark(&self) {
             match self {
-                IoUnpark::Enabled(v) => v.unpark(),
-                IoUnpark::Disabled(v) => v.unpark(),
+                IoHandle::Enabled(handle) => handle.unpark(),
+                IoHandle::Disabled(handle) => handle.unpark(),
             }
         }
 
         #[track_caller]
         pub(crate) fn expect(self, msg: &'static str) -> crate::runtime::io::Handle {
             match self {
-                IoUnpark::Enabled(v) => v,
-                IoUnpark::Disabled(..) => panic!("{}", msg),
+                IoHandle::Enabled(v) => v,
+                IoHandle::Disabled(..) => panic!("{}", msg),
             }
         }
 
         cfg_unstable! {
             pub(crate) fn as_ref(&self) -> Option<&crate::runtime::io::Handle> {
                 match self {
-                    IoUnpark::Enabled(v) => Some(v),
-                    IoUnpark::Disabled(..) => None,
+                    IoHandle::Enabled(v) => Some(v),
+                    IoHandle::Disabled(..) => None,
                 }
             }
         }
@@ -174,9 +180,8 @@ cfg_io_driver! {
 }
 
 cfg_not_io_driver! {
-    pub(crate) type IoHandle = IoUnpark;
+    pub(crate) type IoHandle = UnparkThread;
     pub(crate) type IoStack = ParkThread;
-    pub(crate) type IoUnpark = UnparkThread;
 
     fn create_io_stack(_enabled: bool) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         let park_thread = ParkThread::new();
@@ -249,11 +254,6 @@ cfg_time! {
         Disabled(IoStack),
     }
 
-    pub(crate) enum TimerUnpark {
-        Enabled(crate::runtime::time::TimerUnpark),
-        Disabled(IoUnpark),
-    }
-
     pub(crate) type Clock = crate::time::Clock;
     pub(crate) type TimeHandle = Option<crate::runtime::time::Handle>;
 
@@ -276,13 +276,6 @@ cfg_time! {
     }
 
     impl TimeDriver {
-        pub(crate) fn unpark(&self) -> TimerUnpark {
-            match self {
-                TimeDriver::Enabled { driver, .. } => TimerUnpark::Enabled(driver.unpark()),
-                TimeDriver::Disabled(v) => TimerUnpark::Disabled(v.unpark()),
-            }
-        }
-
         pub(crate) fn park(&mut self) {
             match self {
                 TimeDriver::Enabled { driver, handle } => driver.park(handle),
@@ -304,20 +297,10 @@ cfg_time! {
             }
         }
     }
-
-    impl TimerUnpark {
-        pub(crate) fn unpark(&self) {
-            match self {
-                TimerUnpark::Enabled(v) => v.unpark(),
-                TimerUnpark::Disabled(v) => v.unpark(),
-            }
-        }
-    }
 }
 
 cfg_not_time! {
     type TimeDriver = IoStack;
-    type TimerUnpark = IoUnpark;
 
     pub(crate) type Clock = ();
     pub(crate) type TimeHandle = ();

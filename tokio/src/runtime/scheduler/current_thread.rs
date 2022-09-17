@@ -2,7 +2,7 @@ use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::context::EnterGuard;
-use crate::runtime::driver::{self, Driver, Unpark};
+use crate::runtime::driver::{self, Driver};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::{blocking, Config};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
@@ -82,9 +82,6 @@ struct Shared {
     /// Collection of all active tasks spawned onto this executor.
     owned: OwnedTasks<Arc<Handle>>,
 
-    /// Unpark the blocked thread.
-    unpark: Unpark,
-
     /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
 
@@ -122,13 +119,10 @@ impl CurrentThread {
         seed_generator: RngSeedGenerator,
         config: Config,
     ) -> CurrentThread {
-        let unpark = driver.unpark();
-
         let handle = Arc::new(Handle {
             shared: Shared {
                 queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
                 owned: OwnedTasks::new(),
-                unpark,
                 woken: AtomicBool::new(false),
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
@@ -467,7 +461,7 @@ impl Schedule for Arc<Handle> {
                 if let Some(queue) = guard.as_mut() {
                     queue.push_back(task);
                     drop(guard);
-                    self.shared.unpark.unpark();
+                    self.driver.unpark();
                 }
             }
         });
@@ -511,7 +505,7 @@ impl Wake for Handle {
     /// Wake by reference
     fn wake_by_ref(arc_self: &Arc<Self>) {
         arc_self.shared.woken.store(true, Release);
-        arc_self.shared.unpark.unpark();
+        arc_self.driver.unpark();
     }
 }
 
