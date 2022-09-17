@@ -874,9 +874,8 @@ impl Builder {
     }
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::scheduler::{self, current_thread, CurrentThread};
+        use crate::runtime::scheduler::{self, CurrentThread};
         use crate::runtime::{Config, Scheduler};
-        use std::sync::Arc;
 
         let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
@@ -884,12 +883,19 @@ impl Builder {
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
 
+        // Generate a rng seed for this runtime.
+        let seed_generator_1 = self.seed_generator.next_generator();
+        let seed_generator_2 = self.seed_generator.next_generator();
+
         // And now put a single-threaded scheduler on top of the timer. When
         // there are no futures ready to do something, it'll let the timer or
         // the reactor to generate some new stimuli for the futures to continue
         // in their life.
         let scheduler = CurrentThread::new(
             driver,
+            driver_handle,
+            blocking_spawner,
+            seed_generator_2,
             Config {
                 before_park: self.before_park.clone(),
                 after_unpark: self.after_unpark.clone(),
@@ -898,20 +904,15 @@ impl Builder {
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
-                seed_generator: self.seed_generator.next_generator(),
+                seed_generator: seed_generator_1,
             },
         );
-        let inner = Arc::new(current_thread::Handle {
-            spawner: scheduler.spawner().clone(),
-            driver: driver_handle,
-            blocking_spawner,
-            seed_generator: self.seed_generator.next_generator(),
-        });
-        let inner = scheduler::Handle::CurrentThread(inner);
+
+        let handle = scheduler::Handle::CurrentThread(scheduler.handle().clone());
 
         Ok(Runtime {
             scheduler: Scheduler::CurrentThread(scheduler),
-            handle: Handle { inner },
+            handle: Handle { inner: handle },
             blocking_pool,
         })
     }
@@ -992,10 +993,10 @@ cfg_test_util! {
 cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
+            use crate::loom::sync::Arc;
             use crate::loom::sys::num_cpus;
             use crate::runtime::{Config, Scheduler};
             use crate::runtime::scheduler::{self, multi_thread, MultiThread};
-            use std::sync::Arc;
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 

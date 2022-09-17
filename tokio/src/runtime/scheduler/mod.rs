@@ -59,11 +59,10 @@ impl Handle {
 
 cfg_rt! {
     use crate::future::Future;
+    use crate::loom::sync::Arc;
     use crate::runtime::{blocking, task::Id};
     use crate::task::JoinHandle;
     use crate::util::RngSeedGenerator;
-
-    use std::sync::Arc;
 
     impl Handle {
         pub(crate) fn blocking_spawner(&self) -> &blocking::Spawner {
@@ -81,7 +80,7 @@ cfg_rt! {
             F::Output: Send + 'static,
         {
             match self {
-                Handle::CurrentThread(h) => h.spawner.spawn(future, id),
+                Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id),
 
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Handle::MultiThread(h) => h.spawner.spawn(future, id),
