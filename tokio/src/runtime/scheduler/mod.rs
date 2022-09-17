@@ -83,7 +83,7 @@ cfg_rt! {
                 Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id),
 
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                Handle::MultiThread(h) => h.spawner.spawn(future, id),
+                Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id),
             }
         }
 
@@ -92,7 +92,7 @@ cfg_rt! {
                 Handle::CurrentThread(_) => {},
 
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                Handle::MultiThread(ref h) => h.spawner.shutdown(),
+                Handle::MultiThread(ref h) => h.shutdown(),
             }
         }
 
