@@ -5,7 +5,7 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
-use crate::runtime::driver::{Driver, Unpark};
+use crate::runtime::driver::{self, Driver};
 use crate::util::TryLock;
 
 use std::sync::atomic::Ordering::SeqCst;
@@ -42,15 +42,10 @@ const NOTIFIED: usize = 3;
 struct Shared {
     /// Shared driver. Only one thread at a time can use this
     driver: TryLock<Driver>,
-
-    /// Unpark handle
-    handle: Unpark,
 }
 
 impl Parker {
     pub(crate) fn new(driver: Driver) -> Parker {
-        let handle = driver.unpark();
-
         Parker {
             inner: Arc::new(Inner {
                 state: AtomicUsize::new(EMPTY),
@@ -58,7 +53,6 @@ impl Parker {
                 condvar: Condvar::new(),
                 shared: Arc::new(Shared {
                     driver: TryLock::new(driver),
-                    handle,
                 }),
             }),
         }
@@ -102,8 +96,8 @@ impl Clone for Parker {
 }
 
 impl Unparker {
-    pub(crate) fn unpark(&self) {
-        self.inner.unpark();
+    pub(crate) fn unpark(&self, driver: &driver::Unpark) {
+        self.inner.unpark(driver);
     }
 }
 
@@ -201,7 +195,7 @@ impl Inner {
         }
     }
 
-    fn unpark(&self) {
+    fn unpark(&self, driver: &driver::Unpark) {
         // To ensure the unparked thread will observe any writes we made before
         // this call, we must perform a release operation that `park` can
         // synchronize with. To do that we must write `NOTIFIED` even if `state`
@@ -211,7 +205,7 @@ impl Inner {
             EMPTY => {}    // no one was waiting
             NOTIFIED => {} // already unparked
             PARKED_CONDVAR => self.unpark_condvar(),
-            PARKED_DRIVER => self.unpark_driver(),
+            PARKED_DRIVER => driver.unpark(),
             actual => panic!("inconsistent state in unpark; actual = {}", actual),
         }
     }
@@ -231,10 +225,6 @@ impl Inner {
         drop(self.mutex.lock());
 
         self.condvar.notify_one()
-    }
-
-    fn unpark_driver(&self) {
-        self.shared.handle.unpark();
     }
 
     fn shutdown(&self) {
