@@ -993,10 +993,9 @@ cfg_test_util! {
 cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
-            use crate::loom::sync::Arc;
             use crate::loom::sys::num_cpus;
             use crate::runtime::{Config, Scheduler};
-            use crate::runtime::scheduler::{self, multi_thread, MultiThread};
+            use crate::runtime::scheduler::{self, MultiThread};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
@@ -1007,9 +1006,16 @@ cfg_rt_multi_thread! {
                 blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
+            // Generate a rng seed for this runtime.
+            let seed_generator_1 = self.seed_generator.next_generator();
+            let seed_generator_2 = self.seed_generator.next_generator();
+
             let (scheduler, launch) = MultiThread::new(
                 core_threads,
                 driver,
+                driver_handle,
+                blocking_spawner,
+                seed_generator_2,
                 Config {
                     before_park: self.before_park.clone(),
                     after_unpark: self.after_unpark.clone(),
@@ -1018,20 +1024,12 @@ cfg_rt_multi_thread! {
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
-                    seed_generator: self.seed_generator.next_generator(),
+                    seed_generator: seed_generator_1,
                 },
             );
 
-            let inner = Arc::new(multi_thread::Handle {
-                spawner: scheduler.spawner().clone(),
-                driver: driver_handle,
-                blocking_spawner,
-                seed_generator: self.seed_generator.next_generator(),
-            });
-            let inner = scheduler::Handle::MultiThread(inner);
-
-            // Create the runtime handle
-            let handle = Handle { inner };
+            let handle = scheduler::Handle::MultiThread(scheduler.handle().clone());
+            let handle = Handle { inner: handle };
 
             // Spawn the thread pool workers
             let _enter = crate::runtime::context::enter(handle.clone());
