@@ -30,6 +30,14 @@ impl Handle {
     pub(super) fn is_shutdown(&self) -> bool {
         self.inner.is_shutdown()
     }
+
+    /// Track that the driver is being unparked
+    pub(crate) fn unpark(&self) {
+        #[cfg(feature = "test-util")]
+        self.inner
+            .did_wake
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
 }
 
 cfg_not_rt! {

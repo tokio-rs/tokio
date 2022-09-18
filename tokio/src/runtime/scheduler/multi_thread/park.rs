@@ -96,7 +96,7 @@ impl Clone for Parker {
 }
 
 impl Unparker {
-    pub(crate) fn unpark(&self, driver: &driver::Unpark) {
+    pub(crate) fn unpark(&self, driver: &driver::Handle) {
         self.inner.unpark(driver);
     }
 }
@@ -195,7 +195,7 @@ impl Inner {
         }
     }
 
-    fn unpark(&self, driver: &driver::Unpark) {
+    fn unpark(&self, driver: &driver::Handle) {
         // To ensure the unparked thread will observe any writes we made before
         // this call, we must perform a release operation that `park` can
         // synchronize with. To do that we must write `NOTIFIED` even if `state`

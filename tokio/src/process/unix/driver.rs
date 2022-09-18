@@ -3,7 +3,6 @@
 //! Process driver.
 
 use crate::process::unix::GlobalOrphanQueue;
-use crate::runtime::io::Handle;
 use crate::signal::unix::driver::{Driver as SignalDriver, Handle as SignalHandle};
 
 use std::time::Duration;
@@ -26,10 +25,6 @@ impl Driver {
             park,
             signal_handle,
         }
-    }
-
-    pub(crate) fn unpark(&self) -> Handle {
-        self.park.unpark()
     }
 
     pub(crate) fn park(&mut self) {
