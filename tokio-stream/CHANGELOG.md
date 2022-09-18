@@ -1,3 +1,11 @@
+# 0.1.10 (Sept 18, 2022)
+
+- time: add `StreamExt::chunks_timeout` ([#4695])
+- stream: add track_caller to public APIs ([#4786])
+
+[#4695]: https://github.com/tokio-rs/tokio/pull/4695
+[#4786]: https://github.com/tokio-rs/tokio/pull/4786
+
 # 0.1.9 (June 4, 2022)
 
 - deps: upgrade `tokio-util` dependency to `0.7.x` ([#3762])
