@@ -78,6 +78,7 @@ fn merge() {
 }
 
 #[test]
+#[cfg(not(tokio_wasm))] // No stack unwinding on wasm targets
 #[should_panic]
 fn merge_unrelated_permits() {
     let sem1 = Arc::new(Semaphore::new(3));
