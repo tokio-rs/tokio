@@ -230,8 +230,8 @@ impl<T> fmt::Debug for Tx<T> {
 }
 
 impl<T> Rx<T> {
-    /// Pops the next value off the queue.
-    pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
+    /// Finds the current block in the queue
+    fn current_block(&mut self, tx: &Tx<T>) -> Option<&NonNull<Block<T>>> {
         // Advance `head`, if needed
         if !self.try_advancing_head() {
             return None;
@@ -239,8 +239,13 @@ impl<T> Rx<T> {
 
         self.reclaim_blocks(tx);
 
+        Some(&self.head)
+    }
+
+    /// Pops the next value off the queue.
+    pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
         unsafe {
-            let block = self.head.as_ref();
+            let block = self.current_block(tx)?.as_ref();
 
             let ret = block.read(self.index);
 
@@ -249,6 +254,17 @@ impl<T> Rx<T> {
             }
 
             ret
+        }
+    }
+
+    /// Checks to see if the queue is closed
+    pub(crate) fn is_closed(&mut self, tx: &Tx<T>) -> bool {
+        unsafe {
+            let block = match self.current_block(tx) {
+                None => return false,
+                Some(block) => block.as_ref(),
+            };
+            block.is_closed(self.index)
         }
     }
 

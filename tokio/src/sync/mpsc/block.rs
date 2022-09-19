@@ -104,6 +104,15 @@ impl<T> Block<T> {
         other_index.wrapping_sub(self.start_index) / BLOCK_CAP
     }
 
+    /// Check to see if the given slot is a tx closed entry
+    pub(crate) fn is_closed(&self, slot_index: usize) -> bool {
+        let offset = offset(slot_index);
+
+        let ready_bits = self.ready_slots.load(Acquire);
+
+        !is_ready(ready_bits, offset) && is_tx_closed(ready_bits)
+    }
+
     /// Reads the value at the given offset.
     ///
     /// Returns `None` if the slot is empty.

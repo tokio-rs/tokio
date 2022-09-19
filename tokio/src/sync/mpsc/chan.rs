@@ -335,6 +335,14 @@ impl<T, S: Semaphore> Rx<T, S> {
             }
         })
     }
+
+    /// Check to see if the channel is closed.
+    pub(crate) fn is_closed(&mut self) -> bool {
+        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
+            let rx_fields = unsafe { &mut *rx_fields_ptr };
+            rx_fields.list.is_closed(&self.inner.tx)
+        })
+    }
 }
 
 impl<T, S: Semaphore> Drop for Rx<T, S> {

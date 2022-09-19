@@ -7,38 +7,112 @@ use loom::thread;
 use tokio_test::assert_ok;
 
 #[test]
-fn closing_tx() {
+fn closing_tx_empty() {
     loom::model(|| {
         let (tx, mut rx) = mpsc::channel(16);
+        let permit = tx.clone().reserve_owned();
 
-        thread::spawn(move || {
+        assert!(!rx.is_closed());
+
+        let h = thread::spawn(move || {
             tx.try_send(()).unwrap();
             drop(tx);
         });
+        assert!(!rx.is_closed());
 
         let v = block_on(rx.recv());
         assert!(v.is_some());
+        assert!(!rx.is_closed());
+
+        let _ = h.join();
+        assert!(!rx.is_closed());
+
+        drop(permit);
+        assert!(rx.is_closed());
 
         let v = block_on(rx.recv());
         assert!(v.is_none());
+        assert!(rx.is_closed());
     });
 }
 
 #[test]
-fn closing_unbounded_tx() {
+fn closing_tx_non_empty() {
+    loom::model(|| {
+        let (tx, mut rx) = mpsc::channel(16);
+
+        assert!(!rx.is_closed());
+
+        let h = thread::spawn(move || {
+            tx.try_send(()).unwrap();
+            drop(tx);
+        });
+
+        let _ = h.join();
+        assert!(!rx.is_closed());
+
+        let v = block_on(rx.recv());
+        assert!(v.is_some());
+        assert!(rx.is_closed());
+
+        let v = block_on(rx.recv());
+        assert!(v.is_none());
+        assert!(rx.is_closed());
+    });
+}
+
+#[test]
+fn closing_unbounded_tx_empty() {
+    loom::model(|| {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let second_tx = tx.clone();
+
+        assert!(!rx.is_closed());
+
+        let h = thread::spawn(move || {
+            tx.send(()).unwrap();
+            drop(tx);
+        });
+        assert!(!rx.is_closed());
+
+        let v = block_on(rx.recv());
+        assert!(v.is_some());
+        assert!(!rx.is_closed());
+
+        let _ = h.join();
+        assert!(!rx.is_closed());
+
+        drop(second_tx);
+        assert!(rx.is_closed());
+
+        let v = block_on(rx.recv());
+        assert!(v.is_none());
+        assert!(rx.is_closed());
+    });
+}
+
+#[test]
+fn closing_unbounded_tx_nonempty() {
     loom::model(|| {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
-        thread::spawn(move || {
+        assert!(!rx.is_closed());
+
+        let h = thread::spawn(move || {
             tx.send(()).unwrap();
             drop(tx);
         });
 
+        let _ = h.join();
+        assert!(!rx.is_closed());
+
         let v = block_on(rx.recv());
         assert!(v.is_some());
+        assert!(rx.is_closed());
 
         let v = block_on(rx.recv());
         assert!(v.is_none());
+        assert!(rx.is_closed());
     });
 }
 

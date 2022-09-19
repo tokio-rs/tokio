@@ -391,6 +391,13 @@ impl<T> Receiver<T> {
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
+
+    /// Check to see if the channel has been closed and all messages sent before it
+    /// was closed have been received. This implies that there will never be more
+    /// messages to recieve on this channel.
+    pub fn is_closed(&mut self) -> bool {
+        self.chan.is_closed()
+    }
 }
 
 impl<T> fmt::Debug for Receiver<T> {
