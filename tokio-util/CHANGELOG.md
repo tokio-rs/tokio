@@ -1,3 +1,25 @@
+# 0.7.4 (September 8, 2022)
+
+### Added
+
+- io: add `SyncIoBridge::shutdown()` ([#4938])
+- task: improve `LocalPoolHandle` ([#4680])
+
+### Fixed
+
+- util: add `track_caller` to public APIs ([#4785])
+
+### Unstable
+
+- task: fix compilation errors in `JoinMap` with Tokio v1.21.0 ([#4755])
+- task: remove the unstable, deprecated `JoinMap::join_one` ([#4920])
+
+[#4680]: https://github.com/tokio-rs/tokio/pull/4680
+[#4755]: https://github.com/tokio-rs/tokio/pull/4755
+[#4785]: https://github.com/tokio-rs/tokio/pull/4785
+[#4920]: https://github.com/tokio-rs/tokio/pull/4920
+[#4938]: https://github.com/tokio-rs/tokio/pull/4938
+
 # 0.7.3 (June 4, 2022)
 
 ### Changed

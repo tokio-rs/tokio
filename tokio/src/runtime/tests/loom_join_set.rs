@@ -1,4 +1,3 @@
-#![cfg(tokio_unstable)]
 use crate::runtime::Builder;
 use crate::task::JoinSet;
 

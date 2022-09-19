@@ -22,8 +22,8 @@ cfg_io_util! {
 cfg_net_unix! {
     /// A structure representing a connected Unix socket.
     ///
-    /// This socket can be connected directly with `UnixStream::connect` or accepted
-    /// from a listener with `UnixListener::incoming`. Additionally, a pair of
+    /// This socket can be connected directly with [`UnixStream::connect`] or accepted
+    /// from a listener with [`UnixListener::accept`]. Additionally, a pair of
     /// anonymous Unix sockets can be created with `UnixStream::pair`.
     ///
     /// To shut down the stream in the write direction, you can call the
@@ -32,6 +32,7 @@ cfg_net_unix! {
     /// the stream in one direction.
     ///
     /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
+    /// [`UnixListener::accept`]: crate::net::UnixListener::accept
     pub struct UnixStream {
         io: PollEvented<mio::net::UnixStream>,
     }

@@ -5,8 +5,7 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
-use crate::park::{Park, Unpark};
-use crate::runtime::driver::Driver;
+use crate::runtime::driver::{self, Driver};
 use crate::util::TryLock;
 
 use std::sync::atomic::Ordering::SeqCst;
@@ -43,15 +42,10 @@ const NOTIFIED: usize = 3;
 struct Shared {
     /// Shared driver. Only one thread at a time can use this
     driver: TryLock<Driver>,
-
-    /// Unpark handle
-    handle: <Driver as Park>::Unpark,
 }
 
 impl Parker {
     pub(crate) fn new(driver: Driver) -> Parker {
-        let handle = driver.unpark();
-
         Parker {
             inner: Arc::new(Inner {
                 state: AtomicUsize::new(EMPTY),
@@ -59,10 +53,32 @@ impl Parker {
                 condvar: Condvar::new(),
                 shared: Arc::new(Shared {
                     driver: TryLock::new(driver),
-                    handle,
                 }),
             }),
         }
+    }
+
+    pub(crate) fn unpark(&self) -> Unparker {
+        Unparker {
+            inner: self.inner.clone(),
+        }
+    }
+
+    pub(crate) fn park(&mut self) {
+        self.inner.park();
+    }
+
+    pub(crate) fn park_timeout(&mut self, duration: Duration) {
+        // Only parking with zero is supported...
+        assert_eq!(duration, Duration::from_millis(0));
+
+        if let Some(mut driver) = self.inner.shared.driver.try_lock() {
+            driver.park_timeout(duration)
+        }
+    }
+
+    pub(crate) fn shutdown(&mut self) {
+        self.inner.shutdown();
     }
 }
 
@@ -79,40 +95,9 @@ impl Clone for Parker {
     }
 }
 
-impl Park for Parker {
-    type Unpark = Unparker;
-    type Error = ();
-
-    fn unpark(&self) -> Unparker {
-        Unparker {
-            inner: self.inner.clone(),
-        }
-    }
-
-    fn park(&mut self) -> Result<(), Self::Error> {
-        self.inner.park();
-        Ok(())
-    }
-
-    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        // Only parking with zero is supported...
-        assert_eq!(duration, Duration::from_millis(0));
-
-        if let Some(mut driver) = self.inner.shared.driver.try_lock() {
-            driver.park_timeout(duration).map_err(|_| ())
-        } else {
-            Ok(())
-        }
-    }
-
-    fn shutdown(&mut self) {
-        self.inner.shutdown();
-    }
-}
-
-impl Unpark for Unparker {
-    fn unpark(&self) {
-        self.inner.unpark();
+impl Unparker {
+    pub(crate) fn unpark(&self, driver: &driver::Handle) {
+        self.inner.unpark(driver);
     }
 }
 
@@ -201,8 +186,7 @@ impl Inner {
             Err(actual) => panic!("inconsistent park state; actual = {}", actual),
         }
 
-        // TODO: don't unwrap
-        driver.park().unwrap();
+        driver.park();
 
         match self.state.swap(EMPTY, SeqCst) {
             NOTIFIED => {}      // got a notification, hurray!
@@ -211,7 +195,7 @@ impl Inner {
         }
     }
 
-    fn unpark(&self) {
+    fn unpark(&self, driver: &driver::Handle) {
         // To ensure the unparked thread will observe any writes we made before
         // this call, we must perform a release operation that `park` can
         // synchronize with. To do that we must write `NOTIFIED` even if `state`
@@ -221,7 +205,7 @@ impl Inner {
             EMPTY => {}    // no one was waiting
             NOTIFIED => {} // already unparked
             PARKED_CONDVAR => self.unpark_condvar(),
-            PARKED_DRIVER => self.unpark_driver(),
+            PARKED_DRIVER => driver.unpark(),
             actual => panic!("inconsistent state in unpark; actual = {}", actual),
         }
     }
@@ -241,10 +225,6 @@ impl Inner {
         drop(self.mutex.lock());
 
         self.condvar.notify_one()
-    }
-
-    fn unpark_driver(&self) {
-        self.shared.handle.unpark();
     }
 
     fn shutdown(&self) {

@@ -599,3 +599,62 @@ async fn mut_ref_patterns() {
         },
     };
 }
+
+#[cfg(tokio_unstable)]
+mod unstable {
+    use tokio::runtime::RngSeed;
+
+    #[test]
+    fn deterministic_select_current_thread() {
+        let seed = b"bytes used to generate seed";
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            let num = select_0_to_9().await;
+            assert_eq!(num, 5);
+
+            let num = select_0_to_9().await;
+            assert_eq!(num, 1);
+        });
+    }
+
+    #[test]
+    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+    fn deterministic_select_multi_thread() {
+        let seed = b"bytes used to generate seed";
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            let _ = tokio::spawn(async {
+                let num = select_0_to_9().await;
+                assert_eq!(num, 6);
+
+                let num = select_0_to_9().await;
+                assert_eq!(num, 9);
+            })
+            .await;
+        });
+    }
+
+    async fn select_0_to_9() -> u32 {
+        tokio::select!(
+            x = async { 0 } => x,
+            x = async { 1 } => x,
+            x = async { 2 } => x,
+            x = async { 3 } => x,
+            x = async { 4 } => x,
+            x = async { 5 } => x,
+            x = async { 6 } => x,
+            x = async { 7 } => x,
+            x = async { 8 } => x,
+            x = async { 9 } => x,
+        )
+    }
+}

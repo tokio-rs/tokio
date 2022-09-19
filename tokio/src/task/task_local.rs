@@ -157,7 +157,7 @@ impl<T: 'static> LocalKey<T> {
 
     /// Sets a value `T` as the task-local value for the closure `F`.
     ///
-    /// On completion of `scope`, the task-local will be dropped.
+    /// On completion of `sync_scope`, the task-local will be dropped.
     ///
     /// ### Panics
     ///

@@ -3,7 +3,6 @@ use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
 use crate::park::thread::CachedParkThread;
-use crate::park::Park;
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
@@ -326,13 +325,13 @@ impl<T, S: Semaphore> Rx<T, S> {
 
             // Park the thread until the problematic send has completed.
             let mut park = CachedParkThread::new();
-            let waker = park.unpark().into_waker();
+            let waker = park.waker().unwrap();
             loop {
                 self.inner.rx_waker.register_by_ref(&waker);
                 // It is possible that the problematic send has now completed,
                 // so we have to check for messages again.
                 try_recv!();
-                park.park().expect("park failed");
+                park.park();
             }
         })
     }

@@ -39,7 +39,7 @@ impl RuntimeMetrics {
     /// }
     /// ```
     pub fn num_workers(&self) -> usize {
-        self.handle.spawner.num_workers()
+        self.handle.inner.num_workers()
     }
 
     /// Returns the number of tasks scheduled from **outside** of the runtime.
@@ -68,7 +68,7 @@ impl RuntimeMetrics {
     /// ```
     pub fn remote_schedule_count(&self) -> u64 {
         self.handle
-            .spawner
+            .inner
             .scheduler_metrics()
             .remote_schedule_count
             .load(Relaxed)
@@ -111,7 +111,7 @@ impl RuntimeMetrics {
     /// ```
     pub fn worker_park_count(&self, worker: usize) -> u64 {
         self.handle
-            .spawner
+            .inner
             .worker_metrics(worker)
             .park_count
             .load(Relaxed)
@@ -154,7 +154,7 @@ impl RuntimeMetrics {
     /// ```
     pub fn worker_noop_count(&self, worker: usize) -> u64 {
         self.handle
-            .spawner
+            .inner
             .worker_metrics(worker)
             .noop_count
             .load(Relaxed)
@@ -199,7 +199,7 @@ impl RuntimeMetrics {
     /// ```
     pub fn worker_steal_count(&self, worker: usize) -> u64 {
         self.handle
-            .spawner
+            .inner
             .worker_metrics(worker)
             .steal_count
             .load(Relaxed)
@@ -240,7 +240,7 @@ impl RuntimeMetrics {
     /// ```
     pub fn worker_poll_count(&self, worker: usize) -> u64 {
         self.handle
-            .spawner
+            .inner
             .worker_metrics(worker)
             .poll_count
             .load(Relaxed)
@@ -285,7 +285,7 @@ impl RuntimeMetrics {
     pub fn worker_total_busy_duration(&self, worker: usize) -> Duration {
         let nanos = self
             .handle
-            .spawner
+            .inner
             .worker_metrics(worker)
             .busy_duration_total
             .load(Relaxed);
@@ -331,7 +331,7 @@ impl RuntimeMetrics {
     /// ```
     pub fn worker_local_schedule_count(&self, worker: usize) -> u64 {
         self.handle
-            .spawner
+            .inner
             .worker_metrics(worker)
             .local_schedule_count
             .load(Relaxed)
@@ -377,7 +377,7 @@ impl RuntimeMetrics {
     /// ```
     pub fn worker_overflow_count(&self, worker: usize) -> u64 {
         self.handle
-            .spawner
+            .inner
             .worker_metrics(worker)
             .overflow_count
             .load(Relaxed)
@@ -406,7 +406,7 @@ impl RuntimeMetrics {
     /// }
     /// ```
     pub fn injection_queue_depth(&self) -> usize {
-        self.handle.spawner.injection_queue_depth()
+        self.handle.inner.injection_queue_depth()
     }
 
     /// Returns the number of tasks currently scheduled in the given worker's
@@ -444,7 +444,7 @@ impl RuntimeMetrics {
     /// }
     /// ```
     pub fn worker_local_queue_depth(&self, worker: usize) -> usize {
-        self.handle.spawner.worker_local_queue_depth(worker)
+        self.handle.inner.worker_local_queue_depth(worker)
     }
 }
 
@@ -526,8 +526,9 @@ cfg_net! {
             // TODO: Investigate if this should return 0, most of our metrics always increase
             // thus this breaks that guarantee.
             self.handle
-                .as_inner()
-                .io_handle
+                .inner
+                .driver()
+                .io
                 .as_ref()
                 .map(|h| f(h.metrics()))
                 .unwrap_or(0)

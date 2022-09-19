@@ -1,6 +1,4 @@
-use crate::time::driver::TimerHandle;
-
-use crate::time::driver::{EntryList, TimerShared};
+use crate::runtime::time::{EntryList, TimerHandle, TimerShared};
 
 use std::{fmt, ptr::NonNull};
 

@@ -58,11 +58,10 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::atomic::Ordering;
 
+use crate::runtime::scheduler;
 use crate::sync::AtomicWaker;
 use crate::time::Instant;
 use crate::util::linked_list;
-
-use super::Handle;
 
 use std::cell::UnsafeCell as StdUnsafeCell;
 use std::task::{Context, Poll, Waker};
@@ -283,10 +282,10 @@ impl StateCell {
 /// timer. As this participates in intrusive data structures, it must be pinned
 /// before polling.
 #[derive(Debug)]
-pub(super) struct TimerEntry {
-    /// Arc reference to the driver. We can only free the driver after
+pub(crate) struct TimerEntry {
+    /// Arc reference to the runtime handle. We can only free the driver after
     /// deregistering everything from their respective timer wheels.
-    driver: Handle,
+    driver: scheduler::Handle,
     /// Shared inner structure; this is part of an intrusive linked list, and
     /// therefore other references can exist to it while mutable references to
     /// Entry exist.
@@ -490,7 +489,11 @@ unsafe impl linked_list::Link for TimerShared {
 // ===== impl Entry =====
 
 impl TimerEntry {
-    pub(crate) fn new(handle: &Handle, deadline: Instant) -> Self {
+    #[track_caller]
+    pub(crate) fn new(handle: &scheduler::Handle, deadline: Instant) -> Self {
+        // Panic if the time driver is not enabled
+        let _ = handle.time();
+
         let driver = handle.clone();
 
         Self {
@@ -533,20 +536,21 @@ impl TimerEntry {
         // driver did so far and happens-before everything the driver does in
         // the future. While we have the lock held, we also go ahead and
         // deregister the entry if necessary.
-        unsafe { self.driver.clear_entry(NonNull::from(self.inner())) };
+        unsafe { self.driver().clear_entry(NonNull::from(self.inner())) };
     }
 
     pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant) {
         unsafe { self.as_mut().get_unchecked_mut() }.initial_deadline = None;
 
-        let tick = self.driver.time_source().deadline_to_tick(new_time);
+        let tick = self.driver().time_source().deadline_to_tick(new_time);
 
         if self.inner().extend_expiration(tick).is_ok() {
             return;
         }
 
         unsafe {
-            self.driver.reregister(tick, self.inner().into());
+            self.driver()
+                .reregister(&self.driver.driver().io, tick, self.inner().into());
         }
     }
 
@@ -554,7 +558,7 @@ impl TimerEntry {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), super::Error>> {
-        if self.driver.is_shutdown() {
+        if self.driver().is_shutdown() {
             panic!("{}", crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR);
         }
 
@@ -565,6 +569,10 @@ impl TimerEntry {
         let this = unsafe { self.get_unchecked_mut() };
 
         this.inner().state.poll(cx.waker())
+    }
+
+    fn driver(&self) -> &super::Handle {
+        self.driver.time()
     }
 }
 
