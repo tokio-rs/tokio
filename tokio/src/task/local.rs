@@ -314,12 +314,10 @@ cfg_rt! {
     where F: Future + 'static,
           F::Output: 'static
     {
-        CURRENT.with(|maybe_cx| {
-            match maybe_cx.get() {
-                None => panic!("`spawn_local` called from outside of a `task::LocalSet`"),
-                Some(cx) => cx.spawn(future, name)
-            }
-        })
+        match CURRENT.with(|maybe_cx| maybe_cx.get()) {
+            None => panic!("`spawn_local` called from outside of a `task::LocalSet`"),
+            Some(cx) => cx.spawn(future, name)
+       }
     }
 }
 
