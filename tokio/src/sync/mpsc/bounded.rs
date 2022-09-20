@@ -633,6 +633,7 @@ impl<T> Sender<T> {
     ///     }
     /// }
     /// ```
+    #[track_caller]
     #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     pub async fn send_timeout(
