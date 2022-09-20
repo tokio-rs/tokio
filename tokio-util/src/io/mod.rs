@@ -20,7 +20,7 @@ cfg_io_util! {
     pub use self::sync_bridge::SyncIoBridge;
 }
 
-pub use self::inspect::InspectReader;
+pub use self::inspect::{InspectReader, InspectWriter};
 pub use self::read_buf::read_buf;
 pub use self::reader_stream::ReaderStream;
 pub use self::stream_reader::StreamReader;
