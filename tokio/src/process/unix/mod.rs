@@ -35,9 +35,9 @@ use crate::process::SpawnedChild;
 use crate::signal::unix::driver::Handle as SignalHandle;
 use crate::signal::unix::{signal, Signal, SignalKind};
 
+use crate::util::once_cell::sync::Lazy;
 use mio::event::Source;
 use mio::unix::SourceFd;
-use once_cell::sync::Lazy;
 use std::fmt;
 use std::fs::File;
 use std::future::Future;

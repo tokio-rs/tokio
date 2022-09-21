@@ -4,7 +4,7 @@ use crate::signal::os::{OsExtraData, OsStorage};
 
 use crate::sync::watch;
 
-use once_cell::sync::Lazy;
+use crate::util::once_cell::sync::Lazy;
 use std::ops;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
