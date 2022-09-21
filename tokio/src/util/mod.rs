@@ -6,6 +6,7 @@ cfg_io_driver! {
 #[cfg(feature = "rt")]
 pub(crate) mod atomic_cell;
 
+/// Vendored from [here](https://github.com/matklad/once_cell/tree/v1.14.0)
 #[cfg(any(feature = "process", feature = "rt", feature = "signal"))]
 pub(crate) mod once_cell;
 
