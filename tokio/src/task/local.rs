@@ -923,3 +923,48 @@ impl task::Schedule for Arc<Shared> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::sync::oneshot;
+    use crate::time::sleep;
+    use std::time::Duration;
+
+    #[test]
+    fn test_local() {
+        let rt = crate::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("failed to create runtime");
+
+        let local = LocalSet::new();
+        // Comment this and the program would exit as usual.
+        let _guard = local.enter();
+
+        let (tx, rx) = oneshot::channel();
+
+        local.block_on(&rt, async move {
+            println!("Blocking");
+
+            spawn_local(async move {
+                println!("Started");
+                sleep(Duration::ZERO).await;
+
+                println!("Yielded");
+
+                tx.send(()).expect("failed to send");
+
+                println!("Sent");
+            });
+            assert_eq!(
+                crate::time::timeout(Duration::from_secs(1), rx)
+                    .await
+                    .unwrap(),
+                Ok(())
+            );
+            println!("Finished");
+        });
+    }
+}
