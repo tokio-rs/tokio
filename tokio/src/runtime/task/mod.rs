@@ -508,7 +508,7 @@ impl Id {
 
     cfg_not_has_atomic_u64! {
         pub(crate) fn next() -> Self {
-            use once_cell::sync::Lazy;
+            use crate::util::once_cell::sync::Lazy;
             use crate::loom::sync::Mutex;
 
             static NEXT_ID: Lazy<Mutex<u64>> = Lazy::new(|| Mutex::new(1));

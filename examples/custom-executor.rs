@@ -22,7 +22,7 @@ fn main() {
 }
 
 mod my_custom_runtime {
-    use once_cell::sync::Lazy;
+    use crate::util::once_cell::sync::Lazy;
     use std::future::Future;
     use tokio_util::context::TokioContext;
 
