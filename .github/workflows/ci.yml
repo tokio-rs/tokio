@@ -299,7 +299,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: "test --workspace --all-features"
         # todo remove the exclude whenever we bump clippy to 1.56 (MSRV will fail rn)
-        run: cargo check --workspace --all-features --exclude examples --exclude examples
+        run: cargo check --workspace --all-features --exclude examples --exclude tokio-stream
 
   minimal-versions:
     name: minimal-versions
