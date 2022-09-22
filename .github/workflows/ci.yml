@@ -298,7 +298,7 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: "test --workspace --all-features"
-        run: cargo check --workspace --all-features
+        run: cargo check --workspace --all-features --exclude examples
 
   minimal-versions:
     name: minimal-versions
