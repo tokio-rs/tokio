@@ -10,17 +10,19 @@ use std::ptr;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 
 // Use wider integers when possible to increase ABA resilience.
+//
+// See issue #5041: <https://github.com/tokio-rs/tokio/issues/5041>.
 cfg_has_atomic_u64! {
-    pub(crate) type UnsignedShort = u32;
-    pub(crate) type UnsignedLong = u64;
-    pub(crate) type AtomicUnsignedShort = crate::loom::sync::atomic::AtomicU32;
-    pub(crate) type AtomicUnsignedLong = crate::loom::sync::atomic::AtomicU64;
+    type UnsignedShort = u32;
+    type UnsignedLong = u64;
+    type AtomicUnsignedShort = crate::loom::sync::atomic::AtomicU32;
+    type AtomicUnsignedLong = crate::loom::sync::atomic::AtomicU64;
 }
 cfg_not_has_atomic_u64! {
-    pub(crate) type UnsignedShort = u16;
-    pub(crate) type UnsignedLong = u32;
-    pub(crate) type AtomicUnsignedShort = crate::loom::sync::atomic::AtomicU16;
-    pub(crate) type AtomicUnsignedLong = crate::loom::sync::atomic::AtomicU32;
+    type UnsignedShort = u16;
+    type UnsignedLong = u32;
+    type AtomicUnsignedShort = crate::loom::sync::atomic::AtomicU16;
+    type AtomicUnsignedLong = crate::loom::sync::atomic::AtomicU32;
 }
 
 /// Producer handle. May only be used from a single thread.
