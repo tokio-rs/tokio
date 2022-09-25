@@ -6,6 +6,9 @@ cfg_io_driver! {
 #[cfg(feature = "rt")]
 pub(crate) mod atomic_cell;
 
+#[cfg(any(feature = "rt", feature = "signal", feature = "process"))]
+pub(crate) mod once_cell;
+
 #[cfg(any(
     // io driver uses `WakeList` directly
     feature = "net",
