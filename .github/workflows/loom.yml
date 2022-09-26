@@ -11,7 +11,7 @@ env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
-  rust_stable: stable
+  rust_stable: 1.60.0
 
 jobs:
   loom:
