@@ -1,3 +1,128 @@
+# 1.20.2 (September 27, 2022)
+
+This release removes the dependency on the `once_cell` crate to restore the MSRV
+of the 1.20.x LTS release. ([#5048])
+
+[#5048]: https://github.com/tokio-rs/tokio/pull/5048
+
+# 1.20.1 (July 25, 2022)
+
+### Fixed
+
+- chore: fix version detection in build script ([#4860])
+
+[#4860]: https://github.com/tokio-rs/tokio/pull/4860
+
+# 1.20.0 (July 12, 2022)
+
+### Added
+- tokio: add `track_caller` to public APIs ([#4772], [#4791], [#4793], [#4806], [#4808])
+- sync: Add `has_changed` method to `watch::Ref` ([#4758])
+
+### Changed
+
+- time: remove `src/time/driver/wheel/stack.rs` ([#4766])
+- rt: clean up arguments passed to basic scheduler ([#4767])
+- net: be more specific about winapi features ([#4764])
+- tokio: use const initialized thread locals where possible ([#4677])
+- task: various small improvements to LocalKey ([#4795])
+
+### Documented
+
+- fs: warn about performance pitfall ([#4762])
+- chore: fix spelling ([#4769])
+- sync: document spurious failures in oneshot ([#4777])
+- sync: add warning for watch in non-Send futures ([#4741])
+- chore: fix typo ([#4798])
+
+### Unstable
+
+- joinset: rename `join_one` to `join_next` ([#4755])
+- rt: unhandled panic config for current thread rt ([#4770])
+
+[#4677]: https://github.com/tokio-rs/tokio/pull/4677
+[#4741]: https://github.com/tokio-rs/tokio/pull/4741
+[#4755]: https://github.com/tokio-rs/tokio/pull/4755
+[#4758]: https://github.com/tokio-rs/tokio/pull/4758
+[#4762]: https://github.com/tokio-rs/tokio/pull/4762
+[#4764]: https://github.com/tokio-rs/tokio/pull/4764
+[#4766]: https://github.com/tokio-rs/tokio/pull/4766
+[#4767]: https://github.com/tokio-rs/tokio/pull/4767
+[#4769]: https://github.com/tokio-rs/tokio/pull/4769
+[#4770]: https://github.com/tokio-rs/tokio/pull/4770
+[#4772]: https://github.com/tokio-rs/tokio/pull/4772
+[#4777]: https://github.com/tokio-rs/tokio/pull/4777
+[#4791]: https://github.com/tokio-rs/tokio/pull/4791
+[#4793]: https://github.com/tokio-rs/tokio/pull/4793
+[#4795]: https://github.com/tokio-rs/tokio/pull/4795
+[#4798]: https://github.com/tokio-rs/tokio/pull/4798
+[#4806]: https://github.com/tokio-rs/tokio/pull/4806
+[#4808]: https://github.com/tokio-rs/tokio/pull/4808
+
+# 1.19.2 (June 6, 2022)
+
+This release fixes another bug in `Notified::enable`. ([#4751])
+
+[#4751]: https://github.com/tokio-rs/tokio/pull/4751
+
+# 1.19.1 (June 5, 2022)
+
+This release fixes a bug in `Notified::enable`. ([#4747])
+
+[#4747]: https://github.com/tokio-rs/tokio/pull/4747
+
+# 1.19.0 (June 3, 2022)
+
+### Added
+
+- runtime: add `is_finished` method for `JoinHandle` and `AbortHandle` ([#4709])
+- runtime: make global queue and event polling intervals configurable ([#4671])
+- sync: add `Notified::enable` ([#4705])
+- sync: add `watch::Sender::send_if_modified` ([#4591])
+- sync: add resubscribe method to broadcast::Receiver ([#4607])
+- net: add `take_error` to `TcpSocket` and `TcpStream` ([#4739])
+
+### Changed
+
+- io: refactor out usage of Weak in the io handle ([#4656])
+
+### Fixed
+
+- macros: avoid starvation in `join!` and `try_join!` ([#4624])
+
+### Documented
+
+- runtime: clarify semantics of tasks outliving `block_on` ([#4729])
+- time: fix example for `MissedTickBehavior::Burst` ([#4713])
+
+### Unstable
+
+- metrics: correctly update atomics in `IoDriverMetrics` ([#4725])
+- metrics: fix compilation with unstable, process, and rt, but without net ([#4682])
+- task: add `#[track_caller]` to `JoinSet`/`JoinMap` ([#4697])
+- task: add `Builder::{spawn_on, spawn_local_on, spawn_blocking_on}` ([#4683])
+- task: add `consume_budget` for cooperative scheduling ([#4498])
+- task: add `join_set::Builder` for configuring `JoinSet` tasks ([#4687])
+- task: update return value of `JoinSet::join_one` ([#4726])
+
+[#4498]: https://github.com/tokio-rs/tokio/pull/4498
+[#4591]: https://github.com/tokio-rs/tokio/pull/4591
+[#4607]: https://github.com/tokio-rs/tokio/pull/4607
+[#4624]: https://github.com/tokio-rs/tokio/pull/4624
+[#4656]: https://github.com/tokio-rs/tokio/pull/4656
+[#4671]: https://github.com/tokio-rs/tokio/pull/4671
+[#4682]: https://github.com/tokio-rs/tokio/pull/4682
+[#4683]: https://github.com/tokio-rs/tokio/pull/4683
+[#4687]: https://github.com/tokio-rs/tokio/pull/4687
+[#4697]: https://github.com/tokio-rs/tokio/pull/4697
+[#4705]: https://github.com/tokio-rs/tokio/pull/4705
+[#4709]: https://github.com/tokio-rs/tokio/pull/4709
+[#4713]: https://github.com/tokio-rs/tokio/pull/4713
+[#4725]: https://github.com/tokio-rs/tokio/pull/4725
+[#4726]: https://github.com/tokio-rs/tokio/pull/4726
+[#4729]: https://github.com/tokio-rs/tokio/pull/4729
+[#4739]: https://github.com/tokio-rs/tokio/pull/4739
+
 # 1.18.3 (September 27, 2022)
 
 This release removes the dependency on the `once_cell` crate to restore the MSRV
