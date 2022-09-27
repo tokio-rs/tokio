@@ -249,6 +249,7 @@ pub(super) fn create(
     (handle, launch)
 }
 
+#[track_caller]
 pub(crate) fn block_in_place<F, R>(f: F) -> R
 where
     F: FnOnce() -> R,
@@ -275,7 +276,7 @@ where
 
     let mut had_entered = false;
 
-    CURRENT.with(|maybe_cx| {
+    let setup_result = CURRENT.with(|maybe_cx| {
         match (crate::runtime::enter::context(), maybe_cx.is_some()) {
             (EnterContext::Entered { .. }, true) => {
                 // We are on a thread pool runtime thread, so we just need to
@@ -288,22 +289,24 @@ where
                 // method:
                 if allow_blocking {
                     had_entered = true;
-                    return;
+                    return Ok(());
                 } else {
                     // This probably means we are on the current_thread runtime or in a
                     // LocalSet, where it is _not_ okay to block.
-                    panic!("can call blocking only when running on the multi-threaded runtime");
+                    return Err(
+                        "can call blocking only when running on the multi-threaded runtime",
+                    );
                 }
             }
             (EnterContext::NotEntered, true) => {
                 // This is a nested call to block_in_place (we already exited).
                 // All the necessary setup has already been done.
-                return;
+                return Ok(());
             }
             (EnterContext::NotEntered, false) => {
                 // We are outside of the tokio runtime, so blocking is fine.
                 // We can also skip all of the thread pool blocking setup steps.
-                return;
+                return Ok(());
             }
         }
 
@@ -312,7 +315,7 @@ where
         // Get the worker core. If none is set, then blocking is fine!
         let core = match cx.core.borrow_mut().take() {
             Some(core) => core,
-            None => return,
+            None => return Ok(()),
         };
 
         // The parker should be set here
@@ -331,7 +334,12 @@ where
         // steal the core back.
         let worker = cx.worker.clone();
         runtime::spawn_blocking(move || run(worker));
+        Ok(())
     });
+
+    if let Err(panic_message) = setup_result {
+        panic!("{}", panic_message);
+    }
 
     if had_entered {
         // Unset the current task's budget. Blocking sections are not

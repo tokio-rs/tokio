@@ -70,6 +70,7 @@ cfg_rt_multi_thread! {
     /// This function panics if called from a [`current_thread`] runtime.
     ///
     /// [`current_thread`]: fn@crate::runtime::Builder::new_current_thread
+    #[track_caller]
     pub fn block_in_place<F, R>(f: F) -> R
     where
         F: FnOnce() -> R,
