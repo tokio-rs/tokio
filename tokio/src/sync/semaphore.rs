@@ -620,6 +620,25 @@ impl<'a> SemaphorePermit<'a> {
     pub fn forget(mut self) {
         self.permits = 0;
     }
+
+    /// Merge two [`SemaphorePermit`] instances together, consuming `other`
+    /// without releasing the permits it holds.
+    ///
+    /// Permits held by both `self` and `other` are released when `self` drops.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if permits from different [`Semaphore`] instances
+    /// are merged.
+    #[track_caller]
+    pub fn merge(&mut self, mut other: Self) {
+        assert!(
+            std::ptr::eq(self.sem, other.sem),
+            "merging permits from different semaphore instances"
+        );
+        self.permits += other.permits;
+        other.permits = 0;
+    }
 }
 
 impl OwnedSemaphorePermit {
@@ -628,6 +647,25 @@ impl OwnedSemaphorePermit {
     /// semaphore.
     pub fn forget(mut self) {
         self.permits = 0;
+    }
+
+    /// Merge two [`OwnedSemaphorePermit`] instances together, consuming `other`
+    /// without releasing the permits it holds.
+    ///
+    /// Permits held by both `self` and `other` are released when `self` drops.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if permits from different [`Semaphore`] instances
+    /// are merged.
+    #[track_caller]
+    pub fn merge(&mut self, mut other: Self) {
+        assert!(
+            Arc::ptr_eq(&self.sem, &other.sem),
+            "merging permits from different semaphore instances"
+        );
+        self.permits += other.permits;
+        other.permits = 0;
     }
 }
 

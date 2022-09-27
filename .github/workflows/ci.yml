@@ -297,9 +297,19 @@ jobs:
           toolchain: ${{ env.rust_min }}
           override: true
       - uses: Swatinem/rust-cache@v1
-      - name: "test --all-features"
-        run: cargo check --all-features
-        working-directory: tokio
+      # First compile just the main tokio crate with minrust and newest version
+      # of all dependencies, then pin once_cell and compile the rest of the
+      # crates with the pinned once_cell version.
+      #
+      # This is necessary because tokio-util transitively depends on once_cell,
+      # which is not compatible with the current minrust after the 1.15.0
+      # release.
+      - name: "check -p tokio --all-features"
+        run: cargo check -p tokio --all-features
+      - name: "pin once_cell version"
+        run: cargo update -p once_cell --precise 1.14.0
+      - name: "check --workspace --all-features"
+        run: cargo check --workspace --all-features
 
   minimal-versions:
     name: minimal-versions
