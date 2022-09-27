@@ -1,7 +1,7 @@
 freebsd_instance:
   image: freebsd-12-3-release-amd64
 env:
-  RUST_STABLE: stable
+  RUST_STABLE: 1.62.1
   RUST_NIGHTLY: nightly-2022-03-21
   RUSTFLAGS: -D warnings
 

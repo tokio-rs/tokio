@@ -10,9 +10,9 @@ env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
-  rust_stable: stable
+  rust_stable: 1.62.1
   rust_nightly: nightly-2022-04-18
-  rust_clippy: 1.52.0
+  rust_clippy: 1.56.0
   # When updating this, also update:
   # - README.md
   # - tokio/README.md
@@ -295,8 +295,9 @@ jobs:
           toolchain: ${{ env.rust_min }}
           override: true
       - uses: Swatinem/rust-cache@v1
-      - name: "test --workspace --all-features"
-        run: cargo check --workspace --all-features
+      - name: "test --all-features"
+        run: cargo check --all-features
+        working-directory: tokio
 
   minimal-versions:
     name: minimal-versions
