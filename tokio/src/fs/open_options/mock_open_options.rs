@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Mock version of std::fs::OpenOptions;
 use mockall::mock;
 
