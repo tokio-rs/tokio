@@ -5,7 +5,7 @@ use crate::loom::sync::Arc;
 use crate::runtime::task::{self, Inject};
 use crate::runtime::MetricsBatch;
 
-use std::mem::MaybeUninit;
+use std::mem::{self, MaybeUninit};
 use std::ptr;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 
@@ -516,14 +516,14 @@ impl<T> Inner<T> {
 /// on.
 fn unpack(n: UnsignedLong) -> (UnsignedShort, UnsignedShort) {
     let real = n & UnsignedShort::MAX as UnsignedLong;
-    let steal = n >> UnsignedShort::BITS;
+    let steal = n >> (mem::size_of::<UnsignedShort>() * 8);
 
     (steal as UnsignedShort, real as UnsignedShort)
 }
 
 /// Join the two head values
 fn pack(steal: UnsignedShort, real: UnsignedShort) -> UnsignedLong {
-    (real as UnsignedLong) | ((steal as UnsignedLong) << UnsignedShort::BITS)
+    (real as UnsignedLong) | ((steal as UnsignedLong) << (mem::size_of::<UnsignedShort>() * 8))
 }
 
 #[test]
