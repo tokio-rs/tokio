@@ -755,7 +755,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -769,7 +769,6 @@ impl<T> DelayQueue<T> {
     /// assert!(item.is_none());
     /// # }
     /// ```
-    #[track_caller]
     pub fn try_remove(&mut self, key: &Key) -> Option<Expired<T>> {
         if self.slab.contains(key) {
             Some(self.remove(key))
