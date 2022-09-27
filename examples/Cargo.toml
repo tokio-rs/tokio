@@ -75,7 +75,6 @@ path = "tinyhttp.rs"
 name = "custom-executor"
 path = "custom-executor.rs"
 
-
 [[example]]
 name = "custom-executor-tokio-context"
 path = "custom-executor-tokio-context.rs"
