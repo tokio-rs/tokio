@@ -1,3 +1,10 @@
+# 1.18.3 (September 27, 2022)
+
+This release removes the dependency on the `once_cell` crate to restore the MSRV
+of the 1.18.x LTS release. ([#5048])
+
+[#5048]: https://github.com/tokio-rs/tokio/pull/5048
+
 # 1.18.2 (May 5, 2022)
 
 Add missing features for the `winapi` dependency. ([#4663])
