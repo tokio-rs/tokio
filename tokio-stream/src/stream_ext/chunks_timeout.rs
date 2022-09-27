@@ -67,7 +67,9 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
         }
 
         if !me.items.is_empty() {
-            ready!(me.deadline.as_pin_mut().unwrap().poll(cx));
+            if let Some(deadline) = me.deadline.as_pin_mut() {
+                ready!(deadline.poll(cx));
+            }
             return Poll::Ready(Some(std::mem::take(me.items)));
         }
 
