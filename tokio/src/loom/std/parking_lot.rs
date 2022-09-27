@@ -52,7 +52,7 @@ impl<T> Mutex<T> {
     }
 
     #[inline]
-    #[cfg(all(feature = "parking_lot", not(all(loom, test)),))]
+    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
     #[cfg_attr(docsrs, doc(cfg(all(feature = "parking_lot",))))]
     pub(crate) const fn const_new(t: T) -> Mutex<T> {
         Mutex(PhantomData, parking_lot::const_mutex(t))
