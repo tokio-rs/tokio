@@ -12,7 +12,7 @@ env:
   # Change to specific Rust release to pin
   rust_stable: stable
   rust_nightly: nightly-2022-07-26
-  rust_clippy: 1.52.0
+  rust_clippy: 1.56.0
   # When updating this, also update:
   # - README.md
   # - tokio/README.md
@@ -297,7 +297,18 @@ jobs:
           toolchain: ${{ env.rust_min }}
           override: true
       - uses: Swatinem/rust-cache@v1
-      - name: "test --workspace --all-features"
+      # First compile just the main tokio crate with minrust and newest version
+      # of all dependencies, then pin once_cell and compile the rest of the
+      # crates with the pinned once_cell version.
+      #
+      # This is necessary because tokio-util transitively depends on once_cell,
+      # which is not compatible with the current minrust after the 1.15.0
+      # release.
+      - name: "check -p tokio --all-features"
+        run: cargo check -p tokio --all-features
+      - name: "pin once_cell version"
+        run: cargo update -p once_cell --precise 1.14.0
+      - name: "check --workspace --all-features"
         run: cargo check --workspace --all-features
 
   minimal-versions:
