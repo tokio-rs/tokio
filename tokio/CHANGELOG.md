@@ -1,3 +1,10 @@
+# 1.21.2 (September 27, 2022)
+
+This release removes the dependency on the `once_cell` crate to restore the MSRV
+of 1.21.x, which is the latest minor version at the time of release. ([#5048])
+
+[#5048]: https://github.com/tokio-rs/tokio/pull/5048
+
 # 1.21.1 (September 13, 2022)
 
 ### Fixed
