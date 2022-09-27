@@ -6,7 +6,7 @@ jobs:
     resource_class: arm.medium
     environment:
       # Change to pin rust version
-      RUST_STABLE: stable
+      RUST_STABLE: 1.63.0
     steps:
       - checkout
       - run:

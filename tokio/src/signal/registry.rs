@@ -1,10 +1,9 @@
 #![allow(clippy::unit_arg)]
 
 use crate::signal::os::{OsExtraData, OsStorage};
-
 use crate::sync::watch;
+use crate::util::once_cell::OnceCell;
 
-use once_cell::sync::Lazy;
 use std::ops;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -152,19 +151,25 @@ impl Globals {
     }
 }
 
+fn globals_init() -> Globals
+where
+    OsExtraData: 'static + Send + Sync + Init,
+    OsStorage: 'static + Send + Sync + Init,
+{
+    Globals {
+        extra: OsExtraData::init(),
+        registry: Registry::new(OsStorage::init()),
+    }
+}
+
 pub(crate) fn globals() -> Pin<&'static Globals>
 where
     OsExtraData: 'static + Send + Sync + Init,
     OsStorage: 'static + Send + Sync + Init,
 {
-    static GLOBALS: Lazy<Pin<Box<Globals>>> = Lazy::new(|| {
-        Box::pin(Globals {
-            extra: OsExtraData::init(),
-            registry: Registry::new(OsStorage::init()),
-        })
-    });
+    static GLOBALS: OnceCell<Globals> = OnceCell::new();
 
-    GLOBALS.as_ref()
+    Pin::new(GLOBALS.get(globals_init))
 }
 
 #[cfg(all(test, not(loom)))]
