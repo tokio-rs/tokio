@@ -3,9 +3,8 @@ use crate::io::interest::Interest;
 use crate::io::ready::Ready;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
-use crate::util::bit;
 use crate::util::slab::Entry;
-use crate::util::WakeList;
+use crate::util::{bit, WakeList};
 
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::{Context, Poll, Waker};

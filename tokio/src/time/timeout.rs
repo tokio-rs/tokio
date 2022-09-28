@@ -4,11 +4,10 @@
 //!
 //! [`Timeout`]: struct@Timeout
 
-use crate::{
-    coop,
-    time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
-    util::trace,
-};
+use crate::coop;
+use crate::time::error::Elapsed;
+use crate::time::{sleep_until, Duration, Instant, Sleep};
+use crate::util::trace;
 
 use pin_project_lite::pin_project;
 use std::future::Future;

@@ -1,24 +1,20 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use futures::{
-    future::{pending, ready},
-    FutureExt,
-};
+use futures::future::{pending, ready};
+use futures::FutureExt;
 
-use tokio::runtime;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{self, LocalSet};
-use tokio::time;
+use tokio::{runtime, time};
 
 #[cfg(not(tokio_wasi))]
 use std::cell::Cell;
-use std::sync::atomic::AtomicBool;
 #[cfg(not(tokio_wasi))]
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
 #[cfg(not(tokio_wasi))]
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 #[tokio::test(flavor = "current_thread")]

@@ -177,8 +177,7 @@ pub(crate) mod impl_macos {
 
     use libc::{c_void, getpeereid, getsockopt, pid_t, LOCAL_PEEREPID, SOL_LOCAL};
     use std::io;
-    use std::mem::size_of;
-    use std::mem::MaybeUninit;
+    use std::mem::{size_of, MaybeUninit};
     use std::os::unix::io::AsRawFd;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
@@ -221,9 +220,8 @@ pub(crate) mod impl_macos {
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub(crate) mod impl_solaris {
     use crate::net::unix::UnixStream;
-    use std::io;
     use std::os::unix::io::AsRawFd;
-    use std::ptr;
+    use std::{io, ptr};
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         unsafe {

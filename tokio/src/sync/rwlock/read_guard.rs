@@ -1,8 +1,5 @@
 use crate::sync::batch_semaphore::Semaphore;
-use std::fmt;
-use std::marker;
-use std::mem;
-use std::ops;
+use std::{fmt, marker, mem, ops};
 
 /// RAII structure used to release the shared read access of a lock when
 /// dropped.

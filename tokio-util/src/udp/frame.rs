@@ -1,18 +1,18 @@
 use crate::codec::{Decoder, Encoder};
 
 use futures_core::Stream;
-use tokio::{io::ReadBuf, net::UdpSocket};
+use tokio::io::ReadBuf;
+use tokio::net::UdpSocket;
 
 use bytes::{BufMut, BytesMut};
 use futures_core::ready;
 use futures_sink::Sink;
+use std::borrow::Borrow;
+use std::io;
+use std::mem::MaybeUninit;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{
-    borrow::Borrow,
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-};
-use std::{io, mem::MaybeUninit};
 
 /// A unified [`Stream`] and [`Sink`] interface to an underlying `UdpSocket`, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.

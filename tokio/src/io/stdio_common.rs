@@ -111,8 +111,7 @@ mod tests {
     use crate::io::AsyncWriteExt;
     use std::io;
     use std::pin::Pin;
-    use std::task::Context;
-    use std::task::Poll;
+    use std::task::{Context, Poll};
 
     const MAX_BUF: usize = 16 * 1024;
 

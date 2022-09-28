@@ -4,7 +4,7 @@ use crate::runtime::io::{Handle, ReadyEvent, Registration};
 use mio::unix::SourceFd;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::{task::Context, task::Poll};
+use std::task::{Context, Poll};
 
 /// Associates an IO object backed by a Unix file descriptor with the tokio
 /// reactor, allowing for readiness to be polled. The file descriptor must be of

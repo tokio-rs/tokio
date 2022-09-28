@@ -1,8 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::io::{AsyncRead, ReadBuf};
-use tokio_test::assert_ready;
-use tokio_test::task;
+use tokio_test::{assert_ready, task};
 use tokio_util::codec::{Decoder, FramedRead};
 
 use bytes::{Buf, BytesMut};

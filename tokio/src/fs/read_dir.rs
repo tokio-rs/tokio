@@ -7,8 +7,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Context;
-use std::task::Poll;
+use std::task::{Context, Poll};
 
 #[cfg(test)]
 use super::mocks::spawn_blocking;

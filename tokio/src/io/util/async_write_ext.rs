@@ -4,14 +4,10 @@ use crate::io::util::write::{write, Write};
 use crate::io::util::write_all::{write_all, WriteAll};
 use crate::io::util::write_all_buf::{write_all_buf, WriteAllBuf};
 use crate::io::util::write_buf::{write_buf, WriteBuf};
-use crate::io::util::write_int::{WriteF32, WriteF32Le, WriteF64, WriteF64Le};
 use crate::io::util::write_int::{
-    WriteI128, WriteI128Le, WriteI16, WriteI16Le, WriteI32, WriteI32Le, WriteI64, WriteI64Le,
-    WriteI8,
-};
-use crate::io::util::write_int::{
-    WriteU128, WriteU128Le, WriteU16, WriteU16Le, WriteU32, WriteU32Le, WriteU64, WriteU64Le,
-    WriteU8,
+    WriteF32, WriteF32Le, WriteF64, WriteF64Le, WriteI128, WriteI128Le, WriteI16, WriteI16Le,
+    WriteI32, WriteI32Le, WriteI64, WriteI64Le, WriteI8, WriteU128, WriteU128Le, WriteU16,
+    WriteU16Le, WriteU32, WriteU32Le, WriteU64, WriteU64Le, WriteU8,
 };
 use crate::io::util::write_vectored::{write_vectored, WriteVectored};
 use crate::io::AsyncWrite;

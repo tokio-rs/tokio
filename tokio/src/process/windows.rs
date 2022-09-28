@@ -15,22 +15,20 @@
 //! `RegisterWaitForSingleObject` and then wait on the other end of the oneshot
 //! from then on out.
 
-use crate::io::{blocking::Blocking, AsyncRead, AsyncWrite, ReadBuf};
+use crate::io::blocking::Blocking;
+use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::sync::oneshot;
 
-use std::fmt;
 use std::fs::File as StdFile;
 use std::future::Future;
-use std::io;
 use std::os::windows::prelude::{AsRawHandle, IntoRawHandle, RawHandle};
 use std::pin::Pin;
-use std::process::Stdio;
-use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
-use std::ptr;
+use std::process::{Child as StdChild, Command as StdCommand, ExitStatus, Stdio};
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::{fmt, io, ptr};
 use winapi::shared::minwindef::{DWORD, FALSE};
 use winapi::um::handleapi::{DuplicateHandle, INVALID_HANDLE_VALUE};
 use winapi::um::processthreadsapi::GetCurrentProcess;

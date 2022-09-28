@@ -1,10 +1,8 @@
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 mod tests {
     use std::rc::Rc;
-    use tokio::{
-        task::{Builder, LocalSet},
-        test,
-    };
+    use tokio::task::{Builder, LocalSet};
+    use tokio::test;
 
     #[test]
     async fn spawn_with_name() {

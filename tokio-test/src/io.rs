@@ -25,12 +25,11 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use futures_core::{ready, Stream};
 use std::collections::VecDeque;
-use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{self, Poll, Waker};
-use std::{cmp, io};
+use std::{cmp, fmt, io};
 
 /// An I/O object that follows a predefined script.
 ///

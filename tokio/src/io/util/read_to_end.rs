@@ -3,11 +3,10 @@ use crate::io::AsyncRead;
 
 use pin_project_lite::pin_project;
 use std::future::Future;
-use std::io;
 use std::marker::PhantomPinned;
-use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{io, mem};
 
 pin_project! {
     #[derive(Debug)]

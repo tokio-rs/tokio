@@ -7,8 +7,7 @@ use std::io;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::process::ExitStatus;
-use std::task::Context;
-use std::task::Poll;
+use std::task::{Context, Poll};
 
 /// Orchestrates between registering interest for receiving signals when a
 /// child process has exited, and attempting to poll for process completion.
@@ -137,8 +136,7 @@ mod test {
     use futures::future::FutureExt;
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
-    use std::task::Context;
-    use std::task::Poll;
+    use std::task::{Context, Poll};
 
     #[derive(Debug)]
     struct MockWait {

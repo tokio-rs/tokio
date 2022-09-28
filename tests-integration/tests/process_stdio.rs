@@ -8,9 +8,8 @@ use tokio_test::assert_ok;
 
 use futures::future::{self, FutureExt};
 use std::convert::TryInto;
-use std::env;
-use std::io;
 use std::process::{ExitStatus, Stdio};
+use std::{env, io};
 
 fn cat() -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_test-cat"));

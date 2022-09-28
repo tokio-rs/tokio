@@ -1,11 +1,10 @@
 use crate::sync::rwlock::owned_read_guard::OwnedRwLockReadGuard;
 use crate::sync::rwlock::owned_write_guard_mapped::OwnedRwLockMappedWriteGuard;
 use crate::sync::rwlock::RwLock;
-use std::fmt;
 use std::marker::PhantomData;
 use std::mem::{self, ManuallyDrop};
-use std::ops;
 use std::sync::Arc;
+use std::{fmt, ops};
 
 /// Owned RAII structure used to release the exclusive write access of a lock when
 /// dropped.

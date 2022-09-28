@@ -3,14 +3,12 @@
 use crate::io::interest::Interest;
 use crate::runtime::io::{Handle, ReadyEvent, Registration};
 use mio::event::Source;
-use mio::Registry;
-use mio::Token;
-use std::fmt;
-use std::io;
+use mio::{Registry, Token};
 use std::ops::{Deref, DerefMut};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
 use std::task::{Context, Poll};
+use std::{fmt, io};
 
 /// Like [`mio::event::Source`], but for POSIX AIO only.
 ///

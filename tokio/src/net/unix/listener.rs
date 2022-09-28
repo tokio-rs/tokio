@@ -2,12 +2,11 @@ use crate::io::{Interest, PollEvented};
 use crate::net::unix::{SocketAddr, UnixStream};
 
 use std::convert::TryFrom;
-use std::fmt;
-use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
+use std::{fmt, io};
 
 cfg_net_unix! {
     /// A Unix socket which can accept connections from other Unix sockets.

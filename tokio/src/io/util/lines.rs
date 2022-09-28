@@ -2,10 +2,9 @@ use crate::io::util::read_line::read_line_internal;
 use crate::io::AsyncBufRead;
 
 use pin_project_lite::pin_project;
-use std::io;
-use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{io, mem};
 
 pin_project! {
     /// Reads lines from an [`AsyncBufRead`].

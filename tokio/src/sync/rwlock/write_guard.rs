@@ -1,10 +1,7 @@
 use crate::sync::batch_semaphore::Semaphore;
 use crate::sync::rwlock::read_guard::RwLockReadGuard;
 use crate::sync::rwlock::write_guard_mapped::RwLockMappedWriteGuard;
-use std::fmt;
-use std::marker;
-use std::mem;
-use std::ops;
+use std::{fmt, marker, mem, ops};
 
 /// RAII structure used to release the exclusive write access of a lock when
 /// dropped.

@@ -1,7 +1,8 @@
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::runtime::time::TimeSource;
 use crate::runtime::time::TimerEntry;
-use crate::time::{error::Error, Duration, Instant};
+use crate::time::error::Error;
+use crate::time::{Duration, Instant};
 use crate::util::trace;
 
 use pin_project_lite::pin_project;

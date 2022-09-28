@@ -1,9 +1,8 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-use tokio_test::task;
 use tokio_test::{
-    assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
+    assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task,
 };
 use tokio_util::codec::*;
 

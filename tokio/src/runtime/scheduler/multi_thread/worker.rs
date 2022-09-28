@@ -56,9 +56,7 @@
 //! the inject queue indefinitely. This would be a ref-count cycle and a memory
 //! leak.
 
-use crate::coop;
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime;
 use crate::runtime::enter::EnterContext;
 use crate::runtime::scheduler::multi_thread::{queue, Handle, Idle, Parker, Unparker};
 use crate::runtime::task::{Inject, OwnedTasks};
@@ -67,6 +65,7 @@ use crate::runtime::{
 };
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::{FastRand, RngSeedGenerator};
+use crate::{coop, runtime};
 
 use std::cell::RefCell;
 use std::time::Duration;

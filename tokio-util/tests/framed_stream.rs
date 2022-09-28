@@ -1,6 +1,8 @@
 use futures_core::stream::Stream;
-use std::{io, pin::Pin};
-use tokio_test::{assert_ready, io::Builder, task};
+use std::io;
+use std::pin::Pin;
+use tokio_test::io::Builder;
+use tokio_test::{assert_ready, task};
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 macro_rules! pin {

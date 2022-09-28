@@ -3,7 +3,8 @@
 
 use std::io::ErrorKind;
 use tokio::io::{AsyncBufReadExt, BufReader, Error};
-use tokio_test::{assert_ok, io::Builder};
+use tokio_test::assert_ok;
+use tokio_test::io::Builder;
 
 #[tokio::test]
 async fn read_until() {

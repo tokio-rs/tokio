@@ -2,13 +2,11 @@
 #![cfg(all(target_os = "freebsd", feature = "net"))]
 
 use mio_aio::{AioCb, AioFsyncMode, LioCb};
-use std::{
-    future::Future,
-    mem,
-    os::unix::io::{AsRawFd, RawFd},
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::future::Future;
+use std::mem;
+use std::os::unix::io::{AsRawFd, RawFd};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tempfile::tempfile;
 use tokio::io::bsd::{Aio, AioSource};
 use tokio_test::assert_pending;

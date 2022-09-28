@@ -38,15 +38,13 @@ use crate::util::once_cell::OnceCell;
 
 use mio::event::Source;
 use mio::unix::SourceFd;
-use std::fmt;
 use std::fs::File;
 use std::future::Future;
-use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::pin::Pin;
 use std::process::{Child as StdChild, ExitStatus, Stdio};
-use std::task::Context;
-use std::task::Poll;
+use std::task::{Context, Poll};
+use std::{fmt, io};
 
 impl Wait for StdChild {
     fn id(&self) -> u32 {

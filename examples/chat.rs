@@ -33,15 +33,15 @@ use tokio_util::codec::{Framed, LinesCodec};
 
 use futures::SinkExt;
 use std::collections::HashMap;
-use std::env;
 use std::error::Error;
-use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::{env, io};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
+    use tracing_subscriber::fmt::format::FmtSpan;
+    use tracing_subscriber::EnvFilter;
     // Configure a `tracing` subscriber that logs traces emitted by the chat
     // server.
     tracing_subscriber::fmt()

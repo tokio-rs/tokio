@@ -2,10 +2,9 @@ use crate::io::interest::Interest;
 use crate::runtime::io::{Handle, Registration};
 
 use mio::event::Source;
-use std::fmt;
-use std::io;
 use std::ops::Deref;
 use std::panic::{RefUnwindSafe, UnwindSafe};
+use std::{fmt, io};
 
 cfg_io_driver! {
     /// Associates an I/O resource that implements the [`std::io::Read`] and/or

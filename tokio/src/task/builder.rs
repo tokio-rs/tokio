@@ -1,9 +1,8 @@
 #![allow(unreachable_pub)]
-use crate::{
-    runtime::{context, Handle},
-    task::{JoinHandle, LocalSet},
-};
-use std::{future::Future, io};
+use crate::runtime::{context, Handle};
+use crate::task::{JoinHandle, LocalSet};
+use std::future::Future;
+use std::io;
 
 /// Factory which is used to configure the properties of a new task.
 ///

@@ -2,8 +2,7 @@
 //!
 //! [Windows named pipes]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 
-use std::ffi::c_void;
-use std::ffi::OsStr;
+use std::ffi::{c_void, OsStr};
 use std::io::{self, Read, Write};
 use std::pin::Pin;
 use std::ptr;
@@ -21,11 +20,7 @@ cfg_io_util! {
 mod doc {
     pub(super) use crate::os::windows::ffi::OsStrExt;
     pub(super) use crate::winapi::shared::minwindef::{DWORD, FALSE};
-    pub(super) use crate::winapi::um::fileapi;
-    pub(super) use crate::winapi::um::handleapi;
-    pub(super) use crate::winapi::um::namedpipeapi;
-    pub(super) use crate::winapi::um::winbase;
-    pub(super) use crate::winapi::um::winnt;
+    pub(super) use crate::winapi::um::{fileapi, handleapi, namedpipeapi, winbase, winnt};
 
     pub(super) use mio::windows as mio_windows;
 }

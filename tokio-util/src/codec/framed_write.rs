@@ -7,10 +7,9 @@ use tokio::io::AsyncWrite;
 use bytes::BytesMut;
 use futures_sink::Sink;
 use pin_project_lite::pin_project;
-use std::fmt;
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{fmt, io};
 
 pin_project! {
     /// A [`Sink`] of frames encoded to an `AsyncWrite`.

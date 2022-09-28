@@ -41,10 +41,9 @@ test_accept! {
 }
 
 use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering::SeqCst},
-    Arc,
-};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio_stream::{Stream, StreamExt};
 

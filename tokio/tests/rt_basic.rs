@@ -48,10 +48,9 @@ fn spawned_task_does_not_progress_without_block_on() {
 fn no_extra_poll() {
     use pin_project_lite::pin_project;
     use std::pin::Pin;
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering::SeqCst},
-        Arc,
-    };
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering::SeqCst;
+    use std::sync::Arc;
     use std::task::{Context, Poll};
     use tokio_stream::{Stream, StreamExt};
 

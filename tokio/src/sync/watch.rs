@@ -58,9 +58,7 @@ use crate::sync::notify::Notify;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::Relaxed;
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
-use std::mem;
-use std::ops;
-use std::panic;
+use std::{mem, ops, panic};
 
 /// Receives values from the associated [`Sender`](struct@Sender).
 ///

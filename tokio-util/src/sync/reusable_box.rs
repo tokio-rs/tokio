@@ -1,11 +1,10 @@
 use std::alloc::Layout;
-use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::{self, ManuallyDrop};
 use std::pin::Pin;
-use std::ptr;
 use std::task::{Context, Poll};
+use std::{fmt, ptr};
 
 /// A reusable `Pin<Box<dyn Future<Output = T> + Send + 'a>>`.
 ///

@@ -1,6 +1,7 @@
 use crate::fs::asyncify;
 
-use std::{io, path::Path};
+use std::io;
+use std::path::Path;
 
 /// Creates a future that will open a file for writing and write the entire
 /// contents of `contents` to it.

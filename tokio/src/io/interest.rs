@@ -2,8 +2,7 @@
 
 use crate::io::ready::Ready;
 
-use std::fmt;
-use std::ops;
+use std::{fmt, ops};
 
 /// Readiness event interest.
 ///

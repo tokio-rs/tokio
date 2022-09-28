@@ -4,8 +4,7 @@
 
 use tokio::net::UnixStream;
 
-use libc::getegid;
-use libc::geteuid;
+use libc::{getegid, geteuid};
 
 #[tokio::test]
 #[cfg_attr(

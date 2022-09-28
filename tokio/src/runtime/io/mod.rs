@@ -10,15 +10,15 @@ mod metrics;
 
 use crate::io::interest::Interest;
 use crate::io::ready::Ready;
+use crate::loom::sync::RwLock;
+use crate::util::bit;
 use crate::util::slab::{self, Slab};
-use crate::{loom::sync::RwLock, util::bit};
 
 use metrics::IoDriverMetrics;
 
-use std::fmt;
-use std::io;
 use std::sync::Arc;
 use std::time::Duration;
+use std::{fmt, io};
 
 /// I/O driver, backed by Mio.
 pub(crate) struct Driver {

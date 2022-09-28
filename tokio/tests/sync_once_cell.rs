@@ -5,9 +5,8 @@ use std::mem;
 use std::ops::Drop;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
-use tokio::runtime;
 use tokio::sync::{OnceCell, SetError};
-use tokio::time;
+use tokio::{runtime, time};
 
 async fn func1() -> u32 {
     5

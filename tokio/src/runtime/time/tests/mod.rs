@@ -1,6 +1,7 @@
 #![cfg(not(tokio_wasi))]
 
-use std::{task::Context, time::Duration};
+use std::task::Context;
+use std::time::Duration;
 
 #[cfg(not(loom))]
 use futures::task::noop_waker_ref;

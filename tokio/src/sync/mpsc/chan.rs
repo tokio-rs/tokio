@@ -7,12 +7,10 @@ use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
 
-use std::fmt;
-use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
-use std::usize;
+use std::{fmt, process, usize};
 
 /// Channel sender.
 pub(crate) struct Tx<T, S> {

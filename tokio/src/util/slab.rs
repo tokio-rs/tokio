@@ -4,11 +4,8 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex};
 use crate::util::bit;
-use std::fmt;
-use std::mem;
-use std::ops;
-use std::ptr;
 use std::sync::atomic::Ordering::Relaxed;
+use std::{fmt, mem, ops, ptr};
 
 /// Amortized allocation for homogeneous data types.
 ///

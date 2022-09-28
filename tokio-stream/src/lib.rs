@@ -76,7 +76,8 @@ mod macros;
 pub mod wrappers;
 
 mod stream_ext;
-pub use stream_ext::{collect::FromStream, StreamExt};
+pub use stream_ext::collect::FromStream;
+pub use stream_ext::StreamExt;
 cfg_time! {
     pub use stream_ext::timeout::{Elapsed, Timeout};
 }

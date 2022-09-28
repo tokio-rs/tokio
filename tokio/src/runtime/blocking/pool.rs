@@ -5,15 +5,13 @@ use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
-use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{Builder, Callback, Handle};
+use crate::runtime::{context, Builder, Callback, Handle};
 use crate::util::{replace_thread_rng, RngSeedGenerator};
 
 use std::collections::{HashMap, VecDeque};
-use std::fmt;
-use std::io;
 use std::time::Duration;
+use std::{fmt, io};
 
 pub(crate) struct BlockingPool {
     spawner: Spawner,

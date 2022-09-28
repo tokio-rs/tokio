@@ -15,10 +15,12 @@
 
 use bytes::BytesMut;
 use futures::SinkExt;
-use http::{header::HeaderValue, Request, Response, StatusCode};
+use http::header::HeaderValue;
+use http::{Request, Response, StatusCode};
 #[macro_use]
 extern crate serde_derive;
-use std::{env, error::Error, fmt, io};
+use std::error::Error;
+use std::{env, fmt, io};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{Decoder, Encoder, Framed};

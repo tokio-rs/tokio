@@ -2,8 +2,7 @@ use std::io;
 
 #[cfg(windows)]
 async fn windows_main() -> io::Result<()> {
-    use tokio::io::AsyncWriteExt;
-    use tokio::io::{AsyncBufReadExt, BufReader};
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
 
     const PIPE_NAME: &str = r"\\.\pipe\named-pipe-single-client";

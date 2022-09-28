@@ -1,10 +1,8 @@
 use crate::future::Future;
 use crate::loom::sync::Arc;
 use crate::runtime::scheduler::multi_thread::worker;
-use crate::runtime::{
-    blocking, driver,
-    task::{self, JoinHandle},
-};
+use crate::runtime::task::{self, JoinHandle};
+use crate::runtime::{blocking, driver};
 use crate::util::RngSeedGenerator;
 
 use std::fmt;

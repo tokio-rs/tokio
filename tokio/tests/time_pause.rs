@@ -1,19 +1,17 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use rand::SeedableRng;
-use rand::{rngs::StdRng, Rng};
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use tokio::time::{self, Duration, Instant, Sleep};
 use tokio_test::{assert_elapsed, assert_pending, assert_ready, assert_ready_eq, task};
 
 #[cfg(not(tokio_wasi))]
 use tokio_test::assert_err;
 
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 #[tokio::test]
 async fn pause_time_in_main() {

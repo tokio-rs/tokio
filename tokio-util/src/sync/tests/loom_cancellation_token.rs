@@ -1,6 +1,7 @@
 use crate::sync::CancellationToken;
 
-use loom::{future::block_on, thread};
+use loom::future::block_on;
+use loom::thread;
 use tokio_test::assert_ok;
 
 #[test]

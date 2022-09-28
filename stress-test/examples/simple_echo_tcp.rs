@@ -1,12 +1,11 @@
 //! Simple TCP echo server to check memory leaks using Valgrind.
-use std::{thread::sleep, time::Duration};
+use std::thread::sleep;
+use std::time::Duration;
 
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpSocket},
-    runtime::Builder,
-    sync::oneshot,
-};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpSocket};
+use tokio::runtime::Builder;
+use tokio::sync::oneshot;
 
 const TCP_ENDPOINT: &str = "127.0.0.1:8080";
 const NUM_MSGS: usize = 100;

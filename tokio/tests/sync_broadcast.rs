@@ -6,9 +6,8 @@
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use tokio::sync::broadcast;
-use tokio_test::task;
 use tokio_test::{
-    assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
+    assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task,
 };
 
 use std::sync::Arc;

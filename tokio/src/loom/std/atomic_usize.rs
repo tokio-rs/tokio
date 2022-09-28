@@ -1,6 +1,5 @@
 use std::cell::UnsafeCell;
-use std::fmt;
-use std::ops;
+use std::{fmt, ops};
 
 /// `AtomicUsize` providing an additional `load_unsync` function.
 pub(crate) struct AtomicUsize {

@@ -114,14 +114,13 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use crate::util::linked_list::{self, LinkedList};
 
-use std::fmt;
 use std::future::Future;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll, Waker};
-use std::usize;
+use std::{fmt, usize};
 
 /// Sending-half of the [`broadcast`] channel.
 ///

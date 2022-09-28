@@ -4,8 +4,7 @@ use crate::io::AsyncWrite;
 
 use std::io;
 use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
+use std::task::{Context, Poll};
 
 cfg_io_std! {
     /// A handle to the standard error stream of a process.

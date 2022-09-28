@@ -4,11 +4,9 @@ use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::loom::sync::Mutex;
 
 use bytes::{Buf, BytesMut};
-use std::{
-    pin::Pin,
-    sync::Arc,
-    task::{self, Poll, Waker},
-};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{self, Poll, Waker};
 
 /// A bidirectional pipe to read and write bytes in memory.
 ///

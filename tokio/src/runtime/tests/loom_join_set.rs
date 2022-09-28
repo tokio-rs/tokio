@@ -35,10 +35,9 @@ fn test_join_set() {
 
 #[test]
 fn abort_all_during_completion() {
-    use std::sync::{
-        atomic::{AtomicBool, Ordering::SeqCst},
-        Arc,
-    };
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::Ordering::SeqCst;
+    use std::sync::Arc;
 
     // These booleans assert that at least one execution had the task complete first, and that at
     // least one execution had the task be cancelled before it completed.

@@ -1,10 +1,9 @@
 #![cfg(feature = "full")]
 #![cfg(all(windows))]
 
-use std::io;
-use std::mem;
 use std::os::windows::io::AsRawHandle;
 use std::time::Duration;
+use std::{io, mem};
 use tokio::io::AsyncWriteExt;
 use tokio::net::windows::named_pipe::{ClientOptions, PipeMode, ServerOptions};
 use tokio::time;

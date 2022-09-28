@@ -2,10 +2,9 @@ use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
-use std::fmt;
-use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::task::{Context, Poll};
+use std::{fmt, io};
 
 cfg_io_util! {
     use bytes::BufMut;

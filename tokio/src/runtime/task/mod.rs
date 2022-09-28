@@ -140,8 +140,7 @@
 #![cfg_attr(not(tokio_unstable), allow(dead_code))]
 
 mod core;
-use self::core::Cell;
-use self::core::Header;
+use self::core::{Cell, Header};
 
 mod error;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411

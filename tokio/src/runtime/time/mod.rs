@@ -25,7 +25,9 @@ use crate::time::error::Error;
 use crate::time::{Clock, Duration};
 
 use std::fmt;
-use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
+use std::num::NonZeroU64;
+use std::ptr::NonNull;
+use std::task::Waker;
 
 /// Time implementation that drives [`Sleep`][sleep], [`Interval`][interval], and [`Timeout`][timeout].
 ///

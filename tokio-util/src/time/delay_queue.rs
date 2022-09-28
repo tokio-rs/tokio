@@ -11,15 +11,14 @@ use tokio::time::{sleep_until, Duration, Instant, Sleep};
 
 use core::ops::{Index, IndexMut};
 use slab::Slab;
-use std::cmp;
 use std::collections::HashMap;
 use std::convert::From;
-use std::fmt;
 use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{self, Poll, Waker};
+use std::{cmp, fmt};
 
 /// A queue of delayed elements.
 ///

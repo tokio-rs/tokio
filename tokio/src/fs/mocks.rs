@@ -2,16 +2,14 @@
 use mockall::mock;
 
 use crate::sync::oneshot;
-use std::{
-    cell::RefCell,
-    collections::VecDeque,
-    fs::{Metadata, Permissions},
-    future::Future,
-    io::{self, Read, Seek, SeekFrom, Write},
-    path::PathBuf,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::fs::{Metadata, Permissions};
+use std::future::Future;
+use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 mock! {
     #[derive(Debug)]

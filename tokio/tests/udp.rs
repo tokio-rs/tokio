@@ -4,7 +4,8 @@
 use futures::future::poll_fn;
 use std::io;
 use std::sync::Arc;
-use tokio::{io::ReadBuf, net::UdpSocket};
+use tokio::io::ReadBuf;
+use tokio::net::UdpSocket;
 use tokio_test::assert_ok;
 
 const MSG: &[u8] = b"hello";

@@ -1,6 +1,7 @@
 use bencher::{black_box, Bencher};
 use std::sync::Arc;
-use tokio::{sync::RwLock, task};
+use tokio::sync::RwLock;
+use tokio::task;
 
 fn read_uncontended(b: &mut Bencher) {
     let rt = tokio::runtime::Builder::new_multi_thread()

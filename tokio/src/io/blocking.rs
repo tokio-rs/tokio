@@ -1,13 +1,11 @@
-use crate::io::sys;
-use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
+use crate::io::{sys, AsyncRead, AsyncWrite, ReadBuf};
 
-use std::cmp;
 use std::future::Future;
-use std::io;
 use std::io::prelude::*;
 use std::pin::Pin;
 use std::task::Poll::*;
 use std::task::{Context, Poll};
+use std::{cmp, io};
 
 use self::State::*;
 

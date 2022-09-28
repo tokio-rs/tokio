@@ -39,9 +39,8 @@ fn wake_without_register() {
 #[test]
 #[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn atomic_waker_panic_safe() {
-    use std::panic;
-    use std::ptr;
     use std::task::{RawWaker, RawWakerVTable, Waker};
+    use std::{panic, ptr};
 
     static PANICKING_VTABLE: RawWakerVTable = RawWakerVTable::new(
         |_| panic!("clone"),

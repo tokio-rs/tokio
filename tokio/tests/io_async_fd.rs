@@ -1,17 +1,13 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(unix, feature = "full"))]
 
+use std::future::Future;
+use std::io::{self, ErrorKind, Read, Write};
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::task::{Context, Waker};
 use std::time::Duration;
-use std::{
-    future::Future,
-    io::{self, ErrorKind, Read, Write},
-    task::{Context, Waker},
-};
 
 use nix::unistd::{close, read, write};
 

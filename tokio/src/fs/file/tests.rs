@@ -1,9 +1,8 @@
 use super::*;
-use crate::{
-    fs::mocks::*,
-    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
-};
-use mockall::{predicate::eq, Sequence};
+use crate::fs::mocks::*;
+use crate::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use mockall::predicate::eq;
+use mockall::Sequence;
 use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
 
 const HELLO: &[u8] = b"hello world...";

@@ -1,9 +1,8 @@
 use crate::io::{AsyncBufRead, AsyncRead, ReadBuf};
 
-use std::fmt;
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{fmt, io};
 
 cfg_io_util! {
     /// An async reader which is always at EOF.

@@ -1,8 +1,7 @@
 use crate::net::{TcpListener, TcpStream};
 
-use std::fmt;
-use std::io;
 use std::net::SocketAddr;
+use std::{fmt, io};
 
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};

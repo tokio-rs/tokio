@@ -1,6 +1,5 @@
 use std::any::Any;
-use std::fmt;
-use std::io;
+use std::{fmt, io};
 
 use super::Id;
 use crate::util::SyncWrapper;

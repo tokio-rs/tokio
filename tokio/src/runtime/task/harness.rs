@@ -4,11 +4,10 @@ use crate::runtime::task::state::Snapshot;
 use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{JoinError, Notified, Schedule, Task};
 
-use std::mem;
 use std::mem::ManuallyDrop;
-use std::panic;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
+use std::{mem, panic};
 
 /// Typed raw task handle.
 pub(super) struct Harness<T: Future, S: 'static> {

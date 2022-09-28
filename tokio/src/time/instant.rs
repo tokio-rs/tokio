@@ -1,8 +1,7 @@
 #![allow(clippy::trivially_copy_pass_by_ref)]
 
-use std::fmt;
-use std::ops;
 use std::time::Duration;
+use std::{fmt, ops};
 
 /// A measurement of a monotonically nondecreasing clock.
 /// Opaque and useful only with `Duration`.

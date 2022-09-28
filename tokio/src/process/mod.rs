@@ -258,8 +258,7 @@ use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::pin::Pin;
 use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
-use std::task::Context;
-use std::task::Poll;
+use std::task::{Context, Poll};
 
 /// This structure mimics the API of [`std::process::Command`] found in the standard library, but
 /// replaces functions that create a process with an asynchronous variant. The main provided

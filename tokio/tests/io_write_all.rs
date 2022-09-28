@@ -5,10 +5,9 @@ use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio_test::assert_ok;
 
 use bytes::BytesMut;
-use std::cmp;
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{cmp, io};
 
 #[tokio::test]
 async fn write_all() {

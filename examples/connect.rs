@@ -58,7 +58,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 mod tcp {
     use bytes::Bytes;
     use futures::{future, Sink, SinkExt, Stream, StreamExt};
-    use std::{error::Error, io, net::SocketAddr};
+    use std::error::Error;
+    use std::io;
+    use std::net::SocketAddr;
     use tokio::net::TcpStream;
     use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite};
 

@@ -1,11 +1,10 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))]
 
-use std::{error::Error, sync::Arc};
-use tokio::{
-    runtime::{Builder, Runtime},
-    sync::{broadcast, mpsc, oneshot, Mutex, RwLock, Semaphore},
-};
+use std::error::Error;
+use std::sync::Arc;
+use tokio::runtime::{Builder, Runtime};
+use tokio::sync::{broadcast, mpsc, oneshot, Mutex, RwLock, Semaphore};
 
 mod support {
     pub mod panic;

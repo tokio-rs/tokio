@@ -3,8 +3,7 @@
 
 use tokio::time;
 use tokio_stream::{self as stream, StreamExt};
-use tokio_test::assert_pending;
-use tokio_test::task;
+use tokio_test::{assert_pending, task};
 
 use futures::FutureExt;
 use std::time::Duration;

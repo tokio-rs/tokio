@@ -1,9 +1,8 @@
 use crate::Stream;
 
-use core::cmp;
-use core::fmt;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use core::{cmp, fmt};
 use pin_project_lite::pin_project;
 
 pin_project! {

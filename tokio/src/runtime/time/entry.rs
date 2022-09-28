@@ -55,8 +55,7 @@
 //! [mark_pending]: TimerHandle::mark_pending
 
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::AtomicU64;
-use crate::loom::sync::atomic::Ordering;
+use crate::loom::sync::atomic::{AtomicU64, Ordering};
 
 use crate::runtime::scheduler;
 use crate::sync::AtomicWaker;
@@ -64,8 +63,10 @@ use crate::time::Instant;
 use crate::util::linked_list;
 
 use std::cell::UnsafeCell as StdUnsafeCell;
+use std::marker::PhantomPinned;
+use std::pin::Pin;
+use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
-use std::{marker::PhantomPinned, pin::Pin, ptr::NonNull};
 
 type TimerResult = Result<(), crate::time::error::Error>;
 

@@ -1,6 +1,5 @@
 use tokio_stream::{self as stream, Stream, StreamExt};
-use tokio_test::task;
-use tokio_test::{assert_pending, assert_ready};
+use tokio_test::{assert_pending, assert_ready, task};
 
 mod support {
     pub(crate) mod mpsc;

@@ -2,8 +2,7 @@ use futures_sink::Sink;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{fmt, mem};
-use tokio::sync::mpsc::OwnedPermit;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{OwnedPermit, Sender};
 
 use super::ReusableBoxFuture;
 

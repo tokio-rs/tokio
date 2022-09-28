@@ -46,9 +46,8 @@ fn basic_notification() {
 
 #[test]
 fn test_panicky_waker() {
-    use std::panic;
-    use std::ptr;
     use std::task::{RawWaker, RawWakerVTable, Waker};
+    use std::{panic, ptr};
 
     static PANICKING_VTABLE: RawWakerVTable =
         RawWakerVTable::new(|_| panic!("clone"), |_| (), |_| (), |_| ());

@@ -4,8 +4,7 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::try_join;
-use tokio_test::task;
-use tokio_test::{assert_ok, assert_pending, assert_ready_ok};
+use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 
 use std::io;
 use std::task::Poll;

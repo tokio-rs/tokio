@@ -6,10 +6,9 @@ cfg_not_wasi! {
 }
 
 use std::convert::TryFrom;
-use std::fmt;
-use std::io;
 use std::net::{self, SocketAddr};
 use std::task::{Context, Poll};
+use std::{fmt, io};
 
 cfg_net! {
     /// A TCP socket server, listening for connections.

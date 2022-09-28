@@ -1,4 +1,5 @@
-use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use crate::loom::sync::atomic::AtomicU64;
+use crate::loom::sync::atomic::Ordering::Relaxed;
 
 /// Retrieves metrics from the Tokio runtime.
 ///

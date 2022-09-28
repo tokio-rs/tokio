@@ -2,9 +2,8 @@ use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, Runtime};
 use crate::util::{RngSeed, RngSeedGenerator};
 
-use std::fmt;
-use std::io;
 use std::time::Duration;
+use std::{fmt, io};
 
 /// Builds Tokio Runtime with custom configuration values.
 ///

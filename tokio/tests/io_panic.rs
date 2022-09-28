@@ -1,8 +1,9 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support panic recovery
 
+use std::error::Error;
+use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{error::Error, pin::Pin};
 use tokio::io::{self, split, AsyncRead, AsyncWrite, ReadBuf};
 
 mod support {

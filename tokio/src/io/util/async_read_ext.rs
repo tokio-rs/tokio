@@ -2,12 +2,10 @@ use crate::io::util::chain::{chain, Chain};
 use crate::io::util::read::{read, Read};
 use crate::io::util::read_buf::{read_buf, ReadBuf};
 use crate::io::util::read_exact::{read_exact, ReadExact};
-use crate::io::util::read_int::{ReadF32, ReadF32Le, ReadF64, ReadF64Le};
 use crate::io::util::read_int::{
-    ReadI128, ReadI128Le, ReadI16, ReadI16Le, ReadI32, ReadI32Le, ReadI64, ReadI64Le, ReadI8,
-};
-use crate::io::util::read_int::{
-    ReadU128, ReadU128Le, ReadU16, ReadU16Le, ReadU32, ReadU32Le, ReadU64, ReadU64Le, ReadU8,
+    ReadF32, ReadF32Le, ReadF64, ReadF64Le, ReadI128, ReadI128Le, ReadI16, ReadI16Le, ReadI32,
+    ReadI32Le, ReadI64, ReadI64Le, ReadI8, ReadU128, ReadU128Le, ReadU16, ReadU16Le, ReadU32,
+    ReadU32Le, ReadU64, ReadU64Le, ReadU8,
 };
 use crate::io::util::read_to_end::{read_to_end, ReadToEnd};
 use crate::io::util::read_to_string::{read_to_string, ReadToString};

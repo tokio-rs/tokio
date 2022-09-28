@@ -7,13 +7,12 @@
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use std::cell::UnsafeCell;
-use std::fmt;
-use std::io;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::{fmt, io};
 
 cfg_io_util! {
     /// The readable half of a value returned from [`split`](split()).

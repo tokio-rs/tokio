@@ -7,11 +7,9 @@
 //! that does not provide a tokio context.
 
 use pin_project_lite::pin_project;
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tokio::runtime::{Handle, Runtime};
 
 pin_project! {
