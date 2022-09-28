@@ -20,6 +20,9 @@ pin_project! {
 impl<R, F> InspectReader<R, F> {
     /// Create a new InspectReader, wrapping `reader` and calling `f` for the
     /// new data supplied by each read call.
+    ///
+    /// If no new data is supplied by a successful `poll_read`, then `f` will
+    /// be called with an empty slice.
     pub fn new(reader: R, f: F) -> InspectReader<R, F>
     where
         R: AsyncRead,
@@ -62,6 +65,10 @@ pin_project! {
 impl<W, F> InspectWriter<W, F> {
     /// Create a new InspectWriter, wrapping `write` and calling `f` for the
     /// data successfully written by each write call.
+    ///
+    /// `f` will never be called with an empty slice; a vectored write will
+    /// result in multiple calls to `f`, one for each buffer that was used by
+    /// the write.
     pub fn new(writer: W, f: F) -> InspectWriter<W, F>
     where
         W: AsyncWrite,
@@ -81,7 +88,9 @@ impl<W: AsyncWrite, F: FnMut(&[u8])> AsyncWrite for InspectWriter<W, F> {
         let me = self.project();
         let res = me.writer.poll_write(cx, buf);
         if let Poll::Ready(Ok(count)) = res {
-            (me.f)(&buf[..count]);
+            if count != 0 {
+                (me.f)(&buf[..count]);
+            }
         }
         res
     }
@@ -105,11 +114,13 @@ impl<W: AsyncWrite, F: FnMut(&[u8])> AsyncWrite for InspectWriter<W, F> {
         let res = me.writer.poll_write_vectored(cx, bufs);
         if let Poll::Ready(Ok(mut count)) = res {
             for buf in bufs {
-                let size = count.min(buf.len());
-                (me.f)(&buf[..size]);
-                count -= size;
                 if count == 0 {
                     break;
+                }
+                let size = count.min(buf.len());
+                if size != 0 {
+                    (me.f)(&buf[..size]);
+                    count -= size;
                 }
             }
         }
