@@ -740,6 +740,43 @@ impl<T> DelayQueue<T> {
         }
     }
 
+    /// Attempts to remove the item associated with `key` from the queue.
+    ///
+    /// Removes the item associated with `key`, and returns it along with the
+    /// `Instant` at which it would have expired, if it exists.
+    ///
+    /// Returns `None` if `key` is not in the queue.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage
+    ///
+    /// ```rust
+    /// use tokio_util::time::DelayQueue;
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
+    ///
+    /// // The item is in the queue, `try_remove` returns `Some(Expired("foo"))`.
+    /// let item = delay_queue.try_remove(&key);
+    /// assert_eq!(item.unwrap().into_inner(), "foo");
+    ///
+    /// // The item is not in the queue anymore, `try_remove` returns `None`.
+    /// let item = delay_queue.try_remove(&key);
+    /// assert!(item.is_none());
+    /// # }
+    /// ```
+    pub fn try_remove(&mut self, key: &Key) -> Option<Expired<T>> {
+        if self.slab.contains(key) {
+            Some(self.remove(key))
+        } else {
+            None
+        }
+    }
+
     /// Sets the delay of the item associated with `key` to expire at `when`.
     ///
     /// This function is identical to `reset` but takes an `Instant` instead of
