@@ -1,27 +1,30 @@
 use futures_core::ready;
 use pin_project_lite::pin_project;
-use std::{
-    io::{IoSlice, Result},
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::io::{IoSlice, Result};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 pin_project! {
     /// An adapter that lets you inspect the data that's being read.
     ///
     /// This is useful for things like hashing data as it's read in.
-    pub struct InspectReader<R: AsyncRead, F: FnMut(&[u8])> {
+    pub struct InspectReader<R, F> {
         #[pin]
         reader: R,
         f: F,
     }
 }
 
-impl<R: AsyncRead, F: FnMut(&[u8])> InspectReader<R, F> {
+impl<R, F> InspectReader<R, F> {
     /// Create a new InspectReader, wrapping `reader` and calling `f` for the
     /// new data supplied by each read call.
-    pub fn new(reader: R, f: F) -> InspectReader<R, F> {
+    pub fn new(reader: R, f: F) -> InspectReader<R, F>
+    where
+        R: AsyncRead,
+        F: FnMut(&[u8]),
+    {
         InspectReader { reader, f }
     }
 
@@ -49,17 +52,21 @@ pin_project! {
     /// An adapter that lets you inspect the data that's being written.
     ///
     /// This is useful for things like hashing data as it's written out.
-    pub struct InspectWriter<W: AsyncWrite, F: FnMut(&[u8])> {
+    pub struct InspectWriter<W, F> {
         #[pin]
         writer: W,
         f: F,
     }
 }
 
-impl<W: AsyncWrite, F: FnMut(&[u8])> InspectWriter<W, F> {
+impl<W, F> InspectWriter<W, F> {
     /// Create a new InspectWriter, wrapping `write` and calling `f` for the
     /// data successfully written by each write call.
-    pub fn new(writer: W, f: F) -> InspectWriter<W, F> {
+    pub fn new(writer: W, f: F) -> InspectWriter<W, F>
+    where
+        W: AsyncWrite,
+        F: FnMut(&[u8]),
+    {
         InspectWriter { writer, f }
     }
 
