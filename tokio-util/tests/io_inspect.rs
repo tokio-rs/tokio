@@ -136,7 +136,7 @@ async fn write_all_vectored<W: AsyncWrite + Unpin>(
     let mut res = 0;
     while !bufs.is_empty() {
         let mut written = poll_fn(|cx| {
-            let bufs: Vec<IoSlice> = bufs.iter().map(|v| IoSlice::new(&v)).collect();
+            let bufs: Vec<IoSlice> = bufs.iter().map(|v| IoSlice::new(v)).collect();
             Pin::new(&mut writer).poll_write_vectored(cx, &bufs)
         })
         .await?;
