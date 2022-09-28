@@ -7,12 +7,24 @@ cfg_io_driver! {
 pub(crate) mod atomic_cell;
 
 cfg_has_atomic_u64! {
-    #[cfg(any(feature = "signal", all(unix, feature = "process")))]
-    pub(crate) mod once_cell;
+    cfg_has_const_mutex_new! {
+        #[cfg(feature = "signal")]
+        pub(crate) mod once_cell;
+    }
+    cfg_not_has_const_mutex_new! {
+        #[cfg(any(feature = "signal", all(unix, feature = "process")))]
+        pub(crate) mod once_cell;
+    }
 }
 cfg_not_has_atomic_u64! {
-    #[cfg(any(feature = "rt", feature = "signal", all(unix, feature = "process")))]
-    pub(crate) mod once_cell;
+    cfg_has_const_mutex_new! {
+        #[cfg(any(feature = "rt", feature = "signal"))]
+        pub(crate) mod once_cell;
+    }
+    cfg_not_has_const_mutex_new! {
+        #[cfg(any(feature = "rt", feature = "signal", all(unix, feature = "process")))]
+        pub(crate) mod once_cell;
+    }
 }
 
 #[cfg(any(
