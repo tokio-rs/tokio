@@ -507,21 +507,35 @@ impl Id {
     }
 
     cfg_not_has_atomic_u64! {
-        pub(crate) fn next() -> Self {
-            use crate::util::once_cell::OnceCell;
-            use crate::loom::sync::Mutex;
+        cfg_has_const_mutex_new! {
+            pub(crate) fn next() -> Self {
+                use crate::loom::sync::Mutex;
+                static NEXT_ID: Mutex<u64> = Mutex::const_new(1);
 
-            fn init_next_id() -> Mutex<u64> {
-                Mutex::new(1)
+                let mut lock = NEXT_ID.lock();
+                let id = *lock;
+                *lock += 1;
+                Self(id)
             }
+        }
 
-            static NEXT_ID: OnceCell<Mutex<u64>> = OnceCell::new();
+        cfg_not_has_const_mutex_new! {
+            pub(crate) fn next() -> Self {
+                use crate::util::once_cell::OnceCell;
+                use crate::loom::sync::Mutex;
 
-            let next_id = NEXT_ID.get(init_next_id);
-            let mut lock = next_id.lock();
-            let id = *lock;
-            *lock += 1;
-            Self(id)
+                fn init_next_id() -> Mutex<u64> {
+                    Mutex::new(1)
+                }
+
+                static NEXT_ID: OnceCell<Mutex<u64>> = OnceCell::new();
+
+                let next_id = NEXT_ID.get(init_next_id);
+                let mut lock = next_id.lock();
+                let id = *lock;
+                *lock += 1;
+                Self(id)
+            }
         }
     }
 

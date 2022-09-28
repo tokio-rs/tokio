@@ -481,6 +481,36 @@ macro_rules! cfg_not_has_atomic_u64 {
     }
 }
 
+macro_rules! cfg_has_const_mutex_new {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                not(all(loom, test)),
+                any(
+                    feature = "parking_lot",
+                    not(tokio_no_const_mutex_new)
+                )
+            ))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_has_const_mutex_new {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(
+                not(all(loom, test)),
+                any(
+                    feature = "parking_lot",
+                    not(tokio_no_const_mutex_new)
+                )
+            )))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_not_wasi {
     ($($item:item)*) => {
         $(
