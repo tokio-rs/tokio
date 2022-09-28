@@ -17,9 +17,17 @@ const ADDR_OF_PROBE: &str = r#"
 }
 "#;
 
+const CONST_MUTEX_NEW_PROBE: &str = r#"
+{
+    static MY_MUTEX: ::std::sync::Mutex<i32> = ::std::sync::Mutex::new(1);
+    *MY_MUTEX.lock().unwrap()
+}
+"#;
+
 fn main() {
     let mut enable_const_thread_local = false;
     let mut enable_addr_of = false;
+    let mut enable_const_mutex_new = false;
 
     match AutoCfg::new() {
         Ok(ac) => {
@@ -57,6 +65,21 @@ fn main() {
                     enable_addr_of = true;
                 }
             }
+
+            // The `Mutex::new` method was made const in 1.63.
+            if ac.probe_rustc_version(1, 64) {
+                enable_const_mutex_new = true;
+            } else if ac.probe_rustc_version(1, 63) {
+                // This compiler claims to be 1.63, but there are some nightly
+                // compilers that claim to be 1.63 without supporting the
+                // feature. Explicitly probe to check if code using them
+                // compiles.
+                //
+                // The oldest nightly that supports the feature is 2022-06-20.
+                if ac.probe_expression(CONST_MUTEX_NEW_PROBE) {
+                    enable_const_mutex_new = true;
+                }
+            }
         }
 
         Err(e) => {
@@ -84,6 +107,14 @@ fn main() {
         //
         // RUSTFLAGS="--cfg tokio_no_addr_of"
         autocfg::emit("tokio_no_addr_of")
+    }
+
+    if !enable_const_mutex_new {
+        // To disable this feature on compilers that support it, you can
+        // explicitly pass this flag with the following environment variable:
+        //
+        // RUSTFLAGS="--cfg tokio_no_const_mutex_new"
+        autocfg::emit("tokio_no_const_mutex_new")
     }
 
     let target = ::std::env::var("TARGET").unwrap_or_default();

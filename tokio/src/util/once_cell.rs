@@ -1,4 +1,4 @@
-#![cfg_attr(loom, allow(dead_code))]
+#![allow(dead_code)]
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 use std::sync::Once;
