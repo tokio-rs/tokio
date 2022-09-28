@@ -27,6 +27,46 @@ impl CopyBuffer {
         }
     }
 
+    fn poll_fill_buf<R>(
+        &mut self,
+        cx: &mut Context<'_>,
+        reader: Pin<&mut R>,
+    ) -> Poll<io::Result<()>>
+    where
+        R: AsyncRead + ?Sized,
+    {
+        let me = &mut *self;
+        let mut buf = ReadBuf::new(&mut me.buf[me.cap..]);
+
+        let res = reader.poll_read(cx, &mut buf);
+        me.cap += buf.filled().len();
+        res
+    }
+
+    fn poll_write_buf<R, W>(
+        &mut self,
+        cx: &mut Context<'_>,
+        mut reader: Pin<&mut R>,
+        mut writer: Pin<&mut W>,
+    ) -> Poll<io::Result<usize>>
+    where
+        R: AsyncRead + ?Sized,
+        W: AsyncWrite + ?Sized,
+    {
+        let me = &mut *self;
+        match writer.as_mut().poll_write(cx, &me.buf[me.pos..me.cap]) {
+            Poll::Pending => {
+                // Top up the buffer towards full if we can read a bit more
+                // data - this should improve the chances of a large write
+                if me.cap != me.buf.len() {
+                    ready!(me.poll_fill_buf(cx, reader.as_mut()))?;
+                }
+                Poll::Pending
+            }
+            res => return res,
+        }
+    }
+
     pub(super) fn poll_copy<R, W>(
         &mut self,
         cx: &mut Context<'_>,
@@ -41,10 +81,10 @@ impl CopyBuffer {
             // If our buffer is empty, then we need to read some data to
             // continue.
             if self.pos == self.cap && !self.read_done {
-                let me = &mut *self;
-                let mut buf = ReadBuf::new(&mut me.buf);
+                self.pos = 0;
+                self.cap = 0;
 
-                match reader.as_mut().poll_read(cx, &mut buf) {
+                match self.poll_fill_buf(cx, reader.as_mut()) {
                     Poll::Ready(Ok(_)) => (),
                     Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
                     Poll::Pending => {
@@ -59,19 +99,14 @@ impl CopyBuffer {
                     }
                 }
 
-                let n = buf.filled().len();
-                if n == 0 {
+                if self.cap == 0 {
                     self.read_done = true;
-                } else {
-                    self.pos = 0;
-                    self.cap = n;
                 }
             }
 
             // If our buffer has some data, let's write it out!
             while self.pos < self.cap {
-                let me = &mut *self;
-                let i = ready!(writer.as_mut().poll_write(cx, &me.buf[me.pos..me.cap]))?;
+                let i = ready!(self.poll_write_buf(cx, reader.as_mut(), writer.as_mut()))?;
                 if i == 0 {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::WriteZero,
