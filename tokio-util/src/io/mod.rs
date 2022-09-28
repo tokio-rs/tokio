@@ -10,14 +10,17 @@
 //! [`Body`]: https://docs.rs/hyper/0.13/hyper/struct.Body.html
 //! [`AsyncRead`]: tokio::io::AsyncRead
 
+mod inspect;
 mod read_buf;
 mod reader_stream;
 mod stream_reader;
+
 cfg_io_util! {
     mod sync_bridge;
     pub use self::sync_bridge::SyncIoBridge;
 }
 
+pub use self::inspect::{InspectReader, InspectWriter};
 pub use self::read_buf::read_buf;
 pub use self::reader_stream::ReaderStream;
 pub use self::stream_reader::StreamReader;
