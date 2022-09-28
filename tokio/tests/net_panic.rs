@@ -15,7 +15,7 @@ fn udp_socket_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     use std::net::SocketAddr;
     use tokio::net::UdpSocket;
 
-    let addr = "127.0.0.1:8080".parse::<SocketAddr>().unwrap();
+    let addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
     let std_sock = std::net::UdpSocket::bind(addr).unwrap();
     std_sock.set_nonblocking(true).unwrap();
 
@@ -34,7 +34,7 @@ fn udp_socket_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn tcp_listener_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
-    let std_listener = std::net::TcpListener::bind("127.0.0.1:8080").unwrap();
+    let std_listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     std_listener.set_nonblocking(true).unwrap();
 
     let panic_location_file = test_panic(|| {
