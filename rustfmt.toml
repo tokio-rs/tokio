@@ -1,0 +1,4 @@
+# Currently needed for imports_granularity - https://github.com/rust-lang/rustfmt/issues/4991
+unstable_features = true
+
+imports_granularity = "Module"
