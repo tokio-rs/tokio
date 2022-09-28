@@ -148,10 +148,9 @@ async fn write_all_vectored<W: AsyncWrite + Unpin>(
                 written -= buf_len;
             } else {
                 let buf = &mut bufs[0];
-                while written > 0 {
-                    buf.remove(0);
-                    written -= 1;
-                }
+                let drain_len = written.min(buf.len());
+                buf.drain(..drain_len);
+                written -= drain_len;
             }
         }
     }
