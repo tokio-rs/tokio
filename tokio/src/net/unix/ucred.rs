@@ -46,6 +46,9 @@ pub(crate) use self::impl_macos::get_peer_cred;
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub(crate) use self::impl_solaris::get_peer_cred;
 
+#[cfg(target_os = "aix")]
+pub(crate) use self::impl_aix::get_peer_cred;
+
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "openbsd"))]
 pub(crate) mod impl_linux {
     use crate::net::unix::{self, UnixStream};
@@ -243,6 +246,34 @@ pub(crate) mod impl_solaris {
                     uid: uid as unix::uid_t,
                     gid: gid as unix::gid_t,
                     pid: Some(pid as unix::pid_t),
+                })
+            } else {
+                Err(io::Error::last_os_error())
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "aix")]
+pub(crate) mod impl_aix {
+    use crate::net::unix::UnixStream;
+    use std::io;
+    use std::os::unix::io::AsRawFd;
+
+    pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
+        unsafe {
+            let raw_fd = sock.as_raw_fd();
+
+            let mut uid = std::mem::MaybeUninit::uninit();
+            let mut gid = std::mem::MaybeUninit::uninit();
+
+            let ret = libc::getpeereid(raw_fd, uid.as_mut_ptr(), gid.as_mut_ptr());
+
+            if ret == 0 {
+                Ok(super::UCred {
+                    uid: uid.assume_init(),
+                    gid: gid.assume_init(),
+                    pid: None,
                 })
             } else {
                 Err(io::Error::last_os_error())
