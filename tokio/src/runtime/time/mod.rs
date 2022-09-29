@@ -230,8 +230,10 @@ impl Driver {
                 // yield in `Runtime::block_on`). In this case, we don't
                 // advance the clock.
                 if !handle.did_wake() {
-                    // Simulate advancing time
-                    clock.advance(duration);
+                    // Simulate advancing time if enabled
+                    if clock.auto_advance() {
+                        clock.advance(duration);
+                    }
                 }
             } else {
                 self.park.park_timeout(rt_handle, duration);

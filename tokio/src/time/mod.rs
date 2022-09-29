@@ -86,8 +86,9 @@
 
 mod clock;
 pub(crate) use self::clock::Clock;
+pub use self::clock::PauseSettings;
 #[cfg(feature = "test-util")]
-pub use clock::{advance, pause, resume};
+pub use self::clock::{advance, pause, resume, set_auto_advance};
 
 pub mod error;
 

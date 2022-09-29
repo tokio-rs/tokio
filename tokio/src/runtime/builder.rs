@@ -1,6 +1,7 @@
 use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, Runtime};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
+use crate::time::PauseSettings;
 
 use std::fmt;
 use std::io;
@@ -47,6 +48,9 @@ pub struct Builder {
 
     /// Whether or not to enable the time driver
     enable_time: bool,
+
+    /// Whether or not clock should auto-advance when sleeping while time is paused.
+    auto_advance: bool,
 
     /// Whether or not the clock should start paused.
     start_paused: bool,
@@ -181,6 +185,7 @@ cfg_unstable! {
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
+#[derive(Clone, Copy)]
 pub(crate) enum Kind {
     CurrentThread,
     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
@@ -231,6 +236,14 @@ impl Builder {
 
             // Time defaults to "off"
             enable_time: false,
+
+            // By default time can be paused and will auto-advance,
+            // but only on the `CurrentThread` runtime
+            auto_advance: match &kind {
+                Kind::CurrentThread => true,
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                Kind::MultiThread => false,
+            },
 
             // The clock starts not-paused
             start_paused: false,
@@ -639,14 +652,18 @@ impl Builder {
 
     fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
-            enable_pause_time: match self.kind {
-                Kind::CurrentThread => true,
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                Kind::MultiThread => false,
-            },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
-            start_paused: self.start_paused,
+            time_pausing: PauseSettings {
+                enabled: self.enable_time
+                && match &self.kind {
+                        Kind::CurrentThread => true,
+                        #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                        Kind::MultiThread => false,
+                    },
+                auto_advance: self.auto_advance,
+                start_paused: self.start_paused,
+            },
         }
     }
 
@@ -966,6 +983,27 @@ cfg_time! {
 
 cfg_test_util! {
     impl Builder {
+        /// Controls if the runtime's clock auto-advance behavior when paused.
+        ///
+        /// Pausing time requires the current-thread runtime; construction of
+        /// the runtime will panic otherwise.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .enable_time()
+        ///     .auto_advance(false)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn auto_advance(&mut self, auto_advance: bool) -> &mut Self {
+            self.auto_advance = auto_advance;
+            self
+        }
+
         /// Controls if the runtime's clock starts paused or advancing.
         ///
         /// Pausing time requires the current-thread runtime; construction of

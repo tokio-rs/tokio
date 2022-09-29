@@ -17,7 +17,7 @@ cfg_not_test_util! {
     }
 
     impl Clock {
-        pub(crate) fn new(_enable_pausing: bool, _start_paused: bool) -> Clock {
+        pub(crate) fn new(_enable_pausing: PauseSettings, _start_paused: bool) -> Clock {
             Clock {}
         }
 
@@ -25,6 +25,18 @@ cfg_not_test_util! {
             now()
         }
     }
+}
+
+/// Used to control the time pausing test feature.
+#[derive(Debug, Clone, Copy)]
+pub struct PauseSettings {
+    /// Controls whether the clock can be paused at all.
+    /// If `test-util` feature is not enabled, setting this will panic when used.
+    pub(crate) enabled: bool,
+    /// Controls whether the clock will auto-advance to next sleep deadline automatically.
+    pub(crate) auto_advance: bool,
+    /// Controls whether the clock starts paused.
+    pub(crate) start_paused: bool,
 }
 
 cfg_test_util! {
@@ -57,13 +69,14 @@ cfg_test_util! {
 
     #[derive(Debug)]
     struct Inner {
-        /// True if the ability to pause time is enabled.
-        enable_pausing: bool,
+        /// Control if time can ba paused, and whether auto-advance behavior is enabled.
+        pausing: PauseSettings,
 
         /// Instant to use as the clock's base instant.
         base: std::time::Instant,
 
-        /// Instant at which the clock was last unfrozen.
+        /// Instant at which the clock was last unfrozen,
+        /// or None if the clock is currently frozen
         unfrozen: Option<std::time::Instant>,
     }
 
@@ -98,10 +111,12 @@ cfg_test_util! {
     /// If time is paused and the runtime has no work to do, the clock is
     /// auto-advanced to the next pending timer. This means that [`Sleep`] or
     /// other timer-backed primitives can cause the runtime to advance the
-    /// current time when awaited.
+    /// current time when awaited. This behavior can be disabled using
+    /// [`set_auto_advance`].
     ///
     /// [`Sleep`]: crate::time::Sleep
     /// [`advance`]: crate::time::advance
+    /// [`set_auto_advance`]: crate::time::set_auto_advance
     #[track_caller]
     pub fn pause() {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
@@ -167,6 +182,28 @@ cfg_test_util! {
         crate::task::yield_now().await;
     }
 
+    /// Controls time auto-advance behavior.
+    ///
+    /// When time is paused, by default the runtime automatically advances
+    /// time to the next timer. See [`pause`](pause#auto-advance) for more details.
+    ///
+    /// This function allows enabling and disabling the auto-advance behavior.
+    /// When auto-advance feature is disabled, sleeping will wait indefinitely
+    /// until it's re-enabled, or the time is manually advanced using [`advance`].
+    /// This means that if all tasks call `sleep` simultaneously, the program will
+    /// deadlock.
+    /// 
+    /// # Panics
+    ///
+    /// If called from outside of the Tokio runtime.
+    ///
+    /// [`sleep`]: fn@crate::time::sleep
+    /// [`advance`]: crate::time::advance
+    pub fn set_auto_advance(enable: bool) {
+        let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
+        clock.set_auto_advance(enable);
+    }
+
     /// Returns the current instant, factoring in frozen time.
     pub(crate) fn now() -> Instant {
         if let Some(clock) = clock() {
@@ -179,18 +216,18 @@ cfg_test_util! {
     impl Clock {
         /// Returns a new `Clock` instance that uses the current execution context's
         /// source of time.
-        pub(crate) fn new(enable_pausing: bool, start_paused: bool) -> Clock {
+        pub(crate) fn new(pausing: PauseSettings) -> Clock {
             let now = std::time::Instant::now();
 
             let clock = Clock {
                 inner: Arc::new(Mutex::new(Inner {
-                    enable_pausing,
+                    pausing,
                     base: now,
                     unfrozen: Some(now),
                 })),
             };
 
-            if start_paused {
+            if pausing.start_paused {
                 clock.pause();
             }
 
@@ -201,7 +238,7 @@ cfg_test_util! {
         pub(crate) fn pause(&self) {
             let mut inner = self.inner.lock();
 
-            if !inner.enable_pausing {
+            if !inner.pausing.enabled {
                 drop(inner); // avoid poisoning the lock
                 panic!("`time::pause()` requires the `current_thread` Tokio runtime. \
                         This is the default Runtime used by `#[tokio::test].");
@@ -226,6 +263,23 @@ cfg_test_util! {
             }
 
             inner.base += duration;
+        }
+
+        pub(crate) fn auto_advance(&self) -> bool {
+            let inner = self.inner.lock();
+            inner.pausing.auto_advance
+        }
+
+        pub(crate) fn set_auto_advance(&self, enable: bool) {
+            let mut inner = self.inner.lock();
+
+            if !inner.pausing.enabled {
+                drop(inner); // avoid poisoning the lock
+                panic!("`time::set_auto_advance()` requires the `current_thread` Tokio runtime. \
+                        This is the default Runtime used by `#[tokio::test].");
+            }
+
+            inner.pausing.auto_advance = enable;
         }
 
         pub(crate) fn now(&self) -> Instant {
