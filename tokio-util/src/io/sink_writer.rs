@@ -50,21 +50,20 @@ pin_project! {
     /// [`Sink`]: futures_sink::Sink
     /// [`codec`]: tokio_util::codec
     #[derive(Debug)]
-    pub struct SinkWriter<'a, S>
+    pub struct SinkWriter<S>
     {
         #[pin]
         inner: S,
-        _lt: PhantomData<&'a ()>
     }
 }
 
-impl<'a, S> SinkWriter<'_, S>
+impl<S> SinkWriter<S>
 where
-    S: Sink<&'a [u8], Error = io::Error>,
+    for<'r> S: Sink<&'r [u8], Error = io::Error>,
 {
     /// Creates a new [`SinkWriter`].
     pub fn new(sink: S) -> Self {
-        Self { inner: sink, _lt: PhantomData }
+        Self { inner: sink }
     }
 
     /// Gets a reference to the underlying sink.
@@ -89,9 +88,9 @@ where
     }
 }
 
-impl<'a, S> AsyncWrite for SinkWriter<'a, S>
+impl<S> AsyncWrite for SinkWriter<S>
 where
-    S: Sink<&'a [u8], Error = io::Error>,
+    for<'r> S: Sink<&'r [u8], Error = io::Error>,
 {
     fn poll_write(
         mut self: Pin<&mut Self>,
