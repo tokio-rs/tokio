@@ -63,7 +63,7 @@ impl CopyBuffer {
                 }
                 Poll::Pending
             }
-            res => return res,
+            res => res,
         }
     }
 
