@@ -58,7 +58,7 @@ impl CopyBuffer {
             Poll::Pending => {
                 // Top up the buffer towards full if we can read a bit more
                 // data - this should improve the chances of a large write
-                if me.cap != me.buf.len() {
+                if !me.read_done && me.cap != me.buf.len() {
                     ready!(me.poll_fill_buf(cx, reader.as_mut()))?;
                 }
                 Poll::Pending
