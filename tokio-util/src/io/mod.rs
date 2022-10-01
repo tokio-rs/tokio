@@ -14,6 +14,7 @@ mod inspect;
 mod read_buf;
 mod reader_stream;
 mod stream_reader;
+mod sink_writer;
 
 cfg_io_util! {
     mod sync_bridge;
@@ -24,4 +25,5 @@ pub use self::inspect::{InspectReader, InspectWriter};
 pub use self::read_buf::read_buf;
 pub use self::reader_stream::ReaderStream;
 pub use self::stream_reader::StreamReader;
+pub use self::sink_writer::SinkWriter;
 pub use crate::util::{poll_read_buf, poll_write_buf};
