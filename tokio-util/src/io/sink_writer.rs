@@ -52,7 +52,10 @@ pin_project! {
     }
 }
 
-impl<S> SinkWriter<S> {
+impl<S> SinkWriter<S>
+where
+    for<'r> S: Sink<&'r [u8], Error = io::Error>,
+{
     /// Creates a new [`SinkWriter`].
     pub fn new(sink: S) -> Self {
         Self { inner: sink }
