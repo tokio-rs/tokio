@@ -8,6 +8,9 @@ on:
     paths:
       - '**/Cargo.toml'
 
+permissions:
+  contents: read
+
 jobs:
   security-audit:
     runs-on: ubuntu-latest
