@@ -52,10 +52,7 @@ pin_project! {
     }
 }
 
-impl<S> SinkWriter<S>
-where
-    S: Sink<Vec<u8>, Error = io::Error>,
-{
+impl<S> SinkWriter<S> {
     /// Creates a new [`SinkWriter`].
     pub fn new(sink: S) -> Self {
         Self { inner: sink }
@@ -85,7 +82,7 @@ where
 
 impl<S, E> AsyncWrite for SinkWriter<S>
 where
-    S: Sink<Vec<u8>, Error = E>,
+    for<'a> S: Sink<&'a [u8], Error = E>,
     E: Into<io::Error>,
 {
     fn poll_write(
@@ -95,7 +92,7 @@ where
     ) -> Poll<Result<usize, io::Error>> {
         match self.as_mut().project().inner.poll_ready(cx) {
             Poll::Ready(Ok(())) => {
-                if let Err(e) = self.as_mut().project().inner.start_send(buf.to_vec()) {
+                if let Err(e) = self.as_mut().project().inner.start_send(buf) {
                     Poll::Ready(Err(e.into()))
                 } else {
                     Poll::Ready(Ok(buf.len()))
