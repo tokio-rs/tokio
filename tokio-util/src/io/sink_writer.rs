@@ -86,7 +86,7 @@ where
 impl<S, E> AsyncWrite for SinkWriter<S>
 where
     S: Sink<Vec<u8>, Error = E>,
-    E: Into<io::Error>
+    E: Into<io::Error>,
 {
     fn poll_write(
         mut self: Pin<&mut Self>,
