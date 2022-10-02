@@ -1,7 +1,6 @@
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-/// `AtomicPtr` providing an additional `load_unsync` function.
 pub(crate) struct AtomicPtr<T> {
     inner: std::sync::atomic::AtomicPtr<T>,
 }

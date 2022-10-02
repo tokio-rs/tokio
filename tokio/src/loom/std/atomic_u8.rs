@@ -2,7 +2,6 @@ use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops::Deref;
 
-/// `AtomicU8` providing an additional `load_unsync` function.
 pub(crate) struct AtomicU8 {
     inner: UnsafeCell<std::sync::atomic::AtomicU8>,
 }
