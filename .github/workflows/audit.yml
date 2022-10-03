@@ -9,8 +9,15 @@ on:
   schedule:
     - cron: '0 2 * * *' # run at 2 AM UTC
 
+permissions:
+  contents: read
+
 jobs:
   security-audit:
+    permissions:
+      checks: write  # for actions-rs/audit-check to create check
+      contents: read  # for actions/checkout to fetch code
+      issues: write  # for actions-rs/audit-check to create issues
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, 'ci skip')"
     steps:
