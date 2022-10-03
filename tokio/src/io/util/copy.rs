@@ -40,9 +40,11 @@ impl CopyBuffer {
         buf.set_filled(me.cap);
 
         let res = reader.poll_read(cx, &mut buf);
-        let filled_len = buf.filled().len();
-        me.read_done = me.cap == filled_len;
-        me.cap = filled_len;
+        if let Poll::Ready(_) = res {
+            let filled_len = buf.filled().len();
+            me.read_done = me.cap == filled_len;
+            me.cap = filled_len;
+        }
         res
     }
 
