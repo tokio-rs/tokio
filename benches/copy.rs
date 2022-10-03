@@ -168,8 +168,7 @@ impl AsyncRead for ChunkReader {
 }
 
 fn rt() -> tokio::runtime::Runtime {
-    tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
+    tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()
         .unwrap()

@@ -36,10 +36,13 @@ impl CopyBuffer {
         R: AsyncRead + ?Sized,
     {
         let me = &mut *self;
-        let mut buf = ReadBuf::new(&mut me.buf[me.cap..]);
+        let mut buf = ReadBuf::new(&mut me.buf);
+        buf.set_filled(me.cap);
 
         let res = reader.poll_read(cx, &mut buf);
-        me.cap += buf.filled().len();
+        let filled_len = buf.filled().len();
+        me.read_done = me.cap == filled_len;
+        me.cap = filled_len;
         res
     }
 
@@ -58,7 +61,7 @@ impl CopyBuffer {
             Poll::Pending => {
                 // Top up the buffer towards full if we can read a bit more
                 // data - this should improve the chances of a large write
-                if !me.read_done && me.cap != me.buf.len() {
+                if !me.read_done && me.cap < me.buf.len() {
                     ready!(me.poll_fill_buf(cx, reader.as_mut()))?;
                 }
                 Poll::Pending
@@ -97,10 +100,6 @@ impl CopyBuffer {
 
                         return Poll::Pending;
                     }
-                }
-
-                if self.cap == 0 {
-                    self.read_done = true;
                 }
             }
 
