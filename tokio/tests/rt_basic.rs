@@ -385,43 +385,58 @@ mod unstable {
     #[test]
     fn rng_seed() {
         let seed = b"bytes used to generate seed";
-        let rt = tokio::runtime::Builder::new_current_thread()
+        let rt1 = tokio::runtime::Builder::new_current_thread()
             .rng_seed(RngSeed::from_bytes(seed))
             .build()
             .unwrap();
+        let rt1_values = rt1.block_on(async {
+            let rand_1 = tokio::macros::support::thread_rng_n(100);
+            let rand_2 = tokio::macros::support::thread_rng_n(100);
 
-        rt.block_on(async {
-            let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 59);
-
-            let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 10);
+            (rand_1, rand_2)
         });
+
+        let rt2 = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt2_values = rt2.block_on(async {
+            let rand_1 = tokio::macros::support::thread_rng_n(100);
+            let rand_2 = tokio::macros::support::thread_rng_n(100);
+
+            (rand_1, rand_2)
+        });
+
+        assert_eq!(rt1_values, rt2_values);
     }
 
     #[test]
     fn rng_seed_multi_enter() {
         let seed = b"bytes used to generate seed";
-        let rt = tokio::runtime::Builder::new_current_thread()
+
+        fn two_rand_values() -> (u32, u32) {
+            let rand_1 = tokio::macros::support::thread_rng_n(100);
+            let rand_2 = tokio::macros::support::thread_rng_n(100);
+
+            (rand_1, rand_2)
+        }
+
+        let rt1 = tokio::runtime::Builder::new_current_thread()
             .rng_seed(RngSeed::from_bytes(seed))
             .build()
             .unwrap();
+        let rt1_values_1 = rt1.block_on(async { two_rand_values() });
+        let rt1_values_2 = rt1.block_on(async { two_rand_values() });
 
-        rt.block_on(async {
-            let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 59);
+        let rt2 = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt2_values_1 = rt2.block_on(async { two_rand_values() });
+        let rt2_values_2 = rt2.block_on(async { two_rand_values() });
 
-            let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 10);
-        });
-
-        rt.block_on(async {
-            let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 86);
-
-            let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 1);
-        });
+        assert_eq!(rt1_values_1, rt2_values_1);
+        assert_eq!(rt1_values_2, rt2_values_2);
     }
 }
 

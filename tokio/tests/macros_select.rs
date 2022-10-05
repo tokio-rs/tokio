@@ -607,40 +607,44 @@ mod unstable {
     #[test]
     fn deterministic_select_current_thread() {
         let seed = b"bytes used to generate seed";
-        let rt = tokio::runtime::Builder::new_current_thread()
+        let rt1 = tokio::runtime::Builder::new_current_thread()
             .rng_seed(RngSeed::from_bytes(seed))
             .build()
             .unwrap();
+        let rt1_values = rt1.block_on(async { (select_0_to_9().await, select_0_to_9().await) });
 
-        rt.block_on(async {
-            let num = select_0_to_9().await;
-            assert_eq!(num, 5);
+        let rt2 = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt2_values = rt2.block_on(async { (select_0_to_9().await, select_0_to_9().await) });
 
-            let num = select_0_to_9().await;
-            assert_eq!(num, 1);
-        });
+        assert_eq!(rt1_values, rt2_values);
     }
 
     #[test]
     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
     fn deterministic_select_multi_thread() {
         let seed = b"bytes used to generate seed";
-        let rt = tokio::runtime::Builder::new_multi_thread()
+        let rt1 = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
             .rng_seed(RngSeed::from_bytes(seed))
             .build()
             .unwrap();
-
-        rt.block_on(async {
-            let _ = tokio::spawn(async {
-                let num = select_0_to_9().await;
-                assert_eq!(num, 6);
-
-                let num = select_0_to_9().await;
-                assert_eq!(num, 9);
-            })
-            .await;
+        let rt1_values = rt1.block_on(async {
+            let _ = tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) }).await;
         });
+
+        let rt2 = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt2_values = rt2.block_on(async {
+            let _ = tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) }).await;
+        });
+
+        assert_eq!(rt1_values, rt2_values);
     }
 
     async fn select_0_to_9() -> u32 {
