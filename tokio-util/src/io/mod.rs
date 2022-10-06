@@ -24,6 +24,6 @@ cfg_io_util! {
 pub use self::inspect::{InspectReader, InspectWriter};
 pub use self::read_buf::read_buf;
 pub use self::reader_stream::ReaderStream;
-pub use self::sink_writer::SinkWriter;
+pub use self::sink_writer::{CopyToBytes, SinkWriter};
 pub use self::stream_reader::StreamReader;
 pub use crate::util::{poll_read_buf, poll_write_buf};

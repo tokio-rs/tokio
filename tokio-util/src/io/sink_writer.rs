@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use futures_sink::Sink;
 
 use pin_project_lite::pin_project;
@@ -27,9 +28,9 @@ pin_project! {
     ///  // Note that the sink must mimic a writable object, e.g. have `std::io::Error`
     ///  // as its error type.
     /// let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(1);
-    ///  let mut writer = SinkWriter::new(
+    ///  let mut writer = SinkWriter::new(CopyToBytes::new(
     ///    PollSender::new(tx).sink_map_err(|_| Error::from(ErrorKind::BrokenPipe)),
-    /// );
+    /// ));
     ///  // Write data to our interface...
     ///  let data: [u8; 4] = [1, 2, 3, 4];
     ///  let _ = writer.write(&data).await?;
@@ -52,11 +53,8 @@ pin_project! {
     }
 }
 
-impl<S> SinkWriter<S>
-where
-    for<'r> S: Sink<&'r [u8], Error = io::Error>,
-{
-    /// Creates a new [`SinkWriter`].
+impl<S> SinkWriter<S> {
+    /// Creates a new [`SinkWriter<S>`].
     pub fn new(sink: S) -> Self {
         Self { inner: sink }
     }
@@ -80,6 +78,72 @@ where
     /// It is inadvisable to directly write to the underlying sink.
     pub fn into_inner(self) -> S {
         self.inner
+    }
+}
+pin_project! {
+    /// A helper structure, converting a sink of byte slices into a
+    /// sink of owned [`Bytes`].
+    ///
+    ///
+    /// [`Bytes`]: bytes::Bytes
+    #[derive(Debug)]
+    pub struct CopyToBytes<S> {
+        #[pin]
+        inner: S,
+    }
+}
+
+impl<S> CopyToBytes<S> {
+    /// Creates a new [`CopyToBytes<S>`].
+    pub fn new(inner: S) -> Self {
+        Self { inner }
+    }
+
+    /// Gets a reference to the underlying sink.
+    ///
+    /// It is inadvisable to directly write to the underlying sink.
+    pub fn get_ref(&self) -> &S {
+        &self.inner
+    }
+
+    /// Gets a mutable reference to the underlying sink.
+    ///
+    /// It is inadvisable to directly write to the underlying sink.
+    pub fn get_mut(&mut self) -> &mut S {
+        &mut self.inner
+    }
+
+    /// Consumes this `SinkWriter`, returning the underlying sink.
+    ///
+    /// It is inadvisable to directly write to the underlying sink.
+    pub fn into_inner(self) -> S {
+        self.inner
+    }
+}
+
+impl<'a, S> Sink<&'a [u8]> for CopyToBytes<S>
+where
+    S: Sink<Bytes>,
+{
+    type Error = S::Error;
+
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.as_mut().project().inner.poll_ready(cx)
+    }
+
+    fn start_send(mut self: Pin<&mut Self>, item: &'a [u8]) -> Result<(), Self::Error> {
+        self.as_mut()
+            .project()
+            .inner
+            .start_send(Bytes::copy_from_slice(item))
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.as_mut().project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.as_mut().project().inner.poll_close(cx)
     }
 }
 
