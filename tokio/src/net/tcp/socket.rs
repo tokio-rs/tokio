@@ -428,8 +428,8 @@ impl TcpSocket {
 
     /// Sets the value for the `IP_TOS` option on this socket.
     ///
-    /// This value sets the time-to-live field that is used in every packet sent
-    /// from this socket.
+    /// This value sets the type-of-service field that is used in every packet
+    /// sent from this socket.
     ///
     /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
     /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
