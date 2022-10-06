@@ -19,7 +19,7 @@ pin_project! {
     /// use futures_util::SinkExt;
     /// use std::io::{Error, ErrorKind};
     /// use tokio::io::AsyncWriteExt;
-    /// use tokio_util::io::SinkWriter;
+    /// use tokio_util::io::{SinkWriter, CopyToBytes};
     /// use tokio_util::sync::PollSender;
     ///
     /// # #[tokio::main]
