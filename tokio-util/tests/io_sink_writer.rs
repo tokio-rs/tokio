@@ -2,9 +2,9 @@
 
 use bytes::Bytes;
 use futures_util::SinkExt;
-use std::io::{self, Cursor, Error, ErrorKind};
+use std::io::{self, Error, ErrorKind};
 use tokio::io::AsyncWriteExt;
-use tokio_util::codec::{Encoder, FramedWrite, LinesCodec};
+use tokio_util::codec::{Encoder, FramedWrite};
 use tokio_util::io::{CopyToBytes, SinkWriter};
 use tokio_util::sync::PollSender;
 
@@ -57,8 +57,8 @@ async fn test_direct_sink_writer() -> Result<(), Error> {
     let mut writer = SinkWriter::new(framed_byte_lc);
 
     // Write multiple slices to the sink...
-    writer.write(&[1, 2, 3]).await;
-    writer.write(&[4, 5, 6]).await;
+    let _ = writer.write(&[1, 2, 3]).await;
+    let _ = writer.write(&[4, 5, 6]).await;
 
     // ... and compare it with the buffer.
     assert_eq!(
