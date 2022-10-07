@@ -25,7 +25,7 @@ async fn test_copied_sink_writer() -> Result<(), Error> {
     let _ = writer.write(&data).await;
 
     // ... and receive it.
-    assert_eq!(data.to_vec(), rx.recv().await.unwrap());
+    assert_eq!(data.to_vec(), rx.recv().await.unwrap().to_vec());
 
     Ok(())
 }
@@ -43,7 +43,9 @@ impl<'a> Encoder<&'a [u8]> for SliceEncoder {
     type Error = Error;
 
     fn encode(&mut self, item: &'a [u8], dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
-        // We pretend there is something important going on here.
+        // This is where we'd write packet headers, lengths, etc. in a real encoder.
+        // For simplicity and demonstration purposes, we just pack a copy of
+        // the slice at the end of a buffer.
         dst.extend_from_slice(item);
         Ok(())
     }

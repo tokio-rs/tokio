@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use futures_sink::Sink;
 
 use pin_project_lite::pin_project;
@@ -9,13 +8,17 @@ use tokio::io::AsyncWrite;
 
 pin_project! {
     /// Convert a [`Sink`] of byte chunks into an [`AsyncWrite`].
-    /// Bytes are sent into the sink and the sink is flushed once all bytes are sent. If an error occurs during the sending progress,
-    /// the number of sent but unflushed bytes are saved in case the flushing operation stays unsuccessful.
-    /// For the inverse operation of defining an [`AsyncWrite`] from a [`Sink`] you need to define a [`codec`].
+    ///
+    /// Bytes are sent into the sink and the sink is flushed once all bytes are sent.
+    /// If an error occurs during the sending progress, the number of sent but
+    /// unflushed bytes are saved in case the flushing operation stays unsuccessful.
+    /// For the inverse operation of defining an [`AsyncWrite`] from a [`Sink`] you
+    /// need to define a [`codec`].
     ///
     /// # Example
     ///
     /// ```
+    /// use bytes::Bytes;
     /// use futures_util::SinkExt;
     /// use std::io::{Error, ErrorKind};
     /// use tokio::io::AsyncWriteExt;
@@ -27,15 +30,15 @@ pin_project! {
     ///  // Construct a channel pair to send data across and wrap a pollable sink.
     ///  // Note that the sink must mimic a writable object, e.g. have `std::io::Error`
     ///  // as its error type.
-    /// let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(1);
+    ///  let (tx, mut rx) = tokio::sync::mpsc::channel::<Bytes>(1);
     ///  let mut writer = SinkWriter::new(CopyToBytes::new(
     ///    PollSender::new(tx).sink_map_err(|_| Error::from(ErrorKind::BrokenPipe)),
-    /// ));
+    ///  ));
     ///  // Write data to our interface...
     ///  let data: [u8; 4] = [1, 2, 3, 4];
     ///  let _ = writer.write(&data).await?;
     ///  // ... and receive it.
-    ///  assert_eq!(data.to_vec(), rx.recv().await.unwrap());
+    ///  assert_eq!(data.to_vec(), rx.recv().await.unwrap().to_vec());
     ///
     /// #  Ok(())
     /// # }
@@ -60,93 +63,20 @@ impl<S> SinkWriter<S> {
     }
 
     /// Gets a reference to the underlying sink.
-    ///
-    /// It is inadvisable to directly write to the underlying sink.
     pub fn get_ref(&self) -> &S {
         &self.inner
     }
 
     /// Gets a mutable reference to the underlying sink.
-    ///
-    /// It is inadvisable to directly write to the underlying sink.
     pub fn get_mut(&mut self) -> &mut S {
         &mut self.inner
     }
 
     /// Consumes this `SinkWriter`, returning the underlying sink.
-    ///
-    /// It is inadvisable to directly write to the underlying sink.
     pub fn into_inner(self) -> S {
         self.inner
     }
 }
-pin_project! {
-    /// A helper structure, converting a sink of byte slices into a
-    /// sink of owned [`Bytes`].
-    ///
-    ///
-    /// [`Bytes`]: bytes::Bytes
-    #[derive(Debug)]
-    pub struct CopyToBytes<S> {
-        #[pin]
-        inner: S,
-    }
-}
-
-impl<S> CopyToBytes<S> {
-    /// Creates a new [`CopyToBytes<S>`].
-    pub fn new(inner: S) -> Self {
-        Self { inner }
-    }
-
-    /// Gets a reference to the underlying sink.
-    ///
-    /// It is inadvisable to directly write to the underlying sink.
-    pub fn get_ref(&self) -> &S {
-        &self.inner
-    }
-
-    /// Gets a mutable reference to the underlying sink.
-    ///
-    /// It is inadvisable to directly write to the underlying sink.
-    pub fn get_mut(&mut self) -> &mut S {
-        &mut self.inner
-    }
-
-    /// Consumes this `SinkWriter`, returning the underlying sink.
-    ///
-    /// It is inadvisable to directly write to the underlying sink.
-    pub fn into_inner(self) -> S {
-        self.inner
-    }
-}
-
-impl<'a, S> Sink<&'a [u8]> for CopyToBytes<S>
-where
-    S: Sink<Bytes>,
-{
-    type Error = S::Error;
-
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.as_mut().project().inner.poll_ready(cx)
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, item: &'a [u8]) -> Result<(), Self::Error> {
-        self.as_mut()
-            .project()
-            .inner
-            .start_send(Bytes::copy_from_slice(item))
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.as_mut().project().inner.poll_flush(cx)
-    }
-
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.as_mut().project().inner.poll_close(cx)
-    }
-}
-
 impl<S, E> AsyncWrite for SinkWriter<S>
 where
     for<'a> S: Sink<&'a [u8], Error = E>,
