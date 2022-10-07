@@ -27,7 +27,7 @@ pub(crate) struct Driver {
     tick: u8,
 
     /// Reuse the `mio::Events` value across calls to poll.
-    events: Option<mio::Events>,
+    events: mio::Events,
 
     /// Primary slab handle containing the state for each resource registered
     /// with this driver.
@@ -119,7 +119,7 @@ impl Driver {
 
         Ok(Driver {
             tick: 0,
-            events: Some(mio::Events::with_capacity(1024)),
+            events: mio::Events::with_capacity(1024),
             poll,
             resources: slab,
             inner: Arc::new(Inner {
@@ -173,7 +173,7 @@ impl Driver {
             self.resources.compact()
         }
 
-        let mut events = self.events.take().expect("i/o driver event store missing");
+        let mut events = &mut self.events;
 
         // Block waiting for an event to happen, peeling out how many events
         // happened.
@@ -194,27 +194,28 @@ impl Driver {
             let token = event.token();
 
             if token != TOKEN_WAKEUP {
-                self.dispatch(token, Ready::from_mio(event));
+                Self::dispatch(
+                    &mut self.resources,
+                    self.tick,
+                    token,
+                    Ready::from_mio(event),
+                );
                 ready_count += 1;
             }
         }
 
         self.inner.metrics.incr_ready_count_by(ready_count);
-
-        self.events = Some(events);
     }
 
-    fn dispatch(&mut self, token: mio::Token, ready: Ready) {
+    fn dispatch(resources: &mut Slab<ScheduledIo>, tick: u8, token: mio::Token, ready: Ready) {
         let addr = slab::Address::from_usize(ADDRESS.unpack(token.0));
-
-        let resources = &mut self.resources;
 
         let io = match resources.get(addr) {
             Some(io) => io,
             None => return,
         };
 
-        let res = io.set_readiness(Some(token.0), Tick::Set(self.tick), |curr| curr | ready);
+        let res = io.set_readiness(Some(token.0), Tick::Set(tick), |curr| curr | ready);
 
         if res.is_err() {
             // token no longer valid!
