@@ -49,8 +49,7 @@ pin_project! {
     /// [`Sink`]: futures_sink::Sink
     /// [`codec`]: tokio_util::codec
     #[derive(Debug)]
-    pub struct SinkWriter<S>
-    {
+    pub struct SinkWriter<S> {
         #[pin]
         inner: S,
     }
