@@ -53,7 +53,7 @@ impl<'a> Encoder<&'a [u8]> for SliceEncoder {
 
 #[tokio::test]
 async fn test_direct_sink_writer() -> Result<(), Error> {
-    // We define a framed writer which accepts bytes slices
+    // We define a framed writer which accepts byte slices
     // and 'reverse' this construction immediately.
     let framed_byte_lc = FramedWrite::new(Vec::new(), SliceEncoder::new());
     let mut writer = SinkWriter::new(framed_byte_lc);

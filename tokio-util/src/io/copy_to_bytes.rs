@@ -5,8 +5,9 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// A helper structure which wraps a `Sink<&'a [u8]>` and converts it into
+    /// A helper which wraps a `Sink<&'a [u8]>` and converts it into
     /// a `Sink<Bytes>` by copying each byte slice into an owned [`Bytes`].
+    ///
     /// This can be convenient when dealing with a [`SinkWriter`] which wraps a sink that
     /// needs to take ownership of the data to be sent.
     ///
@@ -20,7 +21,7 @@ pin_project! {
 }
 
 impl<S> CopyToBytes<S> {
-    /// Creates a new [`CopyToBytes<S>`].
+    /// Creates a new [`CopyToBytes`].
     pub fn new(inner: S) -> Self {
         Self { inner }
     }
@@ -35,7 +36,7 @@ impl<S> CopyToBytes<S> {
         &mut self.inner
     }
 
-    /// Consumes this `SinkWriter`, returning the underlying sink.
+    /// Consumes this [`CopyToBytes`], returning the underlying sink.
     pub fn into_inner(self) -> S {
         self.inner
     }

@@ -9,9 +9,12 @@ use tokio::io::AsyncWrite;
 pin_project! {
     /// Convert a [`Sink`] of byte chunks into an [`AsyncWrite`].
     ///
-    /// Each write to the `SinkWriter` is converted into a send of `&[u8]` to the `Sink`. Flushes and shutdown are propagated to the sink's flush and close methods.
+    /// Each write to the [`SinkWriter`] is converted into a send of `&[u8]` to the [`Sink`].
+    /// Flushes and shutdown are propagated to the sink's flush and close methods.
     ///
-    /// This adapter implements `AsyncWrite` for `Sink<&[u8]>`. If you want to implement `Sink<_>` for `AsyncWrite`, see [`codec`]; if you need to implement `AsyncWrite` for `Sink<Bytes>`, see [`CopyToBytes`].
+    /// This adapter implements [`AsyncWrite`] for `Sink<&[u8]>`. If you want to
+    /// implement `Sink<_>` for [`AsyncWrite`], see the [`codec`] module; if you need to implement
+    /// [`AsyncWrite`] for `Sink<Bytes>`, see [`CopyToBytes`].
     ///
     /// # Example
     ///
@@ -25,20 +28,21 @@ pin_project! {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Error> {
-    ///  // Construct a channel pair to send data across and wrap a pollable sink.
-    ///  // Note that the sink must mimic a writable object, e.g. have `std::io::Error`
-    ///  // as its error type.
-    ///  let (tx, mut rx) = tokio::sync::mpsc::channel::<Bytes>(1);
-    ///  let mut writer = SinkWriter::new(CopyToBytes::new(
-    ///    PollSender::new(tx).sink_map_err(|_| Error::from(ErrorKind::BrokenPipe)),
-    ///  ));
-    ///  // Write data to our interface...
-    ///  let data: [u8; 4] = [1, 2, 3, 4];
-    ///  let _ = writer.write(&data).await?;
-    ///  // ... and receive it.
-    ///  assert_eq!(data.to_vec(), rx.recv().await.unwrap().to_vec());
+    /// // Construct a channel pair to send data across and wrap a pollable sink.
+    /// // Note that the sink must mimic a writable object, e.g. have `std::io::Error`
+    /// // as its error type.
+    /// let (tx, mut rx) = tokio::sync::mpsc::channel::<Bytes>(1);
+    /// let mut writer = SinkWriter::new(CopyToBytes::new(
+    ///   PollSender::new(tx).sink_map_err(|_| Error::from(ErrorKind::BrokenPipe)),
+    /// ));
     ///
-    /// #  Ok(())
+    /// // Write data to our interface...
+    /// let data: [u8; 4] = [1, 2, 3, 4];
+    /// let _ = writer.write(&data).await?;
+    ///
+    /// // ... and receive it.
+    /// assert_eq!(data.to_vec(), rx.recv().await.unwrap().to_vec());
+    /// # Ok(())
     /// # }
     /// ```
     ///
@@ -46,6 +50,7 @@ pin_project! {
     /// [`AsyncWrite`]: tokio::io::AsyncWrite
     /// [`Sink`]: futures_sink::Sink
     /// [`codec`]: tokio_util::codec
+    /// [`CopyToBytes`]: tokio_util::io::CopyToBytes
     #[derive(Debug)]
     pub struct SinkWriter<S> {
         #[pin]
@@ -54,7 +59,7 @@ pin_project! {
 }
 
 impl<S> SinkWriter<S> {
-    /// Creates a new [`SinkWriter<S>`].
+    /// Creates a new [`SinkWriter`].
     pub fn new(sink: S) -> Self {
         Self { inner: sink }
     }
@@ -69,7 +74,7 @@ impl<S> SinkWriter<S> {
         &mut self.inner
     }
 
-    /// Consumes this `SinkWriter`, returning the underlying sink.
+    /// Consumes this [`SinkWriter`], returning the underlying sink.
     pub fn into_inner(self) -> S {
         self.inner
     }
