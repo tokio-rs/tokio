@@ -462,6 +462,12 @@ macro_rules! select {
             // satisfy the requirement of `Pin::new_unchecked` called below.
             let mut futures = ( $( $fut , )+ );
 
+            // This assignment makes sure that the `poll_fn` closure only has a
+            // reference to the futures, instead of taking ownership of them.
+            // This mitigates the issue described in
+            // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
+            let mut futures = &mut *futures;
+
             $crate::macros::support::poll_fn(|cx| {
                 // Track if any branch returns pending. If no branch completes
                 // **or** returns pending, this implies that all branches are
@@ -497,7 +503,7 @@ macro_rules! select {
 
                                 // Extract the future for this branch from the
                                 // tuple
-                                let ( $($skip,)* fut, .. ) = &mut futures;
+                                let ( $($skip,)* fut, .. ) = &mut *futures;
 
                                 // Safety: future is stored on the stack above
                                 // and never moved.

@@ -6,20 +6,23 @@ use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::marker::PhantomPinned;
 
 /// Future for the [`poll_fn`] function.
 pub struct PollFn<F> {
     f: F,
+    _pinned: PhantomPinned,
 }
-
-impl<F> Unpin for PollFn<F> {}
 
 /// Creates a new future wrapping around a function returning [`Poll`].
 pub fn poll_fn<T, F>(f: F) -> PollFn<F>
 where
     F: FnMut(&mut Context<'_>) -> Poll<T>,
 {
-    PollFn { f }
+    PollFn {
+        f,
+        _pinned: PhantomPinned,
+    }
 }
 
 impl<F> fmt::Debug for PollFn<F> {
@@ -34,7 +37,15 @@ where
 {
     type Output = T;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<T> {
-        (self.f)(cx)
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<T> {
+        // SAFETY: We never construct a `Pin<&mut F>` anywhere, so accessing `f`
+        // mutably in an unpinned way is sound.
+        //
+        // This is, strictly speaking, not necessary. We could make `PollFn`
+        // unconditionally `Unpin` and avoid this unsafe. However, making this
+        // struct `!Unpin` mitigates the issues described here:
+        // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
+        let me = unsafe { Pin::into_inner_unchecked(self) };
+        (me.f)(cx)
     }
 }
