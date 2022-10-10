@@ -460,6 +460,10 @@ macro_rules! select {
         let mut output = {
             // Safety: Nothing must be moved out of `futures`. This is to
             // satisfy the requirement of `Pin::new_unchecked` called below.
+            //
+            // We can't use the `pin!` macro for this because `futures` is a
+            // tuple and the standard library provides no way to pin-project to
+            // the fields of a tuple.
             let mut futures = ( $( $fut , )+ );
 
             // This assignment makes sure that the `poll_fn` closure only has a
