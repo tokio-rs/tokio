@@ -1044,22 +1044,22 @@ rt_test! {
     #[test]
     fn coop() {
         use std::task::Poll::Ready;
+        use tokio::sync::mpsc;
 
         let rt = rt();
 
         rt.block_on(async {
-            // Create a bunch of tasks
-            let mut tasks = (0..1_000).map(|_| {
-                tokio::spawn(async { })
-            }).collect::<Vec<_>>();
+            let (send, mut recv) = mpsc::unbounded_channel();
 
-            // Hope that all the tasks complete...
-            time::sleep(Duration::from_millis(100)).await;
+            // Send a bunch of messages.
+            for _ in 0..1_000 {
+                send.send(()).unwrap();
+            }
 
             poll_fn(|cx| {
-                // At least one task should not be ready
-                for task in &mut tasks {
-                    if Pin::new(task).poll(cx).is_pending() {
+                // At least one response should return pending.
+                for _ in 0..1_000 {
+                    if recv.poll_recv(cx).is_pending() {
                         return Ready(());
                     }
                 }
@@ -1072,22 +1072,22 @@ rt_test! {
     #[test]
     fn coop_unconstrained() {
         use std::task::Poll::Ready;
+        use tokio::sync::mpsc;
 
         let rt = rt();
 
         rt.block_on(async {
-            // Create a bunch of tasks
-            let mut tasks = (0..1_000).map(|_| {
-                tokio::spawn(async { })
-            }).collect::<Vec<_>>();
+            let (send, mut recv) = mpsc::unbounded_channel();
 
-            // Hope that all the tasks complete...
-            time::sleep(Duration::from_millis(100)).await;
+            // Send a bunch of messages.
+            for _ in 0..1_000 {
+                send.send(()).unwrap();
+            }
 
             tokio::task::unconstrained(poll_fn(|cx| {
-                // All the tasks should be ready
-                for task in &mut tasks {
-                    assert!(Pin::new(task).poll(cx).is_ready());
+                // All the responses should be ready.
+                for _ in 0..1_000 {
+                    assert_eq!(recv.poll_recv(cx), Poll::Ready(Some(())));
                 }
 
                 Ready(())
