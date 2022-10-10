@@ -207,6 +207,7 @@ async fn nested() {
 }
 
 #[maybe_tokio_test]
+#[cfg(target_pointer_width = "64")]
 async fn struct_size() {
     use futures::future;
     use std::mem;

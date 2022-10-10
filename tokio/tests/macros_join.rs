@@ -64,6 +64,7 @@ async fn two_await() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn join_size() {
     use futures::future;
     use std::mem;

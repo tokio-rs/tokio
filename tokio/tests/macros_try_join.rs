@@ -88,6 +88,7 @@ async fn err_abort_early() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn join_size() {
     use futures::future;
     use std::mem;
