@@ -9,11 +9,9 @@ use tokio::io::AsyncWrite;
 pin_project! {
     /// Convert a [`Sink`] of byte chunks into an [`AsyncWrite`].
     ///
-    /// Bytes are sent into the sink and the sink is flushed once all bytes are sent.
-    /// If an error occurs during the sending progress, the number of sent but
-    /// unflushed bytes are saved in case the flushing operation stays unsuccessful.
-    /// For the inverse operation of defining an [`AsyncWrite`] from a [`Sink`] you
-    /// need to define a [`codec`].
+    /// Each write to the `SinkWriter` is converted into a send of `&[u8]` to the `Sink`. Flushes and shutdown are propagated to the sink's flush and close methods.
+    ///
+    /// This adapter implements `AsyncWrite` for `Sink<&[u8]>`. If you want to implement `Sink<_>` for `AsyncWrite`, see [`codec`]; if you need to implement `AsyncWrite` for `Sink<Bytes>`, see [`CopyToBytes`].
     ///
     /// # Example
     ///
