@@ -5,7 +5,6 @@
 use std::cell::Cell;
 use std::future::Future;
 use std::io::SeekFrom;
-use std::marker::PhantomPinned;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::rc::Rc;
