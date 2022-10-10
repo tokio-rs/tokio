@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 #[cfg(tokio_wasm_not_wasi)]
+#[cfg(target_pointer_width = "64")]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 #[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
