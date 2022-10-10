@@ -4,9 +4,9 @@
 
 use std::fmt;
 use std::future::Future;
+use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::marker::PhantomPinned;
 
 /// Future for the [`poll_fn`] function.
 pub struct PollFn<F> {

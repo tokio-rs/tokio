@@ -466,7 +466,7 @@ macro_rules! select {
             // reference to the futures, instead of taking ownership of them.
             // This mitigates the issue described in
             // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
-            let mut futures = &mut *futures;
+            let mut futures = &mut futures;
 
             $crate::macros::support::poll_fn(|cx| {
                 // Track if any branch returns pending. If no branch completes
