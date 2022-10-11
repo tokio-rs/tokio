@@ -12,6 +12,7 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Poll;
+use std::thread::{self, ThreadId};
 
 use pin_project_lite::pin_project;
 
@@ -228,9 +229,6 @@ struct Context {
     /// Collection of all active tasks spawned onto this executor.
     owned: LocalOwnedTasks<Arc<Shared>>,
 
-    /// Local run queue sender and receiver.
-    queue: VecDequeCell<task::Notified<Arc<Shared>>>,
-
     /// State shared between threads.
     shared: Arc<Shared>,
 
@@ -241,6 +239,19 @@ struct Context {
 
 /// LocalSet state shared between threads.
 struct Shared {
+    /// Local run queue sender and receiver.
+    ///
+    /// # Safety
+    ///
+    /// This field must *only* be accessed from the thread that owns the
+    /// `LocalSet` (i.e., `Thread::current().id() == owner`).
+    local_queue: VecDequeCell<task::Notified<Arc<Shared>>>,
+
+    /// The `ThreadId` of the thread that owns the `LocalSet`.
+    ///
+    /// Since `LocalSet` is `!Send`, this will never change.
+    owner: ThreadId,
+
     /// Remote run queue sender.
     queue: Mutex<Option<VecDeque<task::Notified<Arc<Shared>>>>>,
 
@@ -354,8 +365,9 @@ impl LocalSet {
             tick: Cell::new(0),
             context: Rc::new(Context {
                 owned: LocalOwnedTasks::new(),
-                queue: VecDequeCell::with_capacity(INITIAL_CAPACITY),
                 shared: Arc::new(Shared {
+                    local_queue: VecDequeCell::with_capacity(INITIAL_CAPACITY),
+                    owner: thread::current().id(),
                     queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
                     waker: AtomicWaker::new(),
                     #[cfg(tokio_unstable)]
@@ -597,9 +609,9 @@ impl LocalSet {
                 .lock()
                 .as_mut()
                 .and_then(|queue| queue.pop_front())
-                .or_else(|| self.context.queue.pop_front())
+                .or_else(|| self.pop_local())
         } else {
-            self.context.queue.pop_front().or_else(|| {
+            self.pop_local().or_else(|| {
                 self.context
                     .shared
                     .queue
@@ -610,6 +622,15 @@ impl LocalSet {
         };
 
         task.map(|task| self.context.owned.assert_owner(task))
+    }
+
+    fn pop_local(&self) -> Option<task::Notified<Arc<Shared>>> {
+        unsafe {
+            // Safety: because the `LocalSet` itself is `!Send`, we know we are
+            // on the same thread if we have access to the `LocalSet`, and can
+            // therefore access the local run queue.
+            self.context.shared.local_queue().pop_front()
+        }
     }
 
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
@@ -782,7 +803,14 @@ impl Drop for LocalSet {
 
             // We already called shutdown on all tasks above, so there is no
             // need to call shutdown.
-            for task in self.context.queue.take() {
+            let local_queue = unsafe {
+                // Safety: because `LocalSet` is `!Send`, if we are dropping a
+                // `LocalSet`, we know we are on the same thread it was created
+                // on, so we can access its local queue.
+                self.context.shared.local_queue().take()
+            };
+
+            for task in local_queue {
                 drop(task);
             }
 
@@ -854,15 +882,46 @@ impl<T: Future> Future for RunUntil<'_, T> {
 }
 
 impl Shared {
+    /// # Safety
+    ///
+    /// This is safe to call if and ONLY if we are on the thread that owns this
+    /// `LocalSet`.
+    unsafe fn local_queue(&self) -> &VecDequeCell<task::Notified<Arc<Self>>> {
+        debug_assert_eq!(
+            thread::current().id(),
+            self.owner,
+            "`LocalSet`'s local run queue must not be accessed by another thread!"
+        );
+        &self.local_queue
+    }
+
     /// Schedule the provided task on the scheduler.
     fn schedule(&self, task: task::Notified<Arc<Self>>) {
         CURRENT.with(|maybe_cx| {
             match maybe_cx.get() {
-                Some(cx) if cx.shared.ptr_eq(self) => {
-                    cx.queue.push_back(task);
+                Some(cx) if cx.shared.ptr_eq(self) => unsafe {
+                    // Safety: if the current `LocalSet` context points to this
+                    // `LocalSet`, then we are on the thread that owns it.
+                    cx.shared.local_queue().push_back(task);
+                },
+
+                // We are on the thread that owns the `LocalSet`, so we can
+                // wake to the local queue.
+                _ if thread::current().id() == self.owner => {
+                    unsafe {
+                        // Safety: we just checked that the thread ID matches
+                        // the localset's owner, so this is safe.
+                        self.local_queue().push_back(task);
+                    }
+                    // We still have to wake the `LocalSet`, because it isn't
+                    // currently being polled.
+                    self.waker.wake();
                 }
+
+                // We are *not* on the thread that owns the `LocalSet`, so we
+                // have to wake to the remote queue.
                 _ => {
-                    // First check whether the queue is still there (if not, the
+                    // First, check whether the queue is still there (if not, the
                     // LocalSet is dropped). Then push to it if so, and if not,
                     // do nothing.
                     let mut lock = self.queue.lock();
@@ -881,6 +940,10 @@ impl Shared {
         std::ptr::eq(self, other)
     }
 }
+
+// This is safe because (and only because) we *pinky pwomise* to never touch the
+// local run queue except from the thread that owns the `LocalSet`.
+unsafe impl Sync for Shared {}
 
 impl task::Schedule for Arc<Shared> {
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
@@ -962,14 +1025,11 @@ mod tests {
             let addr = listener
                 .local_addr()
                 .expect("listener should have an address");
+            let task = local.spawn_local(async move {
+                let _ = listener.accept().await;
+            });
             let mut run_until = Box::pin(local.run_until(async move {
-                spawn_local(async move {
-                    println!("listening");
-
-                    let _ = listener.accept().await;
-                })
-                .await
-                .unwrap();
+                task.await.unwrap();
             }));
 
             // poll the run until future once
@@ -980,18 +1040,9 @@ mod tests {
             .await;
 
             let _sock = TcpStream::connect(addr).await.unwrap();
-            let task = local.context.queue.pop_front();
-            assert_eq!(
-                local
-                    .context
-                    .shared
-                    .queue
-                    .lock()
-                    .as_ref()
-                    .map(|q| q.is_empty()),
-                Some(true),
-                "the task should *not* have been notified to the local set's remote queue"
-            );
+            let task = unsafe { local.context.shared.local_queue().pop_front() };
+            // TODO(eliza): it would be nice to be able to assert that this is
+            // the local task.
             assert!(
                 task.is_some(),
                 "task should have been notified to the LocalSet's local queue"
