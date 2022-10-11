@@ -939,4 +939,63 @@ mod tests {
             .expect("rt")
             .block_on(f)
     }
+
+    // Tests that when a task on a `LocalSet` is woken by an io driver on the
+    // same thread, the task is woken to the localset's local queue rather than
+    // its remote queue.
+    //
+    // This test has to be defined in the `local.rs` file as a lib test, rather
+    // than in `tests/`, because it makes assertions about the local set's
+    // internal state.
+    #[test]
+    #[cfg(feature = "net")]
+    fn io_wakes_to_local_queue() {
+        use super::*;
+        use crate::net::{TcpListener, TcpStream};
+        let rt = crate::runtime::Builder::new_current_thread()
+            .enable_io()
+            .build()
+            .expect("rt");
+        rt.block_on(async {
+            let local = LocalSet::new();
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener
+                .local_addr()
+                .expect("listener should have an address");
+            let mut run_until = Box::pin(local.run_until(async move {
+                spawn_local(async move {
+                    println!("listening");
+
+                    let _ = listener.accept().await;
+                })
+                .await
+                .unwrap();
+            }));
+
+            // poll the run until future once
+            crate::future::poll_fn(|cx| {
+                let _ = run_until.as_mut().poll(cx);
+                Poll::Ready(())
+            })
+            .await;
+
+            let _sock = TcpStream::connect(addr).await.unwrap();
+            let task = local.context.queue.pop_front();
+            assert_eq!(
+                local
+                    .context
+                    .shared
+                    .queue
+                    .lock()
+                    .as_ref()
+                    .map(|q| q.is_empty()),
+                Some(true),
+                "the task should *not* have been notified to the local set's remote queue"
+            );
+            assert!(
+                task.is_some(),
+                "task should have been notified to the LocalSet's local queue"
+            );
+        })
+    }
 }
