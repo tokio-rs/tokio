@@ -273,10 +273,21 @@ pin_project! {
 }
 
 #[cfg(any(loom, tokio_no_const_thread_local))]
-thread_local!(static CURRENT: RcCell<Context> = RcCell::new());
+thread_local!(static CURRENT: RcCell<Context> = LocalData {
+    thread_id: Cell::new(None),
+    ctx: RcCell::new(),
+});
 
 #[cfg(not(any(loom, tokio_no_const_thread_local)))]
-thread_local!(static CURRENT: RcCell<Context> = const { RcCell::new() });
+thread_local!(static CURRENT: LocalData = const { LocalData {
+    thread_id: Cell::new(None),
+    ctx: RcCell::new(),
+} });
+
+struct LocalData {
+    thread_id: Cell<Option<ThreadId>>,
+    ctx: RcCell<Context>,
+}
 
 cfg_rt! {
     /// Spawns a `!Send` future on the local task set.
@@ -325,7 +336,7 @@ cfg_rt! {
     where F: Future + 'static,
           F::Output: 'static
     {
-        match CURRENT.with(|maybe_cx| maybe_cx.get()) {
+        match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
             None => panic!("`spawn_local` called from outside of a `task::LocalSet`"),
             Some(cx) => cx.spawn(future, name)
        }
@@ -346,7 +357,7 @@ pub struct LocalEnterGuard(Option<Rc<Context>>);
 
 impl Drop for LocalEnterGuard {
     fn drop(&mut self) {
-        CURRENT.with(|ctx| {
+        CURRENT.with(|LocalData { ctx, .. }| {
             ctx.set(self.0.take());
         })
     }
@@ -386,7 +397,7 @@ impl LocalSet {
     ///
     /// [`spawn_local`]: fn@crate::task::spawn_local
     pub fn enter(&self) -> LocalEnterGuard {
-        CURRENT.with(|ctx| {
+        CURRENT.with(|LocalData { ctx, .. }| {
             let old = ctx.replace(Some(self.context.clone()));
             LocalEnterGuard(old)
         })
@@ -634,7 +645,7 @@ impl LocalSet {
     }
 
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
-        CURRENT.with(|ctx| {
+        CURRENT.with(|LocalData { ctx, .. }| {
             struct Reset<'a> {
                 ctx_ref: &'a RcCell<Context>,
                 val: Option<Rc<Context>>,
@@ -647,7 +658,7 @@ impl LocalSet {
             let old = ctx.replace(Some(self.context.clone()));
 
             let _reset = Reset {
-                ctx_ref: ctx,
+                ctx_ref: &ctx,
                 val: old,
             };
 
@@ -660,7 +671,7 @@ impl LocalSet {
     fn with_if_possible<T>(&self, f: impl FnOnce() -> T) -> T {
         let mut f = Some(f);
 
-        let res = CURRENT.try_with(|ctx| {
+        let res = CURRENT.try_with(|LocalData { ctx, .. }| {
             struct Reset<'a> {
                 ctx_ref: &'a RcCell<Context>,
                 val: Option<Rc<Context>>,
@@ -673,7 +684,7 @@ impl LocalSet {
             let old = ctx.replace(Some(self.context.clone()));
 
             let _reset = Reset {
-                ctx_ref: ctx,
+                ctx_ref: &ctx,
                 val: old,
             };
 
@@ -887,9 +898,11 @@ impl Shared {
     /// This is safe to call if and ONLY if we are on the thread that owns this
     /// `LocalSet`.
     unsafe fn local_queue(&self) -> &VecDequeCell<task::Notified<Arc<Self>>> {
-        debug_assert_eq!(
-            thread::current().id(),
-            self.owner,
+        debug_assert!(
+            // if we couldn't get the thread ID because we're dropping the local
+            // data, skip the assertion --- the `Drop` impl is not going to be
+            // called from another thread, because `LocalSet` is `!Send`
+            thread_id().map(|id| id == self.owner).unwrap_or(true),
             "`LocalSet`'s local run queue must not be accessed by another thread!"
         );
         &self.local_queue
@@ -897,8 +910,8 @@ impl Shared {
 
     /// Schedule the provided task on the scheduler.
     fn schedule(&self, task: task::Notified<Arc<Self>>) {
-        CURRENT.with(|maybe_cx| {
-            match maybe_cx.get() {
+        CURRENT.with(|localdata| {
+            match localdata.ctx.get() {
                 Some(cx) if cx.shared.ptr_eq(self) => unsafe {
                     // Safety: if the current `LocalSet` context points to this
                     // `LocalSet`, then we are on the thread that owns it.
@@ -907,7 +920,7 @@ impl Shared {
 
                 // We are on the thread that owns the `LocalSet`, so we can
                 // wake to the local queue.
-                _ if thread::current().id() == self.owner => {
+                _ if localdata.get_or_insert_id() == self.owner => {
                     unsafe {
                         // Safety: we just checked that the thread ID matches
                         // the localset's owner, so this is safe.
@@ -947,7 +960,7 @@ unsafe impl Sync for Shared {}
 
 impl task::Schedule for Arc<Shared> {
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
-        CURRENT.with(|maybe_cx| match maybe_cx.get() {
+        CURRENT.with(|LocalData { ctx, .. }| match ctx.get() {
             None => panic!("scheduler context missing"),
             Some(cx) => {
                 assert!(cx.shared.ptr_eq(self));
@@ -983,6 +996,26 @@ impl task::Schedule for Arc<Shared> {
             }
         }
     }
+}
+
+impl LocalData {
+    fn get_or_insert_id(&self) -> ThreadId {
+        match self.thread_id.get() {
+            Some(id) => id,
+            None => {
+                let id = thread::current().id();
+                self.thread_id.set(Some(id));
+                id
+            }
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+fn thread_id() -> Option<ThreadId> {
+    CURRENT
+        .try_with(|localdata| localdata.get_or_insert_id())
+        .ok()
 }
 
 #[cfg(test)]
