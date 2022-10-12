@@ -1020,6 +1020,12 @@ fn thread_id() -> Option<ThreadId> {
 #[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
+
+    // Does a `LocalSet` running on a current-thread runtime...basically work?
+    //
+    // This duplicates a test in `tests/task_local_set.rs`, but because this is
+    // a lib test, it wil run under Miri, so this is necessary to catch stacked
+    // borrows violations in the `LocalSet` implementation.
     #[test]
     fn local_current_thread_scheduler() {
         let f = async {
