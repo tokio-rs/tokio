@@ -240,7 +240,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
         self.with_inner(|inner|
             // safety: We just checked that the provided task is not in some
             // other linked list.
-            unsafe { inner.list.remove(task.header().into()) })
+            unsafe { inner.list.remove(task.header_ptr()) })
     }
 
     /// Asserts that the given task is owned by this LocalOwnedTasks and convert
