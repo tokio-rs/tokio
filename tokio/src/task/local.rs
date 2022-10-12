@@ -1,5 +1,6 @@
 //! Runs `!Send` futures on the current thread.
 use crate::loom::sync::{Arc, Mutex};
+use crate::loom::thread::{self, ThreadId};
 use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
 use crate::sync::AtomicWaker;
 use crate::util::{RcCell, VecDequeCell};
@@ -12,7 +13,6 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Poll;
-use std::thread::{self, ThreadId};
 
 use pin_project_lite::pin_project;
 
