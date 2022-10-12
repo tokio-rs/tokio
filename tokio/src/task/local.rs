@@ -272,14 +272,8 @@ pin_project! {
     }
 }
 
-#[cfg(any(loom, tokio_no_const_thread_local))]
-thread_local!(static CURRENT: RcCell<Context> = LocalData {
-    thread_id: Cell::new(None),
-    ctx: RcCell::new(),
-});
-
-#[cfg(not(any(loom, tokio_no_const_thread_local)))]
-thread_local!(static CURRENT: LocalData = const { LocalData {
+// #[cfg(not(any(loom, tokio_no_const_thread_local)))]
+tl!(static CURRENT: LocalData = { LocalData {
     thread_id: Cell::new(None),
     ctx: RcCell::new(),
 } });
@@ -985,7 +979,7 @@ impl task::Schedule for Arc<Shared> {
                     // This hook is only called from within the runtime, so
                     // `CURRENT` should match with `&self`, i.e. there is no
                     // opportunity for a nested scheduler to be called.
-                    CURRENT.with(|LocalData { ctx, .. }| match maybe_cx.get() {
+                    CURRENT.with(|LocalData { ctx, .. }| match ctx.get() {
                         Some(cx) if Arc::ptr_eq(self, &cx.shared) => {
                             cx.unhandled_panic.set(true);
                             cx.owned.close_and_shutdown_all();
@@ -1017,7 +1011,7 @@ fn thread_id() -> Option<ThreadId> {
         .ok()
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
     #[test]
