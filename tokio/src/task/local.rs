@@ -985,7 +985,7 @@ impl task::Schedule for Arc<Shared> {
                     // This hook is only called from within the runtime, so
                     // `CURRENT` should match with `&self`, i.e. there is no
                     // opportunity for a nested scheduler to be called.
-                    CURRENT.with(|maybe_cx| match maybe_cx.get() {
+                    CURRENT.with(|LocalData { ctx, .. }| match maybe_cx.get() {
                         Some(cx) if Arc::ptr_eq(self, &cx.shared) => {
                             cx.unhandled_panic.set(true);
                             cx.owned.close_and_shutdown_all();
