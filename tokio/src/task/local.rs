@@ -807,13 +807,20 @@ impl Drop for LocalSet {
 
             // We already called shutdown on all tasks above, so there is no
             // need to call shutdown.
-            let local_queue = unsafe {
-                // Safety: because `LocalSet` is `!Send`, if we are dropping a
-                // `LocalSet`, we know we are on the same thread it was created
-                // on, so we can access its local queue.
-                self.context.shared.local_queue().take()
-            };
 
+            // Safety: note that this *intentionally* bypasses the unsafe
+            // `Shared::local_queue()` method. This is in order to avoid the
+            // debug assertion that we are on the thread that owns the
+            // `LocalSet`, because on some systems (e.g. at least some macOS
+            // versions), attempting to get the current thread ID can panic due
+            // to the thread's local data that stores the thread ID being
+            // dropped *before* the `LocalSet`.
+            //
+            // Despite avoiding the assertion here, it is safe for us to access
+            // the local queue in `Drop`, because the `LocalSet` itself is
+            // `!Send`, so we can reasonably guarantee that it will not be
+            // `Drop`ped from another thread.
+            let local_queue = self.context.shared.local_queue.take();
             for task in local_queue {
                 drop(task);
             }
@@ -913,7 +920,7 @@ impl Shared {
 
                 // We are on the thread that owns the `LocalSet`, so we can
                 // wake to the local queue.
-                _ if localdata.get_or_insert_id() == Some(self.owner) => {
+                _ if localdata.get_or_insert_id() == self.owner => {
                     unsafe {
                         // Safety: we just checked that the thread ID matches
                         // the localset's owner, so this is safe.
@@ -992,19 +999,11 @@ impl task::Schedule for Arc<Shared> {
 }
 
 impl LocalData {
-    fn get_or_insert_id(&self) -> Option<ThreadId> {
-        self.thread_id.get().or_else(|| {
-            if std::thread::panicking() {
-                // Don't try to get the current thread's ID if we are unwinding:
-                // on some systems (definitely some macOS versions, possibly
-                // others), attempting to get the thread ID may panic if the
-                // thread's local data is being destroyed.
-                return None;
-            }
-
+    fn get_or_insert_id(&self) -> ThreadId {
+        self.thread_id.get().unwrap_or_else(|| {
             let id = thread::current().id();
             self.thread_id.set(Some(id));
-            Some(id)
+            id
         })
     }
 }
@@ -1013,7 +1012,6 @@ fn thread_id() -> Option<ThreadId> {
     CURRENT
         .try_with(|localdata| localdata.get_or_insert_id())
         .ok()
-        .flatten()
 }
 
 #[cfg(all(test, not(loom)))]
