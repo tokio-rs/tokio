@@ -1037,22 +1037,20 @@ mod tests {
     // than in `tests/`, because it makes assertions about the local set's
     // internal state.
     #[test]
-    #[cfg(feature = "net")]
-    fn io_wakes_to_local_queue() {
+    fn wakes_to_local_queue() {
         use super::*;
-        use crate::net::{TcpListener, TcpStream};
+        use crate::sync::Notify;
         let rt = crate::runtime::Builder::new_current_thread()
-            .enable_io()
             .build()
             .expect("rt");
         rt.block_on(async {
             let local = LocalSet::new();
-            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let addr = listener
-                .local_addr()
-                .expect("listener should have an address");
-            let task = local.spawn_local(async move {
-                let _ = listener.accept().await;
+            let notify = Arc::new(Notify::new());
+            let task = local.spawn_local({
+                let notify = notify.clone();
+                async move {
+                    notify.notified().await;
+                }
             });
             let mut run_until = Box::pin(local.run_until(async move {
                 task.await.unwrap();
@@ -1065,7 +1063,7 @@ mod tests {
             })
             .await;
 
-            let _sock = TcpStream::connect(addr).await.unwrap();
+            notify.notify_one();
             let task = unsafe { local.context.shared.local_queue().pop_front() };
             // TODO(eliza): it would be nice to be able to assert that this is
             // the local task.
