@@ -72,14 +72,24 @@ fn join_size() {
         let ready = future::ready(0i32);
         tokio::join!(ready)
     };
+
+    #[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
     assert_eq!(mem::size_of_val(&fut), 20);
+
+    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    assert_eq!(mem::size_of_val(&fut), 16);
 
     let fut = async {
         let ready1 = future::ready(0i32);
         let ready2 = future::ready(0i32);
         tokio::join!(ready1, ready2)
     };
+
+    #[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
     assert_eq!(mem::size_of_val(&fut), 32);
+
+    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    assert_eq!(mem::size_of_val(&fut), 24);
 }
 
 async fn non_cooperative_task(permits: Arc<Semaphore>) -> usize {
