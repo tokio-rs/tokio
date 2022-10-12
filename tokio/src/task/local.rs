@@ -652,7 +652,7 @@ impl LocalSet {
             let old = ctx.replace(Some(self.context.clone()));
 
             let _reset = Reset {
-                ctx_ref: &ctx,
+                ctx_ref: ctx,
                 val: old,
             };
 
@@ -678,7 +678,7 @@ impl LocalSet {
             let old = ctx.replace(Some(self.context.clone()));
 
             let _reset = Reset {
-                ctx_ref: &ctx,
+                ctx_ref: ctx,
                 val: old,
             };
 
