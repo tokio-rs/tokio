@@ -273,7 +273,7 @@ pin_project! {
 }
 
 #[cfg(any(loom, tokio_no_const_thread_local))]
-thread_local!(static CURRENT: RcCell<Context> = LocalData {
+thread_local!(static CURRENT: LocalData = LocalData {
     thread_id: Cell::new(None),
     ctx: RcCell::new(),
 });
