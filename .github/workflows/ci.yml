@@ -80,10 +80,6 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
-      # trying to figure out what the panic i cant repro was lol
-      - name: test tokio full
-        run: cargo test --features full --test task_local_set -- --nocapture --test-threads=1
-        working-directory: tokio
 
       # Run `tokio` with `full` features. This excludes testing utilities which
       # can alter the runtime behavior of Tokio.
