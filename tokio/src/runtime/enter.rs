@@ -17,7 +17,7 @@ impl EnterContext {
     }
 }
 
-tokio_thread_local!(static ENTERED: Cell<EnterContext> = const { Cell::new(EnterContext::NotEntered) });
+thread_local!(static ENTERED: Cell<EnterContext> = const { Cell::new(EnterContext::NotEntered) });
 
 /// Represents an executor context.
 pub(crate) struct Enter {

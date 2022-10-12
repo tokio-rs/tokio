@@ -272,7 +272,7 @@ pin_project! {
     }
 }
 
-tokio_thread_local!(static CURRENT: LocalData = const { LocalData {
+thread_local!(static CURRENT: LocalData = const { LocalData {
     thread_id: Cell::new(None),
     ctx: RcCell::new(),
 } });
