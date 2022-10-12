@@ -282,13 +282,6 @@ impl<T> JoinHandle<T> {
     pub fn id(&self) -> super::Id {
         self.id.clone()
     }
-
-    /// if `tokio_unstable` is disabled, we still use task IDs for internal
-    /// testing purposes, so this is `pub(crate)`.
-    #[cfg(all(test, not(tokio_unstable)))]
-    pub(crate) fn id(&self) -> super::Id {
-        self.id.clone()
-    }
 }
 
 impl<T> Unpin for JoinHandle<T> {}
