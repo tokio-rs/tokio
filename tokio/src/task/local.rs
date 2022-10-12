@@ -261,11 +261,7 @@ pin_project! {
     }
 }
 
-#[cfg(any(loom, tokio_no_const_thread_local))]
-thread_local!(static CURRENT: RcCell<Context> = RcCell::new());
-
-#[cfg(not(any(loom, tokio_no_const_thread_local)))]
-thread_local!(static CURRENT: RcCell<Context> = const { RcCell::new() });
+tokio_thread_local!(static CURRENT: RcCell<Context> = const { RcCell::new() });
 
 cfg_rt! {
     /// Spawns a `!Send` future on the local task set.

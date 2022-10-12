@@ -28,7 +28,7 @@ const EMPTY: usize = 0;
 const PARKED: usize = 1;
 const NOTIFIED: usize = 2;
 
-thread_local! {
+tokio_thread_local! {
     static CURRENT_PARKER: ParkThread = ParkThread::new();
 }
 
