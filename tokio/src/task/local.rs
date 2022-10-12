@@ -1011,7 +1011,6 @@ impl LocalData {
     }
 }
 
-#[cfg(debug_assertions)]
 fn thread_id() -> Option<ThreadId> {
     CURRENT
         .try_with(|localdata| localdata.get_or_insert_id())
