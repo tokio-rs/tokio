@@ -4,7 +4,7 @@ use crate::util::{replace_thread_rng, RngSeed};
 
 use std::cell::RefCell;
 
-thread_local! {
+tokio_thread_local! {
     static CONTEXT: RefCell<Option<Handle>> = const { RefCell::new(None) }
 }
 
