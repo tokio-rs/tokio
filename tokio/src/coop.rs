@@ -31,7 +31,7 @@
 
 use std::cell::Cell;
 
-thread_local! {
+tokio_thread_local! {
     static CURRENT: Cell<Budget> = const { Cell::new(Budget::unconstrained()) };
 }
 
