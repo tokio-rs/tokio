@@ -272,13 +272,6 @@ pin_project! {
     }
 }
 
-#[cfg(any(loom, tokio_no_const_thread_local))]
-tokio_thread_local!(static CURRENT: LocalData = LocalData {
-    thread_id: Cell::new(None),
-    ctx: RcCell::new(),
-});
-
-#[cfg(not(any(loom, tokio_no_const_thread_local)))]
 tokio_thread_local!(static CURRENT: LocalData = const { LocalData {
     thread_id: Cell::new(None),
     ctx: RcCell::new(),
