@@ -72,7 +72,17 @@ macro_rules! join {
 
         // Safety: nothing must be moved out of `futures`. This is to satisfy
         // the requirement of `Pin::new_unchecked` called below.
+        //
+        // We can't use the `pin!` macro for this because `futures` is a tuple
+        // and the standard library provides no way to pin-project to the fields
+        // of a tuple.
         let mut futures = ( $( maybe_done($e), )* );
+
+        // This assignment makes sure that the `poll_fn` closure only has a
+        // reference to the futures, instead of taking ownership of them. This
+        // mitigates the issue described in
+        // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
+        let mut futures = &mut futures;
 
         // Each time the future created by poll_fn is polled, a different future will be polled first
         // to ensure every future passed to join! gets a chance to make progress even if
@@ -106,7 +116,7 @@ macro_rules! join {
                     to_run -= 1;
 
                     // Extract the future for this branch from the tuple.
-                    let ( $($skip,)* fut, .. ) = &mut futures;
+                    let ( $($skip,)* fut, .. ) = &mut *futures;
 
                     // Safety: future is stored on the stack above
                     // and never moved.

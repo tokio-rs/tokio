@@ -88,6 +88,7 @@ async fn err_abort_early() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn join_size() {
     use futures::future;
     use std::mem;
@@ -96,14 +97,14 @@ fn join_size() {
         let ready = future::ready(ok(0i32));
         tokio::try_join!(ready)
     };
-    assert_eq!(mem::size_of_val(&fut), 20);
+    assert_eq!(mem::size_of_val(&fut), 32);
 
     let fut = async {
         let ready1 = future::ready(ok(0i32));
         let ready2 = future::ready(ok(0i32));
         tokio::try_join!(ready1, ready2)
     };
-    assert_eq!(mem::size_of_val(&fut), 32);
+    assert_eq!(mem::size_of_val(&fut), 48);
 }
 
 fn ok<T>(val: T) -> Result<T, ()> {

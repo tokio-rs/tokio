@@ -207,6 +207,7 @@ async fn nested() {
 }
 
 #[maybe_tokio_test]
+#[cfg(target_pointer_width = "64")]
 async fn struct_size() {
     use futures::future;
     use std::mem;
@@ -219,7 +220,7 @@ async fn struct_size() {
         }
     };
 
-    assert!(mem::size_of_val(&fut) <= 32);
+    assert_eq!(mem::size_of_val(&fut), 40);
 
     let fut = async {
         let ready1 = future::ready(0i32);
@@ -231,7 +232,7 @@ async fn struct_size() {
         }
     };
 
-    assert!(mem::size_of_val(&fut) <= 40);
+    assert_eq!(mem::size_of_val(&fut), 48);
 
     let fut = async {
         let ready1 = future::ready(0i32);
@@ -245,7 +246,7 @@ async fn struct_size() {
         }
     };
 
-    assert!(mem::size_of_val(&fut) <= 48);
+    assert_eq!(mem::size_of_val(&fut), 56);
 }
 
 #[maybe_tokio_test]

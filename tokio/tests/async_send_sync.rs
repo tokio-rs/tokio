@@ -136,6 +136,21 @@ macro_rules! cfg_not_wasi {
     }
 }
 
+// Manualy re-implementation of `async_assert_fn` for `poll_fn`. The macro
+// doesn't work for this particular case because constructing the closure
+// is too complicated.
+const _: fn() = || {
+    let pinned = std::marker::PhantomPinned;
+    let f = tokio::macros::support::poll_fn(move |_| {
+        // Use `pinned` to take ownership of it.
+        let _ = &pinned;
+        std::task::Poll::Pending::<()>
+    });
+    require_send(&f);
+    require_sync(&f);
+    AmbiguousIfUnpin::some_item(&f);
+};
+
 cfg_not_wasi! {
     mod fs {
         use super::*;
