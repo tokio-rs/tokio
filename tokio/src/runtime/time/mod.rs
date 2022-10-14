@@ -20,7 +20,7 @@ mod wheel;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime::driver::{IoHandle, IoStack};
+use crate::runtime::driver::{self, IoHandle, IoStack};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
 
@@ -165,15 +165,17 @@ impl Driver {
         (driver, handle)
     }
 
-    pub(crate) fn park(&mut self, handle: &Handle) {
+    pub(crate) fn park(&mut self, handle: &driver::Handle) {
         self.park_internal(handle, None)
     }
 
-    pub(crate) fn park_timeout(&mut self, handle: &Handle, duration: Duration) {
+    pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
         self.park_internal(handle, Some(duration))
     }
 
-    pub(crate) fn shutdown(&mut self, handle: &Handle) {
+    pub(crate) fn shutdown(&mut self, rt_handle: &driver::Handle) {
+        let handle = rt_handle.time();
+
         if handle.is_shutdown() {
             return;
         }
@@ -184,10 +186,11 @@ impl Driver {
 
         handle.process_at_time(u64::MAX);
 
-        self.park.shutdown();
+        self.park.shutdown(rt_handle);
     }
 
-    fn park_internal(&mut self, handle: &Handle, limit: Option<Duration>) {
+    fn park_internal(&mut self, rt_handle: &driver::Handle, limit: Option<Duration>) {
+        let handle = rt_handle.time();
         let mut lock = handle.get().state.lock();
 
         assert!(!handle.is_shutdown());
@@ -211,16 +214,16 @@ impl Driver {
                         duration = std::cmp::min(limit, duration);
                     }
 
-                    self.park_thread_timeout(duration);
+                    self.park_thread_timeout(rt_handle, duration);
                 } else {
-                    self.park.park_timeout(Duration::from_secs(0));
+                    self.park.park_timeout(rt_handle, Duration::from_secs(0));
                 }
             }
             None => {
                 if let Some(duration) = limit {
-                    self.park_thread_timeout(duration);
+                    self.park_thread_timeout(rt_handle, duration);
                 } else {
-                    self.park.park();
+                    self.park.park(rt_handle);
                 }
             }
         }
@@ -230,11 +233,11 @@ impl Driver {
     }
 
     cfg_test_util! {
-        fn park_thread_timeout(&mut self, duration: Duration) {
+        fn park_thread_timeout(&mut self, rt_handle: &driver::Handle, duration: Duration) {
             let clock = &self.time_source.clock;
 
             if clock.is_paused() {
-                self.park.park_timeout(Duration::from_secs(0));
+                self.park.park_timeout(rt_handle, Duration::from_secs(0));
 
                 // If the time driver was woken, then the park completed
                 // before the "duration" elapsed (usually caused by a
@@ -245,7 +248,7 @@ impl Driver {
                     clock.advance(duration);
                 }
             } else {
-                self.park.park_timeout(duration);
+                self.park.park_timeout(rt_handle, duration);
             }
         }
 
@@ -255,8 +258,8 @@ impl Driver {
     }
 
     cfg_not_test_util! {
-        fn park_thread_timeout(&mut self, duration: Duration) {
-            self.park.park_timeout(duration);
+        fn park_thread_timeout(&mut self, rt_handle: &driver::Handle, duration: Duration) {
+            self.park.park_timeout(rt_handle, duration);
         }
     }
 }

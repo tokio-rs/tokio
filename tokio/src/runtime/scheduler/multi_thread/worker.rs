@@ -522,9 +522,9 @@ impl Context {
 
         // Park thread
         if let Some(timeout) = duration {
-            park.park_timeout(timeout);
+            park.park_timeout(&self.worker.handle.driver, timeout);
         } else {
-            park.park();
+            park.park(&self.worker.handle.driver);
         }
 
         // Remove `core` from context
@@ -687,14 +687,14 @@ impl Core {
     }
 
     /// Shuts down the core.
-    fn shutdown(&mut self) {
+    fn shutdown(&mut self, handle: &Handle) {
         // Take the core
         let mut park = self.park.take().expect("park missing");
 
         // Drain the queue
         while self.next_local_task().is_some() {}
 
-        park.shutdown();
+        park.shutdown(&handle.driver);
     }
 }
 
@@ -829,7 +829,7 @@ impl Handle {
         debug_assert!(self.shared.owned.is_empty());
 
         for mut core in cores.drain(..) {
-            core.shutdown();
+            core.shutdown(self);
         }
 
         // Drain the injection queue

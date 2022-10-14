@@ -247,7 +247,7 @@ impl Drop for CurrentThread {
 
             // Shutdown the resource drivers
             if let Some(driver) = core.driver.as_mut() {
-                driver.shutdown();
+                driver.shutdown(&self.handle.driver);
             }
 
             (core, ())
@@ -314,7 +314,7 @@ impl Context {
             core.metrics.submit(&self.handle.shared.worker_metrics);
 
             let (c, _) = self.enter(core, || {
-                driver.park();
+                driver.park(&self.handle.driver);
             });
 
             core = c;
@@ -339,7 +339,7 @@ impl Context {
 
         core.metrics.submit(&self.handle.shared.worker_metrics);
         let (mut core, _) = self.enter(core, || {
-            driver.park_timeout(Duration::from_millis(0));
+            driver.park_timeout(&self.handle.driver, Duration::from_millis(0));
         });
 
         core.driver = Some(driver);
