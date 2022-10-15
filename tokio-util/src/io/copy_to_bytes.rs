@@ -5,8 +5,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// A helper which wraps a `Sink<&'a [u8]>` and converts it into
-    /// a `Sink<Bytes>` by copying each byte slice into an owned [`Bytes`].
+    /// A helper which wraps a `Sink<Bytes>` and converts it into
+    /// a `Sink<&'a [u8]>` by copying each byte slice into an owned [`Bytes`].
     ///
     /// This can be convenient when dealing with a [`SinkWriter`] which wraps a sink that
     /// needs to take ownership of the data to be sent.
@@ -48,22 +48,21 @@ where
 {
     type Error = S::Error;
 
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.as_mut().project().inner.poll_ready(cx)
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_ready(cx)
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: &'a [u8]) -> Result<(), Self::Error> {
-        self.as_mut()
-            .project()
+    fn start_send(self: Pin<&mut Self>, item: &'a [u8]) -> Result<(), Self::Error> {
+        self.project()
             .inner
             .start_send(Bytes::copy_from_slice(item))
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.as_mut().project().inner.poll_flush(cx)
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
     }
 
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.as_mut().project().inner.poll_close(cx)
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
     }
 }

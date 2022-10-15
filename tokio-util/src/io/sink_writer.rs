@@ -9,8 +9,9 @@ use tokio::io::AsyncWrite;
 pin_project! {
     /// Convert a [`Sink`] of byte chunks into an [`AsyncWrite`].
     ///
-    /// Each write to the [`SinkWriter`] is converted into a send of `&[u8]` to the [`Sink`].
-    /// Flushes and shutdown are propagated to the sink's flush and close methods.
+    /// Whenever you write to this [`SinkWriter`], the supplied bytes are  copied and
+    /// forwarded to the inner [`Sink`]. When [`shutdown`] is called on this
+    /// [`SinkWriter`], the inner sink is closed.
     ///
     /// This adapter implements [`AsyncWrite`] for `Sink<&[u8]>`. If you want to
     /// implement `Sink<_>` for [`AsyncWrite`], see the [`codec`] module; if you need to implement
