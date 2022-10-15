@@ -10,7 +10,7 @@ pin_project! {
     /// Convert a [`Sink`] of byte chunks into an [`AsyncWrite`].
     ///
     /// Whenever you write to this [`SinkWriter`], the supplied bytes are
-    /// forwarded to the inner [`Sink`]. When [`shutdown`] is called on this
+    /// forwarded to the inner [`Sink`]. When `shutdown` is called on this
     /// [`SinkWriter`], the inner sink is closed.
     ///
     /// This adapter implements [`AsyncWrite`] for `Sink<&[u8]>`. If you want to
