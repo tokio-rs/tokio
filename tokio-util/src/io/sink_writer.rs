@@ -9,7 +9,7 @@ use tokio::io::AsyncWrite;
 pin_project! {
     /// Convert a [`Sink`] of byte chunks into an [`AsyncWrite`].
     ///
-    /// Whenever you write to this [`SinkWriter`], the supplied bytes are  copied and
+    /// Whenever you write to this [`SinkWriter`], the supplied bytes are
     /// forwarded to the inner [`Sink`]. When [`shutdown`] is called on this
     /// [`SinkWriter`], the inner sink is closed.
     ///
