@@ -86,13 +86,14 @@ where
     E: Into<io::Error>,
 {
     fn poll_write(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        match self.as_mut().project().inner.poll_ready(cx) {
+        let mut this = self.project();
+        match this.inner.as_mut().poll_ready(cx) {
             Poll::Ready(Ok(())) => {
-                if let Err(e) = self.as_mut().project().inner.start_send(buf) {
+                if let Err(e) = this.inner.as_mut().start_send(buf) {
                     Poll::Ready(Err(e.into()))
                 } else {
                     Poll::Ready(Ok(buf.len()))
