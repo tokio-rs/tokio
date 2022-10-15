@@ -642,6 +642,8 @@ impl Drop for TimerEntry {
     }
 }
 
+// Copied from [crossbeam/cache_padded](https://github.com/crossbeam-rs/crossbeam/blob/fa35346b7c789bba045ad789e894c68c466d1779/crossbeam-utils/src/cache_padded.rs#L62-L127)
+//
 // Starting from Intel's Sandy Bridge, spatial prefetcher is now pulling pairs of 64-byte cache
 // lines at a time, so we have to align to 128 bytes rather than 64.
 //
