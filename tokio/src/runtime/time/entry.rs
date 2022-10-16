@@ -176,7 +176,7 @@ impl StateCell {
             // https://github.com/tokio-rs/tokio/issues/3675
             assert!(
                 cur_state < STATE_MIN_VALUE,
-                "mark_pending called when the timer entry is deregistered or in pending fire"
+                "mark_pending called when the timer entry is in an invalid state"
             );
 
             if cur_state > not_after {
