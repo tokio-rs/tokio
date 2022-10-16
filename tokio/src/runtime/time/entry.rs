@@ -172,7 +172,12 @@ impl StateCell {
         let mut cur_state = self.state.load(Ordering::Relaxed);
 
         loop {
-            debug_assert!(cur_state < STATE_MIN_VALUE);
+            // improve the error message for things like
+            // https://github.com/tokio-rs/tokio/issues/3675
+            assert!(
+                cur_state < STATE_MIN_VALUE,
+                "mark_pending called when the timer entry is in an invalid state"
+            );
 
             if cur_state > not_after {
                 break Err(cur_state);
