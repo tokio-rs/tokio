@@ -84,7 +84,7 @@ impl Handle {
     cfg_time! {
         /// Returns a reference to the time driver handle.
         ///
-        /// Panics if no time driver is present
+        /// Panics if no time driver is present.
         #[track_caller]
         pub(crate) fn time(&self) -> &crate::runtime::time::Handle {
             self.time
