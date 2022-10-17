@@ -58,16 +58,16 @@ impl Driver {
         ))
     }
 
-    pub(crate) fn park(&mut self) {
-        self.inner.park()
+    pub(crate) fn park(&mut self, handle: &Handle) {
+        self.inner.park(handle)
     }
 
-    pub(crate) fn park_timeout(&mut self, duration: Duration) {
-        self.inner.park_timeout(duration)
+    pub(crate) fn park_timeout(&mut self, handle: &Handle, duration: Duration) {
+        self.inner.park_timeout(handle, duration)
     }
 
-    pub(crate) fn shutdown(&mut self) {
-        self.inner.shutdown()
+    pub(crate) fn shutdown(&mut self, handle: &Handle) {
+        self.inner.shutdown(handle)
     }
 }
 
@@ -79,6 +79,18 @@ impl Handle {
         }
 
         self.io.unpark();
+    }
+
+    cfg_time! {
+        /// Returns a reference to the time driver handle.
+        ///
+        /// Panics if no time driver is present.
+        #[track_caller]
+        pub(crate) fn time(&self) -> &crate::runtime::time::Handle {
+            self.time
+                .as_ref()
+                .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
+        }
     }
 }
 
@@ -121,30 +133,21 @@ cfg_io_driver! {
     }
 
     impl IoStack {
-        /*
-        pub(crate) fn handle(&self) -> IoHandle {
-            match self {
-                IoStack::Enabled(v) => IoHandle::Enabled(v.handle()),
-                IoStack::Disabled(v) => IoHandle::Disabled(v.unpark()),
-            }
-        }]
-        */
-
-        pub(crate) fn park(&mut self) {
+        pub(crate) fn park(&mut self, _handle: &Handle) {
             match self {
                 IoStack::Enabled(v) => v.park(),
                 IoStack::Disabled(v) => v.park(),
             }
         }
 
-        pub(crate) fn park_timeout(&mut self, duration: Duration) {
+        pub(crate) fn park_timeout(&mut self, _handle: &Handle, duration: Duration) {
             match self {
                 IoStack::Enabled(v) => v.park_timeout(duration),
                 IoStack::Disabled(v) => v.park_timeout(duration),
             }
         }
 
-        pub(crate) fn shutdown(&mut self) {
+        pub(crate) fn shutdown(&mut self, _handle: &Handle) {
             match self {
                 IoStack::Enabled(v) => v.shutdown(),
                 IoStack::Disabled(v) => v.shutdown(),
@@ -181,12 +184,28 @@ cfg_io_driver! {
 
 cfg_not_io_driver! {
     pub(crate) type IoHandle = UnparkThread;
-    pub(crate) type IoStack = ParkThread;
+
+    #[derive(Debug)]
+    pub(crate) struct IoStack(ParkThread);
 
     fn create_io_stack(_enabled: bool) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         let park_thread = ParkThread::new();
         let unpark_thread = park_thread.unpark();
-        Ok((park_thread, unpark_thread, Default::default()))
+        Ok((IoStack(park_thread), unpark_thread, Default::default()))
+    }
+
+    impl IoStack {
+        pub(crate) fn park(&mut self, _handle: &Handle) {
+            self.0.park();
+        }
+
+        pub(crate) fn park_timeout(&mut self, _handle: &Handle, duration: Duration) {
+            self.0.park_timeout(duration);
+        }
+
+        pub(crate) fn shutdown(&mut self, _handle: &Handle) {
+            self.0.shutdown();
+        }
     }
 }
 
@@ -249,7 +268,6 @@ cfg_time! {
     pub(crate) enum TimeDriver {
         Enabled {
             driver: crate::runtime::time::Driver,
-            handle: crate::runtime::time::Handle,
         },
         Disabled(IoStack),
     }
@@ -269,31 +287,31 @@ cfg_time! {
         if enable {
             let (driver, handle) = crate::runtime::time::Driver::new(io_stack, clock);
 
-            (TimeDriver::Enabled { driver, handle: handle.clone() }, Some(handle))
+            (TimeDriver::Enabled { driver }, Some(handle))
         } else {
             (TimeDriver::Disabled(io_stack), None)
         }
     }
 
     impl TimeDriver {
-        pub(crate) fn park(&mut self) {
+        pub(crate) fn park(&mut self, handle: &Handle) {
             match self {
-                TimeDriver::Enabled { driver, handle } => driver.park(handle),
-                TimeDriver::Disabled(v) => v.park(),
+                TimeDriver::Enabled { driver, .. } => driver.park(handle),
+                TimeDriver::Disabled(v) => v.park(handle),
             }
         }
 
-        pub(crate) fn park_timeout(&mut self, duration: Duration) {
+        pub(crate) fn park_timeout(&mut self, handle: &Handle, duration: Duration) {
             match self {
-                TimeDriver::Enabled { driver, handle } => driver.park_timeout(handle, duration),
-                TimeDriver::Disabled(v) => v.park_timeout(duration),
+                TimeDriver::Enabled { driver } => driver.park_timeout(handle, duration),
+                TimeDriver::Disabled(v) => v.park_timeout(handle, duration),
             }
         }
 
-        pub(crate) fn shutdown(&mut self) {
+        pub(crate) fn shutdown(&mut self, handle: &Handle) {
             match self {
-                TimeDriver::Enabled { driver, handle } => driver.shutdown(handle),
-                TimeDriver::Disabled(v) => v.shutdown(),
+                TimeDriver::Enabled { driver } => driver.shutdown(handle),
+                TimeDriver::Disabled(v) => v.shutdown(handle),
             }
         }
     }

@@ -43,10 +43,7 @@ impl Handle {
     cfg_time! {
         #[track_caller]
         pub(crate) fn time(&self) -> &crate::runtime::time::Handle {
-            self.driver()
-                .time
-                .as_ref()
-                .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
+            self.driver().time()
         }
 
         cfg_test_util! {
