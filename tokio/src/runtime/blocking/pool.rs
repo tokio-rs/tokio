@@ -380,6 +380,10 @@ impl Spawner {
         let _ = name;
 
         let (task, handle) = task::unowned(fut, NoopSchedule, id);
+
+        #[cfg(feature = "test-util")]
+        crate::time::inhibit_auto_advance();
+
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
         (handle, spawned)
     }

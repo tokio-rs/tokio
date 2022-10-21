@@ -39,6 +39,11 @@ where
         // we want it to start without any budgeting.
         crate::runtime::coop::stop();
 
-        Poll::Ready(func())
+        let r = func();
+
+        #[cfg(feature = "test-util")]
+        crate::time::allow_auto_advance();
+
+        Poll::Ready(r)
     }
 }
