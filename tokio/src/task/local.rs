@@ -283,14 +283,21 @@ struct LocalData {
 }
 
 cfg_rt! {
-    /// Spawns a `!Send` future on the local task set.
+    /// Spawns a `!Send` future on the current [`LocalSet`].
     ///
-    /// The spawned future will be run on the same thread that called `spawn_local.`
-    /// This may only be called from the context of a local task set.
+    /// The spawned future will run on the same thread that called `spawn_local`.
+    ///
+    /// You do not have to `.await` the returned `JoinHandle` to make the
+    /// provided future start execution. It will start running in the background
+    /// immediately when `spawn_local` is called.
     ///
     /// # Panics
     ///
-    /// - This function panics if called outside of a local task set.
+    /// This function panics if called outside of a [`LocalSet`].
+    ///
+    /// Note that if [`tokio::spawn`] is used from within a `LocalSet`, the
+    /// resulting new task will _not_ be inside the `LocalSet`, so you must use
+    /// use `spawn_local` if you want to stay within the `LocalSet`.
     ///
     /// # Examples
     ///
@@ -314,6 +321,9 @@ cfg_rt! {
     ///     }).await;
     /// }
     /// ```
+    ///
+    /// [`LocalSet`]: struct@crate::task::LocalSet
+    /// [`tokio::spawn`]: fn@crate::task::spawn
     #[track_caller]
     pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
     where
@@ -401,7 +411,13 @@ impl LocalSet {
     /// This task is guaranteed to be run on the current thread.
     ///
     /// Unlike the free function [`spawn_local`], this method may be used to
-    /// spawn local tasks when the task set is _not_ running. For example:
+    /// spawn local tasks when the `LocalSet` is _not_ running. You do not have
+    /// to `.await` the returned `JoinHandle` to make the provided future start
+    /// execution. It will start running immediately whenever the `LocalSet` is
+    /// next started.
+    ///
+    /// # Examples
+    ///
     /// ```rust
     /// use tokio::task;
     ///
