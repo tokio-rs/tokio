@@ -114,6 +114,10 @@ impl Handle {
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
     ///
+    /// You do not have to `.await` the returned `JoinHandle` to make the
+    /// provided future start execution. It will start running in the background
+    /// immediately when `spawn` is called.
+    ///
     /// See [module level][mod] documentation for more details.
     ///
     /// [mod]: index.html
