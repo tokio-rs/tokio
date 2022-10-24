@@ -1,5 +1,5 @@
 use crate::loom::sync::{Mutex, MutexGuard};
-use crate::signal::unix::driver::Handle as SignalHandle;
+use crate::runtime::signal::Handle as SignalHandle;
 use crate::signal::unix::{signal_with_handle, SignalKind};
 use crate::sync::watch;
 use std::io;

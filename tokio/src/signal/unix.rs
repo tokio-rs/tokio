@@ -6,6 +6,7 @@
 #![cfg(unix)]
 #![cfg_attr(docsrs, doc(cfg(all(unix, feature = "signal"))))]
 
+use crate::runtime::signal::Handle;
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::signal::RxFuture;
 use crate::sync::watch;
@@ -16,9 +17,6 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
-
-pub(crate) mod driver;
-use self::driver::Handle;
 
 pub(crate) type OsStorage = Vec<SignalInfo>;
 
@@ -52,7 +50,7 @@ impl Storage for OsStorage {
 #[derive(Debug)]
 pub(crate) struct OsExtraData {
     sender: UnixStream,
-    receiver: UnixStream,
+    pub(crate) receiver: UnixStream,
 }
 
 impl Init for OsExtraData {

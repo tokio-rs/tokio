@@ -188,6 +188,10 @@ cfg_time! {
     pub(crate) mod time;
 }
 
+cfg_signal_internal_and_unix! {
+    pub(crate) mod signal;
+}
+
 cfg_rt! {
     pub(crate) mod enter;
 
