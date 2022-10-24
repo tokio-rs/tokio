@@ -576,7 +576,7 @@ impl TimerEntry {
         this.inner().state.poll(cx.waker())
     }
 
-    fn driver(&self) -> &super::Handle {
+    pub(crate) fn driver(&self) -> &super::Handle {
         self.driver.time()
     }
 }
