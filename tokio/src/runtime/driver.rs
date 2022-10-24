@@ -211,19 +211,12 @@ cfg_not_io_driver! {
 
 // ===== signal driver =====
 
-macro_rules! cfg_signal_internal_and_unix {
-    ($($item:item)*) => {
-        #[cfg(unix)]
-        cfg_signal_internal! { $($item)* }
-    }
-}
-
 cfg_signal_internal_and_unix! {
-    type SignalDriver = crate::signal::unix::driver::Driver;
-    pub(crate) type SignalHandle = Option<crate::signal::unix::driver::Handle>;
+    type SignalDriver = crate::runtime::signal::Driver;
+    pub(crate) type SignalHandle = Option<crate::runtime::signal::Handle>;
 
     fn create_signal_driver(io_driver: IoDriver) -> io::Result<(SignalDriver, SignalHandle)> {
-        let driver = crate::signal::unix::driver::Driver::new(io_driver)?;
+        let driver = crate::runtime::signal::Driver::new(io_driver)?;
         let handle = driver.handle();
         Ok((driver, Some(handle)))
     }

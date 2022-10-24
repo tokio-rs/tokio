@@ -3,7 +3,7 @@
 //! Process driver.
 
 use crate::process::unix::GlobalOrphanQueue;
-use crate::signal::unix::driver::{Driver as SignalDriver, Handle as SignalHandle};
+use crate::runtime::signal::{Driver as SignalDriver, Handle as SignalHandle};
 
 use std::time::Duration;
 

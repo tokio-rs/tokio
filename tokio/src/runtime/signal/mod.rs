@@ -150,7 +150,7 @@ unsafe fn noop(_data: *const ()) {}
 // ===== impl Handle =====
 
 impl Handle {
-    pub(super) fn check_inner(&self) -> std_io::Result<()> {
+    pub(crate) fn check_inner(&self) -> std_io::Result<()> {
         if self.inner.strong_count() > 0 {
             Ok(())
         } else {
@@ -170,7 +170,7 @@ cfg_rt! {
         ///
         /// This function panics if there is no current signal driver set.
         #[track_caller]
-        pub(super) fn current() -> Self {
+        pub(crate) fn current() -> Self {
             crate::runtime::context::signal_handle().expect(
                 "there is no signal driver running, must be called from the context of Tokio runtime",
             )
@@ -186,7 +186,7 @@ cfg_not_rt! {
         ///
         /// This function panics if there is no current signal driver set.
         #[track_caller]
-        pub(super) fn current() -> Self {
+        pub(crate) fn current() -> Self {
             panic!(
                 "there is no signal driver running, must be called from the context of Tokio runtime or with\
                 `rt` enabled.",

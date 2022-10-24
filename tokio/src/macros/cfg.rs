@@ -297,6 +297,13 @@ macro_rules! cfg_signal_internal {
     }
 }
 
+macro_rules! cfg_signal_internal_and_unix {
+    ($($item:item)*) => {
+        #[cfg(unix)]
+        cfg_signal_internal! { $($item)* }
+    }
+}
+
 macro_rules! cfg_not_signal_internal {
     ($($item:item)*) => {
         $(

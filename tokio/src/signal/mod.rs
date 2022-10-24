@@ -48,7 +48,7 @@ use std::task::{Context, Poll};
 mod ctrl_c;
 pub use ctrl_c::ctrl_c;
 
-mod registry;
+pub(crate) mod registry;
 
 mod os {
     #[cfg(unix)]
