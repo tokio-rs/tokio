@@ -1,18 +1,26 @@
 #![allow(clippy::redundant_clone)]
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(feature = "sync")]
 
-use std::thread;
-use tokio::runtime::Runtime;
-use tokio::sync::mpsc;
+#[cfg(tokio_wasm_not_wasi)]
+use wasm_bindgen_test::wasm_bindgen_test as test;
+#[cfg(tokio_wasm_not_wasi)]
+use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
+
+#[cfg(not(tokio_wasm_not_wasi))]
+use tokio::test as maybe_tokio_test;
+
 use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
-use tokio_test::task;
-use tokio_test::{
-    assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
-};
+use tokio::sync::mpsc::{self, channel};
+use tokio::sync::oneshot;
+use tokio_test::*;
 
+use std::fmt;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::Arc;
 
+#[cfg(not(tokio_wasm))]
 mod support {
     pub(crate) mod mpsc_stream;
 }
@@ -21,7 +29,7 @@ trait AssertSend: Send {}
 impl AssertSend for mpsc::Sender<i32> {}
 impl AssertSend for mpsc::Receiver<i32> {}
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn send_recv_with_buffer() {
     let (tx, mut rx) = mpsc::channel::<i32>(16);
 
@@ -46,6 +54,7 @@ async fn send_recv_with_buffer() {
 }
 
 #[tokio::test]
+#[cfg(feature = "full")]
 async fn reserve_disarm() {
     let (tx, mut rx) = mpsc::channel::<i32>(2);
     let tx1 = tx.clone();
@@ -58,10 +67,10 @@ async fn reserve_disarm() {
     let permit2 = assert_ok!(tx2.reserve().await);
 
     // But a third should not be ready
-    let mut r3 = task::spawn(tx3.reserve());
+    let mut r3 = tokio_test::task::spawn(tx3.reserve());
     assert_pending!(r3.poll());
 
-    let mut r4 = task::spawn(tx4.reserve());
+    let mut r4 = tokio_test::task::spawn(tx4.reserve());
     assert_pending!(r4.poll());
 
     // Using one of the reserved slots should allow a new handle to become ready
@@ -78,11 +87,12 @@ async fn reserve_disarm() {
     drop(permit2);
     assert!(r4.is_woken());
 
-    let mut r1 = task::spawn(tx1.reserve());
+    let mut r1 = tokio_test::task::spawn(tx1.reserve());
     assert_pending!(r1.poll());
 }
 
 #[tokio::test]
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 async fn send_recv_stream_with_buffer() {
     use tokio_stream::StreamExt;
 
@@ -100,6 +110,7 @@ async fn send_recv_stream_with_buffer() {
 }
 
 #[tokio::test]
+#[cfg(feature = "full")]
 async fn async_send_recv_with_buffer() {
     let (tx, mut rx) = mpsc::channel(16);
 
@@ -114,10 +125,11 @@ async fn async_send_recv_with_buffer() {
 }
 
 #[tokio::test]
+#[cfg(feature = "full")]
 async fn start_send_past_cap() {
     use std::future::Future;
 
-    let mut t1 = task::spawn(());
+    let mut t1 = tokio_test::task::spawn(());
 
     let (tx1, mut rx) = mpsc::channel(1);
     let tx2 = tx1.clone();
@@ -128,7 +140,7 @@ async fn start_send_past_cap() {
     t1.enter(|cx, _| assert_pending!(r1.as_mut().poll(cx)));
 
     {
-        let mut r2 = task::spawn(tx2.reserve());
+        let mut r2 = tokio_test::task::spawn(tx2.reserve());
         assert_pending!(r2.poll());
 
         drop(r1);
@@ -147,11 +159,12 @@ async fn start_send_past_cap() {
 
 #[test]
 #[should_panic]
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn buffer_gteq_one() {
     mpsc::channel::<i32>(0);
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn send_recv_unbounded() {
     let (tx, mut rx) = mpsc::unbounded_channel::<i32>();
 
@@ -168,6 +181,7 @@ async fn send_recv_unbounded() {
 }
 
 #[tokio::test]
+#[cfg(feature = "full")]
 async fn async_send_recv_unbounded() {
     let (tx, mut rx) = mpsc::unbounded_channel();
 
@@ -182,6 +196,7 @@ async fn async_send_recv_unbounded() {
 }
 
 #[tokio::test]
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 async fn send_recv_stream_unbounded() {
     use tokio_stream::StreamExt;
 
@@ -199,32 +214,32 @@ async fn send_recv_stream_unbounded() {
     assert_eq!(None, rx.next().await);
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn no_t_bounds_buffer() {
     struct NoImpls;
 
     let (tx, mut rx) = mpsc::channel(100);
 
     // sender should be Debug even though T isn't Debug
-    println!("{:?}", tx);
+    is_debug(&tx);
     // same with Receiver
-    println!("{:?}", rx);
+    is_debug(&rx);
     // and sender should be Clone even though T isn't Clone
     assert!(tx.clone().try_send(NoImpls).is_ok());
 
     assert!(rx.recv().await.is_some());
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn no_t_bounds_unbounded() {
     struct NoImpls;
 
     let (tx, mut rx) = mpsc::unbounded_channel();
 
     // sender should be Debug even though T isn't Debug
-    println!("{:?}", tx);
+    is_debug(&tx);
     // same with Receiver
-    println!("{:?}", rx);
+    is_debug(&rx);
     // and sender should be Clone even though T isn't Clone
     assert!(tx.clone().send(NoImpls).is_ok());
 
@@ -232,6 +247,7 @@ async fn no_t_bounds_unbounded() {
 }
 
 #[tokio::test]
+#[cfg(feature = "full")]
 async fn send_recv_buffer_limited() {
     let (tx, mut rx) = mpsc::channel::<i32>(1);
 
@@ -242,7 +258,7 @@ async fn send_recv_buffer_limited() {
     p1.send(1);
 
     // Not ready
-    let mut p2 = task::spawn(tx.reserve());
+    let mut p2 = tokio_test::task::spawn(tx.reserve());
     assert_pending!(p2.poll());
 
     // Take the value
@@ -261,7 +277,7 @@ async fn send_recv_buffer_limited() {
     assert!(rx.recv().await.is_some());
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn recv_close_gets_none_idle() {
     let (tx, mut rx) = mpsc::channel::<i32>(10);
 
@@ -273,12 +289,13 @@ async fn recv_close_gets_none_idle() {
 }
 
 #[tokio::test]
+#[cfg(feature = "full")]
 async fn recv_close_gets_none_reserved() {
     let (tx1, mut rx) = mpsc::channel::<i32>(1);
     let tx2 = tx1.clone();
 
     let permit1 = assert_ok!(tx1.reserve().await);
-    let mut permit2 = task::spawn(tx2.reserve());
+    let mut permit2 = tokio_test::task::spawn(tx2.reserve());
     assert_pending!(permit2.poll());
 
     rx.close();
@@ -287,7 +304,7 @@ async fn recv_close_gets_none_reserved() {
     assert_ready_err!(permit2.poll());
 
     {
-        let mut recv = task::spawn(rx.recv());
+        let mut recv = tokio_test::task::spawn(rx.recv());
         assert_pending!(recv.poll());
 
         permit1.send(123);
@@ -300,13 +317,13 @@ async fn recv_close_gets_none_reserved() {
     assert!(rx.recv().await.is_none());
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn tx_close_gets_none() {
     let (_, mut rx) = mpsc::channel::<i32>(10);
     assert!(rx.recv().await.is_none());
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn try_send_fail() {
     let (tx, mut rx) = mpsc::channel(1);
 
@@ -327,7 +344,7 @@ async fn try_send_fail() {
     assert!(rx.recv().await.is_none());
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn try_send_fail_with_try_recv() {
     let (tx, mut rx) = mpsc::channel(1);
 
@@ -348,7 +365,7 @@ async fn try_send_fail_with_try_recv() {
     assert_eq!(rx.try_recv(), Err(TryRecvError::Disconnected));
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn try_reserve_fails() {
     let (tx, mut rx) = mpsc::channel(1);
 
@@ -372,6 +389,7 @@ async fn try_reserve_fails() {
 }
 
 #[tokio::test]
+#[cfg(feature = "full")]
 async fn drop_permit_releases_permit() {
     // poll_ready reserves capacity, ensure that the capacity is released if tx
     // is dropped w/o sending a value.
@@ -380,7 +398,7 @@ async fn drop_permit_releases_permit() {
 
     let permit = assert_ok!(tx1.reserve().await);
 
-    let mut reserve2 = task::spawn(tx2.reserve());
+    let mut reserve2 = tokio_test::task::spawn(tx2.reserve());
     assert_pending!(reserve2.poll());
 
     drop(permit);
@@ -389,7 +407,7 @@ async fn drop_permit_releases_permit() {
     assert_ready_ok!(reserve2.poll());
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn dropping_rx_closes_channel() {
     let (tx, rx) = mpsc::channel(100);
 
@@ -439,48 +457,57 @@ fn unconsumed_messages_are_dropped() {
 }
 
 #[test]
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 fn blocking_recv() {
     let (tx, mut rx) = mpsc::channel::<u8>(1);
 
-    let sync_code = thread::spawn(move || {
+    let sync_code = std::thread::spawn(move || {
         assert_eq!(Some(10), rx.blocking_recv());
     });
 
-    Runtime::new().unwrap().block_on(async move {
-        let _ = tx.send(10).await;
-    });
+    tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(async move {
+            let _ = tx.send(10).await;
+        });
     sync_code.join().unwrap()
 }
 
 #[tokio::test]
 #[should_panic]
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 async fn blocking_recv_async() {
     let (_tx, mut rx) = mpsc::channel::<()>(1);
     let _ = rx.blocking_recv();
 }
 
 #[test]
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 fn blocking_send() {
     let (tx, mut rx) = mpsc::channel::<u8>(1);
 
-    let sync_code = thread::spawn(move || {
+    let sync_code = std::thread::spawn(move || {
         tx.blocking_send(10).unwrap();
     });
 
-    Runtime::new().unwrap().block_on(async move {
-        assert_eq!(Some(10), rx.recv().await);
-    });
+    tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(async move {
+            assert_eq!(Some(10), rx.recv().await);
+        });
     sync_code.join().unwrap()
 }
 
 #[tokio::test]
 #[should_panic]
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 async fn blocking_send_async() {
     let (tx, _rx) = mpsc::channel::<()>(1);
     let _ = tx.blocking_send(());
 }
 
 #[tokio::test]
+#[cfg(feature = "full")]
 async fn ready_close_cancel_bounded() {
     let (tx, mut rx) = mpsc::channel::<()>(100);
     let _tx2 = tx.clone();
@@ -489,7 +516,7 @@ async fn ready_close_cancel_bounded() {
 
     rx.close();
 
-    let mut recv = task::spawn(rx.recv());
+    let mut recv = tokio_test::task::spawn(rx.recv());
     assert_pending!(recv.poll());
 
     drop(permit);
@@ -500,13 +527,14 @@ async fn ready_close_cancel_bounded() {
 }
 
 #[tokio::test]
+#[cfg(feature = "full")]
 async fn permit_available_not_acquired_close() {
     let (tx1, mut rx) = mpsc::channel::<()>(1);
     let tx2 = tx1.clone();
 
     let permit1 = assert_ok!(tx1.reserve().await);
 
-    let mut permit2 = task::spawn(tx2.reserve());
+    let mut permit2 = tokio_test::task::spawn(tx2.reserve());
     assert_pending!(permit2.poll());
 
     rx.close();
@@ -599,6 +627,7 @@ fn try_recv_close_while_empty_unbounded() {
 }
 
 #[tokio::test(start_paused = true)]
+#[cfg(feature = "full")]
 async fn recv_timeout() {
     use tokio::sync::mpsc::error::SendTimeoutError::{Closed, Timeout};
     use tokio::time::Duration;
@@ -624,6 +653,7 @@ async fn recv_timeout() {
 
 #[test]
 #[should_panic = "there is no reactor running, must be called from the context of a Tokio 1.x runtime"]
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn recv_timeout_panic() {
     use futures::future::FutureExt;
     use tokio::time::Duration;
@@ -631,3 +661,285 @@ fn recv_timeout_panic() {
     let (tx, _rx) = mpsc::channel(5);
     tx.send_timeout(10, Duration::from_secs(1)).now_or_never();
 }
+
+#[tokio::test]
+async fn weak_sender() {
+    let (tx, mut rx) = channel(11);
+
+    let tx_weak = tokio::spawn(async move {
+        let tx_weak = tx.clone().downgrade();
+
+        for i in 0..10 {
+            if tx.send(i).await.is_err() {
+                return None;
+            }
+        }
+
+        let tx2 = tx_weak
+            .upgrade()
+            .expect("expected to be able to upgrade tx_weak");
+        let _ = tx2.send(20).await;
+        let tx_weak = tx2.downgrade();
+
+        Some(tx_weak)
+    })
+    .await
+    .unwrap();
+
+    for i in 0..12 {
+        let recvd = rx.recv().await;
+
+        match recvd {
+            Some(msg) => {
+                if i == 10 {
+                    assert_eq!(msg, 20);
+                }
+            }
+            None => {
+                assert_eq!(i, 11);
+                break;
+            }
+        }
+    }
+
+    let tx_weak = tx_weak.unwrap();
+    let upgraded = tx_weak.upgrade();
+    assert!(upgraded.is_none());
+}
+
+#[tokio::test]
+async fn actor_weak_sender() {
+    pub struct MyActor {
+        receiver: mpsc::Receiver<ActorMessage>,
+        sender: mpsc::WeakSender<ActorMessage>,
+        next_id: u32,
+        pub received_self_msg: bool,
+    }
+
+    enum ActorMessage {
+        GetUniqueId { respond_to: oneshot::Sender<u32> },
+        SelfMessage {},
+    }
+
+    impl MyActor {
+        fn new(
+            receiver: mpsc::Receiver<ActorMessage>,
+            sender: mpsc::WeakSender<ActorMessage>,
+        ) -> Self {
+            MyActor {
+                receiver,
+                sender,
+                next_id: 0,
+                received_self_msg: false,
+            }
+        }
+
+        fn handle_message(&mut self, msg: ActorMessage) {
+            match msg {
+                ActorMessage::GetUniqueId { respond_to } => {
+                    self.next_id += 1;
+
+                    // The `let _ =` ignores any errors when sending.
+                    //
+                    // This can happen if the `select!` macro is used
+                    // to cancel waiting for the response.
+                    let _ = respond_to.send(self.next_id);
+                }
+                ActorMessage::SelfMessage { .. } => {
+                    self.received_self_msg = true;
+                }
+            }
+        }
+
+        async fn send_message_to_self(&mut self) {
+            let msg = ActorMessage::SelfMessage {};
+
+            let sender = self.sender.clone();
+
+            // cannot move self.sender here
+            if let Some(sender) = sender.upgrade() {
+                let _ = sender.send(msg).await;
+                self.sender = sender.downgrade();
+            }
+        }
+
+        async fn run(&mut self) {
+            let mut i = 0;
+            while let Some(msg) = self.receiver.recv().await {
+                self.handle_message(msg);
+
+                if i == 0 {
+                    self.send_message_to_self().await;
+                }
+
+                i += 1
+            }
+
+            assert!(self.received_self_msg);
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct MyActorHandle {
+        sender: mpsc::Sender<ActorMessage>,
+    }
+
+    impl MyActorHandle {
+        pub fn new() -> (Self, MyActor) {
+            let (sender, receiver) = mpsc::channel(8);
+            let actor = MyActor::new(receiver, sender.clone().downgrade());
+
+            (Self { sender }, actor)
+        }
+
+        pub async fn get_unique_id(&self) -> u32 {
+            let (send, recv) = oneshot::channel();
+            let msg = ActorMessage::GetUniqueId { respond_to: send };
+
+            // Ignore send errors. If this send fails, so does the
+            // recv.await below. There's no reason to check the
+            // failure twice.
+            let _ = self.sender.send(msg).await;
+            recv.await.expect("Actor task has been killed")
+        }
+    }
+
+    let (handle, mut actor) = MyActorHandle::new();
+
+    let actor_handle = tokio::spawn(async move { actor.run().await });
+
+    let _ = tokio::spawn(async move {
+        let _ = handle.get_unique_id().await;
+        drop(handle);
+    })
+    .await;
+
+    let _ = actor_handle.await;
+}
+
+static NUM_DROPPED: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Debug)]
+struct Msg;
+
+impl Drop for Msg {
+    fn drop(&mut self) {
+        NUM_DROPPED.fetch_add(1, Release);
+    }
+}
+
+// Tests that no pending messages are put onto the channel after `Rx` was
+// dropped.
+//
+// Note: After the introduction of `WeakSender`, which internally
+// used `Arc` and doesn't call a drop of the channel after the last strong
+// `Sender` was dropped while more than one `WeakSender` remains, we want to
+// ensure that no messages are kept in the channel, which were sent after
+// the receiver was dropped.
+#[tokio::test]
+async fn test_msgs_dropped_on_rx_drop() {
+    let (tx, mut rx) = mpsc::channel(3);
+
+    let _ = tx.send(Msg {}).await.unwrap();
+    let _ = tx.send(Msg {}).await.unwrap();
+
+    // This msg will be pending and should be dropped when `rx` is dropped
+    let sent_fut = tx.send(Msg {});
+
+    let _ = rx.recv().await.unwrap();
+    let _ = rx.recv().await.unwrap();
+
+    let _ = sent_fut.await.unwrap();
+
+    drop(rx);
+
+    assert_eq!(NUM_DROPPED.load(Acquire), 3);
+
+    // This msg will not be put onto `Tx` list anymore, since `Rx` is closed.
+    assert!(tx.send(Msg {}).await.is_err());
+
+    assert_eq!(NUM_DROPPED.load(Acquire), 4);
+}
+
+// Tests that a `WeakSender` is upgradeable when other `Sender`s exist.
+#[tokio::test]
+async fn downgrade_upgrade_sender_success() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+    let weak_tx = tx.downgrade();
+    assert!(weak_tx.upgrade().is_some());
+}
+
+// Tests that a `WeakSender` fails to upgrade when no other `Sender` exists.
+#[tokio::test]
+async fn downgrade_upgrade_sender_failure() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+    let weak_tx = tx.downgrade();
+    drop(tx);
+    assert!(weak_tx.upgrade().is_none());
+}
+
+// Tests that a `WeakSender` cannot be upgraded after a `Sender` was dropped,
+// which existed at the time of the `downgrade` call.
+#[tokio::test]
+async fn downgrade_drop_upgrade() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+
+    // the cloned `Tx` is dropped right away
+    let weak_tx = tx.clone().downgrade();
+    drop(tx);
+    assert!(weak_tx.upgrade().is_none());
+}
+
+// Tests that we can upgrade a weak sender with an outstanding permit
+// but no other strong senders.
+#[tokio::test]
+async fn downgrade_get_permit_upgrade_no_senders() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+    let weak_tx = tx.downgrade();
+    let _permit = tx.reserve_owned().await.unwrap();
+    assert!(weak_tx.upgrade().is_some());
+}
+
+// Tests that you can downgrade and upgrade a sender with an outstanding permit
+// but no other senders left.
+#[tokio::test]
+async fn downgrade_upgrade_get_permit_no_senders() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+    let tx2 = tx.clone();
+    let _permit = tx.reserve_owned().await.unwrap();
+    let weak_tx = tx2.downgrade();
+    drop(tx2);
+    assert!(weak_tx.upgrade().is_some());
+}
+
+// Tests that `downgrade` does not change the `tx_count` of the channel.
+#[tokio::test]
+async fn test_tx_count_weak_sender() {
+    let (tx, _rx) = mpsc::channel::<i32>(1);
+    let tx_weak = tx.downgrade();
+    let tx_weak2 = tx.downgrade();
+    drop(tx);
+
+    assert!(tx_weak.upgrade().is_none() && tx_weak2.upgrade().is_none());
+}
+
+// Tests that channel `capacity` changes and `max_capacity` stays the same
+#[tokio::test]
+async fn test_tx_capacity() {
+    let (tx, _rx) = mpsc::channel::<()>(10);
+    // both capacities are same before
+    assert_eq!(tx.capacity(), 10);
+    assert_eq!(tx.max_capacity(), 10);
+
+    let _permit = tx.reserve().await.unwrap();
+    // after reserve, only capacity should drop by one
+    assert_eq!(tx.capacity(), 9);
+    assert_eq!(tx.max_capacity(), 10);
+
+    let _sent = tx.send(()).await.unwrap();
+    // after send, capacity should drop by one again
+    assert_eq!(tx.capacity(), 8);
+    assert_eq!(tx.max_capacity(), 10);
+}
+
+fn is_debug<T: fmt::Debug>(_: &T) {}

@@ -80,7 +80,7 @@ fn drop_token_no_child() {
 }
 
 #[test]
-fn drop_token_with_childs() {
+fn drop_token_with_children() {
     loom::model(|| {
         let token1 = CancellationToken::new();
         let child_token1 = token1.child_token();

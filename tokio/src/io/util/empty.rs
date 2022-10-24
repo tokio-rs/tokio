@@ -50,16 +50,18 @@ impl AsyncRead for Empty {
     #[inline]
     fn poll_read(
         self: Pin<&mut Self>,
-        _: &mut Context<'_>,
+        cx: &mut Context<'_>,
         _: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
+        ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }
 }
 
 impl AsyncBufRead for Empty {
     #[inline]
-    fn poll_fill_buf(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(&[]))
     }
 
@@ -70,6 +72,20 @@ impl AsyncBufRead for Empty {
 impl fmt::Debug for Empty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.pad("Empty { .. }")
+    }
+}
+
+cfg_coop! {
+    fn poll_proceed_and_make_progress(cx: &mut Context<'_>) -> Poll<()> {
+        let coop = ready!(crate::coop::poll_proceed(cx));
+        coop.made_progress();
+        Poll::Ready(())
+    }
+}
+
+cfg_not_coop! {
+    fn poll_proceed_and_make_progress(_: &mut Context<'_>) -> Poll<()> {
+        Poll::Ready(())
     }
 }
 

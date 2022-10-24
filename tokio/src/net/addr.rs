@@ -1,5 +1,4 @@
-use crate::future;
-
+use std::future;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
@@ -56,7 +55,7 @@ impl sealed::ToSocketAddrsPriv for SocketAddr {
 
     fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
         let iter = Some(*self).into_iter();
-        future::ok(iter)
+        future::ready(Ok(iter))
     }
 }
 
@@ -96,7 +95,7 @@ impl sealed::ToSocketAddrsPriv for (IpAddr, u16) {
 
     fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
         let iter = Some(SocketAddr::from(*self)).into_iter();
-        future::ok(iter)
+        future::ready(Ok(iter))
     }
 }
 
@@ -137,8 +136,23 @@ impl sealed::ToSocketAddrsPriv for &[SocketAddr] {
     type Future = ReadyFuture<Self::Iter>;
 
     fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
-        let iter = self.to_vec().into_iter();
-        future::ok(iter)
+        #[inline]
+        fn slice_to_vec(addrs: &[SocketAddr]) -> Vec<SocketAddr> {
+            addrs.to_vec()
+        }
+
+        // This uses a helper method because clippy doesn't like the `to_vec()`
+        // call here (it will allocate, whereas `self.iter().copied()` would
+        // not), but it's actually necessary in order to ensure that the
+        // returned iterator is valid for the `'static` lifetime, which the
+        // borrowed `slice::Iter` iterator would not be.
+        //
+        // Note that we can't actually add an `allow` attribute for
+        // `clippy::unnecessary_to_owned` here, as Tokio's CI runs clippy lints
+        // on Rust 1.52 to avoid breaking LTS releases of Tokio. Users of newer
+        // Rust versions who see this lint should just ignore it.
+        let iter = slice_to_vec(self).into_iter();
+        future::ready(Ok(iter))
     }
 }
 

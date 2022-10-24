@@ -22,6 +22,24 @@
 //! `std::io::ErrorKind::WouldBlock` if a *worker* thread can not be converted
 //! to a *backup* thread immediately.
 //!
+//! **Warning**: These adapters may create a large number of temporary tasks,
+//! especially when reading large files. When performing a lot of operations
+//! in one batch, it may be significantly faster to use [`spawn_blocking`]
+//! directly:
+//!
+//! ```
+//! use tokio::fs::File;
+//! use std::io::{BufReader, BufRead};
+//! async fn count_lines(file: File) -> Result<usize, std::io::Error> {
+//!     let file = file.into_std().await;
+//!     tokio::task::spawn_blocking(move || {
+//!         let line_count = BufReader::new(file).lines().count();
+//!         Ok(line_count)
+//!     }).await?
+//! }
+//! ```
+//!
+//! [`spawn_blocking`]: fn@crate::task::spawn_blocking
 //! [`AsyncRead`]: trait@crate::io::AsyncRead
 
 mod canonicalize;

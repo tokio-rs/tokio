@@ -430,7 +430,8 @@ impl UnixDatagram {
     ///
     /// # Panics
     ///
-    /// This function panics if thread-local runtime is not set.
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a Tokio runtime, otherwise runtime can be set
@@ -457,6 +458,7 @@ impl UnixDatagram {
     /// # Ok(())
     /// # }
     /// ```
+    #[track_caller]
     pub fn from_std(datagram: net::UnixDatagram) -> io::Result<UnixDatagram> {
         let socket = mio::net::UnixDatagram::from_std(datagram);
         let io = PollEvented::new(socket)?;
@@ -1241,7 +1243,9 @@ impl UnixDatagram {
         interest: Interest,
         f: impl FnOnce() -> io::Result<R>,
     ) -> io::Result<R> {
-        self.io.registration().try_io(interest, f)
+        self.io
+            .registration()
+            .try_io(interest, || self.io.try_io(f))
     }
 
     /// Returns the local address that this socket is bound to.

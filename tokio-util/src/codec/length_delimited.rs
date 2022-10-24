@@ -84,7 +84,7 @@
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
-//!     .length_field_length(2)
+//!     .length_field_type::<u16>()
 //!     .length_adjustment(0)   // default value
 //!     .num_skip(0) // Do not strip frame header
 //!     .new_read(io);
@@ -118,7 +118,7 @@
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
-//!     .length_field_length(2)
+//!     .length_field_type::<u16>()
 //!     .length_adjustment(0)   // default value
 //!     // `num_skip` is not needed, the default is to skip
 //!     .new_read(io);
@@ -150,7 +150,7 @@
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
-//!     .length_field_length(2)
+//!     .length_field_type::<u16>()
 //!     .length_adjustment(-2)  // size of head
 //!     .num_skip(0)
 //!     .new_read(io);
@@ -228,7 +228,7 @@
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! LengthDelimitedCodec::builder()
 //!     .length_field_offset(1) // length of hdr1
-//!     .length_field_length(2)
+//!     .length_field_type::<u16>()
 //!     .length_adjustment(1)  // length of hdr2
 //!     .num_skip(3) // length of hdr1 + LEN
 //!     .new_read(io);
@@ -274,7 +274,7 @@
 //! # fn bind_read<T: AsyncRead>(io: T) {
 //! LengthDelimitedCodec::builder()
 //!     .length_field_offset(1) // length of hdr1
-//!     .length_field_length(2)
+//!     .length_field_type::<u16>()
 //!     .length_adjustment(-3)  // length of hdr1 + LEN, negative
 //!     .num_skip(3)
 //!     .new_read(io);
@@ -350,7 +350,7 @@
 //! # fn write_frame<T: AsyncWrite>(io: T) {
 //! # let _ =
 //! LengthDelimitedCodec::builder()
-//!     .length_field_length(2)
+//!     .length_field_type::<u16>()
 //!     .new_write(io);
 //! # }
 //! # pub fn main() {}
@@ -379,7 +379,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
-use std::{cmp, fmt};
+use std::{cmp, fmt, mem};
 
 /// Configure length delimited `LengthDelimitedCodec`s.
 ///
@@ -522,15 +522,11 @@ impl LengthDelimitedCodec {
             }
         };
 
-        let num_skip = self.builder.get_num_skip();
-
-        if num_skip > 0 {
-            src.advance(num_skip);
-        }
+        src.advance(self.builder.get_num_skip());
 
         // Ensure that the buffer has enough space to read the incoming
         // payload
-        src.reserve(n);
+        src.reserve(n.saturating_sub(src.len()));
 
         Ok(Some(n))
     }
@@ -568,7 +564,7 @@ impl Decoder for LengthDelimitedCodec {
                 self.state = DecodeState::Head;
 
                 // Make sure the buffer has enough space to read the next head
-                src.reserve(self.builder.num_head_bytes());
+                src.reserve(self.builder.num_head_bytes().saturating_sub(src.len()));
 
                 Ok(Some(data))
             }
@@ -629,6 +625,24 @@ impl Default for LengthDelimitedCodec {
 
 // ===== impl Builder =====
 
+mod builder {
+    /// Types that can be used with `Builder::length_field_type`.
+    pub trait LengthFieldType {}
+
+    impl LengthFieldType for u8 {}
+    impl LengthFieldType for u16 {}
+    impl LengthFieldType for u32 {}
+    impl LengthFieldType for u64 {}
+
+    #[cfg(any(
+        target_pointer_width = "8",
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64",
+    ))]
+    impl LengthFieldType for usize {}
+}
+
 impl Builder {
     /// Creates a new length delimited codec builder with default configuration
     /// values.
@@ -642,7 +656,7 @@ impl Builder {
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
-    ///     .length_field_length(2)
+    ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
     ///     .num_skip(0)
     ///     .new_read(io);
@@ -746,7 +760,7 @@ impl Builder {
         }
     }
 
-    /// Sets the max frame length
+    /// Sets the max frame length in bytes
     ///
     /// This configuration option applies to both encoding and decoding. The
     /// default value is 8MB.
@@ -767,7 +781,7 @@ impl Builder {
     ///
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// LengthDelimitedCodec::builder()
-    ///     .max_frame_length(8 * 1024)
+    ///     .max_frame_length(8 * 1024 * 1024)
     ///     .new_read(io);
     /// # }
     /// # pub fn main() {}
@@ -775,6 +789,42 @@ impl Builder {
     pub fn max_frame_length(&mut self, val: usize) -> &mut Self {
         self.max_frame_len = val;
         self
+    }
+
+    /// Sets the unsigned integer type used to represent the length field.
+    ///
+    /// The default type is [`u32`]. The max type is [`u64`] (or [`usize`] on
+    /// 64-bit targets).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::io::AsyncRead;
+    /// use tokio_util::codec::LengthDelimitedCodec;
+    ///
+    /// # fn bind_read<T: AsyncRead>(io: T) {
+    /// LengthDelimitedCodec::builder()
+    ///     .length_field_type::<u32>()
+    ///     .new_read(io);
+    /// # }
+    /// # pub fn main() {}
+    /// ```
+    ///
+    /// Unlike [`Builder::length_field_length`], this does not fail at runtime
+    /// and instead produces a compile error:
+    ///
+    /// ```compile_fail
+    /// # use tokio::io::AsyncRead;
+    /// # use tokio_util::codec::LengthDelimitedCodec;
+    /// # fn bind_read<T: AsyncRead>(io: T) {
+    /// LengthDelimitedCodec::builder()
+    ///     .length_field_type::<u128>()
+    ///     .new_read(io);
+    /// # }
+    /// # pub fn main() {}
+    /// ```
+    pub fn length_field_type<T: builder::LengthFieldType>(&mut self) -> &mut Self {
+        self.length_field_length(mem::size_of::<T>())
     }
 
     /// Sets the number of bytes used to represent the length field
@@ -878,7 +928,7 @@ impl Builder {
     /// # pub fn main() {
     /// LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
-    ///     .length_field_length(2)
+    ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
     ///     .num_skip(0)
     ///     .new_codec();
@@ -902,7 +952,7 @@ impl Builder {
     /// # fn bind_read<T: AsyncRead>(io: T) {
     /// LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
-    ///     .length_field_length(2)
+    ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
     ///     .num_skip(0)
     ///     .new_read(io);
@@ -925,7 +975,7 @@ impl Builder {
     /// # use tokio_util::codec::LengthDelimitedCodec;
     /// # fn write_frame<T: AsyncWrite>(io: T) {
     /// LengthDelimitedCodec::builder()
-    ///     .length_field_length(2)
+    ///     .length_field_type::<u16>()
     ///     .new_write(io);
     /// # }
     /// # pub fn main() {}
@@ -947,7 +997,7 @@ impl Builder {
     /// # fn write_frame<T: AsyncRead + AsyncWrite>(io: T) {
     /// # let _ =
     /// LengthDelimitedCodec::builder()
-    ///     .length_field_length(2)
+    ///     .length_field_type::<u16>()
     ///     .new_framed(io);
     /// # }
     /// # pub fn main() {}

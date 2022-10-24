@@ -406,7 +406,7 @@ cfg_io_util! {
             /// ```
             fn write_u8(&mut self, n: u8) -> WriteU8;
 
-            /// Writes an unsigned 8-bit integer to the underlying writer.
+            /// Writes a signed 8-bit integer to the underlying writer.
             ///
             /// Equivalent to:
             ///
@@ -425,7 +425,7 @@ cfg_io_util! {
             ///
             /// # Examples
             ///
-            /// Write unsigned 8 bit integers to a `AsyncWrite`:
+            /// Write signed 8 bit integers to a `AsyncWrite`:
             ///
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
@@ -434,10 +434,10 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut writer = Vec::new();
             ///
-            ///     writer.write_u8(2).await?;
-            ///     writer.write_u8(5).await?;
+            ///     writer.write_i8(-2).await?;
+            ///     writer.write_i8(126).await?;
             ///
-            ///     assert_eq!(writer, b"\x02\x05");
+            ///     assert_eq!(writer, b"\xFE\x7E");
             ///     Ok(())
             /// }
             /// ```

@@ -4,7 +4,10 @@
 use rand::SeedableRng;
 use rand::{rngs::StdRng, Rng};
 use tokio::time::{self, Duration, Instant, Sleep};
-use tokio_test::{assert_elapsed, assert_err, assert_pending, assert_ready, assert_ready_eq, task};
+use tokio_test::{assert_elapsed, assert_pending, assert_ready, assert_ready_eq, task};
+
+#[cfg(not(tokio_wasi))]
+use tokio_test::assert_err;
 
 use std::{
     future::Future,
@@ -26,12 +29,14 @@ async fn pause_time_in_task() {
     t.await.unwrap();
 }
 
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[should_panic]
 async fn pause_time_in_main_threads() {
     tokio::time::pause();
 }
 
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn pause_time_in_spawn_threads() {
     let t = tokio::spawn(async {

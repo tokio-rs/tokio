@@ -1,3 +1,5 @@
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support panic recovery
+
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tokio::time::{timeout, Duration};

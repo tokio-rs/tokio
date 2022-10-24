@@ -17,6 +17,7 @@ async fn simultaneous_deadline_future_completion() {
     assert_ready_ok!(fut.poll());
 }
 
+#[cfg_attr(tokio_wasi, ignore = "FIXME: `fut.poll()` panics on Wasi")]
 #[tokio::test]
 async fn completed_future_past_deadline() {
     // Wrap it with a deadline
@@ -134,4 +135,17 @@ async fn deadline_future_elapses() {
 
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
+}
+
+#[tokio::test]
+async fn timeout_is_not_exhausted_by_future() {
+    let fut = timeout(ms(1), async {
+        let mut buffer = [0u8; 1];
+        loop {
+            use tokio::io::AsyncReadExt;
+            let _ = tokio::io::empty().read(&mut buffer).await;
+        }
+    });
+
+    assert!(fut.await.is_err());
 }

@@ -6,6 +6,7 @@ mod stack;
 pub(crate) use self::stack::Stack;
 
 use std::borrow::Borrow;
+use std::fmt::Debug;
 use std::usize;
 
 /// Timing wheel implementation.
@@ -117,6 +118,7 @@ where
     }
 
     /// Remove `item` from the timing wheel.
+    #[track_caller]
     pub(crate) fn remove(&mut self, item: &T::Borrowed, store: &mut T::Store) {
         let when = T::when(item, store);
 

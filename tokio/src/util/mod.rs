@@ -3,6 +3,12 @@ cfg_io_driver! {
     pub(crate) mod slab;
 }
 
+#[cfg(feature = "rt")]
+pub(crate) mod atomic_cell;
+
+#[cfg(any(feature = "rt", feature = "signal", feature = "process"))]
+pub(crate) mod once_cell;
+
 #[cfg(any(
     // io driver uses `WakeList` directly
     feature = "net",
@@ -37,10 +43,15 @@ pub(crate) use wake_list::WakeList;
 ))]
 pub(crate) mod linked_list;
 
-#[cfg(any(feature = "rt-multi-thread", feature = "macros"))]
+#[cfg(any(feature = "rt", feature = "macros"))]
 mod rand;
 
 cfg_rt! {
+    mod idle_notified_set;
+    pub(crate) use idle_notified_set::IdleNotifiedSet;
+
+    pub(crate) use self::rand::{RngSeedGenerator,replace_thread_rng};
+
     mod wake;
     pub(crate) use wake::WakerRef;
     pub(crate) use wake::{waker_ref, Wake};
@@ -50,7 +61,18 @@ cfg_rt! {
 
     mod vec_deque_cell;
     pub(crate) use vec_deque_cell::VecDequeCell;
+
+    mod rc_cell;
+    pub(crate) use rc_cell::RcCell;
 }
+
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[cfg(feature = "rt")]
+pub use self::rand::RngSeed;
+
+#[cfg(any(feature = "macros"))]
+#[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
+pub use self::rand::thread_rng_n;
 
 cfg_rt_multi_thread! {
     pub(crate) use self::rand::FastRand;
@@ -61,15 +83,4 @@ cfg_rt_multi_thread! {
 
 pub(crate) mod trace;
 
-#[cfg(any(feature = "macros"))]
-#[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
-pub use self::rand::thread_rng_n;
-
-#[cfg(any(
-    feature = "rt",
-    feature = "time",
-    feature = "net",
-    feature = "process",
-    all(unix, feature = "signal")
-))]
 pub(crate) mod error;

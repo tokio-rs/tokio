@@ -100,3 +100,22 @@ async fn max_write_size() {
     // drop b only after task t1 finishes writing
     drop(b);
 }
+
+#[tokio::test]
+async fn duplex_is_cooperative() {
+    let (mut tx, mut rx) = tokio::io::duplex(1024 * 8);
+
+    tokio::select! {
+        biased;
+
+        _ = async {
+            loop {
+                let buf = [3u8; 4096];
+                tx.write_all(&buf).await.unwrap();
+                let mut buf = [0u8; 4096];
+                rx.read(&mut buf).await.unwrap();
+            }
+        } => {},
+        _ = tokio::task::yield_now() => {}
+    }
+}

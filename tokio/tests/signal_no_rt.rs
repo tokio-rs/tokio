@@ -4,6 +4,7 @@
 
 use tokio::signal::unix::{signal, SignalKind};
 
+#[cfg_attr(tokio_wasi, ignore = "Wasi does not support panic recovery")]
 #[test]
 #[should_panic]
 fn no_runtime_panics_creating_signals() {

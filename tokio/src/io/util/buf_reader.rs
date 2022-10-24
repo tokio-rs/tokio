@@ -204,7 +204,6 @@ impl<R: AsyncRead + AsyncSeek> AsyncSeek for BufReader<R> {
                     self.as_mut()
                         .get_pin_mut()
                         .start_seek(SeekFrom::Current(offset))?;
-                    self.as_mut().get_pin_mut().poll_complete(cx)?
                 } else {
                     // seek backwards by our remainder, and then by the offset
                     self.as_mut()
@@ -221,8 +220,8 @@ impl<R: AsyncRead + AsyncSeek> AsyncSeek for BufReader<R> {
                     self.as_mut()
                         .get_pin_mut()
                         .start_seek(SeekFrom::Current(n))?;
-                    self.as_mut().get_pin_mut().poll_complete(cx)?
                 }
+                self.as_mut().get_pin_mut().poll_complete(cx)?
             }
             SeekState::PendingOverflowed(n) => {
                 if self.as_mut().get_pin_mut().poll_complete(cx)?.is_pending() {

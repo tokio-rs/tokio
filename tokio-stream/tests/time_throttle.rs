@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "time", feature = "sync", feature = "io-util"))]
 
 use tokio::time;
 use tokio_stream::StreamExt;

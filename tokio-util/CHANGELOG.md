@@ -1,3 +1,104 @@
+# 0.7.4 (September 8, 2022)
+
+### Added
+
+- io: add `SyncIoBridge::shutdown()` ([#4938])
+- task: improve `LocalPoolHandle` ([#4680])
+
+### Fixed
+
+- util: add `track_caller` to public APIs ([#4785])
+
+### Unstable
+
+- task: fix compilation errors in `JoinMap` with Tokio v1.21.0 ([#4755])
+- task: remove the unstable, deprecated `JoinMap::join_one` ([#4920])
+
+[#4680]: https://github.com/tokio-rs/tokio/pull/4680
+[#4755]: https://github.com/tokio-rs/tokio/pull/4755
+[#4785]: https://github.com/tokio-rs/tokio/pull/4785
+[#4920]: https://github.com/tokio-rs/tokio/pull/4920
+[#4938]: https://github.com/tokio-rs/tokio/pull/4938
+
+# 0.7.3 (June 4, 2022)
+
+### Changed
+
+- tracing: don't require default tracing features ([#4592])
+- util: simplify implementation of `ReusableBoxFuture` ([#4675])
+
+### Added (unstable)
+
+- task: add `JoinMap` ([#4640], [#4697])
+
+[#4592]: https://github.com/tokio-rs/tokio/pull/4592
+[#4640]: https://github.com/tokio-rs/tokio/pull/4640
+[#4675]: https://github.com/tokio-rs/tokio/pull/4675
+[#4697]: https://github.com/tokio-rs/tokio/pull/4697
+
+# 0.7.2 (May 14, 2022)
+
+This release contains a rewrite of `CancellationToken` that fixes a memory leak. ([#4652])
+
+[#4652]: https://github.com/tokio-rs/tokio/pull/4652
+
+# 0.7.1 (February 21, 2022)
+
+### Added
+
+- codec: add `length_field_type` to `LengthDelimitedCodec` builder ([#4508])
+- io: add `StreamReader::into_inner_with_chunk()` ([#4559])
+
+### Changed
+
+- switch from log to tracing ([#4539])
+
+### Fixed
+
+- sync: fix waker update condition in `CancellationToken` ([#4497])
+- bumped tokio dependency to 1.6 to satisfy minimum requirements ([#4490])
+
+[#4490]: https://github.com/tokio-rs/tokio/pull/4490
+[#4497]: https://github.com/tokio-rs/tokio/pull/4497
+[#4508]: https://github.com/tokio-rs/tokio/pull/4508
+[#4539]: https://github.com/tokio-rs/tokio/pull/4539
+[#4559]: https://github.com/tokio-rs/tokio/pull/4559
+
+# 0.7.0 (February 9, 2022)
+
+### Added
+
+- task: add `spawn_pinned` ([#3370])
+- time: add `shrink_to_fit` and `compact` methods to `DelayQueue` ([#4170])
+- codec: improve `Builder::max_frame_length` docs ([#4352])
+- codec: add mutable reference getters for codecs to pinned `Framed` ([#4372])
+- net: add generic trait to combine `UnixListener` and `TcpListener` ([#4385])
+- codec: implement `Framed::map_codec` ([#4427])
+- codec: implement `Encoder<BytesMut>` for `BytesCodec` ([#4465])
+
+### Changed
+
+- sync: add lifetime parameter to `ReusableBoxFuture` ([#3762])
+- sync: refactored `PollSender<T>` to fix a subtly broken `Sink<T>` implementation ([#4214])
+- time: remove error case from the infallible `DelayQueue::poll_elapsed` ([#4241])
+
+[#3370]: https://github.com/tokio-rs/tokio/pull/3370
+[#4170]: https://github.com/tokio-rs/tokio/pull/4170
+[#4352]: https://github.com/tokio-rs/tokio/pull/4352
+[#4372]: https://github.com/tokio-rs/tokio/pull/4372
+[#4385]: https://github.com/tokio-rs/tokio/pull/4385
+[#4427]: https://github.com/tokio-rs/tokio/pull/4427
+[#4465]: https://github.com/tokio-rs/tokio/pull/4465
+[#3762]: https://github.com/tokio-rs/tokio/pull/3762
+[#4214]: https://github.com/tokio-rs/tokio/pull/4214
+[#4241]: https://github.com/tokio-rs/tokio/pull/4241
+
+# 0.6.10 (May 14, 2021)
+
+This is a backport for the memory leak in `CancellationToken` that was originally fixed in 0.7.2. ([#4652])
+
+[#4652]: https://github.com/tokio-rs/tokio/pull/4652
+
 # 0.6.9 (October 29, 2021)
 
 ### Added

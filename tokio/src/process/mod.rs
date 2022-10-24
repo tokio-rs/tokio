@@ -97,6 +97,59 @@
 //! }
 //! ```
 //!
+//! Here is another example using `sort` writing into the child process
+//! standard input, capturing the output of the sorted text.
+//!
+//! ```no_run
+//! use tokio::io::AsyncWriteExt;
+//! use tokio::process::Command;
+//!
+//! use std::process::Stdio;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let mut cmd = Command::new("sort");
+//!
+//!     // Specifying that we want pipe both the output and the input.
+//!     // Similarly to capturing the output, by configuring the pipe
+//!     // to stdin it can now be used as an asynchronous writer.
+//!     cmd.stdout(Stdio::piped());
+//!     cmd.stdin(Stdio::piped());
+//!
+//!     let mut child = cmd.spawn().expect("failed to spawn command");
+//!
+//!     // These are the animals we want to sort
+//!     let animals: &[&str] = &["dog", "bird", "frog", "cat", "fish"];
+//!
+//!     let mut stdin = child
+//!         .stdin
+//!         .take()
+//!         .expect("child did not have a handle to stdin");
+//!
+//!     // Write our animals to the child process
+//!     // Note that the behavior of `sort` is to buffer _all input_ before writing any output.
+//!     // In the general sense, it is recommended to write to the child in a separate task as
+//!     // awaiting its exit (or output) to avoid deadlocks (for example, the child tries to write
+//!     // some output but gets stuck waiting on the parent to read from it, meanwhile the parent
+//!     // is stuck waiting to write its input completely before reading the output).
+//!     stdin
+//!         .write(animals.join("\n").as_bytes())
+//!         .await
+//!         .expect("could not write to stdin");
+//!
+//!     // We drop the handle here which signals EOF to the child process.
+//!     // This tells the child process that it there is no more data on the pipe.
+//!     drop(stdin);
+//!
+//!     let op = child.wait_with_output().await?;
+//!
+//!     // Results should come back in sorted order
+//!     assert_eq!(op.stdout, "bird\ncat\ndog\nfish\nfrog\n".as_bytes());
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
 //! With some coordination, we can also pipe the output of one command into
 //! another.
 //!
@@ -262,6 +315,12 @@ impl Command {
     /// [rust-lang/rust#37519]: https://github.com/rust-lang/rust/issues/37519
     pub fn new<S: AsRef<OsStr>>(program: S) -> Command {
         Self::from(StdCommand::new(program))
+    }
+
+    /// Cheaply convert to a `&std::process::Command` for places where the type from the standard
+    /// library is expected.
+    pub fn as_std(&self) -> &StdCommand {
+        &self.std
     }
 
     /// Adds an argument to pass to the program.
@@ -1124,18 +1183,25 @@ impl Child {
     pub async fn wait_with_output(mut self) -> io::Result<Output> {
         use crate::future::try_join3;
 
-        async fn read_to_end<A: AsyncRead + Unpin>(io: Option<A>) -> io::Result<Vec<u8>> {
+        async fn read_to_end<A: AsyncRead + Unpin>(io: &mut Option<A>) -> io::Result<Vec<u8>> {
             let mut vec = Vec::new();
-            if let Some(mut io) = io {
-                crate::io::util::read_to_end(&mut io, &mut vec).await?;
+            if let Some(io) = io.as_mut() {
+                crate::io::util::read_to_end(io, &mut vec).await?;
             }
             Ok(vec)
         }
 
-        let stdout_fut = read_to_end(self.stdout.take());
-        let stderr_fut = read_to_end(self.stderr.take());
+        let mut stdout_pipe = self.stdout.take();
+        let mut stderr_pipe = self.stderr.take();
+
+        let stdout_fut = read_to_end(&mut stdout_pipe);
+        let stderr_fut = read_to_end(&mut stderr_pipe);
 
         let (status, stdout, stderr) = try_join3(self.wait(), stdout_fut, stderr_fut).await?;
+
+        // Drop happens after `try_join` due to <https://github.com/tokio-rs/tokio/issues/4309>
+        drop(stdout_pipe);
+        drop(stderr_pipe);
 
         Ok(Output {
             status,
@@ -1219,41 +1285,39 @@ impl ChildStderr {
 
 impl AsyncWrite for ChildStdin {
     fn poll_write(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.inner.poll_write(cx, buf)
+        Pin::new(&mut self.inner).poll_write(cx, buf)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }
 
 impl AsyncRead for ChildStdout {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 
 impl AsyncRead for ChildStderr {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 

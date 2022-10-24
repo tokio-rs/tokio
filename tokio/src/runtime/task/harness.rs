@@ -26,6 +26,10 @@ where
         }
     }
 
+    fn header_ptr(&self) -> NonNull<Header> {
+        self.cell.cast()
+    }
+
     fn header(&self) -> &Header {
         unsafe { &self.cell.as_ref().header }
     }
@@ -93,9 +97,16 @@ where
 
         match self.header().state.transition_to_running() {
             TransitionToRunning::Success => {
-                let waker_ref = waker_ref::<T, S>(self.header());
+                let header_ptr = self.header_ptr();
+                let waker_ref = waker_ref::<T, S>(&header_ptr);
                 let cx = Context::from_waker(&*waker_ref);
-                let res = poll_future(&self.core().stage, cx);
+                let core = self.core();
+                let res = poll_future(
+                    &core.stage,
+                    &self.core().scheduler,
+                    core.task_id.clone(),
+                    cx,
+                );
 
                 if res == Poll::Ready(()) {
                     // The future completed. Move on to complete the task.
@@ -109,14 +120,15 @@ where
                     TransitionToIdle::Cancelled => {
                         // The transition to idle failed because the task was
                         // cancelled during the poll.
-
-                        cancel_task(&self.core().stage);
+                        let core = self.core();
+                        cancel_task(&core.stage, core.task_id.clone());
                         PollFuture::Complete
                     }
                 }
             }
             TransitionToRunning::Cancelled => {
-                cancel_task(&self.core().stage);
+                let core = self.core();
+                cancel_task(&core.stage, core.task_id.clone());
                 PollFuture::Complete
             }
             TransitionToRunning::Failed => PollFuture::Done,
@@ -139,7 +151,8 @@ where
 
         // By transitioning the lifecycle to `Running`, we have permission to
         // drop the future.
-        cancel_task(&self.core().stage);
+        let core = self.core();
+        cancel_task(&core.stage, core.task_id.clone());
         self.complete();
     }
 
@@ -164,9 +177,14 @@ where
         }
     }
 
-    pub(super) fn drop_join_handle_slow(self) {
-        let mut maybe_panic = None;
+    /// Try to set the waker notified when the task is complete. Returns true if
+    /// the task has already completed. If this call returns false, then the
+    /// waker will not be notified.
+    pub(super) fn try_set_join_waker(self, waker: &Waker) -> bool {
+        can_read_output(self.header(), self.trailer(), waker)
+    }
 
+    pub(super) fn drop_join_handle_slow(self) {
         // Try to unset `JOIN_INTEREST`. This must be done as a first step in
         // case the task concurrently completed.
         if self.header().state.unset_join_interested().is_err() {
@@ -175,21 +193,17 @@ where
             // the scheduler or `JoinHandle`. i.e. if the output remains in the
             // task structure until the task is deallocated, it may be dropped
             // by a Waker on any arbitrary thread.
-            let panic = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            //
+            // Panics are delivered to the user via the `JoinHandle`. Given that
+            // they are dropping the `JoinHandle`, we assume they are not
+            // interested in the panic and swallow it.
+            let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 self.core().stage.drop_future_or_output();
             }));
-
-            if let Err(panic) = panic {
-                maybe_panic = Some(panic);
-            }
         }
 
         // Drop the `JoinHandle` reference, possibly deallocating the task
         self.drop_reference();
-
-        if let Some(panic) = maybe_panic {
-            panic::resume_unwind(panic);
-        }
     }
 
     /// Remotely aborts the task.
@@ -426,7 +440,7 @@ enum PollFuture {
 }
 
 /// Cancels the task and store the appropriate error in the stage field.
-fn cancel_task<T: Future>(stage: &CoreStage<T>) {
+fn cancel_task<T: Future>(stage: &CoreStage<T>, id: super::Id) {
     // Drop the future from a panic guard.
     let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         stage.drop_future_or_output();
@@ -434,17 +448,22 @@ fn cancel_task<T: Future>(stage: &CoreStage<T>) {
 
     match res {
         Ok(()) => {
-            stage.store_output(Err(JoinError::cancelled()));
+            stage.store_output(Err(JoinError::cancelled(id)));
         }
         Err(panic) => {
-            stage.store_output(Err(JoinError::panic(panic)));
+            stage.store_output(Err(JoinError::panic(id, panic)));
         }
     }
 }
 
 /// Polls the future. If the future completes, the output is written to the
 /// stage field.
-fn poll_future<T: Future>(core: &CoreStage<T>, cx: Context<'_>) -> Poll<()> {
+fn poll_future<T: Future, S: Schedule>(
+    core: &CoreStage<T>,
+    scheduler: &S,
+    id: super::Id,
+    cx: Context<'_>,
+) -> Poll<()> {
     // Poll the future.
     let output = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         struct Guard<'a, T: Future> {
@@ -467,13 +486,20 @@ fn poll_future<T: Future>(core: &CoreStage<T>, cx: Context<'_>) -> Poll<()> {
     let output = match output {
         Ok(Poll::Pending) => return Poll::Pending,
         Ok(Poll::Ready(output)) => Ok(output),
-        Err(panic) => Err(JoinError::panic(panic)),
+        Err(panic) => {
+            scheduler.unhandled_panic();
+            Err(JoinError::panic(id, panic))
+        }
     };
 
     // Catch and ignore panics if the future panics on drop.
-    let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         core.store_output(output);
     }));
+
+    if res.is_err() {
+        scheduler.unhandled_panic();
+    }
 
     Poll::Ready(())
 }

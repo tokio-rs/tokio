@@ -1,10 +1,15 @@
-use crate::{task::JoinHandle, util::error::CONTEXT_MISSING_ERROR};
+use crate::runtime::Handle;
+use crate::task::JoinHandle;
 
 use std::future::Future;
 
 cfg_rt! {
     /// Spawns a new asynchronous task, returning a
     /// [`JoinHandle`](super::JoinHandle) for it.
+    ///
+    /// You do not have to `.await` the returned `JoinHandle` to make the
+    /// provided future start execution. It will start running in the background
+    /// immediately when `spawn` is called.
     ///
     /// Spawning a task enables the task to execute concurrently to other tasks. The
     /// spawned task may execute on the current thread, or it may be sent to a
@@ -48,6 +53,37 @@ cfg_rt! {
     ///     }
     /// }
     /// ```
+    ///
+    /// To run multiple tasks in parallel and receive their results, join
+    /// handles can be stored in a vector.
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread")] async fn main() {
+    /// async fn my_background_op(id: i32) -> String {
+    ///     let s = format!("Starting background task {}.", id);
+    ///     println!("{}", s);
+    ///     s
+    /// }
+    ///
+    /// let ops = vec![1, 2, 3];
+    /// let mut tasks = Vec::with_capacity(ops.len());
+    /// for op in ops {
+    ///     // This call will make them start running in the background
+    ///     // immediately.
+    ///     tasks.push(tokio::spawn(my_background_op(op)));
+    /// }
+    ///
+    /// let mut outputs = Vec::with_capacity(tasks.len());
+    /// for task in tasks {
+    ///     outputs.push(task.await.unwrap());
+    /// }
+    /// println!("{:?}", outputs);
+    /// # }
+    /// ```
+    /// This example pushes the tasks to `outputs` in the order they were
+    /// started in. If you do not care about the ordering of the outputs, then
+    /// you can also use a [`JoinSet`].
+    ///
+    /// [`JoinSet`]: struct@crate::task::JoinSet
     ///
     /// # Panics
     ///
@@ -121,7 +157,7 @@ cfg_rt! {
     /// ```text
     /// error[E0391]: cycle detected when processing `main`
     /// ```
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub fn spawn<T>(future: T) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
@@ -136,14 +172,16 @@ cfg_rt! {
         }
     }
 
-    #[cfg_attr(tokio_track_caller, track_caller)]
+    #[track_caller]
     pub(super) fn spawn_inner<T>(future: T, name: Option<&str>) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let spawn_handle = crate::runtime::context::spawn_handle().expect(CONTEXT_MISSING_ERROR);
-        let task = crate::util::trace::task(future, "task", name);
-        spawn_handle.spawn(task)
+        use crate::runtime::task;
+        let id = task::Id::next();
+        let task = crate::util::trace::task(future, "task", name, id.as_u64());
+        let handle = Handle::current();
+        handle.inner.spawn(task, id)
     }
 }

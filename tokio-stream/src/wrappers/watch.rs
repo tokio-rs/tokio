@@ -49,7 +49,7 @@ use tokio::sync::watch::error::RecvError;
 /// [`Stream`]: trait@crate::Stream
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub struct WatchStream<T> {
-    inner: ReusableBoxFuture<(Result<(), RecvError>, Receiver<T>)>,
+    inner: ReusableBoxFuture<'static, (Result<(), RecvError>, Receiver<T>)>,
 }
 
 async fn make_future<T: Clone + Send + Sync>(

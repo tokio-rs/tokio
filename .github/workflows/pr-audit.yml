@@ -8,12 +8,15 @@ on:
     paths:
       - '**/Cargo.toml'
 
+permissions:
+  contents: read
+
 jobs:
   security-audit:
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, 'ci skip')"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install cargo-audit
         uses: actions-rs/cargo@v1

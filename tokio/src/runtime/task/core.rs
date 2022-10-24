@@ -13,7 +13,7 @@ use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
-use crate::runtime::task::Schedule;
+use crate::runtime::task::{Id, Schedule};
 use crate::util::linked_list;
 
 use std::pin::Pin;
@@ -49,6 +49,9 @@ pub(super) struct Core<T: Future, S> {
 
     /// Either the future or the output.
     pub(super) stage: CoreStage<T>,
+
+    /// The task's ID, used for populating `JoinError`s.
+    pub(super) task_id: Id,
 }
 
 /// Crate public as this is also needed by the pool.
@@ -56,8 +59,6 @@ pub(super) struct Core<T: Future, S> {
 pub(crate) struct Header {
     /// Task state.
     pub(super) state: State,
-
-    pub(super) owned: UnsafeCell<linked_list::Pointers<Header>>,
 
     /// Pointer to next task, used with the injection queue.
     pub(super) queue_next: UnsafeCell<Option<NonNull<Header>>>,
@@ -86,10 +87,21 @@ pub(crate) struct Header {
 unsafe impl Send for Header {}
 unsafe impl Sync for Header {}
 
-/// Cold data is stored after the future.
+/// Cold data is stored after the future. Data is considered cold if it is only
+/// used during creation or shutdown of the task.
 pub(super) struct Trailer {
+    /// Pointers for the linked list in the `OwnedTasks` that owns this task.
+    pub(super) owned: linked_list::Pointers<Header>,
     /// Consumer task waiting on completion of this task.
     pub(super) waker: UnsafeCell<Option<Waker>>,
+}
+
+generate_addr_of_methods! {
+    impl<> Trailer {
+        pub(super) unsafe fn addr_of_owned(self: NonNull<Self>) -> NonNull<linked_list::Pointers<Header>> {
+            &self.owned
+        }
+    }
 }
 
 /// Either the future or the output.
@@ -102,13 +114,12 @@ pub(super) enum Stage<T: Future> {
 impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
-    pub(super) fn new(future: T, scheduler: S, state: State) -> Box<Cell<T, S>> {
+    pub(super) fn new(future: T, scheduler: S, state: State, task_id: Id) -> Box<Cell<T, S>> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let id = future.id();
-        Box::new(Cell {
+        let result = Box::new(Cell {
             header: Header {
                 state,
-                owned: UnsafeCell::new(linked_list::Pointers::new()),
                 queue_next: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
                 owner_id: UnsafeCell::new(0),
@@ -120,11 +131,23 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 stage: CoreStage {
                     stage: UnsafeCell::new(Stage::Running(future)),
                 },
+                task_id,
             },
             trailer: Trailer {
                 waker: UnsafeCell::new(None),
+                owned: linked_list::Pointers::new(),
             },
-        })
+        });
+
+        #[cfg(debug_assertions)]
+        {
+            let trailer_addr = (&result.trailer) as *const Trailer as usize;
+            let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(&result.header)) };
+
+            assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
+        }
+
+        result
     }
 }
 
@@ -235,6 +258,17 @@ impl Header {
         // safety: If there are concurrent writes, then that write has violated
         // the safety requirements on `set_owner_id`.
         unsafe { self.owner_id.with(|ptr| *ptr) }
+    }
+
+    /// Gets a pointer to the `Trailer` of the task containing this `Header`.
+    ///
+    /// # Safety
+    ///
+    /// The provided raw pointer must point at the header of a task.
+    pub(super) unsafe fn get_trailer(me: NonNull<Header>) -> NonNull<Trailer> {
+        let offset = me.as_ref().vtable.trailer_offset;
+        let trailer = me.as_ptr().cast::<u8>().add(offset).cast::<Trailer>();
+        NonNull::new_unchecked(trailer)
     }
 }
 

@@ -12,7 +12,7 @@ use super::ReusableBoxFuture;
 /// [`Semaphore`]: tokio::sync::Semaphore
 pub struct PollSemaphore {
     semaphore: Arc<Semaphore>,
-    permit_fut: Option<ReusableBoxFuture<Result<OwnedSemaphorePermit, AcquireError>>>,
+    permit_fut: Option<ReusableBoxFuture<'static, Result<OwnedSemaphorePermit, AcquireError>>>,
 }
 
 impl PollSemaphore {

@@ -5,6 +5,7 @@ use tokio::time::*;
 
 use std::sync::mpsc;
 
+#[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))] // Wasi doesn't support threads
 #[test]
 fn timer_with_threaded_runtime() {
     use tokio::runtime::Runtime;
@@ -25,7 +26,7 @@ fn timer_with_threaded_runtime() {
 }
 
 #[test]
-fn timer_with_basic_scheduler() {
+fn timer_with_current_thread_scheduler() {
     use tokio::runtime::Builder;
 
     let rt = Builder::new_current_thread().enable_all().build().unwrap();

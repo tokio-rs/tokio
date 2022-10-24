@@ -3,14 +3,16 @@
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
-use crate::runtime::blocking::shutdown;
+use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
+use crate::util::{replace_thread_rng, RngSeedGenerator};
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
+use std::io;
 use std::time::Duration;
 
 pub(crate) struct BlockingPool {
@@ -47,6 +49,9 @@ struct Inner {
 
     // Customizable wait timeout.
     keep_alive: Duration,
+
+    // Random number seed
+    seed_generator: RngSeedGenerator,
 }
 
 struct Shared {
@@ -70,11 +75,61 @@ struct Shared {
     worker_thread_index: usize,
 }
 
-type Task = task::UnownedTask<NoopSchedule>;
+pub(crate) struct Task {
+    task: task::UnownedTask<NoopSchedule>,
+    mandatory: Mandatory,
+}
+
+#[derive(PartialEq, Eq)]
+pub(crate) enum Mandatory {
+    #[cfg_attr(not(fs), allow(dead_code))]
+    Mandatory,
+    NonMandatory,
+}
+
+pub(crate) enum SpawnError {
+    /// Pool is shutting down and the task was not scheduled
+    ShuttingDown,
+    /// There are no worker threads available to take the task
+    /// and the OS failed to spawn a new one
+    NoThreads(io::Error),
+}
+
+impl From<SpawnError> for io::Error {
+    fn from(e: SpawnError) -> Self {
+        match e {
+            SpawnError::ShuttingDown => {
+                io::Error::new(io::ErrorKind::Other, "blocking pool shutting down")
+            }
+            SpawnError::NoThreads(e) => e,
+        }
+    }
+}
+
+impl Task {
+    pub(crate) fn new(task: task::UnownedTask<NoopSchedule>, mandatory: Mandatory) -> Task {
+        Task { task, mandatory }
+    }
+
+    fn run(self) {
+        self.task.run();
+    }
+
+    fn shutdown_or_run_if_mandatory(self) {
+        match self.mandatory {
+            Mandatory::NonMandatory => self.task.shutdown(),
+            Mandatory::Mandatory => self.task.run(),
+        }
+    }
+}
 
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
 /// Runs the provided function on an executor dedicated to blocking operations.
+/// Tasks will be scheduled as non-mandatory, meaning they may not get executed
+/// in case of runtime shutdown.
+#[track_caller]
+#[cfg_attr(tokio_wasi, allow(dead_code))]
 pub(crate) fn spawn_blocking<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
@@ -82,6 +137,25 @@ where
 {
     let rt = context::current();
     rt.spawn_blocking(func)
+}
+
+cfg_fs! {
+    #[cfg_attr(any(
+        all(loom, not(test)), // the function is covered by loom tests
+        test
+    ), allow(dead_code))]
+    /// Runs the provided function on an executor dedicated to blocking
+    /// operations. Tasks will be scheduled as mandatory, meaning they are
+    /// guaranteed to run unless a shutdown is already taking place. In case a
+    /// shutdown is already taking place, `None` will be returned.
+    pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> Option<JoinHandle<R>>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let rt = context::current();
+        rt.inner.blocking_spawner().spawn_mandatory_blocking(&rt, func)
+    }
 }
 
 // ===== impl BlockingPool =====
@@ -112,6 +186,7 @@ impl BlockingPool {
                     before_stop: builder.before_stop.clone(),
                     thread_cap,
                     keep_alive,
+                    seed_generator: builder.seed_generator.next_generator(),
                 }),
             },
             shutdown_rx,
@@ -171,53 +246,157 @@ impl fmt::Debug for BlockingPool {
 // ===== impl Spawner =====
 
 impl Spawner {
-    pub(crate) fn spawn(&self, task: Task, rt: &Handle) -> Result<(), ()> {
-        let shutdown_tx = {
-            let mut shared = self.inner.shared.lock();
-
-            if shared.shutdown {
-                // Shutdown the task
-                task.shutdown();
-
-                // no need to even push this task; it would never get picked up
-                return Err(());
-            }
-
-            shared.queue.push_back(task);
-
-            if shared.num_idle == 0 {
-                // No threads are able to process the task.
-
-                if shared.num_th == self.inner.thread_cap {
-                    // At max number of threads
-                    None
-                } else {
-                    shared.num_th += 1;
-                    assert!(shared.shutdown_tx.is_some());
-                    shared.shutdown_tx.clone()
-                }
+    #[track_caller]
+    pub(crate) fn spawn_blocking<F, R>(&self, rt: &Handle, func: F) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let (join_handle, spawn_result) =
+            if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+                self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, None, rt)
             } else {
-                // Notify an idle worker thread. The notification counter
-                // is used to count the needed amount of notifications
-                // exactly. Thread libraries may generate spurious
-                // wakeups, this counter is used to keep us in a
-                // consistent state.
-                shared.num_idle -= 1;
-                shared.num_notify += 1;
-                self.inner.condvar.notify_one();
+                self.spawn_blocking_inner(func, Mandatory::NonMandatory, None, rt)
+            };
+
+        match spawn_result {
+            Ok(()) => join_handle,
+            // Compat: do not panic here, return the join_handle even though it will never resolve
+            Err(SpawnError::ShuttingDown) => join_handle,
+            Err(SpawnError::NoThreads(e)) => {
+                panic!("OS can't spawn worker thread: {}", e)
+            }
+        }
+    }
+
+    cfg_fs! {
+        #[track_caller]
+        #[cfg_attr(any(
+            all(loom, not(test)), // the function is covered by loom tests
+            test
+        ), allow(dead_code))]
+        pub(crate) fn spawn_mandatory_blocking<F, R>(&self, rt: &Handle, func: F) -> Option<JoinHandle<R>>
+        where
+            F: FnOnce() -> R + Send + 'static,
+            R: Send + 'static,
+        {
+            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+                self.spawn_blocking_inner(
+                    Box::new(func),
+                    Mandatory::Mandatory,
+                    None,
+                    rt,
+                )
+            } else {
+                self.spawn_blocking_inner(
+                    func,
+                    Mandatory::Mandatory,
+                    None,
+                    rt,
+                )
+            };
+
+            if spawn_result.is_ok() {
+                Some(join_handle)
+            } else {
                 None
             }
+        }
+    }
+
+    #[track_caller]
+    pub(crate) fn spawn_blocking_inner<F, R>(
+        &self,
+        func: F,
+        is_mandatory: Mandatory,
+        name: Option<&str>,
+        rt: &Handle,
+    ) -> (JoinHandle<R>, Result<(), SpawnError>)
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let fut = BlockingTask::new(func);
+        let id = task::Id::next();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let fut = {
+            use tracing::Instrument;
+            let location = std::panic::Location::caller();
+            let span = tracing::trace_span!(
+                target: "tokio::task::blocking",
+                "runtime.spawn",
+                kind = %"blocking",
+                task.name = %name.unwrap_or_default(),
+                task.id = id.as_u64(),
+                "fn" = %std::any::type_name::<F>(),
+                spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
+            );
+            fut.instrument(span)
         };
 
-        if let Some(shutdown_tx) = shutdown_tx {
-            let mut shared = self.inner.shared.lock();
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let _ = name;
 
-            let id = shared.worker_thread_index;
-            shared.worker_thread_index += 1;
+        let (task, handle) = task::unowned(fut, NoopSchedule, id);
+        let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
+        (handle, spawned)
+    }
 
-            let handle = self.spawn_thread(shutdown_tx, rt, id);
+    fn spawn_task(&self, task: Task, rt: &Handle) -> Result<(), SpawnError> {
+        let mut shared = self.inner.shared.lock();
 
-            shared.worker_threads.insert(id, handle);
+        if shared.shutdown {
+            // Shutdown the task: it's fine to shutdown this task (even if
+            // mandatory) because it was scheduled after the shutdown of the
+            // runtime began.
+            task.task.shutdown();
+
+            // no need to even push this task; it would never get picked up
+            return Err(SpawnError::ShuttingDown);
+        }
+
+        shared.queue.push_back(task);
+
+        if shared.num_idle == 0 {
+            // No threads are able to process the task.
+
+            if shared.num_th == self.inner.thread_cap {
+                // At max number of threads
+            } else {
+                assert!(shared.shutdown_tx.is_some());
+                let shutdown_tx = shared.shutdown_tx.clone();
+
+                if let Some(shutdown_tx) = shutdown_tx {
+                    let id = shared.worker_thread_index;
+
+                    match self.spawn_thread(shutdown_tx, rt, id) {
+                        Ok(handle) => {
+                            shared.num_th += 1;
+                            shared.worker_thread_index += 1;
+                            shared.worker_threads.insert(id, handle);
+                        }
+                        Err(ref e) if is_temporary_os_thread_error(e) && shared.num_th > 0 => {
+                            // OS temporarily failed to spawn a new thread.
+                            // The task will be picked up eventually by a currently
+                            // busy thread.
+                        }
+                        Err(e) => {
+                            // The OS refused to spawn the thread and there is no thread
+                            // to pick up the task that has just been pushed to the queue.
+                            return Err(SpawnError::NoThreads(e));
+                        }
+                    }
+                }
+            }
+        } else {
+            // Notify an idle worker thread. The notification counter
+            // is used to count the needed amount of notifications
+            // exactly. Thread libraries may generate spurious
+            // wakeups, this counter is used to keep us in a
+            // consistent state.
+            shared.num_idle -= 1;
+            shared.num_notify += 1;
+            self.inner.condvar.notify_one();
         }
 
         Ok(())
@@ -228,7 +407,7 @@ impl Spawner {
         shutdown_tx: shutdown::Sender,
         rt: &Handle,
         id: usize,
-    ) -> thread::JoinHandle<()> {
+    ) -> std::io::Result<thread::JoinHandle<()>> {
         let mut builder = thread::Builder::new().name((self.inner.thread_name)());
 
         if let Some(stack_size) = self.inner.stack_size {
@@ -237,15 +416,19 @@ impl Spawner {
 
         let rt = rt.clone();
 
-        builder
-            .spawn(move || {
-                // Only the reference should be moved into the closure
-                let _enter = crate::runtime::context::enter(rt.clone());
-                rt.blocking_spawner.inner.run(id);
-                drop(shutdown_tx);
-            })
-            .unwrap()
+        builder.spawn(move || {
+            // Only the reference should be moved into the closure
+            let _enter = crate::runtime::context::enter(rt.clone());
+            rt.inner.blocking_spawner().inner.run(id);
+            drop(shutdown_tx);
+        })
     }
+}
+
+// Tells whether the error when spawning a thread is temporary.
+#[inline]
+fn is_temporary_os_thread_error(error: &std::io::Error) -> bool {
+    matches!(error.kind(), std::io::ErrorKind::WouldBlock)
 }
 
 impl Inner {
@@ -253,6 +436,8 @@ impl Inner {
         if let Some(f) = &self.after_start {
             f()
         }
+        // We own this thread so there is no need to replace the RngSeed once we're done.
+        let _ = replace_thread_rng(self.seed_generator.next_seed());
 
         let mut shared = self.shared.lock();
         let mut join_on_thread = None;
@@ -302,7 +487,8 @@ impl Inner {
                 // Drain the queue
                 while let Some(task) = shared.queue.pop_front() {
                     drop(shared);
-                    task.shutdown();
+
+                    task.shutdown_or_run_if_mandatory();
 
                     shared = self.shared.lock();
                 }

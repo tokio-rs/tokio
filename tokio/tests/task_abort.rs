@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support panic recovery
 
 use std::sync::Arc;
 use std::thread::sleep;
@@ -26,10 +26,7 @@ fn test_abort_without_panic_3157() {
         .unwrap();
 
     rt.block_on(async move {
-        let handle = tokio::spawn(async move {
-            println!("task started");
-            tokio::time::sleep(Duration::new(100, 0)).await
-        });
+        let handle = tokio::spawn(async move { tokio::time::sleep(Duration::new(100, 0)).await });
 
         // wait for task to sleep.
         tokio::time::sleep(Duration::from_millis(10)).await;
@@ -89,7 +86,7 @@ fn test_abort_without_panic_3662() {
         // Note: We do the following to trigger a deferred task cleanup.
         //
         // The relevant piece of code you want to look at is in:
-        // `Inner::block_on` of `basic_scheduler.rs`.
+        // `Inner::block_on` of `scheduler/current_thread.rs`.
         //
         // We cause the cleanup to happen by having a poll return Pending once
         // so that the scheduler can go into the "auxiliary tasks" mode, at
@@ -159,7 +156,6 @@ fn test_abort_wakes_task_3964() {
         let handle = tokio::spawn(async move {
             // Make sure the Arc is moved into the task
             let _notify_dropped = notify_dropped;
-            println!("task started");
             tokio::time::sleep(Duration::new(100, 0)).await
         });
 
@@ -187,7 +183,6 @@ fn test_abort_task_that_panics_on_drop_contained() {
         let handle = tokio::spawn(async move {
             // Make sure the Arc is moved into the task
             let _panic_dropped = PanicOnDrop;
-            println!("task started");
             tokio::time::sleep(Duration::new(100, 0)).await
         });
 
@@ -211,7 +206,6 @@ fn test_abort_task_that_panics_on_drop_returned() {
         let handle = tokio::spawn(async move {
             // Make sure the Arc is moved into the task
             let _panic_dropped = PanicOnDrop;
-            println!("task started");
             tokio::time::sleep(Duration::new(100, 0)).await
         });
 

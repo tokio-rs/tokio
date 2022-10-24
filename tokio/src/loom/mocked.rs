@@ -38,3 +38,8 @@ pub(crate) mod sys {
         2
     }
 }
+
+pub(crate) mod thread {
+    pub use loom::lazy_static::AccessError;
+    pub use loom::thread::*;
+}

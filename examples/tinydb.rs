@@ -149,7 +149,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn handle_request(line: &str, db: &Arc<Database>) -> Response {
-    let request = match Request::parse(&line) {
+    let request = match Request::parse(line) {
         Ok(req) => req,
         Err(e) => return Response::Error { msg: e },
     };

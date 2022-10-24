@@ -108,6 +108,32 @@ impl<T, D> FramedRead<T, D> {
         &mut self.inner.codec
     }
 
+    /// Maps the decoder `D` to `C`, preserving the read buffer
+    /// wrapped by `Framed`.
+    pub fn map_decoder<C, F>(self, map: F) -> FramedRead<T, C>
+    where
+        F: FnOnce(D) -> C,
+    {
+        // This could be potentially simplified once rust-lang/rust#86555 hits stable
+        let FramedImpl {
+            inner,
+            state,
+            codec,
+        } = self.inner;
+        FramedRead {
+            inner: FramedImpl {
+                inner,
+                state,
+                codec: map(codec),
+            },
+        }
+    }
+
+    /// Returns a mutable reference to the underlying decoder.
+    pub fn decoder_pin_mut(self: Pin<&mut Self>) -> &mut D {
+        self.project().inner.project().codec
+    }
+
     /// Returns a reference to the read buffer.
     pub fn read_buffer(&self) -> &BytesMut {
         &self.inner.state.buffer

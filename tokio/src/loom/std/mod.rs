@@ -1,10 +1,8 @@
 #![cfg_attr(any(not(feature = "full"), loom), allow(unused_imports, dead_code))]
 
-mod atomic_ptr;
 mod atomic_u16;
 mod atomic_u32;
 mod atomic_u64;
-mod atomic_u8;
 mod atomic_usize;
 mod mutex;
 #[cfg(feature = "parking_lot")]
@@ -23,6 +21,10 @@ pub(crate) mod cell {
 ))]
 pub(crate) mod future {
     pub(crate) use crate::sync::AtomicWaker;
+}
+
+pub(crate) mod hint {
+    pub(crate) use std::hint::spin_loop;
 }
 
 pub(crate) mod rand {
@@ -67,17 +69,12 @@ pub(crate) mod sync {
     pub(crate) use crate::loom::std::mutex::Mutex;
 
     pub(crate) mod atomic {
-        pub(crate) use crate::loom::std::atomic_ptr::AtomicPtr;
         pub(crate) use crate::loom::std::atomic_u16::AtomicU16;
         pub(crate) use crate::loom::std::atomic_u32::AtomicU32;
         pub(crate) use crate::loom::std::atomic_u64::AtomicU64;
-        pub(crate) use crate::loom::std::atomic_u8::AtomicU8;
         pub(crate) use crate::loom::std::atomic_usize::AtomicUsize;
 
-        pub(crate) use std::sync::atomic::{fence, AtomicBool, Ordering};
-        // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
-        #[allow(deprecated)]
-        pub(crate) use std::sync::atomic::spin_loop_hint;
+        pub(crate) use std::sync::atomic::{fence, AtomicBool, AtomicPtr, AtomicU8, Ordering};
     }
 }
 
@@ -96,14 +93,12 @@ pub(crate) mod sys {
 pub(crate) mod thread {
     #[inline]
     pub(crate) fn yield_now() {
-        // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
-        #[allow(deprecated)]
-        std::sync::atomic::spin_loop_hint();
+        std::hint::spin_loop();
     }
 
     #[allow(unused_imports)]
     pub(crate) use std::thread::{
-        current, panicking, park, park_timeout, sleep, spawn, Builder, JoinHandle, LocalKey,
-        Result, Thread, ThreadId,
+        current, panicking, park, park_timeout, sleep, spawn, AccessError, Builder, JoinHandle,
+        LocalKey, Result, Thread, ThreadId,
     };
 }

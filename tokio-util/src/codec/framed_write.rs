@@ -88,6 +88,32 @@ impl<T, E> FramedWrite<T, E> {
         &mut self.inner.codec
     }
 
+    /// Maps the encoder `E` to `C`, preserving the write buffer
+    /// wrapped by `Framed`.
+    pub fn map_encoder<C, F>(self, map: F) -> FramedWrite<T, C>
+    where
+        F: FnOnce(E) -> C,
+    {
+        // This could be potentially simplified once rust-lang/rust#86555 hits stable
+        let FramedImpl {
+            inner,
+            state,
+            codec,
+        } = self.inner;
+        FramedWrite {
+            inner: FramedImpl {
+                inner,
+                state,
+                codec: map(codec),
+            },
+        }
+    }
+
+    /// Returns a mutable reference to the underlying encoder.
+    pub fn encoder_pin_mut(self: Pin<&mut Self>) -> &mut E {
+        self.project().inner.project().codec
+    }
+
     /// Returns a reference to the write buffer.
     pub fn write_buffer(&self) -> &BytesMut {
         &self.inner.state.buffer

@@ -34,7 +34,7 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
     Ok(ReadDir(State::Idle(Some(std))))
 }
 
-/// Reads the the entries in a directory.
+/// Reads the entries in a directory.
 ///
 /// This struct is returned from the [`read_dir`] function of this module and
 /// will yield instances of [`DirEntry`]. Through a [`DirEntry`] information

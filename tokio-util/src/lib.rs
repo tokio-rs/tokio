@@ -5,7 +5,6 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
@@ -30,7 +29,9 @@ cfg_codec! {
 }
 
 cfg_net! {
+    #[cfg(not(target_arch = "wasm32"))]
     pub mod udp;
+    pub mod net;
 }
 
 cfg_compat! {
@@ -43,6 +44,7 @@ cfg_io! {
 
 cfg_rt! {
     pub mod context;
+    pub mod task;
 }
 
 cfg_time! {
@@ -114,6 +116,9 @@ mod util {
 
         let n = {
             let dst = buf.chunk_mut();
+
+            // Safety: `chunk_mut()` returns a `&mut UninitSlice`, and `UninitSlice` is a
+            // transparent wrapper around `[MaybeUninit<u8>]`.
             let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
             let mut buf = ReadBuf::uninit(dst);
             let ptr = buf.filled().as_ptr();

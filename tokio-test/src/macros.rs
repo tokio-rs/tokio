@@ -260,7 +260,7 @@ macro_rules! assert_err {
     }};
 }
 
-/// Asserts that an exact duration has elapsed since since the start instant ±1ms.
+/// Asserts that an exact duration has elapsed since the start instant ±1ms.
 ///
 /// ```rust
 /// use tokio::time::{self, Instant};

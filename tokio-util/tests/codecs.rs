@@ -38,6 +38,9 @@ fn bytes_encoder() {
     codec
         .encode(Bytes::from_static(&[0; INITIAL_CAPACITY + 1]), &mut buf)
         .unwrap();
+    codec
+        .encode(BytesMut::from(&b"hello"[..]), &mut buf)
+        .unwrap();
 }
 
 #[test]

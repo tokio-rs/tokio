@@ -1,10 +1,9 @@
 #![allow(clippy::unit_arg)]
 
 use crate::signal::os::{OsExtraData, OsStorage};
-
 use crate::sync::watch;
+use crate::util::once_cell::OnceCell;
 
-use once_cell::sync::Lazy;
 use std::ops;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -152,19 +151,25 @@ impl Globals {
     }
 }
 
+fn globals_init() -> Globals
+where
+    OsExtraData: 'static + Send + Sync + Init,
+    OsStorage: 'static + Send + Sync + Init,
+{
+    Globals {
+        extra: OsExtraData::init(),
+        registry: Registry::new(OsStorage::init()),
+    }
+}
+
 pub(crate) fn globals() -> Pin<&'static Globals>
 where
     OsExtraData: 'static + Send + Sync + Init,
     OsStorage: 'static + Send + Sync + Init,
 {
-    static GLOBALS: Lazy<Pin<Box<Globals>>> = Lazy::new(|| {
-        Box::pin(Globals {
-            extra: OsExtraData::init(),
-            registry: Registry::new(OsStorage::init()),
-        })
-    });
+    static GLOBALS: OnceCell<Globals> = OnceCell::new();
 
-    GLOBALS.as_ref()
+    Pin::new(GLOBALS.get(globals_init))
 }
 
 #[cfg(all(test, not(loom)))]
@@ -202,7 +207,12 @@ mod tests {
                 registry.broadcast();
 
                 // Yield so the previous broadcast can get received
-                crate::time::sleep(std::time::Duration::from_millis(10)).await;
+                //
+                // This yields many times since the block_on task is only polled every 61
+                // ticks.
+                for _ in 0..100 {
+                    crate::task::yield_now().await;
+                }
 
                 // Send subsequent signal
                 registry.record_event(0);
@@ -232,7 +242,7 @@ mod tests {
     #[test]
     fn record_invalid_event_does_nothing() {
         let registry = Registry::new(vec![EventInfo::default()]);
-        registry.record_event(42);
+        registry.record_event(1302);
     }
 
     #[test]

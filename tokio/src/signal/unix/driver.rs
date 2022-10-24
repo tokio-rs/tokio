@@ -2,13 +2,13 @@
 
 //! Signal driver
 
-use crate::io::driver::{Driver as IoDriver, Interest};
+use crate::io::interest::Interest;
 use crate::io::PollEvented;
-use crate::park::Park;
+use crate::runtime::io;
 use crate::signal::registry::globals;
 
 use mio::net::UnixStream;
-use std::io::{self, Read};
+use std::io::{self as std_io, Read};
 use std::ptr;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
@@ -22,7 +22,7 @@ use std::time::Duration;
 #[derive(Debug)]
 pub(crate) struct Driver {
     /// Thread parker. The `Driver` park implementation delegates to this.
-    park: IoDriver,
+    park: io::Driver,
 
     /// A pipe for receiving wake events from the signal handler
     receiver: PollEvented<UnixStream>,
@@ -43,7 +43,7 @@ pub(super) struct Inner(());
 
 impl Driver {
     /// Creates a new signal `Driver` instance that delegates wakeups to `park`.
-    pub(crate) fn new(park: IoDriver) -> io::Result<Self> {
+    pub(crate) fn new(park: io::Driver) -> std_io::Result<Self> {
         use std::mem::ManuallyDrop;
         use std::os::unix::io::{AsRawFd, FromRawFd};
 
@@ -74,11 +74,8 @@ impl Driver {
         let original =
             ManuallyDrop::new(unsafe { std::os::unix::net::UnixStream::from_raw_fd(receiver_fd) });
         let receiver = UnixStream::from_std(original.try_clone()?);
-        let receiver = PollEvented::new_with_interest_and_handle(
-            receiver,
-            Interest::READABLE | Interest::WRITABLE,
-            park.handle(),
-        )?;
+        let receiver =
+            PollEvented::new_with_interest_and_handle(receiver, Interest::READABLE, park.handle())?;
 
         Ok(Self {
             park,
@@ -93,6 +90,20 @@ impl Driver {
         Handle {
             inner: Arc::downgrade(&self.inner),
         }
+    }
+
+    pub(crate) fn park(&mut self) {
+        self.park.park();
+        self.process();
+    }
+
+    pub(crate) fn park_timeout(&mut self, duration: Duration) {
+        self.park.park_timeout(duration);
+        self.process();
+    }
+
+    pub(crate) fn shutdown(&mut self) {
+        self.park.shutdown()
     }
 
     fn process(&self) {
@@ -116,7 +127,7 @@ impl Driver {
             match (&*self.receiver).read(&mut buf) {
                 Ok(0) => panic!("EOF on self-pipe"),
                 Ok(_) => continue, // Keep reading
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => break,
+                Err(e) if e.kind() == std_io::ErrorKind::WouldBlock => break,
                 Err(e) => panic!("Bad read on self-pipe: {}", e),
             }
         }
@@ -136,41 +147,17 @@ unsafe fn noop_clone(_data: *const ()) -> RawWaker {
 
 unsafe fn noop(_data: *const ()) {}
 
-// ===== impl Park for Driver =====
-
-impl Park for Driver {
-    type Unpark = <IoDriver as Park>::Unpark;
-    type Error = io::Error;
-
-    fn unpark(&self) -> Self::Unpark {
-        self.park.unpark()
-    }
-
-    fn park(&mut self) -> Result<(), Self::Error> {
-        self.park.park()?;
-        self.process();
-        Ok(())
-    }
-
-    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.park.park_timeout(duration)?;
-        self.process();
-        Ok(())
-    }
-
-    fn shutdown(&mut self) {
-        self.park.shutdown()
-    }
-}
-
 // ===== impl Handle =====
 
 impl Handle {
-    pub(super) fn check_inner(&self) -> io::Result<()> {
+    pub(super) fn check_inner(&self) -> std_io::Result<()> {
         if self.inner.strong_count() > 0 {
             Ok(())
         } else {
-            Err(io::Error::new(io::ErrorKind::Other, "signal driver gone"))
+            Err(std_io::Error::new(
+                std_io::ErrorKind::Other,
+                "signal driver gone",
+            ))
         }
     }
 }
@@ -182,6 +169,7 @@ cfg_rt! {
         /// # Panics
         ///
         /// This function panics if there is no current signal driver set.
+        #[track_caller]
         pub(super) fn current() -> Self {
             crate::runtime::context::signal_handle().expect(
                 "there is no signal driver running, must be called from the context of Tokio runtime",
@@ -197,6 +185,7 @@ cfg_not_rt! {
         /// # Panics
         ///
         /// This function panics if there is no current signal driver set.
+        #[track_caller]
         pub(super) fn current() -> Self {
             panic!(
                 "there is no signal driver running, must be called from the context of Tokio runtime or with\

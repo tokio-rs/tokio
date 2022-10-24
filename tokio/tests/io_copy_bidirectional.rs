@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support bind()
 
 use std::time::Duration;
 use tokio::io::{self, copy_bidirectional, AsyncReadExt, AsyncWriteExt};
@@ -111,18 +111,30 @@ async fn blocking_one_side_does_not_block_other() {
 }
 
 #[tokio::test]
-async fn immediate_exit_on_error() {
-    symmetric(|handle, mut a, mut b| async move {
-        block_write(&mut a).await;
+async fn immediate_exit_on_write_error() {
+    let payload = b"here, take this";
+    let error = || io::Error::new(io::ErrorKind::Other, "no thanks!");
 
-        // Fill up the b->copy->a path. We expect that this will _not_ drain
-        // before we exit the copy task.
-        let _bytes_written = block_write(&mut b).await;
+    let mut a = tokio_test::io::Builder::new()
+        .read(payload)
+        .write_error(error())
+        .build();
 
-        // Drop b. We should not wait for a to consume the data buffered in the
-        // copy loop, since b will be failing writes.
-        drop(b);
-        assert!(handle.await.unwrap().is_err());
-    })
-    .await
+    let mut b = tokio_test::io::Builder::new()
+        .read(payload)
+        .write_error(error())
+        .build();
+
+    assert!(copy_bidirectional(&mut a, &mut b).await.is_err());
+}
+
+#[tokio::test]
+async fn immediate_exit_on_read_error() {
+    let error = || io::Error::new(io::ErrorKind::Other, "got nothing!");
+
+    let mut a = tokio_test::io::Builder::new().read_error(error()).build();
+
+    let mut b = tokio_test::io::Builder::new().read_error(error()).build();
+
+    assert!(copy_bidirectional(&mut a, &mut b).await.is_err());
 }

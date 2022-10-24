@@ -57,6 +57,13 @@ pub(crate) unsafe trait Link {
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle;
 
     /// Return the pointers for a node
+    ///
+    /// # Safety
+    ///
+    /// The resulting pointer should have the same tag in the stacked-borrows
+    /// stack as the argument. In particular, the method may not create an
+    /// intermediate reference in the process of creating the resulting raw
+    /// pointer.
     unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>>;
 }
 
@@ -219,6 +226,7 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
 
 #[cfg(any(
     feature = "fs",
+    feature = "rt",
     all(unix, feature = "process"),
     feature = "signal",
     feature = "sync",
@@ -296,7 +304,7 @@ impl<T> Pointers<T> {
         }
     }
 
-    fn get_prev(&self) -> Option<NonNull<T>> {
+    pub(crate) fn get_prev(&self) -> Option<NonNull<T>> {
         // SAFETY: prev is the first field in PointersInner, which is #[repr(C)].
         unsafe {
             let inner = self.inner.get();
@@ -304,7 +312,7 @@ impl<T> Pointers<T> {
             ptr::read(prev)
         }
     }
-    fn get_next(&self) -> Option<NonNull<T>> {
+    pub(crate) fn get_next(&self) -> Option<NonNull<T>> {
         // SAFETY: next is the second field in PointersInner, which is #[repr(C)].
         unsafe {
             let inner = self.inner.get();
@@ -352,6 +360,7 @@ mod tests {
     use std::pin::Pin;
 
     #[derive(Debug)]
+    #[repr(C)]
     struct Entry {
         pointers: Pointers<Entry>,
         val: i32,
@@ -369,8 +378,8 @@ mod tests {
             Pin::new_unchecked(&*ptr.as_ptr())
         }
 
-        unsafe fn pointers(mut target: NonNull<Entry>) -> NonNull<Pointers<Entry>> {
-            NonNull::from(&mut target.as_mut().pointers)
+        unsafe fn pointers(target: NonNull<Entry>) -> NonNull<Pointers<Entry>> {
+            target.cast()
         }
     }
 
@@ -614,6 +623,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(tokio_wasm))]
     proptest::proptest! {
         #[test]
         fn fuzz_linked_list(ops: Vec<usize>) {
@@ -621,6 +631,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(tokio_wasm))]
     fn run_fuzz(ops: Vec<usize>) {
         use std::collections::VecDeque;
 

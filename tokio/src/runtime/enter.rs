@@ -17,7 +17,7 @@ impl EnterContext {
     }
 }
 
-thread_local!(static ENTERED: Cell<EnterContext> = Cell::new(EnterContext::NotEntered));
+tokio_thread_local!(static ENTERED: Cell<EnterContext> = const { Cell::new(EnterContext::NotEntered) });
 
 /// Represents an executor context.
 pub(crate) struct Enter {
@@ -25,12 +25,11 @@ pub(crate) struct Enter {
 }
 
 cfg_rt! {
-    use crate::park::thread::ParkError;
-
     use std::time::Duration;
 
     /// Marks the current thread as being within the dynamic extent of an
     /// executor.
+    #[track_caller]
     pub(crate) fn enter(allow_blocking: bool) -> Enter {
         if let Some(enter) = try_enter(allow_blocking) {
             return enter;
@@ -138,10 +137,12 @@ cfg_rt_multi_thread! {
 }
 
 cfg_rt! {
+    use crate::loom::thread::AccessError;
+
     impl Enter {
         /// Blocks the thread on the specified future, returning the value with
         /// which that future completes.
-        pub(crate) fn block_on<F>(&mut self, f: F) -> Result<F::Output, ParkError>
+        pub(crate) fn block_on<F>(&mut self, f: F) -> Result<F::Output, AccessError>
         where
             F: std::future::Future,
         {
@@ -155,18 +156,17 @@ cfg_rt! {
         ///
         /// If the future completes before `timeout`, the result is returned. If
         /// `timeout` elapses, then `Err` is returned.
-        pub(crate) fn block_on_timeout<F>(&mut self, f: F, timeout: Duration) -> Result<F::Output, ParkError>
+        pub(crate) fn block_on_timeout<F>(&mut self, f: F, timeout: Duration) -> Result<F::Output, ()>
         where
             F: std::future::Future,
         {
-            use crate::park::Park;
             use crate::park::thread::CachedParkThread;
             use std::task::Context;
             use std::task::Poll::Ready;
             use std::time::Instant;
 
             let mut park = CachedParkThread::new();
-            let waker = park.get_unpark()?.into_waker();
+            let waker = park.waker().map_err(|_| ())?;
             let mut cx = Context::from_waker(&waker);
 
             pin!(f);
@@ -183,7 +183,7 @@ cfg_rt! {
                     return Err(());
                 }
 
-                park.park_timeout(when - now)?;
+                park.park_timeout(when - now);
             }
         }
     }

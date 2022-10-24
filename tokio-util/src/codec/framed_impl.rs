@@ -7,12 +7,12 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use bytes::BytesMut;
 use futures_core::ready;
 use futures_sink::Sink;
-use log::trace;
 use pin_project_lite::pin_project;
 use std::borrow::{Borrow, BorrowMut};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use tracing::trace;
 
 pin_project! {
     #[derive(Debug)]
@@ -278,7 +278,7 @@ where
 
         while !pinned.state.borrow_mut().buffer.is_empty() {
             let WriteFrame { buffer } = pinned.state.borrow_mut();
-            trace!("writing; remaining={}", buffer.len());
+            trace!(remaining = buffer.len(), "writing;");
 
             let n = ready!(poll_write_buf(pinned.inner.as_mut(), cx, buffer))?;
 

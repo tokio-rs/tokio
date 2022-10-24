@@ -7,14 +7,26 @@ use crate::signal::RxFuture;
 
 use winapi::shared::minwindef::{BOOL, DWORD, FALSE, TRUE};
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
-use winapi::um::wincon::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
-
-pub(super) fn ctrl_c() -> io::Result<RxFuture> {
-    new(CTRL_C_EVENT)
-}
+use winapi::um::wincon;
 
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
-    new(CTRL_BREAK_EVENT)
+    new(wincon::CTRL_BREAK_EVENT)
+}
+
+pub(super) fn ctrl_close() -> io::Result<RxFuture> {
+    new(wincon::CTRL_CLOSE_EVENT)
+}
+
+pub(super) fn ctrl_c() -> io::Result<RxFuture> {
+    new(wincon::CTRL_C_EVENT)
+}
+
+pub(super) fn ctrl_logoff() -> io::Result<RxFuture> {
+    new(wincon::CTRL_LOGOFF_EVENT)
+}
+
+pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
+    new(wincon::CTRL_SHUTDOWN_EVENT)
 }
 
 fn new(signum: DWORD) -> io::Result<RxFuture> {
@@ -25,15 +37,21 @@ fn new(signum: DWORD) -> io::Result<RxFuture> {
 
 #[derive(Debug)]
 pub(crate) struct OsStorage {
-    ctrl_c: EventInfo,
     ctrl_break: EventInfo,
+    ctrl_close: EventInfo,
+    ctrl_c: EventInfo,
+    ctrl_logoff: EventInfo,
+    ctrl_shutdown: EventInfo,
 }
 
 impl Init for OsStorage {
     fn init() -> Self {
         Self {
-            ctrl_c: EventInfo::default(),
-            ctrl_break: EventInfo::default(),
+            ctrl_break: Default::default(),
+            ctrl_close: Default::default(),
+            ctrl_c: Default::default(),
+            ctrl_logoff: Default::default(),
+            ctrl_shutdown: Default::default(),
         }
     }
 }
@@ -41,8 +59,11 @@ impl Init for OsStorage {
 impl Storage for OsStorage {
     fn event_info(&self, id: EventId) -> Option<&EventInfo> {
         match DWORD::try_from(id) {
-            Ok(CTRL_C_EVENT) => Some(&self.ctrl_c),
-            Ok(CTRL_BREAK_EVENT) => Some(&self.ctrl_break),
+            Ok(wincon::CTRL_BREAK_EVENT) => Some(&self.ctrl_break),
+            Ok(wincon::CTRL_CLOSE_EVENT) => Some(&self.ctrl_close),
+            Ok(wincon::CTRL_C_EVENT) => Some(&self.ctrl_c),
+            Ok(wincon::CTRL_LOGOFF_EVENT) => Some(&self.ctrl_logoff),
+            Ok(wincon::CTRL_SHUTDOWN_EVENT) => Some(&self.ctrl_shutdown),
             _ => None,
         }
     }
@@ -51,8 +72,11 @@ impl Storage for OsStorage {
     where
         F: FnMut(&'a EventInfo),
     {
-        f(&self.ctrl_c);
         f(&self.ctrl_break);
+        f(&self.ctrl_close);
+        f(&self.ctrl_c);
+        f(&self.ctrl_logoff);
+        f(&self.ctrl_shutdown);
     }
 }
 
@@ -121,7 +145,7 @@ mod tests {
         // like sending signals on Unix, so we'll stub out the actual OS
         // integration and test that our handling works.
         unsafe {
-            super::handler(CTRL_C_EVENT);
+            super::handler(wincon::CTRL_C_EVENT);
         }
 
         assert_ready_ok!(ctrl_c.poll());
@@ -138,10 +162,64 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                super::handler(CTRL_BREAK_EVENT);
+                super::handler(wincon::CTRL_BREAK_EVENT);
             }
 
             ctrl_break.recv().await.unwrap();
+        });
+    }
+
+    #[test]
+    fn ctrl_close() {
+        let rt = rt();
+
+        rt.block_on(async {
+            let mut ctrl_close = assert_ok!(crate::signal::windows::ctrl_close());
+
+            // Windows doesn't have a good programmatic way of sending events
+            // like sending signals on Unix, so we'll stub out the actual OS
+            // integration and test that our handling works.
+            unsafe {
+                super::handler(wincon::CTRL_CLOSE_EVENT);
+            }
+
+            ctrl_close.recv().await.unwrap();
+        });
+    }
+
+    #[test]
+    fn ctrl_shutdown() {
+        let rt = rt();
+
+        rt.block_on(async {
+            let mut ctrl_shutdown = assert_ok!(crate::signal::windows::ctrl_shutdown());
+
+            // Windows doesn't have a good programmatic way of sending events
+            // like sending signals on Unix, so we'll stub out the actual OS
+            // integration and test that our handling works.
+            unsafe {
+                super::handler(wincon::CTRL_SHUTDOWN_EVENT);
+            }
+
+            ctrl_shutdown.recv().await.unwrap();
+        });
+    }
+
+    #[test]
+    fn ctrl_logoff() {
+        let rt = rt();
+
+        rt.block_on(async {
+            let mut ctrl_logoff = assert_ok!(crate::signal::windows::ctrl_logoff());
+
+            // Windows doesn't have a good programmatic way of sending events
+            // like sending signals on Unix, so we'll stub out the actual OS
+            // integration and test that our handling works.
+            unsafe {
+                super::handler(wincon::CTRL_LOGOFF_EVENT);
+            }
+
+            ctrl_logoff.recv().await.unwrap();
         });
     }
 

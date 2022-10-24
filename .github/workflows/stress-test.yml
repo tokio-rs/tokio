@@ -5,8 +5,17 @@ on:
     branches:
       - master
 
+env:
+  RUSTFLAGS: -Dwarnings
+  RUST_BACKTRACE: 1
+  # Change to specific Rust release to pin
+  rust_stable: stable
+
+permissions:
+  contents: read
+
 jobs:
-  stess-test:
+  stress-test:
     name: Stress Test
     runs-on: ubuntu-latest
     strategy:
@@ -14,14 +23,15 @@ jobs:
         stress-test:
           - simple_echo_tcp
     steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust
-        run: rustup update stable
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: ${{ env.rust_stable }}
+            override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install Valgrind
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y valgrind
+        uses: taiki-e/install-action@valgrind
 
       # Compiles each of the stress test examples.
       - name: Compile stress test examples
@@ -29,4 +39,4 @@ jobs:
 
       # Runs each of the examples using Valgrind. Detects leaks and displays them.
       - name: Run valgrind
-        run: valgrind  --leak-check=full --show-leak-kinds=all ./target/release/examples/${{ matrix.stress-test }}
+        run: valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all ./target/release/examples/${{ matrix.stress-test }}

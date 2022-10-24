@@ -42,7 +42,7 @@ where
         while !me.buf.is_empty() {
             let n = ready!(Pin::new(&mut *me.writer).poll_write(cx, me.buf))?;
             {
-                let (_, rest) = mem::replace(&mut *me.buf, &[]).split_at(n);
+                let (_, rest) = mem::take(&mut *me.buf).split_at(n);
                 *me.buf = rest;
             }
             if n == 0 {

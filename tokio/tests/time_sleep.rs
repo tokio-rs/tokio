@@ -168,6 +168,7 @@ async fn reset_sleep_to_past() {
     assert_ready!(sleep.poll());
 }
 
+#[cfg(not(tokio_wasi))] // Wasi doesn't support panic recovery
 #[test]
 #[should_panic]
 fn creating_sleep_outside_of_context() {
@@ -188,10 +189,7 @@ async fn greater_than_max() {
 
 #[tokio::test]
 async fn short_sleeps() {
-    for i in 0..10000 {
-        if (i % 10) == 0 {
-            eprintln!("=== {}", i);
-        }
+    for _ in 0..10000 {
         tokio::time::sleep(std::time::Duration::from_millis(0)).await;
     }
 }
@@ -233,22 +231,6 @@ async fn long_sleeps() {
 
     assert!(tokio::time::Instant::now() >= deadline);
     assert!(tokio::time::Instant::now() <= deadline + Duration::from_millis(1));
-}
-
-#[tokio::test]
-#[should_panic(expected = "Duration too far into the future")]
-async fn very_long_sleeps() {
-    tokio::time::pause();
-
-    // Some platforms (eg macos) can't represent times this far in the future
-    if let Some(deadline) = tokio::time::Instant::now().checked_add(Duration::from_secs(1u64 << 62))
-    {
-        tokio::time::sleep_until(deadline).await;
-    } else {
-        // make it pass anyway (we can't skip/ignore the test based on the
-        // result of checked_add)
-        panic!("Duration too far into the future (test ignored)")
-    }
 }
 
 #[tokio::test]

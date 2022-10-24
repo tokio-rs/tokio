@@ -1,9 +1,9 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::runtime::{self, Runtime};
+use tokio::runtime;
 use tokio::sync::oneshot;
 use tokio_test::{assert_err, assert_ok};
 
@@ -14,6 +14,15 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{mpsc, Arc, Mutex};
 use std::task::{Context, Poll, Waker};
+
+macro_rules! cfg_metrics {
+    ($($t:tt)*) => {
+        #[cfg(tokio_unstable)]
+        {
+            $( $t )*
+        }
+    }
+}
 
 #[test]
 fn single_thread() {
@@ -52,6 +61,38 @@ fn many_oneshot_futures() {
 
         // Wait for the pool to shutdown
         drop(rt);
+    }
+}
+
+#[test]
+fn spawn_two() {
+    let rt = rt();
+
+    let out = rt.block_on(async {
+        let (tx, rx) = oneshot::channel();
+
+        tokio::spawn(async move {
+            tokio::spawn(async move {
+                tx.send("ZOMG").unwrap();
+            });
+        });
+
+        assert_ok!(rx.await)
+    });
+
+    assert_eq!(out, "ZOMG");
+
+    cfg_metrics! {
+        let metrics = rt.metrics();
+        drop(rt);
+        assert_eq!(1, metrics.remote_schedule_count());
+
+        let mut local = 0;
+        for i in 0..metrics.num_workers() {
+            local += metrics.worker_local_schedule_count(i);
+        }
+
+        assert_eq!(1, local);
     }
 }
 
@@ -439,9 +480,7 @@ fn wake_during_shutdown() {
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
             let me = Pin::into_inner(self);
             let mut lock = me.shared.lock().unwrap();
-            println!("poll {}", me.put_waker);
             if me.put_waker {
-                println!("putting");
                 lock.waker = Some(cx.waker().clone());
             }
             Poll::Pending
@@ -450,13 +489,11 @@ fn wake_during_shutdown() {
 
     impl Drop for MyFuture {
         fn drop(&mut self) {
-            println!("drop {} start", self.put_waker);
             let mut lock = self.shared.lock().unwrap();
             if !self.put_waker {
                 lock.waker.take().unwrap().wake();
             }
             drop(lock);
-            println!("drop {} stop", self.put_waker);
         }
     }
 
@@ -498,6 +535,71 @@ async fn test_block_in_place4() {
     tokio::task::block_in_place(|| {});
 }
 
-fn rt() -> Runtime {
-    Runtime::new().unwrap()
+fn rt() -> runtime::Runtime {
+    runtime::Runtime::new().unwrap()
+}
+
+#[cfg(tokio_unstable)]
+mod unstable {
+    use super::*;
+    use tokio::runtime::RngSeed;
+
+    #[test]
+    fn test_disable_lifo_slot() {
+        let rt = runtime::Builder::new_multi_thread()
+            .disable_lifo_slot()
+            .worker_threads(2)
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            tokio::spawn(async {
+                // Spawn another task and block the thread until completion. If the LIFO slot
+                // is used then the test doesn't complete.
+                futures::executor::block_on(tokio::spawn(async {})).unwrap();
+            })
+            .await
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn rng_seed() {
+        let seed = b"bytes used to generate seed";
+        let rt1 = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt1_value = rt1.block_on(async {
+            let random = tokio::macros::support::thread_rng_n(100);
+            assert_eq!(random, 86);
+
+            let _ = tokio::spawn(async {
+                // Because we only have a single worker thread, the
+                // RNG will be deterministic here as well.
+                tokio::macros::support::thread_rng_n(100);
+            })
+            .await;
+        });
+
+        let rt2 = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt2_value = rt2.block_on(async {
+            let random = tokio::macros::support::thread_rng_n(100);
+            assert_eq!(random, 86);
+
+            let _ = tokio::spawn(async {
+                // Because we only have a single worker thread, the
+                // RNG will be deterministic here as well.
+                tokio::macros::support::thread_rng_n(100);
+            })
+            .await;
+        });
+
+        assert_eq!(rt1_value, rt2_value);
+    }
 }

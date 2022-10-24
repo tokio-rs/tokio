@@ -1,13 +1,19 @@
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "sync")]
 
-use std::sync::Arc;
+#[cfg(tokio_wasm_not_wasi)]
+use wasm_bindgen_test::wasm_bindgen_test as test;
+#[cfg(tokio_wasm_not_wasi)]
+use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
+
+#[cfg(not(tokio_wasm_not_wasi))]
+use tokio::test as maybe_tokio_test;
+
 use std::task::Poll;
 
 use futures::future::FutureExt;
-use futures::stream;
-use futures::stream::StreamExt;
 
-use tokio::sync::{Barrier, RwLock};
+use tokio::sync::RwLock;
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
@@ -25,7 +31,7 @@ fn read_shared() {
     let mut t1 = spawn(rwlock.read());
     let _g1 = assert_ready!(t1.poll());
     let mut t2 = spawn(rwlock.read());
-    assert_ready!(t2.poll());
+    let _g2 = assert_ready!(t2.poll());
 }
 
 // When there is an active shared owner, exclusive access should not be possible
@@ -69,7 +75,7 @@ fn exhaust_reading() {
     let g2 = reads.pop().unwrap();
     drop(g2);
     assert!(t1.is_woken());
-    assert_ready!(t1.poll());
+    let _g1 = assert_ready!(t1.poll());
 }
 
 // When there is an active exclusive owner, subsequent exclusive access should not be possible
@@ -94,7 +100,7 @@ fn write_shared_drop() {
     assert_pending!(t2.poll());
     drop(g1);
     assert!(t2.is_woken());
-    assert_ready!(t2.poll());
+    let _g2 = assert_ready!(t2.poll());
 }
 
 // when there is an active shared owner, and exclusive access is triggered,
@@ -106,7 +112,7 @@ fn write_read_shared_pending() {
     let _g1 = assert_ready!(t1.poll());
 
     let mut t2 = spawn(rwlock.read());
-    assert_ready!(t2.poll());
+    let _g2 = assert_ready!(t2.poll());
 
     let mut t3 = spawn(rwlock.write());
     assert_pending!(t3.poll());
@@ -131,11 +137,11 @@ fn write_read_shared_drop_pending() {
     drop(t2);
 
     assert!(t3.is_woken());
-    assert_ready!(t3.poll());
+    let _t3 = assert_ready!(t3.poll());
 }
 
 // Acquire an RwLock nonexclusively by a single task
-#[tokio::test]
+#[maybe_tokio_test]
 async fn read_uncontested() {
     let rwlock = RwLock::new(100);
     let result = *rwlock.read().await;
@@ -144,7 +150,7 @@ async fn read_uncontested() {
 }
 
 // Acquire an uncontested RwLock in exclusive mode
-#[tokio::test]
+#[maybe_tokio_test]
 async fn write_uncontested() {
     let rwlock = RwLock::new(100);
     let mut result = rwlock.write().await;
@@ -153,7 +159,7 @@ async fn write_uncontested() {
 }
 
 // RwLocks should be acquired in the order that their Futures are waited upon.
-#[tokio::test]
+#[maybe_tokio_test]
 async fn write_order() {
     let rwlock = RwLock::<Vec<u32>>::new(vec![]);
     let fut2 = rwlock.write().map(|mut guard| guard.push(2));
@@ -166,8 +172,13 @@ async fn write_order() {
 }
 
 // A single RwLock is contested by tasks in multiple threads
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn multithreaded() {
+    use futures::stream::{self, StreamExt};
+    use std::sync::Arc;
+    use tokio::sync::Barrier;
+
     let barrier = Arc::new(Barrier::new(5));
     let rwlock = Arc::new(RwLock::<u32>::new(0));
     let rwclone1 = rwlock.clone();
@@ -236,7 +247,7 @@ async fn multithreaded() {
     assert_eq!(*g, 17_000);
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 async fn try_write() {
     let lock = RwLock::new(0);
     let read_guard = lock.read().await;
