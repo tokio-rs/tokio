@@ -257,8 +257,7 @@ where
     type Error = U::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let state = self.state.borrow();
-        if state.buffer.len() >= state.backpressure_boundary {
+        if self.state.borrow().buffer.len() >= self.state.borrow().backpressure_boundary {
             self.as_mut().poll_flush(cx)
         } else {
             Poll::Ready(Ok(()))
