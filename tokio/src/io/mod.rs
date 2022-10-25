@@ -178,6 +178,12 @@
 //! [`Sink`]: https://docs.rs/futures/0.3/futures/sink/trait.Sink.html
 //! [`Stream`]: https://docs.rs/futures/0.3/futures/stream/trait.Stream.html
 //! [`Write`]: std::io::Write
+
+#![cfg_attr(
+    not(all(feature = "rt", feature = "net")),
+    allow(dead_code, unused_imports)
+)]
+
 cfg_io_blocking! {
     pub(crate) mod blocking;
 }
