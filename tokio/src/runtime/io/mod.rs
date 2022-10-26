@@ -10,6 +10,7 @@ mod metrics;
 
 use crate::io::interest::Interest;
 use crate::io::ready::Ready;
+use crate::runtime::driver;
 use crate::util::slab::{self, Slab};
 use crate::{loom::sync::RwLock, util::bit};
 
@@ -38,9 +39,6 @@ pub(crate) struct Driver {
 
     /// The system event queue.
     poll: mio::Poll,
-
-    /// State shared between the reactor and the handles.
-    inner: Arc<Inner>,
 }
 
 /// A reference to an I/O driver.
@@ -112,7 +110,7 @@ fn _assert_kinds() {
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub(crate) fn new() -> io::Result<Driver> {
+    pub(crate) fn new() -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
         #[cfg(not(tokio_wasi))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
@@ -121,12 +119,15 @@ impl Driver {
         let slab = Slab::new();
         let allocator = slab.allocator();
 
-        Ok(Driver {
+        let driver = Driver {
             tick: 0,
             signal_ready: false,
             events: mio::Events::with_capacity(1024),
             poll,
             resources: slab,
+        };
+
+        let handle = Handle {
             inner: Arc::new(Inner {
                 registry,
                 io_dispatch: RwLock::new(IoDispatcher::new(allocator)),
@@ -134,31 +135,25 @@ impl Driver {
                 waker,
                 metrics: IoDriverMetrics::default(),
             }),
-        })
+        };
+
+        Ok((driver, handle))
     }
 
-    /// Returns a handle to this event loop which can be sent across threads
-    /// and can be used as a proxy to the event loop itself.
-    ///
-    /// Handles are cloneable and clones always refer to the same event loop.
-    /// This handle is typically passed into functions that create I/O objects
-    /// to bind them to this event loop.
-    pub(crate) fn handle(&self) -> Handle {
-        Handle {
-            inner: Arc::clone(&self.inner),
-        }
+    pub(crate) fn park(&mut self, rt_handle: &driver::Handle) {
+        let handle = rt_handle.io();
+        self.turn(handle, None);
     }
 
-    pub(crate) fn park(&mut self) {
-        self.turn(None);
+    pub(crate) fn park_timeout(&mut self, rt_handle: &driver::Handle, duration: Duration) {
+        let handle = rt_handle.io();
+        self.turn(handle, Some(duration));
     }
 
-    pub(crate) fn park_timeout(&mut self, duration: Duration) {
-        self.turn(Some(duration));
-    }
+    pub(crate) fn shutdown(&mut self, rt_handle: &driver::Handle) {
+        let handle = rt_handle.io();
 
-    pub(crate) fn shutdown(&mut self) {
-        if self.inner.shutdown() {
+        if handle.inner.shutdown() {
             self.resources.for_each(|io| {
                 // If a task is waiting on the I/O resource, notify it. The task
                 // will then attempt to use the I/O resource and fail due to the
@@ -168,7 +163,7 @@ impl Driver {
         }
     }
 
-    fn turn(&mut self, max_wait: Option<Duration>) {
+    fn turn(&mut self, handle: &Handle, max_wait: Option<Duration>) {
         // How often to call `compact()` on the resource slab
         const COMPACT_INTERVAL: u8 = 255;
 
@@ -213,7 +208,7 @@ impl Driver {
             }
         }
 
-        self.inner.metrics.incr_ready_count_by(ready_count);
+        handle.inner.metrics.incr_ready_count_by(ready_count);
     }
 
     fn dispatch(resources: &mut Slab<ScheduledIo>, tick: u8, token: mio::Token, ready: Ready) {
@@ -390,12 +385,14 @@ impl Direction {
 
 // Signal handling
 cfg_signal_internal_and_unix! {
-    impl Driver {
-        pub(crate) fn register_signal_receiver(&mut self, receiver: &mut mio::net::UnixStream) -> io::Result<()> {
+    impl Handle {
+        pub(crate) fn register_signal_receiver(&self, receiver: &mut mio::net::UnixStream) -> io::Result<()> {
             self.inner.registry.register(receiver, TOKEN_SIGNAL, mio::Interest::READABLE)?;
             Ok(())
         }
+    }
 
+    impl Driver {
         pub(crate) fn consume_signal_ready(&mut self) -> bool {
             let ret = self.signal_ready;
             self.signal_ready = false;

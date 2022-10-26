@@ -2,7 +2,7 @@
 
 //! Signal driver
 
-use crate::runtime::io;
+use crate::runtime::{driver, io};
 use crate::signal::registry::globals;
 
 use mio::net::UnixStream;
@@ -39,7 +39,7 @@ pub(super) struct Inner(());
 
 impl Driver {
     /// Creates a new signal `Driver` instance that delegates wakeups to `park`.
-    pub(crate) fn new(mut io: io::Driver) -> std_io::Result<Self> {
+    pub(crate) fn new(io: io::Driver, io_handle: &io::Handle) -> std_io::Result<Self> {
         use std::mem::ManuallyDrop;
         use std::os::unix::io::{AsRawFd, FromRawFd};
 
@@ -70,7 +70,7 @@ impl Driver {
             ManuallyDrop::new(unsafe { std::os::unix::net::UnixStream::from_raw_fd(receiver_fd) });
         let mut receiver = UnixStream::from_std(original.try_clone()?);
 
-        io.register_signal_receiver(&mut receiver)?;
+        io_handle.register_signal_receiver(&mut receiver)?;
 
         Ok(Self {
             io,
@@ -87,18 +87,18 @@ impl Driver {
         }
     }
 
-    pub(crate) fn park(&mut self) {
-        self.io.park();
+    pub(crate) fn park(&mut self, handle: &driver::Handle) {
+        self.io.park(handle);
         self.process();
     }
 
-    pub(crate) fn park_timeout(&mut self, duration: Duration) {
-        self.io.park_timeout(duration);
+    pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
+        self.io.park_timeout(handle, duration);
         self.process();
     }
 
-    pub(crate) fn shutdown(&mut self) {
-        self.io.shutdown()
+    pub(crate) fn shutdown(&mut self, handle: &driver::Handle) {
+        self.io.shutdown(handle)
     }
 
     fn process(&mut self) {

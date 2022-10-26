@@ -81,6 +81,14 @@ impl Handle {
         self.io.unpark();
     }
 
+    cfg_io_driver! {
+        pub(crate) fn io(&self) -> &crate::runtime::io::Handle {
+            self.io
+                .as_ref()
+                .expect("A Tokio 1.x context was found, but I/O is disabled. Call `enable_io` on the runtime builder to enable I/O.")
+        }
+    }
+
     cfg_time! {
         /// Returns a reference to the time driver handle.
         ///
@@ -116,10 +124,9 @@ cfg_io_driver! {
         assert!(!enabled);
 
         let ret = if enabled {
-            let io_driver = crate::runtime::io::Driver::new()?;
-            let io_handle = io_driver.handle();
+            let (io_driver, io_handle) = crate::runtime::io::Driver::new()?;
 
-            let (signal_driver, signal_handle) = create_signal_driver(io_driver)?;
+            let (signal_driver, signal_handle) = create_signal_driver(io_driver, &io_handle)?;
             let process_driver = create_process_driver(signal_driver);
 
             (IoStack::Enabled(process_driver), IoHandle::Enabled(io_handle), signal_handle)
@@ -133,23 +140,23 @@ cfg_io_driver! {
     }
 
     impl IoStack {
-        pub(crate) fn park(&mut self, _handle: &Handle) {
+        pub(crate) fn park(&mut self, handle: &Handle) {
             match self {
-                IoStack::Enabled(v) => v.park(),
+                IoStack::Enabled(v) => v.park(handle),
                 IoStack::Disabled(v) => v.park(),
             }
         }
 
-        pub(crate) fn park_timeout(&mut self, _handle: &Handle, duration: Duration) {
+        pub(crate) fn park_timeout(&mut self, handle: &Handle, duration: Duration) {
             match self {
-                IoStack::Enabled(v) => v.park_timeout(duration),
+                IoStack::Enabled(v) => v.park_timeout(handle, duration),
                 IoStack::Disabled(v) => v.park_timeout(duration),
             }
         }
 
-        pub(crate) fn shutdown(&mut self, _handle: &Handle) {
+        pub(crate) fn shutdown(&mut self, handle: &Handle) {
             match self {
-                IoStack::Enabled(v) => v.shutdown(),
+                IoStack::Enabled(v) => v.shutdown(handle),
                 IoStack::Disabled(v) => v.shutdown(),
             }
         }
@@ -171,12 +178,10 @@ cfg_io_driver! {
             }
         }
 
-        cfg_unstable! {
-            pub(crate) fn as_ref(&self) -> Option<&crate::runtime::io::Handle> {
-                match self {
-                    IoHandle::Enabled(v) => Some(v),
-                    IoHandle::Disabled(..) => None,
-                }
+        pub(crate) fn as_ref(&self) -> Option<&crate::runtime::io::Handle> {
+            match self {
+                IoHandle::Enabled(v) => Some(v),
+                IoHandle::Disabled(..) => None,
             }
         }
     }
@@ -215,8 +220,8 @@ cfg_signal_internal_and_unix! {
     type SignalDriver = crate::runtime::signal::Driver;
     pub(crate) type SignalHandle = Option<crate::runtime::signal::Handle>;
 
-    fn create_signal_driver(io_driver: IoDriver) -> io::Result<(SignalDriver, SignalHandle)> {
-        let driver = crate::runtime::signal::Driver::new(io_driver)?;
+    fn create_signal_driver(io_driver: IoDriver, io_handle: &crate::runtime::io::Handle) -> io::Result<(SignalDriver, SignalHandle)> {
+        let driver = crate::runtime::signal::Driver::new(io_driver, io_handle)?;
         let handle = driver.handle();
         Ok((driver, Some(handle)))
     }
@@ -228,7 +233,7 @@ cfg_not_signal_internal! {
     cfg_io_driver! {
         type SignalDriver = IoDriver;
 
-        fn create_signal_driver(io_driver: IoDriver) -> io::Result<(SignalDriver, SignalHandle)> {
+        fn create_signal_driver(io_driver: IoDriver, _io_handle: &crate::runtime::io::Handle) -> io::Result<(SignalDriver, SignalHandle)> {
             Ok((io_driver, ()))
         }
     }
@@ -237,10 +242,10 @@ cfg_not_signal_internal! {
 // ===== process driver =====
 
 cfg_process_driver! {
-    type ProcessDriver = crate::process::unix::driver::Driver;
+    type ProcessDriver = crate::runtime::process::Driver;
 
     fn create_process_driver(signal_driver: SignalDriver) -> ProcessDriver {
-        crate::process::unix::driver::Driver::new(signal_driver)
+        ProcessDriver::new(signal_driver)
     }
 }
 

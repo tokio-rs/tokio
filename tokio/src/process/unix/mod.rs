@@ -21,8 +21,6 @@
 //! processes in general aren't scalable (e.g. millions) so it shouldn't be that
 //! bad in theory...
 
-pub(crate) mod driver;
-
 pub(crate) mod orphan;
 use orphan::{OrphanQueue, OrphanQueueImpl, Wait};
 
@@ -90,7 +88,7 @@ impl fmt::Debug for GlobalOrphanQueue {
 }
 
 impl GlobalOrphanQueue {
-    fn reap_orphans(handle: &SignalHandle) {
+    pub(crate) fn reap_orphans(handle: &SignalHandle) {
         get_orphan_queue().reap_orphans(handle)
     }
 }
