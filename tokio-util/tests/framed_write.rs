@@ -151,7 +151,7 @@ fn write_hits_backpressure() {
         assert!(pin!(framed).poll_ready(cx).is_pending());
 
         // We poll again, forcing another flush, which this time succeeds
-        // The whole 8KB buffer is flushed
+        // The whole 16KB buffer is flushed
         assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
 
         // Send more data. This matches the final message expected by the mock
