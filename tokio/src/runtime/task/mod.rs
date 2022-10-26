@@ -121,7 +121,7 @@
 //!  1. The output is created on the thread that the future was polled on. Since
 //!     only non-Send futures can have non-Send output, the future was polled on
 //!     the thread that the future was spawned from.
-//!  2. Since JoinHandle<Output> is not Send if Output is not Send, the
+//!  2. Since `JoinHandle<Output>` is not Send if Output is not Send, the
 //!     JoinHandle is also on the thread that the future was spawned from.
 //!  3. Thus, the JoinHandle will not move the output across threads when it
 //!     takes or drops the output.
