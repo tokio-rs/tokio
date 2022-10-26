@@ -147,7 +147,10 @@ cfg_test_util! {
     /// it returns `Ready` or is dropped.
     ///
     /// This is a no-op when called from outside the Tokio runtime.
-    pub(crate) fn inhibit_auto_advance<F: Future>(fut: F) -> impl Future<Output = F::Output> {
+    pub(crate) fn inhibit_auto_advance<F>(fut: F) -> impl Future<Output = F::Output> + Send + 'static
+    where
+        F: Future + Send + 'static,
+    {
         // Bump the inhibit count immediately, not inside the async block, to
         // avoid a race condition when used by spawn_blocking.
         let guard = clock().map(|clock| {
