@@ -88,7 +88,10 @@ impl From<BytesMut> for WriteFrame {
             buffer.reserve(INITIAL_CAPACITY - size);
         }
 
-        Self { buffer, backpressure_boundary: INITIAL_CAPACITY }
+        Self {
+            buffer,
+            backpressure_boundary: INITIAL_CAPACITY,
+        }
     }
 }
 

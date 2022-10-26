@@ -123,6 +123,16 @@ impl<T, E> FramedWrite<T, E> {
     pub fn write_buffer_mut(&mut self) -> &mut BytesMut {
         &mut self.inner.state.buffer
     }
+
+    /// Returns backpressure boundary
+    pub fn backpressure_boundary(&self) -> usize {
+        self.inner.state.backpressure_boundary
+    }
+
+    /// Updates backpressure boundary
+    pub fn set_backpressure_boundary(&mut self, boundary: usize) {
+        self.inner.state.backpressure_boundary = boundary;
+    }
 }
 
 // This impl just defers to the underlying FramedImpl
