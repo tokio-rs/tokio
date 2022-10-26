@@ -268,3 +268,23 @@ async fn blocking_task_wakes_paused_runtime() {
         "completing a spawn_blocking should wake the scheduler if it's parked while time is paused"
     );
 }
+
+#[cfg(feature = "test-util")]
+#[tokio::test(start_paused = true)]
+async fn panicking_blocking_task_wakes_paused_runtime() {
+    let t0 = std::time::Instant::now();
+    let result = time::timeout(
+        Duration::from_secs(15),
+        task::spawn_blocking(|| {
+            thread::sleep(Duration::from_millis(250));
+            panic!("blocking task panicked");
+        }),
+    )
+    .await
+    .expect("timeout should not trigger");
+    assert!(result.is_err(), "blocking task should have panicked");
+    assert!(
+        t0.elapsed() < Duration::from_secs(10),
+        "completing a spawn_blocking should wake the scheduler if it's parked while time is paused"
+    );
+}

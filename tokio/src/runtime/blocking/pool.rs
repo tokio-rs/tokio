@@ -379,10 +379,10 @@ impl Spawner {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
 
-        let (task, handle) = task::unowned(fut, NoopSchedule, id);
-
         #[cfg(feature = "test-util")]
-        crate::time::inhibit_auto_advance();
+        let fut = crate::time::inhibit_auto_advance(fut);
+
+        let (task, handle) = task::unowned(fut, NoopSchedule, id);
 
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
         (handle, spawned)

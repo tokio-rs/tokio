@@ -28,6 +28,8 @@ cfg_not_test_util! {
 }
 
 cfg_test_util! {
+    use std::future::Future;
+
     use crate::time::{Duration, Instant};
     use crate::loom::sync::{Arc, Mutex};
 
@@ -132,28 +134,30 @@ cfg_test_util! {
         inner.unfrozen = Some(std::time::Instant::now());
     }
 
-    /// Stop auto-advancing the clock (see `tokio::time::pause`) until
-    /// `allow_auto_advance` is called.
-    ///
-    /// # Panics
-    ///
-    /// Panics if called from outsie of a `current_thread` Tokio runtime.
-    #[track_caller]
-    pub(crate) fn inhibit_auto_advance() {
-        let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
-        clock.inhibit_auto_advance();
+    struct AutoAdvanceInhibit(Clock);
+
+    impl Drop for AutoAdvanceInhibit {
+        fn drop(&mut self) {
+            self.0.allow_auto_advance();
+        }
     }
 
-    /// Resume auto-advance. This should only be called to balance out a previous
-    /// call to `inhibit_auto_advance`.
+    /// Temporarily stop auto-advancing the clock (see `tokio::time::pause`)
+    /// and decorate the given future with code to re-enable auto-advance when
+    /// it returns `Ready` or is dropped.
     ///
-    /// # Panics
-    ///
-    /// Panics if called from outsie of a `current_thread` Tokio runtime.
-    #[track_caller]
-    pub(crate) fn allow_auto_advance() {
-        let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
-        clock.allow_auto_advance();
+    /// This is a no-op when called from outside the Tokio runtime.
+    pub(crate) fn inhibit_auto_advance<F: Future>(fut: F) -> impl Future<Output = F::Output> {
+        // Bump the inhibit count immediately, not inside the async block, to
+        // avoid a race condition when used by spawn_blocking.
+        let guard = clock().map(|clock| {
+            clock.inhibit_auto_advance();
+            AutoAdvanceInhibit(clock)
+        });
+        async move {
+            let _guard = guard;
+            fut.await
+        }
     }
 
     /// Advances time.
