@@ -2,16 +2,12 @@
 
 //! Signal driver
 
-use crate::io::interest::Interest;
-use crate::io::PollEvented;
 use crate::runtime::io;
 use crate::signal::registry::globals;
 
 use mio::net::UnixStream;
 use std::io::{self as std_io, Read};
-use std::ptr;
 use std::sync::{Arc, Weak};
-use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use std::time::Duration;
 
 /// Responsible for registering wakeups when an OS signal is received, and
@@ -22,10 +18,10 @@ use std::time::Duration;
 #[derive(Debug)]
 pub(crate) struct Driver {
     /// Thread parker. The `Driver` park implementation delegates to this.
-    park: io::Driver,
+    io: io::Driver,
 
     /// A pipe for receiving wake events from the signal handler
-    receiver: PollEvented<UnixStream>,
+    receiver: UnixStream,
 
     /// Shared state
     inner: Arc<Inner>,
@@ -43,7 +39,7 @@ pub(super) struct Inner(());
 
 impl Driver {
     /// Creates a new signal `Driver` instance that delegates wakeups to `park`.
-    pub(crate) fn new(park: io::Driver) -> std_io::Result<Self> {
+    pub(crate) fn new(mut io: io::Driver) -> std_io::Result<Self> {
         use std::mem::ManuallyDrop;
         use std::os::unix::io::{AsRawFd, FromRawFd};
 
@@ -55,12 +51,11 @@ impl Driver {
         // I'm not sure if the second (failed) registration simply doesn't end
         // up receiving wake up notifications, or there could be some race
         // condition when consuming readiness events, but having distinct
-        // descriptors for distinct PollEvented instances appears to mitigate
-        // this.
+        // descriptors appears to mitigate this.
         //
-        // Unfortunately we cannot just use a single global PollEvented instance
-        // either, since we can't compare Handles or assume they will always
-        // point to the exact same reactor.
+        // Unfortunately we cannot just use a single global UnixStream instance
+        // either, since we can't assume they will always be registered with the
+        // exact same reactor.
         //
         // Mio 0.7 removed `try_clone()` as an API due to unexpected behavior
         // with registering dups with the same reactor. In this case, duping is
@@ -73,12 +68,12 @@ impl Driver {
         // safety: there is nothing unsafe about this, but the `from_raw_fd` fn is marked as unsafe.
         let original =
             ManuallyDrop::new(unsafe { std::os::unix::net::UnixStream::from_raw_fd(receiver_fd) });
-        let receiver = UnixStream::from_std(original.try_clone()?);
-        let receiver =
-            PollEvented::new_with_interest_and_handle(receiver, Interest::READABLE, park.handle())?;
+        let mut receiver = UnixStream::from_std(original.try_clone()?);
+
+        io.register_signal_receiver(&mut receiver)?;
 
         Ok(Self {
-            park,
+            io,
             receiver,
             inner: Arc::new(Inner(())),
         })
@@ -93,38 +88,31 @@ impl Driver {
     }
 
     pub(crate) fn park(&mut self) {
-        self.park.park();
+        self.io.park();
         self.process();
     }
 
     pub(crate) fn park_timeout(&mut self, duration: Duration) {
-        self.park.park_timeout(duration);
+        self.io.park_timeout(duration);
         self.process();
     }
 
     pub(crate) fn shutdown(&mut self) {
-        self.park.shutdown()
+        self.io.shutdown()
     }
 
-    fn process(&self) {
-        // Check if the pipe is ready to read and therefore has "woken" us up
-        //
-        // To do so, we will `poll_read_ready` with a noop waker, since we don't
-        // need to actually be notified when read ready...
-        let waker = unsafe { Waker::from_raw(RawWaker::new(ptr::null(), &NOOP_WAKER_VTABLE)) };
-        let mut cx = Context::from_waker(&waker);
-
-        let ev = match self.receiver.registration().poll_read_ready(&mut cx) {
-            Poll::Ready(Ok(ev)) => ev,
-            Poll::Ready(Err(e)) => panic!("reactor gone: {}", e),
-            Poll::Pending => return, // No wake has arrived, bail
-        };
+    fn process(&mut self) {
+        // If the signal pipe has not recieved a readiness event, then there is
+        // nothing else to do.
+        if !self.io.consume_signal_ready() {
+            return;
+        }
 
         // Drain the pipe completely so we can receive a new readiness event
         // if another signal has come in.
         let mut buf = [0; 128];
         loop {
-            match (&*self.receiver).read(&mut buf) {
+            match self.receiver.read(&mut buf) {
                 Ok(0) => panic!("EOF on self-pipe"),
                 Ok(_) => continue, // Keep reading
                 Err(e) if e.kind() == std_io::ErrorKind::WouldBlock => break,
@@ -132,20 +120,10 @@ impl Driver {
             }
         }
 
-        self.receiver.registration().clear_readiness(ev);
-
         // Broadcast any signals which were received
         globals().broadcast();
     }
 }
-
-const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(noop_clone, noop, noop, noop);
-
-unsafe fn noop_clone(_data: *const ()) -> RawWaker {
-    RawWaker::new(ptr::null(), &NOOP_WAKER_VTABLE)
-}
-
-unsafe fn noop(_data: *const ()) {}
 
 // ===== impl Handle =====
 

@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "rt"), allow(dead_code))]
+#![cfg_attr(not(all(feature = "rt", feature = "net")), allow(dead_code))]
 
 mod registration;
 pub(crate) use registration::Registration;
@@ -25,6 +25,9 @@ pub(crate) struct Driver {
     /// Tracks the number of times `turn` is called. It is safe for this to wrap
     /// as it is mostly used to determine when to call `compact()`.
     tick: u8,
+
+    /// True when an event with the signal token is received
+    signal_ready: bool,
 
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
@@ -86,6 +89,7 @@ enum Tick {
 // TODO: Don't use a fake token. Instead, reserve a slot entry for the wakeup
 // token.
 const TOKEN_WAKEUP: mio::Token = mio::Token(1 << 31);
+const TOKEN_SIGNAL: mio::Token = mio::Token(1 + (1 << 31));
 
 const ADDRESS: bit::Pack = bit::Pack::least_significant(24);
 
@@ -119,6 +123,7 @@ impl Driver {
 
         Ok(Driver {
             tick: 0,
+            signal_ready: false,
             events: mio::Events::with_capacity(1024),
             poll,
             resources: slab,
@@ -193,7 +198,11 @@ impl Driver {
         for event in events.iter() {
             let token = event.token();
 
-            if token != TOKEN_WAKEUP {
+            if token == TOKEN_WAKEUP {
+                // Nothing to do, the event is used to unblock the I/O driver
+            } else if token == TOKEN_SIGNAL {
+                self.signal_ready = true;
+            } else {
                 Self::dispatch(
                     &mut self.resources,
                     self.tick,
@@ -375,6 +384,22 @@ impl Direction {
         match self {
             Direction::Read => Ready::READABLE | Ready::READ_CLOSED,
             Direction::Write => Ready::WRITABLE | Ready::WRITE_CLOSED,
+        }
+    }
+}
+
+// Signal handling
+cfg_signal_internal_and_unix! {
+    impl Driver {
+        pub(crate) fn register_signal_receiver(&mut self, receiver: &mut mio::net::UnixStream) -> io::Result<()> {
+            self.inner.registry.register(receiver, TOKEN_SIGNAL, mio::Interest::READABLE)?;
+            Ok(())
+        }
+
+        pub(crate) fn consume_signal_ready(&mut self) -> bool {
+            let ret = self.signal_ready;
+            self.signal_ready = false;
+            ret
         }
     }
 }
