@@ -7,7 +7,7 @@ use std::io;
 use std::time::Duration;
 
 /// This key is used to specify the default worker threads for multi-thread runtime.
-#[cfg(feature = "rt-multi-thread")]
+#[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
 const ENV_WORKER_THREADS: &str = "TOKIO_WORKER_THREADS";
 
 /// Builds Tokio Runtime with custom configuration values.
@@ -925,12 +925,12 @@ impl Builder {
         })
     }
 
-    #[cfg(not(feature = "rt-multi-thread"))]
+    #[cfg(any(not(feature = "rt-multi-thread"), tokio_wasi))]
     fn default_worker_threads(_: Kind) -> Option<usize> {
         None
     }
 
-    #[cfg(feature = "rt-multi-thread")]
+    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
     fn default_worker_threads(kind: Kind) -> Option<usize> {
         match kind {
             // Always return None if using current thread
