@@ -571,16 +571,18 @@ mod unstable {
             .rng_seed(RngSeed::from_bytes(seed))
             .build()
             .unwrap();
-        let rt1_value = rt1.block_on(async {
-            let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 86);
+        let rt1_values = rt1.block_on(async {
+            let rand_1 = tokio::macros::support::thread_rng_n(100);
 
-            let _ = tokio::spawn(async {
+            let rand_2 = tokio::spawn(async {
                 // Because we only have a single worker thread, the
                 // RNG will be deterministic here as well.
-                tokio::macros::support::thread_rng_n(100);
+                tokio::macros::support::thread_rng_n(100)
             })
-            .await;
+            .await
+            .unwrap();
+
+            (rand_1, rand_2)
         });
 
         let rt2 = tokio::runtime::Builder::new_multi_thread()
@@ -588,18 +590,20 @@ mod unstable {
             .rng_seed(RngSeed::from_bytes(seed))
             .build()
             .unwrap();
-        let rt2_value = rt2.block_on(async {
-            let random = tokio::macros::support::thread_rng_n(100);
-            assert_eq!(random, 86);
+        let rt2_values = rt2.block_on(async {
+            let rand_1 = tokio::macros::support::thread_rng_n(100);
 
-            let _ = tokio::spawn(async {
+            let rand_2 = tokio::spawn(async {
                 // Because we only have a single worker thread, the
                 // RNG will be deterministic here as well.
-                tokio::macros::support::thread_rng_n(100);
+                tokio::macros::support::thread_rng_n(100)
             })
-            .await;
+            .await
+            .unwrap();
+
+            (rand_1, rand_2)
         });
 
-        assert_eq!(rt1_value, rt2_value);
+        assert_eq!(rt1_values, rt2_values);
     }
 }
