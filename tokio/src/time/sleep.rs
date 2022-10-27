@@ -248,76 +248,61 @@ cfg_not_trace! {
 }
 
 impl Sleep {
-    cfg_rt! {
-        #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
-        #[track_caller]
-        pub(crate) fn new_timeout(
-            deadline: Instant,
-            location: Option<&'static Location<'static>>,
-        ) -> Sleep {
-            use crate::runtime::Handle;
+    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
+    #[track_caller]
+    pub(crate) fn new_timeout(
+        deadline: Instant,
+        location: Option<&'static Location<'static>>,
+    ) -> Sleep {
+        use crate::runtime::scheduler;
 
-            let handle = Handle::current().inner;
-            let entry = TimerEntry::new(&handle, deadline);
+        let handle = scheduler::Handle::current();
+        let entry = TimerEntry::new(&handle, deadline);
 
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            let inner = {
-                let handle = &handle.time();
-                let time_source = handle.time_source();
-                let deadline_tick = time_source.deadline_to_tick(deadline);
-                let duration = deadline_tick.saturating_sub(time_source.now());
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let inner = {
+            let handle = &handle.time();
+            let time_source = handle.time_source();
+            let deadline_tick = time_source.deadline_to_tick(deadline);
+            let duration = deadline_tick.saturating_sub(time_source.now());
 
-                let location = location.expect("should have location if tracing");
-                let resource_span = tracing::trace_span!(
-                    "runtime.resource",
-                    concrete_type = "Sleep",
-                    kind = "timer",
-                    loc.file = location.file(),
-                    loc.line = location.line(),
-                    loc.col = location.column(),
+            let location = location.expect("should have location if tracing");
+            let resource_span = tracing::trace_span!(
+                "runtime.resource",
+                concrete_type = "Sleep",
+                kind = "timer",
+                loc.file = location.file(),
+                loc.line = location.line(),
+                loc.col = location.column(),
+            );
+
+            let async_op_span = resource_span.in_scope(|| {
+                tracing::trace!(
+                    target: "runtime::resource::state_update",
+                    duration = duration,
+                    duration.unit = "ms",
+                    duration.op = "override",
                 );
 
-                let async_op_span = resource_span.in_scope(|| {
-                    tracing::trace!(
-                        target: "runtime::resource::state_update",
-                        duration = duration,
-                        duration.unit = "ms",
-                        duration.op = "override",
-                    );
+                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout")
+            });
 
-                    tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout")
-                });
+            let async_op_poll_span =
+                async_op_span.in_scope(|| tracing::trace_span!("runtime.resource.async_op.poll"));
 
-                let async_op_poll_span =
-                    async_op_span.in_scope(|| tracing::trace_span!("runtime.resource.async_op.poll"));
-
-                let ctx = trace::AsyncOpTracingCtx {
-                    async_op_span,
-                    async_op_poll_span,
-                    resource_span,
-                };
-
-                Inner {
-                    deadline,
-                    ctx,
-                }
+            let ctx = trace::AsyncOpTracingCtx {
+                async_op_span,
+                async_op_poll_span,
+                resource_span,
             };
 
-            #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-            let inner = Inner { deadline };
+            Inner { deadline, ctx }
+        };
 
-            Sleep { inner, entry }
-        }
-    }
+        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        let inner = Inner { deadline };
 
-    cfg_not_rt! {
-        #[track_caller]
-        pub(crate) fn new_timeout(
-            _deadline: Instant,
-            _location: Option<&'static Location<'static>>,
-        ) -> Sleep {
-            panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
-        }
+        Sleep { inner, entry }
     }
 
     pub(crate) fn far_future(location: Option<&'static Location<'static>>) -> Sleep {

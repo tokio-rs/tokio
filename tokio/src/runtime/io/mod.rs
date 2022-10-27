@@ -236,38 +236,6 @@ impl fmt::Debug for Driver {
     }
 }
 
-// ===== impl Handle =====
-
-cfg_rt! {
-    impl Handle {
-        /// Returns a handle to the current reactor.
-        ///
-        /// # Panics
-        ///
-        /// This function panics if there is no current reactor set and `rt` feature
-        /// flag is not enabled.
-        #[track_caller]
-        pub(crate) fn current() -> Self {
-            crate::runtime::context::io_handle().expect("A Tokio 1.x context was found, but IO is disabled. Call `enable_io` on the runtime builder to enable IO.")
-        }
-    }
-}
-
-cfg_not_rt! {
-    impl Handle {
-        /// Returns a handle to the current reactor.
-        ///
-        /// # Panics
-        ///
-        /// This function panics if there is no current reactor set, or if the `rt`
-        /// feature flag is not enabled.
-        #[track_caller]
-        pub(crate) fn current() -> Self {
-            panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
-        }
-    }
-}
-
 cfg_net! {
     cfg_metrics! {
         impl Handle {
