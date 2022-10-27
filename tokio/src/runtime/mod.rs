@@ -226,8 +226,6 @@ cfg_rt! {
         pub use crate::util::RngSeed;
     }
 
-    pub(crate) mod context;
-
     use self::enter::enter;
 
     mod handle;
@@ -622,7 +620,7 @@ cfg_rt! {
                 Scheduler::CurrentThread(current_thread) => {
                     // This ensures that tasks spawned on the current-thread
                     // runtime are dropped inside the runtime's context.
-                    match self::context::try_enter(self.handle.clone()) {
+                    match self.handle.inner.try_enter() {
                         Some(guard) => current_thread.set_context_guard(guard),
                         None => {
                             // The context thread-local has already been destroyed.

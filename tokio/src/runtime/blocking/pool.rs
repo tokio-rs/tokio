@@ -5,7 +5,6 @@ use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
-use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
 use crate::util::{replace_thread_rng, RngSeedGenerator};
@@ -135,7 +134,7 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let rt = context::current();
+    let rt = Handle::current();
     rt.spawn_blocking(func)
 }
 
@@ -153,7 +152,7 @@ cfg_fs! {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        let rt = context::current();
+        let rt = Handle::current();
         rt.inner.blocking_spawner().spawn_mandatory_blocking(&rt, func)
     }
 }
@@ -418,7 +417,7 @@ impl Spawner {
 
         builder.spawn(move || {
             // Only the reference should be moved into the closure
-            let _enter = crate::runtime::context::enter(rt.clone());
+            let _enter = rt.enter();
             rt.inner.blocking_spawner().inner.run(id);
             drop(shutdown_tx);
         })
