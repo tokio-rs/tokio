@@ -24,16 +24,13 @@ pub(crate) struct Driver {
     receiver: UnixStream,
 
     /// Shared state
-    inner: Arc<Inner>,
+    inner: Arc<()>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub(crate) struct Handle {
-    inner: Weak<Inner>,
+    inner: Weak<()>,
 }
-
-#[derive(Debug)]
-pub(super) struct Inner(());
 
 // ===== impl Driver =====
 
@@ -75,7 +72,7 @@ impl Driver {
         Ok(Self {
             io,
             receiver,
-            inner: Arc::new(Inner(())),
+            inner: Arc::new(()),
         })
     }
 
@@ -136,39 +133,6 @@ impl Handle {
                 std_io::ErrorKind::Other,
                 "signal driver gone",
             ))
-        }
-    }
-}
-
-cfg_rt! {
-    impl Handle {
-        /// Returns a handle to the current driver
-        ///
-        /// # Panics
-        ///
-        /// This function panics if there is no current signal driver set.
-        #[track_caller]
-        pub(crate) fn current() -> Self {
-            crate::runtime::context::signal_handle().expect(
-                "there is no signal driver running, must be called from the context of Tokio runtime",
-            )
-        }
-    }
-}
-
-cfg_not_rt! {
-    impl Handle {
-        /// Returns a handle to the current driver
-        ///
-        /// # Panics
-        ///
-        /// This function panics if there is no current signal driver set.
-        #[track_caller]
-        pub(crate) fn current() -> Self {
-            panic!(
-                "there is no signal driver running, must be called from the context of Tokio runtime or with\
-                `rt` enabled.",
-            )
         }
     }
 }

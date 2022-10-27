@@ -24,23 +24,6 @@ pub(crate) fn current() -> Handle {
     }
 }
 
-cfg_signal_internal! {
-    #[cfg(unix)]
-    pub(crate) fn signal_handle() -> crate::runtime::driver::SignalHandle {
-        match CONTEXT.try_with(|ctx| {
-            let ctx = ctx.borrow();
-            ctx.as_ref()
-                .expect(crate::util::error::CONTEXT_MISSING_ERROR)
-                .inner
-                .signal()
-                .clone()
-        }) {
-            Ok(signal_handle) => signal_handle,
-            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
-        }
-    }
-}
-
 cfg_time! {
     cfg_test_util! {
         pub(crate) fn clock() -> Option<crate::runtime::driver::Clock> {

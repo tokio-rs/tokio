@@ -113,13 +113,6 @@ cfg_rt! {
                 Handle::MultiThread(h) => &h.seed_generator,
             }
         }
-
-        #[cfg(unix)]
-        cfg_signal_internal! {
-            pub(crate) fn signal(&self) -> &driver::SignalHandle {
-                &self.driver().signal
-            }
-        }
     }
 
     cfg_metrics! {
