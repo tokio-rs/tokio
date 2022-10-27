@@ -90,7 +90,7 @@ impl Handle {
         }
     }
 
-    cfg_signal_internal! {
+    cfg_signal_internal_and_unix! {
         #[track_caller]
         pub(crate) fn signal(&self) -> &crate::runtime::signal::Handle {
             self.signal
