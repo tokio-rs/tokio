@@ -530,7 +530,7 @@ cfg_net! {
                 .driver()
                 .io
                 .as_ref()
-                .map(|h| f(h.metrics()))
+                .map(|h| f(&h.metrics))
                 .unwrap_or(0)
         }
     }
