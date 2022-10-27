@@ -3,7 +3,8 @@
 //! Process driver.
 
 use crate::process::unix::GlobalOrphanQueue;
-use crate::signal::unix::driver::{Driver as SignalDriver, Handle as SignalHandle};
+use crate::runtime::driver;
+use crate::runtime::signal::{Driver as SignalDriver, Handle as SignalHandle};
 
 use std::time::Duration;
 
@@ -27,17 +28,17 @@ impl Driver {
         }
     }
 
-    pub(crate) fn park(&mut self) {
-        self.park.park();
+    pub(crate) fn park(&mut self, handle: &driver::Handle) {
+        self.park.park(handle);
         GlobalOrphanQueue::reap_orphans(&self.signal_handle);
     }
 
-    pub(crate) fn park_timeout(&mut self, duration: Duration) {
-        self.park.park_timeout(duration);
+    pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
+        self.park.park_timeout(handle, duration);
         GlobalOrphanQueue::reap_orphans(&self.signal_handle);
     }
 
-    pub(crate) fn shutdown(&mut self) {
-        self.park.shutdown()
+    pub(crate) fn shutdown(&mut self, handle: &driver::Handle) {
+        self.park.shutdown(handle)
     }
 }

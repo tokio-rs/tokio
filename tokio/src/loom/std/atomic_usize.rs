@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops;
 
-/// `AtomicUsize` providing an additional `load_unsync` function.
+/// `AtomicUsize` providing an additional `unsync_load` function.
 pub(crate) struct AtomicUsize {
     inner: UnsafeCell<std::sync::atomic::AtomicUsize>,
 }

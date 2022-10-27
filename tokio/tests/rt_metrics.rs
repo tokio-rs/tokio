@@ -375,20 +375,18 @@ fn io_driver_fd_count() {
     let rt = current_thread();
     let metrics = rt.metrics();
 
-    // Since this is enabled w/ the process driver we always
-    // have 1 fd registered.
-    assert_eq!(metrics.io_driver_fd_registered_count(), 1);
+    assert_eq!(metrics.io_driver_fd_registered_count(), 0);
 
     let stream = tokio::net::TcpStream::connect("google.com:80");
     let stream = rt.block_on(async move { stream.await.unwrap() });
 
-    assert_eq!(metrics.io_driver_fd_registered_count(), 2);
+    assert_eq!(metrics.io_driver_fd_registered_count(), 1);
     assert_eq!(metrics.io_driver_fd_deregistered_count(), 0);
 
     drop(stream);
 
     assert_eq!(metrics.io_driver_fd_deregistered_count(), 1);
-    assert_eq!(metrics.io_driver_fd_registered_count(), 2);
+    assert_eq!(metrics.io_driver_fd_registered_count(), 1);
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]

@@ -1,3 +1,9 @@
+# 0.1.11 (October 11, 2022)
+
+- time: allow `StreamExt::chunks_timeout` outside of a runtime ([#5036])
+
+[#5036]: https://github.com/tokio-rs/tokio/pull/5036
+
 # 0.1.10 (Sept 18, 2022)
 
 - time: add `StreamExt::chunks_timeout` ([#4695])

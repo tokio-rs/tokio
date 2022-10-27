@@ -7,6 +7,10 @@ cfg_rt! {
     /// Spawns a new asynchronous task, returning a
     /// [`JoinHandle`](super::JoinHandle) for it.
     ///
+    /// You do not have to `.await` the returned `JoinHandle` to make the
+    /// provided future start execution. It will start running in the background
+    /// immediately when `spawn` is called.
+    ///
     /// Spawning a task enables the task to execute concurrently to other tasks. The
     /// spawned task may execute on the current thread, or it may be sent to a
     /// different thread to be executed. The specifics depend on the current
@@ -49,6 +53,37 @@ cfg_rt! {
     ///     }
     /// }
     /// ```
+    ///
+    /// To run multiple tasks in parallel and receive their results, join
+    /// handles can be stored in a vector.
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread")] async fn main() {
+    /// async fn my_background_op(id: i32) -> String {
+    ///     let s = format!("Starting background task {}.", id);
+    ///     println!("{}", s);
+    ///     s
+    /// }
+    ///
+    /// let ops = vec![1, 2, 3];
+    /// let mut tasks = Vec::with_capacity(ops.len());
+    /// for op in ops {
+    ///     // This call will make them start running in the background
+    ///     // immediately.
+    ///     tasks.push(tokio::spawn(my_background_op(op)));
+    /// }
+    ///
+    /// let mut outputs = Vec::with_capacity(tasks.len());
+    /// for task in tasks {
+    ///     outputs.push(task.await.unwrap());
+    /// }
+    /// println!("{:?}", outputs);
+    /// # }
+    /// ```
+    /// This example pushes the tasks to `outputs` in the order they were
+    /// started in. If you do not care about the ordering of the outputs, then
+    /// you can also use a [`JoinSet`].
+    ///
+    /// [`JoinSet`]: struct@crate::task::JoinSet
     ///
     /// # Panics
     ///

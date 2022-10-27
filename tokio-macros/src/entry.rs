@@ -383,17 +383,20 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
 
     let body = &input.block;
     let brace_token = input.block.brace_token;
-    input.block = syn::parse2(quote_spanned! {last_stmt_end_span=>
+    let block_expr = quote_spanned! {last_stmt_end_span=>
+        #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
+        {
+            return #rt
+                .enable_all()
+                .build()
+                .expect("Failed building the Runtime")
+                .block_on(body);
+        }
+    };
+    input.block = syn::parse2(quote! {
         {
             let body = async #body;
-            #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
-            {
-                return #rt
-                    .enable_all()
-                    .build()
-                    .expect("Failed building the Runtime")
-                    .block_on(body);
-            }
+            #block_expr
         }
     })
     .expect("Parsing failure");

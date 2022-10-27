@@ -13,6 +13,9 @@ env:
   # Change to specific Rust release to pin
   rust_stable: stable
 
+permissions:
+  contents: read
+
 jobs:
   loom:
     name: loom

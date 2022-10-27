@@ -27,6 +27,9 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  contents: read
+
 jobs:
   # Depends on all action sthat are required for a "successful" CI run.
   tests-pass:

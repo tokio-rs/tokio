@@ -157,7 +157,7 @@ impl FastRand {
     }
 }
 
-thread_local! {
+tokio_thread_local! {
     static THREAD_RNG: FastRand = FastRand::new(RngSeed::new());
 }
 

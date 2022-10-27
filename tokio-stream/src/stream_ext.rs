@@ -982,6 +982,8 @@ pub trait StreamExt: Stream {
 
     /// Slows down a stream by enforcing a delay between items.
     ///
+    /// The underlying timer behind this utility has a granularity of one millisecond.
+    ///
     /// # Example
     ///
     /// Create a throttled stream.
