@@ -114,7 +114,7 @@ cfg_io_driver! {
         Disabled(ParkThread),
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug)]
     pub(crate) enum IoHandle {
         Enabled(crate::runtime::io::Handle),
         Disabled(UnparkThread),
