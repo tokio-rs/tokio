@@ -1,4 +1,29 @@
-//! Futures task based helpers
+//! Futures task based helpers to easily test poll fn.
+//!
+//! The [`Spawn`] type is used as a mock task harness that allows you to poll futures
+//! without needing to setup pinning or context. Any future can be polled but if the
+//! future requires the tokio async context you will need to ensure that you poll the
+//! [`Spawn`] within a tokio context, this means that as long as you are inside the
+//! runtime it will work and you can poll it via [`Spawn`].
+//!
+//! [`Spawn`] also supports [`tokio_stream::Stream`] to call `poll_next` without pinning
+//! or context.
+//!
+//! In addition to circumventing the need for pinning and context, [`Spawn`] also tracks
+//! the amount of times the future/task was woken. This can be useful to track if some
+//! leaf future notified the root task correctly.
+//!
+//! # Example
+//!
+//! ```
+//! use tokio_test::task;
+//!
+//! let fut = async {};
+//!
+//! let mut task = task::spawn(fut);
+//!
+//! assert!(task.poll().is_ready(), "Task was not ready!");
+//! ```
 
 #![allow(clippy::mutex_atomic)]
 
@@ -11,7 +36,7 @@ use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use tokio_stream::Stream;
 
-/// TODO: dox
+/// Spawn a future into a [`Spawn`] which wraps the future in a mocked executor.
 pub fn spawn<T>(task: T) -> Spawn<T> {
     Spawn {
         task: MockTask::new(),
