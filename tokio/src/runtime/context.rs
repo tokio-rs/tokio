@@ -24,22 +24,6 @@ pub(crate) fn current() -> Handle {
     }
 }
 
-cfg_time! {
-    cfg_test_util! {
-        pub(crate) fn clock() -> Option<crate::runtime::driver::Clock> {
-            match CONTEXT.try_with(|ctx| {
-                let ctx = ctx.borrow();
-                ctx
-                    .as_ref()
-                    .map(|ctx| ctx.inner.clock().clone())
-            }) {
-                Ok(clock) => clock,
-                Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
-            }
-        }
-    }
-}
-
 /// Sets this [`Handle`] as the current active [`Handle`].
 ///
 /// [`Handle`]: Handle
