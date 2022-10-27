@@ -3,7 +3,7 @@ use crate::time::{Clock, Duration, Instant};
 use std::convert::TryInto;
 
 /// A structure which handles conversion from Instants to u64 timestamps.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct TimeSource {
     pub(crate) clock: Clock,
     start_time: Instant,

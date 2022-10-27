@@ -184,8 +184,16 @@ cfg_io_driver_impl! {
     pub(crate) mod io;
 }
 
+cfg_process_driver! {
+    mod process;
+}
+
 cfg_time! {
     pub(crate) mod time;
+}
+
+cfg_signal_internal_and_unix! {
+    pub(crate) mod signal;
 }
 
 cfg_rt! {

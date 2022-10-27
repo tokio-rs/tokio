@@ -1,5 +1,6 @@
 use crate::io::interest::Interest;
-use crate::runtime::io::{Handle, Registration};
+use crate::runtime::io::Registration;
+use crate::runtime::scheduler;
 
 use mio::event::Source;
 use std::fmt;
@@ -103,13 +104,14 @@ impl<E: Source> PollEvented<E> {
     #[track_caller]
     #[cfg_attr(feature = "signal", allow(unused))]
     pub(crate) fn new_with_interest(io: E, interest: Interest) -> io::Result<Self> {
-        Self::new_with_interest_and_handle(io, interest, Handle::current())
+        Self::new_with_interest_and_handle(io, interest, scheduler::Handle::current())
     }
 
+    #[track_caller]
     pub(crate) fn new_with_interest_and_handle(
         mut io: E,
         interest: Interest,
-        handle: Handle,
+        handle: scheduler::Handle,
     ) -> io::Result<Self> {
         let registration = Registration::new_with_interest_and_handle(&mut io, interest, handle)?;
         Ok(Self {
@@ -119,11 +121,7 @@ impl<E: Source> PollEvented<E> {
     }
 
     /// Returns a reference to the registration.
-    #[cfg(any(
-        feature = "net",
-        all(unix, feature = "process"),
-        all(unix, feature = "signal"),
-    ))]
+    #[cfg(any(feature = "net"))]
     pub(crate) fn registration(&self) -> &Registration {
         &self.registration
     }

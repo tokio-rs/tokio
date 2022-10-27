@@ -1,29 +1,16 @@
-use crate::loom::sync::Arc;
 use crate::runtime::time::TimeSource;
 use std::fmt;
 
 /// Handle to time driver instance.
-#[derive(Clone)]
 pub(crate) struct Handle {
-    time_source: TimeSource,
-    pub(super) inner: Arc<super::Inner>,
+    pub(super) time_source: TimeSource,
+    pub(super) inner: super::Inner,
 }
 
 impl Handle {
-    /// Creates a new timer `Handle` from a shared `Inner` timer state.
-    pub(super) fn new(inner: Arc<super::Inner>) -> Self {
-        let time_source = inner.state.lock().time_source.clone();
-        Handle { time_source, inner }
-    }
-
     /// Returns the time source associated with this handle.
     pub(crate) fn time_source(&self) -> &TimeSource {
         &self.time_source
-    }
-
-    /// Access the driver's inner structure.
-    pub(super) fn get(&self) -> &super::Inner {
-        &*self.inner
     }
 
     /// Checks whether the driver has been shutdown.

@@ -24,24 +24,6 @@ pub(crate) fn current() -> Handle {
     }
 }
 
-cfg_io_driver! {
-    #[track_caller]
-    pub(crate) fn io_handle() -> crate::runtime::driver::IoHandle {
-        match CONTEXT.try_with(|ctx| {
-            let ctx = ctx.borrow();
-            ctx.as_ref()
-                .expect(crate::util::error::CONTEXT_MISSING_ERROR)
-                .inner
-                .driver()
-                .io
-                .clone()
-        }) {
-            Ok(io_handle) => io_handle,
-            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
-        }
-    }
-}
-
 cfg_signal_internal! {
     #[cfg(unix)]
     pub(crate) fn signal_handle() -> crate::runtime::driver::SignalHandle {

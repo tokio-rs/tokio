@@ -1,5 +1,5 @@
 use crate::loom::sync::{Mutex, MutexGuard};
-use crate::signal::unix::driver::Handle as SignalHandle;
+use crate::runtime::signal::Handle as SignalHandle;
 use crate::signal::unix::{signal_with_handle, SignalKind};
 use crate::sync::watch;
 use std::io;
@@ -132,7 +132,7 @@ where
 pub(crate) mod test {
     use super::*;
     use crate::runtime::io::Driver as IoDriver;
-    use crate::signal::unix::driver::{Driver as SignalDriver, Handle as SignalHandle};
+    use crate::runtime::signal::{Driver as SignalDriver, Handle as SignalHandle};
     use crate::sync::watch;
     use std::cell::{Cell, RefCell};
     use std::io;
@@ -294,7 +294,8 @@ pub(crate) mod test {
     #[cfg_attr(miri, ignore)] // Miri does not support epoll.
     #[test]
     fn does_not_register_signal_if_queue_empty() {
-        let signal_driver = IoDriver::new().and_then(SignalDriver::new).unwrap();
+        let (io_driver, io_handle) = IoDriver::new().unwrap();
+        let signal_driver = SignalDriver::new(io_driver, &io_handle).unwrap();
         let handle = signal_driver.handle();
 
         let orphanage = OrphanQueueImpl::new();

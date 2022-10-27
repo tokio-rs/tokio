@@ -40,6 +40,13 @@ impl Handle {
         }
     }
 
+    cfg_io_driver! {
+        #[track_caller]
+        pub(crate) fn io(&self) -> &crate::runtime::io::Handle {
+            self.driver().io()
+        }
+    }
+
     cfg_time! {
         #[track_caller]
         pub(crate) fn time(&self) -> &crate::runtime::time::Handle {
@@ -62,6 +69,11 @@ cfg_rt! {
     use crate::util::RngSeedGenerator;
 
     impl Handle {
+        #[track_caller]
+        pub(crate) fn current() -> Handle {
+            crate::runtime::context::current().inner
+        }
+
         pub(crate) fn blocking_spawner(&self) -> &blocking::Spawner {
             match self {
                 Handle::CurrentThread(h) => &h.blocking_spawner,
@@ -153,6 +165,15 @@ cfg_rt! {
                     Handle::MultiThread(handle) => handle.worker_local_queue_depth(worker),
                 }
             }
+        }
+    }
+}
+
+cfg_not_rt! {
+    impl Handle {
+        #[track_caller]
+        pub(crate) fn current() -> Handle {
+            panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
         }
     }
 }
