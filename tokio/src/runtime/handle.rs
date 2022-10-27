@@ -96,7 +96,9 @@ impl Handle {
     /// ```
     #[track_caller]
     pub fn current() -> Self {
-        context::current()
+        Handle {
+            inner: scheduler::Handle::current(),
+        }
     }
 
     /// Returns a Handle view over the currently running Runtime

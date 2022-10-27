@@ -2,6 +2,7 @@
 
 use crate::io::interest::Interest;
 use crate::runtime::io::{Direction, Handle, ReadyEvent, ScheduledIo};
+use crate::runtime::scheduler;
 use crate::util::slab;
 
 use mio::event::Source;
@@ -43,8 +44,8 @@ cfg_io_driver! {
     /// [`poll_write_ready`]: method@Self::poll_write_ready`
     #[derive(Debug)]
     pub(crate) struct Registration {
-        /// Handle to the associated driver.
-        handle: Handle,
+        /// Handle to the associated runtime.
+        handle: scheduler::Handle,
 
         /// Reference to state stored by the driver.
         shared: slab::Ref<ScheduledIo>,
@@ -66,12 +67,13 @@ impl Registration {
     ///
     /// - `Ok` if the registration happened successfully
     /// - `Err` if an error was encountered during registration
+    #[track_caller]
     pub(crate) fn new_with_interest_and_handle(
         io: &mut impl Source,
         interest: Interest,
-        handle: Handle,
+        handle: scheduler::Handle,
     ) -> io::Result<Registration> {
-        let shared = handle.inner.add_source(io, interest)?;
+        let shared = handle.io().inner.add_source(io, interest)?;
 
         Ok(Registration { handle, shared })
     }
@@ -93,7 +95,7 @@ impl Registration {
     ///
     /// `Err` is returned if an error is encountered.
     pub(crate) fn deregister(&mut self, io: &mut impl Source) -> io::Result<()> {
-        self.handle.inner.deregister_source(io)
+        self.handle().inner.deregister_source(io)
     }
 
     pub(crate) fn clear_readiness(&self, event: ReadyEvent) {
@@ -146,7 +148,7 @@ impl Registration {
         let coop = ready!(crate::coop::poll_proceed(cx));
         let ev = ready!(self.shared.poll_readiness(cx, direction));
 
-        if self.handle.inner.is_shutdown() {
+        if self.handle().inner.is_shutdown() {
             return Poll::Ready(Err(gone()));
         }
 
@@ -195,6 +197,10 @@ impl Registration {
             res => res,
         }
     }
+
+    fn handle(&self) -> &Handle {
+        self.handle.io()
+    }
 }
 
 impl Drop for Registration {
@@ -224,7 +230,7 @@ cfg_io_readiness! {
             pin!(fut);
 
             crate::future::poll_fn(|cx| {
-                if self.handle.inner.is_shutdown() {
+                if self.handle().inner.is_shutdown() {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::Other,
                         crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
