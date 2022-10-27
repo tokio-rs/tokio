@@ -73,7 +73,7 @@ impl Registration {
         interest: Interest,
         handle: scheduler::Handle,
     ) -> io::Result<Registration> {
-        let shared = handle.io().inner.add_source(io, interest)?;
+        let shared = handle.io().add_source(io, interest)?;
 
         Ok(Registration { handle, shared })
     }
@@ -95,7 +95,7 @@ impl Registration {
     ///
     /// `Err` is returned if an error is encountered.
     pub(crate) fn deregister(&mut self, io: &mut impl Source) -> io::Result<()> {
-        self.handle().inner.deregister_source(io)
+        self.handle().deregister_source(io)
     }
 
     pub(crate) fn clear_readiness(&self, event: ReadyEvent) {
@@ -148,7 +148,7 @@ impl Registration {
         let coop = ready!(crate::coop::poll_proceed(cx));
         let ev = ready!(self.shared.poll_readiness(cx, direction));
 
-        if self.handle().inner.is_shutdown() {
+        if self.handle().is_shutdown() {
             return Poll::Ready(Err(gone()));
         }
 
@@ -230,7 +230,7 @@ cfg_io_readiness! {
             pin!(fut);
 
             crate::future::poll_fn(|cx| {
-                if self.handle().inner.is_shutdown() {
+                if self.handle().is_shutdown() {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::Other,
                         crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR

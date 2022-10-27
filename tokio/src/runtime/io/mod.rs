@@ -18,7 +18,6 @@ use metrics::IoDriverMetrics;
 
 use std::fmt;
 use std::io;
-use std::sync::Arc;
 use std::time::Duration;
 
 /// I/O driver, backed by Mio.
@@ -42,23 +41,7 @@ pub(crate) struct Driver {
 }
 
 /// A reference to an I/O driver.
-#[derive(Clone)]
 pub(crate) struct Handle {
-    pub(super) inner: Arc<Inner>,
-}
-
-#[derive(Debug)]
-pub(crate) struct ReadyEvent {
-    tick: u8,
-    pub(crate) ready: Ready,
-}
-
-struct IoDispatcher {
-    allocator: slab::Allocator<ScheduledIo>,
-    is_shutdown: bool,
-}
-
-pub(super) struct Inner {
     /// Registers I/O resources.
     registry: mio::Registry,
 
@@ -70,7 +53,18 @@ pub(super) struct Inner {
     #[cfg(not(tokio_wasi))]
     waker: mio::Waker,
 
-    metrics: IoDriverMetrics,
+    pub(crate) metrics: IoDriverMetrics,
+}
+
+#[derive(Debug)]
+pub(crate) struct ReadyEvent {
+    tick: u8,
+    pub(crate) ready: Ready,
+}
+
+struct IoDispatcher {
+    allocator: slab::Allocator<ScheduledIo>,
+    is_shutdown: bool,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
@@ -128,13 +122,11 @@ impl Driver {
         };
 
         let handle = Handle {
-            inner: Arc::new(Inner {
-                registry,
-                io_dispatch: RwLock::new(IoDispatcher::new(allocator)),
-                #[cfg(not(tokio_wasi))]
-                waker,
-                metrics: IoDriverMetrics::default(),
-            }),
+            registry,
+            io_dispatch: RwLock::new(IoDispatcher::new(allocator)),
+            #[cfg(not(tokio_wasi))]
+            waker,
+            metrics: IoDriverMetrics::default(),
         };
 
         Ok((driver, handle))
@@ -153,7 +145,7 @@ impl Driver {
     pub(crate) fn shutdown(&mut self, rt_handle: &driver::Handle) {
         let handle = rt_handle.io();
 
-        if handle.inner.shutdown() {
+        if handle.shutdown() {
             self.resources.for_each(|io| {
                 // If a task is waiting on the I/O resource, notify it. The task
                 // will then attempt to use the I/O resource and fail due to the
@@ -208,7 +200,7 @@ impl Driver {
             }
         }
 
-        handle.inner.metrics.incr_ready_count_by(ready_count);
+        handle.metrics.incr_ready_count_by(ready_count);
     }
 
     fn dispatch(resources: &mut Slab<ScheduledIo>, tick: u8, token: mio::Token, ready: Ready) {
@@ -236,16 +228,6 @@ impl fmt::Debug for Driver {
     }
 }
 
-cfg_net! {
-    cfg_metrics! {
-        impl Handle {
-            pub(crate) fn metrics(&self) -> &IoDriverMetrics {
-                &self.inner.metrics
-            }
-        }
-    }
-}
-
 impl Handle {
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
@@ -258,30 +240,9 @@ impl Handle {
     /// return immediately.
     pub(crate) fn unpark(&self) {
         #[cfg(not(tokio_wasi))]
-        self.inner.waker.wake().expect("failed to wake I/O driver");
+        self.waker.wake().expect("failed to wake I/O driver");
     }
-}
 
-impl fmt::Debug for Handle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Handle")
-    }
-}
-
-// ===== impl IoDispatcher =====
-
-impl IoDispatcher {
-    fn new(allocator: slab::Allocator<ScheduledIo>) -> Self {
-        Self {
-            allocator,
-            is_shutdown: false,
-        }
-    }
-}
-
-// ===== impl Inner =====
-
-impl Inner {
     /// Registers an I/O resource with the reactor for a given `mio::Ready` state.
     ///
     /// The registration token is returned.
@@ -342,6 +303,23 @@ impl Inner {
     }
 }
 
+impl fmt::Debug for Handle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Handle")
+    }
+}
+
+// ===== impl IoDispatcher =====
+
+impl IoDispatcher {
+    fn new(allocator: slab::Allocator<ScheduledIo>) -> Self {
+        Self {
+            allocator,
+            is_shutdown: false,
+        }
+    }
+}
+
 impl Direction {
     pub(super) fn mask(self) -> Ready {
         match self {
@@ -355,7 +333,7 @@ impl Direction {
 cfg_signal_internal_and_unix! {
     impl Handle {
         pub(crate) fn register_signal_receiver(&self, receiver: &mut mio::net::UnixStream) -> io::Result<()> {
-            self.inner.registry.register(receiver, TOKEN_SIGNAL, mio::Interest::READABLE)?;
+            self.registry.register(receiver, TOKEN_SIGNAL, mio::Interest::READABLE)?;
             Ok(())
         }
     }
