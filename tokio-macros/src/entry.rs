@@ -390,7 +390,7 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
-                .block_on(body);
+                .block_on(::std::boxed::Box::pin(body));
         }
     };
     input.block = syn::parse2(quote! {
