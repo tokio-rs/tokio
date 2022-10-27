@@ -90,6 +90,15 @@ impl Handle {
         }
     }
 
+    cfg_signal_internal_and_unix! {
+        #[track_caller]
+        pub(crate) fn signal(&self) -> &crate::runtime::signal::Handle {
+            self.signal
+                .as_ref()
+                .expect("there is no signal driver running, must be called from the context of Tokio runtime")
+        }
+    }
+
     cfg_time! {
         /// Returns a reference to the time driver handle.
         ///
