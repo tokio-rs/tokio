@@ -64,14 +64,62 @@ impl Handle {
 cfg_rt! {
     use crate::future::Future;
     use crate::loom::sync::Arc;
-    use crate::runtime::{blocking, task::Id};
+    use crate::runtime::{blocking, task::Id, TryCurrentError};
     use crate::task::JoinHandle;
-    use crate::util::RngSeedGenerator;
+    use crate::util::{replace_thread_rng, RngSeed, RngSeedGenerator};
+
+    use std::cell::RefCell;
+
+    #[derive(Debug)]
+    pub(crate) struct EnterGuard {
+        old_handle: Option<Handle>,
+        old_seed: RngSeed,
+    }
+
+    tokio_thread_local! {
+        static CURRENT: RefCell<Option<Handle>> = const { RefCell::new(None) }
+    }
 
     impl Handle {
         #[track_caller]
         pub(crate) fn current() -> Handle {
-            crate::runtime::context::current().inner
+            match Handle::try_current() {
+                Ok(handle) => handle,
+                Err(e) => panic!("{}", e),
+            }
+        }
+
+        pub(crate) fn try_current() -> Result<Handle, TryCurrentError> {
+            match CURRENT.try_with(|ctx| ctx.borrow().clone()) {
+                Ok(Some(handle)) => Ok(handle),
+                Ok(None) => Err(TryCurrentError::new_no_context()),
+                Err(_access_error) => Err(TryCurrentError::new_thread_local_destroyed()),
+            }
+        }
+
+        /// Sets this [`Handle`] as the current active [`Handle`].
+        ///
+        /// [`Handle`]: Handle
+        pub(crate) fn enter(&self) -> EnterGuard {
+            match self.try_enter() {
+                Some(guard) => guard,
+                None => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+            }
+        }
+
+        /// Sets this [`Handle`] as the current active [`Handle`].
+        ///
+        /// [`Handle`]: Handle
+        pub(crate) fn try_enter(&self) -> Option<EnterGuard> {
+            let rng_seed = self.seed_generator().next_seed();
+            let old_handle = CURRENT.try_with(|ctx| ctx.borrow_mut().replace(self.clone())).ok()?;
+
+            let old_seed = replace_thread_rng(rng_seed);
+
+            Some(EnterGuard {
+                old_handle,
+                old_seed,
+            })
         }
 
         pub(crate) fn blocking_spawner(&self) -> &blocking::Spawner {
@@ -112,6 +160,16 @@ cfg_rt! {
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 Handle::MultiThread(h) => &h.seed_generator,
             }
+        }
+    }
+
+    impl Drop for EnterGuard {
+        fn drop(&mut self) {
+            CURRENT.with(|ctx| {
+                *ctx.borrow_mut() = self.old_handle.take();
+            });
+            // We discard the RngSeed associated with this guard
+            let _ = replace_thread_rng(self.old_seed.clone());
         }
     }
 

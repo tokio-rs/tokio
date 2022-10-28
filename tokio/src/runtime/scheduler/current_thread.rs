@@ -1,8 +1,8 @@
 use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::{self, Driver};
+use crate::runtime::scheduler::EnterGuard;
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::{blocking, Config};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};

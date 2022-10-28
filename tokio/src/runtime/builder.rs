@@ -1032,7 +1032,7 @@ cfg_rt_multi_thread! {
             let handle = Handle { inner: handle };
 
             // Spawn the thread pool workers
-            let _enter = crate::runtime::context::enter(handle.clone());
+            let _enter = handle.enter();
             launch.launch();
 
             Ok(Runtime {
