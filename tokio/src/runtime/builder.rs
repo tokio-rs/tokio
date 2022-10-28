@@ -836,22 +836,19 @@ impl Builder {
             self
         }
 
-        /// Specifies the random number generation seed to use within all threads associated
-        /// with the runtime being built.
+        /// Specifies the random number generation seed to use within all
+        /// threads associated with the runtime being built.
         ///
-        /// This option is intended to make certain parts of the runtime deterministic.
-        /// Specifically, it affects the [`tokio::select!`] macro and the work stealing
-        /// algorithm. In the case of [`tokio::select!`] it will ensure that the order that
-        /// branches are polled is deterministic.
+        /// This option is intended to make certain parts of the runtime
+        /// deterministic (e.g. the [`tokio::select!`] macro). In the case of
+        /// [`tokio::select!`] it will ensure that the order that branches are
+        /// polled is deterministic.
         ///
-        /// In the case of work stealing, it's a little more complicated. Each worker will
-        /// be given a deterministic seed so that the starting peer for each work stealing
-        /// search will be deterministic.
-        ///
-        /// In addition to the code specifying `rng_seed` and interacting with the runtime,
-        /// the internals of Tokio and the Rust compiler may affect the sequences of random
-        /// numbers. In order to ensure repeatable results, the version of Tokio, the versions
-        /// of all other dependencies that interact with Tokio, and the Rust compiler version
+        /// In addition to the code specifying `rng_seed` and interacting with
+        /// the runtime, the internals of Tokio and the Rust compiler may affect
+        /// the sequences of random numbers. In order to ensure repeatable
+        /// results, the version of Tokio, the versions of all other
+        /// dependencies that interact with Tokio, and the Rust compiler version
         /// should also all remain constant.
         ///
         /// # Examples
