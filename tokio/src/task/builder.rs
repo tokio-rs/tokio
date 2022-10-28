@@ -1,6 +1,6 @@
 #![allow(unreachable_pub)]
 use crate::{
-    runtime::{context, Handle},
+    runtime::Handle,
     task::{JoinHandle, LocalSet},
 };
 use std::{future::Future, io};
@@ -167,7 +167,8 @@ impl<'a> Builder<'a> {
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
-        self.spawn_blocking_on(function, &context::current())
+        let handle = Handle::current();
+        self.spawn_blocking_on(function, &handle)
     }
 
     /// Spawns blocking code on the provided [runtime handle]'s blocking threadpool.
