@@ -261,7 +261,7 @@ impl Sleep {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
-            let handle = &handle.time();
+            let handle = &handle.driver().time();
             let time_source = handle.time_source();
             let deadline_tick = time_source.deadline_to_tick(deadline);
             let duration = deadline_tick.saturating_sub(time_source.now());

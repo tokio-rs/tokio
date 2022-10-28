@@ -73,7 +73,7 @@ impl Registration {
         interest: Interest,
         handle: scheduler::Handle,
     ) -> io::Result<Registration> {
-        let shared = handle.io().add_source(io, interest)?;
+        let shared = handle.driver().io().add_source(io, interest)?;
 
         Ok(Registration { handle, shared })
     }
@@ -199,7 +199,7 @@ impl Registration {
     }
 
     fn handle(&self) -> &Handle {
-        self.handle.io()
+        self.handle.driver().io()
     }
 }
 

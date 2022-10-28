@@ -50,7 +50,7 @@ fn single_timer() {
         let jh = thread::spawn(move || {
             let entry = TimerEntry::new(
                 &handle_.inner,
-                handle_.inner.clock().now() + Duration::from_secs(1),
+                handle_.inner.driver().clock().now() + Duration::from_secs(1),
             );
             pin!(entry);
 
@@ -62,7 +62,7 @@ fn single_timer() {
 
         thread::yield_now();
 
-        let handle = handle.inner.time();
+        let handle = handle.inner.driver().time();
 
         // This may or may not return Some (depending on how it races with the
         // thread). If it does return None, however, the timer should complete
@@ -83,7 +83,7 @@ fn drop_timer() {
         let jh = thread::spawn(move || {
             let entry = TimerEntry::new(
                 &handle_.inner,
-                handle_.inner.clock().now() + Duration::from_secs(1),
+                handle_.inner.driver().clock().now() + Duration::from_secs(1),
             );
             pin!(entry);
 
@@ -97,7 +97,7 @@ fn drop_timer() {
 
         thread::yield_now();
 
-        let handle = handle.inner.time();
+        let handle = handle.inner.driver().time();
 
         // advance 2s in the future.
         handle.process_at_time(handle.time_source().now() + 2_000_000_000);
@@ -116,7 +116,7 @@ fn change_waker() {
         let jh = thread::spawn(move || {
             let entry = TimerEntry::new(
                 &handle_.inner,
-                handle_.inner.clock().now() + Duration::from_secs(1),
+                handle_.inner.driver().clock().now() + Duration::from_secs(1),
             );
             pin!(entry);
 
@@ -132,7 +132,7 @@ fn change_waker() {
 
         thread::yield_now();
 
-        let handle = handle.inner.time();
+        let handle = handle.inner.driver().time();
 
         // advance 2s
         handle.process_at_time(handle.time_source().now() + 2_000_000_000);
@@ -151,7 +151,7 @@ fn reset_future() {
 
         let handle_ = handle.clone();
         let finished_early_ = finished_early.clone();
-        let start = handle.inner.clock().now();
+        let start = handle.inner.driver().clock().now();
 
         let jh = thread::spawn(move || {
             let entry = TimerEntry::new(&handle_.inner, start + Duration::from_secs(1));
@@ -174,7 +174,7 @@ fn reset_future() {
 
         thread::yield_now();
 
-        let handle = handle.inner.time();
+        let handle = handle.inner.driver().time();
 
         // This may or may not return a wakeup time.
         handle.process_at_time(
@@ -217,7 +217,7 @@ fn poll_process_levels() {
     for i in 0..normal_or_miri(1024, 64) {
         let mut entry = Box::pin(TimerEntry::new(
             &handle.inner,
-            handle.inner.clock().now() + Duration::from_millis(i),
+            handle.inner.driver().clock().now() + Duration::from_millis(i),
         ));
 
         let _ = entry
@@ -228,7 +228,7 @@ fn poll_process_levels() {
     }
 
     for t in 1..normal_or_miri(1024, 64) {
-        handle.inner.time().process_at_time(t as u64);
+        handle.inner.driver().time().process_at_time(t as u64);
 
         for (deadline, future) in entries.iter_mut().enumerate() {
             let mut context = Context::from_waker(noop_waker_ref());
@@ -251,11 +251,11 @@ fn poll_process_levels_targeted() {
 
     let e1 = TimerEntry::new(
         &handle.inner,
-        handle.inner.clock().now() + Duration::from_millis(193),
+        handle.inner.driver().clock().now() + Duration::from_millis(193),
     );
     pin!(e1);
 
-    let handle = handle.inner.time();
+    let handle = handle.inner.driver().time();
 
     handle.process_at_time(62);
     assert!(e1.as_mut().poll_elapsed(&mut context).is_pending());
