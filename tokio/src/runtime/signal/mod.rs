@@ -23,17 +23,18 @@ pub(crate) struct Driver {
     /// A pipe for receiving wake events from the signal handler
     receiver: UnixStream,
 
-    /// Shared state
-    inner: Arc<Inner>,
+    /// Shared state. The driver keeps a strong ref and the handle keeps a weak
+    /// ref. The weak ref is used to check if the driver is still active before
+    /// trying to register a signal handler.
+    inner: Arc<()>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub(crate) struct Handle {
-    inner: Weak<Inner>,
+    /// Paired w/ the `Arc` above and is used to check if the driver is still
+    /// around before attempting to register a signal handler.
+    inner: Weak<()>,
 }
-
-#[derive(Debug)]
-pub(super) struct Inner(());
 
 // ===== impl Driver =====
 
@@ -75,7 +76,7 @@ impl Driver {
         Ok(Self {
             io,
             receiver,
-            inner: Arc::new(Inner(())),
+            inner: Arc::new(()),
         })
     }
 
@@ -136,39 +137,6 @@ impl Handle {
                 std_io::ErrorKind::Other,
                 "signal driver gone",
             ))
-        }
-    }
-}
-
-cfg_rt! {
-    impl Handle {
-        /// Returns a handle to the current driver
-        ///
-        /// # Panics
-        ///
-        /// This function panics if there is no current signal driver set.
-        #[track_caller]
-        pub(crate) fn current() -> Self {
-            crate::runtime::context::signal_handle().expect(
-                "there is no signal driver running, must be called from the context of Tokio runtime",
-            )
-        }
-    }
-}
-
-cfg_not_rt! {
-    impl Handle {
-        /// Returns a handle to the current driver
-        ///
-        /// # Panics
-        ///
-        /// This function panics if there is no current signal driver set.
-        #[track_caller]
-        pub(crate) fn current() -> Self {
-            panic!(
-                "there is no signal driver running, must be called from the context of Tokio runtime or with\
-                `rt` enabled.",
-            )
         }
     }
 }
