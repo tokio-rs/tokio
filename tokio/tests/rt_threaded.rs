@@ -542,7 +542,6 @@ fn rt() -> runtime::Runtime {
 #[cfg(tokio_unstable)]
 mod unstable {
     use super::*;
-    use tokio::runtime::RngSeed;
 
     #[test]
     fn test_disable_lifo_slot() {
