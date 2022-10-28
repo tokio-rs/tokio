@@ -39,26 +39,6 @@ impl Handle {
             Handle::Disabled => unreachable!(),
         }
     }
-
-    cfg_io_driver! {
-        #[track_caller]
-        pub(crate) fn io(&self) -> &crate::runtime::io::Handle {
-            self.driver().io()
-        }
-    }
-
-    cfg_time! {
-        #[track_caller]
-        pub(crate) fn time(&self) -> &crate::runtime::time::Handle {
-            self.driver().time()
-        }
-
-        cfg_test_util! {
-            pub(crate) fn clock(&self) -> &driver::Clock {
-                &self.driver().clock
-            }
-        }
-    }
 }
 
 cfg_rt! {

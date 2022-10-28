@@ -36,7 +36,7 @@ cfg_test_util! {
             use crate::runtime::Handle;
 
             match Handle::try_current() {
-                Ok(handle) => Some(handle.inner.clock().clone()),
+                Ok(handle) => Some(handle.inner.driver().clock().clone()),
                 Err(ref e) if e.is_missing_context() => None,
                 Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
             }

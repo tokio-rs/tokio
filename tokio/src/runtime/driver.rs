@@ -109,6 +109,12 @@ impl Handle {
                 .as_ref()
                 .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
         }
+
+        cfg_test_util! {
+            pub(crate) fn clock(&self) -> &Clock {
+                &self.clock
+            }
+        }
     }
 }
 
