@@ -66,7 +66,7 @@ use crate::runtime::{
     blocking, driver, task, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics,
 };
 use crate::util::atomic_cell::AtomicCell;
-use crate::util::{FastRand, RngSeedGenerator};
+use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
 use std::time::Duration;

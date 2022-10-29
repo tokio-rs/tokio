@@ -156,25 +156,3 @@ impl FastRand {
         s0.wrapping_add(s1)
     }
 }
-
-tokio_thread_local! {
-    static THREAD_RNG: FastRand = FastRand::new(RngSeed::new());
-}
-
-/// Seeds the thread local random number generator with the provided seed and
-/// return the previously stored seed.
-///
-/// The returned seed can be later used to return the thread local random number
-/// generator to its previous state.
-#[cfg(feature = "rt")]
-pub(crate) fn replace_thread_rng(rng_seed: RngSeed) -> RngSeed {
-    THREAD_RNG.with(|rng| rng.replace_seed(rng_seed))
-}
-
-// Used by the select macro and `StreamMap`
-#[cfg(any(feature = "macros"))]
-#[doc(hidden)]
-#[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
-pub fn thread_rng_n(n: u32) -> u32 {
-    THREAD_RNG.with(|rng| rng.fastrand_n(n))
-}

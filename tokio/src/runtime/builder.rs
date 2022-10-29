@@ -1,6 +1,6 @@
 use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, Runtime};
-use crate::util::{RngSeed, RngSeedGenerator};
+use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use std::fmt;
 use std::io;

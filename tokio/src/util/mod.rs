@@ -44,13 +44,13 @@ pub(crate) use wake_list::WakeList;
 pub(crate) mod linked_list;
 
 #[cfg(any(feature = "rt", feature = "macros"))]
-mod rand;
+pub(crate) mod rand;
 
 cfg_rt! {
     mod idle_notified_set;
     pub(crate) use idle_notified_set::IdleNotifiedSet;
 
-    pub(crate) use self::rand::{RngSeedGenerator,replace_thread_rng};
+    pub(crate) use self::rand::RngSeedGenerator;
 
     mod wake;
     pub(crate) use wake::WakerRef;
@@ -66,17 +66,7 @@ cfg_rt! {
     pub(crate) use rc_cell::RcCell;
 }
 
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-#[cfg(feature = "rt")]
-pub use self::rand::RngSeed;
-
-#[cfg(any(feature = "macros"))]
-#[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
-pub use self::rand::thread_rng_n;
-
 cfg_rt_multi_thread! {
-    pub(crate) use self::rand::FastRand;
-
     mod try_lock;
     pub(crate) use try_lock::TryLock;
 }
