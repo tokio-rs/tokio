@@ -109,12 +109,12 @@ fn write_hits_backpressure() {
     const ITER: usize = 2 * 1024;
 
     let mut mock = mock! {
-        // Block the `ITER`th write
+        // Block the `ITER*2`th write
         Err(io::Error::new(io::ErrorKind::WouldBlock, "not ready")),
         Ok(b"".to_vec()),
     };
 
-    for i in 0..=ITER {
+    for i in 0..=ITER * 2 {
         let mut b = BytesMut::with_capacity(4);
         b.put_u32(i as u32);
 
@@ -133,14 +133,15 @@ fn write_hits_backpressure() {
         // Push a new chunk
         mock.calls.push_back(Ok(b[..].to_vec()));
     }
-    // 1 'wouldblock', 4 * 2KB buffers, 1 b-byte buffer
-    assert_eq!(mock.calls.len(), 6);
+    // 1 'wouldblock', 8 * 2KB buffers, 1 b-byte buffer
+    assert_eq!(mock.calls.len(), 10);
 
     let mut task = task::spawn(());
     let mut framed = FramedWrite::new(mock, U32Encoder);
+    framed.set_backpressure_boundary(ITER * 8);
     task.enter(|cx, _| {
-        // Send 8KB. This fills up FramedWrite2 buffer
-        for i in 0..ITER {
+        // Send 16KB. This fills up FramedWrite buffer
+        for i in 0..ITER * 2 {
             assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
             assert!(pin!(framed).start_send(i as u32).is_ok());
         }
@@ -150,11 +151,11 @@ fn write_hits_backpressure() {
         assert!(pin!(framed).poll_ready(cx).is_pending());
 
         // We poll again, forcing another flush, which this time succeeds
-        // The whole 8KB buffer is flushed
+        // The whole 16KB buffer is flushed
         assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
 
         // Send more data. This matches the final message expected by the mock
-        assert!(pin!(framed).start_send(ITER as u32).is_ok());
+        assert!(pin!(framed).start_send((ITER * 2) as u32).is_ok());
 
         // Flush the rest of the buffer
         assert!(assert_ready!(pin!(framed).poll_flush(cx)).is_ok());
