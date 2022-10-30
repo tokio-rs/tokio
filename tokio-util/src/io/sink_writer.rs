@@ -49,7 +49,7 @@ pin_project! {
     /// let _ = writer.write(&data).await?;
     ///
     /// // ... and receive it.
-    /// assert_eq!(data.as_slice(), rx.recv().await.unwrap().as_slice());
+    /// assert_eq!(data.as_slice(), &*rx.recv().await.unwrap());
     /// # Ok(())
     /// # }
     /// ```
