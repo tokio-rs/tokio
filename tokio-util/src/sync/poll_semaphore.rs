@@ -130,7 +130,7 @@ impl PollSemaphore {
 
     /// Adds `n` new permits to the semaphore.
     ///
-    /// The maximum number of permits is `usize::MAX >> 3`, and this function
+    /// The maximum number of permits is [`Semaphore::MAX_PERMITS`], and this function
     /// will panic if the limit is exceeded.
     ///
     /// This is equivalent to the [`Semaphore::add_permits`] method on the
