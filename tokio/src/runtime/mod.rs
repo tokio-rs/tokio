@@ -310,6 +310,18 @@ cfg_rt! {
         blocking_pool: BlockingPool,
     }
 
+    /// The flavor of a `Runtime`.
+    ///
+    /// This is the return type for [`Handle::runtime_flavor`](crate::runtime::Handle::runtime_flavor()).
+    #[derive(Debug, PartialEq, Eq)]
+    #[non_exhaustive]
+    pub enum RuntimeFlavor {
+        /// The flavor that executes all tasks on the current thread.
+        CurrentThread,
+        /// The flavor that executes tasks across multiple threads.
+        MultiThread,
+    }
+
     /// The runtime scheduler is either a multi-thread or a current-thread executor.
     #[derive(Debug)]
     enum Scheduler {

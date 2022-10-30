@@ -1,4 +1,4 @@
-use crate::runtime::scheduler;
+use crate::runtime::{scheduler, RuntimeFlavor};
 
 /// Handle to the runtime.
 ///
@@ -275,6 +275,35 @@ impl Handle {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", _name, id.as_u64());
         self.inner.spawn(future, id)
+    }
+
+    /// Returns the flavor of the current `Runtime`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::{Handle, RuntimeFlavor};
+    ///
+    /// #[tokio::main(flavor = "current_thread")]
+    /// async fn main() {
+    ///   assert_eq!(RuntimeFlavor::CurrentThread, Handle::current().runtime_flavor());
+    /// }
+    /// ```
+    ///
+    /// ```
+    /// use tokio::runtime::{Handle, RuntimeFlavor};
+    ///
+    /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+    /// async fn main() {
+    ///   assert_eq!(RuntimeFlavor::MultiThread, Handle::current().runtime_flavor());
+    /// }
+    /// ```
+    pub fn runtime_flavor(&self) -> RuntimeFlavor {
+        match self.inner {
+            scheduler::Handle::CurrentThread(_) => RuntimeFlavor::CurrentThread,
+            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+            scheduler::Handle::MultiThread(_) => RuntimeFlavor::MultiThread,
+        }
     }
 }
 
