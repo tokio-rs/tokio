@@ -143,7 +143,10 @@ pub struct Receiver<T> {
 #[track_caller]
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
     assert!(buffer > 0, "mpsc bounded channel requires buffer > 0");
-    let semaphore = (semaphore::Semaphore::new(buffer), buffer);
+    let semaphore = Semaphore {
+        semaphore: semaphore::Semaphore::new(buffer),
+        bound: buffer,
+    };
     let (tx, rx) = chan::channel(semaphore);
 
     let tx = Sender::new(tx);
@@ -154,7 +157,11 @@ pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
 
 /// Channel semaphore is a tuple of the semaphore implementation and a `usize`
 /// representing the channel bound.
-type Semaphore = (semaphore::Semaphore, usize);
+#[derive(Debug)]
+pub(crate) struct Semaphore {
+    pub(crate) semaphore: semaphore::Semaphore,
+    pub(crate) bound: usize,
+}
 
 impl<T> Receiver<T> {
     pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> Receiver<T> {
@@ -572,7 +579,7 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub fn try_send(&self, message: T) -> Result<(), TrySendError<T>> {
-        match self.chan.semaphore().0.try_acquire(1) {
+        match self.chan.semaphore().semaphore.try_acquire(1) {
             Ok(_) => {}
             Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(message)),
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(message)),
@@ -852,7 +859,7 @@ impl<T> Sender<T> {
     }
 
     async fn reserve_inner(&self) -> Result<(), SendError<()>> {
-        match self.chan.semaphore().0.acquire(1).await {
+        match self.chan.semaphore().semaphore.acquire(1).await {
             Ok(_) => Ok(()),
             Err(_) => Err(SendError(())),
         }
@@ -902,7 +909,7 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub fn try_reserve(&self) -> Result<Permit<'_, T>, TrySendError<()>> {
-        match self.chan.semaphore().0.try_acquire(1) {
+        match self.chan.semaphore().semaphore.try_acquire(1) {
             Ok(_) => {}
             Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),
@@ -967,7 +974,7 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub fn try_reserve_owned(self) -> Result<OwnedPermit<T>, TrySendError<Self>> {
-        match self.chan.semaphore().0.try_acquire(1) {
+        match self.chan.semaphore().semaphore.try_acquire(1) {
             Ok(_) => {}
             Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(self)),
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(self)),
@@ -1028,7 +1035,7 @@ impl<T> Sender<T> {
     /// [`channel`]: channel
     /// [`max_capacity`]: Sender::max_capacity
     pub fn capacity(&self) -> usize {
-        self.chan.semaphore().0.available_permits()
+        self.chan.semaphore().semaphore.available_permits()
     }
 
     /// Converts the `Sender` to a [`WeakSender`] that does not count
@@ -1074,7 +1081,7 @@ impl<T> Sender<T> {
     /// [`max_capacity`]: Sender::max_capacity
     /// [`capacity`]: Sender::capacity
     pub fn max_capacity(&self) -> usize {
-        self.chan.semaphore().1
+        self.chan.semaphore().bound
     }
 }
 
