@@ -46,7 +46,7 @@ cfg_rt! {
 
     /// Sets this [`Handle`] as the current active [`Handle`].
     ///
-    /// [`Handle`]: Handle
+    /// [`Handle`]: crate::runtime::scheduler::Handle
     pub(crate) fn try_enter(handle: &scheduler::Handle) -> Option<EnterGuard> {
         let rng_seed = handle.seed_generator().next_seed();
 
