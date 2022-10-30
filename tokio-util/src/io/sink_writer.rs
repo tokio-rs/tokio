@@ -13,9 +13,17 @@ pin_project! {
     /// forwarded to the inner [`Sink`]. When `shutdown` is called on this
     /// [`SinkWriter`], the inner sink is closed.
     ///
-    /// This adapter implements [`AsyncWrite`] for `Sink<&[u8]>`. If you want to
-    /// implement `Sink<_>` for [`AsyncWrite`], see the [`codec`] module; if you need to implement
-    /// [`AsyncWrite`] for `Sink<Bytes>`, see [`CopyToBytes`].
+    /// This adapter takes a `Sink<&[u8]>` and provides an [`AsyncWrite`] impl
+    /// for it. Because of the lifetime, this trait is relatively rarely
+    /// implemented. The main ways to get a `Sink<&[u8]>` that you can use with
+    /// this type are:
+    ///
+    ///  * With the codec module by implementing the [`Encoder`]`<&[u8]>` trait.
+    ///  * By wrapping a `Sink<Bytes>` in a [`CopyToBytes`].
+    ///  * Manually implementing `Sink<&[u8]>` directly.
+    ///
+    /// The opposite conversion of implementing `Sink<_>` for an [`AsyncWrite`]
+    /// is done using the [`codec`] module.
     ///
     /// # Example
     ///
@@ -27,31 +35,30 @@ pin_project! {
     /// use tokio_util::io::{SinkWriter, CopyToBytes};
     /// use tokio_util::sync::PollSender;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> Result<(), Error> {
-    /// // Construct a channel pair to send data across and wrap a pollable sink.
-    /// // Note that the sink must mimic a writable object, e.g. have `std::io::Error`
-    /// // as its error type.
+    /// // We use an mpsc channel as an example of a `Sink<Bytes>`.
     /// let (tx, mut rx) = tokio::sync::mpsc::channel::<Bytes>(1);
-    /// let mut writer = SinkWriter::new(CopyToBytes::new(
-    ///   PollSender::new(tx).sink_map_err(|_| Error::from(ErrorKind::BrokenPipe)),
-    /// ));
+    /// let sink = PollSender::new(tx).sink_map_err(|_| Error::from(ErrorKind::BrokenPipe));
+    ///
+    /// // Wrap it in `CopyToBytes` to get a `Sink<&[u8]>`.
+    /// let mut writer = SinkWriter::new(CopyToBytes::new(sink));
     ///
     /// // Write data to our interface...
     /// let data: [u8; 4] = [1, 2, 3, 4];
     /// let _ = writer.write(&data).await?;
     ///
     /// // ... and receive it.
-    /// assert_eq!(data.to_vec(), rx.recv().await.unwrap().to_vec());
+    /// assert_eq!(data.as_slice(), rx.recv().await.unwrap().as_slice());
     /// # Ok(())
     /// # }
     /// ```
     ///
-    ///
     /// [`AsyncWrite`]: tokio::io::AsyncWrite
+    /// [`CopyToBytes`]: crate::io::CopyToBytes
+    /// [`Encoder`]: crate::codec::Encoder
     /// [`Sink`]: futures_sink::Sink
     /// [`codec`]: tokio_util::codec
-    /// [`CopyToBytes`]: tokio_util::io::CopyToBytes
     #[derive(Debug)]
     pub struct SinkWriter<S> {
         #[pin]

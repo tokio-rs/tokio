@@ -5,14 +5,14 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// A helper which wraps a `Sink<Bytes>` and converts it into
-    /// a `Sink<&'a [u8]>` by copying each byte slice into an owned [`Bytes`].
+    /// A helper that wraps a [`Sink`]`<`[`Bytes`]`>` and converts it into a
+    /// [`Sink`]`<&'a [u8]>` by copying each byte slice into an owned [`Bytes`].
     ///
-    /// This can be convenient when dealing with a [`SinkWriter`] which wraps a sink that
-    /// needs to take ownership of the data to be sent.
+    /// See the documentation for [`SinkWriter`] for an example.
     ///
-    /// [`SinkWriter`]: tokio_util::io::SinkWriter
     /// [`Bytes`]: bytes::Bytes
+    /// [`SinkWriter`]: crate::io::SinkWriter
+    /// [`Sink`]: futures_sink::Sink
     #[derive(Debug)]
     pub struct CopyToBytes<S> {
         #[pin]
