@@ -150,7 +150,7 @@ use tokio::io::{AsyncBufRead, AsyncRead, ReadBuf};
 /// [`AsyncBufRead`]: tokio::io::AsyncBufRead
 /// [`Stream`]: futures_core::Stream
 /// [`ReaderStream`]: crate::io::ReaderStream
-/// [`StreamExt`]: tokio_stream::StreamExt
+/// [`StreamExt`]: https://docs.rs/tokio-stream/latest/tokio_stream/trait.StreamExt.html
 #[derive(Debug)]
 pub struct StreamReader<S, B> {
     // This field is pinned.
