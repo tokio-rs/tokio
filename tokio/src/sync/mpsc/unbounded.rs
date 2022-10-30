@@ -61,7 +61,7 @@ impl<T> fmt::Debug for UnboundedReceiver<T> {
 /// the channel. Using an `unbounded` channel has the ability of causing the
 /// process to run out of memory. In this case, the process will be aborted.
 pub fn unbounded_channel<T>() -> (UnboundedSender<T>, UnboundedReceiver<T>) {
-    let (tx, rx) = chan::channel(AtomicUsize::new(0));
+    let (tx, rx) = chan::channel(Semaphore(AtomicUsize::new(0)));
 
     let tx = UnboundedSender::new(tx);
     let rx = UnboundedReceiver::new(rx);
@@ -70,7 +70,8 @@ pub fn unbounded_channel<T>() -> (UnboundedSender<T>, UnboundedReceiver<T>) {
 }
 
 /// No capacity
-type Semaphore = AtomicUsize;
+#[derive(Debug)]
+pub(crate) struct Semaphore(pub(crate) AtomicUsize);
 
 impl<T> UnboundedReceiver<T> {
     pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> UnboundedReceiver<T> {
@@ -279,7 +280,7 @@ impl<T> UnboundedSender<T> {
         use std::process;
         use std::sync::atomic::Ordering::{AcqRel, Acquire};
 
-        let mut curr = self.chan.semaphore().load(Acquire);
+        let mut curr = self.chan.semaphore().0.load(Acquire);
 
         loop {
             if curr & 1 == 1 {
@@ -295,6 +296,7 @@ impl<T> UnboundedSender<T> {
             match self
                 .chan
                 .semaphore()
+                .0
                 .compare_exchange(curr, curr + 2, AcqRel, Acquire)
             {
                 Ok(_) => return true,

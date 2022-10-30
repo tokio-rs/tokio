@@ -25,7 +25,6 @@ pin_project! {
 }
 
 const INITIAL_CAPACITY: usize = 8 * 1024;
-const BACKPRESSURE_BOUNDARY: usize = INITIAL_CAPACITY;
 
 #[derive(Debug)]
 pub(crate) struct ReadFrame {
@@ -37,6 +36,7 @@ pub(crate) struct ReadFrame {
 
 pub(crate) struct WriteFrame {
     pub(crate) buffer: BytesMut,
+    pub(crate) backpressure_boundary: usize,
 }
 
 #[derive(Default)]
@@ -60,6 +60,7 @@ impl Default for WriteFrame {
     fn default() -> Self {
         Self {
             buffer: BytesMut::with_capacity(INITIAL_CAPACITY),
+            backpressure_boundary: INITIAL_CAPACITY,
         }
     }
 }
@@ -87,7 +88,10 @@ impl From<BytesMut> for WriteFrame {
             buffer.reserve(INITIAL_CAPACITY - size);
         }
 
-        Self { buffer }
+        Self {
+            buffer,
+            backpressure_boundary: INITIAL_CAPACITY,
+        }
     }
 }
 
@@ -256,7 +260,7 @@ where
     type Error = U::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.state.borrow().buffer.len() >= BACKPRESSURE_BOUNDARY {
+        if self.state.borrow().buffer.len() >= self.state.borrow().backpressure_boundary {
             self.as_mut().poll_flush(cx)
         } else {
             Poll::Ready(Ok(()))
@@ -277,7 +281,7 @@ where
         let mut pinned = self.project();
 
         while !pinned.state.borrow_mut().buffer.is_empty() {
-            let WriteFrame { buffer } = pinned.state.borrow_mut();
+            let WriteFrame { buffer, .. } = pinned.state.borrow_mut();
             trace!(remaining = buffer.len(), "writing;");
 
             let n = ready!(poll_write_buf(pinned.inner.as_mut(), cx, buffer))?;
