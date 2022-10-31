@@ -243,7 +243,7 @@ impl<T, S: Semaphore> Rx<T, S> {
         use super::block::Read::*;
 
         // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };

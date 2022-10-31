@@ -290,7 +290,7 @@ impl Context {
     /// thread-local context.
     fn run_task<R>(&self, mut core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
         core.metrics.incr_poll_count();
-        self.enter(core, || crate::coop::budget(f))
+        self.enter(core, || crate::runtime::coop::budget(f))
     }
 
     /// Blocks the current thread until an event is received by the driver,
@@ -533,7 +533,7 @@ impl CoreGuard<'_> {
 
                 if handle.reset_woken() {
                     let (c, res) = context.enter(core, || {
-                        crate::coop::budget(|| future.as_mut().poll(&mut cx))
+                        crate::runtime::coop::budget(|| future.as_mut().poll(&mut cx))
                     });
 
                     core = c;

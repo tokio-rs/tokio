@@ -497,17 +497,8 @@ cfg_rt! {
     pub mod runtime;
 }
 cfg_not_rt! {
-    #[cfg(any(
-        feature = "macros",
-        feature = "net",
-        feature = "time",
-        all(unix, feature = "process"),
-        all(unix, feature = "signal"),
-    ))]
     pub(crate) mod runtime;
 }
-
-pub(crate) mod coop;
 
 cfg_signal! {
     pub mod signal;
