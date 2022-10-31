@@ -636,7 +636,7 @@ cfg_rt! {
                 Scheduler::CurrentThread(current_thread) => {
                     // This ensures that tasks spawned on the current-thread
                     // runtime are dropped inside the runtime's context.
-                    match context::try_enter(&self.handle.inner) {
+                    match context::try_set_current(&self.handle.inner) {
                         Some(guard) => current_thread.set_context_guard(guard),
                         None => {
                             // The context thread-local has already been destroyed.

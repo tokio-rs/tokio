@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 pub(crate) enum EnterContext {
     #[cfg_attr(not(feature = "rt"), allow(dead_code))]
     Entered {
-        allow_blocking: bool,
+        allow_block_in_place: bool,
     },
     NotEntered,
 }
@@ -30,8 +30,8 @@ cfg_rt! {
     /// Marks the current thread as being within the dynamic extent of an
     /// executor.
     #[track_caller]
-    pub(crate) fn enter(allow_blocking: bool) -> Enter {
-        if let Some(enter) = try_enter(allow_blocking) {
+    pub(crate) fn enter(allow_block_in_place: bool) -> Enter {
+        if let Some(enter) = try_enter(allow_block_in_place) {
             return enter;
         }
 
@@ -45,12 +45,12 @@ cfg_rt! {
 
     /// Tries to enter a runtime context, returns `None` if already in a runtime
     /// context.
-    pub(crate) fn try_enter(allow_blocking: bool) -> Option<Enter> {
+    pub(crate) fn try_enter(allow_block_in_place: bool) -> Option<Enter> {
         ENTERED.with(|c| {
             if c.get().is_entered() {
                 None
             } else {
-                c.set(EnterContext::Entered { allow_blocking });
+                c.set(EnterContext::Entered { allow_block_in_place });
                 Some(Enter { _p: PhantomData })
             }
         })
@@ -92,35 +92,35 @@ cfg_rt_multi_thread! {
 
 cfg_rt! {
     /// Disallows blocking in the current runtime context until the guard is dropped.
-    pub(crate) fn disallow_blocking() -> DisallowBlockingGuard {
+    pub(crate) fn disallow_block_in_place() -> DisallowBlockInPlaceGuard {
         let reset = ENTERED.with(|c| {
             if let EnterContext::Entered {
-                allow_blocking: true,
+                allow_block_in_place: true,
             } = c.get()
             {
                 c.set(EnterContext::Entered {
-                    allow_blocking: false,
+                    allow_block_in_place: false,
                 });
                 true
             } else {
                 false
             }
         });
-        DisallowBlockingGuard(reset)
+        DisallowBlockInPlaceGuard(reset)
     }
 
-    pub(crate) struct DisallowBlockingGuard(bool);
-    impl Drop for DisallowBlockingGuard {
+    pub(crate) struct DisallowBlockInPlaceGuard(bool);
+    impl Drop for DisallowBlockInPlaceGuard {
         fn drop(&mut self) {
             if self.0 {
                 // XXX: Do we want some kind of assertion here, or is "best effort" okay?
                 ENTERED.with(|c| {
                     if let EnterContext::Entered {
-                        allow_blocking: false,
+                        allow_block_in_place: false,
                     } = c.get()
                     {
                         c.set(EnterContext::Entered {
-                            allow_blocking: true,
+                            allow_block_in_place: true,
                         });
                     }
                 })

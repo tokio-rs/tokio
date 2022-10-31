@@ -1,7 +1,7 @@
 use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime::context::EnterGuard;
+use crate::runtime::context::SetCurrentGuard;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::{blocking, Config};
@@ -34,7 +34,7 @@ pub(crate) struct CurrentThread {
     /// scheduler, it is changed to `Some` with the context being the runtime's
     /// own context. This ensures that any tasks dropped in the `CurrentThread`'s
     /// destructor run in that runtime's context.
-    context_guard: Option<EnterGuard>,
+    context_guard: Option<SetCurrentGuard>,
 }
 
 /// Handle to the current thread scheduler
@@ -201,7 +201,7 @@ impl CurrentThread {
         })
     }
 
-    pub(crate) fn set_context_guard(&mut self, guard: EnterGuard) {
+    pub(crate) fn set_context_guard(&mut self, guard: SetCurrentGuard) {
         self.context_guard = Some(guard);
     }
 }
