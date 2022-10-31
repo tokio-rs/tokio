@@ -31,7 +31,7 @@ cfg_rt! {
     use crate::runtime::TryCurrentError;
 
     #[derive(Debug)]
-    pub(crate) struct EnterGuard {
+    pub(crate) struct SetCurrentGuard {
         old_handle: Option<scheduler::Handle>,
         old_seed: RngSeed,
     }
@@ -47,21 +47,21 @@ cfg_rt! {
     /// Sets this [`Handle`] as the current active [`Handle`].
     ///
     /// [`Handle`]: crate::runtime::scheduler::Handle
-    pub(crate) fn try_enter(handle: &scheduler::Handle) -> Option<EnterGuard> {
+    pub(crate) fn try_set_current(handle: &scheduler::Handle) -> Option<SetCurrentGuard> {
         let rng_seed = handle.seed_generator().next_seed();
 
         CONTEXT.try_with(|ctx| {
             let old_handle = ctx.scheduler.borrow_mut().replace(handle.clone());
             let old_seed = ctx.rng.replace_seed(rng_seed);
 
-            EnterGuard {
+            SetCurrentGuard {
                 old_handle,
                 old_seed,
             }
         }).ok()
     }
 
-    impl Drop for EnterGuard {
+    impl Drop for SetCurrentGuard {
         fn drop(&mut self) {
             CONTEXT.with(|ctx| {
                 *ctx.scheduler.borrow_mut() = self.old_handle.take();

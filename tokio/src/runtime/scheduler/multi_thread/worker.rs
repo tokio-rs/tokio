@@ -283,11 +283,16 @@ where
                 // set up blocking.
                 had_entered = true;
             }
-            (EnterContext::Entered { allow_blocking }, false) => {
+            (
+                EnterContext::Entered {
+                    allow_block_in_place,
+                },
+                false,
+            ) => {
                 // We are on an executor, but _not_ on the thread pool.  That is
                 // _only_ okay if we are in a thread pool runtime's block_on
                 // method:
-                if allow_blocking {
+                if allow_block_in_place {
                     had_entered = true;
                     return Ok(());
                 } else {

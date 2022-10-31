@@ -890,7 +890,7 @@ impl<T: Future> Future for RunUntil<'_, T> {
                 .waker
                 .register_by_ref(cx.waker());
 
-            let _no_blocking = crate::runtime::enter::disallow_blocking();
+            let _no_blocking = crate::runtime::enter::disallow_block_in_place();
             let f = me.future;
 
             if let Poll::Ready(output) = crate::coop::budget(|| f.poll(cx)) {

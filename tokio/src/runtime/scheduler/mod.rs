@@ -45,7 +45,7 @@ cfg_rt! {
     use crate::future::Future;
     use crate::loom::sync::Arc;
     use crate::runtime::{blocking, task::Id};
-    use crate::runtime::context::{self, EnterGuard};
+    use crate::runtime::context;
     use crate::task::JoinHandle;
     use crate::util::RngSeedGenerator;
 
@@ -55,16 +55,6 @@ cfg_rt! {
             match context::try_current() {
                 Ok(handle) => handle,
                 Err(e) => panic!("{}", e),
-            }
-        }
-
-        /// Sets this [`Handle`] as the current active [`Handle`].
-        ///
-        /// [`Handle`]: Handle
-        pub(crate) fn enter(&self) -> EnterGuard {
-            match context::try_enter(self) {
-                Some(guard) => guard,
-                None => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
             }
         }
 

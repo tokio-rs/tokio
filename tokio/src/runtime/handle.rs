@@ -29,7 +29,7 @@ use std::{error, fmt};
 #[derive(Debug)]
 #[must_use = "Creating and dropping a guard does nothing"]
 pub struct EnterGuard<'a> {
-    _guard: context::EnterGuard,
+    _guard: context::SetCurrentGuard,
     _handle_lifetime: PhantomData<&'a Handle>,
 }
 
@@ -44,7 +44,10 @@ impl Handle {
     /// [`tokio::spawn`]: fn@crate::spawn
     pub fn enter(&self) -> EnterGuard<'_> {
         EnterGuard {
-            _guard: self.inner.enter(),
+            _guard: match context::try_set_current(&self.inner) {
+                Some(guard) => guard,
+                None => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+            },
             _handle_lifetime: PhantomData,
         }
     }
