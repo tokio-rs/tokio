@@ -1,4 +1,4 @@
-use crate::runtime::{scheduler, RuntimeFlavor};
+use crate::runtime::{context, scheduler, RuntimeFlavor};
 
 /// Handle to the runtime.
 ///
@@ -29,7 +29,7 @@ use std::{error, fmt};
 #[derive(Debug)]
 #[must_use = "Creating and dropping a guard does nothing"]
 pub struct EnterGuard<'a> {
-    _guard: scheduler::EnterGuard,
+    _guard: context::EnterGuard,
     _handle_lifetime: PhantomData<&'a Handle>,
 }
 
@@ -106,7 +106,7 @@ impl Handle {
     ///
     /// Contrary to `current`, this never panics
     pub fn try_current() -> Result<Self, TryCurrentError> {
-        scheduler::Handle::try_current().map(|inner| Handle { inner })
+        context::try_current().map(|inner| Handle { inner })
     }
 
     /// Spawns a future onto the Tokio runtime.

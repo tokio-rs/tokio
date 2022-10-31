@@ -7,7 +7,6 @@ use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
-use crate::util::{replace_thread_rng, RngSeedGenerator};
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -48,9 +47,6 @@ struct Inner {
 
     // Customizable wait timeout.
     keep_alive: Duration,
-
-    // Random number seed
-    seed_generator: RngSeedGenerator,
 }
 
 struct Shared {
@@ -185,7 +181,6 @@ impl BlockingPool {
                     before_stop: builder.before_stop.clone(),
                     thread_cap,
                     keep_alive,
-                    seed_generator: builder.seed_generator.next_generator(),
                 }),
             },
             shutdown_rx,
@@ -435,8 +430,6 @@ impl Inner {
         if let Some(f) = &self.after_start {
             f()
         }
-        // We own this thread so there is no need to replace the RngSeed once we're done.
-        let _ = replace_thread_rng(self.seed_generator.next_seed());
 
         let mut shared = self.shared.lock();
         let mut join_on_thread = None;

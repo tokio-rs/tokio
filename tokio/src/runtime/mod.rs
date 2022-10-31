@@ -177,7 +177,11 @@
 #[macro_use]
 mod tests;
 
+#[cfg(any(feature = "rt", feature = "macros"))]
+pub(crate) mod context;
+
 mod driver;
+
 pub(crate) mod scheduler;
 
 cfg_io_driver_impl! {
@@ -223,7 +227,7 @@ cfg_rt! {
     pub use self::builder::Builder;
     cfg_unstable! {
         pub use self::builder::UnhandledPanic;
-        pub use crate::util::RngSeed;
+        pub use crate::util::rand::RngSeed;
     }
 
     use self::enter::enter;
@@ -632,7 +636,7 @@ cfg_rt! {
                 Scheduler::CurrentThread(current_thread) => {
                     // This ensures that tasks spawned on the current-thread
                     // runtime are dropped inside the runtime's context.
-                    match self.handle.inner.try_enter() {
+                    match context::try_enter(&self.handle.inner) {
                         Some(guard) => current_thread.set_context_guard(guard),
                         None => {
                             // The context thread-local has already been destroyed.
