@@ -301,7 +301,7 @@ impl Future for WaitForCancellationFutureOwned {
 
             // Safety:
             //  - We transmute notified into Notified<'static>
-            //    since there's no 'static
+            //    since there's no 'self
             //  - self is pinned, so it's safe to have self-reference
             //    data structure.
             //  - this.cancellation_token contains an Arc to TreeNode,
