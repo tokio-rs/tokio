@@ -77,7 +77,7 @@ pub struct WaitForCancellationFutureOwned {
     cancellation_token: CancellationToken,
 
     /// Use 'static lifetime here because we don't have 'this.
-    future: Option<tokio::sync::futures::Notified<'static>>,
+    future: Option<mem::ManuallyDrop<tokio::sync::futures::Notified<'static>>>,
 }
 
 // ===== impl CancellationToken =====
@@ -290,6 +290,11 @@ impl Future for WaitForCancellationFutureOwned {
                 return Poll::Pending;
             }
 
+            // self.future is either None, or a future that is already
+            // polled and returns `Poll::Ready`, which should not be
+            // polled again.
+            this.do_drop_future();
+
             let notified = this.cancellation_token.inner.notified();
 
             // Safety:
@@ -301,20 +306,35 @@ impl Future for WaitForCancellationFutureOwned {
             //    which is guaranteed to have stable dereference.
             //    So even if `Notified` implements `Unpin` and `self`
             //    get moved, it would still be valid.
-            this.future = Some(unsafe { mem::transmute(notified) });
+            //  - We never use Notified<'static>.
+            //    Instead, it is transmuted back to Notified<'a>
+            //    where 'a is lifetime of self before being used.
+            let notified: tokio::sync::futures::Notified<'static> =
+                unsafe { mem::transmute(notified) };
+
+            this.future = Some(mem::ManuallyDrop::new(notified));
         }
     }
 }
 
 impl WaitForCancellationFutureOwned {
-    fn do_drop<'a>(&'a mut self) {
-        if let Some(future) = self.future.take() {
+    fn do_drop_future<'a>(&'a mut self) {
+        if let Some(future) = self.future.as_mut() {
             // Safety:
             //
             // The future itself refererences cancellation_token, so its
             // lifetime must be at least as long as 'a.
-            let future: tokio::sync::futures::Notified<'a> = unsafe { mem::transmute(future) };
-            drop(future);
+            let future: &mut mem::ManuallyDrop<tokio::sync::futures::Notified<'a>> =
+                unsafe { mem::transmute(future) };
+
+            // Safety:
+            //
+            //  - self.future will not be used anymore.
+            //  - future will be dropped in place so that Pin semantics
+            //    will not be violated.
+            unsafe { mem::ManuallyDrop::drop(future) };
+
+            self.future = None;
         }
     }
 
@@ -333,6 +353,6 @@ impl WaitForCancellationFutureOwned {
 
 impl Drop for WaitForCancellationFutureOwned {
     fn drop(&mut self) {
-        self.do_drop();
+        self.do_drop_future();
     }
 }
