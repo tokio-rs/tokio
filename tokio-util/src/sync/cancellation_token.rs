@@ -297,6 +297,10 @@ impl Future for WaitForCancellationFutureOwned {
             //    since there's no 'static
             //  - self is pinned, so it's safe to have self-reference
             //    data structure.
+            //  - this.cancellation_token contains an Arc to TreeNode,
+            //    which is guaranteed to have stable dereference.
+            //    So even if `Notified` implements `Unpin` and `self`
+            //    get moved, it would still be valid.
             this.future = Some(unsafe { mem::transmute(notified) });
         }
     }
