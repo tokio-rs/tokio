@@ -173,7 +173,7 @@ cfg_rt! {
             let when = Instant::now() + timeout;
 
             loop {
-                if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
+                if let Ready(v) = crate::runtime::coop::budget(|| f.as_mut().poll(&mut cx)) {
                     return Ok(v);
                 }
 
