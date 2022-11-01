@@ -893,7 +893,7 @@ impl<T: Future> Future for RunUntil<'_, T> {
             let _no_blocking = crate::runtime::enter::disallow_block_in_place();
             let f = me.future;
 
-            if let Poll::Ready(output) = crate::runtime::coop::budget(|| f.poll(cx)) {
+            if let Poll::Ready(output) = f.poll(cx) {
                 return Poll::Ready(output);
             }
 

@@ -587,6 +587,56 @@ mod unstable {
             })
             .await;
     }
+
+    // This test compares that, when the task driving `run_until` has already
+    // consumed budget, the `run_until` future has less budget than a "spawned"
+    // task.
+    //
+    // "Budget" is a fuzzy metric as the Tokio runtime is able to change values
+    // internally. This is why the test uses indirection to test this.
+    #[tokio::test]
+    async fn run_until_does_not_get_own_budget() {
+        // Consume some budget
+        tokio::task::consume_budget().await;
+
+        LocalSet::new()
+            .run_until(async {
+                let spawned = tokio::spawn(async {
+                    let mut spawned_n = 0;
+
+                    {
+                        let mut spawned = tokio_test::task::spawn(async {
+                            loop {
+                                spawned_n += 1;
+                                tokio::task::consume_budget().await;
+                            }
+                        });
+                        // Poll once
+                        assert!(!spawned.poll().is_ready());
+                    }
+
+                    spawned_n
+                });
+
+                let mut run_until_n = 0;
+                {
+                    let mut run_until = tokio_test::task::spawn(async {
+                        loop {
+                            run_until_n += 1;
+                            tokio::task::consume_budget().await;
+                        }
+                    });
+                    // Poll once
+                    assert!(!run_until.poll().is_ready());
+                }
+
+                let spawned_n = spawned.await.unwrap();
+                assert_ne!(spawned_n, 0);
+                assert_ne!(run_until_n, 0);
+                assert!(spawned_n > run_until_n);
+            })
+            .await
+    }
 }
 
 fn rt() -> runtime::Runtime {
