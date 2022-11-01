@@ -40,6 +40,38 @@ fn cancel_token() {
 }
 
 #[test]
+fn cancel_token_owned() {
+    let (waker, wake_counter) = new_count_waker();
+    let token = CancellationToken::new();
+    assert!(!token.is_cancelled());
+
+    let wait_fut = token.clone().cancelled_owned();
+    pin!(wait_fut);
+
+    assert_eq!(
+        Poll::Pending,
+        wait_fut.as_mut().poll(&mut Context::from_waker(&waker))
+    );
+    assert_eq!(wake_counter, 0);
+
+    let wait_fut_2 = token.clone().cancelled_owned();
+    pin!(wait_fut_2);
+
+    token.cancel();
+    assert_eq!(wake_counter, 1);
+    assert!(token.is_cancelled());
+
+    assert_eq!(
+        Poll::Ready(()),
+        wait_fut.as_mut().poll(&mut Context::from_waker(&waker))
+    );
+    assert_eq!(
+        Poll::Ready(()),
+        wait_fut_2.as_mut().poll(&mut Context::from_waker(&waker))
+    );
+}
+
+#[test]
 fn cancel_child_token_through_parent() {
     let (waker, wake_counter) = new_count_waker();
     let token = CancellationToken::new();
