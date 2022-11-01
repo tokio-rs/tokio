@@ -72,6 +72,24 @@ fn cancel_token_owned() {
 }
 
 #[test]
+fn cancel_token_owned_drop_test() {
+    let (waker, wake_counter) = new_count_waker();
+    let token = CancellationToken::new();
+
+    let future = token.cancelled_owned();
+    pin!(future);
+
+    assert_eq!(
+        Poll::Pending,
+        future.as_mut().poll(&mut Context::from_waker(&waker))
+    );
+    assert_eq!(wake_counter, 0);
+
+    // let future be dropped while pinned and under pending state to
+    // find potential memory related bugs.
+}
+
+#[test]
 fn cancel_child_token_through_parent() {
     let (waker, wake_counter) = new_count_waker();
     let token = CancellationToken::new();
