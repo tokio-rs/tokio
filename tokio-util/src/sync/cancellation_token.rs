@@ -274,16 +274,18 @@ impl Future for WaitForCancellationFutureOwned {
                 return Poll::Ready(());
             }
 
-            // No wakeups can be lost here because there is always a call to
-            // `is_cancelled` between the creation of the future and the call to
-            // `poll`, and the code that sets the cancelled flag does so before
-            // waking the `Notified`.
-            if this
+            let future = this
                 .get_future_mut()
                 // Safety:
                 //
                 // `self` is pinned, so self.future is also pinned.
-                .map(|fut| unsafe { Pin::new_unchecked(fut) })
+                .map(|fut| unsafe { Pin::new_unchecked(fut) });
+
+            // No wakeups can be lost here because there is always a call to
+            // `is_cancelled` between the creation of the future and the call to
+            // `poll`, and the code that sets the cancelled flag does so before
+            // waking the `Notified`.
+            if future
                 .map(|fut| fut.poll(cx).is_pending())
                 .unwrap_or_default()
             {
