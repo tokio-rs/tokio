@@ -13,6 +13,7 @@ use crate::util::WakeList;
 use std::cell::UnsafeCell;
 use std::future::Future;
 use std::marker::PhantomPinned;
+use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::SeqCst;
@@ -565,6 +566,9 @@ impl Default for Notify {
         Notify::new()
     }
 }
+
+impl UnwindSafe for Notify {}
+impl RefUnwindSafe for Notify {}
 
 fn notify_locked(waiters: &mut WaitList, state: &AtomicUsize, curr: usize) -> Option<Waker> {
     loop {
