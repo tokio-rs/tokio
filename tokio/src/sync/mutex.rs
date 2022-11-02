@@ -200,8 +200,8 @@ unsafe impl<'a, T> Send for MappedMutexGuard<'a, T> where T: ?Sized + Send + 'a 
 /// `RwLock::try_read` operation will only fail if the lock is currently held
 /// by an exclusive writer.
 ///
-/// `RwLock::try_write` operation will if lock is held by any reader or by an
-/// exclusive writer.
+/// `RwLock::try_write` operation will only fail if the lock is currently held
+/// by any reader or by an exclusive writer.
 ///
 /// [`Mutex::try_lock`]: Mutex::try_lock
 /// [`RwLock::try_read`]: fn@super::RwLock::try_read
