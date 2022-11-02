@@ -4,7 +4,7 @@
 // don't need to worry much about dead code with certain feature permutations.
 #![cfg_attr(not(feature = "full"), allow(dead_code))]
 
-use crate::park::thread::{ParkThread, UnparkThread};
+use crate::runtime::park::{ParkThread, UnparkThread};
 
 use std::io;
 use std::time::Duration;

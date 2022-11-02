@@ -146,7 +146,7 @@ cfg_rt! {
         where
             F: std::future::Future,
         {
-            use crate::park::thread::CachedParkThread;
+            use crate::runtime::park::CachedParkThread;
 
             let mut park = CachedParkThread::new();
             park.block_on(f)
@@ -160,7 +160,7 @@ cfg_rt! {
         where
             F: std::future::Future,
         {
-            use crate::park::thread::CachedParkThread;
+            use crate::runtime::park::CachedParkThread;
             use std::task::Context;
             use std::task::Poll::Ready;
             use std::time::Instant;
