@@ -1,3 +1,8 @@
+use crate::runtime::coop;
+
+use std::cell::Cell;
+
+#[cfg(any(feature = "rt", feature = "macros"))]
 use crate::util::rand::{FastRand, RngSeed};
 
 cfg_rt! {
@@ -9,7 +14,12 @@ struct Context {
     /// Handle to the runtime scheduler running on the current thread.
     #[cfg(feature = "rt")]
     scheduler: RefCell<Option<scheduler::Handle>>,
+
+    #[cfg(any(feature = "rt", feature = "macros"))]
     rng: FastRand,
+    /// Tracks the amount of "work" a task may still do before yielding back to
+    /// the sheduler
+    budget: Cell<coop::Budget>,
 }
 
 tokio_thread_local! {
@@ -17,7 +27,10 @@ tokio_thread_local! {
         Context {
             #[cfg(feature = "rt")]
             scheduler: RefCell::new(None),
+
+            #[cfg(any(feature = "rt", feature = "macros"))]
             rng: FastRand::new(RngSeed::new()),
+            budget: Cell::new(coop::Budget::unconstrained()),
         }
     }
 }
@@ -25,6 +38,10 @@ tokio_thread_local! {
 #[cfg(feature = "macros")]
 pub(crate) fn thread_rng_n(n: u32) -> u32 {
     CONTEXT.with(|ctx| ctx.rng.fastrand_n(n))
+}
+
+pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> R {
+    CONTEXT.with(|ctx| f(&ctx.budget))
 }
 
 cfg_rt! {
