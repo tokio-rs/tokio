@@ -177,7 +177,6 @@
 #[macro_use]
 mod tests;
 
-#[cfg(any(feature = "rt", feature = "macros"))]
 pub(crate) mod context;
 
 pub(crate) mod coop;
