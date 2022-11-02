@@ -1,6 +1,7 @@
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
+    clippy::module_inception,
     clippy::needless_doctest_main
 )]
 #![warn(
