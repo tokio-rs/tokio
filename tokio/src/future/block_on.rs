@@ -11,7 +11,7 @@ cfg_rt! {
 cfg_not_rt! {
     #[track_caller]
     pub(crate) fn block_on<F: Future>(f: F) -> F::Output {
-        let mut park = crate::park::thread::CachedParkThread::new();
+        let mut park = crate::runtime::park::CachedParkThread::new();
         park.block_on(f).unwrap()
     }
 }
