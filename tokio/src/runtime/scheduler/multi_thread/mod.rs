@@ -17,7 +17,11 @@ pub(crate) use worker::Launch;
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
-use crate::runtime::{blocking, driver, Config, Driver};
+use crate::runtime::{
+    blocking,
+    driver::{self, Driver},
+    Config,
+};
 use crate::util::RngSeedGenerator;
 
 use std::fmt;
