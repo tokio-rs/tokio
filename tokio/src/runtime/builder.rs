@@ -872,7 +872,7 @@ impl Builder {
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::scheduler::{self, CurrentThread};
-        use crate::runtime::{Config, Scheduler};
+        use crate::runtime::{runtime::Scheduler, Config};
 
         let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
@@ -905,13 +905,15 @@ impl Builder {
             },
         );
 
-        let handle = scheduler::Handle::CurrentThread(scheduler.handle().clone());
+        let handle = Handle {
+            inner: scheduler::Handle::CurrentThread(scheduler.handle().clone()),
+        };
 
-        Ok(Runtime {
-            scheduler: Scheduler::CurrentThread(scheduler),
-            handle: Handle { inner: handle },
+        Ok(Runtime::from_parts(
+            Scheduler::CurrentThread(scheduler),
+            handle,
             blocking_pool,
-        })
+        ))
     }
 }
 
@@ -991,7 +993,7 @@ cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
-            use crate::runtime::{Config, Scheduler};
+            use crate::runtime::{Config, runtime::Scheduler};
             use crate::runtime::scheduler::{self, MultiThread};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
@@ -1032,11 +1034,7 @@ cfg_rt_multi_thread! {
             let _enter = handle.enter();
             launch.launch();
 
-            Ok(Runtime {
-                scheduler: Scheduler::MultiThread(scheduler),
-                handle,
-                blocking_pool,
-            })
+            Ok(Runtime::from_parts(Scheduler::MultiThread(scheduler), handle, blocking_pool))
         }
     }
 }
