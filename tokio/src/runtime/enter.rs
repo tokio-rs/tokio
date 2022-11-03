@@ -1,13 +1,16 @@
+use crate::runtime::scheduler;
+
 use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum EnterContext {
+    /// Currently in a runtime context.
     #[cfg_attr(not(feature = "rt"), allow(dead_code))]
-    Entered {
-        allow_block_in_place: bool,
-    },
+    Entered { allow_block_in_place: bool },
+
+    /// Not in a runtime context **or** a blocking region.
     NotEntered,
 }
 
@@ -19,19 +22,29 @@ impl EnterContext {
 
 tokio_thread_local!(static ENTERED: Cell<EnterContext> = const { Cell::new(EnterContext::NotEntered) });
 
-/// Represents an executor context.
-pub(crate) struct Enter {
+/// Guard tracking that a caller has entered a runtime context.
+pub(crate) struct EnterRuntimeGuard {
+    pub(crate) blocking: BlockingRegionGuard,
+}
+
+/// Guard tracking that a caller has entered a blocking region.
+pub(crate) struct BlockingRegionGuard {
     _p: PhantomData<RefCell<()>>,
 }
 
 cfg_rt! {
+    use crate::runtime::context;
+
     use std::time::Duration;
 
     /// Marks the current thread as being within the dynamic extent of an
     /// executor.
     #[track_caller]
-    pub(crate) fn enter(allow_block_in_place: bool) -> Enter {
-        if let Some(enter) = try_enter(allow_block_in_place) {
+    pub(crate) fn enter_runtime(handle: &scheduler::Handle, allow_block_in_place: bool) -> EnterRuntimeGuard {
+        if let Some(enter) = try_enter_runtime(allow_block_in_place) {
+            // Set the current runtime handle. This should not fail. A later
+            // cleanup will remove the unwrap().
+            context::try_set_current(handle).unwrap();
             return enter;
         }
 
@@ -45,13 +58,25 @@ cfg_rt! {
 
     /// Tries to enter a runtime context, returns `None` if already in a runtime
     /// context.
-    pub(crate) fn try_enter(allow_block_in_place: bool) -> Option<Enter> {
+    fn try_enter_runtime(allow_block_in_place: bool) -> Option<EnterRuntimeGuard> {
         ENTERED.with(|c| {
             if c.get().is_entered() {
                 None
             } else {
                 c.set(EnterContext::Entered { allow_block_in_place });
-                Some(Enter { _p: PhantomData })
+                Some(EnterRuntimeGuard {
+                    blocking: BlockingRegionGuard::new(),
+                })
+            }
+        })
+    }
+
+    pub(crate) fn try_enter_blocking_region() -> Option<BlockingRegionGuard> {
+        ENTERED.with(|c| {
+            if c.get().is_entered() {
+                None
+            } else {
+                Some(BlockingRegionGuard::new())
             }
         })
     }
@@ -65,7 +90,7 @@ cfg_rt! {
 // This is hidden for a reason. Do not use without fully understanding
 // executors. Misusing can easily cause your program to deadlock.
 cfg_rt_multi_thread! {
-    pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
+    pub(crate) fn exit_runtime<F: FnOnce() -> R, R>(f: F) -> R {
         // Reset in case the closure panics
         struct Reset(EnterContext);
         impl Drop for Reset {
@@ -139,7 +164,10 @@ cfg_rt_multi_thread! {
 cfg_rt! {
     use crate::loom::thread::AccessError;
 
-    impl Enter {
+    impl BlockingRegionGuard {
+        fn new() -> BlockingRegionGuard {
+            BlockingRegionGuard { _p: PhantomData }
+        }
         /// Blocks the thread on the specified future, returning the value with
         /// which that future completes.
         pub(crate) fn block_on<F>(&mut self, f: F) -> Result<F::Output, AccessError>
@@ -189,13 +217,13 @@ cfg_rt! {
     }
 }
 
-impl fmt::Debug for Enter {
+impl fmt::Debug for EnterRuntimeGuard {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Enter").finish()
     }
 }
 
-impl Drop for Enter {
+impl Drop for EnterRuntimeGuard {
     fn drop(&mut self) {
         ENTERED.with(|c| {
             assert!(c.get().is_entered());

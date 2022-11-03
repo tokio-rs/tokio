@@ -256,14 +256,13 @@ impl Handle {
         let future =
             crate::util::trace::task(future, "block_on", None, super::task::Id::next().as_u64());
 
-        // Enter the **runtime** context. This configures spawning, the current I/O driver, ...
-        let _rt_enter = self.enter();
-
-        // Enter a **blocking** context. This prevents blocking from a runtime.
-        let mut blocking_enter = crate::runtime::enter(true);
+        // Enter the runtime context. This sets the current driver handles and
+        // prevents blocking an existing runtime.
+        let mut enter = crate::runtime::enter::enter_runtime(&self.inner, true);
 
         // Block on the future
-        blocking_enter
+        enter
+            .blocking
             .block_on(future)
             .expect("failed to park thread")
     }

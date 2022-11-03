@@ -62,7 +62,7 @@ use crate::runtime::enter::EnterContext;
 use crate::runtime::scheduler::multi_thread::{queue, Handle, Idle, Parker, Unparker};
 use crate::runtime::task::{Inject, OwnedTasks};
 use crate::runtime::{
-    blocking, coop, driver, task, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics,
+    blocking, coop, driver, scheduler, task, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics,
 };
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
@@ -350,7 +350,7 @@ where
         // constrained by task budgets.
         let _reset = Reset(coop::stop());
 
-        crate::runtime::enter::exit(f)
+        crate::runtime::enter::exit_runtime(f)
     } else {
         f()
     }
@@ -372,13 +372,14 @@ fn run(worker: Arc<Worker>) {
         None => return,
     };
 
+    let handle = scheduler::Handle::MultiThread(worker.handle.clone());
+    let _enter = crate::runtime::enter_runtime(&handle, true);
+
     // Set the worker context.
     let cx = Context {
         worker,
         core: RefCell::new(None),
     };
-
-    let _enter = crate::runtime::enter(true);
 
     CURRENT.set(&cx, || {
         // This should always be an error. It only returns a `Result` to support
