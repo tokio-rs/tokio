@@ -11,6 +11,7 @@ use crate::runtime::{Builder, Callback, Handle};
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::io;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 pub(crate) struct BlockingPool {
@@ -21,6 +22,40 @@ pub(crate) struct BlockingPool {
 #[derive(Clone)]
 pub(crate) struct Spawner {
     inner: Arc<Inner>,
+}
+
+#[derive(Default)]
+pub(crate) struct SpawnerMetrics {
+    num_threads: AtomicUsize,
+    queue_depth: AtomicUsize,
+}
+
+impl SpawnerMetrics {
+    fn num_threads(&self) -> usize {
+        self.num_threads.load(Ordering::Relaxed)
+    }
+
+    cfg_metrics! {
+        fn queue_depth(&self) -> usize {
+            self.queue_depth.load(Ordering::Relaxed)
+        }
+    }
+
+    fn inc_num_threads(&self) {
+        self.num_threads.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn dec_num_threads(&self) {
+        self.num_threads.fetch_sub(1, Ordering::Relaxed);
+    }
+
+    fn inc_queue_depth(&self) {
+        self.queue_depth.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn dec_queue_depth(&self) {
+        self.queue_depth.fetch_sub(1, Ordering::Relaxed);
+    }
 }
 
 struct Inner {
@@ -47,11 +82,13 @@ struct Inner {
 
     // Customizable wait timeout.
     keep_alive: Duration,
+
+    // Metrics about the pool.
+    metrics: SpawnerMetrics,
 }
 
 struct Shared {
     queue: VecDeque<Task>,
-    num_th: usize,
     num_idle: u32,
     num_notify: u32,
     shutdown: bool,
@@ -165,7 +202,6 @@ impl BlockingPool {
                 inner: Arc::new(Inner {
                     shared: Mutex::new(Shared {
                         queue: VecDeque::new(),
-                        num_th: 0,
                         num_idle: 0,
                         num_notify: 0,
                         shutdown: false,
@@ -181,6 +217,7 @@ impl BlockingPool {
                     before_stop: builder.before_stop.clone(),
                     thread_cap,
                     keep_alive,
+                    metrics: Default::default(),
                 }),
             },
             shutdown_rx,
@@ -350,11 +387,12 @@ impl Spawner {
         }
 
         shared.queue.push_back(task);
+        self.inner.metrics.inc_queue_depth();
 
         if shared.num_idle == 0 {
             // No threads are able to process the task.
 
-            if shared.num_th == self.inner.thread_cap {
+            if self.inner.metrics.num_threads() == self.inner.thread_cap {
                 // At max number of threads
             } else {
                 assert!(shared.shutdown_tx.is_some());
@@ -365,11 +403,14 @@ impl Spawner {
 
                     match self.spawn_thread(shutdown_tx, rt, id) {
                         Ok(handle) => {
-                            shared.num_th += 1;
+                            self.inner.metrics.inc_num_threads();
                             shared.worker_thread_index += 1;
                             shared.worker_threads.insert(id, handle);
                         }
-                        Err(ref e) if is_temporary_os_thread_error(e) && shared.num_th > 0 => {
+                        Err(ref e)
+                            if is_temporary_os_thread_error(e)
+                                && self.inner.metrics.num_threads() > 0 =>
+                        {
                             // OS temporarily failed to spawn a new thread.
                             // The task will be picked up eventually by a currently
                             // busy thread.
@@ -419,6 +460,18 @@ impl Spawner {
     }
 }
 
+cfg_metrics! {
+    impl Spawner {
+        pub(crate) fn num_threads(&self) -> usize {
+            self.inner.metrics.num_threads()
+        }
+
+        pub(crate) fn queue_depth(&self) -> usize {
+            self.inner.metrics.queue_depth()
+        }
+    }
+}
+
 // Tells whether the error when spawning a thread is temporary.
 #[inline]
 fn is_temporary_os_thread_error(error: &std::io::Error) -> bool {
@@ -437,6 +490,7 @@ impl Inner {
         'main: loop {
             // BUSY
             while let Some(task) = shared.queue.pop_front() {
+                self.metrics.dec_queue_depth();
                 drop(shared);
                 task.run();
 
@@ -478,6 +532,7 @@ impl Inner {
             if shared.shutdown {
                 // Drain the queue
                 while let Some(task) = shared.queue.pop_front() {
+                    self.metrics.dec_queue_depth();
                     drop(shared);
 
                     task.shutdown_or_run_if_mandatory();
@@ -496,7 +551,7 @@ impl Inner {
         }
 
         // Thread exit
-        shared.num_th -= 1;
+        self.metrics.dec_num_threads();
 
         // num_idle should now be tracked exactly, panic
         // with a descriptive message if it is not the
@@ -506,7 +561,7 @@ impl Inner {
             .checked_sub(1)
             .expect("num_idle underflowed on thread exit");
 
-        if shared.shutdown && shared.num_th == 0 {
+        if shared.shutdown && self.metrics.num_threads() == 0 {
             self.condvar.notify_one();
         }
 
