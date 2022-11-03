@@ -11,7 +11,7 @@ env:
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2022-07-26
+  rust_nightly: nightly-2022-11-03
   rust_clippy: 1.56.0
   # When updating this, also update:
   # - README.md
@@ -555,15 +555,17 @@ jobs:
           - ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install Rust ${{ env.rust_nightly }}
+      - name: Install Rust nightly-2022-07-25
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ env.rust_nightly }}
+          # `check-external-types` requires a specific Rust nightly version. See
+          # the README for details: https://github.com/awslabs/cargo-check-external-types
+          toolchain: nightly-2022-07-25
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: check-external-types
         run: |
           set -x
-          cargo install cargo-check-external-types --locked --version 0.1.3
+          cargo install cargo-check-external-types --locked --version 0.1.5
           cargo check-external-types --all-features --config external-types.toml
         working-directory: tokio
