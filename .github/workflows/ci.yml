@@ -564,6 +564,6 @@ jobs:
       - name: check-external-types
         run: |
           set -x
-          cargo install cargo-check-external-types --locked --version 0.1.3
+          cargo install cargo-check-external-types --locked --version 0.1.5
           cargo check-external-types --all-features --config external-types.toml
         working-directory: tokio
