@@ -24,6 +24,17 @@ fn num_blocking_threads() {
 }
 
 #[test]
+fn num_idle_blocking_threads() {
+    let rt = current_thread();
+    assert_eq!(0, rt.metrics().num_idle_blocking_threads());
+    let _ = rt.block_on(rt.spawn_blocking(move || {}));
+    rt.block_on(async {
+        time::sleep(Duration::from_millis(5)).await;
+    });
+    assert_eq!(1, rt.metrics().num_idle_blocking_threads());
+}
+
+#[test]
 fn blocking_queue_depth() {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()

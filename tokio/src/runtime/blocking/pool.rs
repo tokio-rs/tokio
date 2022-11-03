@@ -27,12 +27,17 @@ pub(crate) struct Spawner {
 #[derive(Default)]
 pub(crate) struct SpawnerMetrics {
     num_threads: AtomicUsize,
+    num_idle_threads: AtomicUsize,
     queue_depth: AtomicUsize,
 }
 
 impl SpawnerMetrics {
     fn num_threads(&self) -> usize {
         self.num_threads.load(Ordering::Relaxed)
+    }
+
+    fn num_idle_threads(&self) -> usize {
+        self.num_idle_threads.load(Ordering::Relaxed)
     }
 
     cfg_metrics! {
@@ -47,6 +52,14 @@ impl SpawnerMetrics {
 
     fn dec_num_threads(&self) {
         self.num_threads.fetch_sub(1, Ordering::Relaxed);
+    }
+
+    fn inc_num_idle_threads(&self) {
+        self.num_idle_threads.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn dec_num_idle_threads(&self) -> usize {
+        self.num_idle_threads.fetch_sub(1, Ordering::Relaxed)
     }
 
     fn inc_queue_depth(&self) {
@@ -89,7 +102,6 @@ struct Inner {
 
 struct Shared {
     queue: VecDeque<Task>,
-    num_idle: u32,
     num_notify: u32,
     shutdown: bool,
     shutdown_tx: Option<shutdown::Sender>,
@@ -202,7 +214,6 @@ impl BlockingPool {
                 inner: Arc::new(Inner {
                     shared: Mutex::new(Shared {
                         queue: VecDeque::new(),
-                        num_idle: 0,
                         num_notify: 0,
                         shutdown: false,
                         shutdown_tx: Some(shutdown_tx),
@@ -389,7 +400,7 @@ impl Spawner {
         shared.queue.push_back(task);
         self.inner.metrics.inc_queue_depth();
 
-        if shared.num_idle == 0 {
+        if self.inner.metrics.num_idle_threads() == 0 {
             // No threads are able to process the task.
 
             if self.inner.metrics.num_threads() == self.inner.thread_cap {
@@ -429,7 +440,7 @@ impl Spawner {
             // exactly. Thread libraries may generate spurious
             // wakeups, this counter is used to keep us in a
             // consistent state.
-            shared.num_idle -= 1;
+            self.inner.metrics.dec_num_idle_threads();
             shared.num_notify += 1;
             self.inner.condvar.notify_one();
         }
@@ -466,6 +477,10 @@ cfg_metrics! {
             self.inner.metrics.num_threads()
         }
 
+        pub(crate) fn num_idle_threads(&self) -> usize {
+            self.inner.metrics.num_idle_threads()
+        }
+
         pub(crate) fn queue_depth(&self) -> usize {
             self.inner.metrics.queue_depth()
         }
@@ -498,7 +513,7 @@ impl Inner {
             }
 
             // IDLE
-            shared.num_idle += 1;
+            self.metrics.inc_num_idle_threads();
 
             while !shared.shutdown {
                 let lock_result = self.condvar.wait_timeout(shared, self.keep_alive).unwrap();
@@ -543,7 +558,7 @@ impl Inner {
                 // Work was produced, and we "took" it (by decrementing num_notify).
                 // This means that num_idle was decremented once for our wakeup.
                 // But, since we are exiting, we need to "undo" that, as we'll stay idle.
-                shared.num_idle += 1;
+                self.metrics.inc_num_idle_threads();
                 // NOTE: Technically we should also do num_notify++ and notify again,
                 // but since we're shutting down anyway, that won't be necessary.
                 break;
@@ -556,10 +571,10 @@ impl Inner {
         // num_idle should now be tracked exactly, panic
         // with a descriptive message if it is not the
         // case.
-        shared.num_idle = shared
-            .num_idle
-            .checked_sub(1)
-            .expect("num_idle underflowed on thread exit");
+        let prev_idle = self.metrics.dec_num_idle_threads();
+        if prev_idle < self.metrics.num_idle_threads() {
+            panic!("num_idle_threads underflowed on thread exit")
+        }
 
         if shared.shutdown && self.metrics.num_threads() == 0 {
             self.condvar.notify_one();

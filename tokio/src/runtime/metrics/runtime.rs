@@ -68,6 +68,30 @@ impl RuntimeMetrics {
         self.handle.inner.num_blocking_threads()
     }
 
+    /// Returns the number of idle threads, which hve spawned by the runtime
+    /// for `spawn_blocking` calls.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let _ = tokio::task::spawn_blocking(move || {
+    ///         // Stand-in for compute-heavy work or using synchronous APIs
+    ///         1 + 1
+    ///     }).await;
+    ///     let metrics = Handle::current().metrics();
+    ///
+    ///     let n = metrics.num_idle_blocking_threads();
+    ///     println!("Runtime has {} idle blocking thread pool threads", n);
+    /// }
+    /// ```
+    pub fn num_idle_blocking_threads(&self) -> usize {
+        self.handle.inner.num_idle_blocking_threads()
+    }
+
     /// Returns the number of tasks scheduled from **outside** of the runtime.
     ///
     /// The remote schedule count starts at zero when the runtime is created and
