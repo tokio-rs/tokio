@@ -230,7 +230,7 @@ cfg_rt! {
         pub use crate::util::rand::RngSeed;
     }
 
-    use self::enter::enter;
+    use self::enter::enter_runtime;
 
     mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};

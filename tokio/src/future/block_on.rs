@@ -3,7 +3,12 @@ use std::future::Future;
 cfg_rt! {
     #[track_caller]
     pub(crate) fn block_on<F: Future>(f: F) -> F::Output {
-        let mut e = crate::runtime::enter::enter(false);
+        let mut e = crate::runtime::enter::try_enter_blocking_region().expect(
+            "Cannot block the current thread from within a runtime. This \
+            happens because a functionattempted to block the current \
+            thread while the thread is being used to drive asynchronous \
+            tasks."
+        );
         e.block_on(f).unwrap()
     }
 }

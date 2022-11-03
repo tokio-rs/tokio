@@ -155,7 +155,12 @@ impl CurrentThread {
 
     #[track_caller]
     pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
+        use crate::runtime::scheduler;
+
         pin!(future);
+
+        let handle = scheduler::Handle::CurrentThread(self.handle.clone());
+        let mut enter = crate::runtime::enter_runtime(&handle, false);
 
         // Attempt to steal the scheduler core and block_on the future if we can
         // there, otherwise, lets select on a notification that the core is
@@ -164,12 +169,11 @@ impl CurrentThread {
             if let Some(core) = self.take_core() {
                 return core.block_on(future);
             } else {
-                let mut enter = crate::runtime::enter(false);
-
                 let notified = self.notify.notified();
                 pin!(notified);
 
                 if let Some(out) = enter
+                    .blocking
                     .block_on(poll_fn(|cx| {
                         if notified.as_mut().poll(cx).is_ready() {
                             return Ready(None);
@@ -522,7 +526,6 @@ impl CoreGuard<'_> {
     #[track_caller]
     fn block_on<F: Future>(self, future: F) -> F::Output {
         let ret = self.enter(|mut core, context| {
-            let _enter = crate::runtime::enter(false);
             let waker = Handle::waker_ref(&context.handle);
             let mut cx = std::task::Context::from_waker(&waker);
 
