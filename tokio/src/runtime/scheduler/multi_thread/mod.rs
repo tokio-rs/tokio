@@ -20,7 +20,7 @@ use crate::loom::sync::Arc;
 use crate::runtime::{
     blocking,
     driver::{self, Driver},
-    Config,
+    scheduler, Config,
 };
 use crate::util::RngSeedGenerator;
 
@@ -73,8 +73,12 @@ impl MultiThread {
     where
         F: Future,
     {
-        let mut enter = crate::runtime::enter(true);
-        enter.block_on(future).expect("failed to park thread")
+        let handle = scheduler::Handle::MultiThread(self.handle.clone());
+        let mut enter = crate::runtime::enter_runtime(&handle, true);
+        enter
+            .blocking
+            .block_on(future)
+            .expect("failed to park thread")
     }
 }
 
