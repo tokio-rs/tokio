@@ -1,10 +1,9 @@
 use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime::context::SetCurrentGuard;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
-use crate::runtime::{blocking, Config};
+use crate::runtime::{blocking, scheduler, Config};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
@@ -26,15 +25,6 @@ pub(crate) struct CurrentThread {
     /// Notifier for waking up other threads to steal the
     /// driver.
     notify: Notify,
-
-    /// Shared handle to the scheduler
-    handle: Arc<Handle>,
-
-    /// This is usually None, but right before dropping the CurrentThread
-    /// scheduler, it is changed to `Some` with the context being the runtime's
-    /// own context. This ensures that any tasks dropped in the `CurrentThread`'s
-    /// destructor run in that runtime's context.
-    context_guard: Option<SetCurrentGuard>,
 }
 
 /// Handle to the current thread scheduler
@@ -118,7 +108,7 @@ impl CurrentThread {
         blocking_spawner: blocking::Spawner,
         seed_generator: RngSeedGenerator,
         config: Config,
-    ) -> CurrentThread {
+    ) -> (CurrentThread, Arc<Handle>) {
         let handle = Arc::new(Handle {
             shared: Shared {
                 queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
@@ -141,32 +131,26 @@ impl CurrentThread {
             unhandled_panic: false,
         })));
 
-        CurrentThread {
+        let scheduler = CurrentThread {
             core,
             notify: Notify::new(),
-            handle,
-            context_guard: None,
-        }
-    }
+        };
 
-    pub(crate) fn handle(&self) -> &Arc<Handle> {
-        &self.handle
+        (scheduler, handle)
     }
 
     #[track_caller]
-    pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
-        use crate::runtime::scheduler;
-
+    pub(crate) fn block_on<F: Future>(&self, handle: &scheduler::Handle, future: F) -> F::Output {
         pin!(future);
 
-        let handle = scheduler::Handle::CurrentThread(self.handle.clone());
-        let mut enter = crate::runtime::enter_runtime(&handle, false);
+        let mut enter = crate::runtime::enter_runtime(handle, false);
+        let handle = handle.as_current_thread();
 
         // Attempt to steal the scheduler core and block_on the future if we can
         // there, otherwise, lets select on a notification that the core is
         // available or the future is complete.
         loop {
-            if let Some(core) = self.take_core() {
+            if let Some(core) = self.take_core(handle) {
                 return core.block_on(future);
             } else {
                 let notified = self.notify.notified();
@@ -193,48 +177,44 @@ impl CurrentThread {
         }
     }
 
-    fn take_core(&self) -> Option<CoreGuard<'_>> {
+    fn take_core(&self, handle: &Arc<Handle>) -> Option<CoreGuard<'_>> {
         let core = self.core.take()?;
 
         Some(CoreGuard {
             context: Context {
-                handle: self.handle.clone(),
+                handle: handle.clone(),
                 core: RefCell::new(Some(core)),
             },
             scheduler: self,
         })
     }
 
-    pub(crate) fn set_context_guard(&mut self, guard: SetCurrentGuard) {
-        self.context_guard = Some(guard);
-    }
-}
+    pub(crate) fn shutdown(&mut self, handle: &scheduler::Handle) {
+        let handle = handle.as_current_thread();
 
-impl Drop for CurrentThread {
-    fn drop(&mut self) {
         // Avoid a double panic if we are currently panicking and
         // the lock may be poisoned.
 
-        let core = match self.take_core() {
+        let core = match self.take_core(handle) {
             Some(core) => core,
             None if std::thread::panicking() => return,
             None => panic!("Oh no! We never placed the Core back, this is a bug!"),
         };
 
-        core.enter(|mut core, context| {
+        core.enter(|mut core, _context| {
             // Drain the OwnedTasks collection. This call also closes the
             // collection, ensuring that no tasks are ever pushed after this
             // call returns.
-            context.handle.shared.owned.close_and_shutdown_all();
+            handle.shared.owned.close_and_shutdown_all();
 
             // Drain local queue
             // We already shut down every task, so we just need to drop the task.
-            while let Some(task) = core.pop_task(&self.handle) {
+            while let Some(task) = core.pop_task(handle) {
                 drop(task);
             }
 
             // Drain remote queue and set it to None
-            let remote_queue = self.handle.shared.queue.lock().take();
+            let remote_queue = handle.shared.queue.lock().take();
 
             // Using `Option::take` to replace the shared queue with `None`.
             // We already shut down every task, so we just need to drop the task.
@@ -244,14 +224,14 @@ impl Drop for CurrentThread {
                 }
             }
 
-            assert!(context.handle.shared.owned.is_empty());
+            assert!(handle.shared.owned.is_empty());
 
             // Submit metrics
-            core.metrics.submit(&self.handle.shared.worker_metrics);
+            core.metrics.submit(&handle.shared.worker_metrics);
 
             // Shutdown the resource drivers
             if let Some(driver) = core.driver.as_mut() {
-                driver.shutdown(&self.handle.driver);
+                driver.shutdown(&handle.driver);
             }
 
             (core, ())
@@ -299,10 +279,10 @@ impl Context {
 
     /// Blocks the current thread until an event is received by the driver,
     /// including I/O events, timer events, ...
-    fn park(&self, mut core: Box<Core>) -> Box<Core> {
+    fn park(&self, mut core: Box<Core>, handle: &Handle) -> Box<Core> {
         let mut driver = core.driver.take().expect("driver missing");
 
-        if let Some(f) = &self.handle.shared.config.before_park {
+        if let Some(f) = &handle.shared.config.before_park {
             // Incorrect lint, the closures are actually different types so `f`
             // cannot be passed as an argument to `enter`.
             #[allow(clippy::redundant_closure)]
@@ -315,17 +295,17 @@ impl Context {
         if core.tasks.is_empty() {
             // Park until the thread is signaled
             core.metrics.about_to_park();
-            core.metrics.submit(&self.handle.shared.worker_metrics);
+            core.metrics.submit(&handle.shared.worker_metrics);
 
             let (c, _) = self.enter(core, || {
-                driver.park(&self.handle.driver);
+                driver.park(&handle.driver);
             });
 
             core = c;
             core.metrics.returned_from_park();
         }
 
-        if let Some(f) = &self.handle.shared.config.after_unpark {
+        if let Some(f) = &handle.shared.config.after_unpark {
             // Incorrect lint, the closures are actually different types so `f`
             // cannot be passed as an argument to `enter`.
             #[allow(clippy::redundant_closure)]
@@ -338,12 +318,12 @@ impl Context {
     }
 
     /// Checks the driver for new events without blocking the thread.
-    fn park_yield(&self, mut core: Box<Core>) -> Box<Core> {
+    fn park_yield(&self, mut core: Box<Core>, handle: &Handle) -> Box<Core> {
         let mut driver = core.driver.take().expect("driver missing");
 
-        core.metrics.submit(&self.handle.shared.worker_metrics);
+        core.metrics.submit(&handle.shared.worker_metrics);
         let (mut core, _) = self.enter(core, || {
-            driver.park_timeout(&self.handle.driver, Duration::from_millis(0));
+            driver.park_timeout(&handle.driver, Duration::from_millis(0));
         });
 
         core.driver = Some(driver);
@@ -577,7 +557,7 @@ impl CoreGuard<'_> {
                     let task = match entry {
                         Some(entry) => entry,
                         None => {
-                            core = context.park(core);
+                            core = context.park(core, handle);
 
                             // Try polling the `block_on` future next
                             continue 'outer;
@@ -595,7 +575,7 @@ impl CoreGuard<'_> {
 
                 // Yield to the driver, this drives the timer and pulls any
                 // pending I/O events.
-                core = context.park_yield(core);
+                core = context.park_yield(core, handle);
             }
         });
 
