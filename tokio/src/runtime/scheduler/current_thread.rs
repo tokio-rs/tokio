@@ -143,7 +143,7 @@ impl CurrentThread {
     pub(crate) fn block_on<F: Future>(&self, handle: &scheduler::Handle, future: F) -> F::Output {
         pin!(future);
 
-        let mut enter = crate::runtime::enter_runtime(handle, false);
+        let mut enter = crate::runtime::context::enter_runtime(handle, false);
         let handle = handle.as_current_thread();
 
         // Attempt to steal the scheduler core and block_on the future if we can

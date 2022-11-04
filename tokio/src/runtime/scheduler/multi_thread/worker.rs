@@ -58,7 +58,7 @@
 
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
-use crate::runtime::enter::EnterContext;
+use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{queue, Handle, Idle, Parker, Unparker};
 use crate::runtime::task::{Inject, OwnedTasks};
 use crate::runtime::{
@@ -276,14 +276,17 @@ where
     let mut had_entered = false;
 
     let setup_result = CURRENT.with(|maybe_cx| {
-        match (crate::runtime::enter::context(), maybe_cx.is_some()) {
-            (EnterContext::Entered { .. }, true) => {
+        match (
+            crate::runtime::context::current_enter_context(),
+            maybe_cx.is_some(),
+        ) {
+            (context::EnterRuntime::Entered { .. }, true) => {
                 // We are on a thread pool runtime thread, so we just need to
                 // set up blocking.
                 had_entered = true;
             }
             (
-                EnterContext::Entered {
+                context::EnterRuntime::Entered {
                     allow_block_in_place,
                 },
                 false,
@@ -302,12 +305,12 @@ where
                     );
                 }
             }
-            (EnterContext::NotEntered, true) => {
+            (context::EnterRuntime::NotEntered, true) => {
                 // This is a nested call to block_in_place (we already exited).
                 // All the necessary setup has already been done.
                 return Ok(());
             }
-            (EnterContext::NotEntered, false) => {
+            (context::EnterRuntime::NotEntered, false) => {
                 // We are outside of the tokio runtime, so blocking is fine.
                 // We can also skip all of the thread pool blocking setup steps.
                 return Ok(());
@@ -350,7 +353,7 @@ where
         // constrained by task budgets.
         let _reset = Reset(coop::stop());
 
-        crate::runtime::enter::exit_runtime(f)
+        crate::runtime::context::exit_runtime(f)
     } else {
         f()
     }
@@ -373,7 +376,7 @@ fn run(worker: Arc<Worker>) {
     };
 
     let handle = scheduler::Handle::MultiThread(worker.handle.clone());
-    let _enter = crate::runtime::enter_runtime(&handle, true);
+    let _enter = crate::runtime::context::enter_runtime(&handle, true);
 
     // Set the worker context.
     let cx = Context {

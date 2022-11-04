@@ -3,7 +3,7 @@ use std::future::Future;
 cfg_rt! {
     #[track_caller]
     pub(crate) fn block_on<F: Future>(f: F) -> F::Output {
-        let mut e = crate::runtime::enter::try_enter_blocking_region().expect(
+        let mut e = crate::runtime::context::try_enter_blocking_region().expect(
             "Cannot block the current thread from within a runtime. This \
             happens because a functionattempted to block the current \
             thread while the thread is being used to drive asynchronous \

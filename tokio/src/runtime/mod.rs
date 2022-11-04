@@ -204,8 +204,6 @@ cfg_signal_internal_and_unix! {
 }
 
 cfg_rt! {
-    pub(crate) mod enter;
-
     pub(crate) mod task;
 
     mod config;
@@ -229,8 +227,6 @@ cfg_rt! {
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
     }
-
-    use self::enter::enter_runtime;
 
     mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};

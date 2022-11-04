@@ -35,7 +35,7 @@ impl Receiver {
     ///
     /// If the timeout has elapsed, it returns `false`, otherwise it returns `true`.
     pub(crate) fn wait(&mut self, timeout: Option<Duration>) -> bool {
-        use crate::runtime::enter::try_enter_blocking_region;
+        use crate::runtime::context::try_enter_blocking_region;
 
         if timeout == Some(Duration::from_nanos(0)) {
             return false;
