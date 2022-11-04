@@ -258,7 +258,7 @@ impl Handle {
 
         // Enter the runtime context. This sets the current driver handles and
         // prevents blocking an existing runtime.
-        let mut enter = crate::runtime::enter::enter_runtime(&self.inner, true);
+        let mut enter = context::enter_runtime(&self.inner, true);
 
         // Block on the future
         enter

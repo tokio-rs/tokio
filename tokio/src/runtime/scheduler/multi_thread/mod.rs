@@ -62,7 +62,7 @@ impl MultiThread {
     where
         F: Future,
     {
-        let mut enter = crate::runtime::enter_runtime(handle, true);
+        let mut enter = crate::runtime::context::enter_runtime(handle, true);
         enter
             .blocking
             .block_on(future)
