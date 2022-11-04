@@ -428,6 +428,18 @@ cfg_metrics! {
             assert_eq!(0, worker);
             &self.shared.worker_metrics
         }
+
+        pub(crate) fn num_blocking_threads(&self) -> usize {
+            self.blocking_spawner.num_threads()
+        }
+
+        pub(crate) fn num_idle_blocking_threads(&self) -> usize {
+            self.blocking_spawner.num_idle_threads()
+        }
+
+        pub(crate) fn blocking_queue_depth(&self) -> usize {
+            self.blocking_spawner.queue_depth()
+        }
     }
 }
 

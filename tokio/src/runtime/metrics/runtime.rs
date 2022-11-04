@@ -42,6 +42,56 @@ impl RuntimeMetrics {
         self.handle.inner.num_workers()
     }
 
+    /// Returns the number of additional threads spawned by the runtime.
+    ///
+    /// The number of workers is set by configuring `max_blocking_threads` on
+    /// `runtime::Builder`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let _ = tokio::task::spawn_blocking(move || {
+    ///         // Stand-in for compute-heavy work or using synchronous APIs
+    ///         1 + 1
+    ///     }).await;
+    ///     let metrics = Handle::current().metrics();
+    ///
+    ///     let n = metrics.num_blocking_threads();
+    ///     println!("Runtime has created {} threads", n);
+    /// }
+    /// ```
+    pub fn num_blocking_threads(&self) -> usize {
+        self.handle.inner.num_blocking_threads()
+    }
+
+    /// Returns the number of idle threads, which hve spawned by the runtime
+    /// for `spawn_blocking` calls.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let _ = tokio::task::spawn_blocking(move || {
+    ///         // Stand-in for compute-heavy work or using synchronous APIs
+    ///         1 + 1
+    ///     }).await;
+    ///     let metrics = Handle::current().metrics();
+    ///
+    ///     let n = metrics.num_idle_blocking_threads();
+    ///     println!("Runtime has {} idle blocking thread pool threads", n);
+    /// }
+    /// ```
+    pub fn num_idle_blocking_threads(&self) -> usize {
+        self.handle.inner.num_idle_blocking_threads()
+    }
+
     /// Returns the number of tasks scheduled from **outside** of the runtime.
     ///
     /// The remote schedule count starts at zero when the runtime is created and
@@ -445,6 +495,30 @@ impl RuntimeMetrics {
     /// ```
     pub fn worker_local_queue_depth(&self, worker: usize) -> usize {
         self.handle.inner.worker_local_queue_depth(worker)
+    }
+
+    /// Returns the number of tasks currently scheduled in the blocking
+    /// thread pool, spawned using `spawn_blocking`.
+    ///
+    /// This metric returns the **current** number of tasks pending in
+    /// blocking thread pool. As such, the returned value may increase
+    /// or decrease as new tasks are scheduled and processed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let metrics = Handle::current().metrics();
+    ///
+    ///     let n = metrics.blocking_queue_depth();
+    ///     println!("{} tasks currently pending in the blocking thread pool", n);
+    /// }
+    /// ```
+    pub fn blocking_queue_depth(&self) -> usize {
+        self.handle.inner.blocking_queue_depth()
     }
 }
 

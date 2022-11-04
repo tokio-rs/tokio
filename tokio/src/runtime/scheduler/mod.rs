@@ -111,6 +111,22 @@ cfg_rt! {
                 }
             }
 
+            pub(crate) fn num_blocking_threads(&self) -> usize {
+                match self {
+                    Handle::CurrentThread(handle) => handle.num_blocking_threads(),
+                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    Handle::MultiThread(handle) => handle.num_blocking_threads(),
+                }
+            }
+
+            pub(crate) fn num_idle_blocking_threads(&self) -> usize {
+                match self {
+                    Handle::CurrentThread(handle) => handle.num_idle_blocking_threads(),
+                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    Handle::MultiThread(handle) => handle.num_idle_blocking_threads(),
+                }
+            }
+
             pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
                 match self {
                     Handle::CurrentThread(handle) => handle.scheduler_metrics(),
@@ -140,6 +156,14 @@ cfg_rt! {
                     Handle::CurrentThread(handle) => handle.worker_metrics(worker).queue_depth(),
                     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                     Handle::MultiThread(handle) => handle.worker_local_queue_depth(worker),
+                }
+            }
+
+            pub(crate) fn blocking_queue_depth(&self) -> usize {
+                match self {
+                    Handle::CurrentThread(handle) => handle.blocking_queue_depth(),
+                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    Handle::MultiThread(handle) => handle.blocking_queue_depth(),
                 }
             }
         }
