@@ -276,9 +276,9 @@ impl Runtime {
         let _enter = self.enter();
 
         match &self.scheduler {
-            Scheduler::CurrentThread(exec) => exec.block_on(future),
+            Scheduler::CurrentThread(exec) => exec.block_on(&self.handle.inner, future),
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-            Scheduler::MultiThread(exec) => exec.block_on(future),
+            Scheduler::MultiThread(exec) => exec.block_on(&self.handle.inner, future),
         }
     }
 
@@ -397,20 +397,14 @@ impl Drop for Runtime {
             Scheduler::CurrentThread(current_thread) => {
                 // This ensures that tasks spawned on the current-thread
                 // runtime are dropped inside the runtime's context.
-                match context::try_set_current(&self.handle.inner) {
-                    Some(guard) => current_thread.set_context_guard(guard),
-                    None => {
-                        // The context thread-local has already been destroyed.
-                        //
-                        // We don't set the guard in this case. Calls to tokio::spawn in task
-                        // destructors would fail regardless if this happens.
-                    }
-                }
+                let _guard = context::try_set_current(&self.handle.inner);
+                current_thread.shutdown(&self.handle.inner);
             }
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-            Scheduler::MultiThread(_) => {
+            Scheduler::MultiThread(multi_thread) => {
                 // The threaded scheduler drops its tasks on its worker threads, which is
                 // already in the runtime's context.
+                multi_thread.shutdown(&self.handle.inner);
             }
         }
     }

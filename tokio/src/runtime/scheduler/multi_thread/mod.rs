@@ -28,9 +28,7 @@ use std::fmt;
 use std::future::Future;
 
 /// Work-stealing based thread pool for executing futures.
-pub(crate) struct MultiThread {
-    handle: Arc<Handle>,
-}
+pub(crate) struct MultiThread;
 
 // ===== impl MultiThread =====
 
@@ -42,7 +40,7 @@ impl MultiThread {
         blocking_spawner: blocking::Spawner,
         seed_generator: RngSeedGenerator,
         config: Config,
-    ) -> (MultiThread, Launch) {
+    ) -> (MultiThread, Arc<Handle>, Launch) {
         let parker = Parker::new(driver);
         let (handle, launch) = worker::create(
             size,
@@ -52,44 +50,35 @@ impl MultiThread {
             seed_generator,
             config,
         );
-        let multi_thread = MultiThread { handle };
 
-        (multi_thread, launch)
-    }
-
-    /// Returns reference to `Spawner`.
-    ///
-    /// The `Spawner` handle can be cloned and enables spawning tasks from other
-    /// threads.
-    pub(crate) fn handle(&self) -> &Arc<Handle> {
-        &self.handle
+        (MultiThread, handle, launch)
     }
 
     /// Blocks the current thread waiting for the future to complete.
     ///
     /// The future will execute on the current thread, but all spawned tasks
     /// will be executed on the thread pool.
-    pub(crate) fn block_on<F>(&self, future: F) -> F::Output
+    pub(crate) fn block_on<F>(&self, handle: &scheduler::Handle, future: F) -> F::Output
     where
         F: Future,
     {
-        let handle = scheduler::Handle::MultiThread(self.handle.clone());
-        let mut enter = crate::runtime::enter_runtime(&handle, true);
+        let mut enter = crate::runtime::enter_runtime(handle, true);
         enter
             .blocking
             .block_on(future)
             .expect("failed to park thread")
+    }
+
+    pub(crate) fn shutdown(&mut self, handle: &scheduler::Handle) {
+        match handle {
+            scheduler::Handle::MultiThread(handle) => handle.shutdown(),
+            _ => panic!("expected MultiThread scheduler"),
+        }
     }
 }
 
 impl fmt::Debug for MultiThread {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("MultiThread").finish()
-    }
-}
-
-impl Drop for MultiThread {
-    fn drop(&mut self) {
-        self.handle.shutdown();
     }
 }

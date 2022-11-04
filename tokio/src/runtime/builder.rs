@@ -888,7 +888,7 @@ impl Builder {
         // there are no futures ready to do something, it'll let the timer or
         // the reactor to generate some new stimuli for the futures to continue
         // in their life.
-        let scheduler = CurrentThread::new(
+        let (scheduler, handle) = CurrentThread::new(
             driver,
             driver_handle,
             blocking_spawner,
@@ -906,7 +906,7 @@ impl Builder {
         );
 
         let handle = Handle {
-            inner: scheduler::Handle::CurrentThread(scheduler.handle().clone()),
+            inner: scheduler::Handle::CurrentThread(handle),
         };
 
         Ok(Runtime::from_parts(
@@ -1009,7 +1009,7 @@ cfg_rt_multi_thread! {
             let seed_generator_1 = self.seed_generator.next_generator();
             let seed_generator_2 = self.seed_generator.next_generator();
 
-            let (scheduler, launch) = MultiThread::new(
+            let (scheduler, handle, launch) = MultiThread::new(
                 core_threads,
                 driver,
                 driver_handle,
@@ -1027,8 +1027,7 @@ cfg_rt_multi_thread! {
                 },
             );
 
-            let handle = scheduler::Handle::MultiThread(scheduler.handle().clone());
-            let handle = Handle { inner: handle };
+            let handle = Handle { inner: scheduler::Handle::MultiThread(handle) };
 
             // Spawn the thread pool workers
             let _enter = handle.enter();

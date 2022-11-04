@@ -97,6 +97,14 @@ cfg_rt! {
                 Handle::MultiThread(h) => &h.seed_generator,
             }
         }
+
+        pub(crate) fn as_current_thread(&self) -> &Arc<current_thread::Handle> {
+            match self {
+                Handle::CurrentThread(handle) => handle,
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                _ => panic!("not a CurrentThread handle"),
+            }
+        }
     }
 
     cfg_metrics! {
