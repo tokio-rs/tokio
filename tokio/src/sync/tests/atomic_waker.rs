@@ -4,7 +4,7 @@ use tokio_test::task;
 use std::task::Waker;
 
 trait AssertSend: Send {}
-trait AssertSync: Send {}
+trait AssertSync: Sync {}
 
 impl AssertSend for AtomicWaker {}
 impl AssertSync for AtomicWaker {}
