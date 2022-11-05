@@ -5,7 +5,7 @@ cfg_rt! {
     pub(crate) fn block_on<F: Future>(f: F) -> F::Output {
         let mut e = crate::runtime::context::try_enter_blocking_region().expect(
             "Cannot block the current thread from within a runtime. This \
-            happens because a functionattempted to block the current \
+            happens because a function attempted to block the current \
             thread while the thread is being used to drive asynchronous \
             tasks."
         );
