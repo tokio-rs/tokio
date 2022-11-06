@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![allow(clippy::declare_interior_mutable_const)]
 #![cfg(all(feature = "full", not(tokio_wasi)))]
 
 use futures::future;
