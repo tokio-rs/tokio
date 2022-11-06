@@ -1,6 +1,6 @@
 use crate::future::Future;
 use crate::runtime::task::core::{Cell, Core, CoreStage, Header, Trailer};
-use crate::runtime::task::state::{State, Snapshot};
+use crate::runtime::task::state::{Snapshot, State};
 use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{JoinError, Notified, Schedule, Task};
 
