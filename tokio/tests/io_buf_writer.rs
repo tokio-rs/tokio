@@ -164,7 +164,7 @@ async fn maybe_pending_buf_writer() {
     assert_eq!(writer.buffer(), []);
     assert_eq!(writer.get_ref().inner, &[0, 1, 2, 3, 4, 5, 6, 7, 8]);
 
-    assert_eq!(writer.write(&[9, 10, 11]).await.unwrap(), 1);
+    assert_eq!(writer.write(&[9, 10, 11]).await.unwrap(), 3);
     assert_eq!(writer.buffer(), []);
     assert_eq!(
         writer.get_ref().inner,
