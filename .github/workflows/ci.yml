@@ -210,7 +210,7 @@ jobs:
         run: cargo miri test --features full --lib --no-fail-fast
         working-directory: tokio
         env:
-          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-tag-raw-pointers
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
           PROPTEST_CASES: 10
 
   asan:
