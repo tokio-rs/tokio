@@ -113,7 +113,7 @@ async fn duplex_is_cooperative() {
                 let buf = [3u8; 4096];
                 tx.write_all(&buf).await.unwrap();
                 let mut buf = [0u8; 4096];
-                rx.read(&mut buf).await.unwrap();
+                let _ = rx.read(&mut buf).await.unwrap();
             }
         } => {},
         _ = tokio::task::yield_now() => {}

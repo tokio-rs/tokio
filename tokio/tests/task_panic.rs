@@ -78,7 +78,7 @@ fn local_key_sync_scope_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         NUMBER.sync_scope(1, || {
             NUMBER.with(|_| {
-                let _ = NUMBER.sync_scope(1, || {});
+                NUMBER.sync_scope(1, || {});
             });
         });
     });

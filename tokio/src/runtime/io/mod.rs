@@ -165,11 +165,11 @@ impl Driver {
             self.resources.compact()
         }
 
-        let mut events = &mut self.events;
+        let events = &mut self.events;
 
         // Block waiting for an event to happen, peeling out how many events
         // happened.
-        match self.poll.poll(&mut events, max_wait) {
+        match self.poll.poll(events, max_wait) {
             Ok(_) => {}
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
             #[cfg(tokio_wasi)]

@@ -12,7 +12,7 @@ const WRITE_CLOSED: usize = 0b0_1000;
 ///
 /// `Ready` tracks which operation an I/O resource is ready to perform.
 #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Ready(usize);
 
 impl Ready {

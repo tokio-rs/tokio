@@ -39,7 +39,7 @@ async fn send_recv_poll() -> std::io::Result<()> {
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
-    let _len = poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
+    poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
 
     assert_eq!(read.filled(), MSG);
     Ok(())
