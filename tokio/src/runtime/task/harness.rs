@@ -31,7 +31,7 @@ where
     }
 
     fn header(&self) -> &Header {
-        unsafe { self.header_ptr().as_ref() }
+        unsafe { &*self.header_ptr().as_ptr() }
     }
 
     fn state(&self) -> &State {
