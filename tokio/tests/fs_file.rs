@@ -73,7 +73,7 @@ async fn coop() {
         let mut buf = [0; 1024];
 
         loop {
-            file.read(&mut buf).await.unwrap();
+            let _ = file.read(&mut buf).await.unwrap();
             file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
         }
     });

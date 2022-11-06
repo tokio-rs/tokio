@@ -407,21 +407,21 @@ impl Task {
         F: FnOnce(&Waker) -> R,
     {
         self.0.with(|ptr| {
-            let waker: *const Waker = (&*ptr).as_ptr();
+            let waker: *const Waker = (*ptr).as_ptr();
             f(&*waker)
         })
     }
 
     unsafe fn drop_task(&self) {
         self.0.with_mut(|ptr| {
-            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            let ptr: *mut Waker = (*ptr).as_mut_ptr();
             ptr.drop_in_place();
         });
     }
 
     unsafe fn set_task(&self, cx: &mut Context<'_>) {
         self.0.with_mut(|ptr| {
-            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            let ptr: *mut Waker = (*ptr).as_mut_ptr();
             ptr.write(cx.waker().clone());
         });
     }

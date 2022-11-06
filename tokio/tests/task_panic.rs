@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![allow(clippy::declare_interior_mutable_const)]
 #![cfg(all(feature = "full", not(tokio_wasi)))]
 
 use futures::future;
@@ -78,7 +79,7 @@ fn local_key_sync_scope_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         NUMBER.sync_scope(1, || {
             NUMBER.with(|_| {
-                let _ = NUMBER.sync_scope(1, || {});
+                NUMBER.sync_scope(1, || {});
             });
         });
     });

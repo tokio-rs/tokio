@@ -195,11 +195,7 @@ where
         } else {
             let res = mem::replace(collection, Ok(U::initialize(sealed::Internal, 0, Some(0))));
 
-            if let Err(err) = res {
-                Err(err)
-            } else {
-                unreachable!();
-            }
+            Err(res.map(drop).unwrap_err())
         }
     }
 }

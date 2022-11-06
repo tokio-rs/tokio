@@ -840,8 +840,8 @@ impl Drop for Msg {
 async fn test_msgs_dropped_on_rx_drop() {
     let (tx, mut rx) = mpsc::channel(3);
 
-    let _ = tx.send(Msg {}).await.unwrap();
-    let _ = tx.send(Msg {}).await.unwrap();
+    tx.send(Msg {}).await.unwrap();
+    tx.send(Msg {}).await.unwrap();
 
     // This msg will be pending and should be dropped when `rx` is dropped
     let sent_fut = tx.send(Msg {});
@@ -849,7 +849,7 @@ async fn test_msgs_dropped_on_rx_drop() {
     let _ = rx.recv().await.unwrap();
     let _ = rx.recv().await.unwrap();
 
-    let _ = sent_fut.await.unwrap();
+    sent_fut.await.unwrap();
 
     drop(rx);
 
@@ -936,7 +936,7 @@ async fn test_tx_capacity() {
     assert_eq!(tx.capacity(), 9);
     assert_eq!(tx.max_capacity(), 10);
 
-    let _sent = tx.send(()).await.unwrap();
+    tx.send(()).await.unwrap();
     // after send, capacity should drop by one again
     assert_eq!(tx.capacity(), 8);
     assert_eq!(tx.max_capacity(), 10);

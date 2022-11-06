@@ -244,7 +244,7 @@ cfg_net! {
         type Future = <str as sealed::ToSocketAddrsPriv>::Future;
 
         fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
-            (&self[..]).to_socket_addrs(sealed::Internal)
+            self[..].to_socket_addrs(sealed::Internal)
         }
     }
 }

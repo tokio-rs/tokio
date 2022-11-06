@@ -49,7 +49,7 @@ struct Waitlist {
 /// Error returned from the [`Semaphore::try_acquire`] function.
 ///
 /// [`Semaphore::try_acquire`]: crate::sync::Semaphore::try_acquire
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TryAcquireError {
     /// The semaphore has been [closed] and cannot issue new permits.
     ///
