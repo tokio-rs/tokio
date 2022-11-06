@@ -31,7 +31,7 @@ where
     }
 
     fn header(&self) -> &Header {
-        unsafe { &self.cell.as_ref().header }
+        unsafe { self.header_ptr().as_ref() }
     }
 
     fn state(&self) -> &State {
