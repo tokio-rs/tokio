@@ -206,9 +206,6 @@ fn create_child_token_after_parent_was_cancelled() {
                 parent_fut.as_mut().poll(&mut Context::from_waker(&waker))
             );
             assert_eq!(wake_counter, 0);
-
-            drop(child_fut);
-            drop(parent_fut);
         }
 
         if drop_child_first {

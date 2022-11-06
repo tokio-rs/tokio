@@ -315,17 +315,17 @@ async fn drop_from_wake() {
 
     tokio::time::pause();
 
-    let mut lock = list.lock().unwrap();
+    {
+        let mut lock = list.lock().unwrap();
 
-    for _ in 0..100 {
-        let mut timer = Box::pin(tokio::time::sleep(Duration::from_millis(10)));
+        for _ in 0..100 {
+            let mut timer = Box::pin(tokio::time::sleep(Duration::from_millis(10)));
 
-        let _ = timer.as_mut().poll(&mut Context::from_waker(&arc_wake));
+            let _ = timer.as_mut().poll(&mut Context::from_waker(&arc_wake));
 
-        lock.push(timer);
+            lock.push(timer);
+        }
     }
-
-    drop(lock);
 
     tokio::time::sleep(Duration::from_millis(11)).await;
 

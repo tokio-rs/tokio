@@ -925,7 +925,7 @@ impl UdpSocket {
 
                 // Safety: We trust `UdpSocket::recv` to have filled up `n` bytes in the
                 // buffer.
-                let n = (&*self.io).recv(dst)?;
+                let n = (*self.io).recv(dst)?;
 
                 unsafe {
                     buf.advance_mut(n);
@@ -989,7 +989,7 @@ impl UdpSocket {
 
                 // Safety: We trust `UdpSocket::recv_from` to have filled up `n` bytes in the
                 // buffer.
-                let (n, addr) = (&*self.io).recv_from(dst)?;
+                let (n, addr) = (*self.io).recv_from(dst)?;
 
                 unsafe {
                     buf.advance_mut(n);

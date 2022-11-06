@@ -50,6 +50,7 @@ pub async fn issue_4175_test() -> std::io::Result<()> {
 }
 
 // https://github.com/tokio-rs/tokio/issues/4175
+#[allow(clippy::let_unit_value)]
 pub mod clippy_semicolon_if_nothing_returned {
     #![deny(clippy::semicolon_if_nothing_returned)]
 
