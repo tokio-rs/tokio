@@ -73,6 +73,26 @@ fn spawn_mandatory_blocking_should_run_even_when_shutting_down_from_other_thread
     });
 }
 
+#[test]
+fn spawn_blocking_when_paused() {
+    use std::time::Duration;
+    loom::model(|| {
+        let rt = crate::runtime::Builder::new_current_thread()
+            .enable_time()
+            .start_paused(true)
+            .build()
+            .unwrap();
+        let handle = rt.handle();
+        let _enter = handle.enter();
+        rt.block_on(crate::time::timeout(
+            Duration::from_millis(1),
+            crate::task::spawn_blocking(|| {}),
+        ))
+        .expect("timeout should not trigger")
+        .expect("blocking task should finish");
+    });
+}
+
 fn mk_runtime(num_threads: usize) -> Runtime {
     runtime::Builder::new_multi_thread()
         .worker_threads(num_threads)
