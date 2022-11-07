@@ -152,13 +152,17 @@ cfg_rt! {
     }
 
     pub(crate) fn try_enter_blocking_region() -> Option<BlockingRegionGuard> {
-        CONTEXT.with(|c| {
+        CONTEXT.try_with(|c| {
             if c.runtime.get().is_entered() {
                 None
             } else {
                 Some(BlockingRegionGuard::new())
             }
-        })
+            // If accessing the thread-local fails, the thread is terminating
+            // and thread-locals are being destroyed. Because we don't know if
+            // we are currently in a runtime or not, we default to being
+            // permissive.
+        }).unwrap_or(Some(BlockingRegionGuard::new()))
     }
 
     /// Disallows blocking in the current runtime context until the guard is dropped.
