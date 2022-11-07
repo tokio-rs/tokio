@@ -162,7 +162,7 @@ cfg_rt! {
             // and thread-locals are being destroyed. Because we don't know if
             // we are currently in a runtime or not, we default to being
             // permissive.
-        }).unwrap_or(Some(BlockingRegionGuard::new()))
+        }).unwrap_or_else(|_| Some(BlockingRegionGuard::new()))
     }
 
     /// Disallows blocking in the current runtime context until the guard is dropped.
