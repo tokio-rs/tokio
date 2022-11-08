@@ -143,10 +143,12 @@ cfg_test_util! {
     }
 
     /// Temporarily stop auto-advancing the clock (see `tokio::time::pause`)
-    /// and decorate the given future with code to re-enable auto-advance when
-    /// it returns `Ready` or is dropped.
+    /// and decorate the given future with code to re-enable auto-advance if
+    /// it is dropped before producing a result.
     ///
-    /// This is a no-op when called from outside the Tokio runtime.
+    /// If the future is polled and returns `Ready`, it becomes the caller's
+    /// responsibility to call `allow_auto_advance`. This quirk is to help
+    /// avoid a race between blocking task runners and a paused runtime.
     pub(crate) fn inhibit_auto_advance<F>(fut: F) -> impl Future<Output = F::Output> + Send + 'static
     where
         F: Future + Send + 'static,
@@ -158,8 +160,20 @@ cfg_test_util! {
             AutoAdvanceInhibit(clock)
         });
         async move {
-            let _guard = guard;
-            fut.await
+            let result = fut.await;
+            // On success, do not resume auto-advance. It must be done on the
+            // main tokio thread (`BlockingSchedule::release`) to avoid a race.
+            std::mem::forget(guard);
+            result
+        }
+    }
+
+
+    /// Resume auto-advance. This should only be called to balance out a
+    /// previous call to `inhibit_auto_advance`.
+    pub(crate) fn allow_auto_advance() {
+        if let Some(clock) = clock() {
+            clock.allow_auto_advance();
         }
     }
 
