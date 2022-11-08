@@ -1,4 +1,4 @@
-use crate::runtime::blocking::NoopSchedule;
+use crate::runtime::blocking::BlockingSchedule;
 use crate::runtime::scheduler::multi_thread::queue;
 use crate::runtime::task::Inject;
 use crate::runtime::MetricsBatch;
@@ -117,7 +117,7 @@ fn steal_overflow() {
 fn multi_stealer() {
     const NUM_TASKS: usize = 5;
 
-    fn steal_tasks(steal: queue::Steal<NoopSchedule>) -> usize {
+    fn steal_tasks(steal: queue::Steal<BlockingSchedule>) -> usize {
         let mut metrics = MetricsBatch::new();
         let (_, mut local) = queue::local();
 

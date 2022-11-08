@@ -5,10 +5,10 @@ use crate::runtime::task::{self, Task};
 /// operations.
 ///
 /// We avoid storing the task by forgetting it in `bind` and re-materializing it
-/// in `release.
-pub(crate) struct NoopSchedule;
+/// in `release`.
+pub(crate) struct BlockingSchedule;
 
-impl task::Schedule for NoopSchedule {
+impl task::Schedule for BlockingSchedule {
     fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
         None
     }
