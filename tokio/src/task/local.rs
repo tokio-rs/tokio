@@ -264,7 +264,7 @@ struct LocalState {
     local_queue: UnsafeCell<VecDeque<task::Notified<Arc<Shared>>>>,
 
     /// Collection of all active tasks spawned onto this executor.
-    owned: UnsafeCell<LocalOwnedTasks<Arc<Shared>>>,
+    owned: LocalOwnedTasks<Arc<Shared>>,
 }
 
 pin_project! {
@@ -385,7 +385,7 @@ impl LocalSet {
                 shared: Arc::new(Shared {
                     local_state: LocalState {
                         owner: thread::current().id(),
-                        owned: UnsafeCell::new(LocalOwnedTasks::new()),
+                        owned: LocalOwnedTasks::new(),
                         local_queue: UnsafeCell::new(VecDeque::with_capacity(INITIAL_CAPACITY)),
                     },
                     queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
@@ -887,12 +887,12 @@ impl Context {
         let future = crate::util::trace::task(future, "local", name, id.as_u64());
 
         // Safety: called from the thread that owns the `LocalSet`
-        let (handle, notified) = unsafe {
+        let (handle, notified) = {
             self.shared.local_state.assert_called_from_owner_thread();
             self.shared
                 .local_state
                 .owned
-                .with(|ptr| (*ptr).bind(future, self.shared.clone(), id))
+                .bind(future, self.shared.clone(), id)
         };
 
         if let Some(notified) = notified {
@@ -1053,7 +1053,7 @@ impl LocalState {
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.owned.with(|ptr| (*ptr).remove(task))
+        self.owned.remove(task)
     }
 
     /// Returns true if the `LocalSet` does not have any spawned tasks
@@ -1062,7 +1062,7 @@ impl LocalState {
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.owned.with(|ptr| (*ptr).is_empty())
+        self.owned.is_empty()
     }
 
     unsafe fn assert_owner(
@@ -1073,7 +1073,7 @@ impl LocalState {
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.owned.with(|ptr| (*ptr).assert_owner(task))
+        self.owned.assert_owner(task)
     }
 
     unsafe fn close_and_shutdown_all(&self) {
@@ -1081,7 +1081,7 @@ impl LocalState {
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.owned.with(|ptr| (*ptr).close_and_shutdown_all())
+        self.owned.close_and_shutdown_all()
     }
 
     #[track_caller]
