@@ -288,6 +288,7 @@ rt_test! {
         let rt = rt();
         let (tx, rx) = oneshot::channel();
 
+        #[allow(clippy::async_yields_async)]
         let handle = rt.handle().block_on(async {
             tokio::spawn(async move {
                 tx.send("ZOMG").unwrap();
