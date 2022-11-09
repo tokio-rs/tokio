@@ -243,14 +243,6 @@ rt_test! {
             tokio::spawn(async move {
                 let (done_tx, mut done_rx) = mpsc::unbounded_channel();
 
-                /*
-                for _ in 0..100 {
-                    tokio::spawn(async move { });
-                }
-
-                tokio::task::yield_now().await;
-                */
-
                 let mut txs = (0..ITER)
                     .map(|i| {
                         let (tx, rx) = oneshot::channel();
@@ -289,6 +281,31 @@ rt_test! {
         for i in 0..ITER {
             assert_eq!(i, out[i]);
         }
+    }
+
+    #[test]
+    fn spawn_one_from_block_on_called_on_handle() {
+        let rt = rt();
+        let (tx, rx) = oneshot::channel();
+
+        #[allow(clippy::async_yields_async)]
+        let handle = rt.handle().block_on(async {
+            tokio::spawn(async move {
+                tx.send("ZOMG").unwrap();
+                "DONE"
+            })
+        });
+
+        let out = rt.block_on(async {
+            let msg = assert_ok!(rx.await);
+
+            let out = assert_ok!(handle.await);
+            assert_eq!(out, "DONE");
+
+            msg
+        });
+
+        assert_eq!(out, "ZOMG");
     }
 
     #[test]
