@@ -74,6 +74,7 @@ cfg_rt! {
     use std::fmt;
 
     #[derive(Debug, Clone, Copy)]
+    #[must_use]
     pub(crate) enum EnterRuntime {
         /// Currently in a runtime context.
         #[cfg_attr(not(feature = "rt"), allow(dead_code))]
@@ -84,17 +85,22 @@ cfg_rt! {
     }
 
     #[derive(Debug)]
+    #[must_use]
     pub(crate) struct SetCurrentGuard {
         old_handle: Option<scheduler::Handle>,
         old_seed: RngSeed,
     }
 
     /// Guard tracking that a caller has entered a runtime context.
+    #[must_use]
     pub(crate) struct EnterRuntimeGuard {
         pub(crate) blocking: BlockingRegionGuard,
+        #[allow(dead_code)] // Only tracking the guard.
+        pub(crate) handle: SetCurrentGuard,
     }
 
     /// Guard tracking that a caller has entered a blocking region.
+    #[must_use]
     pub(crate) struct BlockingRegionGuard {
         _p: PhantomData<RefCell<()>>,
     }
@@ -121,10 +127,7 @@ cfg_rt! {
     /// executor.
     #[track_caller]
     pub(crate) fn enter_runtime(handle: &scheduler::Handle, allow_block_in_place: bool) -> EnterRuntimeGuard {
-        if let Some(enter) = try_enter_runtime(allow_block_in_place) {
-            // Set the current runtime handle. This should not fail. A later
-            // cleanup will remove the unwrap().
-            try_set_current(handle).unwrap();
+        if let Some(enter) = try_enter_runtime(handle, allow_block_in_place) {
             return enter;
         }
 
@@ -138,7 +141,7 @@ cfg_rt! {
 
     /// Tries to enter a runtime context, returns `None` if already in a runtime
     /// context.
-    fn try_enter_runtime(allow_block_in_place: bool) -> Option<EnterRuntimeGuard> {
+    fn try_enter_runtime(handle: &scheduler::Handle, allow_block_in_place: bool) -> Option<EnterRuntimeGuard> {
         CONTEXT.with(|c| {
             if c.runtime.get().is_entered() {
                 None
@@ -146,6 +149,7 @@ cfg_rt! {
                 c.runtime.set(EnterRuntime::Entered { allow_block_in_place });
                 Some(EnterRuntimeGuard {
                     blocking: BlockingRegionGuard::new(),
+                    handle: c.set_current(handle),
                 })
             }
         })
