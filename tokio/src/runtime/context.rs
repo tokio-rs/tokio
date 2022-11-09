@@ -1,3 +1,4 @@
+use crate::loom::thread::AccessError;
 use crate::runtime::coop;
 
 use std::cell::Cell;
@@ -63,12 +64,11 @@ pub(crate) fn thread_rng_n(n: u32) -> u32 {
     CONTEXT.with(|ctx| ctx.rng.fastrand_n(n))
 }
 
-pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> R {
-    CONTEXT.with(|ctx| f(&ctx.budget))
+pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, AccessError> {
+    CONTEXT.try_with(|ctx| f(&ctx.budget))
 }
 
 cfg_rt! {
-    use crate::loom::thread::AccessError;
     use crate::runtime::TryCurrentError;
 
     use std::fmt;

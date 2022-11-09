@@ -59,9 +59,6 @@ cfg_rt! {
     mod sync_wrapper;
     pub(crate) use sync_wrapper::SyncWrapper;
 
-    mod vec_deque_cell;
-    pub(crate) use vec_deque_cell::VecDequeCell;
-
     mod rc_cell;
     pub(crate) use rc_cell::RcCell;
 }
