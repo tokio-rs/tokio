@@ -184,7 +184,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       # Run `tokio` with "unstable" cfg flag.
       - name: test tokio full --cfg unstable
-        run: cargo test --all-features -- --nocapture --test-threads 1
+        run: cargo test --all-features
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
