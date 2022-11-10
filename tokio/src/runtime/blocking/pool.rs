@@ -359,8 +359,6 @@ impl Spawner {
         R: Send + 'static,
     {
         let fut = BlockingTask::new(func);
-        #[cfg(feature = "test-util")]
-        let fut = crate::time::inhibit_auto_advance(fut);
         let id = task::Id::next();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let fut = {
@@ -381,7 +379,7 @@ impl Spawner {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
 
-        let (task, handle) = task::unowned(fut, BlockingSchedule, id);
+        let (task, handle) = task::unowned(fut, BlockingSchedule::new(), id);
 
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
         (handle, spawned)

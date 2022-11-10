@@ -28,8 +28,6 @@ cfg_not_test_util! {
 }
 
 cfg_test_util! {
-    use std::future::Future;
-
     use crate::time::{Duration, Instant};
     use crate::loom::sync::{Arc, Mutex};
 
@@ -134,47 +132,11 @@ cfg_test_util! {
         inner.unfrozen = Some(std::time::Instant::now());
     }
 
-    struct AutoAdvanceInhibit(Clock);
-
-    impl Drop for AutoAdvanceInhibit {
-        fn drop(&mut self) {
-            self.0.allow_auto_advance();
-        }
-    }
-
-    /// Temporarily stop auto-advancing the clock (see `tokio::time::pause`)
-    /// and decorate the given future with code to re-enable auto-advance if
-    /// it is dropped before producing a result.
-    ///
-    /// If the future is polled and returns `Ready`, it becomes the caller's
-    /// responsibility to call `allow_auto_advance`. This quirk is to help
-    /// avoid a race between blocking task runners and a paused runtime.
-    pub(crate) fn inhibit_auto_advance<F>(fut: F) -> impl Future<Output = F::Output> + Send + 'static
-    where
-        F: Future + Send + 'static,
-    {
-        // Bump the inhibit count immediately, not inside the async block, to
-        // avoid a race condition when used by spawn_blocking.
-        let guard = clock().map(|clock| {
-            clock.inhibit_auto_advance();
-            AutoAdvanceInhibit(clock)
-        });
-        async move {
-            let result = fut.await;
-            // On success, do not resume auto-advance. It must be done on the
-            // main tokio thread (`BlockingSchedule::release`) to avoid a race.
-            std::mem::forget(guard);
-            result
-        }
-    }
-
-
-    /// Resume auto-advance. This should only be called to balance out a
-    /// previous call to `inhibit_auto_advance`.
-    pub(crate) fn allow_auto_advance() {
-        if let Some(clock) = clock() {
-            clock.allow_auto_advance();
-        }
+    /// Temporarily stop auto-advancing the clock (see `tokio::time::pause`).
+    pub(crate) fn inhibit_auto_advance() -> Clock {
+        let clock = clock().expect("can't inhibit auto-advance from outside the Tokio runtime");
+        clock.inhibit_auto_advance();
+        clock
     }
 
     /// Advances time.
@@ -266,7 +228,7 @@ cfg_test_util! {
             inner.auto_advance_inhibit_count += 1;
         }
 
-        fn allow_auto_advance(&self) {
+        pub(crate) fn allow_auto_advance(&self) {
             let mut inner = self.inner.lock();
             inner.auto_advance_inhibit_count -= 1;
         }
