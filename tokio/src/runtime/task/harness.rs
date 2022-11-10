@@ -124,7 +124,7 @@ where
                 }
             }
             TransitionToRunning::Cancelled => {
-                cancel_task(&self.core());
+                cancel_task(self.core());
                 PollFuture::Complete
             }
             TransitionToRunning::Failed => PollFuture::Done,
