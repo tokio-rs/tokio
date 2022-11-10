@@ -17,8 +17,6 @@ cfg_trace! {
 mod schedule;
 mod shutdown;
 mod task;
-#[cfg(all(test, not(tokio_wasm)))]
-pub(crate) use schedule::BlockingSchedule;
 pub(crate) use task::BlockingTask;
 
 use crate::runtime::Builder;

@@ -1,4 +1,4 @@
-use crate::runtime::blocking::BlockingSchedule;
+use crate::runtime::tests::NoopSchedule;
 use crate::runtime::task::{self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::util::TryLock;
 
@@ -54,7 +54,7 @@ fn create_drop1() {
             drop(ad);
             unreachable!()
         },
-        BlockingSchedule,
+        NoopSchedule,
         Id::next(),
     );
     drop(notified);
@@ -71,7 +71,7 @@ fn create_drop2() {
             drop(ad);
             unreachable!()
         },
-        BlockingSchedule,
+        NoopSchedule,
         Id::next(),
     );
     drop(join);
@@ -88,7 +88,7 @@ fn drop_abort_handle1() {
             drop(ad);
             unreachable!()
         },
-        BlockingSchedule,
+        NoopSchedule,
         Id::next(),
     );
     let abort = join.abort_handle();
@@ -108,7 +108,7 @@ fn drop_abort_handle2() {
             drop(ad);
             unreachable!()
         },
-        BlockingSchedule,
+        NoopSchedule,
         Id::next(),
     );
     let abort = join.abort_handle();
@@ -129,7 +129,7 @@ fn create_shutdown1() {
             drop(ad);
             unreachable!()
         },
-        BlockingSchedule,
+        NoopSchedule,
         Id::next(),
     );
     drop(join);
@@ -146,7 +146,7 @@ fn create_shutdown2() {
             drop(ad);
             unreachable!()
         },
-        BlockingSchedule,
+        NoopSchedule,
         Id::next(),
     );
     handle.assert_not_dropped();
@@ -157,7 +157,7 @@ fn create_shutdown2() {
 
 #[test]
 fn unowned_poll() {
-    let (task, _) = unowned(async {}, BlockingSchedule, Id::next());
+    let (task, _) = unowned(async {}, NoopSchedule, Id::next());
     task.run();
 }
 
