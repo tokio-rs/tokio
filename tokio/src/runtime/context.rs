@@ -18,6 +18,7 @@ struct Context {
     /// Handle to the runtime scheduler running on the current thread.
     #[cfg(feature = "rt")]
     handle: RefCell<Option<scheduler::Handle>>,
+    #[cfg(feature = "rt")]
     current_task_id: Cell<Option<Id>>,
 
     /// Tracks if the current thread is currently driving a runtime.
