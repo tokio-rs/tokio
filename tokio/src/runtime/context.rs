@@ -44,6 +44,7 @@ tokio_thread_local! {
             /// accessing drivers, etc...
             #[cfg(feature = "rt")]
             handle: RefCell::new(None),
+            #[cfg(feature = "rt")]
             current_task_id: Cell::new(None),
 
             /// Tracks if the current thread is currently driving a runtime.
