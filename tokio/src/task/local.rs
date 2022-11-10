@@ -384,7 +384,7 @@ impl LocalSet {
             context: Rc::new(Context {
                 shared: Arc::new(Shared {
                     local_state: LocalState {
-                        owner: thread::current().id(),
+                        owner: thread_id().expect("cannot create LocalSet during thread shutdown"),
                         owned: LocalOwnedTasks::new(),
                         local_queue: UnsafeCell::new(VecDeque::with_capacity(INITIAL_CAPACITY)),
                     },
@@ -949,7 +949,7 @@ impl Shared {
 
                 // We are on the thread that owns the `LocalSet`, so we can
                 // wake to the local queue.
-                _ if localdata.get_or_insert_id() == self.local_state.owner => {
+                _ if localdata.get_id() == Some(self.local_state.owner) => {
                     unsafe {
                         // Safety: we just checked that the thread ID matches
                         // the localset's owner, so this is safe.
@@ -1101,6 +1101,10 @@ impl LocalState {
 unsafe impl Send for LocalState {}
 
 impl LocalData {
+    fn get_id(&self) -> Option<ThreadId> {
+        self.thread_id.get()
+    }
+
     fn get_or_insert_id(&self) -> ThreadId {
         self.thread_id.get().unwrap_or_else(|| {
             let id = thread::current().id();
