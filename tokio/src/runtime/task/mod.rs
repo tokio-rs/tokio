@@ -198,7 +198,7 @@ use std::{fmt, mem};
 /// currently running task can be obtained from inside the task via the
 /// [`task::try_id()`](crate::task::try_id()) and
 /// [`task::id()`](crate::task::id()) functions and from outside the task via
-/// the [`JoinHandle::id()`](create::task::JoinHandle::id()`) function.
+/// the [`JoinHandle::id()`](crate::task::JoinHandle::id()) function.
 ///
 /// **Note**: This is an [unstable API][unstable]. The public API of this type
 /// may break in 1.x releases. See [the documentation on unstable
@@ -218,11 +218,13 @@ pub struct Id(u64);
 /// to `block_on` do not have task IDs, so the method will panic if called from
 /// within a call to `block_on`. For a version of this function that doesn't
 /// panic, see [`task::try_id()`](crate::runtime::task::try_id()).
+///
 /// **Note**: This is an [unstable API][unstable]. The public API of this type
 /// may break in 1.x releases. See [the documentation on unstable
 /// features][unstable] for details.
 ///
 /// [task ID]: crate::task::Id
+/// [unstable]: crate#unstable-features
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 #[track_caller]
 pub fn id() -> Id {
@@ -241,6 +243,7 @@ pub fn id() -> Id {
 /// features][unstable] for details.
 ///
 /// [task ID]: crate::task::Id
+/// [unstable]: crate#unstable-features
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 #[track_caller]
 pub fn try_id() -> Option<Id> {
