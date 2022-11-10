@@ -201,7 +201,8 @@ use std::{fmt, mem};
 /// [unstable]: crate#unstable-features
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+// TODO(eliza): there's almost certainly no reason not to make this `Copy` as well...
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Id(u64);
 
 /// An owned handle to the task, tracked by ref count.

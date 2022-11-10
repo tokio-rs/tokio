@@ -104,8 +104,7 @@ where
                 let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<T, S>(&header_ptr);
                 let cx = Context::from_waker(&*waker_ref);
-                let core = self.core();
-                let res = poll_future(&core, cx);
+                let res = poll_future(&self.core(), cx);
 
                 if res == Poll::Ready(()) {
                     // The future completed. Move on to complete the task.
@@ -119,15 +118,13 @@ where
                     TransitionToIdle::Cancelled => {
                         // The transition to idle failed because the task was
                         // cancelled during the poll.
-                        let core = self.core();
-                        cancel_task(&core);
+                        cancel_task(&self.core());
                         PollFuture::Complete
                     }
                 }
             }
             TransitionToRunning::Cancelled => {
-                let core = self.core();
-                cancel_task(&core);
+                cancel_task(&self.core());
                 PollFuture::Complete
             }
             TransitionToRunning::Failed => PollFuture::Done,
@@ -150,8 +147,7 @@ where
 
         // By transitioning the lifecycle to `Running`, we have permission to
         // drop the future.
-        let core = self.core();
-        cancel_task(&core);
+        cancel_task(&self.core());
         self.complete();
     }
 
@@ -458,12 +454,13 @@ fn cancel_task<T: Future, S: Schedule>(core: &Core<T, S>) {
         core.drop_future_or_output();
     }));
 
+    let id = core.task_id.clone();
     match res {
         Ok(()) => {
-            core.store_output(Err(JoinError::cancelled(core.task_id)));
+            core.store_output(Err(JoinError::cancelled(id)));
         }
         Err(panic) => {
-            core.store_output(Err(JoinError::panic(core.task_id, panic)));
+            core.store_output(Err(JoinError::panic(id, panic)));
         }
     }
 }
@@ -495,7 +492,7 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
         Ok(Poll::Ready(output)) => Ok(output),
         Err(panic) => {
             core.scheduler.unhandled_panic();
-            Err(JoinError::panic(core.task_id, panic))
+            Err(JoinError::panic(core.task_id.clone(), panic))
         }
     };
 
