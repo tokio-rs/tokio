@@ -2,17 +2,26 @@
 #![allow(clippy::declare_interior_mutable_const)]
 #![cfg(all(feature = "full", not(tokio_wasi)))]
 
+#[cfg(tokio_unstable)]
 use std::error::Error;
+#[cfg(tokio_unstable)]
 use std::future::Future;
+#[cfg(tokio_unstable)]
 use std::pin::Pin;
+#[cfg(tokio_unstable)]
 use std::task::{Context, Poll};
+#[cfg(tokio_unstable)]
 use tokio::runtime::{Builder, Runtime};
+#[cfg(tokio_unstable)]
 use tokio::sync::oneshot;
+#[cfg(tokio_unstable)]
 use tokio::task::{self, LocalSet};
 
+#[cfg(tokio_unstable)]
 mod support {
     pub mod panic;
 }
+#[cfg(tokio_unstable)]
 use support::panic::test_panic;
 
 #[cfg(tokio_unstable)]
