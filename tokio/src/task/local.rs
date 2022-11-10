@@ -1079,6 +1079,10 @@ impl LocalState {
     unsafe fn close_and_shutdown_all(&self) {
         // The caller ensures it is called from the same thread that owns
         // the LocalSet.
+        //
+        // FreeBSD has some weirdness around thread-local destruction.
+        // TODO: remove this hack when thread id is cleaned up
+        #[cfg(not(any(target_os = "openbsd", target_os = "freebsd")))]
         self.assert_called_from_owner_thread();
 
         self.owned.close_and_shutdown_all()
