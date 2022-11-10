@@ -23,7 +23,7 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test -p tokio --all-features --test task_local_set -- --nocapture --test-threads 1
+    - cargo test -p tokio --all-features --test task_local_set -- --nocapture
 
 task:
   name: FreeBSD docs
