@@ -6,7 +6,7 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 use tokio::sync::oneshot;
 use tokio::task::{self, LocalSet};
 
@@ -268,4 +268,22 @@ fn task_id_inside_block_on_panic_caller() -> Result<(), Box<dyn Error>> {
     assert_eq!(&panic_location_file.unwrap(), file!());
 
     Ok(())
+}
+
+#[cfg(tokio_unstable)]
+#[tokio::test(flavor = "multi_thread")]
+async fn task_id_block_in_place_block_on_spawn() {
+    task::spawn(async {
+        let id1 = task::id();
+
+        task::block_in_place(|| {
+            let rt = Builder::new_current_thread().build().unwrap();
+            rt.block_on(rt.spawn(async {})).unwrap();
+        });
+
+        let id2 = task::id();
+        assert_eq!(id1, id2);
+    })
+    .await
+    .unwrap();
 }
