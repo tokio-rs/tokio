@@ -72,6 +72,10 @@ type TimerResult = Result<(), crate::time::error::Error>;
 const STATE_DEREGISTERED: u64 = u64::MAX;
 const STATE_PENDING_FIRE: u64 = STATE_DEREGISTERED - 1;
 const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
+/// The largest safe integer to use for ticks.
+///
+/// This value should be updated if any other signal values are added above.
+pub(super) const MAX_SAFE_MILLIS_DURATION: u64 = u64::MAX - 2;
 
 /// This structure holds the current shared state of the timer - its scheduled
 /// time (if registered), or otherwise the result of the timer completing, as
@@ -126,7 +130,7 @@ impl StateCell {
     fn when(&self) -> Option<u64> {
         let cur_state = self.state.load(Ordering::Relaxed);
 
-        if cur_state == u64::MAX {
+        if cur_state == STATE_DEREGISTERED {
             None
         } else {
             Some(cur_state)
