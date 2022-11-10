@@ -11,6 +11,7 @@
 
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
+use crate::runtime::context;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule};
@@ -157,6 +158,26 @@ impl<T: Future> CoreStage<T> {
     }
 }
 
+/// Set and clear the task id in the context when the future is executed or
+/// dropped, or when the output produced by the future is dropped.
+pub(crate) struct TaskIdGuard {
+    parent_task_id: Option<Id>,
+}
+
+impl TaskIdGuard {
+    fn enter(id: Id) -> Self {
+        TaskIdGuard {
+            parent_task_id: context::set_current_task_id(Some(id)),
+        }
+    }
+}
+
+impl Drop for TaskIdGuard {
+    fn drop(&mut self) {
+        context::set_current_task_id(self.parent_task_id);
+    }
+}
+
 impl<T: Future, S: Schedule> Core<T, S> {
     /// Polls the future.
     ///
@@ -183,6 +204,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
                 // Safety: The caller ensures the future is pinned.
                 let future = unsafe { Pin::new_unchecked(future) };
 
+                let _guard = TaskIdGuard::enter(self.task_id);
                 future.poll(&mut cx)
             })
         };
@@ -236,6 +258,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
     }
 
     unsafe fn set_stage(&self, stage: Stage<T>) {
+        let _guard = TaskIdGuard::enter(self.task_id);
         self.stage.stage.with_mut(|ptr| *ptr = stage)
     }
 }

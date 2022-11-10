@@ -1,4 +1,5 @@
 use crate::runtime::coop;
+use crate::runtime::task::Id;
 
 use std::cell::Cell;
 
@@ -17,6 +18,7 @@ struct Context {
     /// Handle to the runtime scheduler running on the current thread.
     #[cfg(feature = "rt")]
     handle: RefCell<Option<scheduler::Handle>>,
+    current_task_id: Cell<Option<Id>>,
 
     /// Tracks if the current thread is currently driving a runtime.
     /// Note, that if this is set to "entered", the current scheduler
@@ -41,6 +43,7 @@ tokio_thread_local! {
             /// accessing drivers, etc...
             #[cfg(feature = "rt")]
             handle: RefCell::new(None),
+            current_task_id: Cell::new(None),
 
             /// Tracks if the current thread is currently driving a runtime.
             /// Note, that if this is set to "entered", the current scheduler
@@ -106,6 +109,14 @@ cfg_rt! {
     }
 
     pub(crate) struct DisallowBlockInPlaceGuard(bool);
+
+    pub(crate) fn set_current_task_id(id: Option<Id>) -> Option<Id> {
+        CONTEXT.try_with(|ctx| ctx.current_task_id.replace(id)).unwrap_or(None)
+    }
+
+    pub(crate) fn current_task_id() -> Option<Id> {
+        CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
+    }
 
     pub(crate) fn try_current() -> Result<scheduler::Handle, TryCurrentError> {
         match CONTEXT.try_with(|ctx| ctx.handle.borrow().clone()) {
