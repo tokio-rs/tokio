@@ -566,6 +566,48 @@ async fn spawn_wakes_localset() {
     }
 }
 
+#[test]
+fn store_local_set_in_thread_local_with_runtime() {
+    use tokio::runtime::Runtime;
+
+    thread_local! {
+        static CURRENT: RtAndLocalSet = RtAndLocalSet::new();
+    }
+
+    struct RtAndLocalSet {
+        rt: Runtime,
+        local: LocalSet,
+    }
+
+    impl RtAndLocalSet {
+        fn new() -> RtAndLocalSet {
+            RtAndLocalSet {
+                rt: tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap(),
+                local: LocalSet::new(),
+            }
+        }
+
+        async fn inner_method(&self) {
+            self.local
+                .run_until(async move {
+                    tokio::task::spawn_local(async {});
+                })
+                .await
+        }
+
+        fn method(&self) {
+            self.rt.block_on(self.inner_method());
+        }
+    }
+
+    CURRENT.with(|f| {
+        f.method();
+    });
+}
+
 #[cfg(tokio_unstable)]
 mod unstable {
     use tokio::runtime::UnhandledPanic;

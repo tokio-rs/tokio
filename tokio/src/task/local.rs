@@ -1,9 +1,10 @@
 //! Runs `!Send` futures on the current thread.
+use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
 use crate::loom::thread::{self, ThreadId};
 use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
 use crate::sync::AtomicWaker;
-use crate::util::{RcCell, VecDequeCell};
+use crate::util::RcCell;
 
 use std::cell::Cell;
 use std::collections::VecDeque;
@@ -226,9 +227,6 @@ cfg_rt! {
 
 /// State available from the thread-local.
 struct Context {
-    /// Collection of all active tasks spawned onto this executor.
-    owned: LocalOwnedTasks<Arc<Shared>>,
-
     /// State shared between threads.
     shared: Arc<Shared>,
 
@@ -239,18 +237,11 @@ struct Context {
 
 /// LocalSet state shared between threads.
 struct Shared {
-    /// Local run queue sender and receiver.
-    ///
     /// # Safety
     ///
     /// This field must *only* be accessed from the thread that owns the
     /// `LocalSet` (i.e., `Thread::current().id() == owner`).
-    local_queue: VecDequeCell<task::Notified<Arc<Shared>>>,
-
-    /// The `ThreadId` of the thread that owns the `LocalSet`.
-    ///
-    /// Since `LocalSet` is `!Send`, this will never change.
-    owner: ThreadId,
+    local_state: LocalState,
 
     /// Remote run queue sender.
     queue: Mutex<Option<VecDeque<task::Notified<Arc<Shared>>>>>,
@@ -261,6 +252,19 @@ struct Shared {
     /// How to respond to unhandled task panics.
     #[cfg(tokio_unstable)]
     pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
+}
+
+/// Tracks the `LocalSet` state that must only be accessed from the thread that
+/// created the `LocalSet`.
+struct LocalState {
+    /// The `ThreadId` of the thread that owns the `LocalSet`.
+    owner: ThreadId,
+
+    /// Local run queue sender and receiver.
+    local_queue: UnsafeCell<VecDeque<task::Notified<Arc<Shared>>>>,
+
+    /// Collection of all active tasks spawned onto this executor.
+    owned: LocalOwnedTasks<Arc<Shared>>,
 }
 
 pin_project! {
@@ -378,10 +382,12 @@ impl LocalSet {
         LocalSet {
             tick: Cell::new(0),
             context: Rc::new(Context {
-                owned: LocalOwnedTasks::new(),
                 shared: Arc::new(Shared {
-                    local_queue: VecDequeCell::with_capacity(INITIAL_CAPACITY),
-                    owner: thread::current().id(),
+                    local_state: LocalState {
+                        owner: thread_id().expect("cannot create LocalSet during thread shutdown"),
+                        owned: LocalOwnedTasks::new(),
+                        local_queue: UnsafeCell::new(VecDeque::with_capacity(INITIAL_CAPACITY)),
+                    },
                     queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
                     waker: AtomicWaker::new(),
                     #[cfg(tokio_unstable)]
@@ -641,7 +647,12 @@ impl LocalSet {
             })
         };
 
-        task.map(|task| self.context.owned.assert_owner(task))
+        task.map(|task| unsafe {
+            // Safety: because the `LocalSet` itself is `!Send`, we know we are
+            // on the same thread if we have access to the `LocalSet`, and can
+            // therefore access the local run queue.
+            self.context.shared.local_state.assert_owner(task)
+        })
     }
 
     fn pop_local(&self) -> Option<task::Notified<Arc<Shared>>> {
@@ -649,7 +660,7 @@ impl LocalSet {
             // Safety: because the `LocalSet` itself is `!Send`, we know we are
             // on the same thread if we have access to the `LocalSet`, and can
             // therefore access the local run queue.
-            self.context.shared.local_queue().pop_front()
+            self.context.shared.local_state.task_pop_front()
         }
     }
 
@@ -796,7 +807,10 @@ impl Future for LocalSet {
             // there are still tasks remaining in the run queue.
             cx.waker().wake_by_ref();
             Poll::Pending
-        } else if self.context.owned.is_empty() {
+
+        // Safety: called from the thread that owns `LocalSet`. Because
+        // `LocalSet` is `!Send`, this is safe.
+        } else if unsafe { self.context.shared.local_state.owned_is_empty() } {
             // If the scheduler has no remaining futures, we're done!
             Poll::Ready(())
         } else {
@@ -819,7 +833,10 @@ impl Drop for LocalSet {
         self.with_if_possible(|| {
             // Shut down all tasks in the LocalOwnedTasks and close it to
             // prevent new tasks from ever being added.
-            self.context.owned.close_and_shutdown_all();
+            unsafe {
+                // Safety: called from the thread that owns `LocalSet`
+                self.context.shared.local_state.close_and_shutdown_all();
+            }
 
             // We already called shutdown on all tasks above, so there is no
             // need to call shutdown.
@@ -836,7 +853,10 @@ impl Drop for LocalSet {
             // the local queue in `Drop`, because the `LocalSet` itself is
             // `!Send`, so we can reasonably guarantee that it will not be
             // `Drop`ped from another thread.
-            let local_queue = self.context.shared.local_queue.take();
+            let local_queue = unsafe {
+                // Safety: called from the thread that owns `LocalSet`
+                self.context.shared.local_state.take_local_queue()
+            };
             for task in local_queue {
                 drop(task);
             }
@@ -848,7 +868,8 @@ impl Drop for LocalSet {
                 drop(task);
             }
 
-            assert!(self.context.owned.is_empty());
+            // Safety: called from the thread that owns `LocalSet`
+            assert!(unsafe { self.context.shared.local_state.owned_is_empty() });
         });
     }
 }
@@ -865,7 +886,14 @@ impl Context {
         let id = crate::runtime::task::Id::next();
         let future = crate::util::trace::task(future, "local", name, id.as_u64());
 
-        let (handle, notified) = self.owned.bind(future, self.shared.clone(), id);
+        // Safety: called from the thread that owns the `LocalSet`
+        let (handle, notified) = {
+            self.shared.local_state.assert_called_from_owner_thread();
+            self.shared
+                .local_state
+                .owned
+                .bind(future, self.shared.clone(), id)
+        };
 
         if let Some(notified) = notified {
             self.shared.schedule(notified);
@@ -909,21 +937,6 @@ impl<T: Future> Future for RunUntil<'_, T> {
 }
 
 impl Shared {
-    /// # Safety
-    ///
-    /// This is safe to call if and ONLY if we are on the thread that owns this
-    /// `LocalSet`.
-    unsafe fn local_queue(&self) -> &VecDequeCell<task::Notified<Arc<Self>>> {
-        debug_assert!(
-            // if we couldn't get the thread ID because we're dropping the local
-            // data, skip the assertion --- the `Drop` impl is not going to be
-            // called from another thread, because `LocalSet` is `!Send`
-            thread_id().map(|id| id == self.owner).unwrap_or(true),
-            "`LocalSet`'s local run queue must not be accessed by another thread!"
-        );
-        &self.local_queue
-    }
-
     /// Schedule the provided task on the scheduler.
     fn schedule(&self, task: task::Notified<Arc<Self>>) {
         CURRENT.with(|localdata| {
@@ -931,16 +944,16 @@ impl Shared {
                 Some(cx) if cx.shared.ptr_eq(self) => unsafe {
                     // Safety: if the current `LocalSet` context points to this
                     // `LocalSet`, then we are on the thread that owns it.
-                    cx.shared.local_queue().push_back(task);
+                    cx.shared.local_state.task_push_back(task);
                 },
 
                 // We are on the thread that owns the `LocalSet`, so we can
                 // wake to the local queue.
-                _ if localdata.get_or_insert_id() == self.owner => {
+                _ if localdata.get_id() == Some(self.local_state.owner) => {
                     unsafe {
                         // Safety: we just checked that the thread ID matches
                         // the localset's owner, so this is safe.
-                        self.local_queue().push_back(task);
+                        self.local_state.task_push_back(task);
                     }
                     // We still have to wake the `LocalSet`, because it isn't
                     // currently being polled.
@@ -976,13 +989,8 @@ unsafe impl Sync for Shared {}
 
 impl task::Schedule for Arc<Shared> {
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
-        CURRENT.with(|LocalData { ctx, .. }| match ctx.get() {
-            None => panic!("scheduler context missing"),
-            Some(cx) => {
-                assert!(cx.shared.ptr_eq(self));
-                cx.owned.remove(task)
-            }
-        })
+        // Safety, this is always called from the thread that owns `LocalSet`
+        unsafe { self.local_state.task_remove(task) }
     }
 
     fn schedule(&self, task: task::Notified<Self>) {
@@ -1004,7 +1012,8 @@ impl task::Schedule for Arc<Shared> {
                     CURRENT.with(|LocalData { ctx, .. }| match ctx.get() {
                         Some(cx) if Arc::ptr_eq(self, &cx.shared) => {
                             cx.unhandled_panic.set(true);
-                            cx.owned.close_and_shutdown_all();
+                            // Safety: this is always called from the thread that owns `LocalSet`
+                            unsafe { cx.shared.local_state.close_and_shutdown_all(); }
                         }
                         _ => unreachable!("runtime core not set in CURRENT thread-local"),
                     })
@@ -1014,7 +1023,91 @@ impl task::Schedule for Arc<Shared> {
     }
 }
 
+impl LocalState {
+    unsafe fn task_pop_front(&self) -> Option<task::Notified<Arc<Shared>>> {
+        // The caller ensures it is called from the same thread that owns
+        // the LocalSet.
+        self.assert_called_from_owner_thread();
+
+        self.local_queue.with_mut(|ptr| (*ptr).pop_front())
+    }
+
+    unsafe fn task_push_back(&self, task: task::Notified<Arc<Shared>>) {
+        // The caller ensures it is called from the same thread that owns
+        // the LocalSet.
+        self.assert_called_from_owner_thread();
+
+        self.local_queue.with_mut(|ptr| (*ptr).push_back(task))
+    }
+
+    unsafe fn take_local_queue(&self) -> VecDeque<task::Notified<Arc<Shared>>> {
+        // The caller ensures it is called from the same thread that owns
+        // the LocalSet.
+        self.assert_called_from_owner_thread();
+
+        self.local_queue.with_mut(|ptr| std::mem::take(&mut (*ptr)))
+    }
+
+    unsafe fn task_remove(&self, task: &Task<Arc<Shared>>) -> Option<Task<Arc<Shared>>> {
+        // The caller ensures it is called from the same thread that owns
+        // the LocalSet.
+        self.assert_called_from_owner_thread();
+
+        self.owned.remove(task)
+    }
+
+    /// Returns true if the `LocalSet` does not have any spawned tasks
+    unsafe fn owned_is_empty(&self) -> bool {
+        // The caller ensures it is called from the same thread that owns
+        // the LocalSet.
+        self.assert_called_from_owner_thread();
+
+        self.owned.is_empty()
+    }
+
+    unsafe fn assert_owner(
+        &self,
+        task: task::Notified<Arc<Shared>>,
+    ) -> task::LocalNotified<Arc<Shared>> {
+        // The caller ensures it is called from the same thread that owns
+        // the LocalSet.
+        self.assert_called_from_owner_thread();
+
+        self.owned.assert_owner(task)
+    }
+
+    unsafe fn close_and_shutdown_all(&self) {
+        // The caller ensures it is called from the same thread that owns
+        // the LocalSet.
+        self.assert_called_from_owner_thread();
+
+        self.owned.close_and_shutdown_all()
+    }
+
+    #[track_caller]
+    fn assert_called_from_owner_thread(&self) {
+        // FreeBSD has some weirdness around thread-local destruction.
+        // TODO: remove this hack when thread id is cleaned up
+        #[cfg(not(any(target_os = "openbsd", target_os = "freebsd")))]
+        debug_assert!(
+            // if we couldn't get the thread ID because we're dropping the local
+            // data, skip the assertion --- the `Drop` impl is not going to be
+            // called from another thread, because `LocalSet` is `!Send`
+            thread_id().map(|id| id == self.owner).unwrap_or(true),
+            "`LocalSet`'s local run queue must not be accessed by another thread!"
+        );
+    }
+}
+
+// This is `Send` because it is stored in `Shared`. It is up to the caller to
+// ensure they are on the same thread that owns the `LocalSet`.
+unsafe impl Send for LocalState {}
+
 impl LocalData {
+    fn get_id(&self) -> Option<ThreadId> {
+        self.thread_id.get()
+    }
+
     fn get_or_insert_id(&self) -> ThreadId {
         self.thread_id.get().unwrap_or_else(|| {
             let id = thread::current().id();
@@ -1089,7 +1182,7 @@ mod tests {
             .await;
 
             notify.notify_one();
-            let task = unsafe { local.context.shared.local_queue().pop_front() };
+            let task = unsafe { local.context.shared.local_state.task_pop_front() };
             // TODO(eliza): it would be nice to be able to assert that this is
             // the local task.
             assert!(
