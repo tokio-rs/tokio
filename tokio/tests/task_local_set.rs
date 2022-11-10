@@ -603,7 +603,6 @@ fn store_local_set_in_thread_local_with_runtime() {
         }
     }
 
-    // will panic
     CURRENT.with(|f| {
         f.method();
     });
