@@ -155,7 +155,9 @@ impl<T: Future> CoreStage<T> {
     pub(super) fn with_mut<R>(&self, f: impl FnOnce(*mut Stage<T>) -> R) -> R {
         self.stage.with_mut(f)
     }
+}
 
+impl<T: Future, S: Schedule> Core<T, S> {
     /// Polls the future.
     ///
     /// # Safety
@@ -171,7 +173,7 @@ impl<T: Future> CoreStage<T> {
     /// heap.
     pub(super) fn poll(&self, mut cx: Context<'_>) -> Poll<T::Output> {
         let res = {
-            self.stage.with_mut(|ptr| {
+            self.stage.stage.with_mut(|ptr| {
                 // Safety: The caller ensures mutual exclusion to the field.
                 let future = match unsafe { &mut *ptr } {
                     Stage::Running(future) => future,
@@ -224,7 +226,7 @@ impl<T: Future> CoreStage<T> {
     pub(super) fn take_output(&self) -> super::Result<T::Output> {
         use std::mem;
 
-        self.stage.with_mut(|ptr| {
+        self.stage.stage.with_mut(|ptr| {
             // Safety:: the caller ensures mutual exclusion to the field.
             match mem::replace(unsafe { &mut *ptr }, Stage::Consumed) {
                 Stage::Finished(output) => output,
@@ -234,7 +236,7 @@ impl<T: Future> CoreStage<T> {
     }
 
     unsafe fn set_stage(&self, stage: Stage<T>) {
-        self.stage.with_mut(|ptr| *ptr = stage)
+        self.stage.stage.with_mut(|ptr| *ptr = stage)
     }
 }
 

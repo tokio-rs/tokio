@@ -31,8 +31,6 @@
 
 use crate::runtime::context;
 
-use std::cell::Cell;
-
 /// Opaque type tracking the amount of "work" a task may still do before
 /// yielding back to the scheduler.
 #[derive(Debug, Copy, Clone)]
@@ -79,37 +77,42 @@ pub(crate) fn with_unconstrained<R>(f: impl FnOnce() -> R) -> R {
 
 #[inline(always)]
 fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
-    struct ResetGuard<'a> {
-        cell: &'a Cell<Budget>,
+    struct ResetGuard {
         prev: Budget,
     }
 
-    impl<'a> Drop for ResetGuard<'a> {
+    impl Drop for ResetGuard {
         fn drop(&mut self) {
-            self.cell.set(self.prev);
+            let _ = context::budget(|cell| {
+                cell.set(self.prev);
+            });
         }
     }
 
-    context::budget(|cell| {
+    #[allow(unused_variables)]
+    let maybe_guard = context::budget(|cell| {
         let prev = cell.get();
-
         cell.set(budget);
 
-        let _guard = ResetGuard { cell, prev };
+        ResetGuard { prev }
+    });
 
-        f()
-    })
+    // The function is called regardless even if the budget is not successfully
+    // set due to the thread-local being destroyed.
+    f()
 }
 
 #[inline(always)]
 pub(crate) fn has_budget_remaining() -> bool {
-    context::budget(|cell| cell.get().has_remaining())
+    // If the current budget cannot be accessed due to the thread-local being
+    // shutdown, then we assume there is budget remaining.
+    context::budget(|cell| cell.get().has_remaining()).unwrap_or(true)
 }
 
 cfg_rt_multi_thread! {
     /// Sets the current task's budget.
     pub(crate) fn set(budget: Budget) {
-        context::budget(|cell| cell.set(budget))
+        let _ = context::budget(|cell| cell.set(budget));
     }
 }
 
@@ -122,11 +125,12 @@ cfg_rt! {
             let prev = cell.get();
             cell.set(Budget::unconstrained());
             prev
-        })
+        }).unwrap_or(Budget::unconstrained())
     }
 }
 
 cfg_coop! {
+    use std::cell::Cell;
     use std::task::{Context, Poll};
 
     #[must_use]
@@ -144,7 +148,7 @@ cfg_coop! {
             // They are both represented as the remembered budget being unconstrained.
             let budget = self.0.get();
             if !budget.is_unconstrained() {
-                context::budget(|cell| {
+                let _ = context::budget(|cell| {
                     cell.set(budget);
                 });
             }
@@ -176,7 +180,7 @@ cfg_coop! {
                 cx.waker().wake_by_ref();
                 Poll::Pending
             }
-        })
+        }).unwrap_or(Poll::Ready(RestoreOnPending(Cell::new(Budget::unconstrained()))))
     }
 
     impl Budget {
@@ -209,7 +213,7 @@ mod test {
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     fn get() -> Budget {
-        context::budget(|cell| cell.get())
+        context::budget(|cell| cell.get()).unwrap_or(Budget::unconstrained())
     }
 
     #[test]
