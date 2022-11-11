@@ -942,7 +942,21 @@ cfg_io_driver! {
             self
         }
 
-        pub fn set_events_capacity(&mut self, capacity: usize) -> &mut Self {
+        /// Enables the I/O driver and configures the capacity of events to be 
+        /// processed per tick.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .enable_io()
+        ///     .with_events_capacity(1024)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn with_events_capacity(&mut self, capacity: usize) -> &mut Self {
             self.nevents = capacity;
             self
         }
