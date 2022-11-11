@@ -1,4 +1,6 @@
 use crate::runtime::coop;
+
+#[cfg(feature = "rt")]
 use crate::runtime::task::Id;
 
 use std::cell::Cell;
