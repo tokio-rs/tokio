@@ -952,11 +952,11 @@ cfg_io_driver! {
         ///
         /// let rt = runtime::Builder::new_current_thread()
         ///     .enable_io()
-        ///     .with_events_capacity(1024)
+        ///     .events_capacity(1024)
         ///     .build()
         ///     .unwrap();
         /// ```
-        pub fn with_events_capacity(&mut self, capacity: usize) -> &mut Self {
+        pub fn events_capacity(&mut self, capacity: usize) -> &mut Self {
             self.nevents = capacity;
             self
         }
