@@ -41,6 +41,7 @@ impl ThreadId {
 }
 
 #[cold]
+#[allow(dead_code)]
 fn exhausted() -> ! {
     panic!("failed to generate unique thread ID: bitspace exhausted")
 }
