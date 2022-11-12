@@ -208,6 +208,7 @@ fn task_try_id_outside_task() {
     assert_eq!(None, task::try_id());
 }
 
+#[cfg(not(tokio_wasi))]
 #[test]
 fn task_try_id_inside_block_on() {
     let rt = Runtime::new().unwrap();
