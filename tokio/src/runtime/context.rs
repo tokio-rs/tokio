@@ -1,8 +1,5 @@
 use crate::runtime::coop;
 
-#[cfg(feature = "rt")]
-use crate::runtime::task::Id;
-
 use std::cell::Cell;
 
 #[cfg(any(feature = "rt", feature = "macros"))]
@@ -10,6 +7,7 @@ use crate::util::rand::{FastRand, RngSeed};
 
 cfg_rt! {
     use crate::runtime::scheduler;
+    use crate::runtime::task::Id;
 
     use std::cell::RefCell;
     use std::marker::PhantomData;

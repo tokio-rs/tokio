@@ -192,13 +192,13 @@ use std::{fmt, mem};
 /// # Notes
 ///
 /// - Task IDs are unique relative to other *currently running* tasks. When a
-/// task completes, the same ID may be used for another task. - Task IDs are
-/// *not* sequential, and do not indicate the order in which tasks are spawned,
-/// what runtime a task is spawned on, or any other data. - The task ID of the
-/// currently running task can be obtained from inside the task via the
-/// [`task::try_id()`](crate::task::try_id()) and
-/// [`task::id()`](crate::task::id()) functions and from outside the task via
-/// the [`JoinHandle::id()`](crate::task::JoinHandle::id()) function.
+///   task completes, the same ID may be used for another task.
+/// - Task IDs are *not* sequential, and do not indicate the order in which
+///   tasks are spawned, what runtime a task is spawned on, or any other data.
+/// - The task ID of the currently running task can be obtained from inside the
+///   task via the [`task::try_id()`](crate::task::try_id()) and
+///   [`task::id()`](crate::task::id()) functions and from outside the task via
+///   the [`JoinHandle::id()`](crate::task::JoinHandle::id()) function.
 ///
 /// **Note**: This is an [unstable API][unstable]. The public API of this type
 /// may break in 1.x releases. See [the documentation on unstable
