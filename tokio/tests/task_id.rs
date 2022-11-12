@@ -12,6 +12,7 @@ use tokio::runtime::{Builder, Runtime};
 use tokio::sync::oneshot;
 use tokio::task::{self, Id, LocalSet};
 
+#[cfg(not(tokio_wasi))]
 mod support {
     pub mod panic;
 }
