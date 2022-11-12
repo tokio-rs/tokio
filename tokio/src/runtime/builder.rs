@@ -942,7 +942,7 @@ cfg_io_driver! {
             self
         }
 
-        /// Enables the I/O driver and configures the capacity of events to be 
+        /// Enables the I/O driver and configures the capacity of events to be
         /// processed per tick.
         ///
         /// # Examples
