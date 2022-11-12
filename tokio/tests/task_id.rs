@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![allow(clippy::declare_interior_mutable_const)]
-#![cfg(all(feature = "full", tokio_unstable, not(tokio_wasi)))]
+#![cfg(all(feature = "full", tokio_unstable))]
 
 use std::error::Error;
 use std::future::Future;
@@ -119,6 +119,7 @@ async fn task_id_future_destructor_abort() {
     let handle = tokio::spawn(MyFuture { tx: Some(tx) });
     let id = handle.id();
     handle.abort();
+    assert!(handle.await.unwrap_err().is_cancelled());
     assert_eq!(rx.await.unwrap(), id);
 }
 
@@ -146,10 +147,11 @@ async fn task_id_output_destructor_handle_dropped_before_completion() {
         }
     }
 
-    let (tx, rx) = oneshot::channel();
+    let (tx, mut rx) = oneshot::channel();
     let handle = tokio::spawn(MyFuture { tx: Some(tx) });
     let id = handle.id();
     drop(handle);
+    assert!(rx.try_recv().is_err());
     assert_eq!(rx.await.unwrap(), id);
 }
 
@@ -181,7 +183,7 @@ async fn task_id_output_destructor_handle_dropped_after_completion() {
         }
     }
 
-    let (tx_output, rx_output) = oneshot::channel();
+    let (tx_output, mut rx_output) = oneshot::channel();
     let (tx_future, rx_future) = oneshot::channel();
     let handle = tokio::spawn(MyFuture {
         tx_output: Some(tx_output),
@@ -189,6 +191,7 @@ async fn task_id_output_destructor_handle_dropped_after_completion() {
     });
     let id = handle.id();
     rx_future.await.unwrap();
+    assert!(rx_output.try_recv().is_err());
     drop(handle);
     assert_eq!(rx_output.await.unwrap(), id);
 }
@@ -259,6 +262,7 @@ async fn task_id_block_in_place_block_on_spawn() {
     .unwrap();
 }
 
+#[cfg(not(tokio_wasi))]
 #[test]
 fn task_id_outside_task_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -271,6 +275,7 @@ fn task_id_outside_task_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(not(tokio_wasi))]
 #[test]
 fn task_id_inside_block_on_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
