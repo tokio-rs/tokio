@@ -7,6 +7,7 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+#[cfg(not(tokio_wasi))]
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::oneshot;
 use tokio::task::{self, Id, LocalSet};
