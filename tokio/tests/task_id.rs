@@ -2,6 +2,7 @@
 #![allow(clippy::declare_interior_mutable_const)]
 #![cfg(all(feature = "full", tokio_unstable))]
 
+#[cfg_attr(tokio_wasm, ignore)]
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
@@ -13,6 +14,7 @@ use tokio::task::{self, Id, LocalSet};
 mod support {
     pub mod panic;
 }
+#[cfg_attr(tokio_wasm, ignore)]
 use support::panic::test_panic;
 
 #[tokio::test(flavor = "current_thread")]
@@ -22,6 +24,7 @@ async fn task_id_spawn() {
         .unwrap();
 }
 
+#[cfg_attr(tokio_wasm, ignore)]
 #[tokio::test(flavor = "current_thread")]
 async fn task_id_spawn_blocking() {
     task::spawn_blocking(|| println!("task id: {}", task::id()))
@@ -38,6 +41,7 @@ async fn task_id_collision_current_thread() {
     assert_ne!(id1.unwrap(), id2.unwrap());
 }
 
+#[cfg_attr(tokio_wasm, ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn task_id_collision_multi_thread() {
     let handle1 = tokio::spawn(async { task::id() });
@@ -58,6 +62,7 @@ async fn task_ids_match_current_thread() {
     handle.await.unwrap();
 }
 
+#[cfg_attr(tokio_wasm, ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn task_ids_match_multi_thread() {
     let (tx, rx) = oneshot::channel();
@@ -69,6 +74,7 @@ async fn task_ids_match_multi_thread() {
     handle.await.unwrap();
 }
 
+#[cfg_attr(tokio_wasm, ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn task_id_future_destructor_completion() {
     struct MyFuture {
@@ -96,6 +102,7 @@ async fn task_id_future_destructor_completion() {
     assert_eq!(rx.await.unwrap(), id);
 }
 
+#[cfg_attr(tokio_wasm, ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn task_id_future_destructor_abort() {
     struct MyFuture {
@@ -243,6 +250,7 @@ async fn task_id_nested_spawn_local() {
         .await;
 }
 
+#[cfg_attr(tokio_wasm, ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn task_id_block_in_place_block_on_spawn() {
     task::spawn(async {
@@ -262,7 +270,7 @@ async fn task_id_block_in_place_block_on_spawn() {
     .unwrap();
 }
 
-#[cfg(not(tokio_wasi))]
+#[cfg_attr(tokio_wasm, ignore)]
 #[test]
 fn task_id_outside_task_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -275,7 +283,7 @@ fn task_id_outside_task_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(not(tokio_wasi))]
+#[cfg_attr(tokio_wasm, ignore)]
 #[test]
 fn task_id_inside_block_on_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
