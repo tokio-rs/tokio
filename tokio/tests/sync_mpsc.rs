@@ -7,18 +7,13 @@ use wasm_bindgen_test::wasm_bindgen_test as test;
 #[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
+use std::fmt;
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
 #[cfg(not(tokio_wasm_not_wasi))]
 use tokio::test as maybe_tokio_test;
-
-use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
-use tokio::sync::mpsc::{self, channel, unbounded_channel};
-use tokio::sync::oneshot;
 use tokio_test::*;
-
-use std::fmt;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Acquire, Release};
-use std::sync::Arc;
 
 #[cfg(not(tokio_wasm))]
 mod support {

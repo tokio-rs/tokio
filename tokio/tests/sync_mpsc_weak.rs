@@ -7,7 +7,7 @@ use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Release};
-use tokio::sync::mpsc::{channel, unbounded_channel, self};
+use tokio::sync::mpsc::{self, channel, unbounded_channel};
 use tokio::sync::oneshot;
 
 #[tokio::test]
@@ -511,4 +511,3 @@ async fn test_tx_count_weak_unbounded_sender() {
 
     assert!(tx_weak.upgrade().is_none() && tx_weak2.upgrade().is_none());
 }
-
