@@ -210,16 +210,16 @@ async fn test_msgs_dropped_on_rx_drop() {
 }
 
 // Tests that a `WeakSender` is upgradeable when other `Sender`s exist.
-#[tokio::test]
-async fn downgrade_upgrade_sender_success() {
+#[test]
+fn downgrade_upgrade_sender_success() {
     let (tx, _rx) = mpsc::channel::<i32>(1);
     let weak_tx = tx.downgrade();
     assert!(weak_tx.upgrade().is_some());
 }
 
 // Tests that a `WeakSender` fails to upgrade when no other `Sender` exists.
-#[tokio::test]
-async fn downgrade_upgrade_sender_failure() {
+#[test]
+fn downgrade_upgrade_sender_failure() {
     let (tx, _rx) = mpsc::channel::<i32>(1);
     let weak_tx = tx.downgrade();
     drop(tx);
@@ -228,8 +228,8 @@ async fn downgrade_upgrade_sender_failure() {
 
 // Tests that a `WeakSender` cannot be upgraded after a `Sender` was dropped,
 // which existed at the time of the `downgrade` call.
-#[tokio::test]
-async fn downgrade_drop_upgrade() {
+#[test]
+fn downgrade_drop_upgrade() {
     let (tx, _rx) = mpsc::channel::<i32>(1);
 
     // the cloned `Tx` is dropped right away
@@ -261,8 +261,8 @@ async fn downgrade_upgrade_get_permit_no_senders() {
 }
 
 // Tests that `downgrade` does not change the `tx_count` of the channel.
-#[tokio::test]
-async fn test_tx_count_weak_sender() {
+#[test]
+fn test_tx_count_weak_sender() {
     let (tx, _rx) = mpsc::channel::<i32>(1);
     let tx_weak = tx.downgrade();
     let tx_weak2 = tx.downgrade();
@@ -472,8 +472,8 @@ async fn test_msgs_dropped_on_unbounded_rx_drop() {
 
 // Tests that an `WeakUnboundedSender` is upgradeable when other
 // `UnboundedSender`s exist.
-#[tokio::test]
-async fn downgrade_upgrade_unbounded_sender_success() {
+#[test]
+fn downgrade_upgrade_unbounded_sender_success() {
     let (tx, _rx) = mpsc::unbounded_channel::<i32>();
     let weak_tx = tx.downgrade();
     assert!(weak_tx.upgrade().is_some());
@@ -481,8 +481,8 @@ async fn downgrade_upgrade_unbounded_sender_success() {
 
 // Tests that a `WeakUnboundedSender` fails to upgrade when no other
 // `UnboundedSender` exists.
-#[tokio::test]
-async fn downgrade_upgrade_unbounded_sender_failure() {
+#[test]
+fn downgrade_upgrade_unbounded_sender_failure() {
     let (tx, _rx) = mpsc::unbounded_channel::<i32>();
     let weak_tx = tx.downgrade();
     drop(tx);
@@ -491,8 +491,8 @@ async fn downgrade_upgrade_unbounded_sender_failure() {
 
 // Tests that an `WeakUnboundedSender` cannot be upgraded after an
 // `UnboundedSender` was dropped, which existed at the time of the `downgrade` call.
-#[tokio::test]
-async fn downgrade_drop_upgrade_unbounded() {
+#[test]
+fn downgrade_drop_upgrade_unbounded() {
     let (tx, _rx) = mpsc::unbounded_channel::<i32>();
 
     // the cloned `Tx` is dropped right away
@@ -502,8 +502,8 @@ async fn downgrade_drop_upgrade_unbounded() {
 }
 
 // Tests that `downgrade` does not change the `tx_count` of the channel.
-#[tokio::test]
-async fn test_tx_count_weak_unbounded_sender() {
+#[test]
+fn test_tx_count_weak_unbounded_sender() {
     let (tx, _rx) = mpsc::unbounded_channel::<i32>();
     let tx_weak = tx.downgrade();
     let tx_weak2 = tx.downgrade();
