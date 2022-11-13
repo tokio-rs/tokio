@@ -318,7 +318,7 @@ cfg_rt! {
     pub mod join_set;
 
     cfg_unstable! {
-        pub use crate::runtime::task::Id;
+        pub use crate::runtime::task::{Id, id, try_id};
     }
 
     cfg_trace! {
