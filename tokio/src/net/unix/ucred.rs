@@ -1,4 +1,4 @@
-use libc::{gid_t, pid_t, uid_t};
+use crate::net::unix::{gid_t, pid_t, uid_t};
 
 /// Credentials of a process.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
