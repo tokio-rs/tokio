@@ -271,6 +271,25 @@ async fn blocking_task_wakes_paused_runtime() {
 
 #[cfg(feature = "test-util")]
 #[tokio::test(start_paused = true)]
+async fn unawaited_blocking_task_wakes_paused_runtime() {
+    let t0 = std::time::Instant::now();
+
+    // When this task finishes, time should auto-advance, even though the
+    // JoinHandle has not been awaited yet.
+    let a = task::spawn_blocking(|| {
+        thread::sleep(Duration::from_millis(20));
+    });
+
+    crate::time::sleep(Duration::from_secs(15)).await;
+    a.await.expect("blocking task should finish");
+    assert!(
+        t0.elapsed() < Duration::from_secs(10),
+        "completing a spawn_blocking should wake the scheduler if it's parked while time is paused"
+    );
+}
+
+#[cfg(feature = "test-util")]
+#[tokio::test(start_paused = true)]
 async fn panicking_blocking_task_wakes_paused_runtime() {
     let t0 = std::time::Instant::now();
     let result = time::timeout(

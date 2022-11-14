@@ -132,13 +132,6 @@ cfg_test_util! {
         inner.unfrozen = Some(std::time::Instant::now());
     }
 
-    /// Temporarily stop auto-advancing the clock (see `tokio::time::pause`).
-    pub(crate) fn inhibit_auto_advance() -> Clock {
-        let clock = clock().expect("can't inhibit auto-advance from outside the Tokio runtime");
-        clock.inhibit_auto_advance();
-        clock
-    }
-
     /// Advances time.
     ///
     /// Increments the saved `Instant::now()` value by `duration`. Subsequent
@@ -223,7 +216,8 @@ cfg_test_util! {
             inner.unfrozen = None;
         }
 
-        fn inhibit_auto_advance(&self) {
+        /// Temporarily stop auto-advancing the clock (see `tokio::time::pause`).
+        pub(crate) fn inhibit_auto_advance(&self) {
             let mut inner = self.inner.lock();
             inner.auto_advance_inhibit_count += 1;
         }
