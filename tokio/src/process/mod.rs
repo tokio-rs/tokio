@@ -1269,8 +1269,12 @@ impl Child {
         {
             loop {
                 let mut v = vec![];
-                if pipe.read_buf(&mut v).await.is_ok() {
-                    if sender.send(v).is_err() {
+                if let Ok(written) = pipe.read_buf(&mut v).await {
+                    if written > 0 {
+                        if sender.send(v).is_err() {
+                            break;
+                        }
+                    } else {
                         break;
                     }
                 } else {

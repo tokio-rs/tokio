@@ -120,17 +120,17 @@ async fn unbounded_streaming() {
     streams.stdin.unwrap().send(write_bytes.to_vec()).unwrap();
     async fn combine_streamed_data(mut r: UnboundedReceiver<Vec<u8>>) -> Vec<u8> {
         let mut v = Vec::new();
-        while let Ok(bytes) = r.try_recv() {
+        while let Some(bytes) = r.recv().await {
             v.extend(bytes);
         }
         v
     }
 
-    assert!(streams.status.await.unwrap().unwrap().success());
     let stdout = combine_streamed_data(streams.stdout.unwrap()).await;
     let stderr = combine_streamed_data(streams.stderr.unwrap()).await;
     assert_eq!(stdout, write_bytes);
     assert_eq!(stderr.len(), 0);
+    assert!(streams.status.await.unwrap().unwrap().success());
 }
 
 #[tokio::test]
