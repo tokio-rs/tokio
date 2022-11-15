@@ -245,6 +245,12 @@ mod kill;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::process::kill::Kill;
 
+#[cfg(all(feature = "sync", feature = "io-util", feature = "rt-multi-thread"))]
+use crate::sync::{
+    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    oneshot,
+};
+
 use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::future::Future;
@@ -1239,6 +1245,81 @@ impl Child {
             stderr,
         })
     }
+
+    /// Starts streaming stdout and stderr into unbounded channels, in addition to a future that will eventually
+    /// resolve to the exit code for the process. If these queues are not received from, they will
+    /// cause memory usage to grow forever. This function is most useful to people who need to stream stdout and
+    /// stderr, and have no tolerance for the child process blocking due to running out of space in the stdio buffers.
+    #[cfg(all(feature = "sync", feature = "io-util", feature = "rt-multi-thread"))]
+    pub fn unbounded_streaming(mut self) -> ChildUnboundedStream {
+        use crate::io::{AsyncReadExt, AsyncWriteExt};
+        use crate::spawn;
+
+        let stdin_pipe = self.stdin.take();
+        let stdout_pipe = self.stdout.take();
+        let stderr_pipe = self.stderr.take();
+        let (stdin_sender, mut stdin_receiver) = unbounded_channel::<Vec<u8>>();
+        let (stdout_sender, stdout_receiver) = unbounded_channel();
+        let (stderr_sender, stderr_receiver) = unbounded_channel();
+        let (exit_sender, exit_receiver) = oneshot::channel();
+
+        async fn unbounded_buffers<P>(mut pipe: P, sender: UnboundedSender<Vec<u8>>)
+        where
+            P: AsyncRead + Unpin,
+        {
+            loop {
+                let mut v = vec![];
+                if pipe.read_buf(&mut v).await.is_ok() {
+                    if sender.send(v).is_err() {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+        let had_stdout = stdout_pipe.is_some();
+        if let Some(s) = stdout_pipe {
+            spawn(unbounded_buffers(s, stdout_sender));
+        }
+        let had_stderr = stderr_pipe.is_some();
+        if let Some(s) = stderr_pipe {
+            spawn(unbounded_buffers(s, stderr_sender));
+        }
+        let had_stdin = stdin_pipe.is_some();
+        if let Some(mut stdin_pipe) = stdin_pipe {
+            spawn(async move {
+                loop {
+                    match stdin_receiver.recv().await {
+                        Some(buf) => {
+                            if stdin_pipe.write_all(&buf).await.is_err() {
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
+                }
+            });
+        }
+        spawn(async move {
+            let _ = exit_sender.send(self.wait().await);
+        });
+
+        ChildUnboundedStream {
+            stdin: if had_stdin { Some(stdin_sender) } else { None },
+            stdout: if had_stdout {
+                Some(stdout_receiver)
+            } else {
+                None
+            },
+            stderr: if had_stderr {
+                Some(stderr_receiver)
+            } else {
+                None
+            },
+            status: exit_receiver,
+        }
+    }
 }
 
 /// The standard input stream for spawned children.
@@ -1373,6 +1454,22 @@ impl TryInto<Stdio> for ChildStderr {
     fn try_into(self) -> Result<Stdio, Self::Error> {
         imp::convert_to_stdio(self.inner)
     }
+}
+
+/// Contains the asynchronous receivers for [`Child::unbounded_streaming`].
+///
+/// If these aren't emptied periodically they will grow the memory usage forever.
+#[cfg(all(feature = "sync", feature = "rt-multi-thread", feature = "io-util"))]
+#[derive(Debug)]
+pub struct ChildUnboundedStream {
+    /// Can be used to send buffers into the child's stdin.
+    pub stdin: Option<UnboundedSender<Vec<u8>>>,
+    /// Receives byte buffers from the child's stdout, if any stdout is emitted.
+    pub stdout: Option<UnboundedReceiver<Vec<u8>>>,
+    /// Receives byte buffers from the child's stderr, if any stderr is emitted.
+    pub stderr: Option<UnboundedReceiver<Vec<u8>>>,
+    /// Receives the exit code emitted by the child when it shuts down, or an error if the code couldn't be retrieved.
+    pub status: oneshot::Receiver<io::Result<ExitStatus>>,
 }
 
 #[cfg(unix)]

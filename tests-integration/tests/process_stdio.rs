@@ -4,6 +4,7 @@
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::join;
 use tokio::process::{Child, Command};
+use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_test::assert_ok;
 
 use futures::future::{self, FutureExt};
@@ -107,6 +108,29 @@ async fn wait_with_output_captures() {
     assert!(output.status.success());
     assert_eq!(output.stdout, write_bytes);
     assert_eq!(output.stderr.len(), 0);
+}
+
+#[tokio::test]
+async fn unbounded_streaming() {
+    let child = cat().stderr(Stdio::piped()).spawn().unwrap();
+
+    let write_bytes = b"1234";
+
+    let streams = child.unbounded_streaming();
+    streams.stdin.unwrap().send(write_bytes.to_vec()).unwrap();
+    async fn combine_streamed_data(mut r: UnboundedReceiver<Vec<u8>>) -> Vec<u8> {
+        let mut v = Vec::new();
+        while let Ok(bytes) = r.try_recv() {
+            v.extend(bytes);
+        }
+        v
+    }
+
+    assert!(streams.status.await.unwrap().unwrap().success());
+    let stdout = combine_streamed_data(streams.stdout.unwrap()).await;
+    let stderr = combine_streamed_data(streams.stderr.unwrap()).await;
+    assert_eq!(stdout, write_bytes);
+    assert_eq!(stderr.len(), 0);
 }
 
 #[tokio::test]
