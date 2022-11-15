@@ -869,14 +869,13 @@ rt_test! {
     #[test]
     fn io_notify_while_shutting_down() {
         use tokio::net::UdpSocket;
-        use std::net::Ipv6Addr;
         use std::sync::Arc;
 
         for _ in 1..10 {
             let runtime = rt();
 
             runtime.block_on(async {
-                let socket = UdpSocket::bind((Ipv6Addr::LOCALHOST, 0)).await.unwrap();
+                let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
                 let addr = socket.local_addr().unwrap();
                 let send_half = Arc::new(socket);
                 let recv_half = send_half.clone();
