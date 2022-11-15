@@ -1252,6 +1252,8 @@ impl Child {
     /// stderr, and have no tolerance for the child process blocking due to running out of space in the stdio buffers.
     #[cfg(all(feature = "sync", feature = "io-util", feature = "rt-multi-thread"))]
     pub fn unbounded_streaming(mut self) -> ChildUnboundedStream {
+        use std::mem;
+
         use crate::io::{AsyncReadExt, AsyncWriteExt};
         use crate::spawn;
 
@@ -1267,14 +1269,10 @@ impl Child {
         where
             P: AsyncRead + Unpin,
         {
-            loop {
-                let mut v = vec![];
-                if let Ok(written) = pipe.read_buf(&mut v).await {
-                    if written > 0 {
-                        if sender.send(v).is_err() {
-                            break;
-                        }
-                    } else {
+            let mut v = vec![];
+            while let Ok(written) = pipe.read_buf(&mut v).await {
+                if written > 0 {
+                    if sender.send(mem::take(&mut v)).is_err() {
                         break;
                     }
                 } else {
@@ -1293,14 +1291,9 @@ impl Child {
         let had_stdin = stdin_pipe.is_some();
         if let Some(mut stdin_pipe) = stdin_pipe {
             spawn(async move {
-                loop {
-                    match stdin_receiver.recv().await {
-                        Some(buf) => {
-                            if stdin_pipe.write_all(&buf).await.is_err() {
-                                break;
-                            }
-                        }
-                        None => break,
+                while let Some(buf) = stdin_receiver.recv().await {
+                    if stdin_pipe.write_all(&buf).await.is_err() {
+                        break;
                     }
                 }
             });
