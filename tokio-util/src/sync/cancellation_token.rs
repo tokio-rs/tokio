@@ -275,7 +275,8 @@ impl Future for WaitForCancellationFutureOwned {
             }
 
             let future = this
-                .get_future_mut()
+                .future
+                .as_deref_mut()
                 // Safety:
                 //
                 // `self` is pinned, so self.future is also pinned.
@@ -331,18 +332,6 @@ impl WaitForCancellationFutureOwned {
 
             self.future = None;
         }
-    }
-
-    // Use explicit lifetime here just to be clear what this function is doing.
-    #[allow(clippy::needless_lifetimes)]
-    fn get_future_mut<'a>(&'a mut self) -> Option<&mut tokio::sync::futures::Notified<'a>> {
-        self.future
-            .as_mut()
-            // Safety:
-            //
-            // The future itself references cancellation_token, so its
-            // lifetime must be at least as long as 'a.
-            .map(|fut| unsafe { mem::transmute(fut) })
     }
 }
 
