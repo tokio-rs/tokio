@@ -86,13 +86,10 @@ fn spawn_blocking_when_paused() {
         let _enter = handle.enter();
         let a = crate::task::spawn_blocking(|| {});
         let b = crate::task::spawn_blocking(|| {});
-        rt.block_on(crate::time::timeout(
-            Duration::from_millis(1),
-            async move {
-                a.await.expect("blocking task should finish");
-                b.await.expect("blocking task should finish");
-            }
-        ))
+        rt.block_on(crate::time::timeout(Duration::from_millis(1), async move {
+            a.await.expect("blocking task should finish");
+            b.await.expect("blocking task should finish");
+        }))
         .expect("timeout should not trigger");
     });
 }
