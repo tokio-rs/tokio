@@ -379,7 +379,7 @@ impl Spawner {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
 
-        let (task, handle) = task::unowned(fut, BlockingSchedule::new(), id);
+        let (task, handle) = task::unowned(fut, BlockingSchedule::new(rt), id);
 
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
         (handle, spawned)

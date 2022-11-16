@@ -1,6 +1,7 @@
-use crate::runtime::task::{self, Task};
 #[cfg(feature = "test-util")]
-use crate::runtime::{scheduler, Handle};
+use crate::runtime::scheduler;
+use crate::runtime::task::{self, Task};
+use crate::runtime::Handle;
 
 /// `task::Schedule` implementation that does nothing (except some bookkeeping
 /// in test-util builds). This is unique to the blocking scheduler as tasks
@@ -14,20 +15,21 @@ pub(crate) struct BlockingSchedule {
 }
 
 impl BlockingSchedule {
-    pub(crate) fn new() -> Self {
+    #[cfg_attr(not(feature = "test-util"), allow(unused_variables))]
+    pub(crate) fn new(handle: &Handle) -> Self {
+        #[cfg(feature = "test-util")]
+        {
+            match &handle.inner {
+                scheduler::Handle::CurrentThread(handle) => {
+                    handle.driver.clock.inhibit_auto_advance();
+                }
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                scheduler::Handle::MultiThread(_) => {}
+            }
+        }
         BlockingSchedule {
             #[cfg(feature = "test-util")]
-            handle: {
-                let handle = Handle::current();
-                match &handle.inner {
-                    scheduler::Handle::CurrentThread(handle) => {
-                        handle.driver.clock.inhibit_auto_advance();
-                    }
-                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                    scheduler::Handle::MultiThread(_) => {}
-                }
-                handle
-            },
+            handle: handle.clone(),
         }
     }
 }
