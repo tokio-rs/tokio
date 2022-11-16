@@ -320,15 +320,8 @@ impl Future for WaitForCancellationFutureOwned {
 }
 
 impl WaitForCancellationFutureOwned {
-    fn do_drop_future<'a>(&'a mut self) {
+    fn do_drop_future(&mut self) {
         if let Some(future) = self.future.as_mut() {
-            // Safety:
-            //
-            // The future itself refererences cancellation_token, so its
-            // lifetime must be at least as long as 'a.
-            let future: &mut mem::ManuallyDrop<tokio::sync::futures::Notified<'a>> =
-                unsafe { mem::transmute(future) };
-
             // Safety:
             //
             //  - self.future will not be used anymore.
