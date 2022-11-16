@@ -331,7 +331,8 @@ pub mod error {
     use std::fmt;
 
     /// Error returned by the `Future` implementation for `Receiver`.
-    /// This error is returned when the sender is dropped without sending.
+    ///
+    /// This error is returned by the receiver when the sender is dropped without sending.
     #[derive(Debug, Eq, PartialEq, Clone)]
     pub struct RecvError(pub(super) ());
 
