@@ -19,8 +19,12 @@ impl BlockingSchedule {
             #[cfg(feature = "test-util")]
             handle: {
                 let handle = Handle::current();
-                if let scheduler::Handle::CurrentThread(handle) = &handle.inner {
-                    handle.driver.clock.inhibit_auto_advance();
+                match &handle.inner {
+                    scheduler::Handle::CurrentThread(handle) => {
+                        handle.driver.clock.inhibit_auto_advance();
+                    }
+                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    scheduler::Handle::MultiThread(_) => {}
                 }
                 handle
             },
@@ -32,9 +36,13 @@ impl task::Schedule for BlockingSchedule {
     fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
         #[cfg(feature = "test-util")]
         {
-            if let scheduler::Handle::CurrentThread(handle) = &self.handle.inner {
-                handle.driver.clock.allow_auto_advance();
-                handle.driver.unpark();
+            match &self.handle.inner {
+                scheduler::Handle::CurrentThread(handle) => {
+                    handle.driver.clock.allow_auto_advance();
+                    handle.driver.unpark();
+                }
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                scheduler::Handle::MultiThread(_) => {}
             }
         }
         None
