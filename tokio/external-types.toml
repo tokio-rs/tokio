@@ -7,10 +7,5 @@ allowed_external_types = [
    "bytes::buf::buf_mut::BufMut",
 
    "tokio_macros::*",
-
-   # TODO(https://github.com/tokio-rs/tokio/issues/4916): Remove the libc types
-   "libc::unix::gid_t",
-   "libc::unix::pid_t",
-   "libc::unix::uid_t",
 ]
 
