@@ -309,9 +309,6 @@ impl Future for WaitForCancellationFutureOwned {
             //    which is guaranteed to have stable dereference.
             //    So even if `Notified` implements `Unpin` and `self`
             //    get moved, it would still be valid.
-            //  - We never use Notified<'static>.
-            //    Instead, it is transmuted back to Notified<'a>
-            //    where 'a is lifetime of self before being used.
             let notified: tokio::sync::futures::Notified<'static> =
                 unsafe { mem::transmute(notified) };
 
