@@ -20,21 +20,18 @@ cfg_io_util! {
 #[cfg(not(docsrs))]
 mod doc {
     pub(super) use crate::os::windows::ffi::OsStrExt;
-    pub(super) use crate::winapi::shared::minwindef::{DWORD, FALSE};
-    pub(super) use crate::winapi::um::fileapi;
-    pub(super) use crate::winapi::um::handleapi;
-    pub(super) use crate::winapi::um::namedpipeapi;
-    pub(super) use crate::winapi::um::winbase;
-    pub(super) use crate::winapi::um::winnt;
-
+    pub(super) mod windows_sys {
+        pub(crate) use windows_sys::{
+            Win32::Foundation::*, Win32::Storage::FileSystem::*, Win32::System::Pipes::*,
+            Win32::System::SystemServices::*,
+        };
+    }
     pub(super) use mio::windows as mio_windows;
 }
 
 // NB: none of these shows up in public API, so don't document them.
 #[cfg(docsrs)]
 mod doc {
-    pub type DWORD = crate::doc::NotDefinedHere;
-
     pub(super) mod mio_windows {
         pub type NamedPipe = crate::doc::NotDefinedHere;
     }
@@ -101,7 +98,7 @@ use self::doc::*;
 /// # Ok(()) }
 /// ```
 ///
-/// [`ERROR_PIPE_BUSY`]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
+/// [`ERROR_PIPE_BUSY`]: windows_sys::Win32::Foundation::ERROR_PIPE_BUSY
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
 pub struct NamedPipeServer {
@@ -211,7 +208,7 @@ impl NamedPipeServer {
     /// ```
     /// use tokio::io::AsyncWriteExt;
     /// use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
-    /// use winapi::shared::winerror;
+    /// use windows_sys::Win32::Foundation::ERROR_PIPE_NOT_CONNECTED;
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-disconnect";
     ///
@@ -231,7 +228,7 @@ impl NamedPipeServer {
     /// // Write fails with an OS-specific error after client has been
     /// // disconnected.
     /// let e = client.write(b"ping").await.unwrap_err();
-    /// assert_eq!(e.raw_os_error(), Some(winerror::ERROR_PIPE_NOT_CONNECTED as i32));
+    /// assert_eq!(e.raw_os_error(), Some(ERROR_PIPE_NOT_CONNECTED as i32));
     /// # Ok(()) }
     /// ```
     pub fn disconnect(&self) -> io::Result<()> {
@@ -907,7 +904,7 @@ impl AsRawHandle for NamedPipeServer {
 /// use std::time::Duration;
 /// use tokio::net::windows::named_pipe::ClientOptions;
 /// use tokio::time;
-/// use winapi::shared::winerror;
+/// use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 ///
 /// const PIPE_NAME: &str = r"\\.\pipe\named-pipe-idiomatic-client";
 ///
@@ -915,7 +912,7 @@ impl AsRawHandle for NamedPipeServer {
 /// let client = loop {
 ///     match ClientOptions::new().open(PIPE_NAME) {
 ///         Ok(client) => break client,
-///         Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
+///         Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
 ///         Err(e) => return Err(e),
 ///     }
 ///
@@ -926,7 +923,7 @@ impl AsRawHandle for NamedPipeServer {
 /// # Ok(()) }
 /// ```
 ///
-/// [`ERROR_PIPE_BUSY`]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
+/// [`ERROR_PIPE_BUSY`]: windows_sys::Win32::Foundation::ERROR_PIPE_BUSY
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
 pub struct NamedPipeClient {
@@ -1649,12 +1646,12 @@ macro_rules! bool_flag {
 /// See [`ServerOptions::create`].
 #[derive(Debug, Clone)]
 pub struct ServerOptions {
-    open_mode: DWORD,
-    pipe_mode: DWORD,
-    max_instances: DWORD,
-    out_buffer_size: DWORD,
-    in_buffer_size: DWORD,
-    default_timeout: DWORD,
+    open_mode: u32,
+    pipe_mode: u32,
+    max_instances: u32,
+    out_buffer_size: u32,
+    in_buffer_size: u32,
+    default_timeout: u32,
 }
 
 impl ServerOptions {
@@ -1671,9 +1668,9 @@ impl ServerOptions {
     /// ```
     pub fn new() -> ServerOptions {
         ServerOptions {
-            open_mode: winbase::PIPE_ACCESS_DUPLEX | winbase::FILE_FLAG_OVERLAPPED,
-            pipe_mode: winbase::PIPE_TYPE_BYTE | winbase::PIPE_REJECT_REMOTE_CLIENTS,
-            max_instances: winbase::PIPE_UNLIMITED_INSTANCES,
+            open_mode: windows_sys::PIPE_ACCESS_DUPLEX | windows_sys::FILE_FLAG_OVERLAPPED,
+            pipe_mode: windows_sys::PIPE_TYPE_BYTE | windows_sys::PIPE_REJECT_REMOTE_CLIENTS,
+            max_instances: windows_sys::PIPE_UNLIMITED_INSTANCES,
             out_buffer_size: 65536,
             in_buffer_size: 65536,
             default_timeout: 0,
@@ -1690,8 +1687,8 @@ impl ServerOptions {
     /// [`dwPipeMode`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn pipe_mode(&mut self, pipe_mode: PipeMode) -> &mut Self {
         self.pipe_mode = match pipe_mode {
-            PipeMode::Byte => winbase::PIPE_TYPE_BYTE,
-            PipeMode::Message => winbase::PIPE_TYPE_MESSAGE,
+            PipeMode::Byte => windows_sys::PIPE_TYPE_BYTE,
+            PipeMode::Message => windows_sys::PIPE_TYPE_MESSAGE,
         };
 
         self
@@ -1789,7 +1786,7 @@ impl ServerOptions {
     /// # Ok(()) }
     /// ```
     pub fn access_inbound(&mut self, allowed: bool) -> &mut Self {
-        bool_flag!(self.open_mode, allowed, winbase::PIPE_ACCESS_INBOUND);
+        bool_flag!(self.open_mode, allowed, windows_sys::PIPE_ACCESS_INBOUND);
         self
     }
 
@@ -1887,7 +1884,7 @@ impl ServerOptions {
     /// # Ok(()) }
     /// ```
     pub fn access_outbound(&mut self, allowed: bool) -> &mut Self {
-        bool_flag!(self.open_mode, allowed, winbase::PIPE_ACCESS_OUTBOUND);
+        bool_flag!(self.open_mode, allowed, windows_sys::PIPE_ACCESS_OUTBOUND);
         self
     }
 
@@ -1958,7 +1955,7 @@ impl ServerOptions {
         bool_flag!(
             self.open_mode,
             first,
-            winbase::FILE_FLAG_FIRST_PIPE_INSTANCE
+            windows_sys::FILE_FLAG_FIRST_PIPE_INSTANCE
         );
         self
     }
@@ -1973,9 +1970,10 @@ impl ServerOptions {
     /// use std::{io, os::windows::prelude::AsRawHandle, ptr};
     //
     /// use tokio::net::windows::named_pipe::ServerOptions;
-    /// use winapi::{
-    ///     shared::winerror::ERROR_SUCCESS,
-    ///     um::{accctrl::SE_KERNEL_OBJECT, aclapi::SetSecurityInfo, winnt::DACL_SECURITY_INFORMATION},
+    /// use windows_sys::{
+    ///     Win32::Foundation::ERROR_SUCCESS,
+    ///     Win32::Security::DACL_SECURITY_INFORMATION,
+    ///     Win32::Security::Authorization::{SetSecurityInfo, SE_KERNEL_OBJECT},
     /// };
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\write_dac_pipe";
@@ -1989,7 +1987,7 @@ impl ServerOptions {
     ///     assert_eq!(
     ///         ERROR_SUCCESS,
     ///         SetSecurityInfo(
-    ///             pipe.as_raw_handle(),
+    ///             pipe.as_raw_handle() as _,
     ///             SE_KERNEL_OBJECT,
     ///             DACL_SECURITY_INFORMATION,
     ///             ptr::null_mut(),
@@ -2007,9 +2005,10 @@ impl ServerOptions {
     /// use std::{io, os::windows::prelude::AsRawHandle, ptr};
     //
     /// use tokio::net::windows::named_pipe::ServerOptions;
-    /// use winapi::{
-    ///     shared::winerror::ERROR_ACCESS_DENIED,
-    ///     um::{accctrl::SE_KERNEL_OBJECT, aclapi::SetSecurityInfo, winnt::DACL_SECURITY_INFORMATION},
+    /// use windows_sys::{
+    ///     Win32::Foundation::ERROR_ACCESS_DENIED,
+    ///     Win32::Security::DACL_SECURITY_INFORMATION,
+    ///     Win32::Security::Authorization::{SetSecurityInfo, SE_KERNEL_OBJECT},
     /// };
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\write_dac_pipe_fail";
@@ -2023,7 +2022,7 @@ impl ServerOptions {
     ///     assert_eq!(
     ///         ERROR_ACCESS_DENIED,
     ///         SetSecurityInfo(
-    ///             pipe.as_raw_handle(),
+    ///             pipe.as_raw_handle() as _,
     ///             SE_KERNEL_OBJECT,
     ///             DACL_SECURITY_INFORMATION,
     ///             ptr::null_mut(),
@@ -2039,7 +2038,7 @@ impl ServerOptions {
     ///
     /// [`WRITE_DAC`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn write_dac(&mut self, requested: bool) -> &mut Self {
-        bool_flag!(self.open_mode, requested, winnt::WRITE_DAC);
+        bool_flag!(self.open_mode, requested, windows_sys::WRITE_DAC);
         self
     }
 
@@ -2049,7 +2048,7 @@ impl ServerOptions {
     ///
     /// [`WRITE_OWNER`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn write_owner(&mut self, requested: bool) -> &mut Self {
-        bool_flag!(self.open_mode, requested, winnt::WRITE_OWNER);
+        bool_flag!(self.open_mode, requested, windows_sys::WRITE_OWNER);
         self
     }
 
@@ -2059,7 +2058,11 @@ impl ServerOptions {
     ///
     /// [`ACCESS_SYSTEM_SECURITY`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn access_system_security(&mut self, requested: bool) -> &mut Self {
-        bool_flag!(self.open_mode, requested, winnt::ACCESS_SYSTEM_SECURITY);
+        bool_flag!(
+            self.open_mode,
+            requested,
+            windows_sys::ACCESS_SYSTEM_SECURITY
+        );
         self
     }
 
@@ -2070,7 +2073,11 @@ impl ServerOptions {
     ///
     /// [`PIPE_REJECT_REMOTE_CLIENTS`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#pipe_reject_remote_clients
     pub fn reject_remote_clients(&mut self, reject: bool) -> &mut Self {
-        bool_flag!(self.pipe_mode, reject, winbase::PIPE_REJECT_REMOTE_CLIENTS);
+        bool_flag!(
+            self.pipe_mode,
+            reject,
+            windows_sys::PIPE_REJECT_REMOTE_CLIENTS
+        );
         self
     }
 
@@ -2092,7 +2099,7 @@ impl ServerOptions {
     /// ```
     /// use std::io;
     /// use tokio::net::windows::named_pipe::{ServerOptions, ClientOptions};
-    /// use winapi::shared::winerror;
+    /// use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\tokio-named-pipe-max-instances";
     ///
@@ -2108,11 +2115,11 @@ impl ServerOptions {
     ///
     /// // Too many servers!
     /// let e = server.create(PIPE_NAME).unwrap_err();
-    /// assert_eq!(e.raw_os_error(), Some(winerror::ERROR_PIPE_BUSY as i32));
+    /// assert_eq!(e.raw_os_error(), Some(ERROR_PIPE_BUSY as i32));
     ///
     /// // Still too many servers even if we specify a higher value!
     /// let e = server.max_instances(100).create(PIPE_NAME).unwrap_err();
-    /// assert_eq!(e.raw_os_error(), Some(winerror::ERROR_PIPE_BUSY as i32));
+    /// assert_eq!(e.raw_os_error(), Some(ERROR_PIPE_BUSY as i32));
     /// # Ok(()) }
     /// ```
     ///
@@ -2131,7 +2138,7 @@ impl ServerOptions {
     #[track_caller]
     pub fn max_instances(&mut self, instances: usize) -> &mut Self {
         assert!(instances < 255, "cannot specify more than 254 instances");
-        self.max_instances = instances as DWORD;
+        self.max_instances = instances as u32;
         self
     }
 
@@ -2141,7 +2148,7 @@ impl ServerOptions {
     ///
     /// [`nOutBufferSize`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn out_buffer_size(&mut self, buffer: u32) -> &mut Self {
-        self.out_buffer_size = buffer as DWORD;
+        self.out_buffer_size = buffer;
         self
     }
 
@@ -2151,7 +2158,7 @@ impl ServerOptions {
     ///
     /// [`nInBufferSize`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn in_buffer_size(&mut self, buffer: u32) -> &mut Self {
-        self.in_buffer_size = buffer as DWORD;
+        self.in_buffer_size = buffer;
         self
     }
 
@@ -2208,7 +2215,7 @@ impl ServerOptions {
     ///
     /// [`create`]: ServerOptions::create
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
-    /// [`SECURITY_ATTRIBUTES`]: crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES
+    /// [`SECURITY_ATTRIBUTES`]: windows_sys::Win32::Security::SECURITY_ATTRIBUTES
     pub unsafe fn create_with_security_attributes_raw(
         &self,
         addr: impl AsRef<OsStr>,
@@ -2216,7 +2223,7 @@ impl ServerOptions {
     ) -> io::Result<NamedPipeServer> {
         let addr = encode_addr(addr);
 
-        let h = namedpipeapi::CreateNamedPipeW(
+        let h = windows_sys::CreateNamedPipeW(
             addr.as_ptr(),
             self.open_mode,
             self.pipe_mode,
@@ -2227,11 +2234,11 @@ impl ServerOptions {
             attrs as *mut _,
         );
 
-        if h == handleapi::INVALID_HANDLE_VALUE {
+        if h == windows_sys::INVALID_HANDLE_VALUE {
             return Err(io::Error::last_os_error());
         }
 
-        NamedPipeServer::from_raw_handle(h)
+        NamedPipeServer::from_raw_handle(h as _)
     }
 }
 
@@ -2241,8 +2248,8 @@ impl ServerOptions {
 /// See [`ClientOptions::open`].
 #[derive(Debug, Clone)]
 pub struct ClientOptions {
-    desired_access: DWORD,
-    security_qos_flags: DWORD,
+    desired_access: u32,
+    security_qos_flags: u32,
 }
 
 impl ClientOptions {
@@ -2261,8 +2268,9 @@ impl ClientOptions {
     /// ```
     pub fn new() -> Self {
         Self {
-            desired_access: winnt::GENERIC_READ | winnt::GENERIC_WRITE,
-            security_qos_flags: winbase::SECURITY_IDENTIFICATION | winbase::SECURITY_SQOS_PRESENT,
+            desired_access: windows_sys::GENERIC_READ | windows_sys::GENERIC_WRITE,
+            security_qos_flags: windows_sys::SECURITY_IDENTIFICATION
+                | windows_sys::SECURITY_SQOS_PRESENT,
         }
     }
 
@@ -2273,7 +2281,7 @@ impl ClientOptions {
     /// [`GENERIC_READ`]: https://docs.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
     pub fn read(&mut self, allowed: bool) -> &mut Self {
-        bool_flag!(self.desired_access, allowed, winnt::GENERIC_READ);
+        bool_flag!(self.desired_access, allowed, windows_sys::GENERIC_READ);
         self
     }
 
@@ -2284,7 +2292,7 @@ impl ClientOptions {
     /// [`GENERIC_WRITE`]: https://docs.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
     pub fn write(&mut self, allowed: bool) -> &mut Self {
-        bool_flag!(self.desired_access, allowed, winnt::GENERIC_WRITE);
+        bool_flag!(self.desired_access, allowed, windows_sys::GENERIC_WRITE);
         self
     }
 
@@ -2307,11 +2315,11 @@ impl ClientOptions {
     /// automatically when using this method.
     ///
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
-    /// [`SECURITY_IDENTIFICATION`]: crate::winapi::um::winbase::SECURITY_IDENTIFICATION
+    /// [`SECURITY_IDENTIFICATION`]: crate::windows_sys::Win32::Storage::FileSystem::SECURITY_IDENTIFICATION
     /// [Impersonation Levels]: https://docs.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-security_impersonation_level
     pub fn security_qos_flags(&mut self, flags: u32) -> &mut Self {
         // See: https://github.com/rust-lang/rust/pull/58216
-        self.security_qos_flags = flags | winbase::SECURITY_SQOS_PRESENT;
+        self.security_qos_flags = flags | windows_sys::SECURITY_SQOS_PRESENT;
         self
     }
 
@@ -2336,8 +2344,8 @@ impl ClientOptions {
     ///   but the server is not currently waiting for a connection. Please see the
     ///   examples for how to check for this error.
     ///
-    /// [`ERROR_PIPE_BUSY`]: crate::winapi::shared::winerror::ERROR_PIPE_BUSY
-    /// [`winapi`]: crate::winapi
+    /// [`ERROR_PIPE_BUSY`]: crate::windows_sys::Win32::Foundation::ERROR_PIPE_BUSY
+    /// [`windows_sys`]: crate::windows_sys
     /// [enabled I/O]: crate::runtime::Builder::enable_io
     /// [Tokio Runtime]: crate::runtime::Runtime
     ///
@@ -2348,7 +2356,7 @@ impl ClientOptions {
     /// use std::time::Duration;
     /// use tokio::net::windows::named_pipe::ClientOptions;
     /// use tokio::time;
-    /// use winapi::shared::winerror;
+    /// use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
     ///
     /// const PIPE_NAME: &str = r"\\.\pipe\mynamedpipe";
     ///
@@ -2356,7 +2364,7 @@ impl ClientOptions {
     /// let client = loop {
     ///     match ClientOptions::new().open(PIPE_NAME) {
     ///         Ok(client) => break client,
-    ///         Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
+    ///         Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
     ///         Err(e) => return Err(e),
     ///     }
     ///
@@ -2386,7 +2394,7 @@ impl ClientOptions {
     ///
     /// [`open`]: ClientOptions::open
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
-    /// [`SECURITY_ATTRIBUTES`]: crate::winapi::um::minwinbase::SECURITY_ATTRIBUTES
+    /// [`SECURITY_ATTRIBUTES`]: crate::windows_sys::Win32::Security::SECURITY_ATTRIBUTES
     pub unsafe fn open_with_security_attributes_raw(
         &self,
         addr: impl AsRef<OsStr>,
@@ -2395,28 +2403,28 @@ impl ClientOptions {
         let addr = encode_addr(addr);
 
         // NB: We could use a platform specialized `OpenOptions` here, but since
-        // we have access to winapi it ultimately doesn't hurt to use
+        // we have access to windows_sys it ultimately doesn't hurt to use
         // `CreateFile` explicitly since it allows the use of our already
         // well-structured wide `addr` to pass into CreateFileW.
-        let h = fileapi::CreateFileW(
+        let h = windows_sys::CreateFileW(
             addr.as_ptr(),
             self.desired_access,
             0,
             attrs as *mut _,
-            fileapi::OPEN_EXISTING,
+            windows_sys::OPEN_EXISTING,
             self.get_flags(),
-            ptr::null_mut(),
+            0,
         );
 
-        if h == handleapi::INVALID_HANDLE_VALUE {
+        if h == windows_sys::INVALID_HANDLE_VALUE {
             return Err(io::Error::last_os_error());
         }
 
-        NamedPipeClient::from_raw_handle(h)
+        NamedPipeClient::from_raw_handle(h as _)
     }
 
     fn get_flags(&self) -> u32 {
-        self.security_qos_flags | winbase::FILE_FLAG_OVERLAPPED
+        self.security_qos_flags | windows_sys::FILE_FLAG_OVERLAPPED
     }
 }
 
@@ -2429,16 +2437,16 @@ pub enum PipeMode {
     /// Data is written to the pipe as a stream of bytes. The pipe does not
     /// distinguish bytes written during different write operations.
     ///
-    /// Corresponds to [`PIPE_TYPE_BYTE`][crate::winapi::um::winbase::PIPE_TYPE_BYTE].
+    /// Corresponds to [`PIPE_TYPE_BYTE`][crate::windows_sys::Win32::System::Pipes::PIPE_TYPE_BYTE].
     Byte,
     /// Data is written to the pipe as a stream of messages. The pipe treats the
     /// bytes written during each write operation as a message unit. Any reading
     /// on a named pipe returns [`ERROR_MORE_DATA`] when a message is not read
     /// completely.
     ///
-    /// Corresponds to [`PIPE_TYPE_MESSAGE`][crate::winapi::um::winbase::PIPE_TYPE_MESSAGE].
+    /// Corresponds to [`PIPE_TYPE_MESSAGE`][crate::windows_sys::Win32::System::Pipes::PIPE_TYPE_MESSAGE].
     ///
-    /// [`ERROR_MORE_DATA`]: crate::winapi::shared::winerror::ERROR_MORE_DATA
+    /// [`ERROR_MORE_DATA`]: crate::windows_sys::Win32::Foundation::ERROR_MORE_DATA
     Message,
 }
 
@@ -2448,11 +2456,11 @@ pub enum PipeMode {
 pub enum PipeEnd {
     /// The named pipe refers to the client end of a named pipe instance.
     ///
-    /// Corresponds to [`PIPE_CLIENT_END`][crate::winapi::um::winbase::PIPE_CLIENT_END].
+    /// Corresponds to [`PIPE_CLIENT_END`][crate::windows_sys::Win32::System::Pipes::PIPE_CLIENT_END].
     Client,
     /// The named pipe refers to the server end of a named pipe instance.
     ///
-    /// Corresponds to [`PIPE_SERVER_END`][crate::winapi::um::winbase::PIPE_SERVER_END].
+    /// Corresponds to [`PIPE_SERVER_END`][crate::windows_sys::Win32::System::Pipes::PIPE_SERVER_END].
     Server,
 }
 
@@ -2490,26 +2498,26 @@ unsafe fn named_pipe_info(handle: RawHandle) -> io::Result<PipeInfo> {
     let mut in_buffer_size = 0;
     let mut max_instances = 0;
 
-    let result = namedpipeapi::GetNamedPipeInfo(
-        handle,
+    let result = windows_sys::GetNamedPipeInfo(
+        handle as _,
         &mut flags,
         &mut out_buffer_size,
         &mut in_buffer_size,
         &mut max_instances,
     );
 
-    if result == FALSE {
+    if result == 0 {
         return Err(io::Error::last_os_error());
     }
 
     let mut end = PipeEnd::Client;
     let mut mode = PipeMode::Byte;
 
-    if flags & winbase::PIPE_SERVER_END != 0 {
+    if flags & windows_sys::PIPE_SERVER_END != 0 {
         end = PipeEnd::Server;
     }
 
-    if flags & winbase::PIPE_TYPE_MESSAGE != 0 {
+    if flags & windows_sys::PIPE_TYPE_MESSAGE != 0 {
         mode = PipeMode::Message;
     }
 

@@ -5,31 +5,30 @@ use std::sync::Once;
 use crate::signal::registry::{globals, EventId, EventInfo, Init, Storage};
 use crate::signal::RxFuture;
 
-use winapi::shared::minwindef::{BOOL, DWORD, FALSE, TRUE};
-use winapi::um::consoleapi::SetConsoleCtrlHandler;
-use winapi::um::wincon;
+use windows_sys::Win32::Foundation::BOOL;
+use windows_sys::Win32::System::Console as console;
 
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
-    new(wincon::CTRL_BREAK_EVENT)
+    new(console::CTRL_BREAK_EVENT)
 }
 
 pub(super) fn ctrl_close() -> io::Result<RxFuture> {
-    new(wincon::CTRL_CLOSE_EVENT)
+    new(console::CTRL_CLOSE_EVENT)
 }
 
 pub(super) fn ctrl_c() -> io::Result<RxFuture> {
-    new(wincon::CTRL_C_EVENT)
+    new(console::CTRL_C_EVENT)
 }
 
 pub(super) fn ctrl_logoff() -> io::Result<RxFuture> {
-    new(wincon::CTRL_LOGOFF_EVENT)
+    new(console::CTRL_LOGOFF_EVENT)
 }
 
 pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
-    new(wincon::CTRL_SHUTDOWN_EVENT)
+    new(console::CTRL_SHUTDOWN_EVENT)
 }
 
-fn new(signum: DWORD) -> io::Result<RxFuture> {
+fn new(signum: u32) -> io::Result<RxFuture> {
     global_init()?;
     let rx = globals().register_listener(signum as EventId);
     Ok(RxFuture::new(rx))
@@ -58,12 +57,12 @@ impl Init for OsStorage {
 
 impl Storage for OsStorage {
     fn event_info(&self, id: EventId) -> Option<&EventInfo> {
-        match DWORD::try_from(id) {
-            Ok(wincon::CTRL_BREAK_EVENT) => Some(&self.ctrl_break),
-            Ok(wincon::CTRL_CLOSE_EVENT) => Some(&self.ctrl_close),
-            Ok(wincon::CTRL_C_EVENT) => Some(&self.ctrl_c),
-            Ok(wincon::CTRL_LOGOFF_EVENT) => Some(&self.ctrl_logoff),
-            Ok(wincon::CTRL_SHUTDOWN_EVENT) => Some(&self.ctrl_shutdown),
+        match u32::try_from(id) {
+            Ok(console::CTRL_BREAK_EVENT) => Some(&self.ctrl_break),
+            Ok(console::CTRL_CLOSE_EVENT) => Some(&self.ctrl_close),
+            Ok(console::CTRL_C_EVENT) => Some(&self.ctrl_c),
+            Ok(console::CTRL_LOGOFF_EVENT) => Some(&self.ctrl_logoff),
+            Ok(console::CTRL_SHUTDOWN_EVENT) => Some(&self.ctrl_shutdown),
             _ => None,
         }
     }
@@ -95,7 +94,7 @@ fn global_init() -> io::Result<()> {
     let mut init = None;
 
     INIT.call_once(|| unsafe {
-        let rc = SetConsoleCtrlHandler(Some(handler), TRUE);
+        let rc = console::SetConsoleCtrlHandler(Some(handler), 1);
         let ret = if rc == 0 {
             Err(io::Error::last_os_error())
         } else {
@@ -108,7 +107,7 @@ fn global_init() -> io::Result<()> {
     init.unwrap_or_else(|| Ok(()))
 }
 
-unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
+unsafe extern "system" fn handler(ty: u32) -> BOOL {
     let globals = globals();
     globals.record_event(ty as EventId);
 
@@ -117,11 +116,11 @@ unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
     // have the same restrictions as in Unix signal handlers, meaning we can
     // go ahead and perform the broadcast here.
     if globals.broadcast() {
-        TRUE
+        1
     } else {
         // No one is listening for this notification any more
         // let the OS fire the next (possibly the default) handler.
-        FALSE
+        0
     }
 }
 
@@ -145,7 +144,7 @@ mod tests {
         // like sending signals on Unix, so we'll stub out the actual OS
         // integration and test that our handling works.
         unsafe {
-            super::handler(wincon::CTRL_C_EVENT);
+            super::handler(console::CTRL_C_EVENT);
         }
 
         assert_ready_ok!(ctrl_c.poll());
@@ -162,7 +161,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                super::handler(wincon::CTRL_BREAK_EVENT);
+                super::handler(console::CTRL_BREAK_EVENT);
             }
 
             ctrl_break.recv().await.unwrap();
@@ -180,7 +179,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                super::handler(wincon::CTRL_CLOSE_EVENT);
+                super::handler(console::CTRL_CLOSE_EVENT);
             }
 
             ctrl_close.recv().await.unwrap();
@@ -198,7 +197,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                super::handler(wincon::CTRL_SHUTDOWN_EVENT);
+                super::handler(console::CTRL_SHUTDOWN_EVENT);
             }
 
             ctrl_shutdown.recv().await.unwrap();
@@ -216,7 +215,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                super::handler(wincon::CTRL_LOGOFF_EVENT);
+                super::handler(console::CTRL_LOGOFF_EVENT);
             }
 
             ctrl_logoff.recv().await.unwrap();

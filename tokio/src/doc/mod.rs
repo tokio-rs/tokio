@@ -21,4 +21,3 @@
 pub enum NotDefinedHere {}
 
 pub mod os;
-pub mod winapi;
