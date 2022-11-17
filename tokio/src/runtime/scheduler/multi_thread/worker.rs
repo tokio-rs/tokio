@@ -67,6 +67,7 @@ use crate::runtime::{
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
+use crate::runtime::builder::MultiThreadFlavor;
 use std::cell::RefCell;
 use std::time::Duration;
 
@@ -99,7 +100,7 @@ struct Core {
     lifo_enabled: bool,
 
     /// The worker-local run queue.
-    run_queue: queue::Local<Arc<Handle>>,
+    run_queue: Box<dyn queue::Owner<Arc<Handle>> + Send + Sync>,
 
     /// True if the worker is currently searching for more work. Searching
     /// involves attempting to steal from other workers.
@@ -163,7 +164,7 @@ pub(super) struct Shared {
 /// Used to communicate with a worker from other threads.
 struct Remote {
     /// Steals tasks from this worker.
-    steal: queue::Steal<Arc<Handle>>,
+    steal: Box<dyn queue::Stealer<Arc<Handle>> + Send + Sync>,
 
     /// Unparks the associated worker thread
     unpark: Unparker,
@@ -200,6 +201,7 @@ const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 
 pub(super) fn create(
     size: usize,
+    flavor: MultiThreadFlavor,
     park: Parker,
     driver_handle: driver::Handle,
     blocking_spawner: blocking::Spawner,
@@ -212,7 +214,7 @@ pub(super) fn create(
 
     // Create the local queues
     for _ in 0..size {
-        let (steal, run_queue) = queue::local();
+        let (steal, run_queue) = queue::local(flavor);
 
         let park = park.clone();
         let unpark = park.unpark();
@@ -679,7 +681,7 @@ impl Core {
             // `run_queue.push_back` below, there will be *at least* `cap`
             // available slots in the queue.
             let cap = usize::min(
-                self.run_queue.remaining_slots(),
+                self.run_queue.remaining_slots_hint().0 as usize,
                 self.run_queue.max_capacity() / 2,
             );
 
@@ -693,11 +695,15 @@ impl Core {
 
             let mut tasks = worker.inject().pop_n(n);
 
-            // Pop the first task to return immedietly
+            // Pop the first task to return immediately
             let ret = tasks.next();
 
             // Push the rest of the on the run queue
-            self.run_queue.push_back(tasks);
+            // SAFETY: We checked the minimum capacity of the queue in advance, and
+            // don't enqueue more than that. Concurrent enqueues are not possible.
+            unsafe {
+                self.run_queue.push_back_unchecked(Box::new(tasks));
+            }
 
             ret
         }
@@ -732,7 +738,7 @@ impl Core {
             let target = &worker.handle.shared.remotes[i];
             if let Some(task) = target
                 .steal
-                .steal_into(&mut self.run_queue, &mut self.metrics)
+                .steal_into(&mut *self.run_queue, &mut self.metrics)
             {
                 return Some(task);
             }

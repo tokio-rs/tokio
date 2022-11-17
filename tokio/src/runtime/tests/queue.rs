@@ -2,6 +2,7 @@ use crate::runtime::scheduler::multi_thread::queue;
 use crate::runtime::task::{self, Inject, Schedule, Task};
 use crate::runtime::MetricsBatch;
 
+use crate::runtime::builder::MultiThreadFlavor;
 use std::thread;
 use std::time::Duration;
 
@@ -28,7 +29,7 @@ fn metrics_batch() -> MetricsBatch {
 
 #[test]
 fn fits_256_one_at_a_time() {
-    let (_, mut local) = queue::local();
+    let (_, mut local) = queue::local(MultiThreadFlavor::Default);
     let inject = Inject::new();
     let mut metrics = metrics_batch();
 
@@ -48,12 +49,12 @@ fn fits_256_one_at_a_time() {
 
 #[test]
 fn fits_256_all_at_once() {
-    let (_, mut local) = queue::local();
+    let (_, mut local) = queue::local(MultiThreadFlavor::Default);
 
     let mut tasks = (0..256)
         .map(|_| super::unowned(async {}).0)
         .collect::<Vec<_>>();
-    local.push_back(tasks.drain(..));
+    local.push_back(Box::new(tasks.drain(..)));
 
     let mut i = 0;
     while local.pop().is_some() {
@@ -65,16 +66,16 @@ fn fits_256_all_at_once() {
 
 #[test]
 fn fits_256_all_in_chunks() {
-    let (_, mut local) = queue::local();
+    let (_, mut local) = queue::local(MultiThreadFlavor::Default);
 
     let mut tasks = (0..256)
         .map(|_| super::unowned(async {}).0)
         .collect::<Vec<_>>();
 
-    local.push_back(tasks.drain(..10));
-    local.push_back(tasks.drain(..100));
-    local.push_back(tasks.drain(..46));
-    local.push_back(tasks.drain(..100));
+    local.push_back(Box::new(tasks.drain(..10)));
+    local.push_back(Box::new(tasks.drain(..100)));
+    local.push_back(Box::new(tasks.drain(..46)));
+    local.push_back(Box::new(tasks.drain(..100)));
 
     let mut i = 0;
     while local.pop().is_some() {
@@ -86,7 +87,7 @@ fn fits_256_all_in_chunks() {
 
 #[test]
 fn overflow() {
-    let (_, mut local) = queue::local();
+    let (_, mut local) = queue::local(MultiThreadFlavor::Default);
     let inject = Inject::new();
     let mut metrics = metrics_batch();
 
@@ -116,8 +117,8 @@ fn overflow() {
 fn steal_batch() {
     let mut metrics = metrics_batch();
 
-    let (steal1, mut local1) = queue::local();
-    let (_, mut local2) = queue::local();
+    let (steal1, mut local1) = queue::local(MultiThreadFlavor::Default);
+    let (_, mut local2) = queue::local(MultiThreadFlavor::Default);
     let inject = Inject::new();
 
     for _ in 0..4 {
@@ -125,7 +126,7 @@ fn steal_batch() {
         local1.push_back_or_overflow(task, &inject, &mut metrics);
     }
 
-    assert!(steal1.steal_into(&mut local2, &mut metrics).is_some());
+    assert!(steal1.steal_into(&mut *local2, &mut metrics).is_some());
 
     cfg_metrics! {
         assert_metrics!(metrics, steal_count == 2);
@@ -163,16 +164,16 @@ fn stress1() {
     let mut metrics = metrics_batch();
 
     for _ in 0..NUM_ITER {
-        let (steal, mut local) = queue::local();
+        let (steal, mut local) = queue::local(MultiThreadFlavor::Default);
         let inject = Inject::new();
 
         let th = thread::spawn(move || {
             let mut metrics = metrics_batch();
-            let (_, mut local) = queue::local();
+            let (_, mut local) = queue::local(MultiThreadFlavor::Default);
             let mut n = 0;
 
             for _ in 0..NUM_STEAL {
-                if steal.steal_into(&mut local, &mut metrics).is_some() {
+                if steal.steal_into(&mut *local, &mut metrics).is_some() {
                     n += 1;
                 }
 
@@ -226,16 +227,16 @@ fn stress2() {
     let mut metrics = metrics_batch();
 
     for _ in 0..NUM_ITER {
-        let (steal, mut local) = queue::local();
+        let (steal, mut local) = queue::local(MultiThreadFlavor::Default);
         let inject = Inject::new();
 
         let th = thread::spawn(move || {
             let mut stats = metrics_batch();
-            let (_, mut local) = queue::local();
+            let (_, mut local) = queue::local(MultiThreadFlavor::Default);
             let mut n = 0;
 
             for _ in 0..NUM_STEAL {
-                if steal.steal_into(&mut local, &mut stats).is_some() {
+                if steal.steal_into(&mut *local, &mut stats).is_some() {
                     n += 1;
                 }
 

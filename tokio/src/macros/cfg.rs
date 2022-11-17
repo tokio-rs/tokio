@@ -373,6 +373,21 @@ macro_rules! cfg_not_rt_multi_thread {
     }
 }
 
+macro_rules! cfg_rt_multi_thread_bwos {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                tokio_unstable,
+                feature = "rt-multi-thread",
+                feature = "bwos",
+                not(tokio_wasi)
+            ))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "bwos")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_taskdump {
     ($($item:item)*) => {
         $(

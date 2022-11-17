@@ -188,11 +188,24 @@ cfg_unstable! {
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
+cfg_rt_multi_thread!(
+    #[derive(Clone, Copy)]
+    pub(crate) enum MultiThreadFlavor {
+        /// The default multithreaded tokio runqueue, based on the golang runqueue.
+        Default,
+        // There may be more (sub-) variants in the future influencing e.g. queue size
+        // or stealing strategy
+        /// A Block-based workstealing queue offering better performance
+        #[cfg(all(tokio_unstable, feature = "bwos"))]
+        Bwos,
+    }
+);
+
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {
     CurrentThread,
     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-    MultiThread,
+    MultiThread(MultiThreadFlavor),
 }
 
 impl Builder {
@@ -214,15 +227,23 @@ impl Builder {
         Builder::new(Kind::CurrentThread, 31, EVENT_INTERVAL)
     }
 
-    cfg_not_wasi! {
+    cfg_rt_multi_thread! {
         /// Returns a new builder with the multi thread scheduler selected.
         ///
         /// Configuration methods can be chained on the return value.
-        #[cfg(feature = "rt-multi-thread")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
         pub fn new_multi_thread() -> Builder {
             // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-            Builder::new(Kind::MultiThread, 61, 61)
+            Builder::new(Kind::MultiThread(MultiThreadFlavor::Default), 61, 61)
+        }
+    }
+
+    cfg_rt_multi_thread_bwos! {
+        /// Returns a new builder with the BWoS multi thread scheduler selected.
+        ///
+        /// Configuration methods can be chained on the return value.
+        pub fn new_multi_thread_bwos() -> Builder {
+            // The number `61` is copied from `new_multi_thread()`.
+            Builder::new(Kind::MultiThread(MultiThreadFlavor::Bwos), 61, 61)
         }
     }
 
@@ -649,7 +670,7 @@ impl Builder {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-            Kind::MultiThread => self.build_threaded_runtime(),
+            Kind::MultiThread(flavor) => self.build_threaded_runtime(*flavor),
         }
     }
 
@@ -658,7 +679,7 @@ impl Builder {
             enable_pause_time: match self.kind {
                 Kind::CurrentThread => true,
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                Kind::MultiThread => false,
+                Kind::MultiThread(_) => false,
             },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
@@ -1163,7 +1184,7 @@ cfg_test_util! {
 
 cfg_rt_multi_thread! {
     impl Builder {
-        fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
+        fn build_threaded_runtime(&mut self, flavor: MultiThreadFlavor) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
             use crate::runtime::{Config, runtime::Scheduler};
             use crate::runtime::scheduler::{self, MultiThread};
@@ -1183,6 +1204,7 @@ cfg_rt_multi_thread! {
 
             let (scheduler, handle, launch) = MultiThread::new(
                 core_threads,
+                flavor,
                 driver,
                 driver_handle,
                 blocking_spawner,

@@ -14,6 +14,8 @@ pub(crate) use park::{Parker, Unparker};
 
 pub(crate) mod queue;
 
+//pub(crate) mod queue;
+
 mod worker;
 pub(crate) use worker::{Context, Launch};
 
@@ -27,6 +29,7 @@ use crate::runtime::{
 };
 use crate::util::RngSeedGenerator;
 
+use crate::runtime::builder::MultiThreadFlavor;
 use std::fmt;
 use std::future::Future;
 
@@ -38,6 +41,7 @@ pub(crate) struct MultiThread;
 impl MultiThread {
     pub(crate) fn new(
         size: usize,
+        flavor: MultiThreadFlavor,
         driver: Driver,
         driver_handle: driver::Handle,
         blocking_spawner: blocking::Spawner,
@@ -47,6 +51,7 @@ impl MultiThread {
         let parker = Parker::new(driver);
         let (handle, launch) = worker::create(
             size,
+            flavor,
             parker,
             driver_handle,
             blocking_spawner,

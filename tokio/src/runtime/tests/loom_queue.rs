@@ -2,27 +2,28 @@ use crate::runtime::scheduler::multi_thread::queue;
 use crate::runtime::task::Inject;
 use crate::runtime::tests::NoopSchedule;
 use crate::runtime::MetricsBatch;
+use std::sync::Arc;
 
+use crate::runtime::builder::MultiThreadFlavor;
 use loom::thread;
 
 fn metrics_batch() -> MetricsBatch {
     MetricsBatch::new(&crate::runtime::WorkerMetrics::new())
 }
 
-#[test]
-fn basic() {
-    loom::model(|| {
-        let (steal, mut local) = queue::local();
+fn basic_flavor(flavor: MultiThreadFlavor) {
+    loom::model(move || {
+        let (steal, mut local) = queue::local(flavor);
         let inject = Inject::new();
         let mut metrics = metrics_batch();
 
         let th = thread::spawn(move || {
             let mut metrics = metrics_batch();
-            let (_, mut local) = queue::local();
+            let (_, mut local) = queue::local(flavor);
             let mut n = 0;
 
             for _ in 0..3 {
-                if steal.steal_into(&mut local, &mut metrics).is_some() {
+                if steal.steal_into(&mut *local, &mut metrics).is_some() {
                     n += 1;
                 }
 
@@ -66,18 +67,28 @@ fn basic() {
 }
 
 #[test]
-fn steal_overflow() {
-    loom::model(|| {
-        let (steal, mut local) = queue::local();
+fn basic_default() {
+    basic_flavor(MultiThreadFlavor::Default);
+}
+
+#[cfg(all(tokio_unstable, feature = "bwos"))]
+#[test]
+fn basic_bwos() {
+    basic_flavor(MultiThreadFlavor::Bwos);
+}
+
+fn steal_overflow(flavor: MultiThreadFlavor) {
+    loom::model(move || {
+        let (steal, mut local) = queue::local(flavor);
         let inject = Inject::new();
         let mut metrics = metrics_batch();
 
         let th = thread::spawn(move || {
             let mut metrics = metrics_batch();
-            let (_, mut local) = queue::local();
+            let (_, mut local) = queue::local(flavor);
             let mut n = 0;
 
-            if steal.steal_into(&mut local, &mut metrics).is_some() {
+            if steal.steal_into(&mut *local, &mut metrics).is_some() {
                 n += 1;
             }
 
@@ -118,14 +129,27 @@ fn steal_overflow() {
 }
 
 #[test]
-fn multi_stealer() {
+fn steal_overflow_default() {
+    steal_overflow(MultiThreadFlavor::Default)
+}
+
+#[cfg(all(tokio_unstable, feature = "bwos"))]
+#[test]
+fn steal_overflow_bwos() {
+    steal_overflow(MultiThreadFlavor::Bwos)
+}
+
+fn multi_stealer_flavor(flavor: MultiThreadFlavor) {
     const NUM_TASKS: usize = 5;
 
-    fn steal_tasks(steal: queue::Steal<NoopSchedule>) -> usize {
+    fn steal_tasks(
+        steal: Arc<dyn queue::Stealer<NoopSchedule>>,
+        flavor: MultiThreadFlavor,
+    ) -> usize {
         let mut metrics = metrics_batch();
-        let (_, mut local) = queue::local();
+        let (_, mut local) = queue::local(flavor);
 
-        if steal.steal_into(&mut local, &mut metrics).is_none() {
+        if steal.steal_into(&mut *local, &mut metrics).is_none() {
             return 0;
         }
 
@@ -138,8 +162,8 @@ fn multi_stealer() {
         n
     }
 
-    loom::model(|| {
-        let (steal, mut local) = queue::local();
+    loom::model(move || {
+        let (steal, mut local) = queue::local(flavor);
         let inject = Inject::new();
         let mut metrics = metrics_batch();
 
@@ -149,12 +173,14 @@ fn multi_stealer() {
             local.push_back_or_overflow(task, &inject, &mut metrics);
         }
 
+        let steal: Arc<dyn queue::Stealer<NoopSchedule> + Send + Sync> = steal.into();
+
         let th1 = {
             let steal = steal.clone();
-            thread::spawn(move || steal_tasks(steal))
+            thread::spawn(move || steal_tasks(steal, flavor))
         };
 
-        let th2 = thread::spawn(move || steal_tasks(steal));
+        let th2 = thread::spawn(move || steal_tasks(steal, flavor));
 
         let mut n = 0;
 
@@ -174,11 +200,21 @@ fn multi_stealer() {
 }
 
 #[test]
-fn chained_steal() {
-    loom::model(|| {
+fn multi_stealer_default() {
+    multi_stealer_flavor(MultiThreadFlavor::Default)
+}
+
+#[cfg(all(tokio_unstable, feature = "bwos"))]
+#[test]
+fn multi_stealer_bwos() {
+    multi_stealer_flavor(MultiThreadFlavor::Bwos)
+}
+
+fn chained_steal(flavor: MultiThreadFlavor) {
+    loom::model(move || {
         let mut metrics = metrics_batch();
-        let (s1, mut l1) = queue::local();
-        let (s2, mut l2) = queue::local();
+        let (s1, mut l1) = queue::local(flavor);
+        let (s2, mut l2) = queue::local(flavor);
         let inject = Inject::new();
 
         // Load up some tasks
@@ -193,8 +229,8 @@ fn chained_steal() {
         // Spawn a task to steal from **our** queue
         let th = thread::spawn(move || {
             let mut metrics = metrics_batch();
-            let (_, mut local) = queue::local();
-            s1.steal_into(&mut local, &mut metrics);
+            let (_, mut local) = queue::local(flavor);
+            s1.steal_into(&mut *local, &mut metrics);
 
             while local.pop().is_some() {}
         });
@@ -202,7 +238,7 @@ fn chained_steal() {
         // Drain our tasks, then attempt to steal
         while l1.pop().is_some() {}
 
-        s2.steal_into(&mut l1, &mut metrics);
+        s2.steal_into(&mut *l1, &mut metrics);
 
         th.join().unwrap();
 
@@ -210,4 +246,15 @@ fn chained_steal() {
         while l2.pop().is_some() {}
         while inject.pop().is_some() {}
     });
+}
+
+#[test]
+fn chained_steal_default() {
+    chained_steal(MultiThreadFlavor::Default)
+}
+
+#[cfg(all(tokio_unstable, feature = "bwos"))]
+#[test]
+fn chained_steal_bwos() {
+    chained_steal(MultiThreadFlavor::Bwos)
 }
