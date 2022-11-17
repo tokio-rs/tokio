@@ -7,7 +7,6 @@
  - runtime: export metrics about the blocking thread pool ([#5161])
  - sync: add `Mutex::blocking_lock_owned` ([#5130])
  - sync: add `Semaphore::MAX_PERMITS` ([#5144])
- - sync: add `Semaphore::MAX_PERMITS` ([#5144])
  - sync: add `merge()` to semaphore permits ([#4948])
  - sync: add `mpsc::WeakUnboundedSender` ([#5189])
  - task: add `task::id()` and `task::try_id()` ([#5171])
