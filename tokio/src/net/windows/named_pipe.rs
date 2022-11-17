@@ -98,7 +98,7 @@ use self::doc::*;
 /// # Ok(()) }
 /// ```
 ///
-/// [`ERROR_PIPE_BUSY`]: windows_sys::Win32::Foundation::ERROR_PIPE_BUSY
+/// [`ERROR_PIPE_BUSY`]: https://docs.rs/windows-sys/*/windows_sys/Win32/Foundation/constant.ERROR_PIPE_BUSY.html
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
 pub struct NamedPipeServer {
@@ -923,7 +923,7 @@ impl AsRawHandle for NamedPipeServer {
 /// # Ok(()) }
 /// ```
 ///
-/// [`ERROR_PIPE_BUSY`]: windows_sys::Win32::Foundation::ERROR_PIPE_BUSY
+/// [`ERROR_PIPE_BUSY`]: https://docs.rs/windows-sys/*/windows_sys/Win32/Foundation/constant.ERROR_PIPE_BUSY.html
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
 pub struct NamedPipeClient {
@@ -2215,7 +2215,7 @@ impl ServerOptions {
     ///
     /// [`create`]: ServerOptions::create
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
-    /// [`SECURITY_ATTRIBUTES`]: windows_sys::Win32::Security::SECURITY_ATTRIBUTES
+    /// [`SECURITY_ATTRIBUTES`]: https://docs.rs/windows-sys/*/windows_sys/Win32/Security/struct.SECURITY_ATTRIBUTES.html
     pub unsafe fn create_with_security_attributes_raw(
         &self,
         addr: impl AsRef<OsStr>,
