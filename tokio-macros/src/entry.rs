@@ -393,9 +393,37 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
                 .block_on(body);
         }
     };
+
+    // For test functions wrap the body in a `Box` to reduce the amount
+    // `Runtime::block_on` (and related functions) copies we generate during
+    // compilation due to the generic parameter `F` (the future to block on).
+    // This could have an impact on performance, but because it's only for
+    // testing and the runtime already boxes the future to run it, it's unlikely
+    // to be very large.
+    //
+    // We don't do this for the main function as it should only be used once so
+    // there will be no benefit.
+    let body = if is_test {
+        let output_type = match &input.sig.output {
+            // For functions with no return value syn doesn't print anything,
+            // but that doesn't work as `Output` for our boxed `Future`, so
+            // default to `()` (the same type as the function output).
+            syn::ReturnType::Default => quote! { () },
+            syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
+        };
+        quote! {
+            let body: ::std::pin::Pin<::std::boxed::Box<dyn ::std::future::Future<Output = #output_type>>> =
+                ::std::boxed::Box::pin(async #body);
+        }
+    } else {
+        quote! {
+            let body = async #body;
+        }
+    };
+
     input.block = syn::parse2(quote! {
         {
-            let body = async #body;
+            #body
             #block_expr
         }
     })
