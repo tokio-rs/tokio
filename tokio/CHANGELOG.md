@@ -1,14 +1,16 @@
 # 1.22.0 (November 17, 2022)
 
 ### Added
- - process: add `Command::process_group` ([#5114])
  - runtime: add `Handle::runtime_flavor` ([#5138])
- - runtime: add `Handle::runtime_flavor` ([#5138])
- - runtime: export metrics about the blocking thread pool ([#5161])
  - sync: add `Mutex::blocking_lock_owned` ([#5130])
  - sync: add `Semaphore::MAX_PERMITS` ([#5144])
  - sync: add `merge()` to semaphore permits ([#4948])
  - sync: add `mpsc::WeakUnboundedSender` ([#5189])
+
+### Added (unstable)
+
+ - process: add `Command::process_group` ([#5114])
+ - runtime: export metrics about the blocking thread pool ([#5161])
  - task: add `task::id()` and `task::try_id()` ([#5171])
 
 ### Fixed
