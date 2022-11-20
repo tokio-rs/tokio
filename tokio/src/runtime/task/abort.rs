@@ -74,7 +74,8 @@ impl RefUnwindSafe for AbortHandle {}
 impl fmt::Debug for AbortHandle {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Safety: The header pointer is valid.
-        let id = unsafe { Header::get_id_ptr(self.raw.header_ptr()).as_ref() };
+        let id_ptr = unsafe { Header::get_id_ptr(self.raw.header_ptr()) };
+        let id = unsafe { id_ptr.as_ref() };
         fmt.debug_struct("AbortHandle").field("id", id).finish()
     }
 }

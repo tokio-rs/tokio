@@ -186,7 +186,7 @@ impl RawTask {
 
     /// Returns a reference to the task's trailer.
     pub(super) fn trailer(&self) -> &Trailer {
-        unsafe { self.trailer_ptr().as_ref() }
+        unsafe { &*self.trailer_ptr().as_ptr() }
     }
 
     /// Returns a reference to the task's state.
