@@ -450,7 +450,7 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
     };
     let config = if let Some(attr) = input.attrs.iter().find(|attr| attr.path.is_ident("test")) {
         let msg = "second test attribute is supplied";
-        Err(syn::Error::new_spanned(&attr, msg))
+        Err(syn::Error::new_spanned(attr, msg))
     } else {
         AttributeArgs::parse_terminated
             .parse(args)

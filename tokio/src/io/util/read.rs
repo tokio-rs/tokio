@@ -48,7 +48,7 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         let me = self.project();
-        let mut buf = ReadBuf::new(*me.buf);
+        let mut buf = ReadBuf::new(me.buf);
         ready!(Pin::new(me.reader).poll_read(cx, &mut buf))?;
         Poll::Ready(Ok(buf.filled().len()))
     }

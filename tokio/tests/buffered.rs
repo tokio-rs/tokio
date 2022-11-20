@@ -18,10 +18,10 @@ async fn echo_server() {
     let msg = "foo bar baz";
 
     let t = thread::spawn(move || {
-        let mut s = assert_ok!(TcpStream::connect(&addr));
+        let mut s = assert_ok!(TcpStream::connect(addr));
 
         let t2 = thread::spawn(move || {
-            let mut s = assert_ok!(TcpStream::connect(&addr));
+            let mut s = assert_ok!(TcpStream::connect(addr));
             let mut b = vec![0; msg.len() * N];
             assert_ok!(s.read_exact(&mut b));
             b
