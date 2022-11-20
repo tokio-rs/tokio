@@ -612,6 +612,40 @@ fn store_local_set_in_thread_local_with_runtime() {
     });
 }
 
+#[test]
+fn test_yield_now() {
+    use std::task::Poll;
+
+    static IS_OK: AtomicBool = AtomicBool::new(false);
+
+    let mut set = LocalSet::new();
+    let rt = rt();
+
+    let jh = set.spawn_local(async {
+        // If poll once, then it is ok.
+        IS_OK.store(true, Ordering::SeqCst);
+
+        tokio::task::yield_now().await;
+
+        // If polled twice, then it is no longer ok.
+        IS_OK.store(false, Ordering::SeqCst);
+    });
+
+    // Poll the set once.
+    //
+    // Since the task wakes itself, the LocalSet should only poll it once.
+    assert!(rt
+        .block_on(futures::future::poll_fn(|cx| Poll::Ready(
+            set.poll_unpin(cx)
+        )))
+        .is_pending());
+    // This cancels the future assuming that it was polled only once.
+    drop(set);
+
+    assert!(rt.block_on(jh).unwrap_err().is_cancelled());
+    assert!(IS_OK.load(Ordering::SeqCst));
+}
+
 #[cfg(tokio_unstable)]
 mod unstable {
     use tokio::runtime::UnhandledPanic;
