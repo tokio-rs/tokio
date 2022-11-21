@@ -341,6 +341,33 @@ async fn test_named_pipe_mode_message() -> io::Result<()> {
     Ok(())
 }
 
+// This tests `NamedPipeServer::connect` with various access settings.
+#[tokio::test]
+async fn test_named_pipe_access() -> io::Result<()> {
+    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-access";
+
+    for (inb, outb) in [(true, true), (true, false), (false, true)] {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(async move {
+            let s = ServerOptions::new()
+                .access_inbound(inb)
+                .access_outbound(outb)
+                .create(PIPE_NAME)?;
+            let mut connect_fut = tokio_test::task::spawn(s.connect());
+            assert!(connect_fut.poll().is_pending());
+            tx.send(()).unwrap();
+            connect_fut.await
+        });
+
+        // Wait for the server to call connect.
+        rx.await.unwrap();
+        let _ = ClientOptions::new().read(outb).write(inb).open(PIPE_NAME)?;
+
+        server.await??;
+    }
+    Ok(())
+}
+
 fn num_instances(pipe_name: impl AsRef<str>) -> io::Result<u32> {
     use ntapi::ntioapi;
     use winapi::shared::ntdef;

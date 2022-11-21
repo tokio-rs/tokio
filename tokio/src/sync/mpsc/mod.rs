@@ -97,7 +97,9 @@ mod chan;
 pub(super) mod list;
 
 mod unbounded;
-pub use self::unbounded::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+pub use self::unbounded::{
+    unbounded_channel, UnboundedReceiver, UnboundedSender, WeakUnboundedSender,
+};
 
 pub mod error;
 

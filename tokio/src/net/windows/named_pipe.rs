@@ -192,17 +192,15 @@ impl NamedPipeServer {
     /// # Ok(()) }
     /// ```
     pub async fn connect(&self) -> io::Result<()> {
-        loop {
-            match self.io.connect() {
-                Ok(()) => break,
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.registration().readiness(Interest::WRITABLE).await?;
-                }
-                Err(e) => return Err(e),
+        match self.io.connect() {
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.io
+                    .registration()
+                    .async_io(Interest::WRITABLE, || self.io.connect())
+                    .await
             }
+            x => x,
         }
-
-        Ok(())
     }
 
     /// Disconnects the server end of a named pipe instance from a client

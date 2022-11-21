@@ -42,7 +42,8 @@ jobs:
       - test-unstable
       - miri
       - asan
-      - cross
+      - cross-check
+      - cross-test
       - features
       - minrust
       - minimal-versions
@@ -234,13 +235,12 @@ jobs:
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
           TRYBUILD: overwrite
 
-  cross:
-    name: cross
+  cross-check:
+    name: cross-check
     runs-on: ubuntu-latest
     strategy:
       matrix:
         target:
-          - i686-unknown-linux-gnu
           - powerpc-unknown-linux-gnu
           - powerpc64-unknown-linux-gnu
           - mips-unknown-linux-gnu
@@ -259,13 +259,34 @@ jobs:
           use-cross: true
           command: check
           args: --workspace --all-features --target ${{ matrix.target }}
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+
+  cross-test:
+    name: cross-test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - i686-unknown-linux-gnu
+          - arm-unknown-linux-gnueabihf
+          - armv7-unknown-linux-gnueabihf
+          - aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust_stable }}
+          target: ${{ matrix.target }}
+          override: true
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
-          command: check
-          args: --workspace --all-features --target ${{ matrix.target }}
+          command: test
+          args: -p tokio --all-features --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6
 
   features:
     name: features

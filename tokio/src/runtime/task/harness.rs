@@ -454,13 +454,12 @@ fn cancel_task<T: Future, S: Schedule>(core: &Core<T, S>) {
         core.drop_future_or_output();
     }));
 
-    let id = core.task_id.clone();
     match res {
         Ok(()) => {
-            core.store_output(Err(JoinError::cancelled(id)));
+            core.store_output(Err(JoinError::cancelled(core.task_id)));
         }
         Err(panic) => {
-            core.store_output(Err(JoinError::panic(id, panic)));
+            core.store_output(Err(JoinError::panic(core.task_id, panic)));
         }
     }
 }
@@ -492,7 +491,7 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
         Ok(Poll::Ready(output)) => Ok(output),
         Err(panic) => {
             core.scheduler.unhandled_panic();
-            Err(JoinError::panic(core.task_id.clone(), panic))
+            Err(JoinError::panic(core.task_id, panic))
         }
     };
 
