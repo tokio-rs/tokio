@@ -5,7 +5,6 @@ mod tree_node;
 
 use crate::loom::sync::Arc;
 use core::future::Future;
-use core::mem;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
@@ -269,24 +268,19 @@ impl core::fmt::Debug for WaitForCancellationFutureOwned {
 
 impl WaitForCancellationFutureOwned {
     fn new(cancellation_token: CancellationToken) -> Self {
-        let future = cancellation_token.inner.notified();
-
-        // Safety:
-        //  - We transmute notified into Notified<'static>
-        //    since there's no 'self
-        //    Since future is declared before cancellation_token,
-        //    it will be dropped before cancellation_token so it
-        //    will always holds a valid reference.
-        //  - this.cancellation_token contains an Arc to TreeNode,
-        //    which is guaranteed to have stable dereference.
-        //    So it's ok to move it here as long as `Notified::enabled`
-        //    or `Notified::poll` is not called.
-        let future: tokio::sync::futures::Notified<'static> = unsafe { mem::transmute(future) };
-
         WaitForCancellationFutureOwned {
-            future,
+            future: unsafe { Self::get_future(&cancellation_token) },
             cancellation_token,
         }
+    }
+
+    /// * `cancellation_token` - The strong count of cancellation_token.inner
+    ///   must be larger than 0 as long as the returned future is still alive.
+    unsafe fn get_future(
+        cancellation_token: &CancellationToken,
+    ) -> tokio::sync::futures::Notified<'static> {
+        let inner_ptr = Arc::as_ptr(&cancellation_token.inner);
+        (*inner_ptr).notified()
     }
 }
 
@@ -309,21 +303,8 @@ impl Future for WaitForCancellationFutureOwned {
                 return Poll::Pending;
             }
 
-            let future = this.cancellation_token.inner.notified();
-
-            // Safety:
-            //  - We transmute notified into Notified<'static>
-            //    since there's no 'self
-            //    Since future is declared before cancellation_token,
-            //    it will be dropped before cancellation_token so it
-            //    will always holds a valid reference.
-            //  - this.cancellation_token contains an Arc to TreeNode,
-            //    which is guaranteed to have stable dereference.
-            //    So it's ok to move it here as long as `Notified::enabled`
-            //    or `Notified::poll` is not called.
-            let future: tokio::sync::futures::Notified<'static> = unsafe { mem::transmute(future) };
-
-            this.future.set(future);
+            this.future
+                .set(unsafe { Self::get_future(this.cancellation_token) });
         }
     }
 }
