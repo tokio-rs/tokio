@@ -338,7 +338,7 @@ cfg_rt! {
             raw,
             _p: PhantomData,
         });
-        let join = JoinHandle::new(raw, id);
+        let join = JoinHandle::new(raw);
 
         (task, notified, join)
     }
