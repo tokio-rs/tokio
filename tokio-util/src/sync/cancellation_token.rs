@@ -67,16 +67,24 @@ pin_project! {
     }
 }
 
-/// A Future that is resolved once the corresponding [`CancellationToken`]
-/// is cancelled.
-///
-/// This is counterpart to [`WaitForCancellationFuture`] where it takes
-/// [`CancellationToken`] by value instead of using a reference.
-#[must_use = "futures do nothing unless polled"]
-pub struct WaitForCancellationFutureOwned {
-    // Since `future` is the first field, it is dropped before the cancellation token.
-    future: Option<tokio::sync::futures::Notified<'static>>,
-    cancellation_token: CancellationToken,
+pin_project! {
+    /// A Future that is resolved once the corresponding [`CancellationToken`]
+    /// is cancelled.
+    ///
+    /// This is counterpart to [`WaitForCancellationFuture`] where it takes
+    /// [`CancellationToken`] by value instead of using a reference.
+    #[must_use = "futures do nothing unless polled"]
+    pub struct WaitForCancellationFutureOwned {
+        // Since `future` is the first field, it is dropped before the cancellation token.
+        //
+        // Also, cancellation_token holds a heap allocation and is guaranteed to have a
+        // stable deref.
+        //
+        // It would be ok to move it.
+        #[pin]
+        future: tokio::sync::futures::Notified<'static>,
+        cancellation_token: CancellationToken,
+    }
 }
 
 // ===== impl CancellationToken =====
@@ -208,10 +216,7 @@ impl CancellationToken {
     ///
     /// This method is cancel safe.
     pub fn cancelled_owned(self) -> WaitForCancellationFutureOwned {
-        WaitForCancellationFutureOwned {
-            cancellation_token: self,
-            future: None,
-        }
+        WaitForCancellationFutureOwned::new(self)
     }
 
     /// Creates a `DropGuard` for this token.
@@ -262,77 +267,63 @@ impl core::fmt::Debug for WaitForCancellationFutureOwned {
     }
 }
 
+impl WaitForCancellationFutureOwned {
+    fn new(cancellation_token: CancellationToken) -> Self {
+        let future = cancellation_token.inner.notified();
+
+        // Safety:
+        //  - We transmute notified into Notified<'static>
+        //    since there's no 'self
+        //    Since future is declared before cancellation_token,
+        //    it will be dropped before cancellation_token so it
+        //    will always holds a valid reference.
+        //  - this.cancellation_token contains an Arc to TreeNode,
+        //    which is guaranteed to have stable dereference.
+        //    So it's ok to move it here as long as `Notified::enabled`
+        //    or `Notified::poll` is not called.
+        let future: tokio::sync::futures::Notified<'static> = unsafe { mem::transmute(future) };
+
+        WaitForCancellationFutureOwned {
+            future,
+            cancellation_token,
+        }
+    }
+}
+
 impl Future for WaitForCancellationFutureOwned {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let this = unsafe { Pin::into_inner_unchecked(self) };
+        let mut this = self.project();
 
         loop {
             if this.cancellation_token.is_cancelled() {
                 return Poll::Ready(());
             }
 
-            let future = this
-                .future
-                .as_deref_mut()
-                // Safety:
-                //
-                // `self` is pinned, so self.future is also pinned.
-                .map(|fut| unsafe { Pin::new_unchecked(fut) });
-
             // No wakeups can be lost here because there is always a call to
             // `is_cancelled` between the creation of the future and the call to
             // `poll`, and the code that sets the cancelled flag does so before
             // waking the `Notified`.
-            if future
-                .map(|fut| fut.poll(cx).is_pending())
-                .unwrap_or_default()
-            {
+            if this.future.as_mut().poll(cx).is_pending() {
                 return Poll::Pending;
             }
 
-            // self.future is either None, or a future that is already
-            // polled and returns `Poll::Ready`, which should not be
-            // polled again.
-            this.do_drop_future();
-
-            let notified = this.cancellation_token.inner.notified();
+            let future = this.cancellation_token.inner.notified();
 
             // Safety:
             //  - We transmute notified into Notified<'static>
             //    since there's no 'self
-            //  - self is pinned, so it's safe to have self-reference
-            //    data structure.
+            //    Since future is declared before cancellation_token,
+            //    it will be dropped before cancellation_token so it
+            //    will always holds a valid reference.
             //  - this.cancellation_token contains an Arc to TreeNode,
             //    which is guaranteed to have stable dereference.
-            //    So even if `Notified` implements `Unpin` and `self`
-            //    get moved, it would still be valid.
-            let notified: tokio::sync::futures::Notified<'static> =
-                unsafe { mem::transmute(notified) };
+            //    So it's ok to move it here as long as `Notified::enabled`
+            //    or `Notified::poll` is not called.
+            let future: tokio::sync::futures::Notified<'static> = unsafe { mem::transmute(future) };
 
-            this.future = Some(mem::ManuallyDrop::new(notified));
+            this.future.set(future);
         }
-    }
-}
-
-impl WaitForCancellationFutureOwned {
-    fn do_drop_future(&mut self) {
-        if let Some(future) = self.future.as_mut() {
-            // Safety:
-            //
-            //  - self.future will not be used anymore.
-            //  - future will be dropped in place so that Pin semantics
-            //    will not be violated.
-            unsafe { mem::ManuallyDrop::drop(future) };
-
-            self.future = None;
-        }
-    }
-}
-
-impl Drop for WaitForCancellationFutureOwned {
-    fn drop(&mut self) {
-        self.do_drop_future();
     }
 }
