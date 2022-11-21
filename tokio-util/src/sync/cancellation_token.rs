@@ -71,7 +71,7 @@ pin_project! {
     /// A Future that is resolved once the corresponding [`CancellationToken`]
     /// is cancelled.
     ///
-    /// This is counterpart to [`WaitForCancellationFuture`] where it takes
+    /// This is the counterpart to [`WaitForCancellationFuture`] that takes
     /// [`CancellationToken`] by value instead of using a reference.
     #[must_use = "futures do nothing unless polled"]
     pub struct WaitForCancellationFutureOwned {
