@@ -62,7 +62,8 @@ cfg_io_readiness! {
         /// The interest this waiter is waiting on.
         interest: Interest,
 
-        is_ready: bool,
+        /// Awaited readiness.
+        ready: Ready,
 
         /// Should never be `!Unpin`.
         _p: PhantomPinned,
@@ -253,7 +254,7 @@ impl ScheduledIo {
                         let waiter = unsafe { &mut *waiter.as_ptr() };
 
                         if let Some(waker) = waiter.waker.take() {
-                            waiter.is_ready = true;
+                            waiter.ready = ready.intersection(waiter.interest);
                             wakers.push(waker);
                         }
                     }
@@ -389,7 +390,7 @@ cfg_io_readiness! {
                 waiter: UnsafeCell::new(Waiter {
                     pointers: linked_list::Pointers::new(),
                     waker: None,
-                    is_ready: false,
+                    ready: Ready::EMPTY,
                     interest,
                     _p: PhantomPinned,
                 }),
@@ -490,7 +491,7 @@ cfg_io_readiness! {
                         // Safety: called while locked
                         let w = unsafe { &mut *waiter.get() };
 
-                        if w.is_ready {
+                        if !w.ready.is_empty() {
                             // Our waker has been notified.
                             *state = State::Done;
                         } else {
@@ -517,7 +518,7 @@ cfg_io_readiness! {
 
                         return Poll::Ready(ReadyEvent {
                             tick,
-                            ready: Ready::from_interest(w.interest),
+                            ready: w.ready,
                         });
                     }
                 }
