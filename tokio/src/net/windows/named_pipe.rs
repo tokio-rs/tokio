@@ -920,7 +920,7 @@ impl AsRawHandle for NamedPipeServer {
 /// # Ok(()) }
 /// ```
 ///
-/// [`ERROR_PIPE_BUSY`]: windows_sys::Win32::Foundation::ERROR_PIPE_BUSY
+/// [`ERROR_PIPE_BUSY`]: https://docs.rs/windows-sys/*/windows_sys/Win32/Foundation/constant.ERROR_PIPE_BUSY.html
 /// [Windows named pipe]: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipes
 #[derive(Debug)]
 pub struct NamedPipeClient {
@@ -2212,7 +2212,7 @@ impl ServerOptions {
     ///
     /// [`create`]: ServerOptions::create
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
-    /// [`SECURITY_ATTRIBUTES`]: windows_sys::Win32::Security::SECURITY_ATTRIBUTES
+    /// [`SECURITY_ATTRIBUTES`]: https://docs.rs/windows-sys/*/windows_sys/Win32/Security/struct.SECURITY_ATTRIBUTES.html
     pub unsafe fn create_with_security_attributes_raw(
         &self,
         addr: impl AsRef<OsStr>,
@@ -2312,7 +2312,7 @@ impl ClientOptions {
     /// automatically when using this method.
     ///
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
-    /// [`SECURITY_IDENTIFICATION`]: windows_sys::Win32::Storage::FileSystem::SECURITY_IDENTIFICATION
+    /// [`SECURITY_IDENTIFICATION`]: https://docs.rs/windows-sys/*/windows_sys/Win32/Storage/FileSystem/constant.SECURITY_IDENTIFICATION.html
     /// [Impersonation Levels]: https://docs.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-security_impersonation_level
     pub fn security_qos_flags(&mut self, flags: u32) -> &mut Self {
         // See: https://github.com/rust-lang/rust/pull/58216
@@ -2341,7 +2341,7 @@ impl ClientOptions {
     ///   but the server is not currently waiting for a connection. Please see the
     ///   examples for how to check for this error.
     ///
-    /// [`ERROR_PIPE_BUSY`]: windows_sys::Win32::Foundation::ERROR_PIPE_BUSY
+    /// [`ERROR_PIPE_BUSY`]: https://docs.rs/windows-sys/*/windows_sys/Win32/Foundation/constant.ERROR_PIPE_BUSY.html
     /// [enabled I/O]: crate::runtime::Builder::enable_io
     /// [Tokio Runtime]: crate::runtime::Runtime
     ///
@@ -2390,7 +2390,7 @@ impl ClientOptions {
     ///
     /// [`open`]: ClientOptions::open
     /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
-    /// [`SECURITY_ATTRIBUTES`]: windows_sys::Win32::Security::SECURITY_ATTRIBUTES
+    /// [`SECURITY_ATTRIBUTES`]: https://docs.rs/windows-sys/*/windows_sys/Win32/Security/struct.SECURITY_ATTRIBUTES.html
     pub unsafe fn open_with_security_attributes_raw(
         &self,
         addr: impl AsRef<OsStr>,
@@ -2435,7 +2435,7 @@ pub enum PipeMode {
     ///
     /// Corresponds to [`PIPE_TYPE_BYTE`].
     ///
-    /// [`PIPE_TYPE_BYTE`]: windows_sys::Win32::System::Pipes::PIPE_TYPE_BYTE
+    /// [`PIPE_TYPE_BYTE`]: https://docs.rs/windows-sys/*/windows_sys/Win32/System/Pipes/constant.PIPE_TYPE_BYTE.html
     Byte,
     /// Data is written to the pipe as a stream of messages. The pipe treats the
     /// bytes written during each write operation as a message unit. Any reading
@@ -2444,8 +2444,8 @@ pub enum PipeMode {
     ///
     /// Corresponds to [`PIPE_TYPE_MESSAGE`].
     ///
-    /// [`ERROR_MORE_DATA`]: windows_sys::Win32::Foundation::ERROR_MORE_DATA
-    /// [`PIPE_TYPE_MESSAGE`]: windows_sys::Win32::System::Pipes::PIPE_TYPE_MESSAGE
+    /// [`ERROR_MORE_DATA`]: https://docs.rs/windows-sys/*/windows_sys/Win32/Foundation/constant.ERROR_MORE_DATA.html
+    /// [`PIPE_TYPE_MESSAGE`]: https://docs.rs/windows-sys/*/windows_sys/Win32/System/Pipes/constant.PIPE_TYPE_MESSAGE.html
     Message,
 }
 
@@ -2457,13 +2457,13 @@ pub enum PipeEnd {
     ///
     /// Corresponds to [`PIPE_CLIENT_END`].
     ///
-    /// [`PIPE_CLIENT_END`]: windows_sys::Win32::System::Pipes::PIPE_CLIENT_END
+    /// [`PIPE_CLIENT_END`]: https://docs.rs/windows-sys/*/windows_sys/Win32/System/Pipes/constant.PIPE_CLIENT_END.html
     Client,
     /// The named pipe refers to the server end of a named pipe instance.
     ///
     /// Corresponds to [`PIPE_SERVER_END`].
     ///
-    /// [`PIPE_SERVER_END`]: windows_sys::Win32::System::Pipes::PIPE_SERVER_END
+    /// [`PIPE_SERVER_END`]: https://docs.rs/windows-sys/*/windows_sys/Win32/System/Pipes/constant.PIPE_SERVER_END.html
     Server,
 }
 
