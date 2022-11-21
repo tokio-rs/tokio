@@ -74,7 +74,8 @@ pin_project! {
     /// [`CancellationToken`] by value instead of using a reference.
     #[must_use = "futures do nothing unless polled"]
     pub struct WaitForCancellationFutureOwned {
-        // Since `future` is the first field, it is dropped before the cancellation token.
+        // Since `future` is the first field, it is dropped before the
+        // cancellation_token and always holds a valid reference to it.
         #[pin]
         future: tokio::sync::futures::Notified<'static>,
         cancellation_token: CancellationToken,
@@ -264,9 +265,13 @@ impl core::fmt::Debug for WaitForCancellationFutureOwned {
 impl WaitForCancellationFutureOwned {
     fn new(cancellation_token: CancellationToken) -> Self {
         WaitForCancellationFutureOwned {
-            // Also, cancellation_token holds a heap allocation and is guaranteed to have a
+            // cancellation_token holds a heap allocation and is guaranteed to have a
             // stable deref, thus it would be ok to move the future which holds a reference
             // to it.
+            //
+            // # Safety
+            //
+            // cancellation_token is dropped after future due to order of field.
             future: unsafe { Self::new_future(&cancellation_token) },
             cancellation_token,
         }
@@ -301,6 +306,9 @@ impl Future for WaitForCancellationFutureOwned {
                 return Poll::Pending;
             }
 
+            // # Safety
+            //
+            // cancellation_token is dropped after future due to order of field.
             this.future
                 .set(unsafe { Self::new_future(this.cancellation_token) });
         }
