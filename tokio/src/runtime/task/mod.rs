@@ -47,7 +47,8 @@
 //!
 //!  * JOIN_INTEREST - Is set to one if there exists a JoinHandle.
 //!
-//!  * JOIN_WAKER - Is set to one if the JoinHandle has set a waker.
+//!  * JOIN_WAKER - Acts as an access control bit for the join handle waker. The
+//!    protocol for its usage is described below.
 //!
 //! The rest of the bits are used for the ref-count.
 //!
@@ -71,10 +72,34 @@
 //!    a lock for the stage field, and it can be accessed only by the thread
 //!    that set RUNNING to one.
 //!
-//!  * If JOIN_WAKER is zero, then the JoinHandle has exclusive access to the
-//!    join handle waker. If JOIN_WAKER and COMPLETE are both one, then the
-//!    thread that set COMPLETE to one has exclusive access to the join handle
-//!    waker.
+//!  * After a future completes and the runtime sets COMPLETE to one, the
+//!    runtime checks to see if the future's join handle has a waker and invokes
+//!    the waker if so (i.e. reads the waker field). Before a future completes,
+//!    every call to `JoinHandle::poll` on the future's handle tries to install
+//!    a waker (i.e. writes to the waker field). Since the runtime may complete
+//!    a future in one thread and the future's handle may be polled in another
+//!    thread, we need to ensure safe access to the waker field, which is done
+//!    uinsg the JOIN_WAKER bit and the following rules:
+//!
+//!    1. JOIN_WAKER starts as zero.
+//!
+//!    2. If JOIN_WAKER is zero, then the JoinHandle has exclusive access to the
+//!       waker field.
+//!
+//!    3. If JOIN_WAKER is one, then the JoinHandle has read-only access to the
+//!       waker field.
+//!
+//!    4. If JOIN_WAKER is one and the JoinHandle needs to install a waker, then
+//!       the JoinHandle needs to successfully set JOIN_WAKER to zero before
+//!       installing a waker, per rule 2.
+//!
+//!    5. The JoinHandle can only set JOIN_WAKER if COMPLETE is zero (i.e. the
+//!       task hasn't yet completed).
+//!
+//!    6. Once COMPLETE is one (i.e. task has completed), JOIN_WAKER and the
+//!       waker field are not modified. (At this point the runtime invokes the
+//!       waker if the JoinHandle has set one during the calls to
+//!       JoinHandle::poll.)
 //!
 //! All other fields are immutable and can be accessed immutably without
 //! synchronization by anyone.
