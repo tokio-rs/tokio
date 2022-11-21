@@ -75,7 +75,7 @@ pin_project! {
     #[must_use = "futures do nothing unless polled"]
     pub struct WaitForCancellationFutureOwned {
         // Since `future` is the first field, it is dropped before the
-        // cancellation_token and always holds a valid reference to it.
+        // cancellation_token, thus always holds a valid reference to it.
         #[pin]
         future: tokio::sync::futures::Notified<'static>,
         cancellation_token: CancellationToken,
@@ -266,8 +266,8 @@ impl WaitForCancellationFutureOwned {
     fn new(cancellation_token: CancellationToken) -> Self {
         WaitForCancellationFutureOwned {
             // cancellation_token holds a heap allocation and is guaranteed to have a
-            // stable deref, thus it would be ok to move the future which holds a reference
-            // to it.
+            // stable deref, thus it would be ok to move the cancellation_token while
+            // the future which holds a reference to it.
             //
             // # Safety
             //
