@@ -269,14 +269,14 @@ impl core::fmt::Debug for WaitForCancellationFutureOwned {
 impl WaitForCancellationFutureOwned {
     fn new(cancellation_token: CancellationToken) -> Self {
         WaitForCancellationFutureOwned {
-            future: unsafe { Self::get_future(&cancellation_token) },
+            future: unsafe { Self::new_future(&cancellation_token) },
             cancellation_token,
         }
     }
 
     /// * `cancellation_token` - The strong count of cancellation_token.inner
     ///   must be larger than 0 as long as the returned future is still alive.
-    unsafe fn get_future(
+    unsafe fn new_future(
         cancellation_token: &CancellationToken,
     ) -> tokio::sync::futures::Notified<'static> {
         let inner_ptr = Arc::as_ptr(&cancellation_token.inner);
@@ -304,7 +304,7 @@ impl Future for WaitForCancellationFutureOwned {
             }
 
             this.future
-                .set(unsafe { Self::get_future(this.cancellation_token) });
+                .set(unsafe { Self::new_future(this.cancellation_token) });
         }
     }
 }
