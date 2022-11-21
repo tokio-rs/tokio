@@ -66,6 +66,23 @@ pin_project! {
     }
 }
 
+pin_project! {
+    /// A Future that is resolved once the corresponding [`CancellationToken`]
+    /// is cancelled.
+    ///
+    /// This is the counterpart to [`WaitForCancellationFuture`] that takes
+    /// [`CancellationToken`] by value instead of using a reference.
+    #[must_use = "futures do nothing unless polled"]
+    pub struct WaitForCancellationFutureOwned {
+        // Since `future` is the first field, it is dropped before the
+        // cancellation_token field. This ensures that the reference inside the
+        // `Notified` remains valid.
+        #[pin]
+        future: tokio::sync::futures::Notified<'static>,
+        cancellation_token: CancellationToken,
+    }
+}
+
 // ===== impl CancellationToken =====
 
 impl core::fmt::Debug for CancellationToken {
@@ -183,6 +200,21 @@ impl CancellationToken {
         }
     }
 
+    /// Returns a `Future` that gets fulfilled when cancellation is requested.
+    ///
+    /// The future will complete immediately if the token is already cancelled
+    /// when this method is called.
+    ///
+    /// The function takes self by value and returns a future that owns the
+    /// token.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe.
+    pub fn cancelled_owned(self) -> WaitForCancellationFutureOwned {
+        WaitForCancellationFutureOwned::new(self)
+    }
+
     /// Creates a `DropGuard` for this token.
     ///
     /// Returned guard will cancel this token (and all its children) on drop
@@ -219,6 +251,71 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
             }
 
             this.future.set(this.cancellation_token.inner.notified());
+        }
+    }
+}
+
+// ===== impl WaitForCancellationFutureOwned =====
+
+impl core::fmt::Debug for WaitForCancellationFutureOwned {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("WaitForCancellationFutureOwned").finish()
+    }
+}
+
+impl WaitForCancellationFutureOwned {
+    fn new(cancellation_token: CancellationToken) -> Self {
+        WaitForCancellationFutureOwned {
+            // cancellation_token holds a heap allocation and is guaranteed to have a
+            // stable deref, thus it would be ok to move the cancellation_token while
+            // the future holds a reference to it.
+            //
+            // # Safety
+            //
+            // cancellation_token is dropped after future due to the field ordering.
+            future: unsafe { Self::new_future(&cancellation_token) },
+            cancellation_token,
+        }
+    }
+
+    /// # Safety
+    /// The returned future must be destroyed before the cancellation token is
+    /// destroyed.
+    unsafe fn new_future(
+        cancellation_token: &CancellationToken,
+    ) -> tokio::sync::futures::Notified<'static> {
+        let inner_ptr = Arc::as_ptr(&cancellation_token.inner);
+        // SAFETY: The `Arc::as_ptr` method guarantees that `inner_ptr` remains
+        // valid until the strong count of the Arc drops to zero, and the caller
+        // guarantees that they will drop the future before that happens.
+        (*inner_ptr).notified()
+    }
+}
+
+impl Future for WaitForCancellationFutureOwned {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let mut this = self.project();
+
+        loop {
+            if this.cancellation_token.is_cancelled() {
+                return Poll::Ready(());
+            }
+
+            // No wakeups can be lost here because there is always a call to
+            // `is_cancelled` between the creation of the future and the call to
+            // `poll`, and the code that sets the cancelled flag does so before
+            // waking the `Notified`.
+            if this.future.as_mut().poll(cx).is_pending() {
+                return Poll::Pending;
+            }
+
+            // # Safety
+            //
+            // cancellation_token is dropped after future due to the field ordering.
+            this.future
+                .set(unsafe { Self::new_future(this.cancellation_token) });
         }
     }
 }

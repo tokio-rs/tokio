@@ -208,7 +208,7 @@ feature! {
             }
         }
 
-        #[cfg(feature = "net")]
+        #[cfg(any(feature = "net", feature = "process"))]
         pub(crate) fn poll_write_vectored<'a>(
             &'a self,
             cx: &mut Context<'_>,
