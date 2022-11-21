@@ -199,6 +199,7 @@ async fn vectored_writes() {
 
     let mut cat = cat().spawn().unwrap();
     let mut stdin = cat.stdin.take().unwrap();
+    let are_writes_vectored = stdin.is_write_vectored();
     let mut stdout = cat.stdout.take().unwrap();
 
     let write = async {
@@ -236,8 +237,7 @@ async fn vectored_writes() {
     // on unix our small payload should always fit in whatever default sized pipe with a single
     // syscall. if multiple are used, then the forwarding does not work, or we are on a platform
     // for which the `std` does not support vectored writes.
-    #[cfg(target_family = "unix")]
-    assert_eq!(writes_completed, 1);
+    assert_eq!(writes_completed == 1, are_writes_vectored);
 
     assert_eq!(&read.unwrap(), b"hello\nworld!\n");
 }
