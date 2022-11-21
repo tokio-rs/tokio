@@ -74,10 +74,9 @@ pin_project! {
 /// [`CancellationToken`] by value instead of using a reference.
 #[must_use = "futures do nothing unless polled"]
 pub struct WaitForCancellationFutureOwned {
+    // Since `future` is the first field, it is dropped before the cancellation token.
+    future: Option<tokio::sync::futures::Notified<'static>>,
     cancellation_token: CancellationToken,
-
-    /// Use 'static lifetime here because we don't have 'this.
-    future: Option<mem::ManuallyDrop<tokio::sync::futures::Notified<'static>>>,
 }
 
 // ===== impl CancellationToken =====
