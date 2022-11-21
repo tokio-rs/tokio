@@ -313,7 +313,7 @@ impl Future for WaitForCancellationFutureOwned {
 
             // # Safety
             //
-            // cancellation_token is dropped after future due to order of field.
+            // cancellation_token is dropped after future due to the field ordering.
             this.future
                 .set(unsafe { Self::new_future(this.cancellation_token) });
         }
