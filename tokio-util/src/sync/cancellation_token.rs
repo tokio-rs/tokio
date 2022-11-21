@@ -75,7 +75,8 @@ pin_project! {
     #[must_use = "futures do nothing unless polled"]
     pub struct WaitForCancellationFutureOwned {
         // Since `future` is the first field, it is dropped before the
-        // cancellation_token, thus always holds a valid reference to it.
+        // cancellation_token field. This ensures that the reference inside the
+        // `Notified` remains valid.
         #[pin]
         future: tokio::sync::futures::Notified<'static>,
         cancellation_token: CancellationToken,
@@ -267,22 +268,26 @@ impl WaitForCancellationFutureOwned {
         WaitForCancellationFutureOwned {
             // cancellation_token holds a heap allocation and is guaranteed to have a
             // stable deref, thus it would be ok to move the cancellation_token while
-            // the future which holds a reference to it.
+            // the future holds a reference to it.
             //
             // # Safety
             //
-            // cancellation_token is dropped after future due to order of field.
+            // cancellation_token is dropped after future due to the field ordering.
             future: unsafe { Self::new_future(&cancellation_token) },
             cancellation_token,
         }
     }
 
-    /// * `cancellation_token` - The strong count of cancellation_token.inner
-    ///   must be larger than 0 as long as the returned future is still alive.
+    /// # Safety
+    /// The returned future must be destroyed before the cancellation token is
+    /// destroyed.
     unsafe fn new_future(
         cancellation_token: &CancellationToken,
     ) -> tokio::sync::futures::Notified<'static> {
         let inner_ptr = Arc::as_ptr(&cancellation_token.inner);
+        // SAFETY: The `Arc::as_ptr` method guarantees that `inner_ptr` remains
+        // valid until the strong count of the Arc drops to zero, and the caller
+        // guarantees that they will drop the future before that happens.
         (*inner_ptr).notified()
     }
 }
