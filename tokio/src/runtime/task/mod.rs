@@ -84,21 +84,23 @@
 //!    2. If JOIN_WAKER is zero, then the JoinHandle has exclusive (mutable)
 //!       access to the waker field.
 //!
-//!    3. If JOIN_WAKER is one, then the JoinHandle has shared (read-only)
-//!       access to the waker field.
+//!    3. If JOIN_WAKER is one, then the JoinHandle and the runtime have shared
+//!       (read-only) access to the waker field.
 //!
 //!    4. If the JoinHandle needs to install a waker, then the JoinHandle needs
 //!       to (i) successfully set JOIN_WAKER to zero if it is not already zero
 //!       to gain exclusive access to the waker field per rule 2, (ii) install a
 //!       waker, and (iii) successfully set JOIN_WAKER to one.
 //!
-//!    5. The JoinHandle can only change JOIN_WAKER if COMPLETE is zero (i.e.
-//!       the task hasn't yet completed). Hence, steps (i) or (iii) of rule 4
-//!       may fail due to a race.
+//!    5. The JoinHandle can change JOIN_WAKER only if COMPLETE is zero (i.e.
+//!       the task hasn't yet completed).
 //!
-//!    6. Once COMPLETE is one (i.e. task has completed), the JoinHandle will
-//!       not modify JOIN_WAKER and the waker field. At this point the runtime
-//!       invokes the waker if there is one.
+//!    Rule 5 implies that the steps (i) or (iii) of rule 4 may fail due to a
+//!    race. If step (i) fails, then the attempt to install a waker is aborted.
+//!    If step (iii) fails because COMPLETE is set to one by another thread
+//!    after step (i), then the waker field is cleared. Once COMPLETE is one
+//!    (i.e. task has completed), the JoinHandle will not modify JOIN_WAKER.
+//!    After COMPLETE is one, the runtime invokes the waker if there is one.
 //!
 //! All other fields are immutable and can be accessed immutably without
 //! synchronization by anyone.
