@@ -680,6 +680,11 @@ impl UnixStream {
     /// defined on the Tokio `UnixStream` type, as this will mess with the
     /// readiness flag and can cause the socket to behave incorrectly.
     ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, what typically
+    /// needs only one type of interest. The closure is not guaranteed to be called
+    /// if the provided interest is combined.
+    ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
     /// [`readable()`]: UnixStream::readable()
