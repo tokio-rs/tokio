@@ -578,14 +578,6 @@ pub(crate) use self::doc::os;
 #[allow(unused)]
 pub(crate) use std::os;
 
-#[cfg(docsrs)]
-#[allow(unused)]
-pub(crate) use self::doc::winapi;
-
-#[cfg(all(not(docsrs), windows, feature = "net"))]
-#[allow(unused)]
-pub(crate) use winapi;
-
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**
     /// intended to be used as part of the public API and is permitted to
