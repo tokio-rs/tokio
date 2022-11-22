@@ -218,11 +218,7 @@ cfg_rt! {
         CONTEXT.with(|c| {
             let mut defer = c.defer.borrow_mut();
 
-            if let Some(defer) = defer.as_mut() {
-                Some(f(defer))
-            } else {
-                None
-            }
+            defer.as_mut().map(|defer| f(defer))
         })
     }
 
