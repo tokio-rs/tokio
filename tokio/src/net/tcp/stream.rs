@@ -964,7 +964,7 @@ impl TcpStream {
     /// Tries to read or write from the socket using a user-provided IO operation.
     ///
     /// If the socket is ready, the provided closure is called. The closure
-    /// should attempt to perform IO operation from the socket by manually
+    /// should attempt to perform IO operation on the socket by manually
     /// calling the appropriate syscall. If the operation fails because the
     /// socket is not actually ready, then the closure should return a
     /// `WouldBlock` error and the readiness flag is cleared. The return value
