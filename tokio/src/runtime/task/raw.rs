@@ -14,16 +14,14 @@ pub(super) struct Vtable {
     /// Polls the future.
     pub(super) poll: unsafe fn(NonNull<Header>),
 
+    /// Schedules the task for execution on the runtime.
+    pub(super) schedule: unsafe fn(NonNull<Header>),
+
     /// Deallocates the memory.
     pub(super) dealloc: unsafe fn(NonNull<Header>),
 
     /// Reads the task output, if complete.
     pub(super) try_read_output: unsafe fn(NonNull<Header>, *mut (), &Waker),
-
-    /// Try to set the waker notified when the task is complete. Returns true if
-    /// the task has already completed. If this call returns false, then the
-    /// waker will not be notified.
-    pub(super) try_set_join_waker: unsafe fn(NonNull<Header>, &Waker) -> bool,
 
     /// The join handle has been dropped.
     pub(super) drop_join_handle_slow: unsafe fn(NonNull<Header>),
@@ -31,28 +29,32 @@ pub(super) struct Vtable {
     /// An abort handle has been dropped.
     pub(super) drop_abort_handle: unsafe fn(NonNull<Header>),
 
-    /// The task is remotely aborted.
-    pub(super) remote_abort: unsafe fn(NonNull<Header>),
-
     /// Scheduler is being shutdown.
     pub(super) shutdown: unsafe fn(NonNull<Header>),
 
     /// The number of bytes that the `trailer` field is offset from the header.
     pub(super) trailer_offset: usize,
+
+    /// The number of bytes that the `scheduler` field is offset from the header.
+    pub(super) scheduler_offset: usize,
+
+    /// The number of bytes that the `id` field is offset from the header.
+    pub(super) id_offset: usize,
 }
 
 /// Get the vtable for the requested `T` and `S` generics.
 pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
     &Vtable {
         poll: poll::<T, S>,
+        schedule: schedule::<S>,
         dealloc: dealloc::<T, S>,
         try_read_output: try_read_output::<T, S>,
-        try_set_join_waker: try_set_join_waker::<T, S>,
         drop_join_handle_slow: drop_join_handle_slow::<T, S>,
         drop_abort_handle: drop_abort_handle::<T, S>,
-        remote_abort: remote_abort::<T, S>,
         shutdown: shutdown::<T, S>,
-        trailer_offset: TrailerOffsetHelper::<T, S>::OFFSET,
+        trailer_offset: OffsetHelper::<T, S>::TRAILER_OFFSET,
+        scheduler_offset: OffsetHelper::<T, S>::SCHEDULER_OFFSET,
+        id_offset: OffsetHelper::<T, S>::ID_OFFSET,
     }
 }
 
@@ -61,16 +63,30 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
 ///
 /// See this thread for more info:
 /// <https://users.rust-lang.org/t/custom-vtables-with-integers/78508>
-struct TrailerOffsetHelper<T, S>(T, S);
-impl<T: Future, S: Schedule> TrailerOffsetHelper<T, S> {
+struct OffsetHelper<T, S>(T, S);
+impl<T: Future, S: Schedule> OffsetHelper<T, S> {
     // Pass `size_of`/`align_of` as arguments rather than calling them directly
     // inside `get_trailer_offset` because trait bounds on generic parameters
     // of const fn are unstable on our MSRV.
-    const OFFSET: usize = get_trailer_offset(
+    const TRAILER_OFFSET: usize = get_trailer_offset(
         std::mem::size_of::<Header>(),
         std::mem::size_of::<Core<T, S>>(),
         std::mem::align_of::<Core<T, S>>(),
         std::mem::align_of::<Trailer>(),
+    );
+
+    // The `scheduler` is the first field of `Core`, so it has the same
+    // offset as `Core`.
+    const SCHEDULER_OFFSET: usize = get_core_offset(
+        std::mem::size_of::<Header>(),
+        std::mem::align_of::<Core<T, S>>(),
+    );
+
+    const ID_OFFSET: usize = get_id_offset(
+        std::mem::size_of::<Header>(),
+        std::mem::align_of::<Core<T, S>>(),
+        std::mem::size_of::<S>(),
+        std::mem::align_of::<Id>(),
     );
 }
 
@@ -101,6 +117,44 @@ const fn get_trailer_offset(
     offset
 }
 
+/// Compute the offset of the `Core<T, S>` field in `Cell<T, S>` using the
+/// `#[repr(C)]` algorithm.
+///
+/// Pseudo-code for the `#[repr(C)]` algorithm can be found here:
+/// <https://doc.rust-lang.org/reference/type-layout.html#reprc-structs>
+const fn get_core_offset(header_size: usize, core_align: usize) -> usize {
+    let mut offset = header_size;
+
+    let core_misalign = offset % core_align;
+    if core_misalign > 0 {
+        offset += core_align - core_misalign;
+    }
+
+    offset
+}
+
+/// Compute the offset of the `Id` field in `Cell<T, S>` using the
+/// `#[repr(C)]` algorithm.
+///
+/// Pseudo-code for the `#[repr(C)]` algorithm can be found here:
+/// <https://doc.rust-lang.org/reference/type-layout.html#reprc-structs>
+const fn get_id_offset(
+    header_size: usize,
+    core_align: usize,
+    scheduler_size: usize,
+    id_align: usize,
+) -> usize {
+    let mut offset = get_core_offset(header_size, core_align);
+    offset += scheduler_size;
+
+    let id_misalign = offset % id_align;
+    if id_misalign > 0 {
+        offset += id_align - id_misalign;
+    }
+
+    offset
+}
+
 impl RawTask {
     pub(super) fn new<T, S>(task: T, scheduler: S, id: Id) -> RawTask
     where
@@ -121,17 +175,34 @@ impl RawTask {
         self.ptr
     }
 
-    /// Returns a reference to the task's meta structure.
-    ///
-    /// Safe as `Header` is `Sync`.
+    pub(super) fn trailer_ptr(&self) -> NonNull<Trailer> {
+        unsafe { Header::get_trailer(self.ptr) }
+    }
+
+    /// Returns a reference to the task's header.
     pub(super) fn header(&self) -> &Header {
         unsafe { self.ptr.as_ref() }
+    }
+
+    /// Returns a reference to the task's trailer.
+    pub(super) fn trailer(&self) -> &Trailer {
+        unsafe { &*self.trailer_ptr().as_ptr() }
+    }
+
+    /// Returns a reference to the task's state.
+    pub(super) fn state(&self) -> &State {
+        &self.header().state
     }
 
     /// Safety: mutual exclusion is required to call this function.
     pub(super) fn poll(self) {
         let vtable = self.header().vtable;
         unsafe { (vtable.poll)(self.ptr) }
+    }
+
+    pub(super) fn schedule(self) {
+        let vtable = self.header().vtable;
+        unsafe { (vtable.schedule)(self.ptr) }
     }
 
     pub(super) fn dealloc(self) {
@@ -148,11 +219,6 @@ impl RawTask {
         (vtable.try_read_output)(self.ptr, dst, waker);
     }
 
-    pub(super) fn try_set_join_waker(self, waker: &Waker) -> bool {
-        let vtable = self.header().vtable;
-        unsafe { (vtable.try_set_join_waker)(self.ptr, waker) }
-    }
-
     pub(super) fn drop_join_handle_slow(self) {
         let vtable = self.header().vtable;
         unsafe { (vtable.drop_join_handle_slow)(self.ptr) }
@@ -166,11 +232,6 @@ impl RawTask {
     pub(super) fn shutdown(self) {
         let vtable = self.header().vtable;
         unsafe { (vtable.shutdown)(self.ptr) }
-    }
-
-    pub(super) fn remote_abort(self) {
-        let vtable = self.header().vtable;
-        unsafe { (vtable.remote_abort)(self.ptr) }
     }
 
     /// Increment the task's reference count.
@@ -194,6 +255,15 @@ unsafe fn poll<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     harness.poll();
 }
 
+unsafe fn schedule<S: Schedule>(ptr: NonNull<Header>) {
+    use crate::runtime::task::{Notified, Task};
+
+    let scheduler = Header::get_scheduler::<S>(ptr);
+    scheduler
+        .as_ref()
+        .schedule(Notified(Task::from_raw(ptr.cast())));
+}
+
 unsafe fn dealloc<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     let harness = Harness::<T, S>::from_raw(ptr);
     harness.dealloc();
@@ -210,11 +280,6 @@ unsafe fn try_read_output<T: Future, S: Schedule>(
     harness.try_read_output(out, waker);
 }
 
-unsafe fn try_set_join_waker<T: Future, S: Schedule>(ptr: NonNull<Header>, waker: &Waker) -> bool {
-    let harness = Harness::<T, S>::from_raw(ptr);
-    harness.try_set_join_waker(waker)
-}
-
 unsafe fn drop_join_handle_slow<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     let harness = Harness::<T, S>::from_raw(ptr);
     harness.drop_join_handle_slow()
@@ -223,11 +288,6 @@ unsafe fn drop_join_handle_slow<T: Future, S: Schedule>(ptr: NonNull<Header>) {
 unsafe fn drop_abort_handle<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     let harness = Harness::<T, S>::from_raw(ptr);
     harness.drop_reference();
-}
-
-unsafe fn remote_abort<T: Future, S: Schedule>(ptr: NonNull<Header>) {
-    let harness = Harness::<T, S>::from_raw(ptr);
-    harness.remote_abort()
 }
 
 unsafe fn shutdown<T: Future, S: Schedule>(ptr: NonNull<Header>) {
