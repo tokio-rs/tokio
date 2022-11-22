@@ -818,7 +818,7 @@ impl Builder {
         ///
         /// This configuration option is considered a workaround for the LIFO
         /// slot not being stealable. When the slot becomes stealable, we will
-        /// revisit whther or not this option is necessary. See
+        /// revisit whether or not this option is necessary. See
         /// tokio-rs/tokio#4941.
         ///
         /// # Examples
