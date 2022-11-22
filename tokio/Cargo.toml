@@ -53,6 +53,7 @@ net = [
   "mio/net",
   "socket2",
   "windows-sys/Win32_Foundation",
+  "windows-sys/Win32_Security",
   "windows-sys/Win32_Storage_FileSystem",
   "windows-sys/Win32_System_Pipes",
   "windows-sys/Win32_System_SystemServices",
@@ -80,6 +81,7 @@ signal = [
   "mio/net",
   "mio/os-ext",
   "signal-hook-registry",
+  "windows-sys/Win32_Foundation",
   "windows-sys/Win32_System_Console",
 ]
 sync = []
