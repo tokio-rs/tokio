@@ -73,11 +73,11 @@
 //!    that set RUNNING to one.
 //!
 //!  * The waker field may be concurrently accessed by different threads: in one
-//!    thread the runtime may complete a future and read the waker field to
-//!    invoke the waker, and in another thread the future's JoinHandle may be
-//!    polled and if the future hasn't completed, JoinHandle may install a waker
-//!    in the waker field. The JOIN_WAKER bit ensures safe access by multiple
-//!    threads to the waker field using the following rules:
+//!    thread the runtime may complete a task and *read* the waker field to
+//!    invoke the waker, and in another thread the task's JoinHandle may be
+//!    polled, and if the task hasn't yet completed, the JoinHandle may *write*
+//!    a waker to the waker field. The JOIN_WAKER bit ensures safe access by
+//!    multiple threads to the waker field using the following rules:
 //!
 //!    1. JOIN_WAKER is initialized to zero.
 //!
@@ -87,20 +87,20 @@
 //!    3. If JOIN_WAKER is one, then the JoinHandle and the runtime have shared
 //!       (read-only) access to the waker field.
 //!
-//!    4. If the JoinHandle needs to install a waker, then the JoinHandle needs
-//!       to (i) successfully set JOIN_WAKER to zero if it is not already zero
-//!       to gain exclusive access to the waker field per rule 2, (ii) install a
-//!       waker, and (iii) successfully set JOIN_WAKER to one.
+//!    4. If the JoinHandle needs to write to the waker field, then the
+//!       JoinHandle needs to (i) successfully set JOIN_WAKER to zero if it is
+//!       not already zero to gain exclusive access to the waker field per rule
+//!       2, (ii) write a waker, and (iii) successfully set JOIN_WAKER to one.
 //!
 //!    5. The JoinHandle can change JOIN_WAKER only if COMPLETE is zero (i.e.
 //!       the task hasn't yet completed).
 //!
 //!    Rule 5 implies that the steps (i) or (iii) of rule 4 may fail due to a
-//!    race. If step (i) fails, then the attempt to install a waker is aborted.
-//!    If step (iii) fails because COMPLETE is set to one by another thread
-//!    after step (i), then the waker field is cleared. Once COMPLETE is one
-//!    (i.e. task has completed), the JoinHandle will not modify JOIN_WAKER.
-//!    After COMPLETE is one, the runtime invokes the waker if there is one.
+//!    race. If step (i) fails, then the attempt to write a waker is aborted. If
+//!    step (iii) fails because COMPLETE is set to one by another thread after
+//!    step (i), then the waker field is cleared. Once COMPLETE is one (i.e.
+//!    task has completed), the JoinHandle will not modify JOIN_WAKER. After
+//!    COMPLETE is set to one, the runtime invokes the waker if there is one.
 //!
 //! All other fields are immutable and can be accessed immutably without
 //! synchronization by anyone.
