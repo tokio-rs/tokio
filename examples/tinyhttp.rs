@@ -6,16 +6,16 @@
 //! than Tokio, if you'd like a "real world" HTTP library you likely want a
 //! crate like Hyper.
 //!
-//! Code here is based on the `echo-threads` example and implements two paths,
-//! the `/plaintext` and `/json` routes to respond with some text and json,
-//! respectively. By default this will run I/O on all the cores your system has
-//! available, and it doesn't support HTTP request bodies.
+//! Code here implements two paths, the `/plaintext` and `/json` routes to respond
+//! with some text and json, respectively. By default this will run I/O on all the
+//! cores your system has available, and it doesn't support HTTP request bodies.
 
 #![warn(rust_2018_idioms)]
 
 use bytes::BytesMut;
 use futures::SinkExt;
 use http::{header::HeaderValue, Request, Response, StatusCode};
+use std::str;
 #[macro_use]
 extern crate serde_derive;
 use std::{env, error::Error, fmt, io};
@@ -169,9 +169,13 @@ impl Decoder for Http {
             };
 
             let toslice = |a: &[u8]| {
-                let start = a.as_ptr() as usize - src.as_ptr() as usize;
-                assert!(start < src.len());
-                (start, start + a.len())
+                if (a.as_ptr() as usize) > (src.as_ptr() as usize) {
+                    let start = a.as_ptr() as usize - src.as_ptr() as usize;
+                    assert!(start < src.len());
+                    (start, start + a.len())
+                } else {
+                    (0, a.len())
+                }
             };
 
             for (i, header) in r.headers.iter().enumerate() {
