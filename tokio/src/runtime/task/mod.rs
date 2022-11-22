@@ -99,8 +99,8 @@
 //!    race. If step (i) fails, then the attempt to write a waker is aborted. If
 //!    step (iii) fails because COMPLETE is set to one by another thread after
 //!    step (i), then the waker field is cleared. Once COMPLETE is one (i.e.
-//!    task has completed), the JoinHandle will not modify JOIN_WAKER. After
-//!    COMPLETE is set to one, the runtime invokes the waker if there is one.
+//!    task has completed), the JoinHandle will not modify JOIN_WAKER. After the
+//!    runtime sets COMPLETE to one, it invokes the waker if there is one.
 //!
 //! All other fields are immutable and can be accessed immutably without
 //! synchronization by anyone.
