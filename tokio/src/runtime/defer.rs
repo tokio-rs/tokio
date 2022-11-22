@@ -7,7 +7,9 @@ pub(crate) struct Defer {
 
 impl Defer {
     pub(crate) fn new() -> Defer {
-        Defer { deferred: Default::default() }
+        Defer {
+            deferred: Default::default(),
+        }
     }
 
     pub(crate) fn defer(&mut self, waker: Waker) {
