@@ -1,9 +1,7 @@
-//! Hello world server.
-//!
 //! A simple client that opens a TCP stream, writes "hello world\n", and closes
 //! the connection.
 //!
-//! You can test this out by running:
+//! Make sure the server is running and listen on 6142 port, you can test this out by running:
 //!
 //!     ncat -l 6142
 //!
