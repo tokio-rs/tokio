@@ -103,7 +103,7 @@ impl Driver {
     }
 
     fn process(&mut self) {
-        // If the signal pipe has not recieved a readiness event, then there is
+        // If the signal pipe has not received a readiness event, then there is
         // nothing else to do.
         if !self.io.consume_signal_ready() {
             return;
