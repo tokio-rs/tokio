@@ -1,8 +1,7 @@
-use std::collections::VecDeque;
 use std::task::Waker;
 
 pub(crate) struct Defer {
-    deferred: VecDeque<Waker>,
+    deferred: Vec<Waker>,
 }
 
 impl Defer {
@@ -13,7 +12,7 @@ impl Defer {
     }
 
     pub(crate) fn defer(&mut self, waker: Waker) {
-        self.deferred.push_back(waker);
+        self.deferred.push(waker);
     }
 
     pub(crate) fn is_empty(&self) -> bool {

@@ -9,7 +9,6 @@ use crate::util::rand::{FastRand, RngSeed};
 cfg_rt! {
     use crate::runtime::{scheduler, task::Id, Defer};
 
-
     use std::cell::RefCell;
     use std::marker::PhantomData;
     use std::time::Duration;
@@ -33,6 +32,7 @@ struct Context {
 
     /// Yielded task wakers are stored here and notified after resource drivers
     /// are polled.
+    #[cfg(feature = "rt")]
     defer: RefCell<Option<Defer>>,
 
     #[cfg(any(feature = "rt", feature = "macros"))]
