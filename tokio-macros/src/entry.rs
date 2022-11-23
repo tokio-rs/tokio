@@ -412,8 +412,9 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
             syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
         };
         quote! {
-            let body: ::std::pin::Pin<::std::boxed::Box<dyn ::std::future::Future<Output = #output_type>>> =
-                ::std::boxed::Box::pin(async #body);
+            let body = async #body;
+            ::tokio::pin!(body);
+            let body: ::std::pin::Pin<&mut dyn ::std::future::Future<Output = #output_type>> = body;
         }
     } else {
         quote! {
