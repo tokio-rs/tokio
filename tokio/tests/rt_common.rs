@@ -706,6 +706,7 @@ rt_test! {
 
         rt.block_on(async {
             // Make sure other workers cannot steal tasks
+            #[allow(clippy::reversed_empty_ranges)]
             for _ in 0..(NUM_WORKERS-1) {
                 let flag = flag.clone();
                 let barrier = barrier.clone();
