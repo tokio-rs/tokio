@@ -178,7 +178,7 @@ cfg_io_readiness! {
     use crate::io::Interest;
 
     impl Ready {
-        fn from_interest(interest: Interest) -> Ready {
+        pub(crate) fn from_interest(interest: Interest) -> Ready {
             let mut ready = Ready::EMPTY;
 
             if interest.is_readable() {
