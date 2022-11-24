@@ -84,18 +84,21 @@
 //!    2. If JOIN_WAKER is zero, then the JoinHandle has exclusive (mutable)
 //!       access to the waker field.
 //!
-//!    3. If JOIN_WAKER is one, then the JoinHandle and the runtime have shared
+//!    3. If JOIN_WAKER is one, then the JoinHandle has shared (read-only)
+//!       access to the waker field.
+//!
+//!    4. If JOIN_WAKER is one and COMPLETE is one, then the runtime has shared
 //!       (read-only) access to the waker field.
 //!
-//!    4. If the JoinHandle needs to write to the waker field, then the
+//!    5. If the JoinHandle needs to write to the waker field, then the
 //!       JoinHandle needs to (i) successfully set JOIN_WAKER to zero if it is
 //!       not already zero to gain exclusive access to the waker field per rule
 //!       2, (ii) write a waker, and (iii) successfully set JOIN_WAKER to one.
 //!
-//!    5. The JoinHandle can change JOIN_WAKER only if COMPLETE is zero (i.e.
+//!    6. The JoinHandle can change JOIN_WAKER only if COMPLETE is zero (i.e.
 //!       the task hasn't yet completed).
 //!
-//!    Rule 5 implies that the steps (i) or (iii) of rule 4 may fail due to a
+//!    Rule 6 implies that the steps (i) or (iii) of rule 5 may fail due to a
 //!    race. If step (i) fails, then the attempt to write a waker is aborted. If
 //!    step (iii) fails because COMPLETE is set to one by another thread after
 //!    step (i), then the waker field is cleared. Once COMPLETE is one (i.e.
