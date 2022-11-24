@@ -218,7 +218,7 @@ cfg_rt! {
         CONTEXT.with(|c| {
             let mut defer = c.defer.borrow_mut();
 
-            defer.as_mut().map(|defer| f(defer))
+            defer.as_mut().map(f)
         })
     }
 
