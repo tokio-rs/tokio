@@ -514,7 +514,7 @@ cfg_io_readiness! {
                         // Safety: State::Done means it is no longer shared
                         let w = unsafe { &mut *waiter.get() };
 
-                        // Note: the returned tick might be newer then the event
+                        // Note: the returned tick might be newer than the event
                         // which notified our waker. This is ok because the future
                         // still didn't return `Poll::Ready`.
                         let curr = scheduled_io.readiness.load(Acquire);
