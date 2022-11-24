@@ -112,6 +112,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
+use crate::sync::notify::Notify;
 use crate::util::linked_list::{self, LinkedList};
 
 use std::fmt;
@@ -306,6 +307,9 @@ struct Shared<T> {
 
     /// Number of outstanding Sender handles.
     num_tx: AtomicUsize,
+
+    /// Notifies any task listening for `Receiver` dropped events.
+    notify_tx: Notify,
 }
 
 /// Next position to write a value.
@@ -463,6 +467,7 @@ pub fn channel<T: Clone>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
             waiters: LinkedList::new(),
         }),
         num_tx: AtomicUsize::new(1),
+        notify_tx: Notify::new(),
     });
 
     let rx = Receiver {
@@ -639,6 +644,56 @@ impl<T> Sender<T> {
     pub fn receiver_count(&self) -> usize {
         let tail = self.shared.tail.lock();
         tail.rx_cnt
+    }
+
+    /// Completes when all receivers have dropped.
+    ///
+    /// This allows the producers to get notified when interest in the produced
+    /// values is canceled and immediately stop doing work.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once the channel is closed, it stays closed
+    /// forever and all future calls to `closed` will return immediately.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx1, rx) = broadcast::channel::<()>(1);
+    ///     let tx2 = tx1.clone();
+    ///     let tx3 = tx1.clone();
+    ///     let tx4 = tx1.clone();
+    ///     let tx5 = tx1.clone();
+    ///     tokio::spawn(async move {
+    ///         drop(rx);
+    ///     });
+    ///
+    ///     futures::join!(
+    ///         tx1.closed(),
+    ///         tx2.closed(),
+    ///         tx3.closed(),
+    ///         tx4.closed(),
+    ///         tx5.closed()
+    ///     );
+    ///     println!("Receivers dropped");
+    /// }
+    /// ```
+    pub async fn closed(&self) {
+        while self.receiver_count() > 0 {
+            let notified = self.shared.notify_tx.notified();
+
+            if self.receiver_count() == 0 {
+                return;
+            }
+
+            notified.await;
+            // The channel could have been reopened in the meantime by calling
+            // `subscribe`, so we loop again.
+        }
     }
 
     fn close_channel(&self) {
@@ -1020,6 +1075,11 @@ impl<T> Drop for Receiver<T> {
 
         tail.rx_cnt -= 1;
         let until = tail.pos;
+
+        if tail.rx_cnt == 0 {
+            // This is the last `Receiver` handle, tasks waiting on `Sender::closed`
+            self.shared.notify_tx.notify_waiters();
+        }
 
         drop(tail);
 

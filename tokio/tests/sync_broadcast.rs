@@ -526,3 +526,20 @@ fn resubscribe_to_closed_channel() {
     let mut rx_resub = rx.resubscribe();
     assert_closed!(rx_resub.try_recv());
 }
+
+#[test]
+fn poll_close() {
+    let (tx, rx) = tokio::sync::broadcast::channel::<u32>(2);
+
+    {
+        let mut t = task::spawn(tx.closed());
+        assert_pending!(t.poll());
+
+        drop(rx);
+
+        assert!(t.is_woken());
+        assert_ready!(t.poll());
+    }
+
+    assert_err!(tx.send(1));
+}
