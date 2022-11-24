@@ -534,7 +534,7 @@ impl NamedPipeServer {
         /// Tries to read data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
-        /// Receives any pending data from the socket but does not wait for new data
+        /// Receives any pending data from the pipe but does not wait for new data
         /// to arrive. On success, returns the number of bytes read. Because
         /// `try_read_buf()` is non-blocking, the buffer does not have to be stored by
         /// the async task and can exist entirely on the stack.
@@ -565,7 +565,7 @@ impl NamedPipeServer {
         ///     let server = named_pipe::ServerOptions::new().create(PIPE_NAME)?;
         ///
         ///     loop {
-        ///         // Wait for the socket to be readable
+        ///         // Wait for the pipe to be readable
         ///         server.readable().await?;
         ///
         ///         let mut buf = Vec::with_capacity(4096);
@@ -806,27 +806,27 @@ impl NamedPipeServer {
             .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(buf))
     }
 
-    /// Tries to read or write from the socket using a user-provided IO operation.
+    /// Tries to read or write from the pipe using a user-provided IO operation.
     ///
-    /// If the socket is ready, the provided closure is called. The closure
-    /// should attempt to perform IO operation from the socket by manually
+    /// If the pipe is ready, the provided closure is called. The closure
+    /// should attempt to perform IO operation from the pipe by manually
     /// calling the appropriate syscall. If the operation fails because the
-    /// socket is not actually ready, then the closure should return a
+    /// pipe is not actually ready, then the closure should return a
     /// `WouldBlock` error and the readiness flag is cleared. The return value
     /// of the closure is then returned by `try_io`.
     ///
-    /// If the socket is not ready, then the closure is not called
+    /// If the pipe is not ready, then the closure is not called
     /// and a `WouldBlock` error is returned.
     ///
     /// The closure should only return a `WouldBlock` error if it has performed
-    /// an IO operation on the socket that failed due to the socket not being
+    /// an IO operation on the pipe that failed due to the pipe not being
     /// ready. Returning a `WouldBlock` error in any other situation will
-    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// incorrectly clear the readiness flag, which can cause the pipe to
     /// behave incorrectly.
     ///
     /// The closure should not perform the IO operation using any of the
     /// methods defined on the Tokio `NamedPipeServer` type, as this will mess with
-    /// the readiness flag and can cause the socket to behave incorrectly.
+    /// the readiness flag and can cause the pipe to behave incorrectly.
     ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
@@ -1276,7 +1276,7 @@ impl NamedPipeClient {
         /// Tries to read data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
-        /// Receives any pending data from the socket but does not wait for new data
+        /// Receives any pending data from the pipe but does not wait for new data
         /// to arrive. On success, returns the number of bytes read. Because
         /// `try_read_buf()` is non-blocking, the buffer does not have to be stored by
         /// the async task and can exist entirely on the stack.
@@ -1307,7 +1307,7 @@ impl NamedPipeClient {
         ///     let client = named_pipe::ClientOptions::new().open(PIPE_NAME)?;
         ///
         ///     loop {
-        ///         // Wait for the socket to be readable
+        ///         // Wait for the pipe to be readable
         ///         client.readable().await?;
         ///
         ///         let mut buf = Vec::with_capacity(4096);
@@ -1545,27 +1545,27 @@ impl NamedPipeClient {
             .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(buf))
     }
 
-    /// Tries to read or write from the socket using a user-provided IO operation.
+    /// Tries to read or write from the pipe using a user-provided IO operation.
     ///
-    /// If the socket is ready, the provided closure is called. The closure
-    /// should attempt to perform IO operation from the socket by manually
+    /// If the pipe is ready, the provided closure is called. The closure
+    /// should attempt to perform IO operation from the pipe by manually
     /// calling the appropriate syscall. If the operation fails because the
-    /// socket is not actually ready, then the closure should return a
+    /// pipe is not actually ready, then the closure should return a
     /// `WouldBlock` error and the readiness flag is cleared. The return value
     /// of the closure is then returned by `try_io`.
     ///
-    /// If the socket is not ready, then the closure is not called
+    /// If the pipe is not ready, then the closure is not called
     /// and a `WouldBlock` error is returned.
     ///
     /// The closure should only return a `WouldBlock` error if it has performed
-    /// an IO operation on the socket that failed due to the socket not being
+    /// an IO operation on the pipe that failed due to the pipe not being
     /// ready. Returning a `WouldBlock` error in any other situation will
-    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// incorrectly clear the readiness flag, which can cause the pipe to
     /// behave incorrectly.
     ///
     /// The closure should not perform the IO operation using any of the methods
     /// defined on the Tokio `NamedPipeClient` type, as this will mess with the
-    /// readiness flag and can cause the socket to behave incorrectly.
+    /// readiness flag and can cause the pipe to behave incorrectly.
     ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
