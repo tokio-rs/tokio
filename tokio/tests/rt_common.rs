@@ -9,6 +9,7 @@ macro_rules! rt_test {
         mod current_thread_scheduler {
             $($t)*
 
+            #[cfg(not(target_os="wasi"))]
             const NUM_WORKERS: usize = 1;
 
             fn rt() -> Arc<Runtime> {
