@@ -1,6 +1,6 @@
-use crate::runtime::{self, Runtime};
 use crate::runtime::park;
 use crate::runtime::tests::loom_oneshot as oneshot;
+use crate::runtime::{self, Runtime};
 
 #[test]
 fn yield_calls_park_before_scheduling_again() {
