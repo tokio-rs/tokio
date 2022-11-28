@@ -694,6 +694,10 @@ rt_test! {
 
     /// Tests that yielded tasks are not scheduled until **after** resource
     /// drivers are polled.
+    ///
+    /// Note: we may have to delete this test as it is not necessarily reliable.
+    /// The OS does not guarantee when I/O events are delivered, so there may be
+    /// more yields than anticipated.
     #[test]
     #[cfg(not(target_os="wasi"))]
     fn yield_defers_until_park() {
@@ -738,9 +742,11 @@ rt_test! {
                         while !flag.load(SeqCst){
                             tokio::task::yield_now().await;
                             cnt += 1;
-                        }
 
-                        assert!(cnt < 3, "actual={}", cnt);
+                            if cnt >= 10 {
+                                panic!("yielded too many times; TODO: delete this test?");
+                            }
+                        }
                     },
                     async {
                         let _ = listener.accept().await.unwrap();
