@@ -1,24 +1,24 @@
-use libc::{gid_t, pid_t, uid_t};
+use crate::net::unix;
 
 /// Credentials of a process.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct UCred {
     /// PID (process ID) of the process.
-    pid: Option<pid_t>,
+    pid: Option<unix::pid_t>,
     /// UID (user ID) of the process.
-    uid: uid_t,
+    uid: unix::uid_t,
     /// GID (group ID) of the process.
-    gid: gid_t,
+    gid: unix::gid_t,
 }
 
 impl UCred {
     /// Gets UID (user ID) of the process.
-    pub fn uid(&self) -> uid_t {
+    pub fn uid(&self) -> unix::uid_t {
         self.uid
     }
 
     /// Gets GID (group ID) of the process.
-    pub fn gid(&self) -> gid_t {
+    pub fn gid(&self) -> unix::gid_t {
         self.gid
     }
 
@@ -26,7 +26,7 @@ impl UCred {
     ///
     /// This is only implemented under Linux, Android, iOS, macOS, Solaris and
     /// Illumos. On other platforms this will always return `None`.
-    pub fn pid(&self) -> Option<pid_t> {
+    pub fn pid(&self) -> Option<unix::pid_t> {
         self.pid
     }
 }
@@ -48,7 +48,7 @@ pub(crate) use self::impl_solaris::get_peer_cred;
 
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "openbsd"))]
 pub(crate) mod impl_linux {
-    use crate::net::unix::UnixStream;
+    use crate::net::unix::{self, UnixStream};
 
     use libc::{c_void, getsockopt, socklen_t, SOL_SOCKET, SO_PEERCRED};
     use std::{io, mem};
@@ -87,9 +87,9 @@ pub(crate) mod impl_linux {
             );
             if ret == 0 && ucred_size as usize == mem::size_of::<ucred>() {
                 Ok(super::UCred {
-                    uid: ucred.uid,
-                    gid: ucred.gid,
-                    pid: Some(ucred.pid),
+                    uid: ucred.uid as unix::uid_t,
+                    gid: ucred.gid as unix::gid_t,
+                    pid: Some(ucred.pid as unix::pid_t),
                 })
             } else {
                 Err(io::Error::last_os_error())
@@ -100,7 +100,7 @@ pub(crate) mod impl_linux {
 
 #[cfg(any(target_os = "netbsd"))]
 pub(crate) mod impl_netbsd {
-    use crate::net::unix::UnixStream;
+    use crate::net::unix::{self, UnixStream};
 
     use libc::{c_void, getsockopt, socklen_t, unpcbid, LOCAL_PEEREID, SOL_SOCKET};
     use std::io;
@@ -129,9 +129,9 @@ pub(crate) mod impl_netbsd {
             );
             if ret == 0 && unpcbid_size as usize == size_of::<unpcbid>() {
                 Ok(super::UCred {
-                    uid: unpcbid.unp_euid,
-                    gid: unpcbid.unp_egid,
-                    pid: Some(unpcbid.unp_pid),
+                    uid: unpcbid.unp_euid as unix::uid_t,
+                    gid: unpcbid.unp_egid as unix::gid_t,
+                    pid: Some(unpcbid.unp_pid as unix::pid_t),
                 })
             } else {
                 Err(io::Error::last_os_error())
@@ -142,7 +142,7 @@ pub(crate) mod impl_netbsd {
 
 #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
 pub(crate) mod impl_bsd {
-    use crate::net::unix::UnixStream;
+    use crate::net::unix::{self, UnixStream};
 
     use libc::getpeereid;
     use std::io;
@@ -160,8 +160,8 @@ pub(crate) mod impl_bsd {
 
             if ret == 0 {
                 Ok(super::UCred {
-                    uid: uid.assume_init(),
-                    gid: gid.assume_init(),
+                    uid: uid.assume_init() as unix::uid_t,
+                    gid: gid.assume_init() as unix::gid_t,
                     pid: None,
                 })
             } else {
@@ -173,7 +173,7 @@ pub(crate) mod impl_bsd {
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub(crate) mod impl_macos {
-    use crate::net::unix::UnixStream;
+    use crate::net::unix::{self, UnixStream};
 
     use libc::{c_void, getpeereid, getsockopt, pid_t, LOCAL_PEEREPID, SOL_LOCAL};
     use std::io;
@@ -207,9 +207,9 @@ pub(crate) mod impl_macos {
 
             if ret == 0 {
                 Ok(super::UCred {
-                    uid: uid.assume_init(),
-                    gid: gid.assume_init(),
-                    pid: Some(pid.assume_init()),
+                    uid: uid.assume_init() as unix::uid_t,
+                    gid: gid.assume_init() as unix::gid_t,
+                    pid: Some(pid.assume_init() as unix::pid_t),
                 })
             } else {
                 Err(io::Error::last_os_error())
@@ -220,7 +220,7 @@ pub(crate) mod impl_macos {
 
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub(crate) mod impl_solaris {
-    use crate::net::unix::UnixStream;
+    use crate::net::unix::{self, UnixStream};
     use std::io;
     use std::os::unix::io::AsRawFd;
     use std::ptr;
@@ -240,9 +240,9 @@ pub(crate) mod impl_solaris {
                 libc::ucred_free(cred);
 
                 Ok(super::UCred {
-                    uid,
-                    gid,
-                    pid: Some(pid),
+                    uid: uid as unix::uid_t,
+                    gid: gid as unix::gid_t,
+                    pid: Some(pid as unix::pid_t),
                 })
             } else {
                 Err(io::Error::last_os_error())

@@ -1,113 +1,356 @@
-//! Thread local runtime context
-use crate::runtime::{Handle, TryCurrentError};
+use crate::loom::thread::AccessError;
+use crate::runtime::coop;
 
-use std::cell::RefCell;
+use std::cell::Cell;
 
-thread_local! {
-    static CONTEXT: RefCell<Option<Handle>> = const { RefCell::new(None) }
+#[cfg(any(feature = "rt", feature = "macros"))]
+use crate::util::rand::{FastRand, RngSeed};
+
+cfg_rt! {
+    use crate::runtime::scheduler;
+    use crate::runtime::task::Id;
+
+    use std::cell::RefCell;
+    use std::marker::PhantomData;
+    use std::time::Duration;
 }
 
-pub(crate) fn try_current() -> Result<Handle, crate::runtime::TryCurrentError> {
-    match CONTEXT.try_with(|ctx| ctx.borrow().clone()) {
-        Ok(Some(handle)) => Ok(handle),
-        Ok(None) => Err(TryCurrentError::new_no_context()),
-        Err(_access_error) => Err(TryCurrentError::new_thread_local_destroyed()),
-    }
+struct Context {
+    /// Handle to the runtime scheduler running on the current thread.
+    #[cfg(feature = "rt")]
+    handle: RefCell<Option<scheduler::Handle>>,
+    #[cfg(feature = "rt")]
+    current_task_id: Cell<Option<Id>>,
+
+    /// Tracks if the current thread is currently driving a runtime.
+    /// Note, that if this is set to "entered", the current scheduler
+    /// handle may not reference the runtime currently executing. This
+    /// is because other runtime handles may be set to current from
+    /// within a runtime.
+    #[cfg(feature = "rt")]
+    runtime: Cell<EnterRuntime>,
+
+    #[cfg(any(feature = "rt", feature = "macros"))]
+    rng: FastRand,
+
+    /// Tracks the amount of "work" a task may still do before yielding back to
+    /// the sheduler
+    budget: Cell<coop::Budget>,
 }
 
-#[track_caller]
-pub(crate) fn current() -> Handle {
-    match try_current() {
-        Ok(handle) => handle,
-        Err(e) => panic!("{}", e),
-    }
-}
+tokio_thread_local! {
+    static CONTEXT: Context = {
+        Context {
+            /// Tracks the current runtime handle to use when spawning,
+            /// accessing drivers, etc...
+            #[cfg(feature = "rt")]
+            handle: RefCell::new(None),
+            #[cfg(feature = "rt")]
+            current_task_id: Cell::new(None),
 
-cfg_io_driver! {
-    #[track_caller]
-    pub(crate) fn io_handle() -> crate::runtime::driver::IoHandle {
-        match CONTEXT.try_with(|ctx| {
-            let ctx = ctx.borrow();
-            ctx.as_ref().expect(crate::util::error::CONTEXT_MISSING_ERROR).as_inner().io_handle.clone()
-        }) {
-            Ok(io_handle) => io_handle,
-            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+            /// Tracks if the current thread is currently driving a runtime.
+            /// Note, that if this is set to "entered", the current scheduler
+            /// handle may not reference the runtime currently executing. This
+            /// is because other runtime handles may be set to current from
+            /// within a runtime.
+            #[cfg(feature = "rt")]
+            runtime: Cell::new(EnterRuntime::NotEntered),
+
+            #[cfg(any(feature = "rt", feature = "macros"))]
+            rng: FastRand::new(RngSeed::new()),
+
+            budget: Cell::new(coop::Budget::unconstrained()),
         }
     }
 }
 
-cfg_signal_internal! {
-    #[cfg(unix)]
-    pub(crate) fn signal_handle() -> crate::runtime::driver::SignalHandle {
-        match CONTEXT.try_with(|ctx| {
-            let ctx = ctx.borrow();
-            ctx.as_ref().expect(crate::util::error::CONTEXT_MISSING_ERROR).as_inner().signal_handle.clone()
-        }) {
-            Ok(signal_handle) => signal_handle,
-            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
-        }
-    }
+#[cfg(feature = "macros")]
+pub(crate) fn thread_rng_n(n: u32) -> u32 {
+    CONTEXT.with(|ctx| ctx.rng.fastrand_n(n))
 }
 
-cfg_time! {
-    pub(crate) fn time_handle() -> crate::runtime::driver::TimeHandle {
-        match CONTEXT.try_with(|ctx| {
-            let ctx = ctx.borrow();
-            ctx.as_ref().expect(crate::util::error::CONTEXT_MISSING_ERROR).as_inner().time_handle.clone()
-        }) {
-            Ok(time_handle) => time_handle,
-            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
-        }
-    }
-
-    cfg_test_util! {
-        pub(crate) fn clock() -> Option<crate::runtime::driver::Clock> {
-            match CONTEXT.try_with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.as_inner().clock.clone())) {
-                Ok(clock) => clock,
-                Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
-            }
-        }
-    }
+pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, AccessError> {
+    CONTEXT.try_with(|ctx| f(&ctx.budget))
 }
 
 cfg_rt! {
-    pub(crate) fn spawn_handle() -> Option<crate::runtime::Spawner> {
-        match CONTEXT.try_with(|ctx| (*ctx.borrow()).as_ref().map(|ctx| ctx.spawner.clone())) {
-            Ok(spawner) => spawner,
-            Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+    use crate::runtime::TryCurrentError;
+
+    use std::fmt;
+
+    #[derive(Debug, Clone, Copy)]
+    #[must_use]
+    pub(crate) enum EnterRuntime {
+        /// Currently in a runtime context.
+        #[cfg_attr(not(feature = "rt"), allow(dead_code))]
+        Entered { allow_block_in_place: bool },
+
+        /// Not in a runtime context **or** a blocking region.
+        NotEntered,
+    }
+
+    #[derive(Debug)]
+    #[must_use]
+    pub(crate) struct SetCurrentGuard {
+        old_handle: Option<scheduler::Handle>,
+        old_seed: RngSeed,
+    }
+
+    /// Guard tracking that a caller has entered a runtime context.
+    #[must_use]
+    pub(crate) struct EnterRuntimeGuard {
+        pub(crate) blocking: BlockingRegionGuard,
+        #[allow(dead_code)] // Only tracking the guard.
+        pub(crate) handle: SetCurrentGuard,
+    }
+
+    /// Guard tracking that a caller has entered a blocking region.
+    #[must_use]
+    pub(crate) struct BlockingRegionGuard {
+        _p: PhantomData<RefCell<()>>,
+    }
+
+    pub(crate) struct DisallowBlockInPlaceGuard(bool);
+
+    pub(crate) fn set_current_task_id(id: Option<Id>) -> Option<Id> {
+        CONTEXT.try_with(|ctx| ctx.current_task_id.replace(id)).unwrap_or(None)
+    }
+
+    pub(crate) fn current_task_id() -> Option<Id> {
+        CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
+    }
+
+    pub(crate) fn try_current() -> Result<scheduler::Handle, TryCurrentError> {
+        match CONTEXT.try_with(|ctx| ctx.handle.borrow().clone()) {
+            Ok(Some(handle)) => Ok(handle),
+            Ok(None) => Err(TryCurrentError::new_no_context()),
+            Err(_access_error) => Err(TryCurrentError::new_thread_local_destroyed()),
+        }
+    }
+
+    /// Sets this [`Handle`] as the current active [`Handle`].
+    ///
+    /// [`Handle`]: crate::runtime::scheduler::Handle
+    pub(crate) fn try_set_current(handle: &scheduler::Handle) -> Option<SetCurrentGuard> {
+        CONTEXT.try_with(|ctx| ctx.set_current(handle)).ok()
+    }
+
+
+    /// Marks the current thread as being within the dynamic extent of an
+    /// executor.
+    #[track_caller]
+    pub(crate) fn enter_runtime(handle: &scheduler::Handle, allow_block_in_place: bool) -> EnterRuntimeGuard {
+        if let Some(enter) = try_enter_runtime(handle, allow_block_in_place) {
+            return enter;
+        }
+
+        panic!(
+            "Cannot start a runtime from within a runtime. This happens \
+            because a function (like `block_on`) attempted to block the \
+            current thread while the thread is being used to drive \
+            asynchronous tasks."
+        );
+    }
+
+    /// Tries to enter a runtime context, returns `None` if already in a runtime
+    /// context.
+    fn try_enter_runtime(handle: &scheduler::Handle, allow_block_in_place: bool) -> Option<EnterRuntimeGuard> {
+        CONTEXT.with(|c| {
+            if c.runtime.get().is_entered() {
+                None
+            } else {
+                c.runtime.set(EnterRuntime::Entered { allow_block_in_place });
+                Some(EnterRuntimeGuard {
+                    blocking: BlockingRegionGuard::new(),
+                    handle: c.set_current(handle),
+                })
+            }
+        })
+    }
+
+    pub(crate) fn try_enter_blocking_region() -> Option<BlockingRegionGuard> {
+        CONTEXT.try_with(|c| {
+            if c.runtime.get().is_entered() {
+                None
+            } else {
+                Some(BlockingRegionGuard::new())
+            }
+            // If accessing the thread-local fails, the thread is terminating
+            // and thread-locals are being destroyed. Because we don't know if
+            // we are currently in a runtime or not, we default to being
+            // permissive.
+        }).unwrap_or_else(|_| Some(BlockingRegionGuard::new()))
+    }
+
+    /// Disallows blocking in the current runtime context until the guard is dropped.
+    pub(crate) fn disallow_block_in_place() -> DisallowBlockInPlaceGuard {
+        let reset = CONTEXT.with(|c| {
+            if let EnterRuntime::Entered {
+                allow_block_in_place: true,
+            } = c.runtime.get()
+            {
+                c.runtime.set(EnterRuntime::Entered {
+                    allow_block_in_place: false,
+                });
+                true
+            } else {
+                false
+            }
+        });
+
+        DisallowBlockInPlaceGuard(reset)
+    }
+
+    impl Context {
+        fn set_current(&self, handle: &scheduler::Handle) -> SetCurrentGuard {
+            let rng_seed = handle.seed_generator().next_seed();
+
+            let old_handle = self.handle.borrow_mut().replace(handle.clone());
+            let old_seed = self.rng.replace_seed(rng_seed);
+
+            SetCurrentGuard {
+                old_handle,
+                old_seed,
+            }
+        }
+    }
+
+    impl Drop for SetCurrentGuard {
+        fn drop(&mut self) {
+            CONTEXT.with(|ctx| {
+                *ctx.handle.borrow_mut() = self.old_handle.take();
+                ctx.rng.replace_seed(self.old_seed.clone());
+            });
+        }
+    }
+
+    impl fmt::Debug for EnterRuntimeGuard {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("Enter").finish()
+        }
+    }
+
+    impl Drop for EnterRuntimeGuard {
+        fn drop(&mut self) {
+            CONTEXT.with(|c| {
+                assert!(c.runtime.get().is_entered());
+                c.runtime.set(EnterRuntime::NotEntered);
+            });
+        }
+    }
+
+    impl BlockingRegionGuard {
+        fn new() -> BlockingRegionGuard {
+            BlockingRegionGuard { _p: PhantomData }
+        }
+        /// Blocks the thread on the specified future, returning the value with
+        /// which that future completes.
+        pub(crate) fn block_on<F>(&mut self, f: F) -> Result<F::Output, AccessError>
+        where
+            F: std::future::Future,
+        {
+            use crate::runtime::park::CachedParkThread;
+
+            let mut park = CachedParkThread::new();
+            park.block_on(f)
+        }
+
+        /// Blocks the thread on the specified future for **at most** `timeout`
+        ///
+        /// If the future completes before `timeout`, the result is returned. If
+        /// `timeout` elapses, then `Err` is returned.
+        pub(crate) fn block_on_timeout<F>(&mut self, f: F, timeout: Duration) -> Result<F::Output, ()>
+        where
+            F: std::future::Future,
+        {
+            use crate::runtime::park::CachedParkThread;
+            use std::task::Context;
+            use std::task::Poll::Ready;
+            use std::time::Instant;
+
+            let mut park = CachedParkThread::new();
+            let waker = park.waker().map_err(|_| ())?;
+            let mut cx = Context::from_waker(&waker);
+
+            pin!(f);
+            let when = Instant::now() + timeout;
+
+            loop {
+                if let Ready(v) = crate::runtime::coop::budget(|| f.as_mut().poll(&mut cx)) {
+                    return Ok(v);
+                }
+
+                let now = Instant::now();
+
+                if now >= when {
+                    return Err(());
+                }
+
+                park.park_timeout(when - now);
+            }
+        }
+    }
+
+    impl Drop for DisallowBlockInPlaceGuard {
+        fn drop(&mut self) {
+            if self.0 {
+                // XXX: Do we want some kind of assertion here, or is "best effort" okay?
+                CONTEXT.with(|c| {
+                    if let EnterRuntime::Entered {
+                        allow_block_in_place: false,
+                    } = c.runtime.get()
+                    {
+                        c.runtime.set(EnterRuntime::Entered {
+                            allow_block_in_place: true,
+                        });
+                    }
+                })
+            }
+        }
+    }
+
+    impl EnterRuntime {
+        pub(crate) fn is_entered(self) -> bool {
+            matches!(self, EnterRuntime::Entered { .. })
         }
     }
 }
 
-/// Sets this [`Handle`] as the current active [`Handle`].
-///
-/// [`Handle`]: Handle
-pub(crate) fn enter(new: Handle) -> EnterGuard {
-    match try_enter(new) {
-        Some(guard) => guard,
-        None => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+// Forces the current "entered" state to be cleared while the closure
+// is executed.
+//
+// # Warning
+//
+// This is hidden for a reason. Do not use without fully understanding
+// executors. Misusing can easily cause your program to deadlock.
+cfg_rt_multi_thread! {
+    /// Returns true if in a runtime context.
+    pub(crate) fn current_enter_context() -> EnterRuntime {
+        CONTEXT.with(|c| c.runtime.get())
     }
-}
 
-/// Sets this [`Handle`] as the current active [`Handle`].
-///
-/// [`Handle`]: Handle
-pub(crate) fn try_enter(new: Handle) -> Option<EnterGuard> {
-    CONTEXT
-        .try_with(|ctx| {
-            let old = ctx.borrow_mut().replace(new);
-            EnterGuard(old)
-        })
-        .ok()
-}
+    pub(crate) fn exit_runtime<F: FnOnce() -> R, R>(f: F) -> R {
+        // Reset in case the closure panics
+        struct Reset(EnterRuntime);
 
-#[derive(Debug)]
-pub(crate) struct EnterGuard(Option<Handle>);
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                CONTEXT.with(|c| {
+                    assert!(!c.runtime.get().is_entered(), "closure claimed permanent executor");
+                    c.runtime.set(self.0);
+                });
+            }
+        }
 
-impl Drop for EnterGuard {
-    fn drop(&mut self) {
-        CONTEXT.with(|ctx| {
-            *ctx.borrow_mut() = self.0.take();
+        let was = CONTEXT.with(|c| {
+            let e = c.runtime.get();
+            assert!(e.is_entered(), "asked to exit when not entered");
+            c.runtime.set(EnterRuntime::NotEntered);
+            e
         });
+
+        let _reset = Reset(was);
+        // dropping _reset after f() will reset ENTERED
+        f()
     }
 }

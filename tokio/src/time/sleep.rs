@@ -1,6 +1,4 @@
-#[cfg(all(tokio_unstable, feature = "tracing"))]
-use crate::runtime::time::TimeSource;
-use crate::runtime::time::{Handle, TimerEntry};
+use crate::runtime::time::TimerEntry;
 use crate::time::{error::Error, Duration, Instant};
 use crate::util::trace;
 
@@ -239,7 +237,6 @@ cfg_trace! {
     struct Inner {
         deadline: Instant,
         ctx: trace::AsyncOpTracingCtx,
-        time_source: TimeSource,
     }
 }
 
@@ -257,12 +254,15 @@ impl Sleep {
         deadline: Instant,
         location: Option<&'static Location<'static>>,
     ) -> Sleep {
-        let handle = Handle::current();
+        use crate::runtime::scheduler;
+
+        let handle = scheduler::Handle::current();
         let entry = TimerEntry::new(&handle, deadline);
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
-            let time_source = handle.time_source().clone();
+            let handle = &handle.driver().time();
+            let time_source = handle.time_source();
             let deadline_tick = time_source.deadline_to_tick(deadline);
             let duration = deadline_tick.saturating_sub(time_source.now());
 
@@ -296,11 +296,7 @@ impl Sleep {
                 resource_span,
             };
 
-            Inner {
-                deadline,
-                ctx,
-                time_source,
-            }
+            Inner { deadline, ctx }
         };
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
@@ -359,8 +355,8 @@ impl Sleep {
     }
 
     fn reset_inner(self: Pin<&mut Self>, deadline: Instant) {
-        let me = self.project();
-        me.entry.reset(deadline);
+        let mut me = self.project();
+        me.entry.as_mut().reset(deadline);
         (*me.inner).deadline = deadline;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -374,8 +370,9 @@ impl Sleep {
                 tracing::trace_span!("runtime.resource.async_op.poll");
 
             let duration = {
-                let now = me.inner.time_source.now();
-                let deadline_tick = me.inner.time_source.deadline_to_tick(deadline);
+                let time_source = me.entry.driver().time_source();
+                let now = time_source.now();
+                let deadline_tick = time_source.deadline_to_tick(deadline);
                 deadline_tick.saturating_sub(now)
             };
 
@@ -395,11 +392,11 @@ impl Sleep {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let coop = ready!(trace_poll_op!(
             "poll_elapsed",
-            crate::coop::poll_proceed(cx),
+            crate::runtime::coop::poll_proceed(cx),
         ));
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         let result = me.entry.poll_elapsed(cx).map(move |r| {
             coop.made_progress();

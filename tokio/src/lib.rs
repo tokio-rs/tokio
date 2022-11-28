@@ -1,7 +1,9 @@
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
-    clippy::needless_doctest_main
+    clippy::module_inception,
+    clippy::needless_doctest_main,
+    clippy::declare_interior_mutable_const
 )]
 #![warn(
     missing_debug_implementations,
@@ -326,19 +328,14 @@
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
+//! - `parking_lot`: As a potential optimization, use the _parking_lot_ crate's
+//!                  synchronization primitives internally. Also, this
+//!                  dependency is necessary to construct some of our primitives
+//!                  in a const context. MSRV may increase according to the
+//!                  _parking_lot_ release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
-//!
-//! ### Internal features
-//!
-//! These features do not expose any new API, but influence internal
-//! implementation aspects of Tokio, and can pull in additional
-//! dependencies.
-//!
-//! - `parking_lot`: As a potential optimization, use the _parking_lot_ crate's
-//! synchronization primitives internally. MSRV may increase according to the
-//! _parking_lot_ release in use.
 //!
 //! ### Unstable features
 //!
@@ -479,7 +476,6 @@ pub mod io;
 pub mod net;
 
 mod loom;
-mod park;
 
 cfg_process! {
     pub mod process;
@@ -497,11 +493,8 @@ cfg_rt! {
     pub mod runtime;
 }
 cfg_not_rt! {
-    // The `runtime` module is used when the IO or time driver is needed.
     pub(crate) mod runtime;
 }
-
-pub(crate) mod coop;
 
 cfg_signal! {
     pub mod signal;
@@ -584,14 +577,6 @@ pub(crate) use self::doc::os;
 #[cfg(not(docsrs))]
 #[allow(unused)]
 pub(crate) use std::os;
-
-#[cfg(docsrs)]
-#[allow(unused)]
-pub(crate) use self::doc::winapi;
-
-#[cfg(all(not(docsrs), windows, feature = "net"))]
-#[allow(unused)]
-pub(crate) use winapi;
 
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**

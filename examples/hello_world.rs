@@ -1,9 +1,7 @@
-//! Hello world server.
-//!
 //! A simple client that opens a TCP stream, writes "hello world\n", and closes
 //! the connection.
 //!
-//! You can test this out by running:
+//! To start a server that this client can talk to on port 6142, you can use this command:
 //!
 //!     ncat -l 6142
 //!
@@ -26,7 +24,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let mut stream = TcpStream::connect("127.0.0.1:6142").await?;
     println!("created stream");
 
-    let result = stream.write(b"hello world\n").await;
+    let result = stream.write_all(b"hello world\n").await;
     println!("wrote to stream; success={:?}", result.is_ok());
 
     Ok(())

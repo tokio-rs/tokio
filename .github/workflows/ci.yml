@@ -11,8 +11,8 @@ env:
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2022-07-26
-  rust_clippy: 1.52.0
+  rust_nightly: nightly-2022-11-03
+  rust_clippy: 1.60.0
   # When updating this, also update:
   # - README.md
   # - tokio/README.md
@@ -27,6 +27,9 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  contents: read
+
 jobs:
   # Depends on all action sthat are required for a "successful" CI run.
   tests-pass:
@@ -39,7 +42,9 @@ jobs:
       - test-unstable
       - miri
       - asan
-      - cross
+      - cross-check
+      - cross-test
+      - no-atomic-u64
       - features
       - minrust
       - minimal-versions
@@ -49,6 +54,7 @@ jobs:
       - loom-compile
       - check-readme
       - test-hyper
+      - x86_64-fortanix-unknown-sgx
       - wasm32-unknown-unknown
       - wasm32-wasi
       - check-external-types
@@ -75,7 +81,7 @@ jobs:
         run: rustup update stable
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
 
       # Run `tokio` with `full` features. This excludes testing utilities which
       # can alter the runtime behavior of Tokio.
@@ -141,9 +147,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
 
       - name: Install Valgrind
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y valgrind
+        uses: taiki-e/install-action@valgrind
 
       # Compile tests
       - name: cargo build test-mem
@@ -208,7 +212,7 @@ jobs:
         run: cargo miri test --features full --lib --no-fail-fast
         working-directory: tokio
         env:
-          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-tag-raw-pointers
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
           PROPTEST_CASES: 10
 
   asan:
@@ -232,13 +236,12 @@ jobs:
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
           TRYBUILD: overwrite
 
-  cross:
-    name: cross
+  cross-check:
+    name: cross-check
     runs-on: ubuntu-latest
     strategy:
       matrix:
         target:
-          - i686-unknown-linux-gnu
           - powerpc-unknown-linux-gnu
           - powerpc64-unknown-linux-gnu
           - mips-unknown-linux-gnu
@@ -257,13 +260,54 @@ jobs:
           use-cross: true
           command: check
           args: --workspace --all-features --target ${{ matrix.target }}
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+
+  cross-test:
+    name: cross-test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - i686-unknown-linux-gnu
+          - arm-unknown-linux-gnueabihf
+          - armv7-unknown-linux-gnueabihf
+          - aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust_stable }}
+          target: ${{ matrix.target }}
+          override: true
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
-          command: check
-          args: --workspace --all-features --target ${{ matrix.target }}
+          command: test
+          args: -p tokio --all-features --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6
+
+  # See https://github.com/tokio-rs/tokio/issues/5187
+  no-atomic-u64:
+    name: Test i686-unknown-linux-gnu without AtomicU64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust_nightly }}
+          components: rust-src
+          override: true
+      # Install linker and libraries for i686-unknown-linux-gnu
+      - uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: i686-unknown-linux-gnu
+      - run: cargo test -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_atomic_u64
 
   features:
     name: features
@@ -278,14 +322,12 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
-      - name: check --each-feature
-        run: cargo hack check --all --each-feature -Z avoid-dev-deps
-      - name: check net,time
-        run: cargo check -p tokio --no-default-features --features net,time -Z avoid-dev-deps
+        uses: taiki-e/install-action@cargo-hack
+      - name: check --feature-powerset
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
       # Try with unstable feature flags
-      - name: check --each-feature --unstable
-        run: cargo hack check --all --each-feature -Z avoid-dev-deps
+      - name: check --feature-powerset --unstable
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -300,7 +342,18 @@ jobs:
           toolchain: ${{ env.rust_min }}
           override: true
       - uses: Swatinem/rust-cache@v1
-      - name: "test --workspace --all-features"
+      # First compile just the main tokio crate with minrust and newest version
+      # of all dependencies, then pin once_cell and compile the rest of the
+      # crates with the pinned once_cell version.
+      #
+      # This is necessary because tokio-util transitively depends on once_cell,
+      # which is not compatible with the current minrust after the 1.15.0
+      # release.
+      - name: "check -p tokio --all-features"
+        run: cargo check -p tokio --all-features
+      - name: "pin once_cell version"
+        run: cargo update -p once_cell --precise 1.14.0
+      - name: "check --workspace --all-features"
         run: cargo check --workspace --all-features
 
   minimal-versions:
@@ -315,7 +368,7 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       - name: "check --all-features -Z minimal-versions"
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
@@ -452,6 +505,23 @@ jobs:
           git diff
           cargo test --features full
 
+  x86_64-fortanix-unknown-sgx:
+    name: build tokio for x86_64-fortanix-unknown-sgx
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust_nightly }}
+          target: x86_64-fortanix-unknown-sgx
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      # NOTE: Currently the only test we can run is to build tokio with rt and sync features.
+      - name: build tokio
+        run: cargo build --target x86_64-fortanix-unknown-sgx --features rt,sync
+        working-directory: tokio
+
   wasm32-unknown-unknown:
     name: test tokio for wasm32-unknown-unknown
     runs-on: ubuntu-latest
@@ -483,13 +553,13 @@ jobs:
 
       # Install dependencies
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
 
       - name: Install wasm32-wasi target
         run: rustup target add wasm32-wasi
 
       - name: Install wasmtime
-        run: cargo install wasmtime-cli
+        uses: taiki-e/install-action@wasmtime
 
       - name: Install cargo-wasi
         run: cargo install cargo-wasi
@@ -527,16 +597,17 @@ jobs:
           - ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install Rust ${{ env.rust_nightly }}
+      - name: Install Rust nightly-2022-07-25
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ env.rust_nightly }}
+          # `check-external-types` requires a specific Rust nightly version. See
+          # the README for details: https://github.com/awslabs/cargo-check-external-types
+          toolchain: nightly-2022-07-25
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: check-external-types
         run: |
           set -x
-          cargo install cargo-check-external-types --locked --version 0.1.3
+          cargo install cargo-check-external-types --locked --version 0.1.5
           cargo check-external-types --all-features --config external-types.toml
         working-directory: tokio
-

@@ -6,6 +6,8 @@
 #![cfg(unix)]
 #![cfg_attr(docsrs, doc(cfg(all(unix, feature = "signal"))))]
 
+use crate::runtime::scheduler;
+use crate::runtime::signal::Handle;
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::signal::RxFuture;
 use crate::sync::watch;
@@ -16,9 +18,6 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
-
-pub(crate) mod driver;
-use self::driver::Handle;
 
 pub(crate) type OsStorage = Vec<SignalInfo>;
 
@@ -52,7 +51,7 @@ impl Storage for OsStorage {
 #[derive(Debug)]
 pub(crate) struct OsExtraData {
     sender: UnixStream,
-    receiver: UnixStream,
+    pub(crate) receiver: UnixStream,
 }
 
 impl Init for OsExtraData {
@@ -391,7 +390,8 @@ pub struct Signal {
 /// feature flag is not enabled.
 #[track_caller]
 pub fn signal(kind: SignalKind) -> io::Result<Signal> {
-    let rx = signal_with_handle(kind, &Handle::current())?;
+    let handle = scheduler::Handle::current();
+    let rx = signal_with_handle(kind, handle.driver().signal())?;
 
     Ok(Signal {
         inner: RxFuture::new(rx),

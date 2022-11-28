@@ -28,7 +28,7 @@ const EMPTY: usize = 0;
 const PARKED: usize = 1;
 const NOTIFIED: usize = 2;
 
-thread_local! {
+tokio_thread_local! {
     static CURRENT_PARKER: ParkThread = ParkThread::new();
 }
 
@@ -269,7 +269,7 @@ impl CachedParkThread {
         pin!(f);
 
         loop {
-            if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
+            if let Ready(v) = crate::runtime::coop::budget(|| f.as_mut().poll(&mut cx)) {
                 return Ok(v);
             }
 

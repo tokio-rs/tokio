@@ -1,11 +1,4 @@
-use crate::runtime::blocking::{BlockingTask, NoopSchedule};
-use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{blocking, context, driver, Spawner};
-use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
-
-use std::future::Future;
-use std::marker::PhantomData;
-use std::{error, fmt};
+use crate::runtime::{context, scheduler, RuntimeFlavor};
 
 /// Handle to the runtime.
 ///
@@ -14,51 +7,18 @@ use std::{error, fmt};
 ///
 /// [`Runtime::handle`]: crate::runtime::Runtime::handle()
 #[derive(Debug, Clone)]
+// When the `rt` feature is *not* enabled, this type is still defined, but not
+// included in the public API.
 pub struct Handle {
-    pub(super) spawner: Spawner,
+    pub(crate) inner: scheduler::Handle,
 }
 
-/// All internal handles that are *not* the scheduler's spawner.
-#[derive(Debug)]
-pub(crate) struct HandleInner {
-    /// Handles to the I/O drivers
-    #[cfg_attr(
-        not(any(
-            feature = "net",
-            all(unix, feature = "process"),
-            all(unix, feature = "signal"),
-        )),
-        allow(dead_code)
-    )]
-    pub(super) io_handle: driver::IoHandle,
+use crate::runtime::task::JoinHandle;
+use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
-    /// Handles to the signal drivers
-    #[cfg_attr(
-        any(
-            loom,
-            not(all(unix, feature = "signal")),
-            not(all(unix, feature = "process")),
-        ),
-        allow(dead_code)
-    )]
-    pub(super) signal_handle: driver::SignalHandle,
-
-    /// Handles to the time drivers
-    #[cfg_attr(not(feature = "time"), allow(dead_code))]
-    pub(super) time_handle: driver::TimeHandle,
-
-    /// Source of `Instant::now()`
-    #[cfg_attr(not(all(feature = "time", feature = "test-util")), allow(dead_code))]
-    pub(super) clock: driver::Clock,
-
-    /// Blocking pool spawner
-    pub(super) blocking_spawner: blocking::Spawner,
-}
-
-/// Create a new runtime handle.
-pub(crate) trait ToHandle {
-    fn to_handle(&self) -> Handle;
-}
+use std::future::Future;
+use std::marker::PhantomData;
+use std::{error, fmt};
 
 /// Runtime context guard.
 ///
@@ -69,7 +29,7 @@ pub(crate) trait ToHandle {
 #[derive(Debug)]
 #[must_use = "Creating and dropping a guard does nothing"]
 pub struct EnterGuard<'a> {
-    _guard: context::EnterGuard,
+    _guard: context::SetCurrentGuard,
     _handle_lifetime: PhantomData<&'a Handle>,
 }
 
@@ -84,7 +44,10 @@ impl Handle {
     /// [`tokio::spawn`]: fn@crate::spawn
     pub fn enter(&self) -> EnterGuard<'_> {
         EnterGuard {
-            _guard: context::enter(self.clone()),
+            _guard: match context::try_set_current(&self.inner) {
+                Some(guard) => guard,
+                None => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+            },
             _handle_lifetime: PhantomData,
         }
     }
@@ -135,7 +98,9 @@ impl Handle {
     /// ```
     #[track_caller]
     pub fn current() -> Self {
-        context::current()
+        Handle {
+            inner: scheduler::Handle::current(),
+        }
     }
 
     /// Returns a Handle view over the currently running Runtime
@@ -144,7 +109,7 @@ impl Handle {
     ///
     /// Contrary to `current`, this never panics
     pub fn try_current() -> Result<Self, TryCurrentError> {
-        context::try_current()
+        context::try_current().map(|inner| Handle { inner })
     }
 
     /// Spawns a future onto the Tokio runtime.
@@ -152,6 +117,10 @@ impl Handle {
     /// This spawns the given future onto the runtime's executor, usually a
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
+    ///
+    /// You do not have to `.await` the returned `JoinHandle` to make the
+    /// provided future start execution. It will start running in the background
+    /// immediately when `spawn` is called.
     ///
     /// See [module level][mod] documentation for more details.
     ///
@@ -208,11 +177,7 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        self.as_inner().spawn_blocking(self, func)
-    }
-
-    pub(crate) fn as_inner(&self) -> &HandleInner {
-        self.spawner.as_handle_inner()
+        self.inner.blocking_spawner().spawn_blocking(self, func)
     }
 
     /// Runs a future to completion on this `Handle`'s associated `Runtime`.
@@ -291,14 +256,13 @@ impl Handle {
         let future =
             crate::util::trace::task(future, "block_on", None, super::task::Id::next().as_u64());
 
-        // Enter the **runtime** context. This configures spawning, the current I/O driver, ...
-        let _rt_enter = self.enter();
-
-        // Enter a **blocking** context. This prevents blocking from a runtime.
-        let mut blocking_enter = crate::runtime::enter(true);
+        // Enter the runtime context. This sets the current driver handles and
+        // prevents blocking an existing runtime.
+        let mut enter = context::enter_runtime(&self.inner, true);
 
         // Block on the future
-        blocking_enter
+        enter
+            .blocking
             .block_on(future)
             .expect("failed to park thread")
     }
@@ -312,17 +276,36 @@ impl Handle {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", _name, id.as_u64());
-        self.spawner.spawn(future, id)
+        self.inner.spawn(future, id)
     }
 
-    pub(crate) fn shutdown(mut self) {
-        self.spawner.shutdown();
-    }
-}
-
-impl ToHandle for Handle {
-    fn to_handle(&self) -> Handle {
-        self.clone()
+    /// Returns the flavor of the current `Runtime`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::{Handle, RuntimeFlavor};
+    ///
+    /// #[tokio::main(flavor = "current_thread")]
+    /// async fn main() {
+    ///   assert_eq!(RuntimeFlavor::CurrentThread, Handle::current().runtime_flavor());
+    /// }
+    /// ```
+    ///
+    /// ```
+    /// use tokio::runtime::{Handle, RuntimeFlavor};
+    ///
+    /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+    /// async fn main() {
+    ///   assert_eq!(RuntimeFlavor::MultiThread, Handle::current().runtime_flavor());
+    /// }
+    /// ```
+    pub fn runtime_flavor(&self) -> RuntimeFlavor {
+        match self.inner {
+            scheduler::Handle::CurrentThread(_) => RuntimeFlavor::CurrentThread,
+            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+            scheduler::Handle::MultiThread(_) => RuntimeFlavor::MultiThread,
+        }
     }
 }
 
@@ -335,107 +318,6 @@ cfg_metrics! {
         pub fn metrics(&self) -> RuntimeMetrics {
             RuntimeMetrics::new(self.clone())
         }
-    }
-}
-
-impl HandleInner {
-    #[track_caller]
-    pub(crate) fn spawn_blocking<F, R>(&self, rt: &dyn ToHandle, func: F) -> JoinHandle<R>
-    where
-        F: FnOnce() -> R + Send + 'static,
-        R: Send + 'static,
-    {
-        let (join_handle, spawn_result) = if cfg!(debug_assertions)
-            && std::mem::size_of::<F>() > 2048
-        {
-            self.spawn_blocking_inner(Box::new(func), blocking::Mandatory::NonMandatory, None, rt)
-        } else {
-            self.spawn_blocking_inner(func, blocking::Mandatory::NonMandatory, None, rt)
-        };
-
-        match spawn_result {
-            Ok(()) => join_handle,
-            // Compat: do not panic here, return the join_handle even though it will never resolve
-            Err(blocking::SpawnError::ShuttingDown) => join_handle,
-            Err(blocking::SpawnError::NoThreads(e)) => {
-                panic!("OS can't spawn worker thread: {}", e)
-            }
-        }
-    }
-
-    cfg_fs! {
-        #[track_caller]
-        #[cfg_attr(any(
-            all(loom, not(test)), // the function is covered by loom tests
-            test
-        ), allow(dead_code))]
-        pub(crate) fn spawn_mandatory_blocking<F, R>(&self, rt: &dyn ToHandle, func: F) -> Option<JoinHandle<R>>
-        where
-            F: FnOnce() -> R + Send + 'static,
-            R: Send + 'static,
-        {
-            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
-                self.spawn_blocking_inner(
-                    Box::new(func),
-                    blocking::Mandatory::Mandatory,
-                    None,
-                    rt,
-                )
-            } else {
-                self.spawn_blocking_inner(
-                    func,
-                    blocking::Mandatory::Mandatory,
-                    None,
-                    rt,
-                )
-            };
-
-            if spawn_result.is_ok() {
-                Some(join_handle)
-            } else {
-                None
-            }
-        }
-    }
-
-    #[track_caller]
-    pub(crate) fn spawn_blocking_inner<F, R>(
-        &self,
-        func: F,
-        is_mandatory: blocking::Mandatory,
-        name: Option<&str>,
-        rt: &dyn ToHandle,
-    ) -> (JoinHandle<R>, Result<(), blocking::SpawnError>)
-    where
-        F: FnOnce() -> R + Send + 'static,
-        R: Send + 'static,
-    {
-        let fut = BlockingTask::new(func);
-        let id = super::task::Id::next();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let fut = {
-            use tracing::Instrument;
-            let location = std::panic::Location::caller();
-            let span = tracing::trace_span!(
-                target: "tokio::task::blocking",
-                "runtime.spawn",
-                kind = %"blocking",
-                task.name = %name.unwrap_or_default(),
-                task.id = id.as_u64(),
-                "fn" = %std::any::type_name::<F>(),
-                spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
-            );
-            fut.instrument(span)
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let _ = name;
-
-        let (task, handle) = task::unowned(fut, NoopSchedule, id);
-        let spawned = self
-            .blocking_spawner
-            .spawn(blocking::Task::new(task, is_mandatory), rt);
-        (handle, spawned)
     }
 }
 

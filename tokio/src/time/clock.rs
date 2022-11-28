@@ -33,7 +33,13 @@ cfg_test_util! {
 
     cfg_rt! {
         fn clock() -> Option<Clock> {
-            crate::runtime::context::clock()
+            use crate::runtime::Handle;
+
+            match Handle::try_current() {
+                Ok(handle) => Some(handle.inner.driver().clock().clone()),
+                Err(ref e) if e.is_missing_context() => None,
+                Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+            }
         }
     }
 

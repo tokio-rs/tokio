@@ -1,0 +1,40 @@
+{
+  "arch": "x86",
+  "cpu": "pentium4",
+  "crt-static-respected": true,
+  "data-layout": "e-m:e-p:32:32-p270:32:32-p271:32:32-p272:64:64-f64:32:64-f80:32-n8:16:32-S128",
+  "dynamic-linking": true,
+  "env": "gnu",
+  "has-rpath": true,
+  "has-thread-local": true,
+  "llvm-target": "i686-unknown-linux-gnu",
+  "max-atomic-width": 32,
+  "os": "linux",
+  "position-independent-executables": true,
+  "pre-link-args": {
+    "gcc": [
+      "-m32"
+    ]
+  },
+  "relro-level": "full",
+  "stack-probes": {
+    "kind": "inline-or-call",
+    "min-llvm-version-for-inline": [
+      16,
+      0,
+      0
+    ]
+  },
+  "supported-sanitizers": [
+    "address"
+  ],
+  "supported-split-debuginfo": [
+    "packed",
+    "unpacked",
+    "off"
+  ],
+  "target-family": [
+    "unix"
+  ],
+  "target-pointer-width": "32"
+}

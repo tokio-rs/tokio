@@ -24,6 +24,7 @@ async fn basic_usage_v4() {
 }
 
 #[tokio::test]
+#[cfg(not(tokio_no_ipv6))]
 async fn basic_usage_v6() {
     // Create server
     let addr = assert_ok!("[::1]:0".parse());

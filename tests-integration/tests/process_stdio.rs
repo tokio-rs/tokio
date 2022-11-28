@@ -190,3 +190,54 @@ async fn pipe_from_one_command_to_another() {
     assert!(second_status.expect("second status").success());
     assert!(third_status.expect("third status").success());
 }
+
+#[tokio::test]
+async fn vectored_writes() {
+    use bytes::{Buf, Bytes};
+    use std::{io::IoSlice, pin::Pin};
+    use tokio::io::AsyncWrite;
+
+    let mut cat = cat().spawn().unwrap();
+    let mut stdin = cat.stdin.take().unwrap();
+    let are_writes_vectored = stdin.is_write_vectored();
+    let mut stdout = cat.stdout.take().unwrap();
+
+    let write = async {
+        let mut input = Bytes::from_static(b"hello\n").chain(Bytes::from_static(b"world!\n"));
+        let mut writes_completed = 0;
+
+        futures::future::poll_fn(|cx| loop {
+            let mut slices = [IoSlice::new(&[]); 2];
+            let vectored = input.chunks_vectored(&mut slices);
+            if vectored == 0 {
+                return std::task::Poll::Ready(std::io::Result::Ok(()));
+            }
+            let n = futures::ready!(Pin::new(&mut stdin).poll_write_vectored(cx, &slices))?;
+            writes_completed += 1;
+            input.advance(n);
+        })
+        .await?;
+
+        drop(stdin);
+
+        std::io::Result::Ok(writes_completed)
+    };
+
+    let read = async {
+        let mut buffer = Vec::with_capacity(6 + 7);
+        stdout.read_to_end(&mut buffer).await?;
+        std::io::Result::Ok(buffer)
+    };
+
+    let (write, read, status) = future::join3(write, read, cat.wait()).await;
+
+    assert!(status.unwrap().success());
+
+    let writes_completed = write.unwrap();
+    // on unix our small payload should always fit in whatever default sized pipe with a single
+    // syscall. if multiple are used, then the forwarding does not work, or we are on a platform
+    // for which the `std` does not support vectored writes.
+    assert_eq!(writes_completed == 1, are_writes_vectored);
+
+    assert_eq!(&read.unwrap(), b"hello\nworld!\n");
+}

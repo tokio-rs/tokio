@@ -8,7 +8,7 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::windows::named_pipe::{ClientOptions, PipeMode, ServerOptions};
 use tokio::time;
-use winapi::shared::winerror;
+use windows_sys::Win32::Foundation::{ERROR_NO_DATA, ERROR_PIPE_BUSY, NO_ERROR, UNICODE_STRING};
 
 #[tokio::test]
 async fn test_named_pipe_client_drop() -> io::Result<()> {
@@ -25,7 +25,7 @@ async fn test_named_pipe_client_drop() -> io::Result<()> {
 
     // instance will be broken because client is gone
     match server.write_all(b"ping").await {
-        Err(e) if e.raw_os_error() == Some(winerror::ERROR_NO_DATA as i32) => (),
+        Err(e) if e.raw_os_error() == Some(ERROR_NO_DATA as i32) => (),
         x => panic!("{:?}", x),
     }
 
@@ -120,7 +120,7 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
             let client = loop {
                 match ClientOptions::new().open(PIPE_NAME) {
                     Ok(client) => break client,
-                    Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
+                    Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
                     Err(e) if e.kind() == io::ErrorKind::NotFound => (),
                     Err(e) => return Err(e),
                 }
@@ -249,7 +249,7 @@ async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
             let client = loop {
                 match ClientOptions::new().open(PIPE_NAME) {
                     Ok(client) => break client,
-                    Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
+                    Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
                     Err(e) if e.kind() == io::ErrorKind::NotFound => (),
                     Err(e) => return Err(e),
                 }
@@ -341,12 +341,38 @@ async fn test_named_pipe_mode_message() -> io::Result<()> {
     Ok(())
 }
 
+// This tests `NamedPipeServer::connect` with various access settings.
+#[tokio::test]
+async fn test_named_pipe_access() -> io::Result<()> {
+    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-access";
+
+    for (inb, outb) in [(true, true), (true, false), (false, true)] {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(async move {
+            let s = ServerOptions::new()
+                .access_inbound(inb)
+                .access_outbound(outb)
+                .create(PIPE_NAME)?;
+            let mut connect_fut = tokio_test::task::spawn(s.connect());
+            assert!(connect_fut.poll().is_pending());
+            tx.send(()).unwrap();
+            connect_fut.await
+        });
+
+        // Wait for the server to call connect.
+        rx.await.unwrap();
+        let _ = ClientOptions::new().read(outb).write(inb).open(PIPE_NAME)?;
+
+        server.await??;
+    }
+    Ok(())
+}
+
 fn num_instances(pipe_name: impl AsRef<str>) -> io::Result<u32> {
     use ntapi::ntioapi;
-    use winapi::shared::ntdef;
 
     let mut name = pipe_name.as_ref().encode_utf16().collect::<Vec<_>>();
-    let mut name = ntdef::UNICODE_STRING {
+    let mut name = UNICODE_STRING {
         Length: (name.len() * mem::size_of::<u16>()) as u16,
         MaximumLength: (name.len() * mem::size_of::<u16>()) as u16,
         Buffer: name.as_mut_ptr(),
@@ -366,12 +392,12 @@ fn num_instances(pipe_name: impl AsRef<str>) -> io::Result<u32> {
             1024,
             ntioapi::FileDirectoryInformation,
             0,
-            &mut name,
+            &mut name as *mut _ as _,
             0,
         )
     };
 
-    if status as u32 != winerror::NO_ERROR {
+    if status as u32 != NO_ERROR {
         return Err(io::Error::last_os_error());
     }
 

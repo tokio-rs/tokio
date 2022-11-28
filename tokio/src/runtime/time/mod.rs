@@ -19,22 +19,10 @@ pub(crate) use source::TimeSource;
 mod wheel;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
-use crate::loom::sync::{Arc, Mutex};
+use crate::loom::sync::Mutex;
+use crate::runtime::driver::{self, IoHandle, IoStack};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
-
-// This duplication should be cleaned up in a later refactor
-cfg_io_driver! {
-    cfg_rt! {
-        use crate::runtime::driver::{IoStack, IoUnpark};
-    }
-    cfg_not_rt! {
-        use crate::runtime::io::{Driver as IoStack, Handle as IoUnpark};
-    }
-}
-cfg_not_io_driver! {
-    use crate::park::thread::{ParkThread as IoStack, UnparkThread as IoUnpark};
-}
 
 use std::fmt;
 use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
@@ -96,23 +84,8 @@ use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
 /// [interval]: crate::time::Interval
 #[derive(Debug)]
 pub(crate) struct Driver {
-    /// Timing backend in use.
-    time_source: TimeSource,
-
-    /// Shared state.
-    handle: Handle,
-
     /// Parker to delegate to.
     park: IoStack,
-
-    // When `true`, a call to `park_timeout` should immediately return and time
-    // should not advance. One reason for this to be `true` is if the task
-    // passed to `Runtime::block_on` called `task::yield_now()`.
-    //
-    // While it may look racy, it only has any effect when the clock is paused
-    // and pausing the clock is restricted to a single-threaded runtime.
-    #[cfg(feature = "test-util")]
-    did_wake: Arc<AtomicBool>,
 }
 
 /// Timer state shared between `Driver`, `Handle`, and `Registration`.
@@ -123,15 +96,18 @@ struct Inner {
     /// True if the driver is being shutdown.
     pub(super) is_shutdown: AtomicBool,
 
-    /// Unparker that can be used to wake the time driver.
-    unpark: IoUnpark,
+    // When `true`, a call to `park_timeout` should immediately return and time
+    // should not advance. One reason for this to be `true` is if the task
+    // passed to `Runtime::block_on` called `task::yield_now()`.
+    //
+    // While it may look racy, it only has any effect when the clock is paused
+    // and pausing the clock is restricted to a single-threaded runtime.
+    #[cfg(feature = "test-util")]
+    did_wake: AtomicBool,
 }
 
 /// Time state shared which must be protected by a `Mutex`
 struct InnerState {
-    /// Timing backend in use.
-    time_source: TimeSource,
-
     /// The last published timer `elapsed` value.
     elapsed: u64,
 
@@ -149,60 +125,58 @@ impl Driver {
     /// thread and `time_source` to get the current time and convert to ticks.
     ///
     /// Specifying the source of time is useful when testing.
-    pub(crate) fn new(park: IoStack, clock: Clock) -> Driver {
+    pub(crate) fn new(park: IoStack, clock: Clock) -> (Driver, Handle) {
         let time_source = TimeSource::new(clock);
 
-        let inner = Inner::new(time_source.clone(), park.unpark());
-
-        Driver {
+        let handle = Handle {
             time_source,
-            handle: Handle::new(Arc::new(inner)),
-            park,
-            #[cfg(feature = "test-util")]
-            did_wake: Arc::new(AtomicBool::new(false)),
-        }
+            inner: Inner {
+                state: Mutex::new(InnerState {
+                    elapsed: 0,
+                    next_wake: None,
+                    wheel: wheel::Wheel::new(),
+                }),
+                is_shutdown: AtomicBool::new(false),
+
+                #[cfg(feature = "test-util")]
+                did_wake: AtomicBool::new(false),
+            },
+        };
+
+        let driver = Driver { park };
+
+        (driver, handle)
     }
 
-    /// Returns a handle to the timer.
-    ///
-    /// The `Handle` is how `Sleep` instances are created. The `Sleep` instances
-    /// can either be created directly or the `Handle` instance can be passed to
-    /// `with_default`, setting the timer as the default timer for the execution
-    /// context.
-    pub(crate) fn handle(&self) -> Handle {
-        self.handle.clone()
+    pub(crate) fn park(&mut self, handle: &driver::Handle) {
+        self.park_internal(handle, None)
     }
 
-    pub(crate) fn unpark(&self) -> TimerUnpark {
-        TimerUnpark::new(self)
+    pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
+        self.park_internal(handle, Some(duration))
     }
 
-    pub(crate) fn park(&mut self) {
-        self.park_internal(None)
-    }
+    pub(crate) fn shutdown(&mut self, rt_handle: &driver::Handle) {
+        let handle = rt_handle.time();
 
-    pub(crate) fn park_timeout(&mut self, duration: Duration) {
-        self.park_internal(Some(duration))
-    }
-
-    pub(crate) fn shutdown(&mut self) {
-        if self.handle.is_shutdown() {
+        if handle.is_shutdown() {
             return;
         }
 
-        self.handle.get().is_shutdown.store(true, Ordering::SeqCst);
+        handle.inner.is_shutdown.store(true, Ordering::SeqCst);
 
         // Advance time forward to the end of time.
 
-        self.handle.process_at_time(u64::MAX);
+        handle.process_at_time(u64::MAX);
 
-        self.park.shutdown();
+        self.park.shutdown(rt_handle);
     }
 
-    fn park_internal(&mut self, limit: Option<Duration>) {
-        let mut lock = self.handle.get().state.lock();
+    fn park_internal(&mut self, rt_handle: &driver::Handle, limit: Option<Duration>) {
+        let handle = rt_handle.time();
+        let mut lock = handle.inner.state.lock();
 
-        assert!(!self.handle.is_shutdown());
+        assert!(!handle.is_shutdown());
 
         let next_wake = lock.wheel.next_expiration_time();
         lock.next_wake =
@@ -212,63 +186,62 @@ impl Driver {
 
         match next_wake {
             Some(when) => {
-                let now = self.time_source.now();
+                let now = handle.time_source.now();
                 // Note that we effectively round up to 1ms here - this avoids
                 // very short-duration microsecond-resolution sleeps that the OS
                 // might treat as zero-length.
-                let mut duration = self.time_source.tick_to_duration(when.saturating_sub(now));
+                let mut duration = handle
+                    .time_source
+                    .tick_to_duration(when.saturating_sub(now));
 
                 if duration > Duration::from_millis(0) {
                     if let Some(limit) = limit {
                         duration = std::cmp::min(limit, duration);
                     }
 
-                    self.park_thread_timeout(duration);
+                    self.park_thread_timeout(rt_handle, duration);
                 } else {
-                    self.park.park_timeout(Duration::from_secs(0));
+                    self.park.park_timeout(rt_handle, Duration::from_secs(0));
                 }
             }
             None => {
                 if let Some(duration) = limit {
-                    self.park_thread_timeout(duration);
+                    self.park_thread_timeout(rt_handle, duration);
                 } else {
-                    self.park.park();
+                    self.park.park(rt_handle);
                 }
             }
         }
 
         // Process pending timers after waking up
-        self.handle.process();
+        handle.process();
     }
 
     cfg_test_util! {
-        fn park_thread_timeout(&mut self, duration: Duration) {
-            let clock = &self.time_source.clock;
+        fn park_thread_timeout(&mut self, rt_handle: &driver::Handle, duration: Duration) {
+            let handle = rt_handle.time();
+            let clock = &handle.time_source.clock;
 
             if clock.is_paused() {
-                self.park.park_timeout(Duration::from_secs(0));
+                self.park.park_timeout(rt_handle, Duration::from_secs(0));
 
                 // If the time driver was woken, then the park completed
                 // before the "duration" elapsed (usually caused by a
                 // yield in `Runtime::block_on`). In this case, we don't
                 // advance the clock.
-                if !self.did_wake() {
+                if !handle.did_wake() {
                     // Simulate advancing time
                     clock.advance(duration);
                 }
             } else {
-                self.park.park_timeout(duration);
+                self.park.park_timeout(rt_handle, duration);
             }
-        }
-
-        fn did_wake(&self) -> bool {
-            self.did_wake.swap(false, Ordering::SeqCst)
         }
     }
 
     cfg_not_test_util! {
-        fn park_thread_timeout(&mut self, duration: Duration) {
-            self.park.park_timeout(duration);
+        fn park_thread_timeout(&mut self, rt_handle: &driver::Handle, duration: Duration) {
+            self.park.park_timeout(rt_handle, duration);
         }
     }
 }
@@ -285,7 +258,7 @@ impl Handle {
         let mut waker_list: [Option<Waker>; 32] = Default::default();
         let mut waker_idx = 0;
 
-        let mut lock = self.get().lock();
+        let mut lock = self.inner.lock();
 
         if now < lock.elapsed {
             // Time went backwards! This normally shouldn't happen as the Rust language
@@ -316,7 +289,7 @@ impl Handle {
 
                     waker_idx = 0;
 
-                    lock = self.get().lock();
+                    lock = self.inner.lock();
                 }
             }
         }
@@ -347,7 +320,7 @@ impl Handle {
     /// `add_entry` must not be called concurrently.
     pub(self) unsafe fn clear_entry(&self, entry: NonNull<TimerShared>) {
         unsafe {
-            let mut lock = self.get().lock();
+            let mut lock = self.inner.lock();
 
             if entry.as_ref().might_be_registered() {
                 lock.wheel.remove(entry);
@@ -363,9 +336,14 @@ impl Handle {
     /// driver. No other threads are allowed to concurrently manipulate the
     /// timer at all (the current thread should hold an exclusive reference to
     /// the `TimerEntry`)
-    pub(self) unsafe fn reregister(&self, new_tick: u64, entry: NonNull<TimerShared>) {
+    pub(self) unsafe fn reregister(
+        &self,
+        unpark: &IoHandle,
+        new_tick: u64,
+        entry: NonNull<TimerShared>,
+    ) {
         let waker = unsafe {
-            let mut lock = self.get().lock();
+            let mut lock = self.inner.lock();
 
             // We may have raced with a firing/deregistration, so check before
             // deregistering.
@@ -391,7 +369,7 @@ impl Handle {
                             .map(|next_wake| when < next_wake.get())
                             .unwrap_or(true)
                         {
-                            self.inner.unpark.unpark();
+                            unpark.unpark();
                         }
 
                         None
@@ -412,55 +390,17 @@ impl Handle {
             waker.wake();
         }
     }
-}
 
-impl Drop for Driver {
-    fn drop(&mut self) {
-        self.shutdown();
-    }
-}
-
-pub(crate) struct TimerUnpark {
-    inner: IoUnpark,
-
-    #[cfg(feature = "test-util")]
-    did_wake: Arc<AtomicBool>,
-}
-
-impl TimerUnpark {
-    fn new(driver: &Driver) -> TimerUnpark {
-        TimerUnpark {
-            inner: driver.park.unpark(),
-
-            #[cfg(feature = "test-util")]
-            did_wake: driver.did_wake.clone(),
+    cfg_test_util! {
+        fn did_wake(&self) -> bool {
+            self.inner.did_wake.swap(false, Ordering::SeqCst)
         }
-    }
-
-    pub(crate) fn unpark(&self) {
-        #[cfg(feature = "test-util")]
-        self.did_wake.store(true, Ordering::SeqCst);
-
-        self.inner.unpark();
     }
 }
 
 // ===== impl Inner =====
 
 impl Inner {
-    pub(self) fn new(time_source: TimeSource, unpark: IoUnpark) -> Self {
-        Inner {
-            state: Mutex::new(InnerState {
-                time_source,
-                elapsed: 0,
-                next_wake: None,
-                wheel: wheel::Wheel::new(),
-            }),
-            unpark,
-            is_shutdown: AtomicBool::new(false),
-        }
-    }
-
     /// Locks the driver's inner structure
     pub(super) fn lock(&self) -> crate::loom::sync::MutexGuard<'_, InnerState> {
         self.state.lock()

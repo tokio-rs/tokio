@@ -690,6 +690,36 @@ impl Command {
         self
     }
 
+    /// Sets the process group ID (PGID) of the child process. Equivalent to a
+    /// setpgid call in the child process, but may be more efficient.
+    ///
+    /// Process groups determine which processes receive signals.
+    ///
+    /// **Note**: This is an [unstable API][unstable] but will be stabilised once
+    /// tokio's MSRV is sufficiently new. See [the documentation on
+    /// unstable features][unstable] for details about using unstable features.
+    ///
+    /// If you want similar behaviour without using this unstable feature you can
+    /// create a [`std::process::Command`] and convert that into a
+    /// [`tokio::process::Command`] using the `From` trait.
+    ///
+    /// [unstable]: crate#unstable-features
+    /// [`tokio::process::Command`]: crate::process::Command
+    ///
+    /// ```no_run
+    /// use tokio::process::Command;
+    ///
+    /// let command = Command::new("ls")
+    ///         .process_group(0);
+    /// ```
+    #[cfg(unix)]
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(all(unix, tokio_unstable))))]
+    pub fn process_group(&mut self, pgroup: i32) -> &mut Command {
+        self.std.process_group(pgroup);
+        self
+    }
+
     /// Executes the command as a child process, returning a handle to it.
     ///
     /// By default, stdin, stdout and stderr are inherited from the parent.
@@ -924,7 +954,7 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         let ret = Pin::new(&mut self.inner).poll(cx);
 
@@ -1298,6 +1328,18 @@ impl AsyncWrite for ChildStdin {
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
+
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<Result<usize, io::Error>> {
+        Pin::new(&mut self.inner).poll_write_vectored(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.inner.is_write_vectored()
     }
 }
 

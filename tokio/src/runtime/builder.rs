@@ -1,5 +1,6 @@
 use crate::runtime::handle::Handle;
-use crate::runtime::{blocking, driver, Callback, Runtime, Spawner};
+use crate::runtime::{blocking, driver, Callback, Runtime};
+use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use std::fmt;
 use std::io;
@@ -89,6 +90,9 @@ pub struct Builder {
     ///
     /// This option should only be exposed as unstable.
     pub(super) disable_lifo_slot: bool,
+
+    /// Specify a random number generator seed to provide deterministic results
+    pub(super) seed_generator: RngSeedGenerator,
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
@@ -254,6 +258,8 @@ impl Builder {
             // as parameters.
             global_queue_interval,
             event_interval,
+
+            seed_generator: RngSeedGenerator::new(RngSeed::new()),
 
             #[cfg(tokio_unstable)]
             unhandled_panic: UnhandledPanic::Ignore,
@@ -812,7 +818,7 @@ impl Builder {
         ///
         /// This configuration option is considered a workaround for the LIFO
         /// slot not being stealable. When the slot becomes stealable, we will
-        /// revisit whther or not this option is necessary. See
+        /// revisit whether or not this option is necessary. See
         /// tokio-rs/tokio#4941.
         ///
         /// # Examples
@@ -829,32 +835,64 @@ impl Builder {
             self.disable_lifo_slot = true;
             self
         }
+
+        /// Specifies the random number generation seed to use within all
+        /// threads associated with the runtime being built.
+        ///
+        /// This option is intended to make certain parts of the runtime
+        /// deterministic (e.g. the [`tokio::select!`] macro). In the case of
+        /// [`tokio::select!`] it will ensure that the order that branches are
+        /// polled is deterministic.
+        ///
+        /// In addition to the code specifying `rng_seed` and interacting with
+        /// the runtime, the internals of Tokio and the Rust compiler may affect
+        /// the sequences of random numbers. In order to ensure repeatable
+        /// results, the version of Tokio, the versions of all other
+        /// dependencies that interact with Tokio, and the Rust compiler version
+        /// should also all remain constant.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # use tokio::runtime::{self, RngSeed};
+        /// # pub fn main() {
+        /// let seed = RngSeed::from_bytes(b"place your seed here");
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .rng_seed(seed)
+        ///     .build();
+        /// # }
+        /// ```
+        ///
+        /// [`tokio::select!`]: crate::select
+        pub fn rng_seed(&mut self, seed: RngSeed) -> &mut Self {
+            self.seed_generator = RngSeedGenerator::new(seed);
+            self
+        }
     }
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::{Config, CurrentThread, HandleInner, Kind};
+        use crate::runtime::scheduler::{self, CurrentThread};
+        use crate::runtime::{runtime::Scheduler, Config};
 
-        let (driver, resources) = driver::Driver::new(self.get_cfg())?;
+        let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
 
-        let handle_inner = HandleInner {
-            io_handle: resources.io_handle,
-            time_handle: resources.time_handle,
-            signal_handle: resources.signal_handle,
-            clock: resources.clock,
-            blocking_spawner,
-        };
+        // Generate a rng seed for this runtime.
+        let seed_generator_1 = self.seed_generator.next_generator();
+        let seed_generator_2 = self.seed_generator.next_generator();
 
         // And now put a single-threaded scheduler on top of the timer. When
         // there are no futures ready to do something, it'll let the timer or
         // the reactor to generate some new stimuli for the futures to continue
         // in their life.
-        let scheduler = CurrentThread::new(
+        let (scheduler, handle) = CurrentThread::new(
             driver,
-            handle_inner,
+            driver_handle,
+            blocking_spawner,
+            seed_generator_2,
             Config {
                 before_park: self.before_park.clone(),
                 after_unpark: self.after_unpark.clone(),
@@ -863,15 +901,19 @@ impl Builder {
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
+                seed_generator: seed_generator_1,
             },
         );
-        let spawner = Spawner::CurrentThread(scheduler.spawner().clone());
 
-        Ok(Runtime {
-            kind: Kind::CurrentThread(scheduler),
-            handle: Handle { spawner },
+        let handle = Handle {
+            inner: scheduler::Handle::CurrentThread(handle),
+        };
+
+        Ok(Runtime::from_parts(
+            Scheduler::CurrentThread(scheduler),
+            handle,
             blocking_pool,
-        })
+        ))
     }
 }
 
@@ -951,29 +993,28 @@ cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
-            use crate::runtime::{Config, HandleInner, Kind, MultiThread};
+            use crate::runtime::{Config, runtime::Scheduler};
+            use crate::runtime::scheduler::{self, MultiThread};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
-            let (driver, resources) = driver::Driver::new(self.get_cfg())?;
+            let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
             // Create the blocking pool
             let blocking_pool =
                 blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
-            let handle_inner = HandleInner {
-                io_handle: resources.io_handle,
-                time_handle: resources.time_handle,
-                signal_handle: resources.signal_handle,
-                clock: resources.clock,
-                blocking_spawner,
-            };
+            // Generate a rng seed for this runtime.
+            let seed_generator_1 = self.seed_generator.next_generator();
+            let seed_generator_2 = self.seed_generator.next_generator();
 
-            let (scheduler, launch) = MultiThread::new(
+            let (scheduler, handle, launch) = MultiThread::new(
                 core_threads,
                 driver,
-                handle_inner,
+                driver_handle,
+                blocking_spawner,
+                seed_generator_2,
                 Config {
                     before_park: self.before_park.clone(),
                     after_unpark: self.after_unpark.clone(),
@@ -982,22 +1023,17 @@ cfg_rt_multi_thread! {
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
+                    seed_generator: seed_generator_1,
                 },
             );
-            let spawner = Spawner::MultiThread(scheduler.spawner().clone());
 
-            // Create the runtime handle
-            let handle = Handle { spawner };
+            let handle = Handle { inner: scheduler::Handle::MultiThread(handle) };
 
             // Spawn the thread pool workers
-            let _enter = crate::runtime::context::enter(handle.clone());
+            let _enter = handle.enter();
             launch.launch();
 
-            Ok(Runtime {
-                kind: Kind::MultiThread(scheduler),
-                handle,
-                blocking_pool,
-            })
+            Ok(Runtime::from_parts(Scheduler::MultiThread(scheduler), handle, blocking_pool))
         }
     }
 }

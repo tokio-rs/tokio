@@ -58,11 +58,10 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::atomic::Ordering;
 
+use crate::runtime::scheduler;
 use crate::sync::AtomicWaker;
 use crate::time::Instant;
 use crate::util::linked_list;
-
-use super::Handle;
 
 use std::cell::UnsafeCell as StdUnsafeCell;
 use std::task::{Context, Poll, Waker};
@@ -173,7 +172,12 @@ impl StateCell {
         let mut cur_state = self.state.load(Ordering::Relaxed);
 
         loop {
-            debug_assert!(cur_state < STATE_MIN_VALUE);
+            // improve the error message for things like
+            // https://github.com/tokio-rs/tokio/issues/3675
+            assert!(
+                cur_state < STATE_MIN_VALUE,
+                "mark_pending called when the timer entry is in an invalid state"
+            );
 
             if cur_state > not_after {
                 break Err(cur_state);
@@ -284,9 +288,9 @@ impl StateCell {
 /// before polling.
 #[derive(Debug)]
 pub(crate) struct TimerEntry {
-    /// Arc reference to the driver. We can only free the driver after
+    /// Arc reference to the runtime handle. We can only free the driver after
     /// deregistering everything from their respective timer wheels.
-    driver: Handle,
+    driver: scheduler::Handle,
     /// Shared inner structure; this is part of an intrusive linked list, and
     /// therefore other references can exist to it while mutable references to
     /// Entry exist.
@@ -490,7 +494,11 @@ unsafe impl linked_list::Link for TimerShared {
 // ===== impl Entry =====
 
 impl TimerEntry {
-    pub(crate) fn new(handle: &Handle, deadline: Instant) -> Self {
+    #[track_caller]
+    pub(crate) fn new(handle: &scheduler::Handle, deadline: Instant) -> Self {
+        // Panic if the time driver is not enabled
+        let _ = handle.driver().time();
+
         let driver = handle.clone();
 
         Self {
@@ -533,20 +541,21 @@ impl TimerEntry {
         // driver did so far and happens-before everything the driver does in
         // the future. While we have the lock held, we also go ahead and
         // deregister the entry if necessary.
-        unsafe { self.driver.clear_entry(NonNull::from(self.inner())) };
+        unsafe { self.driver().clear_entry(NonNull::from(self.inner())) };
     }
 
     pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant) {
         unsafe { self.as_mut().get_unchecked_mut() }.initial_deadline = None;
 
-        let tick = self.driver.time_source().deadline_to_tick(new_time);
+        let tick = self.driver().time_source().deadline_to_tick(new_time);
 
         if self.inner().extend_expiration(tick).is_ok() {
             return;
         }
 
         unsafe {
-            self.driver.reregister(tick, self.inner().into());
+            self.driver()
+                .reregister(&self.driver.driver().io, tick, self.inner().into());
         }
     }
 
@@ -554,7 +563,7 @@ impl TimerEntry {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), super::Error>> {
-        if self.driver.is_shutdown() {
+        if self.driver().is_shutdown() {
             panic!("{}", crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR);
         }
 
@@ -565,6 +574,10 @@ impl TimerEntry {
         let this = unsafe { self.get_unchecked_mut() };
 
         this.inner().state.poll(cx.waker())
+    }
+
+    pub(crate) fn driver(&self) -> &super::Handle {
+        self.driver.driver().time()
     }
 }
 
@@ -634,7 +647,73 @@ impl Drop for TimerEntry {
     }
 }
 
-#[cfg_attr(target_arch = "x86_64", repr(align(128)))]
-#[cfg_attr(not(target_arch = "x86_64"), repr(align(64)))]
+// Copied from [crossbeam/cache_padded](https://github.com/crossbeam-rs/crossbeam/blob/fa35346b7c789bba045ad789e894c68c466d1779/crossbeam-utils/src/cache_padded.rs#L62-L127)
+//
+// Starting from Intel's Sandy Bridge, spatial prefetcher is now pulling pairs of 64-byte cache
+// lines at a time, so we have to align to 128 bytes rather than 64.
+//
+// Sources:
+// - https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-optimization-manual.pdf
+// - https://github.com/facebook/folly/blob/1b5288e6eea6df074758f877c849b6e73bbb9fbb/folly/lang/Align.h#L107
+//
+// ARM's big.LITTLE architecture has asymmetric cores and "big" cores have 128-byte cache line size.
+//
+// Sources:
+// - https://www.mono-project.com/news/2016/09/12/arm64-icache/
+//
+// powerpc64 has 128-byte cache line size.
+//
+// Sources:
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_ppc64x.go#L9
+#[cfg_attr(
+    any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "powerpc64",
+    ),
+    repr(align(128))
+)]
+// arm, mips, mips64, and riscv64 have 32-byte cache line size.
+//
+// Sources:
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_arm.go#L7
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mips.go#L7
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mipsle.go#L7
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mips64x.go#L9
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_riscv64.go#L7
+#[cfg_attr(
+    any(
+        target_arch = "arm",
+        target_arch = "mips",
+        target_arch = "mips64",
+        target_arch = "riscv64",
+    ),
+    repr(align(32))
+)]
+// s390x has 256-byte cache line size.
+//
+// Sources:
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_s390x.go#L7
+#[cfg_attr(target_arch = "s390x", repr(align(256)))]
+// x86 and wasm have 64-byte cache line size.
+//
+// Sources:
+// - https://github.com/golang/go/blob/dda2991c2ea0c5914714469c4defc2562a907230/src/internal/cpu/cpu_x86.go#L9
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_wasm.go#L7
+//
+// All others are assumed to have 64-byte cache line size.
+#[cfg_attr(
+    not(any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "powerpc64",
+        target_arch = "arm",
+        target_arch = "mips",
+        target_arch = "mips64",
+        target_arch = "riscv64",
+        target_arch = "s390x",
+    )),
+    repr(align(64))
+)]
 #[derive(Debug, Default)]
 struct CachePadded<T>(T);

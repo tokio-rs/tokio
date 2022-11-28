@@ -207,6 +207,7 @@ async fn nested() {
 }
 
 #[maybe_tokio_test]
+#[cfg(target_pointer_width = "64")]
 async fn struct_size() {
     use futures::future;
     use std::mem;
@@ -219,7 +220,7 @@ async fn struct_size() {
         }
     };
 
-    assert!(mem::size_of_val(&fut) <= 32);
+    assert_eq!(mem::size_of_val(&fut), 40);
 
     let fut = async {
         let ready1 = future::ready(0i32);
@@ -231,7 +232,7 @@ async fn struct_size() {
         }
     };
 
-    assert!(mem::size_of_val(&fut) <= 40);
+    assert_eq!(mem::size_of_val(&fut), 48);
 
     let fut = async {
         let ready1 = future::ready(0i32);
@@ -245,7 +246,7 @@ async fn struct_size() {
         }
     };
 
-    assert!(mem::size_of_val(&fut) <= 48);
+    assert_eq!(mem::size_of_val(&fut), 56);
 }
 
 #[maybe_tokio_test]
@@ -598,4 +599,67 @@ async fn mut_ref_patterns() {
             assert_eq!(*foo, "2");
         },
     };
+}
+
+#[cfg(tokio_unstable)]
+mod unstable {
+    use tokio::runtime::RngSeed;
+
+    #[test]
+    fn deterministic_select_current_thread() {
+        let seed = b"bytes used to generate seed";
+        let rt1 = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt1_values = rt1.block_on(async { (select_0_to_9().await, select_0_to_9().await) });
+
+        let rt2 = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt2_values = rt2.block_on(async { (select_0_to_9().await, select_0_to_9().await) });
+
+        assert_eq!(rt1_values, rt2_values);
+    }
+
+    #[test]
+    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+    fn deterministic_select_multi_thread() {
+        let seed = b"bytes used to generate seed";
+        let rt1 = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt1_values = rt1.block_on(async {
+            let _ = tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) }).await;
+        });
+
+        let rt2 = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt2_values = rt2.block_on(async {
+            let _ = tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) }).await;
+        });
+
+        assert_eq!(rt1_values, rt2_values);
+    }
+
+    async fn select_0_to_9() -> u32 {
+        tokio::select!(
+            x = async { 0 } => x,
+            x = async { 1 } => x,
+            x = async { 2 } => x,
+            x = async { 3 } => x,
+            x = async { 4 } => x,
+            x = async { 5 } => x,
+            x = async { 6 } => x,
+            x = async { 7 } => x,
+            x = async { 8 } => x,
+            x = async { 9 } => x,
+        )
+    }
 }
