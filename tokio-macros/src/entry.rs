@@ -394,12 +394,12 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
         }
     };
 
-    // For test functions wrap the body in a `Box` to reduce the amount
-    // `Runtime::block_on` (and related functions) copies we generate during
-    // compilation due to the generic parameter `F` (the future to block on).
-    // This could have an impact on performance, but because it's only for
-    // testing and the runtime already boxes the future to run it, it's unlikely
-    // to be very large.
+    // For test functions pin the body to the stack and use `Pin<&mut dyn
+    // Future>` to reduce the amount of `Runtime::block_on` (and related
+    // functions) copies we generate during compilation due to the generic
+    // parameter `F` (the future to block on). This could have an impact on
+    // performance, but because it's only for testing it's unlikely to be very
+    // large.
     //
     // We don't do this for the main function as it should only be used once so
     // there will be no benefit.
@@ -413,7 +413,7 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
         };
         quote! {
             let body = async #body;
-            ::tokio::pin!(body);
+            #crate_ident::pin!(body);
             let body: ::std::pin::Pin<&mut dyn ::std::future::Future<Output = #output_type>> = body;
         }
     } else {
