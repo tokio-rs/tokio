@@ -383,6 +383,7 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
 
     let body = &input.block;
     let brace_token = input.block.brace_token;
+    let body_ident = quote! { body };
     let block_expr = quote_spanned! {last_stmt_end_span=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
         {
@@ -390,7 +391,7 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
-                .block_on(body);
+                .block_on(#body_ident);
         }
     };
 
@@ -479,7 +480,7 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
     };
     let config = if let Some(attr) = input.attrs.iter().find(|attr| attr.path.is_ident("test")) {
         let msg = "second test attribute is supplied";
-        Err(syn::Error::new_spanned(&attr, msg))
+        Err(syn::Error::new_spanned(attr, msg))
     } else {
         AttributeArgs::parse_terminated
             .parse(args)
