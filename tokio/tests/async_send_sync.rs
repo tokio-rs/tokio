@@ -136,7 +136,7 @@ macro_rules! cfg_not_wasi {
     }
 }
 
-// Manualy re-implementation of `async_assert_fn` for `poll_fn`. The macro
+// Manually re-implementation of `async_assert_fn` for `poll_fn`. The macro
 // doesn't work for this particular case because constructing the closure
 // is too complicated.
 const _: fn() = || {

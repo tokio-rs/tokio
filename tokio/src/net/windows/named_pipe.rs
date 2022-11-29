@@ -828,6 +828,11 @@ impl NamedPipeServer {
     /// methods defined on the Tokio `NamedPipeServer` type, as this will mess with
     /// the readiness flag and can cause the pipe to behave incorrectly.
     ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
+    ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
     /// [`readable()`]: NamedPipeServer::readable()
@@ -1566,6 +1571,11 @@ impl NamedPipeClient {
     /// The closure should not perform the IO operation using any of the methods
     /// defined on the Tokio `NamedPipeClient` type, as this will mess with the
     /// readiness flag and can cause the pipe to behave incorrectly.
+    ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
     ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
