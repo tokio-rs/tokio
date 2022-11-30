@@ -729,7 +729,7 @@ rt_test! {
 
             tokio::spawn(async move {
                 // Create a TCP litener
-                let listener = TcpListener::bind("0.0.0.0:0").await.unwrap();
+                let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
                 let addr = listener.local_addr().unwrap();
 
                 tokio::join!(
