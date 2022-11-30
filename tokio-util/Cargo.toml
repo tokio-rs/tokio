@@ -18,16 +18,16 @@ categories = ["asynchronous"]
 
 [features]
 # No features on by default
-default = ["tokio"]
+default = ["tokio/sync"]
 
 # Shorthand for enabling everything
 full = ["codec", "compat", "io-util", "time", "net", "rt"]
 
 net = ["tokio/net"]
-compat = ["tokio", "futures-io",]
-codec = ["tokio", "tracing"]
+compat = ["tokio/sync", "futures-io",]
+codec = ["tokio/sync", "tracing"]
 time = ["tokio/time","slab"]
-io = ["tokio"]
+io = ["tokio/sync"]
 io-util = ["io", "tokio/rt", "tokio/io-util"]
 rt = ["tokio/rt", "tokio/sync", "futures-util", "hashbrown"]
 
