@@ -412,7 +412,11 @@ impl Context {
                 core = self.run_task(task, core)?;
             } else {
                 // Wait for work
-                core = self.park(core);
+                core = if did_defer_tasks() {
+                    self.park_timeout(core, Some(Duration::from_millis(0)))
+                } else {
+                    self.park(core)
+                };
             }
         }
 
@@ -534,6 +538,8 @@ impl Context {
         } else {
             park.park(&self.worker.handle.driver);
         }
+
+        wake_deferred_tasks();
 
         // Remove `core` from context
         core = self.core.borrow_mut().take().expect("core missing");
@@ -851,6 +857,14 @@ impl Handle {
     fn ptr_eq(&self, other: &Handle) -> bool {
         std::ptr::eq(self, other)
     }
+}
+
+fn did_defer_tasks() -> bool {
+    context::with_defer(|deferred| !deferred.is_empty()).unwrap()
+}
+
+fn wake_deferred_tasks() {
+    context::with_defer(|deferred| deferred.wake());
 }
 
 cfg_metrics! {
