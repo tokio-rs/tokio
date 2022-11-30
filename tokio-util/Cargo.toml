@@ -31,7 +31,7 @@ io = ["tokio"]
 io-util = ["io", "tokio/rt", "tokio/io-util"]
 rt = ["tokio/rt", "tokio/sync", "futures-util", "hashbrown"]
 
-__docs_rs = ["tokio", "futures-util"]
+__docs_rs = ["tokio/sync", "futures-util"]
 
 [dependencies]
 tokio = { version = "1.21.0", path = "../tokio", default-features = true, optional = true }
