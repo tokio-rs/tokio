@@ -5,7 +5,7 @@ name = "tokio"
 # - Update doc url
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v1.0.x" git tag.
+# - Create "v1.x.y" git tag.
 version = "1.22.0"
 edition = "2018"
 rust-version = "1.49"

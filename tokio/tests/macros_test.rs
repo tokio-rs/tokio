@@ -71,3 +71,18 @@ pub mod clippy_semicolon_if_nothing_returned {
         // To trigger clippy::semicolon_if_nothing_returned lint, the block needs to contain newline.
     }
 }
+
+// https://github.com/tokio-rs/tokio/issues/5243
+pub mod issue_5243 {
+    macro_rules! mac {
+        (async fn $name:ident() $b:block) => {
+            #[::tokio::test]
+            async fn $name() {
+                $b
+            }
+        };
+    }
+    mac!(
+        async fn foo() {}
+    );
+}
