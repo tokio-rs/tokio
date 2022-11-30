@@ -22,7 +22,7 @@
 #[macro_use]
 mod cfg;
 
-#[cfg(feature = "tokio")]
+#[cfg(feature = "sync")]
 mod loom;
 
 cfg_codec! {

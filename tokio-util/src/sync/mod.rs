@@ -1,18 +1,18 @@
 //! Synchronization primitives
 
-cfg_tokio! {
+cfg_sync! {
     mod cancellation_token;
     pub use cancellation_token::{
         guard::DropGuard, CancellationToken, WaitForCancellationFuture, WaitForCancellationFutureOwned,
     };
 }
 
-cfg_tokio! {
+cfg_sync! {
     mod mpsc;
     pub use mpsc::{PollSendError, PollSender};
 }
 
-cfg_tokio! {
+cfg_sync! {
     mod poll_semaphore;
     pub use poll_semaphore::PollSemaphore;
 }

@@ -17,21 +17,21 @@ Additional utilities for working with Tokio.
 categories = ["asynchronous"]
 
 [features]
-# No features on by default
-default = ["tokio/sync"]
+default = ["sync"]
 
 # Shorthand for enabling everything
-full = ["codec", "compat", "io-util", "time", "net", "rt"]
+full = ["codec", "compat", "io-util", "time", "net", "rt", "sync"]
 
 net = ["tokio/net"]
-compat = ["tokio/sync", "futures-io",]
-codec = ["tokio/sync", "tracing"]
+compat = ["tokio", "futures-io",]
+codec = ["tokio", "tracing"]
 time = ["tokio/time","slab"]
-io = ["tokio/sync"]
+io = ["tokio"]
 io-util = ["io", "tokio/rt", "tokio/io-util"]
 rt = ["tokio/rt", "tokio/sync", "futures-util", "hashbrown"]
+sync = ["tokio/sync"]
 
-__docs_rs = ["tokio/sync", "futures-util"]
+__docs_rs = ["futures-util"]
 
 [dependencies]
 tokio = { version = "1.21.0", path = "../tokio", default-features = true, optional = true }
