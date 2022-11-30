@@ -1,8 +1,16 @@
+# 1.8.2 (November 30th, 2022)
+
+- fix a regression introduced in 1.8.1 ([#5244])
+
+[#5244]: https://github.com/tokio-rs/tokio/pull/5244
+
 # 1.8.1 (November 29th, 2022)
 
-- macros: Pin Futures in #[tokio::test] to stack ([#5205])
+(yanked)
+
+- macros: Pin Futures in `#[tokio::test]` to stack ([#5205])
 - macros: Reduce usage of last statement spans in proc-macros ([#5092])
-- macros: Improve the documentation for #[tokio::test] ([#4761])
+- macros: Improve the documentation for `#[tokio::test]` ([#4761])
 
 [#5205]: https://github.com/tokio-rs/tokio/pull/5205
 [#5092]: https://github.com/tokio-rs/tokio/pull/5092
