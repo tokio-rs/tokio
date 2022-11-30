@@ -22,6 +22,7 @@
 #[macro_use]
 mod cfg;
 
+#[cfg(feature = "tokio")]
 mod loom;
 
 cfg_codec! {
@@ -53,7 +54,9 @@ cfg_time! {
 
 pub mod sync;
 
-pub mod either;
+cfg_tokio! {
+    pub mod either;
+}
 
 #[cfg(any(feature = "io", feature = "codec"))]
 mod util {
