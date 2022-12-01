@@ -7,8 +7,7 @@ use std::cell::Cell;
 use crate::util::rand::{FastRand, RngSeed};
 
 cfg_rt! {
-    use crate::runtime::scheduler;
-    use crate::runtime::task::Id;
+    use crate::runtime::{scheduler, task::Id, Defer};
 
     use std::cell::RefCell;
     use std::marker::PhantomData;
@@ -19,6 +18,7 @@ struct Context {
     /// Handle to the runtime scheduler running on the current thread.
     #[cfg(feature = "rt")]
     handle: RefCell<Option<scheduler::Handle>>,
+
     #[cfg(feature = "rt")]
     current_task_id: Cell<Option<Id>>,
 
@@ -29,6 +29,11 @@ struct Context {
     /// within a runtime.
     #[cfg(feature = "rt")]
     runtime: Cell<EnterRuntime>,
+
+    /// Yielded task wakers are stored here and notified after resource drivers
+    /// are polled.
+    #[cfg(feature = "rt")]
+    defer: RefCell<Option<Defer>>,
 
     #[cfg(any(feature = "rt", feature = "macros"))]
     rng: FastRand,
@@ -55,6 +60,9 @@ tokio_thread_local! {
             /// within a runtime.
             #[cfg(feature = "rt")]
             runtime: Cell::new(EnterRuntime::NotEntered),
+
+            #[cfg(feature = "rt")]
+            defer: RefCell::new(None),
 
             #[cfg(any(feature = "rt", feature = "macros"))]
             rng: FastRand::new(RngSeed::new()),
@@ -159,7 +167,12 @@ cfg_rt! {
             if c.runtime.get().is_entered() {
                 None
             } else {
+                // Set the entered flag
                 c.runtime.set(EnterRuntime::Entered { allow_block_in_place });
+
+                // Initialize queue to track yielded tasks
+                *c.defer.borrow_mut() = Some(Defer::new());
+
                 Some(EnterRuntimeGuard {
                     blocking: BlockingRegionGuard::new(),
                     handle: c.set_current(handle),
@@ -201,6 +214,14 @@ cfg_rt! {
         DisallowBlockInPlaceGuard(reset)
     }
 
+    pub(crate) fn with_defer<R>(f: impl FnOnce(&mut Defer) -> R) -> Option<R> {
+        CONTEXT.with(|c| {
+            let mut defer = c.defer.borrow_mut();
+
+            defer.as_mut().map(f)
+        })
+    }
+
     impl Context {
         fn set_current(&self, handle: &scheduler::Handle) -> SetCurrentGuard {
             let rng_seed = handle.seed_generator().next_seed();
@@ -235,6 +256,7 @@ cfg_rt! {
             CONTEXT.with(|c| {
                 assert!(c.runtime.get().is_entered());
                 c.runtime.set(EnterRuntime::NotEntered);
+                *c.defer.borrow_mut() = None;
             });
         }
     }
@@ -285,6 +307,10 @@ cfg_rt! {
                 if now >= when {
                     return Err(());
                 }
+
+                // Wake any yielded tasks before parking in order to avoid
+                // blocking.
+                with_defer(|defer| defer.wake());
 
                 park.park_timeout(when - now);
             }

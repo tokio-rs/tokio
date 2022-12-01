@@ -500,11 +500,15 @@ async fn local_tasks_are_polled_after_tick_inner() {
                     tx.send(()).unwrap();
                 }
 
-                time::sleep(Duration::from_millis(20)).await;
-                let rx1 = RX1.load(SeqCst);
-                let rx2 = RX2.load(SeqCst);
-                assert_eq!(EXPECTED, rx1);
-                assert_eq!(EXPECTED, rx2);
+                loop {
+                    time::sleep(Duration::from_millis(20)).await;
+                    let rx1 = RX1.load(SeqCst);
+                    let rx2 = RX2.load(SeqCst);
+
+                    if rx1 == EXPECTED && rx2 == EXPECTED {
+                        break;
+                    }
+                }
             });
 
             while let Some(oneshot) = rx.recv().await {

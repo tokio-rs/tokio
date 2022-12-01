@@ -42,7 +42,9 @@ jobs:
       - test-unstable
       - miri
       - asan
-      - cross
+      - cross-check
+      - cross-test
+      - no-atomic-u64
       - features
       - minrust
       - minimal-versions
@@ -234,13 +236,12 @@ jobs:
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
           TRYBUILD: overwrite
 
-  cross:
-    name: cross
+  cross-check:
+    name: cross-check
     runs-on: ubuntu-latest
     strategy:
       matrix:
         target:
-          - i686-unknown-linux-gnu
           - powerpc-unknown-linux-gnu
           - powerpc64-unknown-linux-gnu
           - mips-unknown-linux-gnu
@@ -259,13 +260,54 @@ jobs:
           use-cross: true
           command: check
           args: --workspace --all-features --target ${{ matrix.target }}
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+
+  cross-test:
+    name: cross-test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - i686-unknown-linux-gnu
+          - arm-unknown-linux-gnueabihf
+          - armv7-unknown-linux-gnueabihf
+          - aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust_stable }}
+          target: ${{ matrix.target }}
+          override: true
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
-          command: check
-          args: --workspace --all-features --target ${{ matrix.target }}
+          command: test
+          args: -p tokio --all-features --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6
+
+  # See https://github.com/tokio-rs/tokio/issues/5187
+  no-atomic-u64:
+    name: Test i686-unknown-linux-gnu without AtomicU64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust_nightly }}
+          components: rust-src
+          override: true
+      # Install linker and libraries for i686-unknown-linux-gnu
+      - uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: i686-unknown-linux-gnu
+      - run: cargo test -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_atomic_u64
 
   features:
     name: features

@@ -182,6 +182,10 @@ impl<'a> io::Write for &'a Pipe {
     fn flush(&mut self) -> io::Result<()> {
         (&self.fd).flush()
     }
+
+    fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
+        (&self.fd).write_vectored(bufs)
+    }
 }
 
 impl AsRawFd for Pipe {
@@ -257,6 +261,18 @@ impl AsyncWrite for ChildStdio {
 
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<Result<usize, io::Error>> {
+        self.inner.poll_write_vectored(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
     }
 }
 

@@ -105,7 +105,7 @@ fn worker_park_count() {
         time::sleep(Duration::from_millis(1)).await;
     });
     drop(rt);
-    assert!(2 <= metrics.worker_park_count(0));
+    assert!(1 <= metrics.worker_park_count(0));
 
     let rt = threaded();
     let metrics = rt.metrics();

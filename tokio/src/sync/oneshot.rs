@@ -227,7 +227,7 @@ pub struct Sender<T> {
 /// [`channel`](fn@channel) function.
 ///
 /// This channel has no `recv` method because the receiver itself implements the
-/// [`Future`] trait. To receive a value, `.await` the `Receiver` object directly.
+/// [`Future`] trait. To receive a `Result<T, `[`error::RecvError`]`>`, `.await` the `Receiver` object directly.
 ///
 /// The `poll` method on the `Future` trait is allowed to spuriously return
 /// `Poll::Pending` even if the message has been sent. If such a spurious
@@ -331,6 +331,8 @@ pub mod error {
     use std::fmt;
 
     /// Error returned by the `Future` implementation for `Receiver`.
+    ///
+    /// This error is returned by the receiver when the sender is dropped without sending.
     #[derive(Debug, Eq, PartialEq, Clone)]
     pub struct RecvError(pub(super) ());
 
