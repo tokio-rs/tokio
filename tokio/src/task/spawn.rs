@@ -24,6 +24,15 @@ cfg_rt! {
     /// the Tokio runtime are always inside its context, but you can also enter the context
     /// using the [`Runtime::enter`](crate::runtime::Runtime::enter()) method.
     ///
+    /// # Note
+    ///
+    /// The default Rust allocator will not release the memory back to the OS upon
+    /// completion of tasks, under the assumption that memory with the same layout will be
+    /// requested requested in the future. This will lead to an ever-increasing memory
+    /// consumption that might causes crashes at runtime.
+    /// To avert this issue, an allocator that can be configured to release memory back to
+    /// the OS more consistently may be used, like [jemallocator](https://github.com/tikv/jemallocator).
+    ///
     /// # Examples
     ///
     /// In this example, a server is started and `spawn` is used to start a new task
