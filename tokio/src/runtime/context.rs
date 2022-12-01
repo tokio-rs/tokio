@@ -107,9 +107,17 @@ cfg_rt! {
     /// Guard tracking that a caller has entered a runtime context.
     #[must_use]
     pub(crate) struct EnterRuntimeGuard {
+        /// Tracks that the current thread has entered a blocking function call.
         pub(crate) blocking: BlockingRegionGuard,
+
         #[allow(dead_code)] // Only tracking the guard.
         pub(crate) handle: SetCurrentGuard,
+
+        /// If true, then this is the root runtime guard. It is possible to nest
+        /// runtime guards by using `block_in_place` between the calls. We need
+        /// to track the root guard as this is the guard responsible for freeing
+        /// the deferred task queue.
+        is_root: bool,
     }
 
     /// Guard tracking that a caller has entered a blocking region.
@@ -171,11 +179,19 @@ cfg_rt! {
                 c.runtime.set(EnterRuntime::Entered { allow_block_in_place });
 
                 // Initialize queue to track yielded tasks
-                *c.defer.borrow_mut() = Some(Defer::new());
+                let mut defer = c.defer.borrow_mut();
+
+                let is_root = if defer.is_none() {
+                    *defer = Some(Defer::new());
+                    true
+                } else {
+                    false
+                };
 
                 Some(EnterRuntimeGuard {
                     blocking: BlockingRegionGuard::new(),
                     handle: c.set_current(handle),
+                    is_root,
                 })
             }
         })
@@ -217,7 +233,6 @@ cfg_rt! {
     pub(crate) fn with_defer<R>(f: impl FnOnce(&mut Defer) -> R) -> Option<R> {
         CONTEXT.with(|c| {
             let mut defer = c.defer.borrow_mut();
-
             defer.as_mut().map(f)
         })
     }
@@ -256,7 +271,10 @@ cfg_rt! {
             CONTEXT.with(|c| {
                 assert!(c.runtime.get().is_entered());
                 c.runtime.set(EnterRuntime::NotEntered);
-                *c.defer.borrow_mut() = None;
+
+                if self.is_root {
+                    *c.defer.borrow_mut() = None;
+                }
             });
         }
     }
