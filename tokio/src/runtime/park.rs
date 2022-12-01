@@ -32,6 +32,12 @@ tokio_thread_local! {
     static CURRENT_PARKER: ParkThread = ParkThread::new();
 }
 
+// Bit of a hack, but it is only for loom
+#[cfg(loom)]
+tokio_thread_local! {
+    static CURRENT_THREAD_PARK_COUNT: AtomicUsize = AtomicUsize::new(0);
+}
+
 // ==== impl ParkThread ====
 
 impl ParkThread {
@@ -51,10 +57,15 @@ impl ParkThread {
     }
 
     pub(crate) fn park(&mut self) {
+        #[cfg(loom)]
+        CURRENT_THREAD_PARK_COUNT.with(|count| count.fetch_add(1, SeqCst));
         self.inner.park();
     }
 
     pub(crate) fn park_timeout(&mut self, duration: Duration) {
+        #[cfg(loom)]
+        CURRENT_THREAD_PARK_COUNT.with(|count| count.fetch_add(1, SeqCst));
+
         // Wasm doesn't have threads, so just sleep.
         #[cfg(not(tokio_wasm))]
         self.inner.park_timeout(duration);
@@ -273,6 +284,11 @@ impl CachedParkThread {
                 return Ok(v);
             }
 
+            // Wake any yielded tasks before parking in order to avoid
+            // blocking.
+            #[cfg(feature = "rt")]
+            crate::runtime::context::with_defer(|defer| defer.wake());
+
             self.park();
         }
     }
@@ -329,4 +345,9 @@ unsafe fn wake_by_ref(raw: *const ()) {
 
     // We don't actually own a reference to the unparker
     mem::forget(unparker);
+}
+
+#[cfg(loom)]
+pub(crate) fn current_thread_park_count() -> usize {
+    CURRENT_THREAD_PARK_COUNT.with(|count| count.load(SeqCst))
 }

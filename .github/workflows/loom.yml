@@ -45,4 +45,5 @@ jobs:
         env:
           RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
           LOOM_MAX_PREEMPTIONS: 2
+          LOOM_MAX_BRANCHES: 10000
           SCOPE: ${{ matrix.scope }}

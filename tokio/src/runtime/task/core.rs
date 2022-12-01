@@ -25,6 +25,9 @@ use std::task::{Context, Poll, Waker};
 ///
 /// It is critical for `Header` to be the first field as the task structure will
 /// be referenced by both *mut Cell and *mut Header.
+///
+/// Any changes to the layout of this struct _must_ also be reflected in the
+/// const fns in raw.rs.
 #[repr(C)]
 pub(super) struct Cell<T: Future, S> {
     /// Hot task state data
@@ -44,15 +47,19 @@ pub(super) struct CoreStage<T: Future> {
 /// The core of the task.
 ///
 /// Holds the future or output, depending on the stage of execution.
+///
+/// Any changes to the layout of this struct _must_ also be reflected in the
+/// const fns in raw.rs.
+#[repr(C)]
 pub(super) struct Core<T: Future, S> {
     /// Scheduler used to drive this future.
     pub(super) scheduler: S,
 
-    /// Either the future or the output.
-    pub(super) stage: CoreStage<T>,
-
     /// The task's ID, used for populating `JoinError`s.
     pub(super) task_id: Id,
+
+    /// Either the future or the output.
+    pub(super) stage: CoreStage<T>,
 }
 
 /// Crate public as this is also needed by the pool.
@@ -82,7 +89,7 @@ pub(crate) struct Header {
 
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(super) id: Option<tracing::Id>,
+    pub(super) tracing_id: Option<tracing::Id>,
 }
 
 unsafe impl Send for Header {}
@@ -117,7 +124,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
     /// structures.
     pub(super) fn new(future: T, scheduler: S, state: State, task_id: Id) -> Box<Cell<T, S>> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let id = future.id();
+        let tracing_id = future.id();
         let result = Box::new(Cell {
             header: Header {
                 state,
@@ -125,7 +132,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 vtable: raw::vtable::<T, S>(),
                 owner_id: UnsafeCell::new(0),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
-                id,
+                tracing_id,
             },
             core: Core {
                 scheduler,
@@ -144,8 +151,16 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         {
             let trailer_addr = (&result.trailer) as *const Trailer as usize;
             let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(&result.header)) };
-
             assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
+
+            let scheduler_addr = (&result.core.scheduler) as *const S as usize;
+            let scheduler_ptr =
+                unsafe { Header::get_scheduler::<S>(NonNull::from(&result.header)) };
+            assert_eq!(scheduler_addr, scheduler_ptr.as_ptr() as usize);
+
+            let id_addr = (&result.core.task_id) as *const Id as usize;
+            let id_ptr = unsafe { Header::get_id_ptr(NonNull::from(&result.header)) };
+            assert_eq!(id_addr, id_ptr.as_ptr() as usize);
         }
 
         result
@@ -294,6 +309,51 @@ impl Header {
         let offset = me.as_ref().vtable.trailer_offset;
         let trailer = me.as_ptr().cast::<u8>().add(offset).cast::<Trailer>();
         NonNull::new_unchecked(trailer)
+    }
+
+    /// Gets a pointer to the scheduler of the task containing this `Header`.
+    ///
+    /// # Safety
+    ///
+    /// The provided raw pointer must point at the header of a task.
+    ///
+    /// The generic type S must be set to the correct scheduler type for this
+    /// task.
+    pub(super) unsafe fn get_scheduler<S>(me: NonNull<Header>) -> NonNull<S> {
+        let offset = me.as_ref().vtable.scheduler_offset;
+        let scheduler = me.as_ptr().cast::<u8>().add(offset).cast::<S>();
+        NonNull::new_unchecked(scheduler)
+    }
+
+    /// Gets a pointer to the id of the task containing this `Header`.
+    ///
+    /// # Safety
+    ///
+    /// The provided raw pointer must point at the header of a task.
+    pub(super) unsafe fn get_id_ptr(me: NonNull<Header>) -> NonNull<Id> {
+        let offset = me.as_ref().vtable.id_offset;
+        let id = me.as_ptr().cast::<u8>().add(offset).cast::<Id>();
+        NonNull::new_unchecked(id)
+    }
+
+    /// Gets the id of the task containing this `Header`.
+    ///
+    /// # Safety
+    ///
+    /// The provided raw pointer must point at the header of a task.
+    pub(super) unsafe fn get_id(me: NonNull<Header>) -> Id {
+        let ptr = Header::get_id_ptr(me).as_ptr();
+        *ptr
+    }
+
+    /// Gets the tracing id of the task containing this `Header`.
+    ///
+    /// # Safety
+    ///
+    /// The provided raw pointer must point at the header of a task.
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(super) unsafe fn get_tracing_id(me: &NonNull<Header>) -> Option<&tracing::Id> {
+        me.as_ref().tracing_id.as_ref()
     }
 }
 

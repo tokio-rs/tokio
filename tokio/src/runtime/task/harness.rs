@@ -2,7 +2,7 @@ use crate::future::Future;
 use crate::runtime::task::core::{Cell, Core, Header, Trailer};
 use crate::runtime::task::state::{Snapshot, State};
 use crate::runtime::task::waker::waker_ref;
-use crate::runtime::task::{JoinError, Notified, Schedule, Task};
+use crate::runtime::task::{JoinError, Notified, RawTask, Schedule, Task};
 
 use std::mem;
 use std::mem::ManuallyDrop;
@@ -47,11 +47,102 @@ where
     }
 }
 
+/// Task operations that can be implemented without being generic over the
+/// scheduler or task. Only one version of these methods should exist in the
+/// final binary.
+impl RawTask {
+    pub(super) fn drop_reference(self) {
+        if self.state().ref_dec() {
+            self.dealloc();
+        }
+    }
+
+    /// This call consumes a ref-count and notifies the task. This will create a
+    /// new Notified and submit it if necessary.
+    ///
+    /// The caller does not need to hold a ref-count besides the one that was
+    /// passed to this call.
+    pub(super) fn wake_by_val(&self) {
+        use super::state::TransitionToNotifiedByVal;
+
+        match self.state().transition_to_notified_by_val() {
+            TransitionToNotifiedByVal::Submit => {
+                // The caller has given us a ref-count, and the transition has
+                // created a new ref-count, so we now hold two. We turn the new
+                // ref-count Notified and pass it to the call to `schedule`.
+                //
+                // The old ref-count is retained for now to ensure that the task
+                // is not dropped during the call to `schedule` if the call
+                // drops the task it was given.
+                self.schedule();
+
+                // Now that we have completed the call to schedule, we can
+                // release our ref-count.
+                self.drop_reference();
+            }
+            TransitionToNotifiedByVal::Dealloc => {
+                self.dealloc();
+            }
+            TransitionToNotifiedByVal::DoNothing => {}
+        }
+    }
+
+    /// This call notifies the task. It will not consume any ref-counts, but the
+    /// caller should hold a ref-count.  This will create a new Notified and
+    /// submit it if necessary.
+    pub(super) fn wake_by_ref(&self) {
+        use super::state::TransitionToNotifiedByRef;
+
+        match self.state().transition_to_notified_by_ref() {
+            TransitionToNotifiedByRef::Submit => {
+                // The transition above incremented the ref-count for a new task
+                // and the caller also holds a ref-count. The caller's ref-count
+                // ensures that the task is not destroyed even if the new task
+                // is dropped before `schedule` returns.
+                self.schedule();
+            }
+            TransitionToNotifiedByRef::DoNothing => {}
+        }
+    }
+
+    /// Remotely aborts the task.
+    ///
+    /// The caller should hold a ref-count, but we do not consume it.
+    ///
+    /// This is similar to `shutdown` except that it asks the runtime to perform
+    /// the shutdown. This is necessary to avoid the shutdown happening in the
+    /// wrong thread for non-Send tasks.
+    pub(super) fn remote_abort(&self) {
+        if self.state().transition_to_notified_and_cancel() {
+            // The transition has created a new ref-count, which we turn into
+            // a Notified and pass to the task.
+            //
+            // Since the caller holds a ref-count, the task cannot be destroyed
+            // before the call to `schedule` returns even if the call drops the
+            // `Notified` internally.
+            self.schedule();
+        }
+    }
+
+    /// Try to set the waker notified when the task is complete. Returns true if
+    /// the task has already completed. If this call returns false, then the
+    /// waker will not be notified.
+    pub(super) fn try_set_join_waker(&self, waker: &Waker) -> bool {
+        can_read_output(self.header(), self.trailer(), waker)
+    }
+}
+
 impl<T, S> Harness<T, S>
 where
     T: Future,
     S: Schedule,
 {
+    pub(super) fn drop_reference(self) {
+        if self.state().ref_dec() {
+            self.dealloc();
+        }
+    }
+
     /// Polls the inner future. A ref-count is consumed.
     ///
     /// All necessary state checks and transitions are performed.
@@ -185,13 +276,6 @@ where
         }
     }
 
-    /// Try to set the waker notified when the task is complete. Returns true if
-    /// the task has already completed. If this call returns false, then the
-    /// waker will not be notified.
-    pub(super) fn try_set_join_waker(self, waker: &Waker) -> bool {
-        can_read_output(self.header(), self.trailer(), waker)
-    }
-
     pub(super) fn drop_join_handle_slow(self) {
         // Try to unset `JOIN_INTEREST`. This must be done as a first step in
         // case the task concurrently completed.
@@ -212,92 +296,6 @@ where
 
         // Drop the `JoinHandle` reference, possibly deallocating the task
         self.drop_reference();
-    }
-
-    /// Remotely aborts the task.
-    ///
-    /// The caller should hold a ref-count, but we do not consume it.
-    ///
-    /// This is similar to `shutdown` except that it asks the runtime to perform
-    /// the shutdown. This is necessary to avoid the shutdown happening in the
-    /// wrong thread for non-Send tasks.
-    pub(super) fn remote_abort(self) {
-        if self.state().transition_to_notified_and_cancel() {
-            // The transition has created a new ref-count, which we turn into
-            // a Notified and pass to the task.
-            //
-            // Since the caller holds a ref-count, the task cannot be destroyed
-            // before the call to `schedule` returns even if the call drops the
-            // `Notified` internally.
-            self.core()
-                .scheduler
-                .schedule(Notified(self.get_new_task()));
-        }
-    }
-
-    // ===== waker behavior =====
-
-    /// This call consumes a ref-count and notifies the task. This will create a
-    /// new Notified and submit it if necessary.
-    ///
-    /// The caller does not need to hold a ref-count besides the one that was
-    /// passed to this call.
-    pub(super) fn wake_by_val(self) {
-        use super::state::TransitionToNotifiedByVal;
-
-        match self.state().transition_to_notified_by_val() {
-            TransitionToNotifiedByVal::Submit => {
-                // The caller has given us a ref-count, and the transition has
-                // created a new ref-count, so we now hold two. We turn the new
-                // ref-count Notified and pass it to the call to `schedule`.
-                //
-                // The old ref-count is retained for now to ensure that the task
-                // is not dropped during the call to `schedule` if the call
-                // drops the task it was given.
-                self.core()
-                    .scheduler
-                    .schedule(Notified(self.get_new_task()));
-
-                // Now that we have completed the call to schedule, we can
-                // release our ref-count.
-                self.drop_reference();
-            }
-            TransitionToNotifiedByVal::Dealloc => {
-                self.dealloc();
-            }
-            TransitionToNotifiedByVal::DoNothing => {}
-        }
-    }
-
-    /// This call notifies the task. It will not consume any ref-counts, but the
-    /// caller should hold a ref-count.  This will create a new Notified and
-    /// submit it if necessary.
-    pub(super) fn wake_by_ref(&self) {
-        use super::state::TransitionToNotifiedByRef;
-
-        match self.state().transition_to_notified_by_ref() {
-            TransitionToNotifiedByRef::Submit => {
-                // The transition above incremented the ref-count for a new task
-                // and the caller also holds a ref-count. The caller's ref-count
-                // ensures that the task is not destroyed even if the new task
-                // is dropped before `schedule` returns.
-                self.core()
-                    .scheduler
-                    .schedule(Notified(self.get_new_task()));
-            }
-            TransitionToNotifiedByRef::DoNothing => {}
-        }
-    }
-
-    pub(super) fn drop_reference(self) {
-        if self.state().ref_dec() {
-            self.dealloc();
-        }
-    }
-
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(super) fn id(&self) -> Option<&tracing::Id> {
-        self.header().id.as_ref()
     }
 
     // ====== internal ======
