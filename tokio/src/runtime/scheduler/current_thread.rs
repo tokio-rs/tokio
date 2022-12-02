@@ -3,7 +3,7 @@ use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
-use crate::runtime::{blocking, scheduler, Config};
+use crate::runtime::{blocking, context, scheduler, Config};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
@@ -267,6 +267,14 @@ impl Core {
     }
 }
 
+fn did_defer_tasks() -> bool {
+    context::with_defer(|deferred| !deferred.is_empty()).unwrap()
+}
+
+fn wake_deferred_tasks() {
+    context::with_defer(|deferred| deferred.wake());
+}
+
 // ===== impl Context =====
 
 impl Context {
@@ -299,6 +307,7 @@ impl Context {
 
             let (c, _) = self.enter(core, || {
                 driver.park(&handle.driver);
+                wake_deferred_tasks();
             });
 
             core = c;
@@ -324,6 +333,7 @@ impl Context {
         core.metrics.submit(&handle.shared.worker_metrics);
         let (mut core, _) = self.enter(core, || {
             driver.park_timeout(&handle.driver, Duration::from_millis(0));
+            wake_deferred_tasks();
         });
 
         core.driver = Some(driver);
@@ -557,7 +567,11 @@ impl CoreGuard<'_> {
                     let task = match entry {
                         Some(entry) => entry,
                         None => {
-                            core = context.park(core, handle);
+                            core = if did_defer_tasks() {
+                                context.park_yield(core, handle)
+                            } else {
+                                context.park(core, handle)
+                            };
 
                             // Try polling the `block_on` future next
                             continue 'outer;

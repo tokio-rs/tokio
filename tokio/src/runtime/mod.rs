@@ -228,6 +228,9 @@ cfg_rt! {
         pub use crate::util::rand::RngSeed;
     }
 
+    mod defer;
+    pub(crate) use defer::Defer;
+
     mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};
 
