@@ -383,6 +383,7 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
 
     let body = &input.block;
     let brace_token = input.block.brace_token;
+    let body_ident = quote! { body };
     let block_expr = quote_spanned! {last_stmt_end_span=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
         {
@@ -390,12 +391,41 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
-                .block_on(body);
+                .block_on(#body_ident);
         }
     };
+
+    // For test functions pin the body to the stack and use `Pin<&mut dyn
+    // Future>` to reduce the amount of `Runtime::block_on` (and related
+    // functions) copies we generate during compilation due to the generic
+    // parameter `F` (the future to block on). This could have an impact on
+    // performance, but because it's only for testing it's unlikely to be very
+    // large.
+    //
+    // We don't do this for the main function as it should only be used once so
+    // there will be no benefit.
+    let body = if is_test {
+        let output_type = match &input.sig.output {
+            // For functions with no return value syn doesn't print anything,
+            // but that doesn't work as `Output` for our boxed `Future`, so
+            // default to `()` (the same type as the function output).
+            syn::ReturnType::Default => quote! { () },
+            syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
+        };
+        quote! {
+            let body = async #body;
+            #crate_ident::pin!(body);
+            let body: ::std::pin::Pin<&mut dyn ::std::future::Future<Output = #output_type>> = body;
+        }
+    } else {
+        quote! {
+            let body = async #body;
+        }
+    };
+
     input.block = syn::parse2(quote! {
         {
-            let body = async #body;
+            #body
             #block_expr
         }
     })
@@ -450,7 +480,7 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
     };
     let config = if let Some(attr) = input.attrs.iter().find(|attr| attr.path.is_ident("test")) {
         let msg = "second test attribute is supplied";
-        Err(syn::Error::new_spanned(&attr, msg))
+        Err(syn::Error::new_spanned(attr, msg))
     } else {
         AttributeArgs::parse_terminated
             .parse(args)

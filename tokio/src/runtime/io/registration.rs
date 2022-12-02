@@ -73,7 +73,7 @@ impl Registration {
         interest: Interest,
         handle: scheduler::Handle,
     ) -> io::Result<Registration> {
-        let shared = handle.io().add_source(io, interest)?;
+        let shared = handle.driver().io().add_source(io, interest)?;
 
         Ok(Registration { handle, shared })
     }
@@ -145,7 +145,7 @@ impl Registration {
         direction: Direction,
     ) -> Poll<io::Result<ReadyEvent>> {
         // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
         let ev = ready!(self.shared.poll_readiness(cx, direction));
 
         if self.handle().is_shutdown() {
@@ -199,7 +199,7 @@ impl Registration {
     }
 
     fn handle(&self) -> &Handle {
-        self.handle.io()
+        self.handle.driver().io()
     }
 }
 

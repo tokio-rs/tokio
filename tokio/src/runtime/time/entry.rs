@@ -497,7 +497,7 @@ impl TimerEntry {
     #[track_caller]
     pub(crate) fn new(handle: &scheduler::Handle, deadline: Instant) -> Self {
         // Panic if the time driver is not enabled
-        let _ = handle.time();
+        let _ = handle.driver().time();
 
         let driver = handle.clone();
 
@@ -577,7 +577,7 @@ impl TimerEntry {
     }
 
     pub(crate) fn driver(&self) -> &super::Handle {
-        self.driver.time()
+        self.driver.driver().time()
     }
 }
 

@@ -261,7 +261,7 @@ impl Sleep {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
-            let handle = &handle.time();
+            let handle = &handle.driver().time();
             let time_source = handle.time_source();
             let deadline_tick = time_source.deadline_to_tick(deadline);
             let duration = deadline_tick.saturating_sub(time_source.now());
@@ -392,11 +392,11 @@ impl Sleep {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let coop = ready!(trace_poll_op!(
             "poll_elapsed",
-            crate::coop::poll_proceed(cx),
+            crate::runtime::coop::poll_proceed(cx),
         ));
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         let result = me.entry.poll_elapsed(cx).map(move |r| {
             coop.made_progress();

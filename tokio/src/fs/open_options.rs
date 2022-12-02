@@ -542,7 +542,7 @@ feature! {
         /// # Examples
         ///
         /// ```no_run
-        /// use winapi::um::winbase::FILE_FLAG_DELETE_ON_CLOSE;
+        /// use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_DELETE_ON_CLOSE;
         /// use tokio::fs::OpenOptions;
         ///
         /// # #[tokio::main]
@@ -581,7 +581,7 @@ feature! {
         /// # Examples
         ///
         /// ```no_run
-        /// use winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN;
+        /// use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN;
         /// use tokio::fs::OpenOptions;
         ///
         /// # #[tokio::main]
@@ -624,7 +624,7 @@ feature! {
         /// # Examples
         ///
         /// ```no_run
-        /// use winapi::um::winbase::SECURITY_IDENTIFICATION;
+        /// use windows_sys::Win32::Storage::FileSystem::SECURITY_IDENTIFICATION;
         /// use tokio::fs::OpenOptions;
         ///
         /// # #[tokio::main]

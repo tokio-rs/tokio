@@ -5,7 +5,7 @@
 //! [`Timeout`]: struct@Timeout
 
 use crate::{
-    coop,
+    runtime::coop,
     time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
     util::trace,
 };
@@ -20,6 +20,10 @@ use std::task::{self, Poll};
 /// If the future completes before the duration has elapsed, then the completed
 /// value is returned. Otherwise, an error is returned and the future is
 /// canceled.
+///
+/// Note that the timeout is checked before polling the future, so if the future
+/// does not yield during execution then it is possible for the future to complete
+/// and exceed the timeout _without_ returning an error.
 ///
 /// This function returns a future whose return type is [`Result`]`<T,`[`Elapsed`]`>`, where `T` is the
 /// return type of the provided future.

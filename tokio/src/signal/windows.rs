@@ -3,7 +3,7 @@
 //! This module is only defined on Windows and allows receiving "ctrl-c",
 //! "ctrl-break", "ctrl-logoff", "ctrl-shutdown", and "ctrl-close"
 //! notifications. These events are listened for via the `SetConsoleCtrlHandler`
-//! function which receives the corresponding winapi event type.
+//! function which receives the corresponding windows_sys event type.
 
 #![cfg(any(windows, docsrs))]
 #![cfg_attr(docsrs, doc(cfg(all(windows, feature = "signal"))))]

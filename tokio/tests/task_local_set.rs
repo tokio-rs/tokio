@@ -500,11 +500,15 @@ async fn local_tasks_are_polled_after_tick_inner() {
                     tx.send(()).unwrap();
                 }
 
-                time::sleep(Duration::from_millis(20)).await;
-                let rx1 = RX1.load(SeqCst);
-                let rx2 = RX2.load(SeqCst);
-                assert_eq!(EXPECTED, rx1);
-                assert_eq!(EXPECTED, rx2);
+                loop {
+                    time::sleep(Duration::from_millis(20)).await;
+                    let rx1 = RX1.load(SeqCst);
+                    let rx2 = RX2.load(SeqCst);
+
+                    if rx1 == EXPECTED && rx2 == EXPECTED {
+                        break;
+                    }
+                }
             });
 
             while let Some(oneshot) = rx.recv().await {
@@ -566,6 +570,48 @@ async fn spawn_wakes_localset() {
     }
 }
 
+#[test]
+fn store_local_set_in_thread_local_with_runtime() {
+    use tokio::runtime::Runtime;
+
+    thread_local! {
+        static CURRENT: RtAndLocalSet = RtAndLocalSet::new();
+    }
+
+    struct RtAndLocalSet {
+        rt: Runtime,
+        local: LocalSet,
+    }
+
+    impl RtAndLocalSet {
+        fn new() -> RtAndLocalSet {
+            RtAndLocalSet {
+                rt: tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap(),
+                local: LocalSet::new(),
+            }
+        }
+
+        async fn inner_method(&self) {
+            self.local
+                .run_until(async move {
+                    tokio::task::spawn_local(async {});
+                })
+                .await
+        }
+
+        fn method(&self) {
+            self.rt.block_on(self.inner_method());
+        }
+    }
+
+    CURRENT.with(|f| {
+        f.method();
+    });
+}
+
 #[cfg(tokio_unstable)]
 mod unstable {
     use tokio::runtime::UnhandledPanic;
@@ -586,6 +632,56 @@ mod unstable {
                 futures::future::pending::<()>().await;
             })
             .await;
+    }
+
+    // This test compares that, when the task driving `run_until` has already
+    // consumed budget, the `run_until` future has less budget than a "spawned"
+    // task.
+    //
+    // "Budget" is a fuzzy metric as the Tokio runtime is able to change values
+    // internally. This is why the test uses indirection to test this.
+    #[tokio::test]
+    async fn run_until_does_not_get_own_budget() {
+        // Consume some budget
+        tokio::task::consume_budget().await;
+
+        LocalSet::new()
+            .run_until(async {
+                let spawned = tokio::spawn(async {
+                    let mut spawned_n = 0;
+
+                    {
+                        let mut spawned = tokio_test::task::spawn(async {
+                            loop {
+                                spawned_n += 1;
+                                tokio::task::consume_budget().await;
+                            }
+                        });
+                        // Poll once
+                        assert!(!spawned.poll().is_ready());
+                    }
+
+                    spawned_n
+                });
+
+                let mut run_until_n = 0;
+                {
+                    let mut run_until = tokio_test::task::spawn(async {
+                        loop {
+                            run_until_n += 1;
+                            tokio::task::consume_budget().await;
+                        }
+                    });
+                    // Poll once
+                    assert!(!run_until.poll().is_ready());
+                }
+
+                let spawned_n = spawned.await.unwrap();
+                assert_ne!(spawned_n, 0);
+                assert_ne!(run_until_n, 0);
+                assert!(spawned_n > run_until_n);
+            })
+            .await
     }
 }
 

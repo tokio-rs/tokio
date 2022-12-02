@@ -275,7 +275,7 @@ impl<T> SlabStorage<T> {
     fn remap_key(&self, key: &Key) -> Option<KeyInternal> {
         let key_map = &self.key_map;
         if self.compact_called {
-            key_map.get(&*key).copied()
+            key_map.get(key).copied()
         } else {
             Some((*key).into())
         }

@@ -4,7 +4,7 @@
 // don't need to worry much about dead code with certain feature permutations.
 #![cfg_attr(not(feature = "full"), allow(dead_code))]
 
-use crate::park::thread::{ParkThread, UnparkThread};
+use crate::runtime::park::{ParkThread, UnparkThread};
 
 use std::io;
 use std::time::Duration;
@@ -108,6 +108,12 @@ impl Handle {
             self.time
                 .as_ref()
                 .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
+        }
+
+        cfg_test_util! {
+            pub(crate) fn clock(&self) -> &Clock {
+                &self.clock
+            }
         }
     }
 }

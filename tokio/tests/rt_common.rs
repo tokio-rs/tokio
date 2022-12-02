@@ -9,6 +9,9 @@ macro_rules! rt_test {
         mod current_thread_scheduler {
             $($t)*
 
+            #[cfg(not(target_os="wasi"))]
+            const NUM_WORKERS: usize = 1;
+
             fn rt() -> Arc<Runtime> {
                 tokio::runtime::Builder::new_current_thread()
                     .enable_all()
@@ -21,6 +24,8 @@ macro_rules! rt_test {
         #[cfg(not(tokio_wasi))] // Wasi doesn't support threads
         mod threaded_scheduler_4_threads {
             $($t)*
+
+            const NUM_WORKERS: usize = 4;
 
             fn rt() -> Arc<Runtime> {
                 tokio::runtime::Builder::new_multi_thread()
@@ -35,6 +40,8 @@ macro_rules! rt_test {
         #[cfg(not(tokio_wasi))] // Wasi doesn't support threads
         mod threaded_scheduler_1_thread {
             $($t)*
+
+            const NUM_WORKERS: usize = 1;
 
             fn rt() -> Arc<Runtime> {
                 tokio::runtime::Builder::new_multi_thread()
@@ -243,14 +250,6 @@ rt_test! {
             tokio::spawn(async move {
                 let (done_tx, mut done_rx) = mpsc::unbounded_channel();
 
-                /*
-                for _ in 0..100 {
-                    tokio::spawn(async move { });
-                }
-
-                tokio::task::yield_now().await;
-                */
-
                 let mut txs = (0..ITER)
                     .map(|i| {
                         let (tx, rx) = oneshot::channel();
@@ -289,6 +288,31 @@ rt_test! {
         for i in 0..ITER {
             assert_eq!(i, out[i]);
         }
+    }
+
+    #[test]
+    fn spawn_one_from_block_on_called_on_handle() {
+        let rt = rt();
+        let (tx, rx) = oneshot::channel();
+
+        #[allow(clippy::async_yields_async)]
+        let handle = rt.handle().block_on(async {
+            tokio::spawn(async move {
+                tx.send("ZOMG").unwrap();
+                "DONE"
+            })
+        });
+
+        let out = rt.block_on(async {
+            let msg = assert_ok!(rx.await);
+
+            let out = assert_ok!(handle.await);
+            assert_eq!(out, "DONE");
+
+            msg
+        });
+
+        assert_eq!(out, "ZOMG");
     }
 
     #[test]
@@ -635,7 +659,12 @@ rt_test! {
         for _ in 0..100 {
             rt.spawn(async {
                 loop {
-                    tokio::task::yield_now().await;
+                    // Don't use Tokio's `yield_now()` to avoid special defer
+                    // logic.
+                    let _: () = futures::future::poll_fn(|cx| {
+                        cx.waker().wake_by_ref();
+                        std::task::Poll::Pending
+                    }).await;
                 }
             });
         }
@@ -660,6 +689,71 @@ rt_test! {
 
             assert_ok!(srv.await);
             assert_ok!(cli.await);
+        });
+    }
+
+    /// Tests that yielded tasks are not scheduled until **after** resource
+    /// drivers are polled.
+    ///
+    /// Note: we may have to delete this test as it is not necessarily reliable.
+    /// The OS does not guarantee when I/O events are delivered, so there may be
+    /// more yields than anticipated.
+    #[test]
+    #[cfg(not(target_os="wasi"))]
+    fn yield_defers_until_park() {
+        use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
+        use std::sync::Barrier;
+
+        let rt = rt();
+
+        let flag = Arc::new(AtomicBool::new(false));
+        let barrier = Arc::new(Barrier::new(NUM_WORKERS));
+
+        rt.block_on(async {
+            // Make sure other workers cannot steal tasks
+            #[allow(clippy::reversed_empty_ranges)]
+            for _ in 0..(NUM_WORKERS-1) {
+                let flag = flag.clone();
+                let barrier = barrier.clone();
+
+                tokio::spawn(async move {
+                    barrier.wait();
+
+                    while !flag.load(SeqCst) {
+                        std::thread::sleep(std::time::Duration::from_millis(1));
+                    }
+                });
+            }
+
+            barrier.wait();
+
+            tokio::spawn(async move {
+                // Create a TCP litener
+                let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let addr = listener.local_addr().unwrap();
+
+                tokio::join!(
+                    async {
+                        // Done blocking intentionally
+                        let _socket = std::net::TcpStream::connect(addr).unwrap();
+
+                        // Yield until connected
+                        let mut cnt = 0;
+                        while !flag.load(SeqCst){
+                            tokio::task::yield_now().await;
+                            cnt += 1;
+
+                            if cnt >= 10 {
+                                panic!("yielded too many times; TODO: delete this test?");
+                            }
+                        }
+                    },
+                    async {
+                        let _ = listener.accept().await.unwrap();
+                        flag.store(true, SeqCst);
+                    }
+                );
+            }).await.unwrap();
         });
     }
 
@@ -852,14 +946,13 @@ rt_test! {
     #[test]
     fn io_notify_while_shutting_down() {
         use tokio::net::UdpSocket;
-        use std::net::Ipv6Addr;
         use std::sync::Arc;
 
         for _ in 1..10 {
             let runtime = rt();
 
             runtime.block_on(async {
-                let socket = UdpSocket::bind((Ipv6Addr::LOCALHOST, 0)).await.unwrap();
+                let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
                 let addr = socket.local_addr().unwrap();
                 let send_half = Arc::new(socket);
                 let recv_half = send_half.clone();

@@ -24,8 +24,8 @@ httpdate = "1.0"
 once_cell = "1.5.2"
 rand = "0.8.3"
 
-[target.'cfg(windows)'.dev-dependencies.winapi]
-version = "0.3.8"
+[target.'cfg(windows)'.dev-dependencies.windows-sys]
+version = "0.42.0"
 
 [[example]]
 name = "chat"

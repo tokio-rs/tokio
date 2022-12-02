@@ -70,15 +70,15 @@ where
 async fn buf_writer() {
     let mut writer = BufWriter::with_capacity(2, Vec::new());
 
-    writer.write(&[0, 1]).await.unwrap();
+    assert_eq!(writer.write(&[0, 1]).await.unwrap(), 2);
     assert_eq!(writer.buffer(), []);
     assert_eq!(*writer.get_ref(), [0, 1]);
 
-    writer.write(&[2]).await.unwrap();
+    assert_eq!(writer.write(&[2]).await.unwrap(), 1);
     assert_eq!(writer.buffer(), [2]);
     assert_eq!(*writer.get_ref(), [0, 1]);
 
-    writer.write(&[3]).await.unwrap();
+    assert_eq!(writer.write(&[3]).await.unwrap(), 1);
     assert_eq!(writer.buffer(), [2, 3]);
     assert_eq!(*writer.get_ref(), [0, 1]);
 
@@ -86,20 +86,20 @@ async fn buf_writer() {
     assert_eq!(writer.buffer(), []);
     assert_eq!(*writer.get_ref(), [0, 1, 2, 3]);
 
-    writer.write(&[4]).await.unwrap();
-    writer.write(&[5]).await.unwrap();
+    assert_eq!(writer.write(&[4]).await.unwrap(), 1);
+    assert_eq!(writer.write(&[5]).await.unwrap(), 1);
     assert_eq!(writer.buffer(), [4, 5]);
     assert_eq!(*writer.get_ref(), [0, 1, 2, 3]);
 
-    writer.write(&[6]).await.unwrap();
+    assert_eq!(writer.write(&[6]).await.unwrap(), 1);
     assert_eq!(writer.buffer(), [6]);
     assert_eq!(*writer.get_ref(), [0, 1, 2, 3, 4, 5]);
 
-    writer.write(&[7, 8]).await.unwrap();
+    assert_eq!(writer.write(&[7, 8]).await.unwrap(), 2);
     assert_eq!(writer.buffer(), []);
     assert_eq!(*writer.get_ref(), [0, 1, 2, 3, 4, 5, 6, 7, 8]);
 
-    writer.write(&[9, 10, 11]).await.unwrap();
+    assert_eq!(writer.write(&[9, 10, 11]).await.unwrap(), 3);
     assert_eq!(writer.buffer(), []);
     assert_eq!(*writer.get_ref(), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
@@ -111,7 +111,7 @@ async fn buf_writer() {
 #[tokio::test]
 async fn buf_writer_inner_flushes() {
     let mut w = BufWriter::with_capacity(3, Vec::new());
-    w.write(&[0, 1]).await.unwrap();
+    assert_eq!(w.write(&[0, 1]).await.unwrap(), 2);
     assert_eq!(*w.get_ref(), []);
     w.flush().await.unwrap();
     let w = w.into_inner();
@@ -135,15 +135,15 @@ async fn buf_writer_seek() {
 async fn maybe_pending_buf_writer() {
     let mut writer = BufWriter::with_capacity(2, MaybePending::new(Vec::new()));
 
-    writer.write(&[0, 1]).await.unwrap();
+    assert_eq!(writer.write(&[0, 1]).await.unwrap(), 2);
     assert_eq!(writer.buffer(), []);
     assert_eq!(&writer.get_ref().inner, &[0, 1]);
 
-    writer.write(&[2]).await.unwrap();
+    assert_eq!(writer.write(&[2]).await.unwrap(), 1);
     assert_eq!(writer.buffer(), [2]);
     assert_eq!(&writer.get_ref().inner, &[0, 1]);
 
-    writer.write(&[3]).await.unwrap();
+    assert_eq!(writer.write(&[3]).await.unwrap(), 1);
     assert_eq!(writer.buffer(), [2, 3]);
     assert_eq!(&writer.get_ref().inner, &[0, 1]);
 
@@ -151,20 +151,20 @@ async fn maybe_pending_buf_writer() {
     assert_eq!(writer.buffer(), []);
     assert_eq!(&writer.get_ref().inner, &[0, 1, 2, 3]);
 
-    writer.write(&[4]).await.unwrap();
-    writer.write(&[5]).await.unwrap();
+    assert_eq!(writer.write(&[4]).await.unwrap(), 1);
+    assert_eq!(writer.write(&[5]).await.unwrap(), 1);
     assert_eq!(writer.buffer(), [4, 5]);
     assert_eq!(&writer.get_ref().inner, &[0, 1, 2, 3]);
 
-    writer.write(&[6]).await.unwrap();
+    assert_eq!(writer.write(&[6]).await.unwrap(), 1);
     assert_eq!(writer.buffer(), [6]);
     assert_eq!(writer.get_ref().inner, &[0, 1, 2, 3, 4, 5]);
 
-    writer.write(&[7, 8]).await.unwrap();
+    assert_eq!(writer.write(&[7, 8]).await.unwrap(), 2);
     assert_eq!(writer.buffer(), []);
     assert_eq!(writer.get_ref().inner, &[0, 1, 2, 3, 4, 5, 6, 7, 8]);
 
-    writer.write(&[9, 10, 11]).await.unwrap();
+    assert_eq!(writer.write(&[9, 10, 11]).await.unwrap(), 3);
     assert_eq!(writer.buffer(), []);
     assert_eq!(
         writer.get_ref().inner,
@@ -182,7 +182,7 @@ async fn maybe_pending_buf_writer() {
 #[tokio::test]
 async fn maybe_pending_buf_writer_inner_flushes() {
     let mut w = BufWriter::with_capacity(3, MaybePending::new(Vec::new()));
-    w.write(&[0, 1]).await.unwrap();
+    assert_eq!(w.write(&[0, 1]).await.unwrap(), 2);
     assert_eq!(&w.get_ref().inner, &[]);
     w.flush().await.unwrap();
     let w = w.into_inner().inner;

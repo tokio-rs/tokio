@@ -44,7 +44,7 @@ impl From<Kind> for Error {
 ///
 /// This error is returned when a timeout expires before the function was able
 /// to finish.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Elapsed(());
 
 #[derive(Debug)]

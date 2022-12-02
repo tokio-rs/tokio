@@ -56,17 +56,16 @@
 //! the inject queue indefinitely. This would be a ref-count cycle and a memory
 //! leak.
 
-use crate::coop;
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
-use crate::runtime::enter::EnterContext;
+use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{queue, Handle, Idle, Parker, Unparker};
 use crate::runtime::task::{Inject, OwnedTasks};
 use crate::runtime::{
-    blocking, driver, task, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics,
+    blocking, coop, driver, scheduler, task, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics,
 };
 use crate::util::atomic_cell::AtomicCell;
-use crate::util::{FastRand, RngSeedGenerator};
+use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
 use std::time::Duration;
@@ -277,17 +276,25 @@ where
     let mut had_entered = false;
 
     let setup_result = CURRENT.with(|maybe_cx| {
-        match (crate::runtime::enter::context(), maybe_cx.is_some()) {
-            (EnterContext::Entered { .. }, true) => {
+        match (
+            crate::runtime::context::current_enter_context(),
+            maybe_cx.is_some(),
+        ) {
+            (context::EnterRuntime::Entered { .. }, true) => {
                 // We are on a thread pool runtime thread, so we just need to
                 // set up blocking.
                 had_entered = true;
             }
-            (EnterContext::Entered { allow_blocking }, false) => {
+            (
+                context::EnterRuntime::Entered {
+                    allow_block_in_place,
+                },
+                false,
+            ) => {
                 // We are on an executor, but _not_ on the thread pool.  That is
                 // _only_ okay if we are in a thread pool runtime's block_on
                 // method:
-                if allow_blocking {
+                if allow_block_in_place {
                     had_entered = true;
                     return Ok(());
                 } else {
@@ -298,12 +305,12 @@ where
                     );
                 }
             }
-            (EnterContext::NotEntered, true) => {
+            (context::EnterRuntime::NotEntered, true) => {
                 // This is a nested call to block_in_place (we already exited).
                 // All the necessary setup has already been done.
                 return Ok(());
             }
-            (EnterContext::NotEntered, false) => {
+            (context::EnterRuntime::NotEntered, false) => {
                 // We are outside of the tokio runtime, so blocking is fine.
                 // We can also skip all of the thread pool blocking setup steps.
                 return Ok(());
@@ -346,7 +353,7 @@ where
         // constrained by task budgets.
         let _reset = Reset(coop::stop());
 
-        crate::runtime::enter::exit(f)
+        crate::runtime::context::exit_runtime(f)
     } else {
         f()
     }
@@ -361,6 +368,22 @@ impl Launch {
 }
 
 fn run(worker: Arc<Worker>) {
+    struct AbortOnPanic;
+
+    impl Drop for AbortOnPanic {
+        fn drop(&mut self) {
+            if std::thread::panicking() {
+                eprintln!("worker thread panicking; aborting process");
+                std::process::abort();
+            }
+        }
+    }
+
+    // Catching panics on worker threads in tests is quite tricky. Instead, when
+    // debug assertions are enabled, we just abort the process.
+    #[cfg(debug_assertions)]
+    let _abort_on_panic = AbortOnPanic;
+
     // Acquire a core. If this fails, then another thread is running this
     // worker and there is nothing further to do.
     let core = match worker.core.take() {
@@ -368,18 +391,24 @@ fn run(worker: Arc<Worker>) {
         None => return,
     };
 
+    let handle = scheduler::Handle::MultiThread(worker.handle.clone());
+    let _enter = crate::runtime::context::enter_runtime(&handle, true);
+
     // Set the worker context.
     let cx = Context {
         worker,
         core: RefCell::new(None),
     };
 
-    let _enter = crate::runtime::enter(true);
-
     CURRENT.set(&cx, || {
         // This should always be an error. It only returns a `Result` to support
         // using `?` to short circuit.
         assert!(cx.run(core).is_err());
+
+        // Check if there are any deferred tasks to notify. This can happen when
+        // the worker core is lost due to `block_in_place()` being called from
+        // within the task.
+        wake_deferred_tasks();
     });
 }
 
@@ -404,7 +433,11 @@ impl Context {
                 core = self.run_task(task, core)?;
             } else {
                 // Wait for work
-                core = self.park(core);
+                core = if did_defer_tasks() {
+                    self.park_timeout(core, Some(Duration::from_millis(0)))
+                } else {
+                    self.park(core)
+                };
             }
         }
 
@@ -526,6 +559,8 @@ impl Context {
         } else {
             park.park(&self.worker.handle.driver);
         }
+
+        wake_deferred_tasks();
 
         // Remove `core` from context
         core = self.core.borrow_mut().take().expect("core missing");
@@ -843,6 +878,14 @@ impl Handle {
     fn ptr_eq(&self, other: &Handle) -> bool {
         std::ptr::eq(self, other)
     }
+}
+
+fn did_defer_tasks() -> bool {
+    context::with_defer(|deferred| !deferred.is_empty()).unwrap()
+}
+
+fn wake_deferred_tasks() {
+    context::with_defer(|deferred| deferred.wake());
 }
 
 cfg_metrics! {

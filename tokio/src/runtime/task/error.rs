@@ -128,7 +128,7 @@ impl JoinError {
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn id(&self) -> Id {
-        self.id.clone()
+        self.id
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::runtime::scheduler;
+use crate::runtime::{context, scheduler, RuntimeFlavor};
 
 /// Handle to the runtime.
 ///
@@ -13,7 +13,6 @@ pub struct Handle {
     pub(crate) inner: scheduler::Handle,
 }
 
-use crate::runtime::context;
 use crate::runtime::task::JoinHandle;
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
@@ -30,7 +29,7 @@ use std::{error, fmt};
 #[derive(Debug)]
 #[must_use = "Creating and dropping a guard does nothing"]
 pub struct EnterGuard<'a> {
-    _guard: context::EnterGuard,
+    _guard: context::SetCurrentGuard,
     _handle_lifetime: PhantomData<&'a Handle>,
 }
 
@@ -45,7 +44,10 @@ impl Handle {
     /// [`tokio::spawn`]: fn@crate::spawn
     pub fn enter(&self) -> EnterGuard<'_> {
         EnterGuard {
-            _guard: context::enter(self.clone()),
+            _guard: match context::try_set_current(&self.inner) {
+                Some(guard) => guard,
+                None => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+            },
             _handle_lifetime: PhantomData,
         }
     }
@@ -107,7 +109,7 @@ impl Handle {
     ///
     /// Contrary to `current`, this never panics
     pub fn try_current() -> Result<Self, TryCurrentError> {
-        context::try_current()
+        context::try_current().map(|inner| Handle { inner })
     }
 
     /// Spawns a future onto the Tokio runtime.
@@ -254,14 +256,13 @@ impl Handle {
         let future =
             crate::util::trace::task(future, "block_on", None, super::task::Id::next().as_u64());
 
-        // Enter the **runtime** context. This configures spawning, the current I/O driver, ...
-        let _rt_enter = self.enter();
-
-        // Enter a **blocking** context. This prevents blocking from a runtime.
-        let mut blocking_enter = crate::runtime::enter(true);
+        // Enter the runtime context. This sets the current driver handles and
+        // prevents blocking an existing runtime.
+        let mut enter = context::enter_runtime(&self.inner, true);
 
         // Block on the future
-        blocking_enter
+        enter
+            .blocking
             .block_on(future)
             .expect("failed to park thread")
     }
@@ -276,6 +277,35 @@ impl Handle {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", _name, id.as_u64());
         self.inner.spawn(future, id)
+    }
+
+    /// Returns the flavor of the current `Runtime`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::{Handle, RuntimeFlavor};
+    ///
+    /// #[tokio::main(flavor = "current_thread")]
+    /// async fn main() {
+    ///   assert_eq!(RuntimeFlavor::CurrentThread, Handle::current().runtime_flavor());
+    /// }
+    /// ```
+    ///
+    /// ```
+    /// use tokio::runtime::{Handle, RuntimeFlavor};
+    ///
+    /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+    /// async fn main() {
+    ///   assert_eq!(RuntimeFlavor::MultiThread, Handle::current().runtime_flavor());
+    /// }
+    /// ```
+    pub fn runtime_flavor(&self) -> RuntimeFlavor {
+        match self.inner {
+            scheduler::Handle::CurrentThread(_) => RuntimeFlavor::CurrentThread,
+            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+            scheduler::Handle::MultiThread(_) => RuntimeFlavor::MultiThread,
+        }
     }
 }
 

@@ -39,39 +39,23 @@ impl Handle {
             Handle::Disabled => unreachable!(),
         }
     }
-
-    cfg_io_driver! {
-        #[track_caller]
-        pub(crate) fn io(&self) -> &crate::runtime::io::Handle {
-            self.driver().io()
-        }
-    }
-
-    cfg_time! {
-        #[track_caller]
-        pub(crate) fn time(&self) -> &crate::runtime::time::Handle {
-            self.driver().time()
-        }
-
-        cfg_test_util! {
-            pub(crate) fn clock(&self) -> &driver::Clock {
-                &self.driver().clock
-            }
-        }
-    }
 }
 
 cfg_rt! {
     use crate::future::Future;
     use crate::loom::sync::Arc;
     use crate::runtime::{blocking, task::Id};
+    use crate::runtime::context;
     use crate::task::JoinHandle;
     use crate::util::RngSeedGenerator;
 
     impl Handle {
         #[track_caller]
         pub(crate) fn current() -> Handle {
-            crate::runtime::context::current().inner
+            match context::try_current() {
+                Ok(handle) => handle,
+                Err(e) => panic!("{}", e),
+            }
         }
 
         pub(crate) fn blocking_spawner(&self) -> &blocking::Spawner {
@@ -113,6 +97,14 @@ cfg_rt! {
                 Handle::MultiThread(h) => &h.seed_generator,
             }
         }
+
+        pub(crate) fn as_current_thread(&self) -> &Arc<current_thread::Handle> {
+            match self {
+                Handle::CurrentThread(handle) => handle,
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                _ => panic!("not a CurrentThread handle"),
+            }
+        }
     }
 
     cfg_metrics! {
@@ -124,6 +116,22 @@ cfg_rt! {
                     Handle::CurrentThread(_) => 1,
                     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                     Handle::MultiThread(handle) => handle.num_workers(),
+                }
+            }
+
+            pub(crate) fn num_blocking_threads(&self) -> usize {
+                match self {
+                    Handle::CurrentThread(handle) => handle.num_blocking_threads(),
+                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    Handle::MultiThread(handle) => handle.num_blocking_threads(),
+                }
+            }
+
+            pub(crate) fn num_idle_blocking_threads(&self) -> usize {
+                match self {
+                    Handle::CurrentThread(handle) => handle.num_idle_blocking_threads(),
+                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    Handle::MultiThread(handle) => handle.num_idle_blocking_threads(),
                 }
             }
 
@@ -158,11 +166,25 @@ cfg_rt! {
                     Handle::MultiThread(handle) => handle.worker_local_queue_depth(worker),
                 }
             }
+
+            pub(crate) fn blocking_queue_depth(&self) -> usize {
+                match self {
+                    Handle::CurrentThread(handle) => handle.blocking_queue_depth(),
+                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    Handle::MultiThread(handle) => handle.blocking_queue_depth(),
+                }
+            }
         }
     }
 }
 
 cfg_not_rt! {
+    #[cfg(any(
+        feature = "net",
+        all(unix, feature = "process"),
+        all(unix, feature = "signal"),
+        feature = "time",
+    ))]
     impl Handle {
         #[track_caller]
         pub(crate) fn current() -> Handle {

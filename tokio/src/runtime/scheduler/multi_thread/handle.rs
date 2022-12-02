@@ -61,6 +61,14 @@ cfg_metrics! {
             self.shared.worker_metrics.len()
         }
 
+        pub(crate) fn num_blocking_threads(&self) -> usize {
+            self.blocking_spawner.num_threads()
+        }
+
+        pub(crate) fn num_idle_blocking_threads(&self) -> usize {
+            self.blocking_spawner.num_idle_threads()
+        }
+
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             &self.shared.scheduler_metrics
         }
@@ -75,6 +83,10 @@ cfg_metrics! {
 
         pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
             self.shared.worker_local_queue_depth(worker)
+        }
+
+        pub(crate) fn blocking_queue_depth(&self) -> usize {
+            self.blocking_spawner.queue_depth()
         }
     }
 }

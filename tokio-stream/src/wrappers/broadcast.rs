@@ -18,7 +18,7 @@ pub struct BroadcastStream<T> {
 }
 
 /// An error returned from the inner stream of a [`BroadcastStream`].
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BroadcastStreamRecvError {
     /// The receiver lagged too far behind. Attempting to receive again will
     /// return the oldest message still retained by the channel.

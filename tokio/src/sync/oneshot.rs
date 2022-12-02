@@ -227,7 +227,7 @@ pub struct Sender<T> {
 /// [`channel`](fn@channel) function.
 ///
 /// This channel has no `recv` method because the receiver itself implements the
-/// [`Future`] trait. To receive a value, `.await` the `Receiver` object directly.
+/// [`Future`] trait. To receive a `Result<T, `[`error::RecvError`]`>`, `.await` the `Receiver` object directly.
 ///
 /// The `poll` method on the `Future` trait is allowed to spuriously return
 /// `Poll::Pending` even if the message has been sent. If such a spurious
@@ -331,6 +331,8 @@ pub mod error {
     use std::fmt;
 
     /// Error returned by the `Future` implementation for `Receiver`.
+    ///
+    /// This error is returned by the receiver when the sender is dropped without sending.
     #[derive(Debug, Eq, PartialEq, Clone)]
     pub struct RecvError(pub(super) ());
 
@@ -407,21 +409,21 @@ impl Task {
         F: FnOnce(&Waker) -> R,
     {
         self.0.with(|ptr| {
-            let waker: *const Waker = (&*ptr).as_ptr();
+            let waker: *const Waker = (*ptr).as_ptr();
             f(&*waker)
         })
     }
 
     unsafe fn drop_task(&self) {
         self.0.with_mut(|ptr| {
-            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            let ptr: *mut Waker = (*ptr).as_mut_ptr();
             ptr.drop_in_place();
         });
     }
 
     unsafe fn set_task(&self, cx: &mut Context<'_>) {
         self.0.with_mut(|ptr| {
-            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            let ptr: *mut Waker = (*ptr).as_mut_ptr();
             ptr.write(cx.waker().clone());
         });
     }
@@ -785,7 +787,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         let inner = self.inner.as_ref().unwrap();
 
@@ -1124,7 +1126,7 @@ impl<T> Inner<T> {
 
     fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
         // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         // Load the state
         let mut state = State::load(&self.state, Acquire);

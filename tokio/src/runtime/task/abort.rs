@@ -1,4 +1,4 @@
-use crate::runtime::task::{Id, RawTask};
+use crate::runtime::task::{Header, RawTask};
 use std::fmt;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 
@@ -14,13 +14,12 @@ use std::panic::{RefUnwindSafe, UnwindSafe};
 /// [`JoinHandle`]: crate::task::JoinHandle
 #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub struct AbortHandle {
-    raw: Option<RawTask>,
-    id: Id,
+    raw: RawTask,
 }
 
 impl AbortHandle {
-    pub(super) fn new(raw: Option<RawTask>, id: Id) -> Self {
-        Self { raw, id }
+    pub(super) fn new(raw: RawTask) -> Self {
+        Self { raw }
     }
 
     /// Abort the task associated with the handle.
@@ -35,9 +34,7 @@ impl AbortHandle {
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     /// [`JoinHandle::abort`]: method@super::JoinHandle::abort
     pub fn abort(&self) {
-        if let Some(ref raw) = self.raw {
-            raw.remote_abort();
-        }
+        self.raw.remote_abort();
     }
 
     /// Checks if the task associated with this `AbortHandle` has finished.
@@ -47,12 +44,8 @@ impl AbortHandle {
     /// some time, and this method does not return `true` until it has
     /// completed.
     pub fn is_finished(&self) -> bool {
-        if let Some(raw) = self.raw {
-            let state = raw.header().state.load();
-            state.is_complete()
-        } else {
-            true
-        }
+        let state = self.raw.state().load();
+        state.is_complete()
     }
 
     /// Returns a [task ID] that uniquely identifies this task relative to other
@@ -67,7 +60,8 @@ impl AbortHandle {
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn id(&self) -> super::Id {
-        self.id.clone()
+        // Safety: The header pointer is valid.
+        unsafe { Header::get_id(self.raw.header_ptr()) }
     }
 }
 
@@ -79,16 +73,15 @@ impl RefUnwindSafe for AbortHandle {}
 
 impl fmt::Debug for AbortHandle {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("AbortHandle")
-            .field("id", &self.id)
-            .finish()
+        // Safety: The header pointer is valid.
+        let id_ptr = unsafe { Header::get_id_ptr(self.raw.header_ptr()) };
+        let id = unsafe { id_ptr.as_ref() };
+        fmt.debug_struct("AbortHandle").field("id", id).finish()
     }
 }
 
 impl Drop for AbortHandle {
     fn drop(&mut self) {
-        if let Some(raw) = self.raw.take() {
-            raw.drop_abort_handle();
-        }
+        self.raw.drop_abort_handle();
     }
 }

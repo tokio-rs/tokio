@@ -1,3 +1,5 @@
+use crate::runtime::context;
+
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -49,7 +51,17 @@ pub async fn yield_now() {
             }
 
             self.yielded = true;
-            cx.waker().wake_by_ref();
+
+            let defer = context::with_defer(|rt| {
+                rt.defer(cx.waker().clone());
+            });
+
+            if defer.is_none() {
+                //  Not currently in a runtime, just notify ourselves
+                //  immediately.
+                cx.waker().wake_by_ref();
+            }
+
             Poll::Pending
         }
     }

@@ -2,9 +2,9 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
-use crate::park::thread::CachedParkThread;
+use crate::runtime::park::CachedParkThread;
 use crate::sync::mpsc::error::TryRecvError;
-use crate::sync::mpsc::list;
+use crate::sync::mpsc::{bounded, list, unbounded};
 use crate::sync::notify::Notify;
 
 use std::fmt;
@@ -12,7 +12,6 @@ use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
-use std::usize;
 
 /// Channel sender.
 pub(crate) struct Tx<T, S> {
@@ -244,7 +243,7 @@ impl<T, S: Semaphore> Rx<T, S> {
         use super::block::Read::*;
 
         // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
@@ -382,29 +381,29 @@ impl<T, S> Drop for Chan<T, S> {
 
 // ===== impl Semaphore for (::Semaphore, capacity) =====
 
-impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
+impl Semaphore for bounded::Semaphore {
     fn add_permit(&self) {
-        self.0.release(1)
+        self.semaphore.release(1)
     }
 
     fn is_idle(&self) -> bool {
-        self.0.available_permits() == self.1
+        self.semaphore.available_permits() == self.bound
     }
 
     fn close(&self) {
-        self.0.close();
+        self.semaphore.close();
     }
 
     fn is_closed(&self) -> bool {
-        self.0.is_closed()
+        self.semaphore.is_closed()
     }
 }
 
 // ===== impl Semaphore for AtomicUsize =====
 
-impl Semaphore for AtomicUsize {
+impl Semaphore for unbounded::Semaphore {
     fn add_permit(&self) {
-        let prev = self.fetch_sub(2, Release);
+        let prev = self.0.fetch_sub(2, Release);
 
         if prev >> 1 == 0 {
             // Something went wrong
@@ -413,14 +412,14 @@ impl Semaphore for AtomicUsize {
     }
 
     fn is_idle(&self) -> bool {
-        self.load(Acquire) >> 1 == 0
+        self.0.load(Acquire) >> 1 == 0
     }
 
     fn close(&self) {
-        self.fetch_or(1, Release);
+        self.0.fetch_or(1, Release);
     }
 
     fn is_closed(&self) -> bool {
-        self.load(Acquire) & 1 == 1
+        self.0.load(Acquire) & 1 == 1
     }
 }

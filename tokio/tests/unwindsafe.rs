@@ -4,6 +4,11 @@
 use std::panic::{RefUnwindSafe, UnwindSafe};
 
 #[test]
+fn notify_is_unwind_safe() {
+    is_unwind_safe::<tokio::sync::Notify>();
+}
+
+#[test]
 fn join_handle_is_unwind_safe() {
     is_unwind_safe::<tokio::task::JoinHandle<()>>();
 }
