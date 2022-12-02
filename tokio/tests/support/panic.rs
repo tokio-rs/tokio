@@ -1,9 +1,8 @@
-use parking_lot::{const_mutex, Mutex};
 use std::panic;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub fn test_panic<Func: FnOnce() + panic::UnwindSafe>(func: Func) -> Option<String> {
-    static PANIC_MUTEX: Mutex<()> = const_mutex(());
+    static PANIC_MUTEX: Mutex<()> = Mutex::new(());
 
     {
         let _guard = PANIC_MUTEX.lock();
@@ -16,6 +15,7 @@ pub fn test_panic<Func: FnOnce() + panic::UnwindSafe>(func: Func) -> Option<Stri
                 let panic_location = panic_info.location().unwrap();
                 panic_file
                     .lock()
+                    .unwrap()
                     .clone_from(&Some(panic_location.file().to_string()));
             }));
         }
@@ -26,7 +26,7 @@ pub fn test_panic<Func: FnOnce() + panic::UnwindSafe>(func: Func) -> Option<Stri
         panic::set_hook(prev_hook);
 
         if result.is_err() {
-            panic_file.lock().clone()
+            panic_file.lock().unwrap().clone()
         } else {
             None
         }
