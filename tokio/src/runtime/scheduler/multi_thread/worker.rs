@@ -368,6 +368,22 @@ impl Launch {
 }
 
 fn run(worker: Arc<Worker>) {
+    struct AbortOnPanic;
+
+    impl Drop for AbortOnPanic {
+        fn drop(&mut self) {
+            if std::thread::panicking() {
+                eprintln!("worker thread panicking; aborting process");
+                std::process::abort();
+            }
+        }
+    }
+
+    // Catching panics on worker threads in tests is quite tricky. Instead, when
+    // debug assertions are enabled, we just abort the process.
+    #[cfg(debug_assertions)]
+    let _abort_on_panic = AbortOnPanic;
+
     // Acquire a core. If this fails, then another thread is running this
     // worker and there is nothing further to do.
     let core = match worker.core.take() {
@@ -388,6 +404,11 @@ fn run(worker: Arc<Worker>) {
         // This should always be an error. It only returns a `Result` to support
         // using `?` to short circuit.
         assert!(cx.run(core).is_err());
+
+        // Check if there are any deferred tasks to notify. This can happen when
+        // the worker core is lost due to `block_in_place()` being called from
+        // within the task.
+        wake_deferred_tasks();
     });
 }
 
