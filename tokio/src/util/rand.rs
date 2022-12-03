@@ -46,7 +46,7 @@ cfg_rt! {
     }
 }
 
-/// A seed for random numnber generation.
+/// A seed for random number generation.
 ///
 /// In order to make certain functions within a runtime deterministic, a seed
 /// can be specified at the time of creation.
