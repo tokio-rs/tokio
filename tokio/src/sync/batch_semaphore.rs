@@ -181,7 +181,10 @@ impl Semaphore {
     ///
     /// If the specified number of permits exceeds the maximum permit amount
     /// Then the value will get clamped to the maximum number of permits.
-    #[cfg(all(any(feature = "parking_lot", not(tokio_no_const_mutex_new)), not(all(loom, test))))]
+    #[cfg(all(
+        any(feature = "parking_lot", not(tokio_no_const_mutex_new)),
+        not(all(loom, test))
+    ))]
     pub(crate) const fn const_new(mut permits: usize) -> Self {
         // NOTE: assertions and by extension panics are still being worked on: https://github.com/rust-lang/rust/issues/74925
         // currently we just clamp the permit count when it exceeds the max
