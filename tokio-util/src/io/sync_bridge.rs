@@ -1,5 +1,7 @@
-use std::io::{Read, Write};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use std::io::{BufRead, Read, Write};
+use tokio::io::{
+    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
+};
 
 /// Use a [`tokio::io::AsyncRead`] synchronously as a [`std::io::Read`] or
 /// a [`tokio::io::AsyncWrite`] as a [`std::io::Write`].
@@ -7,6 +9,28 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 pub struct SyncIoBridge<T> {
     src: T,
     rt: tokio::runtime::Handle,
+}
+
+impl<T: AsyncBufRead + Unpin> BufRead for SyncIoBridge<T> {
+    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+        let src = &mut self.src;
+        self.rt.block_on(AsyncBufReadExt::fill_buf(src))
+    }
+
+    fn consume(&mut self, amt: usize) {
+        let src = &mut self.src;
+        AsyncBufReadExt::consume(src, amt)
+    }
+
+    fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>) -> std::io::Result<usize> {
+        let src = &mut self.src;
+        self.rt
+            .block_on(AsyncBufReadExt::read_until(src, byte, buf))
+    }
+    fn read_line(&mut self, buf: &mut String) -> std::io::Result<usize> {
+        let src = &mut self.src;
+        self.rt.block_on(AsyncBufReadExt::read_line(src, buf))
+    }
 }
 
 impl<T: AsyncRead + Unpin> Read for SyncIoBridge<T> {
