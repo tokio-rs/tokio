@@ -238,6 +238,12 @@ impl NamedPipeServer {
     /// can be used to concurrently read / write to the same pipe on a single
     /// task without splitting the pipe.
     ///
+    /// The function may complete without the pipe being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
+    /// [`Ready`] set, so you should always check the returned value and possibly
+    /// wait again if the requested states are not set.
+    ///
     /// # Examples
     ///
     /// Concurrently read and write to the pipe on the same task without
@@ -988,6 +994,12 @@ impl NamedPipeClient {
     /// This function is usually paired with `try_read()` or `try_write()`. It
     /// can be used to concurrently read / write to the same pipe on a single
     /// task without splitting the pipe.
+    ///
+    /// The function may complete without the pipe being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
+    /// [`Ready`] set, so you should always check the returned value and possibly
+    /// wait again if the requested states are not set.
     ///
     /// # Examples
     ///
