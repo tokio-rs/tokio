@@ -167,13 +167,15 @@ impl Decoder for Http {
                 httparse::Status::Partial => return Ok(None),
             };
 
-            let toslice = |a: &[u8]| {
-                if (a.as_ptr() as usize) > (src.as_ptr() as usize) {
-                    let start = a.as_ptr() as usize - src.as_ptr() as usize;
+            let toslice = |input: &[u8]| {
+                if (input.as_ptr() as usize) > (src.as_ptr() as usize) {
+                    let start = input.as_ptr() as usize - src.as_ptr() as usize;
                     assert!(start < src.len());
-                    (start, start + a.len())
+                    (start, start + input.len())
                 } else {
-                    (0, a.len())
+                    let ret = src.windows(input.len()).position(|window| window == input);
+                    assert!(ret.is_some());
+                    (ret.unwrap(), ret.unwrap() + input.len())
                 }
             };
 
