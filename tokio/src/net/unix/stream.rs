@@ -735,8 +735,8 @@ impl UnixStream {
     /// use std::error::Error;
     /// use std::io::Read;
     /// use tokio::net::UnixListener;
-    /// # use tokio::net::UnixStream;
-    /// # use tokio::io::AsyncWriteExt;
+    /// // use tokio::net::TcpStream;
+    /// // use tokio::io::AsyncWriteExt;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
@@ -745,16 +745,16 @@ impl UnixStream {
     ///
     ///     let mut data = [0u8; 12];
     ///     let listener = UnixListener::bind(&bind_path)?;
-    /// #   let handle = tokio::spawn(async {
-    /// #       let mut stream = UnixStream::connect(bind_path).await.unwrap();
-    /// #       stream.write(b"Hello world!").await.unwrap();
-    /// #   });
+    /// //  let handle = tokio::spawn(async {
+    /// //      let mut stream = UnixStream::connect(bind_path).await.unwrap();
+    /// //      stream.write(b"Hello world!").await.unwrap();
+    /// //  });
     ///     let (tokio_unix_stream, _) = listener.accept().await?;
     ///     let mut std_unix_stream = tokio_unix_stream.into_std()?;
-    /// #   handle.await.expect("The task being joined has panicked");
+    /// //  handle.await.expect("The task being joined has panicked");
     ///     std_unix_stream.set_nonblocking(false)?;
     ///     std_unix_stream.read_exact(&mut data)?;
-    /// #   assert_eq!(b"Hello world!", &data);
+    /// //  assert_eq!(b"Hello world!", &data);
     ///     Ok(())
     /// }
     /// ```

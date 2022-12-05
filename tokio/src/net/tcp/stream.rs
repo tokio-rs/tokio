@@ -210,23 +210,23 @@ impl TcpStream {
     /// use std::error::Error;
     /// use std::io::Read;
     /// use tokio::net::TcpListener;
-    /// # use tokio::net::TcpStream;
-    /// # use tokio::io::AsyncWriteExt;
+    /// // use tokio::net::TcpStream;
+    /// // use tokio::io::AsyncWriteExt;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let mut data = [0u8; 12];
     ///     let listener = TcpListener::bind("127.0.0.1:34254").await?;
-    /// #   let handle = tokio::spawn(async {
-    /// #       let mut stream: TcpStream = TcpStream::connect("127.0.0.1:34254").await.unwrap();
-    /// #       stream.write(b"Hello world!").await.unwrap();
-    /// #   });
+    /// //  let handle = tokio::spawn(async {
+    /// //      let mut stream: TcpStream = TcpStream::connect("127.0.0.1:34254").await.unwrap();
+    /// //      stream.write(b"Hello world!").await.unwrap();
+    /// //  });
     ///     let (tokio_tcp_stream, _) = listener.accept().await?;
     ///     let mut std_tcp_stream = tokio_tcp_stream.into_std()?;
-    /// #   handle.await.expect("The task being joined has panicked");
+    /// //  handle.await.expect("The task being joined has panicked");
     ///     std_tcp_stream.set_nonblocking(false)?;
     ///     std_tcp_stream.read_exact(&mut data)?;
-    /// #   assert_eq!(b"Hello world!", &data);
+    /// //  assert_eq!(b"Hello world!", &data);
     ///     Ok(())
     /// }
     /// ```
