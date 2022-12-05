@@ -551,10 +551,9 @@ impl<T> Slots<T> {
     fn index_for(&self, slot: *const Value<T>) -> usize {
         use std::mem;
 
-        let base = &self.slots[0] as *const _ as usize;
+        assert_ne!(self.slots.capacity(), 0, "page is unallocated");
 
-        assert!(base != 0, "page is unallocated");
-
+        let base = self.slots.as_ptr() as usize;
         let slot = slot as usize;
         let width = mem::size_of::<Slot<T>>();
 

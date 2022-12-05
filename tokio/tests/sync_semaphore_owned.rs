@@ -1,6 +1,6 @@
 #![cfg(feature = "sync")]
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use std::sync::Arc;
@@ -89,9 +89,34 @@ fn forget() {
     assert!(sem.try_acquire_owned().is_err());
 }
 
+#[test]
+fn merge() {
+    let sem = Arc::new(Semaphore::new(3));
+    {
+        let mut p1 = sem.clone().try_acquire_owned().unwrap();
+        assert_eq!(sem.available_permits(), 2);
+        let p2 = sem.clone().try_acquire_many_owned(2).unwrap();
+        assert_eq!(sem.available_permits(), 0);
+        p1.merge(p2);
+        assert_eq!(sem.available_permits(), 0);
+    }
+    assert_eq!(sem.available_permits(), 3);
+}
+
+#[test]
+#[cfg(not(tokio_wasm))] // No stack unwinding on wasm targets
+#[should_panic]
+fn merge_unrelated_permits() {
+    let sem1 = Arc::new(Semaphore::new(3));
+    let sem2 = Arc::new(Semaphore::new(3));
+    let mut p1 = sem1.try_acquire_owned().unwrap();
+    let p2 = sem2.try_acquire_owned().unwrap();
+    p1.merge(p2)
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
-async fn stresstest() {
+async fn stress_test() {
     let sem = Arc::new(Semaphore::new(5));
     let mut join_handles = Vec::new();
     for _ in 0..1000 {

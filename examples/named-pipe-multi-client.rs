@@ -6,7 +6,7 @@ async fn windows_main() -> io::Result<()> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
     use tokio::time;
-    use winapi::shared::winerror;
+    use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 
     const PIPE_NAME: &str = r"\\.\pipe\named-pipe-multi-client";
     const N: usize = 10;
@@ -59,7 +59,7 @@ async fn windows_main() -> io::Result<()> {
             let mut client = loop {
                 match ClientOptions::new().open(PIPE_NAME) {
                     Ok(client) => break client,
-                    Err(e) if e.raw_os_error() == Some(winerror::ERROR_PIPE_BUSY as i32) => (),
+                    Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
                     Err(e) => return Err(e),
                 }
 

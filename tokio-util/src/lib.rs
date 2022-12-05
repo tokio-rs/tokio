@@ -29,6 +29,7 @@ cfg_codec! {
 }
 
 cfg_net! {
+    #[cfg(not(target_arch = "wasm32"))]
     pub mod udp;
     pub mod net;
 }
@@ -115,6 +116,9 @@ mod util {
 
         let n = {
             let dst = buf.chunk_mut();
+
+            // Safety: `chunk_mut()` returns a `&mut UninitSlice`, and `UninitSlice` is a
+            // transparent wrapper around `[MaybeUninit<u8>]`.
             let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
             let mut buf = ReadBuf::uninit(dst);
             let ptr = buf.filled().as_ptr();

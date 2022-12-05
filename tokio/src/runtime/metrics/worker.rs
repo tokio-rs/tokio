@@ -1,7 +1,7 @@
 use crate::loom::sync::atomic::Ordering::Relaxed;
 use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
 
-/// Retreive runtime worker metrics.
+/// Retrieve runtime worker metrics.
 ///
 /// **Note**: This is an [unstable API][unstable]. The public API of this type
 /// may break in 1.x releases. See [the documentation on unstable

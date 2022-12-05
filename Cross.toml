@@ -1,0 +1,5 @@
+[build.env]
+passthrough = [
+    "RUSTFLAGS",
+    "RUST_BACKTRACE",
+]

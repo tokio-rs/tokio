@@ -10,9 +10,10 @@
 use std::time::Duration;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
-use tokio::task::spawn_blocking;
-use tokio::{fs, net, time};
+#[cfg(not(tokio_wasi))]
+use tokio::{net, time};
 
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
 macro_rules! multi_threaded_rt_test {
     ($($t:tt)*) => {
         mod threaded_scheduler_4_threads_only {
@@ -45,6 +46,7 @@ macro_rules! multi_threaded_rt_test {
     }
 }
 
+#[cfg(not(tokio_wasi))]
 macro_rules! rt_test {
     ($($t:tt)*) => {
         mod current_thread_scheduler {
@@ -124,7 +126,9 @@ fn unbounded_mpsc_channel() {
     })
 }
 
+#[cfg(not(tokio_wasi))] // Wasi doesn't support file operations or bind
 rt_test! {
+    use tokio::fs;
     // ==== spawn blocking futures ======
 
     #[test]
@@ -156,6 +160,7 @@ rt_test! {
 
     #[test]
     fn basic_spawn_blocking() {
+        use tokio::task::spawn_blocking;
         let rt = rt();
         let _enter = rt.enter();
 
@@ -171,6 +176,7 @@ rt_test! {
 
     #[test]
     fn spawn_blocking_after_shutdown_fails() {
+        use tokio::task::spawn_blocking;
         let rt = rt();
         let _enter = rt.enter();
         rt.shutdown_timeout(Duration::from_secs(1000));
@@ -187,6 +193,7 @@ rt_test! {
 
     #[test]
     fn spawn_blocking_started_before_shutdown_continues() {
+        use tokio::task::spawn_blocking;
         let rt = rt();
         let _enter = rt.enter();
 
@@ -412,6 +419,7 @@ rt_test! {
     }
 }
 
+#[cfg(not(tokio_wasi))]
 multi_threaded_rt_test! {
     #[cfg(unix)]
     #[test]
@@ -474,6 +482,7 @@ multi_threaded_rt_test! {
 // ==== utils ======
 
 /// Create a new multi threaded runtime
+#[cfg(not(tokio_wasi))]
 fn new_multi_thread(n: usize) -> Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(n)
@@ -496,37 +505,30 @@ where
     F: Fn(),
 {
     {
-        println!("current thread runtime");
-
         let rt = new_current_thread();
         let _enter = rt.enter();
         f();
 
-        println!("current thread runtime after shutdown");
         rt.shutdown_timeout(Duration::from_secs(1000));
         f();
     }
 
+    #[cfg(not(tokio_wasi))]
     {
-        println!("multi thread (1 thread) runtime");
-
         let rt = new_multi_thread(1);
         let _enter = rt.enter();
         f();
 
-        println!("multi thread runtime after shutdown");
         rt.shutdown_timeout(Duration::from_secs(1000));
         f();
     }
 
+    #[cfg(not(tokio_wasi))]
     {
-        println!("multi thread (4 threads) runtime");
-
         let rt = new_multi_thread(4);
         let _enter = rt.enter();
         f();
 
-        println!("multi thread runtime after shutdown");
         rt.shutdown_timeout(Duration::from_secs(1000));
         f();
     }

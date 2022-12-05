@@ -5,7 +5,7 @@
 //! [`Timeout`]: struct@Timeout
 
 use crate::{
-    coop,
+    runtime::coop,
     time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
     util::trace,
 };
@@ -21,7 +21,17 @@ use std::task::{self, Poll};
 /// value is returned. Otherwise, an error is returned and the future is
 /// canceled.
 ///
-/// # Cancelation
+/// Note that the timeout is checked before polling the future, so if the future
+/// does not yield during execution then it is possible for the future to complete
+/// and exceed the timeout _without_ returning an error.
+///
+/// This function returns a future whose return type is [`Result`]`<T,`[`Elapsed`]`>`, where `T` is the
+/// return type of the provided future.
+///
+/// [`Result`]: std::result::Result
+/// [`Elapsed`]: crate::time::error::Elapsed
+///
+/// # Cancellation
 ///
 /// Cancelling a timeout is done by dropping the future. No additional cleanup
 /// or other work is required.
@@ -68,9 +78,9 @@ use std::task::{self, Poll};
 /// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
 /// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 #[track_caller]
-pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
+pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F>
 where
-    T: Future,
+    F: Future,
 {
     let location = trace::caller_location();
 
@@ -87,7 +97,13 @@ where
 /// If the future completes before the instant is reached, then the completed
 /// value is returned. Otherwise, an error is returned.
 ///
-/// # Cancelation
+/// This function returns a future whose return type is [`Result`]`<T,`[`Elapsed`]`>`, where `T` is the
+/// return type of the provided future.
+///
+/// [`Result`]: std::result::Result
+/// [`Elapsed`]: crate::time::error::Elapsed
+///
+/// # Cancellation
 ///
 /// Cancelling a timeout is done by dropping the future. No additional cleanup
 /// or other work is required.
@@ -116,9 +132,9 @@ where
 /// }
 /// # }
 /// ```
-pub fn timeout_at<T>(deadline: Instant, future: T) -> Timeout<T>
+pub fn timeout_at<F>(deadline: Instant, future: F) -> Timeout<F>
 where
-    T: Future,
+    F: Future,
 {
     let delay = sleep_until(deadline);
 

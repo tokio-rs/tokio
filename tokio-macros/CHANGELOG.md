@@ -1,6 +1,32 @@
+# 1.8.2 (November 30th, 2022)
+
+- fix a regression introduced in 1.8.1 ([#5244])
+
+[#5244]: https://github.com/tokio-rs/tokio/pull/5244
+
+# 1.8.1 (November 29th, 2022)
+
+(yanked)
+
+- macros: Pin Futures in `#[tokio::test]` to stack ([#5205])
+- macros: Reduce usage of last statement spans in proc-macros ([#5092])
+- macros: Improve the documentation for `#[tokio::test]` ([#4761])
+
+[#5205]: https://github.com/tokio-rs/tokio/pull/5205
+[#5092]: https://github.com/tokio-rs/tokio/pull/5092
+[#4761]: https://github.com/tokio-rs/tokio/pull/4761
+
+# 1.8.0 (June 4th, 2022)
+
+- macros: always emit return statement ([#4636])
+- macros: support setting a custom crate name for `#[tokio::main]` and `#[tokio::test]` ([#4613])
+
+[#4613]: https://github.com/tokio-rs/tokio/pull/4613
+[#4636]: https://github.com/tokio-rs/tokio/pull/4636
+
 # 1.7.0 (December 15th, 2021)
 
-- macros: address remainging clippy::semicolon_if_nothing_returned warning ([#4252])
+- macros: address remaining `clippy::semicolon_if_nothing_returned` warning ([#4252])
 
 [#4252]: https://github.com/tokio-rs/tokio/pull/4252
 

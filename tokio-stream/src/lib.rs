@@ -78,7 +78,7 @@ pub mod wrappers;
 mod stream_ext;
 pub use stream_ext::{collect::FromStream, StreamExt};
 cfg_time! {
-    pub use stream_ext::timeout::Elapsed;
+    pub use stream_ext::timeout::{Elapsed, Timeout};
 }
 
 mod empty;

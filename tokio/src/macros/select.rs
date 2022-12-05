@@ -101,6 +101,7 @@
 ///  * [`tokio::sync::watch::Receiver::changed`](crate::sync::watch::Receiver::changed)
 ///  * [`tokio::net::TcpListener::accept`](crate::net::TcpListener::accept)
 ///  * [`tokio::net::UnixListener::accept`](crate::net::UnixListener::accept)
+///  * [`tokio::signal::unix::Signal::recv`](crate::signal::unix::Signal::recv)
 ///  * [`tokio::io::AsyncReadExt::read`](crate::io::AsyncReadExt::read) on any `AsyncRead`
 ///  * [`tokio::io::AsyncReadExt::read_buf`](crate::io::AsyncReadExt::read_buf) on any `AsyncRead`
 ///  * [`tokio::io::AsyncWriteExt::write`](crate::io::AsyncWriteExt::write) on any `AsyncWrite`
@@ -459,7 +460,17 @@ macro_rules! select {
         let mut output = {
             // Safety: Nothing must be moved out of `futures`. This is to
             // satisfy the requirement of `Pin::new_unchecked` called below.
+            //
+            // We can't use the `pin!` macro for this because `futures` is a
+            // tuple and the standard library provides no way to pin-project to
+            // the fields of a tuple.
             let mut futures = ( $( $fut , )+ );
+
+            // This assignment makes sure that the `poll_fn` closure only has a
+            // reference to the futures, instead of taking ownership of them.
+            // This mitigates the issue described in
+            // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
+            let mut futures = &mut futures;
 
             $crate::macros::support::poll_fn(|cx| {
                 // Track if any branch returns pending. If no branch completes
@@ -496,7 +507,7 @@ macro_rules! select {
 
                                 // Extract the future for this branch from the
                                 // tuple
-                                let ( $($skip,)* fut, .. ) = &mut futures;
+                                let ( $($skip,)* fut, .. ) = &mut *futures;
 
                                 // Safety: future is stored on the stack above
                                 // and never moved.

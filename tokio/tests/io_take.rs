@@ -1,10 +1,15 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support panic recovery
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{self, AsyncRead, AsyncReadExt, ReadBuf};
 use tokio_test::assert_ok;
+
+mod support {
+    pub(crate) mod leaked_buffers;
+}
+use support::leaked_buffers::LeakedBuffers;
 
 #[tokio::test]
 async fn take() {
@@ -34,17 +39,25 @@ async fn issue_4435() {
     assert_eq!(&buf, &b"ABhell\0\0"[..]);
 }
 
-struct BadReader;
+struct BadReader {
+    leaked_buffers: LeakedBuffers,
+}
+
+impl BadReader {
+    fn new() -> Self {
+        Self {
+            leaked_buffers: LeakedBuffers::new(),
+        }
+    }
+}
 
 impl AsyncRead for BadReader {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
         read_buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        let vec = vec![0; 10];
-
-        let mut buf = ReadBuf::new(vec.leak());
+        let mut buf = ReadBuf::new(unsafe { self.leaked_buffers.create(10) });
         buf.put_slice(&[123; 10]);
         *read_buf = buf;
 
@@ -57,5 +70,5 @@ impl AsyncRead for BadReader {
 async fn bad_reader_fails() {
     let mut buf = Vec::with_capacity(10);
 
-    BadReader.take(10).read_buf(&mut buf).await.unwrap();
+    BadReader::new().take(10).read_buf(&mut buf).await.unwrap();
 }

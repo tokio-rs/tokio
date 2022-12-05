@@ -207,6 +207,9 @@ pub enum MissedTickBehavior {
     /// # async fn main() {
     /// let mut interval = interval(Duration::from_millis(50));
     ///
+    /// // First tick resolves immediately after creation
+    /// interval.tick().await;
+    ///
     /// task_that_takes_200_millis().await;
     /// // The `Interval` has missed a tick
     ///
@@ -275,7 +278,7 @@ pub enum MissedTickBehavior {
     /// // 50ms after the call to `tick` up above. That is, in `tick`, when we
     /// // recognize that we missed a tick, we schedule the next tick to happen
     /// // 50ms (or whatever the `period` is) from right then, not from when
-    /// // were were *supposed* to tick
+    /// // were *supposed* to tick
     /// interval.tick().await;
     /// # }
     /// ```
@@ -420,6 +423,7 @@ impl Interval {
     ///     let mut interval = time::interval(Duration::from_millis(10));
     ///
     ///     interval.tick().await;
+    ///     // approximately 0ms have elapsed. The first tick completes immediately.
     ///     interval.tick().await;
     ///     interval.tick().await;
     ///

@@ -29,9 +29,7 @@ async fn echo() -> io::Result<()> {
     let server_socket = UnixDatagram::bind(server_path.clone())?;
 
     tokio::spawn(async move {
-        if let Err(e) = echo_server(server_socket).await {
-            eprintln!("Error in echo server: {}", e);
-        }
+        let _ = echo_server(server_socket).await;
     });
 
     {
@@ -55,9 +53,7 @@ async fn echo_from() -> io::Result<()> {
     let server_socket = UnixDatagram::bind(server_path.clone())?;
 
     tokio::spawn(async move {
-        if let Err(e) = echo_server(server_socket).await {
-            eprintln!("Error in echo server: {}", e);
-        }
+        let _ = echo_server(server_socket).await;
     });
 
     {
@@ -181,7 +177,7 @@ async fn send_recv_poll() -> std::io::Result<()> {
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
-    let _len = poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
+    poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
 
     assert_eq!(read.filled(), msg);
     Ok(())

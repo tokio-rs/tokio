@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi cannot run system commands
 
 use tokio::process::Command;
 use tokio_test::assert_ok;

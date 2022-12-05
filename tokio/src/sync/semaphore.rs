@@ -123,7 +123,14 @@ fn bounds() {
 }
 
 impl Semaphore {
+    /// The maximum number of permits which a semaphore can hold. It is `usize::MAX >>> 3`.
+    ///
+    /// Exceeding this limit typically results in a panic.
+    pub const MAX_PERMITS: usize = super::batch_semaphore::Semaphore::MAX_PERMITS;
+
     /// Creates a new semaphore with the initial number of permits.
+    ///
+    /// Panics if `permits` exceeds [`Semaphore::MAX_PERMITS`].
     #[track_caller]
     pub fn new(permits: usize) -> Self {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -186,7 +193,7 @@ impl Semaphore {
 
     /// Adds `n` new permits to the semaphore.
     ///
-    /// The maximum number of permits is `usize::MAX >> 3`, and this function will panic if the limit is exceeded.
+    /// The maximum number of permits is [`Semaphore::MAX_PERMITS`], and this function will panic if the limit is exceeded.
     pub fn add_permits(&self, n: usize) {
         self.ll_sem.release(n);
     }
@@ -620,6 +627,25 @@ impl<'a> SemaphorePermit<'a> {
     pub fn forget(mut self) {
         self.permits = 0;
     }
+
+    /// Merge two [`SemaphorePermit`] instances together, consuming `other`
+    /// without releasing the permits it holds.
+    ///
+    /// Permits held by both `self` and `other` are released when `self` drops.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if permits from different [`Semaphore`] instances
+    /// are merged.
+    #[track_caller]
+    pub fn merge(&mut self, mut other: Self) {
+        assert!(
+            std::ptr::eq(self.sem, other.sem),
+            "merging permits from different semaphore instances"
+        );
+        self.permits += other.permits;
+        other.permits = 0;
+    }
 }
 
 impl OwnedSemaphorePermit {
@@ -629,9 +655,28 @@ impl OwnedSemaphorePermit {
     pub fn forget(mut self) {
         self.permits = 0;
     }
+
+    /// Merge two [`OwnedSemaphorePermit`] instances together, consuming `other`
+    /// without releasing the permits it holds.
+    ///
+    /// Permits held by both `self` and `other` are released when `self` drops.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if permits from different [`Semaphore`] instances
+    /// are merged.
+    #[track_caller]
+    pub fn merge(&mut self, mut other: Self) {
+        assert!(
+            Arc::ptr_eq(&self.sem, &other.sem),
+            "merging permits from different semaphore instances"
+        );
+        self.permits += other.permits;
+        other.permits = 0;
+    }
 }
 
-impl<'a> Drop for SemaphorePermit<'_> {
+impl Drop for SemaphorePermit<'_> {
     fn drop(&mut self) {
         self.sem.add_permits(self.permits as usize);
     }

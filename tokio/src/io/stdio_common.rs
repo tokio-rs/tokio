@@ -42,7 +42,7 @@ where
         // for further code. Since `AsyncWrite` can always shrink
         // buffer at its discretion, excessive (i.e. in tests) shrinking
         // does not break correctness.
-        // 2. If buffer is small, it will not be shrinked.
+        // 2. If buffer is small, it will not be shrunk.
         // That's why, it's "textness" will not change, so we don't have
         // to fixup it.
         if cfg!(not(any(target_os = "windows", test))) || buf.len() <= crate::io::blocking::MAX_BUF
@@ -193,7 +193,7 @@ mod tests {
     fn test_pseudo_text() {
         // In this test we write a piece of binary data, whose beginning is
         // text though. We then validate that even in this corner case buffer
-        // was not shrinked too much.
+        // was not shrunk too much.
         let checked_count = super::MAGIC_CONST * super::MAX_BYTES_PER_CHAR;
         let mut data: Vec<u8> = str::repeat("a", checked_count).into();
         data.extend(std::iter::repeat(0b1010_1010).take(MAX_BUF - checked_count + 1));
@@ -212,7 +212,7 @@ mod tests {
             writer.write_history.iter().copied().sum::<usize>(),
             data.len()
         );
-        // Check that at most MAX_BYTES_PER_CHAR + 1 (i.e. 5) bytes were shrinked
+        // Check that at most MAX_BYTES_PER_CHAR + 1 (i.e. 5) bytes were shrunk
         // from the buffer: one because it was outside of MAX_BUF boundary, and
         // up to one "utf8 code point".
         assert!(data.len() - writer.write_history[0] <= super::MAX_BYTES_PER_CHAR + 1);

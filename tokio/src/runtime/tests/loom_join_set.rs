@@ -16,13 +16,13 @@ fn test_join_set() {
             assert_eq!(set.len(), 1);
             set.spawn(async { () });
             assert_eq!(set.len(), 2);
-            let () = set.join_one().await.unwrap().unwrap();
+            let () = set.join_next().await.unwrap().unwrap();
             assert_eq!(set.len(), 1);
             set.spawn(async { () });
             assert_eq!(set.len(), 2);
-            let () = set.join_one().await.unwrap().unwrap();
+            let () = set.join_next().await.unwrap().unwrap();
             assert_eq!(set.len(), 1);
-            let () = set.join_one().await.unwrap().unwrap();
+            let () = set.join_next().await.unwrap().unwrap();
             assert_eq!(set.len(), 0);
             set.spawn(async { () });
             assert_eq!(set.len(), 1);
@@ -60,16 +60,16 @@ fn abort_all_during_completion() {
                 set.spawn(async { () });
                 set.abort_all();
 
-                match set.join_one().await {
-                    Ok(Some(())) => complete_happened.store(true, SeqCst),
-                    Err(err) if err.is_cancelled() => cancel_happened.store(true, SeqCst),
-                    Err(err) => panic!("fail: {}", err),
-                    Ok(None) => {
+                match set.join_next().await {
+                    Some(Ok(())) => complete_happened.store(true, SeqCst),
+                    Some(Err(err)) if err.is_cancelled() => cancel_happened.store(true, SeqCst),
+                    Some(Err(err)) => panic!("fail: {}", err),
+                    None => {
                         unreachable!("Aborting the task does not remove it from the JoinSet.")
                     }
                 }
 
-                assert!(matches!(set.join_one().await, Ok(None)));
+                assert!(matches!(set.join_next().await, None));
             });
 
             drop(set);

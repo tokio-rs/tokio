@@ -1,6 +1,9 @@
 use crate::io::{Interest, PollEvented};
 use crate::net::tcp::TcpStream;
-use crate::net::{to_socket_addrs, ToSocketAddrs};
+
+cfg_not_wasi! {
+    use crate::net::{to_socket_addrs, ToSocketAddrs};
+}
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -55,68 +58,70 @@ cfg_net! {
 }
 
 impl TcpListener {
-    /// Creates a new TcpListener, which will be bound to the specified address.
-    ///
-    /// The returned listener is ready for accepting connections.
-    ///
-    /// Binding with a port number of 0 will request that the OS assigns a port
-    /// to this listener. The port allocated can be queried via the `local_addr`
-    /// method.
-    ///
-    /// The address type can be any implementor of the [`ToSocketAddrs`] trait.
-    /// If `addr` yields multiple addresses, bind will be attempted with each of
-    /// the addresses until one succeeds and returns the listener. If none of
-    /// the addresses succeed in creating a listener, the error returned from
-    /// the last attempt (the last address) is returned.
-    ///
-    /// This function sets the `SO_REUSEADDR` option on the socket.
-    ///
-    /// To configure the socket before binding, you can use the [`TcpSocket`]
-    /// type.
-    ///
-    /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
-    /// [`TcpSocket`]: struct@crate::net::TcpSocket
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpListener;
-    ///
-    /// use std::io;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let listener = TcpListener::bind("127.0.0.1:2345").await?;
-    ///
-    ///     // use the listener
-    ///
-    ///     # let _ = listener;
-    ///     Ok(())
-    /// }
-    /// ```
-    pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<TcpListener> {
-        let addrs = to_socket_addrs(addr).await?;
+    cfg_not_wasi! {
+        /// Creates a new TcpListener, which will be bound to the specified address.
+        ///
+        /// The returned listener is ready for accepting connections.
+        ///
+        /// Binding with a port number of 0 will request that the OS assigns a port
+        /// to this listener. The port allocated can be queried via the `local_addr`
+        /// method.
+        ///
+        /// The address type can be any implementor of the [`ToSocketAddrs`] trait.
+        /// If `addr` yields multiple addresses, bind will be attempted with each of
+        /// the addresses until one succeeds and returns the listener. If none of
+        /// the addresses succeed in creating a listener, the error returned from
+        /// the last attempt (the last address) is returned.
+        ///
+        /// This function sets the `SO_REUSEADDR` option on the socket.
+        ///
+        /// To configure the socket before binding, you can use the [`TcpSocket`]
+        /// type.
+        ///
+        /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+        /// [`TcpSocket`]: struct@crate::net::TcpSocket
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpListener;
+        ///
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     let listener = TcpListener::bind("127.0.0.1:2345").await?;
+        ///
+        ///     // use the listener
+        ///
+        ///     # let _ = listener;
+        ///     Ok(())
+        /// }
+        /// ```
+        pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<TcpListener> {
+            let addrs = to_socket_addrs(addr).await?;
 
-        let mut last_err = None;
+            let mut last_err = None;
 
-        for addr in addrs {
-            match TcpListener::bind_addr(addr) {
-                Ok(listener) => return Ok(listener),
-                Err(e) => last_err = Some(e),
+            for addr in addrs {
+                match TcpListener::bind_addr(addr) {
+                    Ok(listener) => return Ok(listener),
+                    Err(e) => last_err = Some(e),
+                }
             }
+
+            Err(last_err.unwrap_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "could not resolve to any address",
+                )
+            }))
         }
 
-        Err(last_err.unwrap_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "could not resolve to any address",
-            )
-        }))
-    }
-
-    fn bind_addr(addr: SocketAddr) -> io::Result<TcpListener> {
-        let listener = mio::net::TcpListener::bind(addr)?;
-        TcpListener::new(listener)
+        fn bind_addr(addr: SocketAddr) -> io::Result<TcpListener> {
+            let listener = mio::net::TcpListener::bind(addr)?;
+            TcpListener::new(listener)
+        }
     }
 
     /// Accepts a new incoming connection from this listener.
@@ -216,11 +221,13 @@ impl TcpListener {
     ///
     /// # Panics
     ///
-    /// This function panics if thread-local runtime is not set.
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[track_caller]
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
         let io = mio::net::TcpListener::from_std(listener);
         let io = PollEvented::new(io)?;
@@ -267,11 +274,22 @@ impl TcpListener {
                 .map(|io| io.into_raw_socket())
                 .map(|raw_socket| unsafe { std::net::TcpListener::from_raw_socket(raw_socket) })
         }
+
+        #[cfg(tokio_wasi)]
+        {
+            use std::os::wasi::io::{FromRawFd, IntoRawFd};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_fd())
+                .map(|raw_fd| unsafe { std::net::TcpListener::from_raw_fd(raw_fd) })
+        }
     }
 
-    pub(crate) fn new(listener: mio::net::TcpListener) -> io::Result<TcpListener> {
-        let io = PollEvented::new(listener)?;
-        Ok(TcpListener { io })
+    cfg_not_wasi! {
+        pub(crate) fn new(listener: mio::net::TcpListener) -> io::Result<TcpListener> {
+            let io = PollEvented::new(listener)?;
+            Ok(TcpListener { io })
+        }
     }
 
     /// Returns the local address that this listener is bound to.
@@ -380,6 +398,20 @@ mod sys {
     impl AsRawFd for TcpListener {
         fn as_raw_fd(&self) -> RawFd {
             self.io.as_raw_fd()
+        }
+    }
+}
+
+cfg_unstable! {
+    #[cfg(tokio_wasi)]
+    mod sys {
+        use super::TcpListener;
+        use std::os::wasi::prelude::*;
+
+        impl AsRawFd for TcpListener {
+            fn as_raw_fd(&self) -> RawFd {
+                self.io.as_raw_fd()
+            }
         }
     }
 }

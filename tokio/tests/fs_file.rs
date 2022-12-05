@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support file operations
 
 use std::io::prelude::*;
 use tempfile::NamedTempFile;
@@ -73,7 +73,7 @@ async fn coop() {
         let mut buf = [0; 1024];
 
         loop {
-            file.read(&mut buf).await.unwrap();
+            let _ = file.read(&mut buf).await.unwrap();
             file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
         }
     });

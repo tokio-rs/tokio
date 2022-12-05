@@ -1,12 +1,12 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(target_arch = "wasm32")]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(tokio_wasm_not_wasi))]
 use tokio::test as maybe_tokio_test;
 
 use tokio::sync::oneshot;
@@ -179,7 +179,7 @@ fn explicit_close_try_recv() {
 
 #[test]
 #[should_panic]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn close_try_recv_poll() {
     let (_tx, rx) = oneshot::channel::<i32>();
     let mut rx = task::spawn(rx);
@@ -208,6 +208,18 @@ fn try_recv_after_completion() {
     tx.send(17).unwrap();
 
     assert_eq!(17, rx.try_recv().unwrap());
+    assert_eq!(Err(TryRecvError::Closed), rx.try_recv());
+    rx.close();
+}
+
+#[test]
+fn try_recv_after_completion_await() {
+    let (tx, rx) = oneshot::channel::<i32>();
+    let mut rx = task::spawn(rx);
+
+    tx.send(17).unwrap();
+
+    assert_eq!(Ok(17), assert_ready!(rx.poll()));
     assert_eq!(Err(TryRecvError::Closed), rx.try_recv());
     rx.close();
 }

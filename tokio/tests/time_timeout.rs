@@ -17,6 +17,7 @@ async fn simultaneous_deadline_future_completion() {
     assert_ready_ok!(fut.poll());
 }
 
+#[cfg_attr(tokio_wasi, ignore = "FIXME: `fut.poll()` panics on Wasi")]
 #[tokio::test]
 async fn completed_future_past_deadline() {
     // Wrap it with a deadline

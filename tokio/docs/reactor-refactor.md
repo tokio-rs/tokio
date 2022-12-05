@@ -188,9 +188,9 @@ readiness, the driver's tick is packed into the atomic `usize`.
 The `ScheduledIo` readiness `AtomicUsize` is structured as:
 
 ```
-| reserved | generation |  driver tick | readinesss |
-|----------+------------+--------------+------------|
-|   1 bit  |   7 bits   +    8 bits    +   16 bits  |
+| reserved | generation |  driver tick | readiness |
+|----------+------------+--------------+-----------|
+|   1 bit  |   7 bits   +    8 bits    +  16 bits  |
 ```
 
 The `reserved` and `generation` components exist today.

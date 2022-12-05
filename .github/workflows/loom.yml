@@ -13,11 +13,14 @@ env:
   # Change to specific Rust release to pin
   rust_stable: stable
 
+permissions:
+  contents: read
+
 jobs:
   loom:
     name: loom
     # base_ref is null when it's not a pull request
-    if: contains(github.event.pull_request.labels.*.name, 'R-loom') || (github.base_ref == null)
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom') || (github.base_ref == null))
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -29,7 +32,7 @@ jobs:
           - loom_pool::group_d
           - time::driver
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: actions-rs/toolchain@v1
         with:
@@ -42,4 +45,5 @@ jobs:
         env:
           RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
           LOOM_MAX_PREEMPTIONS: 2
+          LOOM_MAX_BRANCHES: 10000
           SCOPE: ${{ matrix.scope }}

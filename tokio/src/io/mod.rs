@@ -1,5 +1,3 @@
-#![cfg_attr(loom, allow(dead_code, unreachable_pub))]
-
 //! Traits, helpers, and type definitions for asynchronous I/O functionality.
 //!
 //! This module is the asynchronous version of `std::io`. Primarily, it
@@ -180,6 +178,12 @@
 //! [`Sink`]: https://docs.rs/futures/0.3/futures/sink/trait.Sink.html
 //! [`Stream`]: https://docs.rs/futures/0.3/futures/stream/trait.Stream.html
 //! [`Write`]: std::io::Write
+
+#![cfg_attr(
+    not(all(feature = "rt", feature = "net")),
+    allow(dead_code, unused_imports)
+)]
+
 cfg_io_blocking! {
     pub(crate) mod blocking;
 }
@@ -205,15 +209,19 @@ pub use self::read_buf::ReadBuf;
 pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 
 cfg_io_driver_impl! {
-    pub(crate) mod driver;
+    pub(crate) mod interest;
+    pub(crate) mod ready;
 
     cfg_net! {
-        pub use driver::{Interest, Ready};
+        pub use interest::Interest;
+        pub use ready::Ready;
     }
 
+    #[cfg_attr(tokio_wasi, allow(unused_imports))]
     mod poll_evented;
 
     #[cfg(not(loom))]
+    #[cfg_attr(tokio_wasi, allow(unused_imports))]
     pub(crate) use poll_evented::PollEvented;
 }
 

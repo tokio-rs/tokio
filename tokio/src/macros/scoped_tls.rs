@@ -10,7 +10,7 @@ macro_rules! scoped_thread_local {
         $vis static $name: $crate::macros::scoped_tls::ScopedKey<$ty>
             = $crate::macros::scoped_tls::ScopedKey {
                 inner: {
-                    thread_local!(static FOO: ::std::cell::Cell<*const ()> = {
+                    tokio_thread_local!(static FOO: ::std::cell::Cell<*const ()> = const {
                         std::cell::Cell::new(::std::ptr::null())
                     });
                     &FOO

@@ -61,6 +61,7 @@ macro_rules! cfg_fs {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "fs")]
+            #[cfg(not(tokio_wasi))]
             #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
             $item
         )*
@@ -69,7 +70,11 @@ macro_rules! cfg_fs {
 
 macro_rules! cfg_io_blocking {
     ($($item:item)*) => {
-        $( #[cfg(any(feature = "io-std", feature = "fs"))] $item )*
+        $( #[cfg(any(
+                feature = "io-std",
+                feature = "fs",
+                all(windows, feature = "process"),
+        ))] $item )*
     }
 }
 
@@ -78,12 +83,12 @@ macro_rules! cfg_io_driver {
         $(
             #[cfg(any(
                 feature = "net",
-                feature = "process",
+                all(unix, feature = "process"),
                 all(unix, feature = "signal"),
             ))]
             #[cfg_attr(docsrs, doc(cfg(any(
                 feature = "net",
-                feature = "process",
+                all(unix, feature = "process"),
                 all(unix, feature = "signal"),
             ))))]
             $item
@@ -96,7 +101,7 @@ macro_rules! cfg_io_driver_impl {
         $(
             #[cfg(any(
                 feature = "net",
-                feature = "process",
+                all(unix, feature = "process"),
                 all(unix, feature = "signal"),
             ))]
             $item
@@ -109,7 +114,7 @@ macro_rules! cfg_not_io_driver {
         $(
             #[cfg(not(any(
                 feature = "net",
-                feature = "process",
+                all(unix, feature = "process"),
                 all(unix, feature = "signal"),
             )))]
             $item
@@ -195,9 +200,19 @@ macro_rules! cfg_not_metrics {
     }
 }
 
-macro_rules! cfg_not_rt_and_metrics {
+macro_rules! cfg_not_rt_and_metrics_and_net {
     ($($item:item)*) => {
-        $( #[cfg(not(all(feature = "rt", all(tokio_unstable, not(loom)))))] $item )*
+        $( #[cfg(not(all(feature = "net", feature = "rt", all(tokio_unstable, not(loom)))))]$item )*
+    }
+}
+
+macro_rules! cfg_net_or_process {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(feature = "net", feature = "process"))]
+            #[cfg_attr(docsrs, doc(cfg(any(feature = "net", feature = "process"))))]
+            $item
+        )*
     }
 }
 
@@ -237,6 +252,7 @@ macro_rules! cfg_process {
             #[cfg(feature = "process")]
             #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
+            #[cfg(not(tokio_wasi))]
             $item
         )*
     }
@@ -265,6 +281,7 @@ macro_rules! cfg_signal {
             #[cfg(feature = "signal")]
             #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
             #[cfg(not(loom))]
+            #[cfg(not(tokio_wasi))]
             $item
         )*
     }
@@ -277,6 +294,13 @@ macro_rules! cfg_signal_internal {
             #[cfg(not(loom))]
             $item
         )*
+    }
+}
+
+macro_rules! cfg_signal_internal_and_unix {
+    ($($item:item)*) => {
+        #[cfg(unix)]
+        cfg_signal_internal! { $($item)* }
     }
 }
 
@@ -324,7 +348,7 @@ macro_rules! cfg_not_rt {
 macro_rules! cfg_rt_multi_thread {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "rt-multi-thread")]
+            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
             #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
             $item
         )*
@@ -438,11 +462,13 @@ macro_rules! cfg_has_atomic_u64 {
     ($($item:item)*) => {
         $(
             #[cfg(not(any(
-                    target_arch = "arm",
-                    target_arch = "mips",
-                    target_arch = "powerpc",
-                    target_arch = "riscv32"
-                    )))]
+                target_arch = "arm",
+                target_arch = "mips",
+                target_arch = "powerpc",
+                target_arch = "riscv32",
+                tokio_wasm,
+                tokio_no_atomic_u64,
+            )))]
             $item
         )*
     }
@@ -452,11 +478,61 @@ macro_rules! cfg_not_has_atomic_u64 {
     ($($item:item)*) => {
         $(
             #[cfg(any(
-                    target_arch = "arm",
-                    target_arch = "mips",
-                    target_arch = "powerpc",
-                    target_arch = "riscv32"
-                    ))]
+                target_arch = "arm",
+                target_arch = "mips",
+                target_arch = "powerpc",
+                target_arch = "riscv32",
+                tokio_wasm,
+                tokio_no_atomic_u64,
+            ))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_has_const_mutex_new {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                not(all(loom, test)),
+                any(
+                    feature = "parking_lot",
+                    not(tokio_no_const_mutex_new)
+                )
+            ))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_has_const_mutex_new {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(
+                not(all(loom, test)),
+                any(
+                    feature = "parking_lot",
+                    not(tokio_no_const_mutex_new)
+                )
+            )))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_wasi {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(tokio_wasi))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_is_wasm_not_wasi {
+    ($($item:item)*) => {
+        $(
+            #[cfg(tokio_wasm_not_wasi)]
             $item
         )*
     }

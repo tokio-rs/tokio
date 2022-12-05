@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support bind
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
@@ -35,6 +35,7 @@ async fn connect_v4() {
 }
 
 #[tokio::test]
+#[cfg(not(tokio_no_ipv6))]
 async fn connect_v6() {
     let srv = assert_ok!(TcpListener::bind("[::1]:0").await);
     let addr = assert_ok!(srv.local_addr());

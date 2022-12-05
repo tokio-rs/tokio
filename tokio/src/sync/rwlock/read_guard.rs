@@ -12,6 +12,7 @@ use std::ops;
 ///
 /// [`read`]: method@crate::sync::RwLock::read
 /// [`RwLock`]: struct@crate::sync::RwLock
+#[must_use = "if unused the RwLock will immediately unlock"]
 pub struct RwLockReadGuard<'a, T: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) resource_span: tracing::Span,

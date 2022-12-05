@@ -9,6 +9,12 @@ use pin_project_lite::pin_project;
 
 pin_project! {
     /// Future for the [`try_next`](super::StreamExt::try_next) method.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. It only
+    /// holds onto a reference to the underlying stream,
+    /// so dropping it will never lose a value.
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct TryNext<'a, St: ?Sized> {

@@ -227,7 +227,15 @@ pub struct Sender<T> {
 /// [`channel`](fn@channel) function.
 ///
 /// This channel has no `recv` method because the receiver itself implements the
-/// [`Future`] trait. To receive a value, `.await` the `Receiver` object directly.
+/// [`Future`] trait. To receive a `Result<T, `[`error::RecvError`]`>`, `.await` the `Receiver` object directly.
+///
+/// The `poll` method on the `Future` trait is allowed to spuriously return
+/// `Poll::Pending` even if the message has been sent. If such a spurious
+/// failure happens, then the caller will be woken when the spurious failure has
+/// been resolved so that the caller can attempt to receive the message again.
+/// Note that receiving such a wakeup does not guarantee that the next call will
+/// succeed — it could fail with another spurious failure. (A spurious failure
+/// does not mean that the message is lost. It is just delayed.)
 ///
 /// [`Future`]: trait@std::future::Future
 ///
@@ -323,11 +331,13 @@ pub mod error {
     use std::fmt;
 
     /// Error returned by the `Future` implementation for `Receiver`.
-    #[derive(Debug, Eq, PartialEq)]
+    ///
+    /// This error is returned by the receiver when the sender is dropped without sending.
+    #[derive(Debug, Eq, PartialEq, Clone)]
     pub struct RecvError(pub(super) ());
 
     /// Error returned by the `try_recv` function on `Receiver`.
-    #[derive(Debug, Eq, PartialEq)]
+    #[derive(Debug, Eq, PartialEq, Clone)]
     pub enum TryRecvError {
         /// The send half of the channel has not yet sent a value.
         Empty,
@@ -399,21 +409,21 @@ impl Task {
         F: FnOnce(&Waker) -> R,
     {
         self.0.with(|ptr| {
-            let waker: *const Waker = (&*ptr).as_ptr();
+            let waker: *const Waker = (*ptr).as_ptr();
             f(&*waker)
         })
     }
 
     unsafe fn drop_task(&self) {
         self.0.with_mut(|ptr| {
-            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            let ptr: *mut Waker = (*ptr).as_mut_ptr();
             ptr.drop_in_place();
         });
     }
 
     unsafe fn set_task(&self, cx: &mut Context<'_>) {
         self.0.with_mut(|ptr| {
-            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            let ptr: *mut Waker = (*ptr).as_mut_ptr();
             ptr.write(cx.waker().clone());
         });
     }
@@ -777,7 +787,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         let inner = self.inner.as_ref().unwrap();
 
@@ -923,12 +933,16 @@ impl<T> Receiver<T> {
     /// This function is useful to call from outside the context of an
     /// asynchronous task.
     ///
+    /// Note that unlike the `poll` method, the `try_recv` method cannot fail
+    /// spuriously. Any send or close event that happens before this call to
+    /// `try_recv` will be correctly returned to the caller.
+    ///
     /// # Return
     ///
     /// - `Ok(T)` if a value is pending in the channel.
     /// - `Err(TryRecvError::Empty)` if no value has been sent yet.
     /// - `Err(TryRecvError::Closed)` if the sender has dropped without sending
-    ///   a value.
+    ///   a value, or if the message has already been received.
     ///
     /// # Examples
     ///
@@ -1040,6 +1054,7 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap();
     /// }
     /// ```
+    #[track_caller]
     #[cfg(feature = "sync")]
     pub fn blocking_recv(self) -> Result<T, RecvError> {
         crate::future::block_on(self)
@@ -1111,7 +1126,7 @@ impl<T> Inner<T> {
 
     fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
         // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         // Load the state
         let mut state = State::load(&self.state, Acquire);

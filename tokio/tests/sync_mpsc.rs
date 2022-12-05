@@ -2,21 +2,20 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(target_arch = "wasm32")]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::test as maybe_tokio_test;
-
+use std::fmt;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
+#[cfg(not(tokio_wasm_not_wasi))]
+use tokio::test as maybe_tokio_test;
 use tokio_test::*;
 
-use std::sync::Arc;
-
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(tokio_wasm))]
 mod support {
     pub(crate) mod mpsc_stream;
 }
@@ -88,7 +87,7 @@ async fn reserve_disarm() {
 }
 
 #[tokio::test]
-#[cfg(feature = "full")]
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 async fn send_recv_stream_with_buffer() {
     use tokio_stream::StreamExt;
 
@@ -155,7 +154,7 @@ async fn start_send_past_cap() {
 
 #[test]
 #[should_panic]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn buffer_gteq_one() {
     mpsc::channel::<i32>(0);
 }
@@ -192,7 +191,7 @@ async fn async_send_recv_unbounded() {
 }
 
 #[tokio::test]
-#[cfg(feature = "full")]
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 async fn send_recv_stream_unbounded() {
     use tokio_stream::StreamExt;
 
@@ -217,9 +216,9 @@ async fn no_t_bounds_buffer() {
     let (tx, mut rx) = mpsc::channel(100);
 
     // sender should be Debug even though T isn't Debug
-    println!("{:?}", tx);
+    is_debug(&tx);
     // same with Receiver
-    println!("{:?}", rx);
+    is_debug(&rx);
     // and sender should be Clone even though T isn't Clone
     assert!(tx.clone().try_send(NoImpls).is_ok());
 
@@ -233,9 +232,9 @@ async fn no_t_bounds_unbounded() {
     let (tx, mut rx) = mpsc::unbounded_channel();
 
     // sender should be Debug even though T isn't Debug
-    println!("{:?}", tx);
+    is_debug(&tx);
     // same with Receiver
-    println!("{:?}", rx);
+    is_debug(&rx);
     // and sender should be Clone even though T isn't Clone
     assert!(tx.clone().send(NoImpls).is_ok());
 
@@ -453,7 +452,7 @@ fn unconsumed_messages_are_dropped() {
 }
 
 #[test]
-#[cfg(feature = "full")]
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 fn blocking_recv() {
     let (tx, mut rx) = mpsc::channel::<u8>(1);
 
@@ -471,14 +470,14 @@ fn blocking_recv() {
 
 #[tokio::test]
 #[should_panic]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 async fn blocking_recv_async() {
     let (_tx, mut rx) = mpsc::channel::<()>(1);
     let _ = rx.blocking_recv();
 }
 
 #[test]
-#[cfg(feature = "full")]
+#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 fn blocking_send() {
     let (tx, mut rx) = mpsc::channel::<u8>(1);
 
@@ -496,7 +495,7 @@ fn blocking_send() {
 
 #[tokio::test]
 #[should_panic]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 async fn blocking_send_async() {
     let (tx, _rx) = mpsc::channel::<()>(1);
     let _ = tx.blocking_send(());
@@ -649,7 +648,7 @@ async fn recv_timeout() {
 
 #[test]
 #[should_panic = "there is no reactor running, must be called from the context of a Tokio 1.x runtime"]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn recv_timeout_panic() {
     use futures::future::FutureExt;
     use tokio::time::Duration;
@@ -657,3 +656,24 @@ fn recv_timeout_panic() {
     let (tx, _rx) = mpsc::channel(5);
     tx.send_timeout(10, Duration::from_secs(1)).now_or_never();
 }
+
+// Tests that channel `capacity` changes and `max_capacity` stays the same
+#[tokio::test]
+async fn test_tx_capacity() {
+    let (tx, _rx) = mpsc::channel::<()>(10);
+    // both capacities are same before
+    assert_eq!(tx.capacity(), 10);
+    assert_eq!(tx.max_capacity(), 10);
+
+    let _permit = tx.reserve().await.unwrap();
+    // after reserve, only capacity should drop by one
+    assert_eq!(tx.capacity(), 9);
+    assert_eq!(tx.max_capacity(), 10);
+
+    tx.send(()).await.unwrap();
+    // after send, capacity should drop by one again
+    assert_eq!(tx.capacity(), 8);
+    assert_eq!(tx.max_capacity(), 10);
+}
+
+fn is_debug<T: fmt::Debug>(_: &T) {}

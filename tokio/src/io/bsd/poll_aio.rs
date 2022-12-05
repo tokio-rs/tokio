@@ -1,6 +1,8 @@
 //! Use POSIX AIO futures with Tokio.
 
-use crate::io::driver::{Handle, Interest, ReadyEvent, Registration};
+use crate::io::interest::Interest;
+use crate::runtime::io::{ReadyEvent, Registration};
+use crate::runtime::scheduler;
 use mio::event::Source;
 use mio::Registry;
 use mio::Token;
@@ -117,7 +119,7 @@ impl<E: AioSource> Aio<E> {
 
     fn new_with_interest(io: E, interest: Interest) -> io::Result<Self> {
         let mut io = MioSource(io);
-        let handle = Handle::current();
+        let handle = scheduler::Handle::current();
         let registration = Registration::new_with_interest_and_handle(&mut io, interest, handle)?;
         Ok(Self { io, registration })
     }

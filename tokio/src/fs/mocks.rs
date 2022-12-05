@@ -81,7 +81,7 @@ impl Write for &'_ MockFile {
     }
 }
 
-thread_local! {
+tokio_thread_local! {
     static QUEUE: RefCell<VecDeque<Box<dyn FnOnce() + Send>>> = RefCell::new(VecDeque::new())
 }
 

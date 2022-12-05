@@ -15,29 +15,31 @@
 //! `RegisterWaitForSingleObject` and then wait on the other end of the oneshot
 //! from then on out.
 
-use crate::io::PollEvented;
+use crate::io::{blocking::Blocking, AsyncRead, AsyncWrite, ReadBuf};
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::sync::oneshot;
 
-use mio::windows::NamedPipe;
 use std::fmt;
+use std::fs::File as StdFile;
 use std::future::Future;
 use std::io;
-use std::os::windows::prelude::{AsRawHandle, FromRawHandle, IntoRawHandle, RawHandle};
+use std::os::windows::prelude::{AsRawHandle, IntoRawHandle, RawHandle};
 use std::pin::Pin;
 use std::process::Stdio;
 use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
-use std::ptr;
-use std::task::Context;
-use std::task::Poll;
-use winapi::shared::minwindef::{DWORD, FALSE};
-use winapi::um::handleapi::{DuplicateHandle, INVALID_HANDLE_VALUE};
-use winapi::um::processthreadsapi::GetCurrentProcess;
-use winapi::um::threadpoollegacyapiset::UnregisterWaitEx;
-use winapi::um::winbase::{RegisterWaitForSingleObject, INFINITE};
-use winapi::um::winnt::{
-    BOOLEAN, DUPLICATE_SAME_ACCESS, HANDLE, PVOID, WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE,
+use std::sync::Arc;
+use std::task::{Context, Poll};
+
+use windows_sys::{
+    Win32::Foundation::{
+        DuplicateHandle, BOOLEAN, DUPLICATE_SAME_ACCESS, HANDLE, INVALID_HANDLE_VALUE,
+    },
+    Win32::System::Threading::{
+        GetCurrentProcess, RegisterWaitForSingleObject, UnregisterWaitEx, WT_EXECUTEINWAITTHREAD,
+        WT_EXECUTEONLYONCE,
+    },
+    Win32::System::WindowsProgramming::INFINITE,
 };
 
 #[must_use = "futures do nothing unless polled"]
@@ -119,11 +121,11 @@ impl Future for Child {
             }
             let (tx, rx) = oneshot::channel();
             let ptr = Box::into_raw(Box::new(Some(tx)));
-            let mut wait_object = ptr::null_mut();
+            let mut wait_object = 0;
             let rc = unsafe {
                 RegisterWaitForSingleObject(
                     &mut wait_object,
-                    inner.child.as_raw_handle(),
+                    inner.child.as_raw_handle() as _,
                     Some(callback),
                     ptr as *mut _,
                     INFINITE,
@@ -162,37 +164,106 @@ impl Drop for Waiting {
     }
 }
 
-unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
+unsafe extern "system" fn callback(ptr: *mut std::ffi::c_void, _timer_fired: BOOLEAN) {
     let complete = &mut *(ptr as *mut Option<oneshot::Sender<()>>);
     let _ = complete.take().unwrap().send(());
 }
 
-pub(crate) type ChildStdio = PollEvented<NamedPipe>;
+#[derive(Debug)]
+struct ArcFile(Arc<StdFile>);
 
-pub(super) fn stdio<T>(io: T) -> io::Result<PollEvented<NamedPipe>>
+impl io::Read for ArcFile {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        (&*self.0).read(bytes)
+    }
+}
+
+impl io::Write for ArcFile {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        (&*self.0).write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        (&*self.0).flush()
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ChildStdio {
+    // Used for accessing the raw handle, even if the io version is busy
+    raw: Arc<StdFile>,
+    // For doing I/O operations asynchronously
+    io: Blocking<ArcFile>,
+}
+
+impl AsRawHandle for ChildStdio {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.raw.as_raw_handle()
+    }
+}
+
+impl AsyncRead for ChildStdio {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.io).poll_read(cx, buf)
+    }
+}
+
+impl AsyncWrite for ChildStdio {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.io).poll_write(cx, buf)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.io).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.io).poll_shutdown(cx)
+    }
+}
+
+pub(super) fn stdio<T>(io: T) -> io::Result<ChildStdio>
 where
     T: IntoRawHandle,
 {
-    let pipe = unsafe { NamedPipe::from_raw_handle(io.into_raw_handle()) };
-    PollEvented::new(pipe)
+    use std::os::windows::prelude::FromRawHandle;
+
+    let raw = Arc::new(unsafe { StdFile::from_raw_handle(io.into_raw_handle()) });
+    let io = Blocking::new(ArcFile(raw.clone()));
+    Ok(ChildStdio { raw, io })
 }
 
-pub(crate) fn convert_to_stdio(io: PollEvented<NamedPipe>) -> io::Result<Stdio> {
-    let named_pipe = io.into_inner()?;
+pub(crate) fn convert_to_stdio(child_stdio: ChildStdio) -> io::Result<Stdio> {
+    let ChildStdio { raw, io } = child_stdio;
+    drop(io); // Try to drop the Arc count here
 
-    // Mio does not implement `IntoRawHandle` for `NamedPipe`, so we'll manually
-    // duplicate the handle here...
+    Arc::try_unwrap(raw)
+        .or_else(|raw| duplicate_handle(&*raw))
+        .map(Stdio::from)
+}
+
+fn duplicate_handle<T: AsRawHandle>(io: &T) -> io::Result<StdFile> {
+    use std::os::windows::prelude::FromRawHandle;
+
     unsafe {
         let mut dup_handle = INVALID_HANDLE_VALUE;
         let cur_proc = GetCurrentProcess();
 
         let status = DuplicateHandle(
             cur_proc,
-            named_pipe.as_raw_handle(),
+            io.as_raw_handle() as _,
             cur_proc,
             &mut dup_handle,
-            0 as DWORD,
-            FALSE,
+            0,
+            0,
             DUPLICATE_SAME_ACCESS,
         );
 
@@ -200,6 +271,6 @@ pub(crate) fn convert_to_stdio(io: PollEvented<NamedPipe>) -> io::Result<Stdio> 
             return Err(io::Error::last_os_error());
         }
 
-        Ok(Stdio::from_raw_handle(dup_handle))
+        Ok(StdFile::from_raw_handle(dup_handle as _))
     }
 }

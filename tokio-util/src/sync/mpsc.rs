@@ -136,6 +136,7 @@ impl<T: Send + 'static> PollSender<T> {
     ///
     /// If `poll_reserve` was not successfully called prior to calling `send_item`, then this method
     /// will panic.
+    #[track_caller]
     pub fn send_item(&mut self, value: T) -> Result<(), PollSendError<T>> {
         let (result, next_state) = match self.take_state() {
             State::Idle(_) | State::Acquiring => {

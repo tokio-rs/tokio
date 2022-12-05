@@ -1,13 +1,15 @@
 #![cfg(feature = "macros")]
 #![allow(clippy::blacklisted_name)]
 
-use tokio::sync::oneshot;
+use std::sync::Arc;
+
+use tokio::sync::{oneshot, Semaphore};
 use tokio_test::{assert_pending, assert_ready, task};
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(tokio_wasm_not_wasi))]
 use tokio::test as maybe_tokio_test;
 
 #[maybe_tokio_test]
@@ -86,6 +88,7 @@ async fn err_abort_early() {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
 fn join_size() {
     use futures::future;
     use std::mem;
@@ -94,16 +97,89 @@ fn join_size() {
         let ready = future::ready(ok(0i32));
         tokio::try_join!(ready)
     };
-    assert_eq!(mem::size_of_val(&fut), 16);
+    assert_eq!(mem::size_of_val(&fut), 32);
 
     let fut = async {
         let ready1 = future::ready(ok(0i32));
         let ready2 = future::ready(ok(0i32));
         tokio::try_join!(ready1, ready2)
     };
-    assert_eq!(mem::size_of_val(&fut), 28);
+    assert_eq!(mem::size_of_val(&fut), 48);
 }
 
 fn ok<T>(val: T) -> Result<T, ()> {
     Ok(val)
+}
+
+async fn non_cooperative_task(permits: Arc<Semaphore>) -> Result<usize, String> {
+    let mut exceeded_budget = 0;
+
+    for _ in 0..5 {
+        // Another task should run after this task uses its whole budget
+        for _ in 0..128 {
+            let _permit = permits.clone().acquire_owned().await.unwrap();
+        }
+
+        exceeded_budget += 1;
+    }
+
+    Ok(exceeded_budget)
+}
+
+async fn poor_little_task(permits: Arc<Semaphore>) -> Result<usize, String> {
+    let mut how_many_times_i_got_to_run = 0;
+
+    for _ in 0..5 {
+        let _permit = permits.clone().acquire_owned().await.unwrap();
+
+        how_many_times_i_got_to_run += 1;
+    }
+
+    Ok(how_many_times_i_got_to_run)
+}
+
+#[tokio::test]
+async fn try_join_does_not_allow_tasks_to_starve() {
+    let permits = Arc::new(Semaphore::new(10));
+
+    // non_cooperative_task should yield after its budget is exceeded and then poor_little_task should run.
+    let result = tokio::try_join!(
+        non_cooperative_task(Arc::clone(&permits)),
+        poor_little_task(permits)
+    );
+
+    let (non_cooperative_result, little_task_result) = result.unwrap();
+
+    assert_eq!(5, non_cooperative_result);
+    assert_eq!(5, little_task_result);
+}
+
+#[tokio::test]
+async fn a_different_future_is_polled_first_every_time_poll_fn_is_polled() {
+    let poll_order = Arc::new(std::sync::Mutex::new(vec![]));
+
+    let fut = |x, poll_order: Arc<std::sync::Mutex<Vec<i32>>>| async move {
+        for _ in 0..4 {
+            {
+                let mut guard = poll_order.lock().unwrap();
+
+                guard.push(x);
+            }
+
+            tokio::task::yield_now().await;
+        }
+    };
+
+    tokio::join!(
+        fut(1, Arc::clone(&poll_order)),
+        fut(2, Arc::clone(&poll_order)),
+        fut(3, Arc::clone(&poll_order)),
+    );
+
+    // Each time the future created by join! is polled, it should start
+    // by polling a different future first.
+    assert_eq!(
+        vec![1, 2, 3, 2, 3, 1, 3, 1, 2, 1, 2, 3],
+        *poll_order.lock().unwrap()
+    );
 }

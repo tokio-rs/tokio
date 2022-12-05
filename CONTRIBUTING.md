@@ -131,12 +131,30 @@ cargo check --all-features
 cargo test --all-features
 ```
 
+Clippy must be run using the MSRV, so Tokio can avoid having to `#[allow]` new
+lints whose fixes would be incompatible with the current MSRV:
+
+<!--
+When updating this, also update:
+- .github/workflows/ci.yml
+- README.md
+- tokio/README.md
+- tokio/Cargo.toml
+- tokio-util/Cargo.toml
+- tokio-test/Cargo.toml
+- tokio-stream/Cargo.toml
+-->
+
+```
+cargo +1.49.0 clippy --all --tests --all-features
+```
+
 When building documentation normally, the markers that list the features
 required for various parts of Tokio are missing. To build the documentation
 correctly, use this command:
 
 ```
-RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+RUSTDOCFLAGS="--cfg docsrs" RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 ```
 
 To build documentation including Tokio's unstable features, it is necessary to
@@ -144,14 +162,8 @@ pass `--cfg tokio_unstable` to both RustDoc *and* rustc. To build the
 documentation for unstable features, use this command:
 
 ```
-RUSTDOCFLAGS="--cfg docsrs --cfg tokio_unstable" RUSTFLAGS="--cfg tokio_unstable" cargo +nightly doc --all-features
+RUSTDOCFLAGS="--cfg docsrs --cfg tokio_unstable" RUSTFLAGS="--cfg docsrs --cfg tokio_unstable" cargo +nightly doc --all-features
 ```
-
-There is currently a [bug in cargo] that means documentation cannot be built
-from the root of the workspace. If you `cd` into the `tokio` subdirectory the
-command shown above will work.
-
-[bug in cargo]: https://github.com/rust-lang/cargo/issues/9274
 
 The `cargo fmt` command does not work on the Tokio codebase. You can use the
 command below instead:
@@ -544,7 +556,7 @@ Tokio ≥1.0.0 comes with LTS guarantees:
 
 The goal of these guarantees is to provide stability to the ecosystem.
 
-## Mininum Supported Rust Version (MSRV)
+## Minimum Supported Rust Version (MSRV)
 
  * All Tokio ≥1.0.0 releases will support at least a 6-month old Rust
    compiler release.

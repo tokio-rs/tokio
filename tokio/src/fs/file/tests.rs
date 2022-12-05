@@ -955,3 +955,24 @@ fn partial_read_set_len_ok() {
     assert_eq!(n, FOO.len());
     assert_eq!(&buf[..n], FOO);
 }
+
+#[test]
+fn busy_file_seek_error() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+
+    let mut file = crate::io::BufReader::new(File::from_std(file));
+    {
+        let mut t = task::spawn(file.write(HELLO));
+        assert_ready_ok!(t.poll());
+    }
+
+    pool::run_one();
+
+    let mut t = task::spawn(file.seek(SeekFrom::Start(0)));
+    assert_ready_err!(t.poll());
+}

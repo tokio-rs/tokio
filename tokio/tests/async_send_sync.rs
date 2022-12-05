@@ -127,70 +127,111 @@ macro_rules! assert_value {
     };
 }
 
-assert_value!(tokio::fs::DirBuilder: Send & Sync & Unpin);
-assert_value!(tokio::fs::DirEntry: Send & Sync & Unpin);
-assert_value!(tokio::fs::File: Send & Sync & Unpin);
-assert_value!(tokio::fs::OpenOptions: Send & Sync & Unpin);
-assert_value!(tokio::fs::ReadDir: Send & Sync & Unpin);
+macro_rules! cfg_not_wasi {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(tokio_wasi))]
+            $item
+        )*
+    }
+}
 
-async_assert_fn!(tokio::fs::canonicalize(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::copy(&str, &str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::create_dir(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::create_dir_all(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::hard_link(&str, &str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::metadata(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::read(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::read_dir(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::read_link(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::read_to_string(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::remove_dir(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::remove_dir_all(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::remove_file(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::rename(&str, &str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::set_permissions(&str, std::fs::Permissions): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::symlink_metadata(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::write(&str, Vec<u8>): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::ReadDir::next_entry(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::OpenOptions::open(_, &str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::DirBuilder::create(_, &str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::DirEntry::metadata(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::DirEntry::file_type(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::File::open(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::File::create(&str): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::File::sync_all(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::File::sync_data(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::File::set_len(_, u64): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::File::metadata(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::File::try_clone(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::File::into_std(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::fs::File::set_permissions(_, std::fs::Permissions): Send & Sync & !Unpin);
+// Manually re-implementation of `async_assert_fn` for `poll_fn`. The macro
+// doesn't work for this particular case because constructing the closure
+// is too complicated.
+const _: fn() = || {
+    let pinned = std::marker::PhantomPinned;
+    let f = tokio::macros::support::poll_fn(move |_| {
+        // Use `pinned` to take ownership of it.
+        let _ = &pinned;
+        std::task::Poll::Pending::<()>
+    });
+    require_send(&f);
+    require_sync(&f);
+    AmbiguousIfUnpin::some_item(&f);
+};
+
+cfg_not_wasi! {
+    mod fs {
+        use super::*;
+        assert_value!(tokio::fs::DirBuilder: Send & Sync & Unpin);
+        assert_value!(tokio::fs::DirEntry: Send & Sync & Unpin);
+        assert_value!(tokio::fs::File: Send & Sync & Unpin);
+        assert_value!(tokio::fs::OpenOptions: Send & Sync & Unpin);
+        assert_value!(tokio::fs::ReadDir: Send & Sync & Unpin);
+
+        async_assert_fn!(tokio::fs::canonicalize(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::copy(&str, &str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::create_dir(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::create_dir_all(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::hard_link(&str, &str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::metadata(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::read(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::read_dir(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::read_link(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::read_to_string(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::remove_dir(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::remove_dir_all(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::remove_file(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::rename(&str, &str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::set_permissions(&str, std::fs::Permissions): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::symlink_metadata(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::write(&str, Vec<u8>): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::ReadDir::next_entry(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::OpenOptions::open(_, &str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::DirBuilder::create(_, &str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::DirEntry::metadata(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::DirEntry::file_type(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::File::open(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::File::create(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::File::sync_all(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::File::sync_data(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::File::set_len(_, u64): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::File::metadata(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::File::try_clone(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::File::into_std(_): Send & Sync & !Unpin);
+        async_assert_fn!(
+            tokio::fs::File::set_permissions(_, std::fs::Permissions): Send & Sync & !Unpin
+        );
+    }
+}
+
+cfg_not_wasi! {
+    assert_value!(tokio::net::TcpSocket: Send & Sync & Unpin);
+    async_assert_fn!(tokio::net::TcpListener::bind(SocketAddr): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::net::TcpStream::connect(SocketAddr): Send & Sync & !Unpin);
+}
 
 assert_value!(tokio::net::TcpListener: Send & Sync & Unpin);
-assert_value!(tokio::net::TcpSocket: Send & Sync & Unpin);
 assert_value!(tokio::net::TcpStream: Send & Sync & Unpin);
-assert_value!(tokio::net::UdpSocket: Send & Sync & Unpin);
 assert_value!(tokio::net::tcp::OwnedReadHalf: Send & Sync & Unpin);
 assert_value!(tokio::net::tcp::OwnedWriteHalf: Send & Sync & Unpin);
 assert_value!(tokio::net::tcp::ReadHalf<'_>: Send & Sync & Unpin);
 assert_value!(tokio::net::tcp::ReuniteError: Send & Sync & Unpin);
 assert_value!(tokio::net::tcp::WriteHalf<'_>: Send & Sync & Unpin);
 async_assert_fn!(tokio::net::TcpListener::accept(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::TcpListener::bind(SocketAddr): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::TcpStream::connect(SocketAddr): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::TcpStream::peek(_, &mut [u8]): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::TcpStream::readable(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::TcpStream::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::TcpStream::writable(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::UdpSocket::bind(SocketAddr): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::UdpSocket::connect(_, SocketAddr): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::UdpSocket::peek_from(_, &mut [u8]): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::UdpSocket::readable(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::UdpSocket::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::UdpSocket::recv(_, &mut [u8]): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::UdpSocket::recv_from(_, &mut [u8]): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::UdpSocket::send(_, &[u8]): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::UdpSocket::send_to(_, &[u8], SocketAddr): Send & Sync & !Unpin);
-async_assert_fn!(tokio::net::UdpSocket::writable(_): Send & Sync & !Unpin);
+
+// Wasi does not support UDP
+cfg_not_wasi! {
+    mod udp_socket {
+        use super::*;
+        assert_value!(tokio::net::UdpSocket: Send & Sync & Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::bind(SocketAddr): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::connect(_, SocketAddr): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::peek_from(_, &mut [u8]): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::readable(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::recv(_, &mut [u8]): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::recv_from(_, &mut [u8]): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::send(_, &[u8]): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::send_to(_, &[u8], SocketAddr): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::writable(_): Send & Sync & !Unpin);
+    }
+}
 async_assert_fn!(tokio::net::lookup_host(SocketAddr): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::tcp::ReadHalf::peek(_, &mut [u8]): Send & Sync & !Unpin);
 
@@ -242,16 +283,22 @@ mod windows_named_pipe {
     async_assert_fn!(NamedPipeServer::writable(_): Send & Sync & !Unpin);
 }
 
-assert_value!(tokio::process::Child: Send & Sync & Unpin);
-assert_value!(tokio::process::ChildStderr: Send & Sync & Unpin);
-assert_value!(tokio::process::ChildStdin: Send & Sync & Unpin);
-assert_value!(tokio::process::ChildStdout: Send & Sync & Unpin);
-assert_value!(tokio::process::Command: Send & Sync & Unpin);
-async_assert_fn!(tokio::process::Child::kill(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::process::Child::wait(_): Send & Sync & !Unpin);
-async_assert_fn!(tokio::process::Child::wait_with_output(_): Send & Sync & !Unpin);
+cfg_not_wasi! {
+    mod test_process {
+        use super::*;
+        assert_value!(tokio::process::Child: Send & Sync & Unpin);
+        assert_value!(tokio::process::ChildStderr: Send & Sync & Unpin);
+        assert_value!(tokio::process::ChildStdin: Send & Sync & Unpin);
+        assert_value!(tokio::process::ChildStdout: Send & Sync & Unpin);
+        assert_value!(tokio::process::Command: Send & Sync & Unpin);
+        async_assert_fn!(tokio::process::Child::kill(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::process::Child::wait(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::process::Child::wait_with_output(_): Send & Sync & !Unpin);
+    }
 
-async_assert_fn!(tokio::signal::ctrl_c(): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::signal::ctrl_c(): Send & Sync & !Unpin);
+}
+
 #[cfg(unix)]
 mod unix_signal {
     use super::*;
@@ -362,6 +409,14 @@ assert_value!(tokio::sync::watch::Ref<'_, YY>: !Send & Sync & Unpin);
 assert_value!(tokio::sync::watch::Sender<NN>: !Send & !Sync & Unpin);
 assert_value!(tokio::sync::watch::Sender<YN>: !Send & !Sync & Unpin);
 assert_value!(tokio::sync::watch::Sender<YY>: Send & Sync & Unpin);
+assert_value!(tokio::task::JoinError: Send & Sync & Unpin);
+assert_value!(tokio::task::JoinHandle<NN>: !Send & !Sync & Unpin);
+assert_value!(tokio::task::JoinHandle<YN>: Send & Sync & Unpin);
+assert_value!(tokio::task::JoinHandle<YY>: Send & Sync & Unpin);
+assert_value!(tokio::task::JoinSet<NN>: !Send & !Sync & Unpin);
+assert_value!(tokio::task::JoinSet<YN>: Send & Sync & Unpin);
+assert_value!(tokio::task::JoinSet<YY>: Send & Sync & Unpin);
+assert_value!(tokio::task::LocalSet: !Send & !Sync & Unpin);
 async_assert_fn!(tokio::sync::Barrier::wait(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::sync::Mutex<NN>::lock(_): !Send & !Sync & !Unpin);
 async_assert_fn!(tokio::sync::Mutex<NN>::lock_owned(_): !Send & !Sync & !Unpin);
@@ -434,6 +489,12 @@ async_assert_fn!(tokio::sync::watch::Receiver<YY>::changed(_): Send & Sync & !Un
 async_assert_fn!(tokio::sync::watch::Sender<NN>::closed(_): !Send & !Sync & !Unpin);
 async_assert_fn!(tokio::sync::watch::Sender<YN>::closed(_): !Send & !Sync & !Unpin);
 async_assert_fn!(tokio::sync::watch::Sender<YY>::closed(_): Send & Sync & !Unpin);
+async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::join_next(_): Send & Sync & !Unpin);
+async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::shutdown(_): Send & Sync & !Unpin);
+async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::join_next(_): !Send & !Sync & !Unpin);
+async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::shutdown(_): !Send & !Sync & !Unpin);
+async_assert_fn!(tokio::task::JoinSet<u32>::join_next(_): Send & Sync & !Unpin);
+async_assert_fn!(tokio::task::JoinSet<u32>::shutdown(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::task::LocalKey<Cell<u32>>::scope(_, Cell<u32>, BoxFuture<()>): !Send & !Sync & !Unpin);
 async_assert_fn!(tokio::task::LocalKey<Cell<u32>>::scope(_, Cell<u32>, BoxFutureSend<()>): Send & !Sync & !Unpin);
 async_assert_fn!(tokio::task::LocalKey<Cell<u32>>::scope(_, Cell<u32>, BoxFutureSync<()>): Send & !Sync & !Unpin);
@@ -447,24 +508,6 @@ async_assert_fn!(tokio::task::LocalSet::run_until(_, BoxFutureSync<()>): !Send &
 async_assert_fn!(tokio::task::unconstrained(BoxFuture<()>): !Send & !Sync & Unpin);
 async_assert_fn!(tokio::task::unconstrained(BoxFutureSend<()>): Send & !Sync & Unpin);
 async_assert_fn!(tokio::task::unconstrained(BoxFutureSync<()>): Send & Sync & Unpin);
-assert_value!(tokio::task::JoinError: Send & Sync & Unpin);
-assert_value!(tokio::task::JoinHandle<NN>: !Send & !Sync & Unpin);
-assert_value!(tokio::task::JoinHandle<YN>: Send & Sync & Unpin);
-assert_value!(tokio::task::JoinHandle<YY>: Send & Sync & Unpin);
-#[cfg(tokio_unstable)]
-mod unstable {
-    use super::*;
-    async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::join_one(_): Send & Sync & !Unpin);
-    async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::shutdown(_): Send & Sync & !Unpin);
-    async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::join_one(_): !Send & !Sync & !Unpin);
-    async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::shutdown(_): !Send & !Sync & !Unpin);
-    async_assert_fn!(tokio::task::JoinSet<u32>::join_one(_): Send & Sync & !Unpin);
-    async_assert_fn!(tokio::task::JoinSet<u32>::shutdown(_): Send & Sync & !Unpin);
-    assert_value!(tokio::task::JoinSet<YY>: Send & Sync & Unpin);
-    assert_value!(tokio::task::JoinSet<YN>: Send & Sync & Unpin);
-    assert_value!(tokio::task::JoinSet<NN>: !Send & !Sync & Unpin);
-    assert_value!(tokio::task::LocalSet: !Send & !Sync & Unpin);
-}
 
 assert_value!(tokio::runtime::Builder: Send & Sync & Unpin);
 assert_value!(tokio::runtime::EnterGuard<'_>: Send & Sync & Unpin);

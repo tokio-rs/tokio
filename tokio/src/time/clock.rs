@@ -33,7 +33,13 @@ cfg_test_util! {
 
     cfg_rt! {
         fn clock() -> Option<Clock> {
-            crate::runtime::context::clock()
+            use crate::runtime::Handle;
+
+            match Handle::try_current() {
+                Ok(handle) => Some(handle.inner.driver().clock().clone()),
+                Err(ref e) if e.is_missing_context() => None,
+                Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
+            }
         }
     }
 
@@ -96,6 +102,7 @@ cfg_test_util! {
     ///
     /// [`Sleep`]: crate::time::Sleep
     /// [`advance`]: crate::time::advance
+    #[track_caller]
     pub fn pause() {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.pause();
@@ -110,6 +117,7 @@ cfg_test_util! {
     ///
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
+    #[track_caller]
     pub fn resume() {
         let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         let mut inner = clock.inner.lock();
@@ -189,6 +197,7 @@ cfg_test_util! {
             clock
         }
 
+        #[track_caller]
         pub(crate) fn pause(&self) {
             let mut inner = self.inner.lock();
 
@@ -208,6 +217,7 @@ cfg_test_util! {
             inner.unfrozen.is_none()
         }
 
+        #[track_caller]
         pub(crate) fn advance(&self, duration: Duration) {
             let mut inner = self.inner.lock();
 

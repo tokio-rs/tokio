@@ -1,3 +1,37 @@
+# 0.1.11 (October 11, 2022)
+
+- time: allow `StreamExt::chunks_timeout` outside of a runtime ([#5036])
+
+[#5036]: https://github.com/tokio-rs/tokio/pull/5036
+
+# 0.1.10 (Sept 18, 2022)
+
+- time: add `StreamExt::chunks_timeout` ([#4695])
+- stream: add track_caller to public APIs ([#4786])
+
+[#4695]: https://github.com/tokio-rs/tokio/pull/4695
+[#4786]: https://github.com/tokio-rs/tokio/pull/4786
+
+# 0.1.9 (June 4, 2022)
+
+- deps: upgrade `tokio-util` dependency to `0.7.x` ([#3762])
+- stream: add `StreamExt::map_while` ([#4351])
+- stream: add `StreamExt::then` ([#4355])
+- stream: add cancel-safety docs to `StreamExt::next` and `try_next` ([#4715])
+- stream: expose `Elapsed` error ([#4502])
+- stream: expose `Timeout` ([#4601])
+- stream: implement `Extend` for `StreamMap` ([#4272])
+- sync: add `Clone` to `RecvError` types ([#4560])
+
+[#3762]: https://github.com/tokio-rs/tokio/pull/3762
+[#4272]: https://github.com/tokio-rs/tokio/pull/4272
+[#4351]: https://github.com/tokio-rs/tokio/pull/4351
+[#4355]: https://github.com/tokio-rs/tokio/pull/4355
+[#4502]: https://github.com/tokio-rs/tokio/pull/4502
+[#4560]: https://github.com/tokio-rs/tokio/pull/4560
+[#4601]: https://github.com/tokio-rs/tokio/pull/4601
+[#4715]: https://github.com/tokio-rs/tokio/pull/4715
+
 # 0.1.8 (October 29, 2021)
 
 - stream: add `From<Receiver<T>>` impl for receiver streams ([#4080])

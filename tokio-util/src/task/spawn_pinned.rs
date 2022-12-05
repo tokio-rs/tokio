@@ -9,7 +9,44 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 use tokio::task::{spawn_local, JoinHandle, LocalSet};
 
-/// A handle to a local pool, used for spawning `!Send` tasks.
+/// A cloneable handle to a local pool, used for spawning `!Send` tasks.
+///
+/// Internally the local pool uses a [`tokio::task::LocalSet`] for each worker thread
+/// in the pool. Consequently you can also use [`tokio::task::spawn_local`] (which will
+/// execute on the same thread) inside the Future you supply to the various spawn methods
+/// of `LocalPoolHandle`,
+///
+/// [`tokio::task::LocalSet`]: tokio::task::LocalSet
+/// [`tokio::task::spawn_local`]: tokio::task::spawn_local
+///
+/// # Examples
+///
+/// ```
+/// use std::rc::Rc;
+/// use tokio::{self, task };
+/// use tokio_util::task::LocalPoolHandle;
+///
+/// #[tokio::main(flavor = "current_thread")]
+/// async fn main() {
+///     let pool = LocalPoolHandle::new(5);
+///
+///     let output = pool.spawn_pinned(|| {
+///         // `data` is !Send + !Sync
+///         let data = Rc::new("local data");
+///         let data_clone = data.clone();
+///
+///         async move {
+///             task::spawn_local(async move {
+///                 println!("{}", data_clone);
+///             });
+///     
+///             data.to_string()
+///         }   
+///     }).await.unwrap();
+///     println!("output: {}", output);
+/// }
+/// ```
+///
 #[derive(Clone)]
 pub struct LocalPoolHandle {
     pool: Arc<LocalPool>,
@@ -20,7 +57,9 @@ impl LocalPoolHandle {
     /// pool via [`LocalPoolHandle::spawn_pinned`].
     ///
     /// # Panics
+    ///
     /// Panics if the pool size is less than one.
+    #[track_caller]
     pub fn new(pool_size: usize) -> LocalPoolHandle {
         assert!(pool_size > 0);
 
@@ -31,6 +70,22 @@ impl LocalPoolHandle {
         let pool = Arc::new(LocalPool { workers });
 
         LocalPoolHandle { pool }
+    }
+
+    /// Returns the number of threads of the Pool.
+    #[inline]
+    pub fn num_threads(&self) -> usize {
+        self.pool.workers.len()
+    }
+
+    /// Returns the number of tasks scheduled on each worker. The indices of the
+    /// worker threads correspond to the indices of the returned `Vec`.
+    pub fn get_task_loads_for_each_worker(&self) -> Vec<usize> {
+        self.pool
+            .workers
+            .iter()
+            .map(|worker| worker.task_count.load(Ordering::SeqCst))
+            .collect::<Vec<_>>()
     }
 
     /// Spawn a task onto a worker thread and pin it there so it can't be moved
@@ -69,7 +124,61 @@ impl LocalPoolHandle {
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
-        self.pool.spawn_pinned(create_task)
+        self.pool
+            .spawn_pinned(create_task, WorkerChoice::LeastBurdened)
+    }
+
+    /// Differs from `spawn_pinned` only in that you can choose a specific worker thread
+    /// of the pool, whereas `spawn_pinned` chooses the worker with the smallest
+    /// number of tasks scheduled.
+    ///
+    /// A worker thread is chosen by index. Indices are 0 based and the largest index
+    /// is given by `num_threads() - 1`
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the index is out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// This method can be used to spawn a task on all worker threads of the pool:
+    ///
+    /// ```
+    /// use tokio_util::task::LocalPoolHandle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     const NUM_WORKERS: usize = 3;
+    ///     let pool = LocalPoolHandle::new(NUM_WORKERS);
+    ///     let handles = (0..pool.num_threads())
+    ///         .map(|worker_idx| {
+    ///             pool.spawn_pinned_by_idx(
+    ///                 || {
+    ///                     async {
+    ///                         "test"
+    ///                     }
+    ///                 },
+    ///                 worker_idx,
+    ///             )
+    ///         })
+    ///         .collect::<Vec<_>>();
+    ///
+    ///     for handle in handles {
+    ///         handle.await.unwrap();
+    ///     }
+    /// }
+    /// ```
+    ///
+    #[track_caller]
+    pub fn spawn_pinned_by_idx<F, Fut>(&self, create_task: F, idx: usize) -> JoinHandle<Fut::Output>
+    where
+        F: FnOnce() -> Fut,
+        F: Send + 'static,
+        Fut: Future + 'static,
+        Fut::Output: Send + 'static,
+    {
+        self.pool
+            .spawn_pinned(create_task, WorkerChoice::ByIdx(idx))
     }
 }
 
@@ -79,13 +188,23 @@ impl Debug for LocalPoolHandle {
     }
 }
 
+enum WorkerChoice {
+    LeastBurdened,
+    ByIdx(usize),
+}
+
 struct LocalPool {
     workers: Vec<LocalWorkerHandle>,
 }
 
 impl LocalPool {
     /// Spawn a `?Send` future onto a worker
-    fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
+    #[track_caller]
+    fn spawn_pinned<F, Fut>(
+        &self,
+        create_task: F,
+        worker_choice: WorkerChoice,
+    ) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut,
         F: Send + 'static,
@@ -93,8 +212,10 @@ impl LocalPool {
         Fut::Output: Send + 'static,
     {
         let (sender, receiver) = oneshot::channel();
-
-        let (worker, job_guard) = self.find_and_incr_least_burdened_worker();
+        let (worker, job_guard) = match worker_choice {
+            WorkerChoice::LeastBurdened => self.find_and_incr_least_burdened_worker(),
+            WorkerChoice::ByIdx(idx) => self.find_worker_by_idx(idx),
+        };
         let worker_spawner = worker.spawner.clone();
 
         // Spawn a future onto the worker's runtime so we can immediately return
@@ -205,6 +326,14 @@ impl LocalPool {
                 return (worker, JobCountGuard(Arc::clone(&worker.task_count)));
             }
         }
+    }
+
+    #[track_caller]
+    fn find_worker_by_idx(&self, idx: usize) -> (&LocalWorkerHandle, JobCountGuard) {
+        let worker = &self.workers[idx];
+        worker.task_count.fetch_add(1, Ordering::SeqCst);
+
+        (worker, JobCountGuard(Arc::clone(&worker.task_count)))
     }
 }
 

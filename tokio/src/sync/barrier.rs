@@ -135,7 +135,7 @@ impl Barrier {
         // NOTE: we are taking a _synchronous_ lock here.
         // It is okay to do so because the critical section is fast and never yields, so it cannot
         // deadlock even if another future is concurrently holding the lock.
-        // It is _desireable_ to do so as synchronous Mutexes are, at least in theory, faster than
+        // It is _desirable_ to do so as synchronous Mutexes are, at least in theory, faster than
         // the asynchronous counter-parts, so we should use them where possible [citation needed].
         // NOTE: the extra scope here is so that the compiler doesn't think `state` is held across
         // a yield point, and thus marks the returned future as !Send.

@@ -1,7 +1,12 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support panic recovery
 
 use std::panic::{RefUnwindSafe, UnwindSafe};
+
+#[test]
+fn notify_is_unwind_safe() {
+    is_unwind_safe::<tokio::sync::Notify>();
+}
 
 #[test]
 fn join_handle_is_unwind_safe() {

@@ -61,6 +61,8 @@ cfg_time! {
     use tokio::time::Duration;
     mod throttle;
     use throttle::{throttle, Throttle};
+    mod chunks_timeout;
+    use chunks_timeout::ChunksTimeout;
 }
 
 /// An extension trait for the [`Stream`] trait that provides a variety of
@@ -113,6 +115,12 @@ pub trait StreamExt: Stream {
     /// pinning it to the stack using the `pin_mut!` macro from the `pin_utils`
     /// crate.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. The returned future only
+    /// holds onto a reference to the underlying stream,
+    /// so dropping it will never lose a value.
+    ///
     /// # Examples
     ///
     /// ```
@@ -148,6 +156,12 @@ pub trait StreamExt: Stream {
     /// but returns a [`Result<Option<T>, E>`](Result) rather than
     /// an [`Option<Result<T, E>>`](Option), making for easy use
     /// with the [`?`](std::ops::Try) operator.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. The returned future only
+    /// holds onto a reference to the underlying stream,
+    /// so dropping it will never lose a value.
     ///
     /// # Examples
     ///
@@ -968,6 +982,8 @@ pub trait StreamExt: Stream {
 
     /// Slows down a stream by enforcing a delay between items.
     ///
+    /// The underlying timer behind this utility has a granularity of one millisecond.
+    ///
     /// # Example
     ///
     /// Create a throttled stream.
@@ -993,6 +1009,63 @@ pub trait StreamExt: Stream {
     {
         throttle(duration, self)
     }
+
+    /// Batches the items in the given stream using a maximum duration and size for each batch.
+    ///
+    /// This stream returns the next batch of items in the following situations:
+    ///  1. The inner stream has returned at least `max_size` many items since the last batch.
+    ///  2. The time since the first item of a batch is greater than the given duration.
+    ///  3. The end of the stream is reached.
+    ///
+    /// The length of the returned vector is never empty or greater than the maximum size. Empty batches
+    /// will not be emitted if no items are received upstream.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `max_size` is zero
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use std::time::Duration;
+    /// use tokio::time;
+    /// use tokio_stream::{self as stream, StreamExt};
+    /// use futures::FutureExt;
+    ///
+    /// #[tokio::main]
+    /// # async fn _unused() {}
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// async fn main() {
+    ///     let iter = vec![1, 2, 3, 4].into_iter();
+    ///     let stream0 = stream::iter(iter);
+    ///
+    ///     let iter = vec![5].into_iter();
+    ///     let stream1 = stream::iter(iter)
+    ///          .then(move |n| time::sleep(Duration::from_secs(5)).map(move |_| n));
+    ///
+    ///     let chunk_stream = stream0
+    ///         .chain(stream1)
+    ///         .chunks_timeout(3, Duration::from_secs(2));
+    ///     tokio::pin!(chunk_stream);
+    ///
+    ///     // a full batch was received
+    ///     assert_eq!(chunk_stream.next().await, Some(vec![1,2,3]));
+    ///     // deadline was reached before max_size was reached
+    ///     assert_eq!(chunk_stream.next().await, Some(vec![4]));
+    ///     // last element in the stream
+    ///     assert_eq!(chunk_stream.next().await, Some(vec![5]));
+    /// }
+    /// ```
+    #[cfg(feature = "time")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    #[track_caller]
+    fn chunks_timeout(self, max_size: usize, duration: Duration) -> ChunksTimeout<Self>
+    where
+        Self: Sized,
+    {
+        assert!(max_size > 0, "`max_size` must be non-zero.");
+        ChunksTimeout::new(self, max_size, duration)
+    }
 }
 
 impl<St: ?Sized> StreamExt for St where St: Stream {}
@@ -1000,10 +1073,10 @@ impl<St: ?Sized> StreamExt for St where St: Stream {}
 /// Merge the size hints from two streams.
 fn merge_size_hints(
     (left_low, left_high): (usize, Option<usize>),
-    (right_low, right_hign): (usize, Option<usize>),
+    (right_low, right_high): (usize, Option<usize>),
 ) -> (usize, Option<usize>) {
     let low = left_low.saturating_add(right_low);
-    let high = match (left_high, right_hign) {
+    let high = match (left_high, right_high) {
         (Some(h1), Some(h2)) => h1.checked_add(h2),
         _ => None,
     };

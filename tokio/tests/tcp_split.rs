@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support bind
 
 use std::io::Result;
 use std::io::{Read, Write};
@@ -36,7 +36,7 @@ async fn split() -> Result<()> {
     assert_eq!(peek_len1, read_len);
     assert_eq!(&read_buf[..read_len], MSG);
 
-    write_half.write(MSG).await?;
+    assert_eq!(write_half.write(MSG).await?, MSG.len());
     handle.join().unwrap();
     Ok(())
 }

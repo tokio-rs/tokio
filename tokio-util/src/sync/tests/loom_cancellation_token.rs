@@ -25,6 +25,27 @@ fn cancel_token() {
 }
 
 #[test]
+fn cancel_token_owned() {
+    loom::model(|| {
+        let token = CancellationToken::new();
+        let token1 = token.clone();
+
+        let th1 = thread::spawn(move || {
+            block_on(async {
+                token1.cancelled_owned().await;
+            });
+        });
+
+        let th2 = thread::spawn(move || {
+            token.cancel();
+        });
+
+        assert_ok!(th1.join());
+        assert_ok!(th2.join());
+    });
+}
+
+#[test]
 fn cancel_with_child() {
     loom::model(|| {
         let token = CancellationToken::new();
@@ -80,7 +101,7 @@ fn drop_token_no_child() {
 }
 
 #[test]
-fn drop_token_with_childs() {
+fn drop_token_with_children() {
     loom::model(|| {
         let token1 = CancellationToken::new();
         let child_token1 = token1.child_token();

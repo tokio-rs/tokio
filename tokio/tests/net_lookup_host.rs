@@ -1,4 +1,4 @@
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support direct socket operations
 
 use tokio::net;
 use tokio_test::assert_ok;

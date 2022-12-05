@@ -1,9 +1,9 @@
 //! Synchronization primitives
 
 mod cancellation_token;
-pub use cancellation_token::{guard::DropGuard, CancellationToken, WaitForCancellationFuture};
-
-mod intrusive_double_linked_list;
+pub use cancellation_token::{
+    guard::DropGuard, CancellationToken, WaitForCancellationFuture, WaitForCancellationFutureOwned,
+};
 
 mod mpsc;
 pub use mpsc::{PollSendError, PollSender};

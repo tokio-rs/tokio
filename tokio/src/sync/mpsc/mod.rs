@@ -90,14 +90,16 @@
 pub(super) mod block;
 
 mod bounded;
-pub use self::bounded::{channel, OwnedPermit, Permit, Receiver, Sender};
+pub use self::bounded::{channel, OwnedPermit, Permit, Receiver, Sender, WeakSender};
 
 mod chan;
 
 pub(super) mod list;
 
 mod unbounded;
-pub use self::unbounded::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+pub use self::unbounded::{
+    unbounded_channel, UnboundedReceiver, UnboundedSender, WeakUnboundedSender,
+};
 
 pub mod error;
 

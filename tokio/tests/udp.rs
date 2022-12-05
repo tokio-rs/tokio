@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support bind or UDP
 
 use futures::future::poll_fn;
 use std::io;
@@ -39,7 +39,7 @@ async fn send_recv_poll() -> std::io::Result<()> {
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
-    let _len = poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
+    poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
 
     assert_eq!(read.filled(), MSG);
     Ok(())

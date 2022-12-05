@@ -178,6 +178,7 @@ fn drop_tasks_in_context() {
 }
 
 #[test]
+#[cfg_attr(tokio_wasi, ignore = "Wasi does not support panic recovery")]
 #[should_panic(expected = "boom")]
 fn wake_in_drop_after_panic() {
     let (tx, rx) = oneshot::channel::<()>();
@@ -238,6 +239,7 @@ fn spawn_two() {
     }
 }
 
+#[cfg_attr(tokio_wasi, ignore = "WASI: std::thread::spawn not supported")]
 #[test]
 fn spawn_remote() {
     let rt = rt();
@@ -274,6 +276,7 @@ fn spawn_remote() {
 }
 
 #[test]
+#[cfg_attr(tokio_wasi, ignore = "Wasi does not support panic recovery")]
 #[should_panic(
     expected = "A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers."
 )]
@@ -286,6 +289,155 @@ fn timeout_panics_when_no_time_handle() {
         let dur = Duration::from_millis(20);
         let _ = timeout(dur, rx).await;
     });
+}
+
+#[cfg(tokio_unstable)]
+mod unstable {
+    use tokio::runtime::{Builder, RngSeed, UnhandledPanic};
+
+    #[test]
+    #[should_panic(
+        expected = "a spawned task panicked and the runtime is configured to shut down on unhandled panic"
+    )]
+    fn shutdown_on_panic() {
+        let rt = Builder::new_current_thread()
+            .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            tokio::spawn(async {
+                panic!("boom");
+            });
+
+            futures::future::pending::<()>().await;
+        })
+    }
+
+    #[test]
+    #[cfg_attr(tokio_wasi, ignore = "Wasi does not support panic recovery")]
+    fn spawns_do_nothing() {
+        use std::sync::Arc;
+
+        let rt = Builder::new_current_thread()
+            .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+            .build()
+            .unwrap();
+
+        let rt1 = Arc::new(rt);
+        let rt2 = rt1.clone();
+
+        let _ = std::thread::spawn(move || {
+            rt2.block_on(async {
+                tokio::spawn(async {
+                    panic!("boom");
+                });
+
+                futures::future::pending::<()>().await;
+            })
+        })
+        .join();
+
+        let task = rt1.spawn(async {});
+        let res = futures::executor::block_on(task);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    #[cfg_attr(tokio_wasi, ignore = "Wasi does not support panic recovery")]
+    fn shutdown_all_concurrent_block_on() {
+        const N: usize = 2;
+        use std::sync::{mpsc, Arc};
+
+        let rt = Builder::new_current_thread()
+            .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+            .build()
+            .unwrap();
+
+        let rt = Arc::new(rt);
+        let mut ths = vec![];
+        let (tx, rx) = mpsc::channel();
+
+        for _ in 0..N {
+            let rt = rt.clone();
+            let tx = tx.clone();
+            ths.push(std::thread::spawn(move || {
+                rt.block_on(async {
+                    tx.send(()).unwrap();
+                    futures::future::pending::<()>().await;
+                });
+            }));
+        }
+
+        for _ in 0..N {
+            rx.recv().unwrap();
+        }
+
+        rt.spawn(async {
+            panic!("boom");
+        });
+
+        for th in ths {
+            assert!(th.join().is_err());
+        }
+    }
+
+    #[test]
+    fn rng_seed() {
+        let seed = b"bytes used to generate seed";
+        let rt1 = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt1_values = rt1.block_on(async {
+            let rand_1 = tokio::macros::support::thread_rng_n(100);
+            let rand_2 = tokio::macros::support::thread_rng_n(100);
+
+            (rand_1, rand_2)
+        });
+
+        let rt2 = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt2_values = rt2.block_on(async {
+            let rand_1 = tokio::macros::support::thread_rng_n(100);
+            let rand_2 = tokio::macros::support::thread_rng_n(100);
+
+            (rand_1, rand_2)
+        });
+
+        assert_eq!(rt1_values, rt2_values);
+    }
+
+    #[test]
+    fn rng_seed_multi_enter() {
+        let seed = b"bytes used to generate seed";
+
+        fn two_rand_values() -> (u32, u32) {
+            let rand_1 = tokio::macros::support::thread_rng_n(100);
+            let rand_2 = tokio::macros::support::thread_rng_n(100);
+
+            (rand_1, rand_2)
+        }
+
+        let rt1 = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt1_values_1 = rt1.block_on(async { two_rand_values() });
+        let rt1_values_2 = rt1.block_on(async { two_rand_values() });
+
+        let rt2 = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap();
+        let rt2_values_1 = rt2.block_on(async { two_rand_values() });
+        let rt2_values_2 = rt2.block_on(async { two_rand_values() });
+
+        assert_eq!(rt1_values_1, rt2_values_1);
+        assert_eq!(rt1_values_2, rt2_values_2);
+    }
 }
 
 fn rt() -> Runtime {

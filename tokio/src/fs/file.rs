@@ -565,29 +565,30 @@ impl AsyncSeek for File {
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
-        loop {
-            match inner.state {
-                Busy(_) => panic!("must wait for poll_complete before calling start_seek"),
-                Idle(ref mut buf_cell) => {
-                    let mut buf = buf_cell.take().unwrap();
+        match inner.state {
+            Busy(_) => Err(io::Error::new(
+                io::ErrorKind::Other,
+                "other file operation is pending, call poll_complete before start_seek",
+            )),
+            Idle(ref mut buf_cell) => {
+                let mut buf = buf_cell.take().unwrap();
 
-                    // Factor in any unread data from the buf
-                    if !buf.is_empty() {
-                        let n = buf.discard_read();
+                // Factor in any unread data from the buf
+                if !buf.is_empty() {
+                    let n = buf.discard_read();
 
-                        if let SeekFrom::Current(ref mut offset) = pos {
-                            *offset += n;
-                        }
+                    if let SeekFrom::Current(ref mut offset) = pos {
+                        *offset += n;
                     }
-
-                    let std = me.std.clone();
-
-                    inner.state = Busy(spawn_blocking(move || {
-                        let res = (&*std).seek(pos);
-                        (Operation::Seek(res), buf)
-                    }));
-                    return Ok(());
                 }
+
+                let std = me.std.clone();
+
+                inner.state = Busy(spawn_blocking(move || {
+                    let res = (&*std).seek(pos);
+                    (Operation::Seek(res), buf)
+                }));
+                Ok(())
             }
         }
     }

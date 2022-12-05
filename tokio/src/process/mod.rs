@@ -111,7 +111,7 @@
 //!     let mut cmd = Command::new("sort");
 //!
 //!     // Specifying that we want pipe both the output and the input.
-//!     // Similarily to capturing the output, by configuring the pipe
+//!     // Similarly to capturing the output, by configuring the pipe
 //!     // to stdin it can now be used as an asynchronous writer.
 //!     cmd.stdout(Stdio::piped());
 //!     cmd.stdin(Stdio::piped());
@@ -690,6 +690,36 @@ impl Command {
         self
     }
 
+    /// Sets the process group ID (PGID) of the child process. Equivalent to a
+    /// setpgid call in the child process, but may be more efficient.
+    ///
+    /// Process groups determine which processes receive signals.
+    ///
+    /// **Note**: This is an [unstable API][unstable] but will be stabilised once
+    /// tokio's MSRV is sufficiently new. See [the documentation on
+    /// unstable features][unstable] for details about using unstable features.
+    ///
+    /// If you want similar behaviour without using this unstable feature you can
+    /// create a [`std::process::Command`] and convert that into a
+    /// [`tokio::process::Command`] using the `From` trait.
+    ///
+    /// [unstable]: crate#unstable-features
+    /// [`tokio::process::Command`]: crate::process::Command
+    ///
+    /// ```no_run
+    /// use tokio::process::Command;
+    ///
+    /// let command = Command::new("ls")
+    ///         .process_group(0);
+    /// ```
+    #[cfg(unix)]
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(all(unix, tokio_unstable))))]
+    pub fn process_group(&mut self, pgroup: i32) -> &mut Command {
+        self.std.process_group(pgroup);
+        self
+    }
+
     /// Executes the command as a child process, returning a handle to it.
     ///
     /// By default, stdin, stdout and stderr are inherited from the parent.
@@ -924,7 +954,7 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         let ret = Pin::new(&mut self.inner).poll(cx);
 
@@ -1285,41 +1315,51 @@ impl ChildStderr {
 
 impl AsyncWrite for ChildStdin {
     fn poll_write(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.inner.poll_write(cx, buf)
+        Pin::new(&mut self.inner).poll_write(cx, buf)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
+
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<Result<usize, io::Error>> {
+        Pin::new(&mut self.inner).poll_write_vectored(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.inner.is_write_vectored()
     }
 }
 
 impl AsyncRead for ChildStdout {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 
 impl AsyncRead for ChildStderr {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 

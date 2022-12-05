@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use tokio::sync::broadcast;
@@ -47,7 +47,7 @@ macro_rules! assert_closed {
     ($e:expr) => {
         match assert_err!($e) {
             broadcast::error::TryRecvError::Closed => {}
-            _ => panic!("did not lag"),
+            _ => panic!("is not closed"),
         }
     };
 }
@@ -276,14 +276,14 @@ fn send_no_rx() {
 
 #[test]
 #[should_panic]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn zero_capacity() {
     broadcast::channel::<()>(0);
 }
 
 #[test]
 #[should_panic]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn capacity_too_big() {
     use std::usize;
 
@@ -291,7 +291,7 @@ fn capacity_too_big() {
 }
 
 #[test]
-#[cfg(not(target_arch = "wasm32"))] // wasm currently doesn't support unwinding
+#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn panic_in_clone() {
     use std::panic::{self, AssertUnwindSafe};
 
@@ -478,4 +478,51 @@ fn receiver_len_with_lagged() {
 
 fn is_closed(err: broadcast::error::RecvError) -> bool {
     matches!(err, broadcast::error::RecvError::Closed)
+}
+
+#[test]
+fn resubscribe_points_to_tail() {
+    let (tx, mut rx) = broadcast::channel(3);
+    tx.send(1).unwrap();
+
+    let mut rx_resub = rx.resubscribe();
+
+    // verify we're one behind at the start
+    assert_empty!(rx_resub);
+    assert_eq!(assert_recv!(rx), 1);
+
+    // verify we do not affect rx
+    tx.send(2).unwrap();
+    assert_eq!(assert_recv!(rx_resub), 2);
+    tx.send(3).unwrap();
+    assert_eq!(assert_recv!(rx), 2);
+    assert_eq!(assert_recv!(rx), 3);
+    assert_empty!(rx);
+
+    assert_eq!(assert_recv!(rx_resub), 3);
+    assert_empty!(rx_resub);
+}
+
+#[test]
+fn resubscribe_lagged() {
+    let (tx, mut rx) = broadcast::channel(1);
+    tx.send(1).unwrap();
+    tx.send(2).unwrap();
+
+    let mut rx_resub = rx.resubscribe();
+    assert_lagged!(rx.try_recv(), 1);
+    assert_empty!(rx_resub);
+
+    assert_eq!(assert_recv!(rx), 2);
+    assert_empty!(rx);
+    assert_empty!(rx_resub);
+}
+
+#[test]
+fn resubscribe_to_closed_channel() {
+    let (tx, rx) = tokio::sync::broadcast::channel::<u32>(2);
+    drop(tx);
+
+    let mut rx_resub = rx.resubscribe();
+    assert_closed!(rx_resub.try_recv());
 }

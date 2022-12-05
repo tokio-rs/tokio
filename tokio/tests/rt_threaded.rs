@@ -1,9 +1,9 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(tokio_wasi)))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::runtime::{self, Runtime};
+use tokio::runtime;
 use tokio::sync::oneshot;
 use tokio_test::{assert_err, assert_ok};
 
@@ -415,6 +415,32 @@ fn coop_and_block_in_place() {
     });
 }
 
+#[test]
+fn yield_after_block_in_place() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        tokio::spawn(async move {
+            // Block in place then enter a new runtime
+            tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .build()
+                    .unwrap();
+
+                rt.block_on(async {});
+            });
+
+            // Yield, then complete
+            tokio::task::yield_now().await;
+        })
+        .await
+        .unwrap()
+    });
+}
+
 // Testing this does not panic
 #[test]
 fn max_blocking_threads() {
@@ -480,9 +506,7 @@ fn wake_during_shutdown() {
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
             let me = Pin::into_inner(self);
             let mut lock = me.shared.lock().unwrap();
-            println!("poll {}", me.put_waker);
             if me.put_waker {
-                println!("putting");
                 lock.waker = Some(cx.waker().clone());
             }
             Poll::Pending
@@ -491,13 +515,11 @@ fn wake_during_shutdown() {
 
     impl Drop for MyFuture {
         fn drop(&mut self) {
-            println!("drop {} start", self.put_waker);
             let mut lock = self.shared.lock().unwrap();
             if !self.put_waker {
                 lock.waker.take().unwrap().wake();
             }
             drop(lock);
-            println!("drop {} stop", self.put_waker);
         }
     }
 
@@ -539,6 +561,30 @@ async fn test_block_in_place4() {
     tokio::task::block_in_place(|| {});
 }
 
-fn rt() -> Runtime {
-    Runtime::new().unwrap()
+fn rt() -> runtime::Runtime {
+    runtime::Runtime::new().unwrap()
+}
+
+#[cfg(tokio_unstable)]
+mod unstable {
+    use super::*;
+
+    #[test]
+    fn test_disable_lifo_slot() {
+        let rt = runtime::Builder::new_multi_thread()
+            .disable_lifo_slot()
+            .worker_threads(2)
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            tokio::spawn(async {
+                // Spawn another task and block the thread until completion. If the LIFO slot
+                // is used then the test doesn't complete.
+                futures::executor::block_on(tokio::spawn(async {})).unwrap();
+            })
+            .await
+            .unwrap();
+        })
+    }
 }
