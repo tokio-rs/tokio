@@ -254,30 +254,34 @@ async fn create_pair() -> (TcpStream, TcpStream) {
     (client, server)
 }
 
-fn read_until_pending(stream: &mut TcpStream) {
+fn read_until_pending(stream: &mut TcpStream) -> usize {
     let mut buf = vec![0u8; 1024 * 1024];
+    let mut total = 0;
     loop {
         match stream.try_read(&mut buf) {
-            Ok(_) => (),
+            Ok(n) => total += n,
             Err(err) => {
                 assert_eq!(err.kind(), io::ErrorKind::WouldBlock);
                 break;
             }
         }
     }
+    total
 }
 
-fn write_until_pending(stream: &mut TcpStream) {
+fn write_until_pending(stream: &mut TcpStream) -> usize {
     let buf = vec![0u8; 1024 * 1024];
+    let mut total = 0;
     loop {
         match stream.try_write(&buf) {
-            Ok(_) => (),
+            Ok(n) => total += n,
             Err(err) => {
                 assert_eq!(err.kind(), io::ErrorKind::WouldBlock);
                 break;
             }
         }
     }
+    total
 }
 
 #[tokio::test]
@@ -356,4 +360,41 @@ async fn try_read_buf() {
             tokio::task::yield_now().await;
         }
     }
+}
+
+// read_closed is a best effort event, so test only for no false positives.
+#[tokio::test]
+async fn read_closed() {
+    let (client, mut server) = create_pair().await;
+
+    let mut ready_fut = task::spawn(client.ready(Interest::READABLE));
+    assert_pending!(ready_fut.poll());
+
+    assert_ok!(server.write_all(b"ping").await);
+
+    let ready_event = assert_ok!(ready_fut.await);
+
+    assert!(!ready_event.is_read_closed());
+}
+
+// write_closed is a best effort event, so test only for no false positives.
+#[tokio::test]
+async fn write_closed() {
+    let (mut client, mut server) = create_pair().await;
+
+    // Fill the write buffer.
+    let write_size = write_until_pending(&mut client);
+    let mut ready_fut = task::spawn(client.ready(Interest::WRITABLE));
+    assert_pending!(ready_fut.poll());
+
+    // Drain the socket to make client writable.
+    let mut read_size = 0;
+    while read_size < write_size {
+        server.readable().await.unwrap();
+        read_size += read_until_pending(&mut server);
+    }
+
+    let ready_event = assert_ok!(ready_fut.await);
+
+    assert!(!ready_event.is_write_closed());
 }
