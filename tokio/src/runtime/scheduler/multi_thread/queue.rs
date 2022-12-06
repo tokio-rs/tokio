@@ -263,7 +263,7 @@ impl<T> Local<T> {
         // safety: The CAS above ensures that no consumer will look at these
         // values again, and we are the only producer.
         let batch_iter = BatchTaskIter {
-            buffer: &*self.inner.buffer,
+            buffer: &self.inner.buffer,
             head: head as UnsignedLong,
             i: 0,
         };
