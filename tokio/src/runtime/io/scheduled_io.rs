@@ -510,14 +510,24 @@ cfg_io_readiness! {
                         drop(waiters);
                     }
                     State::Done => {
-                        let tick = TICK.unpack(scheduled_io.readiness.load(Acquire)) as u8;
-
                         // Safety: State::Done means it is no longer shared
                         let w = unsafe { &mut *waiter.get() };
 
+                        let curr = scheduled_io.readiness.load(Acquire);
+
+                        // The returned tick might be newer than the event
+                        // which notified our waker. This is ok because the future
+                        // still didn't return `Poll::Ready`.
+                        let tick = TICK.unpack(curr) as u8;
+
+                        // The readiness state could have been cleared in the meantime,
+                        // but we allow the returned ready set to be empty.
+                        let curr_ready = Ready::from_usize(READINESS.unpack(curr));
+                        let ready = curr_ready.intersection(w.interest);
+
                         return Poll::Ready(ReadyEvent {
                             tick,
-                            ready: Ready::from_interest(w.interest),
+                            ready,
                         });
                     }
                 }

@@ -1,5 +1,5 @@
 #![cfg(feature = "macros")]
-#![allow(clippy::blacklisted_name)]
+#![allow(clippy::disallowed_names)]
 
 use std::sync::Arc;
 

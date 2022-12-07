@@ -1,5 +1,5 @@
 freebsd_instance:
-  image: freebsd-12-3-release-amd64
+  image: freebsd-12-4-release-amd64
 env:
   RUST_STABLE: stable
   RUST_NIGHTLY: nightly-2022-10-25

@@ -194,7 +194,7 @@ where
             TransitionToRunning::Success => {
                 let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<T, S>(&header_ptr);
-                let cx = Context::from_waker(&*waker_ref);
+                let cx = Context::from_waker(&waker_ref);
                 let res = poll_future(self.core(), cx);
 
                 if res == Poll::Ready(()) {

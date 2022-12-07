@@ -138,6 +138,9 @@ impl Runtime {
     /// The returned handle can be used to spawn tasks that run on this runtime, and can
     /// be cloned to allow moving the `Handle` to other threads.
     ///
+    /// Calling [`Handle::block_on`] on a handle to a `current_thread` runtime is error-prone.
+    /// Refer to the documentation of [`Handle::block_on`] for more.
+    ///
     /// # Examples
     ///
     /// ```
