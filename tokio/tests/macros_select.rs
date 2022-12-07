@@ -1,5 +1,5 @@
 #![cfg(feature = "macros")]
-#![allow(clippy::blacklisted_name)]
+#![allow(clippy::disallowed_names)]
 
 #[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;

@@ -661,7 +661,7 @@ rt_test! {
                 loop {
                     // Don't use Tokio's `yield_now()` to avoid special defer
                     // logic.
-                    let _: () = futures::future::poll_fn(|cx| {
+                    futures::future::poll_fn::<(), _>(|cx| {
                         cx.waker().wake_by_ref();
                         std::task::Poll::Pending
                     }).await;
