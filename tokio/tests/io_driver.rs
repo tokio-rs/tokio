@@ -80,7 +80,7 @@ fn test_drop_on_notify() {
     drop(task);
 
     // Establish a connection to the acceptor
-    let _s = TcpStream::connect(&addr).unwrap();
+    let _s = TcpStream::connect(addr).unwrap();
 
     // Force the reactor to turn
     rt.block_on(async {});

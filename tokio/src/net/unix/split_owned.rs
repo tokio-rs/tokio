@@ -398,12 +398,12 @@ impl AsyncWrite for OwnedWriteHalf {
 
 impl AsRef<UnixStream> for OwnedReadHalf {
     fn as_ref(&self) -> &UnixStream {
-        &*self.inner
+        &self.inner
     }
 }
 
 impl AsRef<UnixStream> for OwnedWriteHalf {
     fn as_ref(&self) -> &UnixStream {
-        &*self.inner
+        &self.inner
     }
 }

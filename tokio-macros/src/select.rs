@@ -100,10 +100,10 @@ fn clean_pattern(pat: &mut syn::Pat) {
         }
         syn::Pat::Reference(reference) => {
             reference.mutability = None;
-            clean_pattern(&mut *reference.pat);
+            clean_pattern(&mut reference.pat);
         }
         syn::Pat::Type(type_pat) => {
-            clean_pattern(&mut *type_pat.pat);
+            clean_pattern(&mut type_pat.pat);
         }
         _ => {}
     }
