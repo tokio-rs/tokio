@@ -186,8 +186,8 @@ impl Decoder for Http {
             }
 
             (
-                toslice(r.method.unwrap().as_bytes()),
-                toslice(r.path.unwrap().as_bytes()),
+                r.method.unwrap().as_bytes(),
+                r.path.unwrap().as_bytes(),
                 r.version.unwrap(),
                 amt,
             )
@@ -198,11 +198,12 @@ impl Decoder for Http {
                 "only HTTP/1.1 accepted",
             ));
         }
-        let data = src.split_to(amt).freeze();
+
         let mut ret = Request::builder();
-        ret = ret.method(&data[method.0..method.1]);
-        let s = data.slice(path.0..path.1);
+        ret = ret.method(method);
+        let s = path;
         let s = unsafe { String::from_utf8_unchecked(Vec::from(s.as_ref())) };
+        let data = src.split_to(amt).freeze();
         ret = ret.uri(s);
         ret = ret.version(http::Version::HTTP_11);
         for header in headers.iter() {
