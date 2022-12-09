@@ -7,12 +7,13 @@
 // `#[cfg(target_has_atomic = "64")]`.
 // Refs: https://github.com/rust-lang/rust/tree/master/src/librustc_target
 cfg_has_atomic_u64! {
-    pub(crate) use std::sync::atomic::AtomicU64;
+    #[path = "atomic_u64_native.rs"]
+    mod imp;
 }
 
 cfg_not_has_atomic_u64! {
     #[path = "atomic_u64_as_mutex.rs"]
-    mod atomic_u64_as_mutex;
-
-    pub(crate) use atomic_u64_as_mutex::AtomicU64;
+    mod imp;
 }
+
+pub(crate) use imp::{AtomicU64, StaticAtomicU64};
