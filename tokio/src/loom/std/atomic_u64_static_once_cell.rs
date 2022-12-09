@@ -1,5 +1,5 @@
 use super::AtomicU64;
-use crate::loom::sync::{Mutex, atomic::Ordering};
+use crate::loom::sync::{atomic::Ordering, Mutex};
 use crate::util::once_cell::OnceCell;
 
 pub(crate) struct StaticAtomicU64 {
