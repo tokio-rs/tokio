@@ -562,55 +562,12 @@ impl fmt::Display for Id {
 }
 
 impl Id {
-    // When 64-bit atomics are available, use a static `AtomicU64` counter to
-    // generate task IDs.
-    //
-    // Note(eliza): we _could_ just use `crate::loom::AtomicU64`, which switches
-    // between an atomic and mutex-based implementation here, rather than having
-    // two separate functions for targets with and without 64-bit atomics.
-    // However, because we can't use the mutex-based implementation in a static
-    // initializer directly, the 32-bit impl also has to use a `OnceCell`, and I
-    // thought it was nicer to avoid the `OnceCell` overhead on 64-bit
-    // platforms...
-    cfg_has_atomic_u64! {
-        pub(crate) fn next() -> Self {
-            use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
-            static NEXT_ID: AtomicU64 = AtomicU64::new(1);
-            Self(NEXT_ID.fetch_add(1, Relaxed))
-        }
-    }
+    pub(crate) fn next() -> Self {
+        use crate::loom::sync::atomic::{Ordering::Relaxed, StaticAtomicU64};
 
-    cfg_not_has_atomic_u64! {
-        cfg_has_const_mutex_new! {
-            pub(crate) fn next() -> Self {
-                use crate::loom::sync::Mutex;
-                static NEXT_ID: Mutex<u64> = Mutex::const_new(1);
+        static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
 
-                let mut lock = NEXT_ID.lock();
-                let id = *lock;
-                *lock += 1;
-                Self(id)
-            }
-        }
-
-        cfg_not_has_const_mutex_new! {
-            pub(crate) fn next() -> Self {
-                use crate::util::once_cell::OnceCell;
-                use crate::loom::sync::Mutex;
-
-                fn init_next_id() -> Mutex<u64> {
-                    Mutex::new(1)
-                }
-
-                static NEXT_ID: OnceCell<Mutex<u64>> = OnceCell::new();
-
-                let next_id = NEXT_ID.get(init_next_id);
-                let mut lock = next_id.lock();
-                let id = *lock;
-                *lock += 1;
-                Self(id)
-            }
-        }
+        Self(NEXT_ID.fetch_add(1, Relaxed))
     }
 
     pub(crate) fn as_u64(&self) -> u64 {

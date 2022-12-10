@@ -1,18 +1,24 @@
 use crate::loom::sync::Mutex;
 use std::sync::atomic::Ordering;
 
+cfg_has_const_mutex_new! {
+    #[path = "atomic_u64_static_const_new.rs"]
+    mod static_macro;
+}
+
+cfg_not_has_const_mutex_new! {
+    #[path = "atomic_u64_static_once_cell.rs"]
+    mod static_macro;
+}
+
+pub(crate) use static_macro::StaticAtomicU64;
+
 #[derive(Debug)]
 pub(crate) struct AtomicU64 {
     inner: Mutex<u64>,
 }
 
 impl AtomicU64 {
-    pub(crate) fn new(val: u64) -> Self {
-        Self {
-            inner: Mutex::new(val),
-        }
-    }
-
     pub(crate) fn load(&self, _: Ordering) -> u64 {
         *self.inner.lock()
     }
