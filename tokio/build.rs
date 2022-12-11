@@ -24,9 +24,17 @@ const CONST_MUTEX_NEW_PROBE: &str = r#"
 }
 "#;
 
+const TARGET_HAS_ATOMIC_PROBE: &str = r#"
+{
+    #[cfg(target_has_atomic = "ptr")]
+    let _ = (); 
+}
+"#;
+
 fn main() {
     let mut enable_const_thread_local = false;
     let mut enable_addr_of = false;
+    let mut enable_target_has_atomic = false;
     let mut enable_const_mutex_new = false;
 
     match AutoCfg::new() {
@@ -63,6 +71,21 @@ fn main() {
                 // The oldest nightly that supports the feature is 2021-01-31.
                 if ac.probe_expression(ADDR_OF_PROBE) {
                     enable_addr_of = true;
+                }
+            }
+
+            // The `target_has_atomic` cfg was stabilized in 1.60.
+            if ac.probe_rustc_version(1, 61) {
+                enable_target_has_atomic = true;
+            } else if ac.probe_rustc_version(1, 60) {
+                // This compiler claims to be 1.60, but there are some nightly
+                // compilers that claim to be 1.60 without supporting the
+                // feature. Explicitly probe to check if code using them
+                // compiles.
+                //
+                // The oldest nightly that supports the feature is 2022-02-11.
+                if ac.probe_expression(TARGET_HAS_ATOMIC_PROBE) {
+                    enable_target_has_atomic = true;
                 }
             }
 
@@ -107,6 +130,14 @@ fn main() {
         //
         // RUSTFLAGS="--cfg tokio_no_addr_of"
         autocfg::emit("tokio_no_addr_of")
+    }
+
+    if !enable_target_has_atomic {
+        // To disable this feature on compilers that support it, you can
+        // explicitly pass this flag with the following environment variable:
+        //
+        // RUSTFLAGS="--cfg tokio_no_target_has_atomic"
+        autocfg::emit("tokio_no_target_has_atomic")
     }
 
     if !enable_const_mutex_new {
