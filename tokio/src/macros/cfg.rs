@@ -467,14 +467,7 @@ macro_rules! cfg_has_atomic_u64 {
             ))]
             #[cfg_attr(
                 tokio_no_target_has_atomic,
-                cfg(not(any(
-                    target_arch = "arm",
-                    target_arch = "mips",
-                    target_arch = "powerpc",
-                    target_arch = "riscv32",
-                    tokio_wasm,
-                    tokio_no_atomic_u64,
-                )))
+                cfg(not(tokio_no_atomic_u64))
             )]
             $item
         )*
@@ -490,14 +483,7 @@ macro_rules! cfg_not_has_atomic_u64 {
             ))]
             #[cfg_attr(
                 tokio_no_target_has_atomic,
-                cfg(any(
-                    target_arch = "arm",
-                    target_arch = "mips",
-                    target_arch = "powerpc",
-                    target_arch = "riscv32",
-                    tokio_wasm,
-                    tokio_no_atomic_u64,
-                ))
+                cfg(tokio_no_atomic_u64)
             )]
             $item
         )*
