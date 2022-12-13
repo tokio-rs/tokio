@@ -13,11 +13,6 @@ impl Handle {
         &self.time_source
     }
 
-    /// Checks whether the driver has been shutdown.
-    pub(super) fn is_shutdown(&self) -> bool {
-        self.inner.is_shutdown()
-    }
-
     /// Track that the driver is being unparked
     pub(crate) fn unpark(&self) {
         #[cfg(feature = "test-util")]

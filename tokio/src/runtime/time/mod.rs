@@ -93,9 +93,6 @@ struct Inner {
     // The state is split like this so `Handle` can access `is_shutdown` without locking the mutex
     pub(super) state: Mutex<InnerState>,
 
-    /// True if the driver is being shutdown.
-    pub(super) is_shutdown: AtomicBool,
-
     // When `true`, a call to `park_timeout` should immediately return and time
     // should not advance. One reason for this to be `true` is if the task
     // passed to `Runtime::block_on` called `task::yield_now()`.
@@ -116,6 +113,9 @@ struct InnerState {
 
     /// Timer wheel.
     wheel: wheel::Wheel,
+
+    /// True if the driver is being shutdown.
+    is_shutdown: bool,
 }
 
 // ===== impl Driver =====
@@ -135,8 +135,8 @@ impl Driver {
                     elapsed: 0,
                     next_wake: None,
                     wheel: wheel::Wheel::new(),
+                    is_shutdown: false,
                 }),
-                is_shutdown: AtomicBool::new(false),
 
                 #[cfg(feature = "test-util")]
                 did_wake: AtomicBool::new(false),
@@ -159,15 +159,17 @@ impl Driver {
     pub(crate) fn shutdown(&mut self, rt_handle: &driver::Handle) {
         let handle = rt_handle.time();
 
-        if handle.is_shutdown() {
-            return;
+        {
+            let mut lock = handle.inner.lock();
+
+            if lock.is_shutdown {
+                return;
+            }
+
+            lock.is_shutdown = true;
         }
 
-        handle.inner.is_shutdown.store(true, Ordering::SeqCst);
-
-        // Advance time forward to the end of time.
-
-        handle.process_at_time(u64::MAX);
+        handle.process_at_time(None);
 
         self.park.shutdown(rt_handle);
     }
@@ -176,7 +178,7 @@ impl Driver {
         let handle = rt_handle.time();
         let mut lock = handle.inner.state.lock();
 
-        assert!(!handle.is_shutdown());
+        assert!(!lock.is_shutdown);
 
         let next_wake = lock.wheel.next_expiration_time();
         lock.next_wake =
@@ -251,10 +253,16 @@ impl Handle {
     pub(self) fn process(&self) {
         let now = self.time_source().now();
 
-        self.process_at_time(now)
+        self.process_at_time(Some(now))
     }
 
-    pub(self) fn process_at_time(&self, mut now: u64) {
+    pub(self) fn process_at_time(&self, now: Option<u64>) {
+        let (mut now, state) = match now {
+            Some(now) => (now, Ok(())),
+            // Runtime being shutdown, advance time forward to the end of time.
+            None => (u64::MAX, Err(Error::shutdown())),
+        };
+
         let mut waker_list: [Option<Waker>; 32] = Default::default();
         let mut waker_idx = 0;
 
@@ -274,7 +282,7 @@ impl Handle {
             debug_assert!(unsafe { entry.is_pending() });
 
             // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
-            if let Some(waker) = unsafe { entry.fire(Ok(())) } {
+            if let Some(waker) = unsafe { entry.fire(state) } {
                 waker_list[waker_idx] = Some(waker);
 
                 waker_idx += 1;
@@ -354,8 +362,11 @@ impl Handle {
             // Now that we have exclusive control of this entry, mint a handle to reinsert it.
             let entry = entry.as_ref().handle();
 
-            if self.is_shutdown() {
-                unsafe { entry.fire(Err(crate::time::error::Error::shutdown())) }
+            if lock.is_shutdown {
+                unsafe {
+                    entry.set_expiration(0);
+                    entry.fire(Err(Error::shutdown()))
+                }
             } else {
                 entry.set_expiration(new_tick);
 
@@ -404,11 +415,6 @@ impl Inner {
     /// Locks the driver's inner structure
     pub(super) fn lock(&self) -> crate::loom::sync::MutexGuard<'_, InnerState> {
         self.state.lock()
-    }
-
-    // Check whether the driver has been shutdown
-    pub(super) fn is_shutdown(&self) -> bool {
-        self.is_shutdown.load(Ordering::SeqCst)
     }
 }
 

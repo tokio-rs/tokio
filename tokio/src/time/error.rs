@@ -92,7 +92,7 @@ impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Kind::*;
         let descr = match self.0 {
-            Shutdown => "the timer is shutdown, must be called from the context of Tokio runtime",
+            Shutdown => crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
             AtCapacity => "timer is at capacity and cannot create a new entry",
             Invalid => "timer duration exceeds maximum duration",
         };

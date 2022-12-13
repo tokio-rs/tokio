@@ -469,6 +469,25 @@ multi_threaded_rt_test! {
 
     #[test]
     #[should_panic(expected = "A Tokio 1.x context was found, but it is being shutdown.")]
+    fn sleep_polled_before_shutdown_panics() {
+        use futures::future::poll_immediate;
+
+        let rt = rt();
+        let _enter = rt.enter();
+
+        let f = time::sleep(Duration::from_millis(100));
+        tokio::pin!(f);
+        Handle::current().block_on(async {
+            assert!(poll_immediate(f.as_mut()).await.is_none());
+        });
+
+        rt.shutdown_timeout(Duration::from_secs(1000));
+
+        Handle::current().block_on(f);
+    }
+
+    #[test]
+    #[should_panic(expected = "A Tokio 1.x context was found, but it is being shutdown.")]
     fn sleep_after_shutdown_panics() {
         let rt = rt();
         let _enter = rt.enter();

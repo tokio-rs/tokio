@@ -126,7 +126,7 @@ impl StateCell {
     fn when(&self) -> Option<u64> {
         let cur_state = self.state.load(Ordering::Relaxed);
 
-        if cur_state == u64::MAX {
+        if cur_state >= STATE_MIN_VALUE {
             None
         } else {
             Some(cur_state)
@@ -563,10 +563,6 @@ impl TimerEntry {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), super::Error>> {
-        if self.driver().is_shutdown() {
-            panic!("{}", crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR);
-        }
-
         if let Some(deadline) = self.initial_deadline {
             self.as_mut().reset(deadline);
         }

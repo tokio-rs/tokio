@@ -67,7 +67,7 @@ fn single_timer() {
         // This may or may not return Some (depending on how it races with the
         // thread). If it does return None, however, the timer should complete
         // synchronously.
-        handle.process_at_time(handle.time_source().now() + 2_000_000_000);
+        handle.process_at_time(Some(handle.time_source().now() + 2_000_000_000));
 
         jh.join().unwrap();
     })
@@ -100,7 +100,7 @@ fn drop_timer() {
         let handle = handle.inner.driver().time();
 
         // advance 2s in the future.
-        handle.process_at_time(handle.time_source().now() + 2_000_000_000);
+        handle.process_at_time(Some(handle.time_source().now() + 2_000_000_000));
 
         jh.join().unwrap();
     })
@@ -135,7 +135,7 @@ fn change_waker() {
         let handle = handle.inner.driver().time();
 
         // advance 2s
-        handle.process_at_time(handle.time_source().now() + 2_000_000_000);
+        handle.process_at_time(Some(handle.time_source().now() + 2_000_000_000));
 
         jh.join().unwrap();
     })
@@ -177,19 +177,19 @@ fn reset_future() {
         let handle = handle.inner.driver().time();
 
         // This may or may not return a wakeup time.
-        handle.process_at_time(
+        handle.process_at_time(Some(
             handle
                 .time_source()
                 .instant_to_tick(start + Duration::from_millis(1500)),
-        );
+        ));
 
         assert!(!finished_early.load(Ordering::Relaxed));
 
-        handle.process_at_time(
+        handle.process_at_time(Some(
             handle
                 .time_source()
                 .instant_to_tick(start + Duration::from_millis(2500)),
-        );
+        ));
 
         jh.join().unwrap();
 
@@ -228,7 +228,7 @@ fn poll_process_levels() {
     }
 
     for t in 1..normal_or_miri(1024, 64) {
-        handle.inner.driver().time().process_at_time(t as u64);
+        handle.inner.driver().time().process_at_time(Some(t as u64));
 
         for (deadline, future) in entries.iter_mut().enumerate() {
             let mut context = Context::from_waker(noop_waker_ref());
@@ -257,8 +257,8 @@ fn poll_process_levels_targeted() {
 
     let handle = handle.inner.driver().time();
 
-    handle.process_at_time(62);
+    handle.process_at_time(Some(62));
     assert!(e1.as_mut().poll_elapsed(&mut context).is_pending());
-    handle.process_at_time(192);
-    handle.process_at_time(192);
+    handle.process_at_time(Some(192));
+    handle.process_at_time(Some(192));
 }
