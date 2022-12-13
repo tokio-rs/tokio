@@ -1,6 +1,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicPtr, AtomicUsize};
 
+use std::alloc::Layout;
 use std::mem::MaybeUninit;
 use std::ops;
 use std::ptr::{self, NonNull};
@@ -28,7 +29,7 @@ pub(crate) struct Block<T> {
     /// Array containing values pushed into the block. Values are stored in a
     /// continuous array in order to improve cache line behavior when reading.
     /// The values must be manually dropped.
-    values: Values<T>,
+    values: Box<Values<T>>,
 }
 
 pub(crate) enum Read<T> {
@@ -72,8 +73,8 @@ pub(crate) fn offset(slot_index: usize) -> usize {
 }
 
 impl<T> Block<T> {
-    pub(crate) fn new(start_index: usize) -> Block<T> {
-        Block {
+    pub(crate) fn new(start_index: usize) -> Box<Block<T>> {
+        Box::new(Block {
             // The absolute index in the channel of the first slot in the block.
             start_index,
 
@@ -85,8 +86,18 @@ impl<T> Block<T> {
             observed_tail_position: UnsafeCell::new(0),
 
             // Value storage
-            values: unsafe { Values::uninitialized() },
-        }
+            values: unsafe {
+                // Allocate the values array on the heap.
+                let heap_alloc =
+                    std::alloc::alloc(Layout::new::<Values<T>>()) as *mut MaybeUninit<Values<T>>;
+
+                // Initialize the values array.
+                Values::initialize(&mut *heap_alloc);
+
+                // Convert the pointer to a `Box`.
+                Box::from_raw(heap_alloc as *mut Values<T>)
+            },
+        })
     }
 
     /// Returns `true` if the block matches the given index.
@@ -291,7 +302,7 @@ impl<T> Block<T> {
         // Create the new block. It is assumed that the block will become the
         // next one after `&self`. If this turns out to not be the case,
         // `start_index` is updated accordingly.
-        let new_block = Box::new(Block::new(self.start_index + BLOCK_CAP));
+        let new_block = Block::new(self.start_index + BLOCK_CAP);
 
         let mut new_block = unsafe { NonNull::new_unchecked(Box::into_raw(new_block)) };
 
@@ -360,19 +371,15 @@ fn is_tx_closed(bits: usize) -> bool {
 }
 
 impl<T> Values<T> {
-    unsafe fn uninitialized() -> Values<T> {
-        let mut vals = MaybeUninit::uninit();
-
+    unsafe fn initialize(_value: &mut MaybeUninit<Values<T>>) {
         // When fuzzing, `UnsafeCell` needs to be initialized.
         if_loom! {
-            let p = vals.as_mut_ptr() as *mut UnsafeCell<MaybeUninit<T>>;
+            let p = _value.as_mut_ptr() as *mut UnsafeCell<MaybeUninit<T>>;
             for i in 0..BLOCK_CAP {
                 p.add(i)
                     .write(UnsafeCell::new(MaybeUninit::uninit()));
             }
         }
-
-        Values(vals.assume_init())
     }
 }
 
@@ -382,4 +389,20 @@ impl<T> ops::Index<usize> for Values<T> {
     fn index(&self, index: usize) -> &Self::Output {
         self.0.index(index)
     }
+}
+#[cfg(test)]
+#[test]
+fn assert_no_stack_overflow() {
+    // https://github.com/tokio-rs/tokio/issues/5293
+
+    struct Foo {
+        _a: [u8; 2_000_000],
+    }
+
+    assert_eq!(
+        Layout::new::<MaybeUninit<Block<Foo>>>(),
+        Layout::new::<Block<Foo>>()
+    );
+
+    let _block = Block::<Foo>::new(0);
 }
