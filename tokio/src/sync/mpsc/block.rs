@@ -43,6 +43,7 @@ pub(crate) enum Read<T> {
     Closed,
 }
 
+#[repr(transparent)]
 struct Values<T>([UnsafeCell<MaybeUninit<T>>; BLOCK_CAP]);
 
 use super::BLOCK_CAP;
@@ -94,6 +95,7 @@ impl<T> Block<T> {
     pub(crate) fn new(start_index: usize) -> Box<Block<T>> {
         unsafe {
             // Allocate the block on the heap.
+            // SAFETY: The size of the Block<T> is non-zero, since it is at least the size of the header.
             let block = std::alloc::alloc(Layout::new::<Block<T>>()) as *mut Block<T>;
             let block = match NonNull::new(block) {
                 Some(block) => block,
@@ -117,6 +119,8 @@ impl<T> Block<T> {
             Values::initialize(Block::addr_of_values(block));
 
             // Convert the pointer to a `Box`.
+            // Safety: The raw pointer was allocated using the global allocator, and with
+            // the layout for a `Block<T>`, so it's valid to convert it to box.
             Box::from_raw(block.as_ptr())
         }
     }
@@ -401,6 +405,11 @@ fn is_tx_closed(bits: usize) -> bool {
 }
 
 impl<T> Values<T> {
+    /// Initialize a `Values` struct from a pointer.
+    ///
+    /// # Safety
+    ///
+    /// The raw pointer must be valid for writing a `Values<T>`.
     unsafe fn initialize(_value: NonNull<Values<T>>) {
         // When fuzzing, `UnsafeCell` needs to be initialized.
         if_loom! {
