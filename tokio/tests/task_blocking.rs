@@ -234,7 +234,7 @@ async fn blocking_when_paused() {
     // not yet finished.
     time::timeout(
         Duration::from_secs(3),
-        task::spawn_blocking(|| thread::sleep(Duration::from_millis(250))),
+        task::spawn_blocking(|| thread::sleep(Duration::from_millis(1))),
     )
     .await
     .expect("timeout should not trigger")
@@ -245,7 +245,7 @@ async fn blocking_when_paused() {
     // is paused; system time is not.
     time::timeout(
         Duration::from_millis(1),
-        task::spawn_blocking(|| thread::sleep(Duration::from_millis(250))),
+        task::spawn_blocking(|| thread::sleep(Duration::from_millis(50))),
     )
     .await
     .expect("timeout should not trigger")
@@ -258,7 +258,7 @@ async fn blocking_task_wakes_paused_runtime() {
     let t0 = std::time::Instant::now();
     time::timeout(
         Duration::from_secs(15),
-        task::spawn_blocking(|| thread::sleep(Duration::from_millis(250))),
+        task::spawn_blocking(|| thread::sleep(Duration::from_millis(1))),
     )
     .await
     .expect("timeout should not trigger")
@@ -277,7 +277,7 @@ async fn unawaited_blocking_task_wakes_paused_runtime() {
     // When this task finishes, time should auto-advance, even though the
     // JoinHandle has not been awaited yet.
     let a = task::spawn_blocking(|| {
-        thread::sleep(Duration::from_millis(20));
+        thread::sleep(Duration::from_millis(1));
     });
 
     crate::time::sleep(Duration::from_secs(15)).await;
@@ -295,7 +295,7 @@ async fn panicking_blocking_task_wakes_paused_runtime() {
     let result = time::timeout(
         Duration::from_secs(15),
         task::spawn_blocking(|| {
-            thread::sleep(Duration::from_millis(250));
+            thread::sleep(Duration::from_millis(1));
             panic!("blocking task panicked");
         }),
     )
