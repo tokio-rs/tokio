@@ -9,10 +9,10 @@
 //! # Usage
 //!
 //! [`channel`] returns a [`Sender`] / [`Receiver`] pair. These are the producer
-//! and sender halves of the channel. The channel is created with an initial
+//! and consumer halves of the channel. The channel is created with an initial
 //! value. The **latest** value stored in the channel is accessed with
 //! [`Receiver::borrow()`]. Awaiting [`Receiver::changed()`] waits for a new
-//! value to sent by the [`Sender`] half.
+//! value to be sent by the [`Sender`] half.
 //!
 //! # Examples
 //!
@@ -90,10 +90,11 @@ pub struct Sender<T> {
 /// Returns a reference to the inner value.
 ///
 /// Outstanding borrows hold a read lock on the inner value. This means that
-/// long lived borrows could cause the produce half to block. It is recommended
-/// to keep the borrow as short lived as possible. Additionally, if you are
+/// long-lived borrows could cause the producer half to block. It is recommended
+/// to keep the borrow as short-lived as possible. Additionally, if you are
 /// running in an environment that allows `!Send` futures, you must ensure that
-/// the returned `Ref` type is never held alive across an `.await` point.
+/// the returned `Ref` type is never held alive across an `.await` point,
+/// otherwise, it can lead to a deadlock.
 ///
 /// The priority policy of the lock is dependent on the underlying lock
 /// implementation, and this type does not guarantee that any particular policy
@@ -350,11 +351,12 @@ impl<T> Receiver<T> {
     /// [`changed`] may return immediately even if you have already seen the
     /// value with a call to `borrow`.
     ///
-    /// Outstanding borrows hold a read lock. This means that long lived borrows
-    /// could cause the send half to block. It is recommended to keep the borrow
-    /// as short lived as possible. Additionally, if you are running in an
-    /// environment that allows `!Send` futures, you must ensure that the
-    /// returned `Ref` type is never held alive across an `.await` point.
+    /// Outstanding borrows hold a read lock on the inner value. This means that
+    /// long-lived borrows could cause the producer half to block. It is recommended
+    /// to keep the borrow as short-lived as possible. Additionally, if you are
+    /// running in an environment that allows `!Send` futures, you must ensure that
+    /// the returned `Ref` type is never held alive across an `.await` point,
+    /// otherwise, it can lead to a deadlock.
     ///
     /// The priority policy of the lock is dependent on the underlying lock
     /// implementation, and this type does not guarantee that any particular policy
@@ -401,11 +403,12 @@ impl<T> Receiver<T> {
     /// will not return immediately until the [`Sender`] has modified the shared
     /// value again.
     ///
-    /// Outstanding borrows hold a read lock. This means that long lived borrows
-    /// could cause the send half to block. It is recommended to keep the borrow
-    /// as short lived as possible. Additionally, if you are running in an
-    /// environment that allows `!Send` futures, you must ensure that the
-    /// returned `Ref` type is never held alive across an `.await` point.
+    /// Outstanding borrows hold a read lock on the inner value. This means that
+    /// long-lived borrows could cause the producer half to block. It is recommended
+    /// to keep the borrow as short-lived as possible. Additionally, if you are
+    /// running in an environment that allows `!Send` futures, you must ensure that
+    /// the returned `Ref` type is never held alive across an `.await` point,
+    /// otherwise, it can lead to a deadlock.
     ///
     /// The priority policy of the lock is dependent on the underlying lock
     /// implementation, and this type does not guarantee that any particular policy
@@ -794,9 +797,12 @@ impl<T> Sender<T> {
 
     /// Returns a reference to the most recently sent value
     ///
-    /// Outstanding borrows hold a read lock. This means that long lived borrows
-    /// could cause the send half to block. It is recommended to keep the borrow
-    /// as short lived as possible.
+    /// Outstanding borrows hold a read lock on the inner value. This means that
+    /// long-lived borrows could cause the producer half to block. It is recommended
+    /// to keep the borrow as short-lived as possible. Additionally, if you are
+    /// running in an environment that allows `!Send` futures, you must ensure that
+    /// the returned `Ref` type is never held alive across an `.await` point,
+    /// otherwise, it can lead to a deadlock.
     ///
     /// # Examples
     ///

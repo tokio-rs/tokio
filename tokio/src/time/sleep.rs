@@ -357,7 +357,7 @@ impl Sleep {
     fn reset_inner(self: Pin<&mut Self>, deadline: Instant) {
         let mut me = self.project();
         me.entry.as_mut().reset(deadline);
-        (*me.inner).deadline = deadline;
+        (me.inner).deadline = deadline;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {

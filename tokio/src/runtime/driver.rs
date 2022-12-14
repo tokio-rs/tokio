@@ -36,11 +36,12 @@ pub(crate) struct Cfg {
     pub(crate) enable_time: bool,
     pub(crate) enable_pause_time: bool,
     pub(crate) start_paused: bool,
+    pub(crate) nevents: usize,
 }
 
 impl Driver {
     pub(crate) fn new(cfg: Cfg) -> io::Result<(Self, Handle)> {
-        let (io_stack, io_handle, signal_handle) = create_io_stack(cfg.enable_io)?;
+        let (io_stack, io_handle, signal_handle) = create_io_stack(cfg.enable_io, cfg.nevents)?;
 
         let clock = create_clock(cfg.enable_pause_time, cfg.start_paused);
 
@@ -135,12 +136,12 @@ cfg_io_driver! {
         Disabled(UnparkThread),
     }
 
-    fn create_io_stack(enabled: bool) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
+    fn create_io_stack(enabled: bool, nevents: usize) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         #[cfg(loom)]
         assert!(!enabled);
 
         let ret = if enabled {
-            let (io_driver, io_handle) = crate::runtime::io::Driver::new()?;
+            let (io_driver, io_handle) = crate::runtime::io::Driver::new(nevents)?;
 
             let (signal_driver, signal_handle) = create_signal_driver(io_driver, &io_handle)?;
             let process_driver = create_process_driver(signal_driver);
@@ -201,7 +202,7 @@ cfg_not_io_driver! {
     #[derive(Debug)]
     pub(crate) struct IoStack(ParkThread);
 
-    fn create_io_stack(_enabled: bool) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
+    fn create_io_stack(_enabled: bool, _nevents: usize) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         let park_thread = ParkThread::new();
         let unpark_thread = park_thread.unpark();
         Ok((IoStack(park_thread), unpark_thread, Default::default()))

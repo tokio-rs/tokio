@@ -368,10 +368,7 @@ pub struct FramedParts<T, U> {
 
 impl<T, U> FramedParts<T, U> {
     /// Create a new, default, `FramedParts`
-    pub fn new<I>(io: T, codec: U) -> FramedParts<T, U>
-    where
-        U: Encoder<I>,
-    {
+    pub fn new(io: T, codec: U) -> FramedParts<T, U> {
         FramedParts {
             io,
             codec,

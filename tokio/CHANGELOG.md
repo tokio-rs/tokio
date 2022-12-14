@@ -1,3 +1,23 @@
+# 1.23.0 (December 5, 2022)
+
+### Fixed
+
+ - net: fix Windows named pipe connect ([#5208])
+ - io: support vectored writes for `ChildStdin` ([#5216])
+ - io: fix `async fn ready()` false positive for OS-specific events ([#5231])
+
+ ### Changed
+ - runtime: `yield_now` defers task until after driver poll ([#5223])
+ - runtime: reduce amount of codegen needed per spawned task ([#5213])
+ - windows: replace `winapi` dependency with `windows-sys` ([#5204])
+
+ [#5208]: https://github.com/tokio-rs/tokio/pull/5208
+ [#5216]: https://github.com/tokio-rs/tokio/pull/5216
+ [#5213]: https://github.com/tokio-rs/tokio/pull/5213
+ [#5204]: https://github.com/tokio-rs/tokio/pull/5204
+ [#5223]: https://github.com/tokio-rs/tokio/pull/5223
+ [#5231]: https://github.com/tokio-rs/tokio/pull/5231
+
 # 1.22.0 (November 17, 2022)
 
 ### Added
