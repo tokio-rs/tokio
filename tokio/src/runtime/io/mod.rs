@@ -60,6 +60,7 @@ pub(crate) struct Handle {
 pub(crate) struct ReadyEvent {
     tick: u8,
     pub(crate) ready: Ready,
+    is_shutdown: bool,
 }
 
 struct IoDispatcher {
@@ -147,9 +148,8 @@ impl Driver {
 
         if handle.shutdown() {
             self.resources.for_each(|io| {
-                // If a task is waiting on the I/O resource, notify it. The task
-                // will then attempt to use the I/O resource and fail due to the
-                // driver being shutdown. And shutdown will clear all wakers.
+                // If a task is waiting on the I/O resource, notify it that the
+                // runtime is being shutdown. And shutdown will clear all wakers.
                 io.shutdown();
             });
         }
@@ -282,16 +282,12 @@ impl Handle {
         true
     }
 
-    fn is_shutdown(&self) -> bool {
-        return self.io_dispatch.read().unwrap().is_shutdown;
-    }
-
     fn allocate(&self) -> io::Result<(slab::Address, slab::Ref<ScheduledIo>)> {
         let io = self.io_dispatch.read().unwrap();
         if io.is_shutdown {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                "failed to find event loop",
+                crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
             ));
         }
         io.allocator.allocate().ok_or_else(|| {

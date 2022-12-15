@@ -188,12 +188,12 @@ readiness, the driver's tick is packed into the atomic `usize`.
 The `ScheduledIo` readiness `AtomicUsize` is structured as:
 
 ```
-| reserved | generation |  driver tick | readiness |
+| shutdown | generation |  driver tick | readiness |
 |----------+------------+--------------+-----------|
 |   1 bit  |   7 bits   +    8 bits    +  16 bits  |
 ```
 
-The `reserved` and `generation` components exist today.
+The `shutdown` and `generation` components exist today.
 
 The `readiness()` function returns a `ReadyEvent` value. This value includes the
 `tick` component read with the resource's readiness value. When

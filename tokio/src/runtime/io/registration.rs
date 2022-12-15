@@ -148,7 +148,7 @@ impl Registration {
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
         let ev = ready!(self.shared.poll_readiness(cx, direction));
 
-        if self.handle().is_shutdown() {
+        if ev.is_shutdown {
             return Poll::Ready(Err(gone()));
         }
 
@@ -217,7 +217,10 @@ impl Drop for Registration {
 }
 
 fn gone() -> io::Error {
-    io::Error::new(io::ErrorKind::Other, "IO driver has terminated")
+    io::Error::new(
+        io::ErrorKind::Other,
+        crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
+    )
 }
 
 cfg_io_readiness! {
@@ -229,16 +232,15 @@ cfg_io_readiness! {
             let fut = self.shared.readiness(interest);
             pin!(fut);
 
-            crate::future::poll_fn(|cx| {
-                if self.handle().is_shutdown() {
-                    return Poll::Ready(Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
-                    )));
-                }
+            let ev = crate::future::poll_fn(|cx| {
+                Pin::new(&mut fut).poll(cx)
+            }).await;
 
-                Pin::new(&mut fut).poll(cx).map(Ok)
-            }).await
+            if ev.is_shutdown {
+                return Err(gone())
+            }
+
+            Ok(ev)
         }
 
         pub(crate) async fn async_io<R>(&self, interest: Interest, mut f: impl FnMut() -> io::Result<R>) -> io::Result<R> {

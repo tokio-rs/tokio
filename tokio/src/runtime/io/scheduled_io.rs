@@ -46,9 +46,6 @@ struct Waiters {
 
     /// Waker used for AsyncWrite.
     writer: Option<Waker>,
-
-    /// True if this ScheduledIo has been killed due to IO driver shutdown.
-    is_shutdown: bool,
 }
 
 cfg_io_readiness! {
@@ -95,7 +92,7 @@ cfg_io_readiness! {
 
 // The `ScheduledIo::readiness` (`AtomicUsize`) is packed full of goodness.
 //
-// | reserved | generation |  driver tick | readiness |
+// | shutdown | generation |  driver tick | readiness |
 // |----------+------------+--------------+-----------|
 // |   1 bit  |   7 bits   +    8 bits    +   16 bits |
 
@@ -104,6 +101,8 @@ const READINESS: bit::Pack = bit::Pack::least_significant(16);
 const TICK: bit::Pack = READINESS.then(8);
 
 const GENERATION: bit::Pack = TICK.then(7);
+
+const SHUTDOWN: bit::Pack = GENERATION.then(1);
 
 #[test]
 fn test_generations_assert_same() {
@@ -138,9 +137,11 @@ impl ScheduledIo {
     }
 
     /// Invoked when the IO driver is shut down; forces this ScheduledIo into a
-    /// permanently ready state.
+    /// permanently shutdown state.
     pub(super) fn shutdown(&self) {
-        self.wake0(Ready::ALL, true)
+        let mask = SHUTDOWN.pack(1, 0);
+        self.readiness.fetch_or(mask, AcqRel);
+        self.wake(Ready::ALL);
     }
 
     /// Sets the readiness on this `ScheduledIo` by invoking the given closure on
@@ -219,15 +220,9 @@ impl ScheduledIo {
     /// than 32 wakers to notify, if the stack array fills up, the lock is
     /// released, the array is cleared, and the iteration continues.
     pub(super) fn wake(&self, ready: Ready) {
-        self.wake0(ready, false);
-    }
-
-    fn wake0(&self, ready: Ready, shutdown: bool) {
         let mut wakers = WakeList::new();
 
         let mut waiters = self.waiters.lock();
-
-        waiters.is_shutdown |= shutdown;
 
         // check for AsyncRead slot
         if ready.is_readable() {
@@ -283,6 +278,7 @@ impl ScheduledIo {
         ReadyEvent {
             tick: TICK.unpack(curr) as u8,
             ready: interest.mask() & Ready::from_usize(READINESS.unpack(curr)),
+            is_shutdown: SHUTDOWN.unpack(curr) != 0,
         }
     }
 
@@ -299,8 +295,9 @@ impl ScheduledIo {
         let curr = self.readiness.load(Acquire);
 
         let ready = direction.mask() & Ready::from_usize(READINESS.unpack(curr));
+        let is_shutdown = SHUTDOWN.unpack(curr) != 0;
 
-        if ready.is_empty() {
+        if ready.is_empty() && !is_shutdown {
             // Update the task info
             let mut waiters = self.waiters.lock();
             let slot = match direction {
@@ -325,10 +322,12 @@ impl ScheduledIo {
             // taking the waiters lock
             let curr = self.readiness.load(Acquire);
             let ready = direction.mask() & Ready::from_usize(READINESS.unpack(curr));
-            if waiters.is_shutdown {
+            let is_shutdown = SHUTDOWN.unpack(curr) != 0;
+            if is_shutdown {
                 Poll::Ready(ReadyEvent {
                     tick: TICK.unpack(curr) as u8,
                     ready: direction.mask(),
+                    is_shutdown,
                 })
             } else if ready.is_empty() {
                 Poll::Pending
@@ -336,12 +335,14 @@ impl ScheduledIo {
                 Poll::Ready(ReadyEvent {
                     tick: TICK.unpack(curr) as u8,
                     ready,
+                    is_shutdown,
                 })
             }
         } else {
             Poll::Ready(ReadyEvent {
                 tick: TICK.unpack(curr) as u8,
                 ready,
+                is_shutdown,
             })
         }
     }
@@ -433,16 +434,17 @@ cfg_io_readiness! {
                         // Optimistically check existing readiness
                         let curr = scheduled_io.readiness.load(SeqCst);
                         let ready = Ready::from_usize(READINESS.unpack(curr));
+                        let is_shutdown = SHUTDOWN.unpack(curr) != 0;
 
                         // Safety: `waiter.interest` never changes
                         let interest = unsafe { (*waiter.get()).interest };
                         let ready = ready.intersection(interest);
 
-                        if !ready.is_empty() {
+                        if !ready.is_empty() || is_shutdown {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { tick, ready });
+                            return Poll::Ready(ReadyEvent { tick, ready, is_shutdown });
                         }
 
                         // Wasn't ready, take the lock (and check again while locked).
@@ -450,18 +452,19 @@ cfg_io_readiness! {
 
                         let curr = scheduled_io.readiness.load(SeqCst);
                         let mut ready = Ready::from_usize(READINESS.unpack(curr));
+                        let is_shutdown = SHUTDOWN.unpack(curr) != 0;
 
-                        if waiters.is_shutdown {
+                        if is_shutdown {
                             ready = Ready::ALL;
                         }
 
                         let ready = ready.intersection(interest);
 
-                        if !ready.is_empty() {
+                        if !ready.is_empty() || is_shutdown {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { tick, ready });
+                            return Poll::Ready(ReadyEvent { tick, ready, is_shutdown });
                         }
 
                         // Not ready even after locked, insert into list...
@@ -514,6 +517,7 @@ cfg_io_readiness! {
                         let w = unsafe { &mut *waiter.get() };
 
                         let curr = scheduled_io.readiness.load(Acquire);
+                        let is_shutdown = SHUTDOWN.unpack(curr) != 0;
 
                         // The returned tick might be newer than the event
                         // which notified our waker. This is ok because the future
@@ -528,6 +532,7 @@ cfg_io_readiness! {
                         return Poll::Ready(ReadyEvent {
                             tick,
                             ready,
+                            is_shutdown,
                         });
                     }
                 }
