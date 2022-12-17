@@ -316,7 +316,7 @@ where
                 // output.
                 self.core().drop_future_or_output();
             } else if snapshot.is_join_waker_set() {
-                // Notify the waker. Reading the waker field is safe per rule 3
+                // Notify the waker. Reading the waker field is safe per rule 4
                 // in task/mod.rs, since the JOIN_WAKER bit is set and the call
                 // to transition_to_complete() above set the COMPLETE bit.
                 self.trailer().wake_join();
