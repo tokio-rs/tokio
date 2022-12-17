@@ -18,6 +18,7 @@ pub(crate) use source::TimeSource;
 
 mod wheel;
 
+#[cfg(feature = "test-util")]
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Mutex;
 use crate::runtime::driver::{self, IoHandle, IoStack};
