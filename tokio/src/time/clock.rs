@@ -65,6 +65,9 @@ cfg_test_util! {
 
         /// Instant at which the clock was last unfrozen.
         unfrozen: Option<std::time::Instant>,
+
+        /// Number of `inhibit_auto_advance` calls still in effect.
+        auto_advance_inhibit_count: usize,
     }
 
     /// Pauses time.
@@ -187,6 +190,7 @@ cfg_test_util! {
                     enable_pausing,
                     base: now,
                     unfrozen: Some(now),
+                    auto_advance_inhibit_count: 0,
                 })),
             };
 
@@ -212,9 +216,20 @@ cfg_test_util! {
             inner.unfrozen = None;
         }
 
-        pub(crate) fn is_paused(&self) -> bool {
+        /// Temporarily stop auto-advancing the clock (see `tokio::time::pause`).
+        pub(crate) fn inhibit_auto_advance(&self) {
+            let mut inner = self.inner.lock();
+            inner.auto_advance_inhibit_count += 1;
+        }
+
+        pub(crate) fn allow_auto_advance(&self) {
+            let mut inner = self.inner.lock();
+            inner.auto_advance_inhibit_count -= 1;
+        }
+
+        pub(crate) fn can_auto_advance(&self) -> bool {
             let inner = self.inner.lock();
-            inner.unfrozen.is_none()
+            inner.unfrozen.is_none() && inner.auto_advance_inhibit_count == 0
         }
 
         #[track_caller]
