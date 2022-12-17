@@ -378,7 +378,7 @@ impl State {
     pub(super) fn set_join_waker(&self) -> UpdateResult {
         self.fetch_update(|curr| {
             assert!(curr.is_join_interested());
-            assert!(!curr.has_join_waker());
+            assert!(!curr.is_join_waker_set());
 
             if curr.is_complete() {
                 return None;
@@ -398,7 +398,7 @@ impl State {
     pub(super) fn unset_waker(&self) -> UpdateResult {
         self.fetch_update(|curr| {
             assert!(curr.is_join_interested());
-            assert!(curr.has_join_waker());
+            assert!(curr.is_join_waker_set());
 
             if curr.is_complete() {
                 return None;
@@ -546,7 +546,7 @@ impl Snapshot {
         self.0 &= !JOIN_INTEREST
     }
 
-    pub(super) fn has_join_waker(self) -> bool {
+    pub(super) fn is_join_waker_set(self) -> bool {
         self.0 & JOIN_WAKER == JOIN_WAKER
     }
 
@@ -588,7 +588,7 @@ impl fmt::Debug for Snapshot {
             .field("is_notified", &self.is_notified())
             .field("is_cancelled", &self.is_cancelled())
             .field("is_join_interested", &self.is_join_interested())
-            .field("has_join_waker", &self.has_join_waker())
+            .field("is_join_waker_set", &self.is_join_waker_set())
             .field("ref_count", &self.ref_count())
             .finish()
     }
