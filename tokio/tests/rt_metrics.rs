@@ -31,6 +31,19 @@ fn num_idle_blocking_threads() {
     rt.block_on(async {
         time::sleep(Duration::from_millis(5)).await;
     });
+
+    // We need to wait until the blocking thread has become idle. Usually 5ms is
+    // enough for this to happen, but not always. When it isn't enough, sleep
+    // for another second. We don't always wait for a whole second since we want
+    // the test suite to finish quickly.
+    //
+    // Note that the timeout for idle threads to be killed is 10 seconds.
+    if 0 == rt.metrics().num_idle_blocking_threads() {
+        rt.block_on(async {
+            time::sleep(Duration::from_secs(1)).await;
+        });
+    }
+
     assert_eq!(1, rt.metrics().num_idle_blocking_threads());
 }
 
