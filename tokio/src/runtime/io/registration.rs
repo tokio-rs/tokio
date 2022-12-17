@@ -226,15 +226,7 @@ fn gone() -> io::Error {
 cfg_io_readiness! {
     impl Registration {
         pub(crate) async fn readiness(&self, interest: Interest) -> io::Result<ReadyEvent> {
-            use std::future::Future;
-            use std::pin::Pin;
-
-            let fut = self.shared.readiness(interest);
-            pin!(fut);
-
-            let ev = crate::future::poll_fn(|cx| {
-                Pin::new(&mut fut).poll(cx)
-            }).await;
+            let ev = self.shared.readiness(interest).await;
 
             if ev.is_shutdown {
                 return Err(gone())
