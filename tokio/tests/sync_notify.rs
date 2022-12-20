@@ -225,3 +225,17 @@ fn test_waker_update() {
 
     assert!(future.is_woken());
 }
+
+#[test]
+fn test_two_notify_one_after_poll() {
+    let notify = Notify::new();
+    let mut future = spawn(notify.notified());
+    assert_pending!(future.poll());
+
+    notify.notify_one();
+    notify.notify_one();
+
+    assert_ready!(future.poll());
+    let mut future = spawn(notify.notified());
+    assert_pending!(future.poll());
+}

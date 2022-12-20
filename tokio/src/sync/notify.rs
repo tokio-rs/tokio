@@ -591,26 +591,20 @@ fn notify_locked(waiters: &mut WaitList, state: &AtomicUsize, curr: usize) -> Op
                 // concurrently change as holding the lock is required to
                 // transition **out** of `WAITING`.
                 //
-                // Get a pending waiter
-                let mut waiter = waiters.pop_back().unwrap();
+                // Get a pending waiter if one exists
+                if let Some(mut waiter) = waiters.pop_back() {
+                    // Safety: `waiters` lock is still held.
+                    let waiter = unsafe { waiter.as_mut() };
 
-                // Safety: `waiters` lock is still held.
-                let waiter = unsafe { waiter.as_mut() };
+                    assert!(waiter.notified.is_none());
 
-                assert!(waiter.notified.is_none());
+                    waiter.notified = Some(NotificationType::OneWaiter);
+                    let waker = waiter.waker.take();
 
-                waiter.notified = Some(NotificationType::OneWaiter);
-                let waker = waiter.waker.take();
+                    return waker;
+                };
 
-                if waiters.is_empty() {
-                    // As this the **final** waiter in the list, the state
-                    // must be transitioned to `EMPTY`. As transitioning
-                    // **from** `WAITING` requires the lock to be held, a
-                    // `store` is sufficient.
-                    state.store(set_state(curr, EMPTY), SeqCst);
-                }
-
-                return waker;
+                return None;
             }
             _ => unreachable!(),
         }
@@ -863,6 +857,15 @@ impl Notified<'_> {
                         w.notified = None;
 
                         *state = Done;
+
+                        if waiters.is_empty() {
+                            // As this the **final** waiter in the list, the state
+                            // must be transitioned to `EMPTY`. As transitioning
+                            // **from** `WAITING` requires the lock to be held, a
+                            // `store` is sufficient.
+                            let curr = notify.state.load(SeqCst);
+                            notify.state.store(set_state(curr, EMPTY), SeqCst);
+                        }
                     } else {
                         // Update the waker, if necessary.
                         if let Some(waker) = waker {
