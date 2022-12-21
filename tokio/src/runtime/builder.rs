@@ -6,10 +6,6 @@ use std::fmt;
 use std::io;
 use std::time::Duration;
 
-/// This key is used to specify the default worker threads for multi-thread runtime.
-#[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-const ENV_WORKER_THREADS: &str = "TOKIO_WORKER_THREADS";
-
 /// Builds Tokio Runtime with custom configuration values.
 ///
 /// Methods can be chained in order to set the configuration values. The
@@ -244,7 +240,7 @@ impl Builder {
 
             // Read from environment variable first in multi-threaded mode.
             // Default to lazy auto-detection (one thread per CPU core)
-            worker_threads: Self::default_worker_threads(kind),
+            worker_threads: None,
 
             max_blocking_threads: 512,
 
@@ -925,33 +921,6 @@ impl Builder {
             handle,
             blocking_pool,
         ))
-    }
-
-    #[cfg(any(not(feature = "rt-multi-thread"), tokio_wasi))]
-    fn default_worker_threads(_: Kind) -> Option<usize> {
-        None
-    }
-
-    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-    fn default_worker_threads(kind: Kind) -> Option<usize> {
-        match kind {
-            // Always return None if using current thread
-            Kind::CurrentThread => return None,
-            Kind::MultiThread => {}
-        };
-        match std::env::var(ENV_WORKER_THREADS) {
-            Ok(s) => {
-                let n: usize = s.parse().unwrap_or_else(|e| {
-                    panic!(
-                        "{} must be usize, error: {}, value: {}",
-                        ENV_WORKER_THREADS, e, s
-                    )
-                });
-                assert!(n > 0, "{} cannot be set to 0", ENV_WORKER_THREADS);
-                Some(n)
-            }
-            Err(_) => None,
-        }
     }
 }
 
