@@ -87,14 +87,20 @@ pub(crate) mod sys {
             Ok(s) => {
                 let n = s.parse().unwrap_or_else(|e| {
                     panic!(
-                        "{} must be usize, error: {}, value: {}",
+                        "\"{}\" must be usize, error: {}, value: {}",
                         ENV_WORKER_THREADS, e, s
                     )
                 });
-                assert!(n > 0, "{} cannot be set to 0", ENV_WORKER_THREADS);
+                assert!(n > 0, "\"{}\" cannot be set to 0", ENV_WORKER_THREADS);
                 n
             }
-            Err(_) => usize::max(1, num_cpus::get()),
+            Err(std::env::VarError::NotPresent) => usize::max(1, num_cpus::get()),
+            Err(std::env::VarError::NotUnicode(e)) => {
+                panic!(
+                    "\"{}\" must be valid unicode, error: {:?}",
+                    ENV_WORKER_THREADS, e
+                )
+            }
         }
     }
 
