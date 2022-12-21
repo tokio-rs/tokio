@@ -177,7 +177,7 @@
 //! combat this, Tokio provides two kinds of threads: Core threads and blocking threads.
 //!
 //! The core threads are where all asynchronous code runs, and Tokio will by default
-//! spawn one for each CPU core. You can use the environment variable "TOKIO_WORKER_THREADS"
+//! spawn one for each CPU core. You can use the environment variable `TOKIO_WORKER_THREADS`
 //! to override the default value.
 //!
 //! The blocking threads are spawned on demand, can be used to run blocking code
