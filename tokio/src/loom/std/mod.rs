@@ -81,7 +81,27 @@ pub(crate) mod sync {
 pub(crate) mod sys {
     #[cfg(feature = "rt-multi-thread")]
     pub(crate) fn num_cpus() -> usize {
-        usize::max(1, num_cpus::get())
+        const ENV_WORKER_THREADS: &str = "TOKIO_WORKER_THREADS";
+
+        match std::env::var(ENV_WORKER_THREADS) {
+            Ok(s) => {
+                let n = s.parse().unwrap_or_else(|e| {
+                    panic!(
+                        "\"{}\" must be usize, error: {}, value: {}",
+                        ENV_WORKER_THREADS, e, s
+                    )
+                });
+                assert!(n > 0, "\"{}\" cannot be set to 0", ENV_WORKER_THREADS);
+                n
+            }
+            Err(std::env::VarError::NotPresent) => usize::max(1, num_cpus::get()),
+            Err(std::env::VarError::NotUnicode(e)) => {
+                panic!(
+                    "\"{}\" must be valid unicode, error: {:?}",
+                    ENV_WORKER_THREADS, e
+                )
+            }
+        }
     }
 
     #[cfg(not(feature = "rt-multi-thread"))]

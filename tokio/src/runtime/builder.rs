@@ -182,6 +182,7 @@ cfg_unstable! {
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
+#[derive(Clone, Copy)]
 pub(crate) enum Kind {
     CurrentThread,
     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
@@ -237,6 +238,7 @@ impl Builder {
             // The clock starts not-paused
             start_paused: false,
 
+            // Read from environment variable first in multi-threaded mode.
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
 
@@ -303,6 +305,8 @@ impl Builder {
     ///
     /// This can be any number above 0 though it is advised to keep this value
     /// on the smaller side.
+    ///
+    /// This will override the value read from environment variable `TOKIO_WORKER_THREADS`.
     ///
     /// # Default
     ///
