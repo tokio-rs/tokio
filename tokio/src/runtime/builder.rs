@@ -306,7 +306,7 @@ impl Builder {
     /// This can be any number above 0 though it is advised to keep this value
     /// on the smaller side.
     ///
-    /// This will override the value read from environment variable "TOKIO_WORKER_THREADS".
+    /// This will override the value read from environment variable `TOKIO_WORKER_THREADS`.
     ///
     /// # Default
     ///
