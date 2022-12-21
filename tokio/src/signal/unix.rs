@@ -14,7 +14,6 @@ use crate::sync::watch;
 
 use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
-use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
@@ -240,7 +239,7 @@ impl Default for SignalInfo {
 /// 2. Wake up the driver by writing a byte to a pipe
 ///
 /// Those two operations should both be async-signal safe.
-fn action(globals: Pin<&'static Globals>, signal: libc::c_int) {
+fn action(globals: &'static Globals, signal: libc::c_int) {
     globals.record_event(signal as EventId);
 
     // Send a wakeup, ignore any errors (anything reasonably possible is

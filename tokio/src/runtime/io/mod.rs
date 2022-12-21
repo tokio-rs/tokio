@@ -104,7 +104,7 @@ fn _assert_kinds() {
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub(crate) fn new() -> io::Result<(Driver, Handle)> {
+    pub(crate) fn new(nevents: usize) -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
         #[cfg(not(tokio_wasi))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
@@ -116,7 +116,7 @@ impl Driver {
         let driver = Driver {
             tick: 0,
             signal_ready: false,
-            events: mio::Events::with_capacity(1024),
+            events: mio::Events::with_capacity(nevents),
             poll,
             resources: slab,
         };

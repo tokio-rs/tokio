@@ -222,7 +222,7 @@ impl Driver {
             let handle = rt_handle.time();
             let clock = &handle.time_source.clock;
 
-            if clock.is_paused() {
+            if clock.can_auto_advance() {
                 self.park.park_timeout(rt_handle, Duration::from_secs(0));
 
                 // If the time driver was woken, then the park completed

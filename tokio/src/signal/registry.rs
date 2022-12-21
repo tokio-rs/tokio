@@ -5,7 +5,6 @@ use crate::sync::watch;
 use crate::util::once_cell::OnceCell;
 
 use std::ops;
-use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub(crate) type EventId = usize;
@@ -162,14 +161,14 @@ where
     }
 }
 
-pub(crate) fn globals() -> Pin<&'static Globals>
+pub(crate) fn globals() -> &'static Globals
 where
     OsExtraData: 'static + Send + Sync + Init,
     OsStorage: 'static + Send + Sync + Init,
 {
     static GLOBALS: OnceCell<Globals> = OnceCell::new();
 
-    Pin::new(GLOBALS.get(globals_init))
+    GLOBALS.get(globals_init)
 }
 
 #[cfg(all(test, not(loom)))]

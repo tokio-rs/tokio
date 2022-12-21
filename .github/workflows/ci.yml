@@ -12,7 +12,7 @@ env:
   # Change to specific Rust release to pin
   rust_stable: stable
   rust_nightly: nightly-2022-11-03
-  rust_clippy: 1.60.0
+  rust_clippy: 1.65.0
   # When updating this, also update:
   # - README.md
   # - tokio/README.md
@@ -268,26 +268,42 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
-          - i686-unknown-linux-gnu
-          - arm-unknown-linux-gnueabihf
-          - armv7-unknown-linux-gnueabihf
-          - aarch64-unknown-linux-gnu
+        include:
+          - target: i686-unknown-linux-gnu
+          - target: arm-unknown-linux-gnueabihf
+          - target: armv7-unknown-linux-gnueabihf
+          - target: aarch64-unknown-linux-gnu
+
+          # Run a platform without AtomicU64 and no const Mutex::new
+          - target: arm-unknown-linux-gnueabihf
+            rustflags: --cfg tokio_no_const_mutex_new
     steps:
       - uses: actions/checkout@v3
-      - name: Install Rust ${{ env.rust_stable }}
+      - name: Install Rust stable
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
           override: true
+      # First run with all features (including parking_lot)
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: test
           args: -p tokio --all-features --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 ${{ matrix.rustflags }}
+      # Now run without parking_lot
+      - name: Remove `parking_lot` from `full` feature
+        run: sed -i '0,/parking_lot/{/parking_lot/d;}' tokio/Cargo.toml
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: test
+          # The `tokio_no_parking_lot` cfg is here to ensure the `sed` above does not silently break.
+          args: -p tokio --features full,test-util --target ${{ matrix.target }} --tests
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot ${{ matrix.rustflags }}
 
   # See https://github.com/tokio-rs/tokio/issues/5187
   no-atomic-u64:

@@ -461,14 +461,14 @@ macro_rules! cfg_not_coop {
 macro_rules! cfg_has_atomic_u64 {
     ($($item:item)*) => {
         $(
-            #[cfg(not(any(
-                target_arch = "arm",
-                target_arch = "mips",
-                target_arch = "powerpc",
-                target_arch = "riscv32",
-                tokio_wasm,
-                tokio_no_atomic_u64,
-            )))]
+            #[cfg_attr(
+                not(tokio_no_target_has_atomic),
+                cfg(all(target_has_atomic = "64", not(tokio_no_atomic_u64))
+            ))]
+            #[cfg_attr(
+                tokio_no_target_has_atomic,
+                cfg(not(tokio_no_atomic_u64))
+            )]
             $item
         )*
     }
@@ -477,14 +477,14 @@ macro_rules! cfg_has_atomic_u64 {
 macro_rules! cfg_not_has_atomic_u64 {
     ($($item:item)*) => {
         $(
-            #[cfg(any(
-                target_arch = "arm",
-                target_arch = "mips",
-                target_arch = "powerpc",
-                target_arch = "riscv32",
-                tokio_wasm,
-                tokio_no_atomic_u64,
+            #[cfg_attr(
+                not(tokio_no_target_has_atomic),
+                cfg(any(not(target_has_atomic = "64"), tokio_no_atomic_u64)
             ))]
+            #[cfg_attr(
+                tokio_no_target_has_atomic,
+                cfg(tokio_no_atomic_u64)
+            )]
             $item
         )*
     }

@@ -166,6 +166,6 @@ impl fmt::Debug for PollSemaphore {
 
 impl AsRef<Semaphore> for PollSemaphore {
     fn as_ref(&self) -> &Semaphore {
-        &*self.semaphore
+        &self.semaphore
     }
 }

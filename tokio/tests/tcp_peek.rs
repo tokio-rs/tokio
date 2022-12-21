@@ -15,7 +15,7 @@ async fn peek() {
     let addr = listener.local_addr().unwrap();
     let t = thread::spawn(move || assert_ok!(listener.accept()).0);
 
-    let left = net::TcpStream::connect(&addr).unwrap();
+    let left = net::TcpStream::connect(addr).unwrap();
     let mut right = t.join().unwrap();
     let _ = right.write(&[1, 2, 3, 4]).unwrap();
 

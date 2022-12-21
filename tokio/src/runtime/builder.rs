@@ -48,6 +48,7 @@ pub struct Builder {
 
     /// Whether or not to enable the I/O driver
     enable_io: bool,
+    nevents: usize,
 
     /// Whether or not to enable the time driver
     enable_time: bool,
@@ -233,6 +234,7 @@ impl Builder {
 
             // I/O defaults to "off"
             enable_io: false,
+            nevents: 1024,
 
             // Time defaults to "off"
             enable_time: false,
@@ -655,6 +657,7 @@ impl Builder {
             enable_io: self.enable_io,
             enable_time: self.enable_time,
             start_paused: self.start_paused,
+            nevents: self.nevents,
         }
     }
 
@@ -971,6 +974,25 @@ cfg_io_driver! {
         /// ```
         pub fn enable_io(&mut self) -> &mut Self {
             self.enable_io = true;
+            self
+        }
+
+        /// Enables the I/O driver and configures the max number of events to be
+        /// processed per tick.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .enable_io()
+        ///     .max_io_events_per_tick(1024)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn max_io_events_per_tick(&mut self, capacity: usize) -> &mut Self {
+            self.nevents = capacity;
             self
         }
     }
