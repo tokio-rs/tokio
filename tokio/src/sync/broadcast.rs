@@ -18,6 +18,9 @@
 //! returned [`Receiver`] will receive values sent **after** the call to
 //! `subscribe`.
 //!
+//! This channel is also suitable for the single-producer multi-consumer
+//! use-case, where a single sender broadcasts values to many receivers.
+//!
 //! ## Lagging
 //!
 //! As sent messages must be retained until **all** [`Receiver`] handles receive
