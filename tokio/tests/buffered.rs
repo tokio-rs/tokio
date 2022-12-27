@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support bind()
+#![cfg(not(miri))] // Miri doesn't support socket
 
 use tokio::net::TcpListener;
 use tokio_test::assert_ok;
