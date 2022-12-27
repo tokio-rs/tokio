@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi cannot run system commands
+#![cfg(not(miri))] // Miri doesn't support gnu_get_libc_version
 
 use tokio::process::Command;
 use tokio_test::assert_ok;
