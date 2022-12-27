@@ -606,6 +606,7 @@ rt_test! {
 
     #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
+    #[cfg_attr(miri, ignore)] // Miri doesn't support epoll_wait
     fn always_active_parker() {
         // This test it to show that we will always have
         // an active parker even if we call block_on concurrently

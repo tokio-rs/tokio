@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
+#![cfg(not(miri))] // Miri doesn't support epoll_wait
 
 use tokio::sync::oneshot;
 use tokio::time::{self, timeout, timeout_at, Instant};
@@ -119,7 +120,6 @@ async fn deadline_now_elapses() {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn deadline_future_elapses() {
     time::pause();
 

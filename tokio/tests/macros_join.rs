@@ -125,6 +125,7 @@ async fn join_does_not_allow_tasks_to_starve() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support epoll_wait
 async fn a_different_future_is_polled_first_every_time_poll_fn_is_polled() {
     let poll_order = Arc::new(std::sync::Mutex::new(vec![]));
 

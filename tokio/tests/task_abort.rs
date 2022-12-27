@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support panic recovery
+#![cfg(not(miri))] // Miri doesn't support epoll_wait
 
 use std::sync::Arc;
 use std::thread::sleep;
