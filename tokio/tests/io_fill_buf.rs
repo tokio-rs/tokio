@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support file operations
+#![cfg(not(miri))] // Miri doesn't support opening file with non-default mode (inside NamedTempFile::new)
 
 use tempfile::NamedTempFile;
 use tokio::fs::File;
