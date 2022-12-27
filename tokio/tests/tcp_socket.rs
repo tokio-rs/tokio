@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support bind
+#![cfg(not(miri))] // Miri doesn't support socket
 
 use std::time::Duration;
 use tokio::net::TcpSocket;

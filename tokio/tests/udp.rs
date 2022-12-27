@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support bind or UDP
+#![cfg(not(miri))] // Miri doesn't support socket
 
 use futures::future::poll_fn;
 use std::io;

@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 // Wasi does not support panic recovery or threading
 #![cfg(all(feature = "full", not(tokio_wasi)))]
+#![cfg(not(miri))] // Miri doesn't support socket
 
 use tokio::net::TcpListener;
 use tokio::runtime;

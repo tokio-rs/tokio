@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))]
+#![cfg(not(miri))] // Miri doesn't support socket
 
 use std::error::Error;
 use tokio::net::{TcpListener, TcpStream};

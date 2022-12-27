@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(unix)]
+#![cfg(not(miri))] // Miri doesn't support socket
 
 use futures::future::poll_fn;
 use tokio::io::ReadBuf;

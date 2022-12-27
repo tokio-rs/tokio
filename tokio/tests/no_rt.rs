@@ -1,4 +1,5 @@
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support panic recovery
+#![cfg(not(miri))] // Miri doesn't support socket
 
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
