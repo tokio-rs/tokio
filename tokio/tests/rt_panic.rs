@@ -24,6 +24,7 @@ fn current_handle_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 fn into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(move || {
         let rt = current_thread();

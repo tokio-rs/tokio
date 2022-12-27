@@ -3,11 +3,13 @@
 use tokio::test;
 
 #[test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn test_macro_can_be_used_via_use() {
     tokio::spawn(async {}).await.unwrap();
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn test_macro_is_resilient_to_shadowing() {
     tokio::spawn(async {}).await.unwrap();
 }

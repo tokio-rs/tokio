@@ -119,6 +119,7 @@ async fn deadline_now_elapses() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn deadline_future_elapses() {
     time::pause();
 

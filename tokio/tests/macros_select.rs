@@ -127,6 +127,7 @@ async fn one_ready() {
 
 #[maybe_tokio_test]
 #[cfg(feature = "full")]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn select_streams() {
     use tokio::sync::mpsc;
 

@@ -10,6 +10,7 @@ impl Drop for PanicsOnDrop {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn test_panics_do_not_propagate_when_dropping_join_handle() {
     let join_handle = tokio::spawn(async move { PanicsOnDrop });
 

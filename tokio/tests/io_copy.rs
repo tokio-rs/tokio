@@ -38,6 +38,7 @@ async fn copy() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn proxy() {
     struct BufferedWd {
         buf: BytesMut,

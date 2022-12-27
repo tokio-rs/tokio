@@ -27,6 +27,7 @@ fn try_acquire() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn acquire() {
     let sem = Arc::new(Semaphore::new(1));
     let p1 = sem.try_acquire().unwrap();
@@ -40,6 +41,7 @@ async fn acquire() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn add_permits() {
     let sem = Arc::new(Semaphore::new(0));
     let sem_clone = sem.clone();
@@ -90,6 +92,7 @@ fn merge_unrelated_permits() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn stress_test() {
     let sem = Arc::new(Semaphore::new(5));
     let mut join_handles = Vec::new();

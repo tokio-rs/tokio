@@ -92,6 +92,7 @@ fn lock() {
 /// is aborted prematurely.
 #[tokio::test]
 #[cfg(feature = "full")]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn aborted_future_1() {
     use std::time::Duration;
     use tokio::time::{interval, timeout};
@@ -122,6 +123,7 @@ async fn aborted_future_1() {
 /// aborted future is waiting for the lock.
 #[tokio::test]
 #[cfg(feature = "full")]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn aborted_future_2() {
     use std::time::Duration;
     use tokio::time::timeout;

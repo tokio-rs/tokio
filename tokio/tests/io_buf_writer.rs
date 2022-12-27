@@ -132,6 +132,7 @@ async fn buf_writer_seek() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn maybe_pending_buf_writer() {
     let mut writer = BufWriter::with_capacity(2, MaybePending::new(Vec::new()));
 
@@ -180,6 +181,7 @@ async fn maybe_pending_buf_writer() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn maybe_pending_buf_writer_inner_flushes() {
     let mut w = BufWriter::with_capacity(3, MaybePending::new(Vec::new()));
     assert_eq!(w.write(&[0, 1]).await.unwrap(), 2);
@@ -190,6 +192,7 @@ async fn maybe_pending_buf_writer_inner_flushes() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn maybe_pending_buf_writer_seek() {
     struct MaybePendingSeek {
         inner: Cursor<Vec<u8>>,

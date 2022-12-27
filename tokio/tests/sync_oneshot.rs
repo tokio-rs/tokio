@@ -95,6 +95,7 @@ fn close_rx() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn async_rx_closed() {
     let (mut tx, rx) = oneshot::channel::<()>();
 

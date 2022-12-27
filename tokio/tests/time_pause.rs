@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
+#![cfg(not(miri))] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 
 use rand::SeedableRng;
 use rand::{rngs::StdRng, Rng};

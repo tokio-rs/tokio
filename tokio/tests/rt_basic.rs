@@ -113,6 +113,7 @@ fn no_extra_poll() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 fn acquire_mutex_in_drop() {
     use futures::future::pending;
     use tokio::task;
@@ -149,6 +150,7 @@ fn acquire_mutex_in_drop() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 fn drop_tasks_in_context() {
     static SUCCESS: AtomicBool = AtomicBool::new(false);
 

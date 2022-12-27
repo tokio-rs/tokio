@@ -223,6 +223,7 @@ async fn test_short_reads() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn maybe_pending() {
     let inner: &[u8] = &[5, 6, 7, 0, 1, 2, 3, 4];
     let mut reader = BufReader::with_capacity(2, MaybePending::new(inner));
@@ -260,6 +261,7 @@ async fn maybe_pending() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn maybe_pending_buf_read() {
     let inner = MaybePending::new(&[0, 1, 2, 3, 1, 0]);
     let mut reader = BufReader::with_capacity(2, inner);
@@ -279,6 +281,7 @@ async fn maybe_pending_buf_read() {
 
 // https://github.com/rust-lang/futures-rs/pull/1573#discussion_r281162309
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn maybe_pending_seek() {
     struct MaybePendingSeek<'a> {
         inner: Cursor<&'a [u8]>,
