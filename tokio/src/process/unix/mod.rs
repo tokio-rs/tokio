@@ -156,7 +156,7 @@ impl Future for Child {
 
 #[derive(Debug)]
 pub(crate) struct Pipe {
-    // Actually a pipe and not a File. However, we are reusing `File` to get
+    // Actually a pipe is not a File. However, we are reusing `File` to get
     // close on drop. This is a similar trick as `mio`.
     fd: File,
 }
