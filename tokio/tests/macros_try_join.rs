@@ -139,6 +139,7 @@ async fn poor_little_task(permits: Arc<Semaphore>) -> Result<usize, String> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn try_join_does_not_allow_tasks_to_starve() {
     let permits = Arc::new(Semaphore::new(10));
 
