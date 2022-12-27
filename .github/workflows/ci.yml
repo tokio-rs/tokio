@@ -202,9 +202,7 @@ jobs:
           components: miri
       - uses: Swatinem/rust-cache@v2
       - name: miri
-        # Many of tests in tokio/tests and doctests use #[tokio::test] or
-        # #[tokio::main] that calls epoll_create1 that Miri does not support.
-        run: cargo miri test --features full --lib --no-fail-fast
+        run: cargo miri test --features full --no-fail-fast
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
