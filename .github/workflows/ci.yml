@@ -202,6 +202,7 @@ jobs:
           components: miri
       - uses: Swatinem/rust-cache@v2
       - name: miri
+        # Ignore doctest because many features don't work with Miri yet.
         run: cargo miri test --features full --no-fail-fast --tests
         working-directory: tokio
         env:
