@@ -51,6 +51,7 @@ async fn acquire() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn acquire_many() {
     let semaphore = Arc::new(Semaphore::new(42));
     let permit32 = semaphore.clone().try_acquire_many_owned(32).unwrap();

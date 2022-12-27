@@ -45,6 +45,7 @@ fn spawned_task_does_not_progress_without_block_on() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 fn no_extra_poll() {
     use pin_project_lite::pin_project;
     use std::pin::Pin;
