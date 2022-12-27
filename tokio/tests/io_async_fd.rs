@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(unix, feature = "full"))]
+#![cfg(not(miri))] // Miri doesn't support 0x3 command for fcntl
 
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{
