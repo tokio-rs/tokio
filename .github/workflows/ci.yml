@@ -73,10 +73,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-            override: true
       - name: Install Rust
         run: rustup update stable
       - uses: Swatinem/rust-cache@v1
@@ -123,10 +122,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-            override: true
       - uses: Swatinem/rust-cache@v1
       - name: Enable parking_lot send_guard feature
         # Inserts the line "plsend = ["parking_lot/send_guard"]" right after [features]
@@ -140,10 +138,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-            override: true
       - uses: Swatinem/rust-cache@v1
 
       - name: Install Valgrind
@@ -179,10 +176,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-            override: true
       - uses: Swatinem/rust-cache@v1
       # Run `tokio` with "unstable" cfg flag.
       - name: test tokio full --cfg unstable
@@ -200,11 +196,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_nightly }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
           components: miri
-          override: true
       - uses: Swatinem/rust-cache@v1
       - name: miri
         # Many of tests in tokio/tests and doctests use #[tokio::test] or
@@ -224,10 +219,9 @@ jobs:
         # Required to resolve symbols in sanitizer output
         run: sudo apt-get install -y llvm
       - name: Install Rust ${{ env.rust_nightly }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
-          override: true
       - uses: Swatinem/rust-cache@v1
       - name: asan
         run: cargo test --workspace --all-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1
@@ -250,16 +244,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: check
-          args: --workspace --all-features --target ${{ matrix.target }}
+      - name: Install cross
+        uses: taiki-e/install-action@cross
+      - run: cross check --workspace --all-features --target ${{ matrix.target }}
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -280,28 +271,21 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
-          override: true
+      - name: Install cross
+        uses: taiki-e/install-action@cross
       # First run with all features (including parking_lot)
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: test
-          args: -p tokio --all-features --target ${{ matrix.target }} --tests
+      - run: cross test -p tokio --all-features --target ${{ matrix.target }} --tests
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 ${{ matrix.rustflags }}
       # Now run without parking_lot
       - name: Remove `parking_lot` from `full` feature
         run: sed -i '0,/parking_lot/{/parking_lot/d;}' tokio/Cargo.toml
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: test
-          # The `tokio_no_parking_lot` cfg is here to ensure the `sed` above does not silently break.
-          args: -p tokio --features full,test-util --target ${{ matrix.target }} --tests
+      # The `tokio_no_parking_lot` cfg is here to ensure the `sed` above does not silently break.
+      - run: cross test -p tokio --features full,test-util --target ${{ matrix.target }} --tests
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot ${{ matrix.rustflags }}
 
@@ -312,11 +296,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_nightly }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
           components: rust-src
-          override: true
       # Install linker and libraries for i686-unknown-linux-gnu
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
@@ -331,11 +314,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_nightly }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
           target: ${{ matrix.target }}
-          override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
@@ -353,10 +335,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_min }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_min }}
-          override: true
       - uses: Swatinem/rust-cache@v1
       # First compile just the main tokio crate with minrust and newest version
       # of all dependencies, then pin once_cell and compile the rest of the
@@ -378,10 +359,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_nightly }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
-          override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
@@ -410,10 +390,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
-          override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
       # Check fmt
@@ -431,10 +410,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_clippy }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_clippy }}
-          override: true
           components: clippy
       - uses: Swatinem/rust-cache@v1
       # Run clippy
@@ -447,10 +425,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_nightly }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
-          override: true
       - uses: Swatinem/rust-cache@v1
       - name: "doc --lib --all-features"
         run: cargo doc --lib --no-deps --all-features --document-private-items
@@ -464,10 +441,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
-          override: true
       - uses: Swatinem/rust-cache@v1
       - name: build --cfg loom
         run: cargo test --no-run --lib --features full
@@ -499,10 +475,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
-          override: true
       - uses: Swatinem/rust-cache@v1
       - name: Test hyper
         run: |
@@ -527,11 +502,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_nightly }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
           target: x86_64-fortanix-unknown-sgx
-          override: true
       - uses: Swatinem/rust-cache@v1
       # NOTE: Currently the only test we can run is to build tokio with rt and sync features.
       - name: build tokio
@@ -544,10 +518,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
-          override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -561,10 +534,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
-          override: true
       - uses: Swatinem/rust-cache@v1
 
       # Install dependencies
@@ -614,12 +586,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust nightly-2022-07-25
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           # `check-external-types` requires a specific Rust nightly version. See
           # the README for details: https://github.com/awslabs/cargo-check-external-types
           toolchain: nightly-2022-07-25
-          override: true
       - uses: Swatinem/rust-cache@v1
       - name: check-external-types
         run: |
