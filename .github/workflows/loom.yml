@@ -37,7 +37,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: loom ${{ matrix.scope }}
         run: cargo test --lib --release --features full -- --nocapture $SCOPE
         working-directory: tokio

@@ -78,7 +78,7 @@ jobs:
             toolchain: ${{ env.rust_stable }}
       - name: Install Rust
         run: rustup update stable
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
@@ -125,7 +125,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Enable parking_lot send_guard feature
         # Inserts the line "plsend = ["parking_lot/send_guard"]" right after [features]
         run: sed -i '/\[features\]/a plsend = ["parking_lot/send_guard"]' tokio/Cargo.toml
@@ -141,7 +141,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
@@ -179,7 +179,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       # Run `tokio` with "unstable" cfg flag.
       - name: test tokio full --cfg unstable
         run: cargo test --all-features
@@ -200,7 +200,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
           components: miri
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: miri
         # Many of tests in tokio/tests and doctests use #[tokio::test] or
         # #[tokio::main] that calls epoll_create1 that Miri does not support.
@@ -222,7 +222,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: asan
         run: cargo test --workspace --all-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1
         env:
@@ -318,7 +318,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
           target: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
       - name: check --feature-powerset
@@ -338,7 +338,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_min }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       # First compile just the main tokio crate with minrust and newest version
       # of all dependencies, then pin once_cell and compile the rest of the
       # crates with the pinned once_cell version.
@@ -362,7 +362,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
       - name: "check --all-features -Z minimal-versions"
@@ -394,7 +394,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_stable }}
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       # Check fmt
       - name: "rustfmt --check"
         # Workaround for rust-lang/cargo#7732
@@ -414,7 +414,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_clippy }}
           components: clippy
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       # Run clippy
       - name: "clippy --all"
         run: cargo clippy --all --tests --all-features
@@ -428,7 +428,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: "doc --lib --all-features"
         run: cargo doc --lib --no-deps --all-features --document-private-items
         env:
@@ -444,7 +444,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: build --cfg loom
         run: cargo test --no-run --lib --features full
         working-directory: tokio
@@ -478,7 +478,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Test hyper
         run: |
           set -x
@@ -506,7 +506,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
           target: x86_64-fortanix-unknown-sgx
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       # NOTE: Currently the only test we can run is to build tokio with rt and sync features.
       - name: build tokio
         run: cargo build --target x86_64-fortanix-unknown-sgx --features rt,sync
@@ -521,7 +521,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       - name: test tokio
@@ -537,7 +537,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Install dependencies
       - name: Install cargo-hack
@@ -591,7 +591,7 @@ jobs:
           # `check-external-types` requires a specific Rust nightly version. See
           # the README for details: https://github.com/awslabs/cargo-check-external-types
           toolchain: nightly-2022-07-25
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: check-external-types
         run: |
           set -x

@@ -28,7 +28,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
 
