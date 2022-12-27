@@ -106,6 +106,7 @@ rt_test! {
 
     #[cfg(not(target_os="wasi"))]
     #[test]
+    #[cfg_attr(miri, ignore)] // Miri doesn't support epoll_wait
     fn block_on_async() {
         let rt = rt();
 
