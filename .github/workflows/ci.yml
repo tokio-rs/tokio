@@ -202,7 +202,7 @@ jobs:
           components: miri
       - uses: Swatinem/rust-cache@v2
       - name: miri
-        run: cargo miri test --features full --no-fail-fast
+        run: cargo miri test --features full --no-fail-fast --tests
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
