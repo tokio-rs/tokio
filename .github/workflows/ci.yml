@@ -201,6 +201,11 @@ jobs:
           toolchain: ${{ env.rust_nightly }}
           components: miri
       - uses: Swatinem/rust-cache@v2
+      - run: |
+          echo '[patch.crates-io]' >>Cargo.toml
+          echo 'parking_lot_core = { git = "https://github.com/taiki-e/parking_lot.git", branch = "strict-provenance" }' >>Cargo.toml
+          git diff
+          cargo update
       - name: miri
         # Ignore doctest because many features don't work with Miri yet.
         run: cargo miri test --features full --no-fail-fast --tests
