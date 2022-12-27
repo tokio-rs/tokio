@@ -8,6 +8,7 @@
 // `EV_EOF` or `EV_ERROR` flag set. If either flag is set a write would be
 // attempted, but that does not seem to occur.
 #![cfg(all(unix, not(target_os = "freebsd")))]
+#![cfg(not(miri))] // Miri doesn't support pipe2
 
 use std::process::Stdio;
 use std::time::Duration;

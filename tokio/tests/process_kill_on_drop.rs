@@ -1,5 +1,6 @@
 #![cfg(all(unix, feature = "process"))]
 #![warn(rust_2018_idioms)]
+#![cfg(not(miri))] // Miri doesn't support pipe2
 
 use std::io::ErrorKind;
 use std::process::Stdio;

@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", unix))]
+#![cfg(not(miri))] // Miri doesn't support pipe2
 
 use tokio::process::Command;
 
