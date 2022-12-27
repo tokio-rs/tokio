@@ -9,6 +9,7 @@ name: CI
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
+  ACTIONS_STEP_DEBUG: true
   # Change to specific Rust release to pin
   rust_stable: stable
   rust_nightly: nightly-2022-11-03
