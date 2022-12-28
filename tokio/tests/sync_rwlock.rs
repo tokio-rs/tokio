@@ -174,6 +174,7 @@ async fn write_order() {
 // A single RwLock is contested by tasks in multiple threads
 #[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+#[cfg_attr(miri, ignore)] // Miri doesn't support epoll_wait
 async fn multithreaded() {
     use futures::stream::{self, StreamExt};
     use std::sync::Arc;

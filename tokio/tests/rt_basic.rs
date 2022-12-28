@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
+#![cfg(not(miri))] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
@@ -45,7 +46,6 @@ fn spawned_task_does_not_progress_without_block_on() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 fn no_extra_poll() {
     use pin_project_lite::pin_project;
     use std::pin::Pin;
@@ -114,7 +114,6 @@ fn no_extra_poll() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 fn acquire_mutex_in_drop() {
     use futures::future::pending;
     use tokio::task;
@@ -151,7 +150,6 @@ fn acquire_mutex_in_drop() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 fn drop_tasks_in_context() {
     static SUCCESS: AtomicBool = AtomicBool::new(false);
 

@@ -1,5 +1,7 @@
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 #![allow(clippy::declare_interior_mutable_const)]
+#![cfg(not(miri))] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
+
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};

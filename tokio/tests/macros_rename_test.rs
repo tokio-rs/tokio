@@ -1,4 +1,5 @@
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threading
+#![cfg(not(miri))] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 
 #[allow(unused_imports)]
 use std as tokio;

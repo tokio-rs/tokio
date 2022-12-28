@@ -1,6 +1,7 @@
 #![allow(clippy::needless_range_loop)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
+#![cfg(not(miri))] // Miri doesn't support epoll_wait
 
 // Tests to run on both current-thread & multi-thread runtime variants.
 
@@ -106,7 +107,6 @@ rt_test! {
 
     #[cfg(not(target_os="wasi"))]
     #[test]
-    #[cfg_attr(miri, ignore)] // Miri doesn't support epoll_wait
     fn block_on_async() {
         let rt = rt();
 
@@ -607,7 +607,6 @@ rt_test! {
 
     #[cfg(not(target_os="wasi"))] // Wasi does not support threads
     #[test]
-    #[cfg_attr(miri, ignore)] // Miri doesn't support epoll_wait
     fn always_active_parker() {
         // This test it to show that we will always have
         // an active parker even if we call block_on concurrently

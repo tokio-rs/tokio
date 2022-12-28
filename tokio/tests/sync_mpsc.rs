@@ -1,6 +1,7 @@
 #![allow(clippy::redundant_clone)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
+#![cfg(not(miri))] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 
 #[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
@@ -106,7 +107,6 @@ async fn send_recv_stream_with_buffer() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
-#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn async_send_recv_with_buffer() {
     let (tx, mut rx) = mpsc::channel(16);
 
@@ -178,7 +178,6 @@ async fn send_recv_unbounded() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
-#[cfg_attr(miri, ignore)] // Miri doesn't support write to event (inside mio::waker::Waker::wake)
 async fn async_send_recv_unbounded() {
     let (tx, mut rx) = mpsc::unbounded_channel();
 
