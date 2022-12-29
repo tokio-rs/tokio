@@ -294,15 +294,15 @@ where
                 // We are on an executor, but _not_ on the thread pool.  That is
                 // _only_ okay if we are in a thread pool runtime's block_on
                 // method:
-                if allow_block_in_place {
+                return if allow_block_in_place {
                     had_entered = true;
-                    return Ok(());
+                    Ok(())
                 } else {
                     // This probably means we are on the current_thread runtime or in a
                     // LocalSet, where it is _not_ okay to block.
-                    return Err(
+                    Err(
                         "can call blocking only when running on the multi-threaded runtime",
-                    );
+                    )
                 }
             }
             (context::EnterRuntime::NotEntered, true) => {

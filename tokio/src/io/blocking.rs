@@ -79,17 +79,17 @@ where
                     let (res, mut buf, inner) = ready!(Pin::new(rx).poll(cx))?;
                     self.inner = Some(inner);
 
-                    match res {
+                    return match res {
                         Ok(_) => {
                             buf.copy_to(dst);
                             self.state = Idle(Some(buf));
-                            return Ready(Ok(()));
+                            Ready(Ok(()))
                         }
                         Err(e) => {
                             assert!(buf.is_empty());
 
                             self.state = Idle(Some(buf));
-                            return Ready(Err(e));
+                            Ready(Err(e))
                         }
                     }
                 }

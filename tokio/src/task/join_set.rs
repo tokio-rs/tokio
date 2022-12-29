@@ -309,11 +309,11 @@ impl<T: 'static> JoinSet<T> {
         let mut entry = match self.inner.pop_notified(cx.waker()) {
             Some(entry) => entry,
             None => {
-                if self.is_empty() {
-                    return Poll::Ready(None);
+                return if self.is_empty() {
+                    Poll::Ready(None)
                 } else {
                     // The waker was set by `pop_notified`.
-                    return Poll::Pending;
+                    Poll::Pending
                 }
             }
         };
@@ -369,11 +369,11 @@ impl<T: 'static> JoinSet<T> {
         let mut entry = match self.inner.pop_notified(cx.waker()) {
             Some(entry) => entry,
             None => {
-                if self.is_empty() {
-                    return Poll::Ready(None);
+                return if self.is_empty() {
+                    Poll::Ready(None)
                 } else {
                     // The waker was set by `pop_notified`.
-                    return Poll::Pending;
+                    Poll::Pending
                 }
             }
         };

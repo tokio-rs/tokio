@@ -52,12 +52,12 @@ where
 
         loop {
             if let Some(future) = me.future.as_mut().as_pin_mut() {
-                match future.poll(cx) {
+                return match future.poll(cx) {
                     Poll::Ready(item) => {
                         me.future.set(None);
-                        return Poll::Ready(Some(item));
+                        Poll::Ready(Some(item))
                     }
-                    Poll::Pending => return Poll::Pending,
+                    Poll::Pending => Poll::Pending,
                 }
             }
 

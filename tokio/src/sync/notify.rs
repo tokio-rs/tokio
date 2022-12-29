@@ -576,13 +576,13 @@ fn notify_locked(waiters: &mut WaitList, state: &AtomicUsize, curr: usize) -> Op
             EMPTY | NOTIFIED => {
                 let res = state.compare_exchange(curr, set_state(curr, NOTIFIED), SeqCst, SeqCst);
 
-                match res {
-                    Ok(_) => return None,
+                return match res {
+                    Ok(_) => None,
                     Err(actual) => {
                         let actual_state = get_state(actual);
                         assert!(actual_state == EMPTY || actual_state == NOTIFIED);
                         state.store(set_state(actual, NOTIFIED), SeqCst);
-                        return None;
+                        None
                     }
                 }
             }
