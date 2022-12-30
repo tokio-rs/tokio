@@ -1,8 +1,8 @@
 //! Runs `!Send` futures on the current thread.
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
-use crate::loom::thread::{self, ThreadId};
 use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
+use crate::runtime::{context, ThreadId};
 use crate::sync::AtomicWaker;
 use crate::util::RcCell;
 
@@ -277,12 +277,10 @@ pin_project! {
 }
 
 tokio_thread_local!(static CURRENT: LocalData = const { LocalData {
-    thread_id: Cell::new(None),
     ctx: RcCell::new(),
 } });
 
 struct LocalData {
-    thread_id: Cell<Option<ThreadId>>,
     ctx: RcCell<Context>,
 }
 
@@ -379,12 +377,14 @@ impl fmt::Debug for LocalEnterGuard {
 impl LocalSet {
     /// Returns a new local task set.
     pub fn new() -> LocalSet {
+        let owner = context::thread_id().expect("cannot create LocalSet during thread shutdown");
+
         LocalSet {
             tick: Cell::new(0),
             context: Rc::new(Context {
                 shared: Arc::new(Shared {
                     local_state: LocalState {
-                        owner: thread_id().expect("cannot create LocalSet during thread shutdown"),
+                        owner,
                         owned: LocalOwnedTasks::new(),
                         local_queue: UnsafeCell::new(VecDeque::with_capacity(INITIAL_CAPACITY)),
                     },
@@ -949,7 +949,7 @@ impl Shared {
 
                 // We are on the thread that owns the `LocalSet`, so we can
                 // wake to the local queue.
-                _ if localdata.get_id() == Some(self.local_state.owner) => {
+                _ if context::thread_id().ok() == Some(self.local_state.owner) => {
                     unsafe {
                         // Safety: we just checked that the thread ID matches
                         // the localset's owner, so this is safe.
@@ -1093,7 +1093,9 @@ impl LocalState {
             // if we couldn't get the thread ID because we're dropping the local
             // data, skip the assertion --- the `Drop` impl is not going to be
             // called from another thread, because `LocalSet` is `!Send`
-            thread_id().map(|id| id == self.owner).unwrap_or(true),
+            context::thread_id()
+                .map(|id| id == self.owner)
+                .unwrap_or(true),
             "`LocalSet`'s local run queue must not be accessed by another thread!"
         );
     }
@@ -1102,26 +1104,6 @@ impl LocalState {
 // This is `Send` because it is stored in `Shared`. It is up to the caller to
 // ensure they are on the same thread that owns the `LocalSet`.
 unsafe impl Send for LocalState {}
-
-impl LocalData {
-    fn get_id(&self) -> Option<ThreadId> {
-        self.thread_id.get()
-    }
-
-    fn get_or_insert_id(&self) -> ThreadId {
-        self.thread_id.get().unwrap_or_else(|| {
-            let id = thread::current().id();
-            self.thread_id.set(Some(id));
-            id
-        })
-    }
-}
-
-fn thread_id() -> Option<ThreadId> {
-    CURRENT
-        .try_with(|localdata| localdata.get_or_insert_id())
-        .ok()
-}
 
 #[cfg(all(test, not(loom)))]
 mod tests {
