@@ -237,6 +237,9 @@ cfg_rt! {
     mod runtime;
     pub use runtime::{Runtime, RuntimeFlavor};
 
+    mod thread_id;
+    pub(crate) use thread_id::ThreadId;
+
     cfg_metrics! {
         mod metrics;
         pub use metrics::RuntimeMetrics;
