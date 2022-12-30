@@ -180,7 +180,7 @@ use self::harness::Harness;
 
 mod id;
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-pub use id::{Id, id, try_id};
+pub use id::{id, try_id, Id};
 
 cfg_rt_multi_thread! {
     mod inject;
