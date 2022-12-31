@@ -328,8 +328,8 @@ impl RuntimeMetrics {
     /// async fn main() {
     ///     let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.worker_poll_count(0);
-    ///     println!("worker 0 has polled {} tasks", n);
+    ///     let n = metrics.worker_total_busy_duration(0);
+    ///     println!("worker 0 was busy for a total of {:?}", n);
     /// }
     /// ```
     pub fn worker_total_busy_duration(&self, worker: usize) -> Duration {
