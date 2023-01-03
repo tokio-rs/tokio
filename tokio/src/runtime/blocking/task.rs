@@ -39,6 +39,15 @@ where
         // we want it to start without any budgeting.
         crate::runtime::coop::stop();
 
-        Poll::Ready(func())
+        #[cfg(feature = "probe")]
+        crate::probes::task_blocking_begin();
+
+        let res = Poll::Ready(func());
+
+        #[cfg(feature = "probe")]
+        crate::probes::task_blocking_end();
+
+        #[allow(clippy::let_and_return)]
+        res
     }
 }

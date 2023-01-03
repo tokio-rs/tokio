@@ -210,6 +210,9 @@ impl<T: Future, S: Schedule> Core<T, S> {
     pub(super) fn poll(&self, mut cx: Context<'_>) -> Poll<T::Output> {
         let res = {
             self.stage.stage.with_mut(|ptr| {
+                #[cfg(feature = "probe")]
+                let mut probe_helper = ProbeHelper::new(self.task_id);
+
                 // Safety: The caller ensures mutual exclusion to the field.
                 let future = match unsafe { &mut *ptr } {
                     Stage::Running(future) => future,
@@ -220,7 +223,16 @@ impl<T: Future, S: Schedule> Core<T, S> {
                 let future = unsafe { Pin::new_unchecked(future) };
 
                 let _guard = TaskIdGuard::enter(self.task_id);
-                future.poll(&mut cx)
+                let res = future.poll(&mut cx);
+
+                #[cfg(feature = "probe")]
+                {
+                    probe_helper.is_ready = res.is_ready();
+                    probe_helper.panicked = false
+                }
+
+                #[allow(clippy::let_and_return)]
+                res
             })
         };
 
@@ -274,7 +286,14 @@ impl<T: Future, S: Schedule> Core<T, S> {
 
     unsafe fn set_stage(&self, stage: Stage<T>) {
         let _guard = TaskIdGuard::enter(self.task_id);
-        self.stage.stage.with_mut(|ptr| *ptr = stage)
+        self.stage.stage.with_mut(|ptr| {
+            #[cfg(feature = "probe")]
+            if matches!(stage, Stage::Consumed | Stage::Finished(_)) {
+                crate::probes::task_finish(self.task_id);
+            }
+
+            *ptr = stage;
+        })
     }
 }
 
@@ -283,6 +302,32 @@ cfg_rt_multi_thread! {
         pub(super) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
             self.queue_next.with_mut(|ptr| *ptr = next);
         }
+    }
+}
+
+#[cfg(feature = "probe")]
+struct ProbeHelper {
+    id: Id,
+    is_ready: bool,
+    panicked: bool,
+}
+
+#[cfg(feature = "probe")]
+impl ProbeHelper {
+    fn new(id: Id) -> Self {
+        crate::probes::task_poll_begin(id);
+        Self {
+            id,
+            is_ready: false,
+            panicked: true,
+        }
+    }
+}
+
+#[cfg(feature = "probe")]
+impl Drop for ProbeHelper {
+    fn drop(&mut self) {
+        crate::probes::task_poll_end(self.id, self.is_ready, self.panicked);
     }
 }
 
