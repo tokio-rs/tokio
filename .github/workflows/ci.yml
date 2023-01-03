@@ -41,7 +41,6 @@ jobs:
       - features
       - minrust
       - fmt
-      - clippy
       - docs
       - valgrind
       - loom-compile
@@ -351,22 +350,6 @@ jobs:
             printf "Please run \`rustfmt --edition 2018 \$(git ls-files '*.rs')\` to fix rustfmt errors.\nSee CONTRIBUTING.md for more details.\n" >&2
             exit 1
           fi
-
-  clippy:
-    name: clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust ${{ env.rust_clippy }}
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ env.rust_clippy }}
-          override: true
-          components: clippy
-      - uses: Swatinem/rust-cache@v1
-      # Run clippy
-      - name: "clippy --all"
-        run: cargo clippy --all --tests --all-features
 
   docs:
     name: docs

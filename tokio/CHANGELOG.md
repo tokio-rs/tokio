@@ -123,6 +123,15 @@ This release fixes a bug in `Notified::enable`. ([#4747])
 [#4729]: https://github.com/tokio-rs/tokio/pull/4729
 [#4739]: https://github.com/tokio-rs/tokio/pull/4739
 
+# 1.18.4 (January 3, 2022)
+
+### Fixed
+
+- net: fix Windows named pipe server builder to maintain option when toggling
+  pipe mode ([#5336]).
+
+[#5336]: https://github.com/tokio-rs/tokio/pull/5336
+
 # 1.18.3 (September 27, 2022)
 
 This release removes the dependency on the `once_cell` crate to restore the MSRV
