@@ -666,6 +666,7 @@ impl TcpSocket {
     /// socket must not have been connected prior to calling this function. This
     /// function is typically used together with crates such as [`socket2`] to
     /// configure socket options that are not available on `TcpSocket`.
+    /// It is left up to the user to set the socket in non-blocking mode.
     ///
     /// [`std::net::TcpStream`]: struct@std::net::TcpStream
     /// [`socket2`]: https://docs.rs/socket2/
@@ -678,8 +679,8 @@ impl TcpSocket {
     ///
     /// #[tokio::main]
     /// async fn main() -> std::io::Result<()> {
-    ///
     ///     let socket2_socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
+    ///     socket2_socket.set_nonblocking(true)?;
     ///
     ///     let socket = TcpSocket::from_std_stream(socket2_socket.into());
     ///
