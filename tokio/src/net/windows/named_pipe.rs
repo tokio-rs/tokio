@@ -2557,7 +2557,7 @@ unsafe fn named_pipe_info(handle: RawHandle) -> io::Result<PipeInfo> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use windows_sys::{PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE};
+    use self::windows_sys::{PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE};
 
     #[test]
     fn opts_default_pipe_mode() {
@@ -2567,14 +2567,14 @@ mod test {
 
     #[test]
     fn opts_unset_reject_remote() {
-        let opts = ServerOptions::new();
+        let mut opts = ServerOptions::new();
         opts.reject_remote_clients(false);
         assert_eq!(opts.pipe_mode & PIPE_REJECT_REMOTE_CLIENTS, 0);
     }
 
     #[test]
     fn opts_set_pipe_mode_maintains_reject_remote_clients() {
-        let opts = ServerOptions::new();
+        let mut opts = ServerOptions::new();
         opts.pipe_mode(PipeMode::Byte);
         assert_eq!(opts.pipe_mode, PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS);
 
