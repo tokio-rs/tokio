@@ -1,3 +1,14 @@
+# 1.20.3 (January 3, 2022)
+
+This release forward ports changes from 1.18.4.
+
+### Fixed
+
+- net: fix Windows named pipe server builder to maintain option when toggling
+  pipe mode ([#5336]).
+
+[#5336]: https://github.com/tokio-rs/tokio/pull/5336
+
 # 1.20.2 (September 27, 2022)
 
 This release removes the dependency on the `once_cell` crate to restore the MSRV
