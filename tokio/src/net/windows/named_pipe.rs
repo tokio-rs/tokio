@@ -2556,8 +2556,8 @@ unsafe fn named_pipe_info(handle: RawHandle) -> io::Result<PipeInfo> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use self::windows_sys::{PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE};
+    use super::*;
 
     #[test]
     fn opts_default_pipe_mode() {
