@@ -453,10 +453,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install Rust ${{ env.rust_stable }}
+      - name: Install Rust stable
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ env.rust_stable }}
+          toolchain: stable
           override: true
       - uses: Swatinem/rust-cache@v1
 
@@ -481,3 +481,5 @@ jobs:
         # TODO: this should become: `cargo hack wasi test --each-feature`
         run: cargo wasi test --test rt_yield --features wasi-rt
         working-directory: tests-integration
+        env:
+          RUSTFLAGS: ""
