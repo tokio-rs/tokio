@@ -13,7 +13,7 @@ use tokio::process::Command;
 use tokio_test::task;
 use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 
-/// Helper struct which will clean up temporary files once the `TempFifo` is dropped.
+/// Helper struct which will clean up temporary files once dropped.
 struct TempFifo {
     path: PathBuf,
     _dir: tempfile::TempDir,
@@ -39,9 +39,11 @@ impl AsRef<Path> for TempFifo {
 
 #[tokio::test]
 async fn fifo_simple_send() -> io::Result<()> {
-    let fifo = TempFifo::new("simple_send")?;
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
+    let fifo = TempFifo::new("simple_send")?;
+
+    // Create a reading task which should wait for data from the pipe.
     let mut reader = pipe::Receiver::open(&fifo)?;
     let mut read_fut = task::spawn(async move {
         let mut buf = vec![0; DATA.len()];
@@ -58,6 +60,7 @@ async fn fifo_simple_send() -> io::Result<()> {
         tokio::task::yield_now().await;
     }
 
+    // Reading task should be ready now.
     let read_data = assert_ready_ok!(read_fut.poll());
     assert_eq!(&read_data, DATA);
 
@@ -67,16 +70,20 @@ async fn fifo_simple_send() -> io::Result<()> {
 #[tokio::test]
 #[cfg(target_os = "linux")]
 async fn fifo_simple_send_sender_first() -> io::Result<()> {
-    let fifo = TempFifo::new("simple_send_sender_first")?;
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
-    // Simple open should fail with ENXIO (no such device or address).
+    // Create a new fifo file with *no reading ends open*.
+    let fifo = TempFifo::new("simple_send_sender_first")?;
+
+    // Simple `open` should fail with ENXIO (no such device or address).
     let err = assert_err!(pipe::Sender::open(&fifo));
     assert_eq!(err.raw_os_error(), Some(libc::ENXIO));
 
+    // `open_dangling` should succeed and the pipe should be ready to write.
     let mut writer = pipe::Sender::open_dangling(&fifo)?;
     writer.write_all(DATA).await?;
 
+    // Read the written data and validate.
     let mut reader = pipe::Receiver::open(&fifo)?;
     let mut read_data = vec![0; DATA.len()];
     reader.read_exact(&mut read_data).await?;
@@ -92,11 +99,15 @@ async fn detects_not_a_fifo() -> io::Result<()> {
         .tempdir()
         .unwrap();
     let path = dir.path().join("not_a_fifo");
+
+    // Create an ordinary file.
     File::create(&path)?;
 
+    // Sender detects the invalid file type.
     let err = assert_err!(pipe::Sender::open(&path));
     assert_eq!(err.kind(), io::ErrorKind::Other);
 
+    // Receiver detects the invalid file type.
     let err = assert_err!(pipe::Receiver::open(&path));
     assert_eq!(err.kind(), io::ErrorKind::Other);
 
@@ -107,17 +118,20 @@ async fn detects_not_a_fifo() -> io::Result<()> {
 async fn from_child_stdout() -> io::Result<()> {
     const MSG: &[u8] = b"hello_world";
 
+    // Spawn a child process which will print a message to its stdout.
     let mut cmd = Command::new("sh");
     cmd.arg("-c")
         .arg(format!("echo -n {}", std::str::from_utf8(MSG).unwrap()))
         .stdout(Stdio::piped());
     let mut handle = cmd.spawn()?;
 
+    // Convert ChildStdout to a Sender pipe and receive the message.
     let mut reader = pipe::Receiver::try_from(handle.stdout.take().unwrap())?;
     let mut read_data = vec![0; MSG.len()];
     reader.read_exact(&mut read_data).await?;
     assert_eq!(&read_data, MSG);
 
+    // Check the status code.
     let status = assert_ok!(handle.wait().await);
     assert_eq!(status.code(), Some(0));
 
@@ -128,6 +142,7 @@ async fn from_child_stdout() -> io::Result<()> {
 async fn from_child_stdin() -> io::Result<()> {
     const MSG: &[u8] = b"hello_world";
 
+    // Spawn a child process which will check its stdin.
     let mut cmd = Command::new("sh");
     cmd.arg("-c")
         .arg(format!(
@@ -137,10 +152,12 @@ async fn from_child_stdin() -> io::Result<()> {
         .stdin(Stdio::piped());
     let mut handle = cmd.spawn()?;
 
+    // Convert ChildStdin to a Sender pipe and send the message.
     let mut writer = pipe::Sender::try_from(handle.stdin.take().unwrap())?;
     writer.write_all(MSG).await?;
     drop(writer);
 
+    // Check the status code.
     let status = assert_ok!(handle.wait().await);
     assert_eq!(status.code(), Some(0));
 
@@ -155,12 +172,12 @@ fn writable_by_poll(writer: &pipe::Sender) -> bool {
 async fn try_read_write() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
-    // Create a pair
+    // Create a pipe pair over a fifo file.
     let fifo = TempFifo::new("try_read_write")?;
     let reader = pipe::Receiver::open(&fifo)?;
     let writer = pipe::Sender::open(&fifo)?;
 
-    // Fill the pipe buffer
+    // Fill the pipe buffer with `try_write`.
     let mut write_data = Vec::new();
     while writable_by_poll(&writer) {
         match writer.try_write(DATA) {
@@ -172,7 +189,7 @@ async fn try_read_write() -> io::Result<()> {
         }
     }
 
-    // Drain the pipe buffer
+    // Drain the pipe buffer with `try_read`.
     let mut read_data = vec![0; write_data.len()];
     let mut i = 0;
     while i < write_data.len() {
@@ -195,14 +212,14 @@ async fn try_read_write() -> io::Result<()> {
 async fn try_read_write_vectored() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
-    // Create a pair
+    // Create a pipe pair over a fifo file.
     let fifo = TempFifo::new("try_read_write_vectored")?;
     let reader = pipe::Receiver::open(&fifo)?;
     let writer = pipe::Sender::open(&fifo)?;
 
     let write_bufs: Vec<_> = DATA.chunks(3).map(io::IoSlice::new).collect();
 
-    // Fill the pipe buffer
+    // Fill the pipe buffer with `try_write_vectored`.
     let mut write_data = Vec::new();
     while writable_by_poll(&writer) {
         match writer.try_write_vectored(&write_bufs) {
@@ -214,7 +231,7 @@ async fn try_read_write_vectored() -> io::Result<()> {
         }
     }
 
-    // Drain the pipe buffer
+    // Drain the pipe buffer with `try_read_vectored`.
     let mut read_data = vec![0; write_data.len()];
     let mut i = 0;
     while i < write_data.len() {
