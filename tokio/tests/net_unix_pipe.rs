@@ -97,7 +97,7 @@ async fn fifo_simple_send_sender_first() -> io::Result<()> {
 async fn from_child_stdout() -> io::Result<()> {
     const MSG: &[u8] = b"hello_world";
 
-    // Spawn a child process which will print a message to its stdout.
+    // Spawn a child process which will print the message to its stdout.
     let mut cmd = Command::new("sh");
     cmd.arg("-c")
         .arg(format!("echo -n {}", std::str::from_utf8(MSG).unwrap()))

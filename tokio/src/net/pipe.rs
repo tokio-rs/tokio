@@ -96,7 +96,6 @@ impl Sender {
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    /// ```
     pub fn open_dangling<P>(path: P) -> io::Result<Sender>
     where
         P: AsRef<Path>,
@@ -161,13 +160,30 @@ impl Sender {
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    /// ```
     pub fn from_file(file: File) -> io::Result<Sender> {
         let raw_fd = file.into_raw_fd();
         let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(raw_fd) };
         Sender::from_mio(mio_tx)
     }
 
+    /// Waits for any of the requested ready states.
+    ///
+    /// This function can be used to wait for a [`WRITE_CLOSED`] event.
+    ///
+    /// The function may complete without the socket being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
+    /// [`Ready`] set, so you should always check the returned value and possibly
+    /// wait again if the requested states are not set.
+    ///
+    /// [`WRITE_CLOSED`]: Ready::WRITE_CLOSED
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
         let event = self.io.registration().readiness(interest).await?;
         Ok(event.ready)
@@ -499,6 +515,24 @@ impl Receiver {
         Receiver::from_mio(mio_rx)
     }
 
+    /// Waits for any of the requested ready states.
+    ///
+    /// This function can be used to wait for a [`READ_CLOSED`] event.
+    ///
+    /// The function may complete without the socket being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
+    /// [`Ready`] set, so you should always check the returned value and possibly
+    /// wait again if the requested states are not set.
+    ///
+    /// [`READ_CLOSED`]: Ready::READ_CLOSED
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
         let event = self.io.registration().readiness(interest).await?;
         Ok(event.ready)
