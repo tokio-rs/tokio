@@ -1,7 +1,6 @@
 //! Tokio support for Unix pipes.
 
 use mio::unix::pipe as mio_pipe;
-use std::convert::TryFrom;
 use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
 use std::os::unix::fs::FileTypeExt;
@@ -350,22 +349,6 @@ impl AsRawFd for Sender {
     }
 }
 
-cfg_process! {
-    use crate::process::ChildStdin;
-
-    impl TryFrom<ChildStdin> for Sender {
-        type Error = io::Error;
-        fn try_from(stdin: ChildStdin) -> io::Result<Sender> {
-            let fd = stdin.into_inner().into_fd()?;
-
-            // Safety: ChildStdin had a valid fd to the writing end of a pipe.
-            let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(fd) };
-
-            Sender::from_mio(mio_tx)
-        }
-    }
-}
-
 cfg_net_unix! {
     /// Reading end of a Unix pipe.
     #[derive(Debug)]
@@ -655,7 +638,20 @@ impl AsRawFd for Receiver {
 }
 
 cfg_process! {
-    use crate::process::{ChildStderr, ChildStdout};
+    use std::convert::TryFrom;
+    use crate::process::{ChildStdin, ChildStderr, ChildStdout};
+
+    impl TryFrom<ChildStdin> for Sender {
+        type Error = io::Error;
+        fn try_from(stdin: ChildStdin) -> io::Result<Sender> {
+            let fd = stdin.into_inner().into_fd()?;
+
+            // Safety: ChildStdin had a valid fd to the writing end of a pipe.
+            let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(fd) };
+
+            Sender::from_mio(mio_tx)
+        }
+    }
 
     impl TryFrom<ChildStdout> for Receiver {
         type Error = io::Error;
