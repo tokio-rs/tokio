@@ -254,7 +254,7 @@ impl AsRawFd for ChildStdio {
 
 #[cfg(feature = "net")]
 impl ChildStdio {
-    pub(super) fn into_fd(self) -> io::Result<RawFd> {
+    pub(crate) fn into_fd(self) -> io::Result<RawFd> {
         let pipe = self.inner.into_inner()?;
         Ok(pipe.into_raw_fd())
     }

@@ -356,8 +356,11 @@ cfg_process! {
     impl TryFrom<ChildStdin> for Sender {
         type Error = io::Error;
         fn try_from(stdin: ChildStdin) -> io::Result<Sender> {
-            // Safety: ChildStdin has a valid fd to the writing end of a pipe.
-            let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(stdin.into_fd()?) };
+            let fd = stdin.into_inner().into_fd()?;
+
+            // Safety: ChildStdin had a valid fd to the writing end of a pipe.
+            let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(fd) };
+
             Sender::from_mio(mio_tx)
         }
     }
@@ -657,8 +660,11 @@ cfg_process! {
     impl TryFrom<ChildStdout> for Receiver {
         type Error = io::Error;
         fn try_from(stdout: ChildStdout) -> io::Result<Receiver> {
-            // Safety: ChildStdout has a valid fd to the reading end of a pipe.
-            let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(stdout.into_fd()?) };
+            let fd = stdout.into_inner().into_fd()?;
+
+            // Safety: ChildStdout had a valid fd to the reading end of a pipe.
+            let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(fd) };
+
             Receiver::from_mio(mio_rx)
         }
     }
@@ -666,8 +672,11 @@ cfg_process! {
     impl TryFrom<ChildStderr> for Receiver {
         type Error = io::Error;
         fn try_from(stderr: ChildStderr) -> io::Result<Receiver> {
-            // Safety: ChildStderr has a valid fd to the reading end of a pipe.
-            let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(stderr.into_fd()?) };
+            let fd = stderr.into_inner().into_fd()?;
+
+            // Safety: ChildStderr had a valid fd to the reading end of a pipe.
+            let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(fd) };
+
             Receiver::from_mio(mio_rx)
         }
     }
