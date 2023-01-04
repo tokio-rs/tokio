@@ -15,11 +15,6 @@ use std::task::{Context, Poll};
 use crate::io::interest::Interest;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 
-pub fn new() -> io::Result<(Sender, Receiver)> {
-    let (tx, rx) = mio_pipe::new()?;
-    Ok((Sender::from_mio(tx)?, Receiver::from_mio(rx)?))
-}
-
 cfg_net_unix! {
     #[derive(Debug)]
     pub struct Sender {
