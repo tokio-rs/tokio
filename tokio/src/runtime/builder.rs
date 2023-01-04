@@ -60,6 +60,9 @@ pub struct Builder {
     /// Cap on thread usage.
     max_blocking_threads: usize,
 
+    /// Timeout for joining hanging threads on drop
+    pub(super) drop_timeout: Option<Duration>,
+
     /// Name fn used for threads spawned by the runtime.
     pub(super) thread_name: ThreadNameFn,
 
@@ -243,6 +246,8 @@ impl Builder {
             worker_threads: None,
 
             max_blocking_threads: 512,
+
+            drop_timeout: None,
 
             // Default thread name
             thread_name: std::sync::Arc::new(|| "tokio-runtime-worker".into()),
@@ -453,6 +458,37 @@ impl Builder {
     /// ```
     pub fn thread_stack_size(&mut self, val: usize) -> &mut Self {
         self.thread_stack_size = Some(val);
+        self
+    }
+
+    /// Sets the drop timeout.
+    ///
+    /// This is intended to limit the time it could take to wait for threads that
+    /// are still stuck in [`spawn_blocking`].
+    ///
+    /// Important: After the timeout, the runtime stops waiting for those threads.
+    /// It does **not** cancel those threads. This means it is no longer guaranteed
+    /// that all resources of this pool are properly released.
+    ///
+    /// For that reason, this option is primarily intended for runtimes that are
+    /// dropped right before the end of the program.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # use std::time::Duration;
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .drop_timeout(Duration::from_millis(500))
+    ///     .build();
+    /// # }
+    /// ```
+    ///
+    /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
+    pub fn drop_timeout(&mut self, val: Duration) -> &mut Self {
+        self.drop_timeout = Some(val);
         self
     }
 

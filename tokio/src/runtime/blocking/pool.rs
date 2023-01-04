@@ -17,6 +17,7 @@ use std::time::Duration;
 pub(crate) struct BlockingPool {
     spawner: Spawner,
     shutdown_rx: shutdown::Receiver,
+    drop_timeout: Option<Duration>,
 }
 
 #[derive(Clone)]
@@ -232,6 +233,7 @@ impl BlockingPool {
                 }),
             },
             shutdown_rx,
+            drop_timeout: builder.drop_timeout.clone(),
         }
     }
 
@@ -275,7 +277,7 @@ impl BlockingPool {
 
 impl Drop for BlockingPool {
     fn drop(&mut self) {
-        self.shutdown(None);
+        self.shutdown(self.drop_timeout);
     }
 }
 
