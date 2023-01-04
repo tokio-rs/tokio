@@ -25,11 +25,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-            override: true
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
 

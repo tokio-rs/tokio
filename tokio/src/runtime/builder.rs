@@ -44,6 +44,7 @@ pub struct Builder {
 
     /// Whether or not to enable the I/O driver
     enable_io: bool,
+    nevents: usize,
 
     /// Whether or not to enable the time driver
     enable_time: bool,
@@ -181,6 +182,7 @@ cfg_unstable! {
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
+#[derive(Clone, Copy)]
 pub(crate) enum Kind {
     CurrentThread,
     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
@@ -228,6 +230,7 @@ impl Builder {
 
             // I/O defaults to "off"
             enable_io: false,
+            nevents: 1024,
 
             // Time defaults to "off"
             enable_time: false,
@@ -235,6 +238,7 @@ impl Builder {
             // The clock starts not-paused
             start_paused: false,
 
+            // Read from environment variable first in multi-threaded mode.
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
 
@@ -301,6 +305,8 @@ impl Builder {
     ///
     /// This can be any number above 0 though it is advised to keep this value
     /// on the smaller side.
+    ///
+    /// This will override the value read from environment variable `TOKIO_WORKER_THREADS`.
     ///
     /// # Default
     ///
@@ -647,6 +653,7 @@ impl Builder {
             enable_io: self.enable_io,
             enable_time: self.enable_time,
             start_paused: self.start_paused,
+            nevents: self.nevents,
         }
     }
 
@@ -936,6 +943,25 @@ cfg_io_driver! {
         /// ```
         pub fn enable_io(&mut self) -> &mut Self {
             self.enable_io = true;
+            self
+        }
+
+        /// Enables the I/O driver and configures the max number of events to be
+        /// processed per tick.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .enable_io()
+        ///     .max_io_events_per_tick(1024)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn max_io_events_per_tick(&mut self, capacity: usize) -> &mut Self {
+            self.nevents = capacity;
             self
         }
     }

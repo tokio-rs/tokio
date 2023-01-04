@@ -94,6 +94,10 @@
 //! producers to a single consumer. This channel is often used to send work to a
 //! task or to receive the result of many computations.
 //!
+//! This is also the channel you should use if you want to send many messages
+//! from a single producer to a single consumer. There is no dedicated spsc
+//! channel.
+//!
 //! **Example:** using an mpsc to incrementally stream the results of a series
 //! of computations.
 //!
@@ -243,6 +247,10 @@
 //!
 //! This channel tends to be used less often than `oneshot` and `mpsc` but still
 //! has its use cases.
+//!
+//! This is also the channel you should use if you want to broadcast values from
+//! a single producer to many consumers. There is no dedicated spmc broadcast
+//! channel.
 //!
 //! Basic usage
 //!

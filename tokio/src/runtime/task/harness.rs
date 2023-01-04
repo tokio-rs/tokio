@@ -194,7 +194,7 @@ where
             TransitionToRunning::Success => {
                 let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<T, S>(&header_ptr);
-                let cx = Context::from_waker(&*waker_ref);
+                let cx = Context::from_waker(&waker_ref);
                 let res = poll_future(self.core(), cx);
 
                 if res == Poll::Ready(()) {
@@ -315,9 +315,10 @@ where
                 // this task. It is our responsibility to drop the
                 // output.
                 self.core().drop_future_or_output();
-            } else if snapshot.has_join_waker() {
-                // Notify the join handle. The previous transition obtains the
-                // lock on the waker cell.
+            } else if snapshot.is_join_waker_set() {
+                // Notify the waker. Reading the waker field is safe per rule 4
+                // in task/mod.rs, since the JOIN_WAKER bit is set and the call
+                // to transition_to_complete() above set the COMPLETE bit.
                 self.trailer().wake_join();
             }
         }));
@@ -367,36 +368,30 @@ fn can_read_output(header: &Header, trailer: &Trailer, waker: &Waker) -> bool {
     debug_assert!(snapshot.is_join_interested());
 
     if !snapshot.is_complete() {
-        // The waker must be stored in the task struct.
-        let res = if snapshot.has_join_waker() {
-            // There already is a waker stored in the struct. If it matches
-            // the provided waker, then there is no further work to do.
-            // Otherwise, the waker must be swapped.
-            let will_wake = unsafe {
-                // Safety: when `JOIN_INTEREST` is set, only `JOIN_HANDLE`
-                // may mutate the `waker` field.
-                trailer.will_wake(waker)
-            };
+        // If the task is not complete, try storing the provided waker in the
+        // task's waker field.
 
-            if will_wake {
-                // The task is not complete **and** the waker is up to date,
-                // there is nothing further that needs to be done.
+        let res = if snapshot.is_join_waker_set() {
+            // If JOIN_WAKER is set, then JoinHandle has previously stored a
+            // waker in the waker field per step (iii) of rule 5 in task/mod.rs.
+
+            // Optimization: if the stored waker and the provided waker wake the
+            // same task, then return without touching the waker field. (Reading
+            // the waker field below is safe per rule 3 in task/mod.rs.)
+            if unsafe { trailer.will_wake(waker) } {
                 return false;
             }
 
-            // Unset the `JOIN_WAKER` to gain mutable access to the `waker`
-            // field then update the field with the new join worker.
-            //
-            // This requires two atomic operations, unsetting the bit and
-            // then resetting it. If the task transitions to complete
-            // concurrently to either one of those operations, then setting
-            // the join waker fails and we proceed to reading the task
-            // output.
+            // Otherwise swap the stored waker with the provided waker by
+            // following the rule 5 in task/mod.rs.
             header
                 .state
                 .unset_waker()
                 .and_then(|snapshot| set_join_waker(header, trailer, waker.clone(), snapshot))
         } else {
+            // If JOIN_WAKER is unset, then JoinHandle has mutable access to the
+            // waker field per rule 2 in task/mod.rs; therefore, skip step (i)
+            // of rule 5 and try to store the provided waker in the waker field.
             set_join_waker(header, trailer, waker.clone(), snapshot)
         };
 
@@ -417,7 +412,7 @@ fn set_join_waker(
     snapshot: Snapshot,
 ) -> Result<Snapshot, Snapshot> {
     assert!(snapshot.is_join_interested());
-    assert!(!snapshot.has_join_waker());
+    assert!(!snapshot.is_join_waker_set());
 
     // Safety: Only the `JoinHandle` may set the `waker` field. When
     // `JOIN_INTEREST` is **not** set, nothing else will touch the field.

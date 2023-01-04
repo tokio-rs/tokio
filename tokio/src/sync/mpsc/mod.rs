@@ -21,6 +21,9 @@
 //! when additional capacity is available. In other words, the channel provides
 //! backpressure.
 //!
+//! This channel is also suitable for the single-producer single-consumer
+//! use-case. (Unless you only need to send one message, in which case you
+//! should use the [oneshot] channel.)
 //!
 //! # Disconnection
 //!
@@ -62,7 +65,7 @@
 //! in mind, but they can also be generalized to other kinds of channels. In
 //! general, any channel method that isn't marked async can be called anywhere,
 //! including outside of the runtime. For example, sending a message on a
-//! oneshot channel from outside the runtime is perfectly fine.
+//! [oneshot] channel from outside the runtime is perfectly fine.
 //!
 //! # Multiple runtimes
 //!
@@ -82,6 +85,7 @@
 //! [blocking-recv]: crate::sync::mpsc::Receiver::blocking_recv()
 //! [`UnboundedSender`]: crate::sync::mpsc::UnboundedSender
 //! [`UnboundedReceiver`]: crate::sync::mpsc::UnboundedReceiver
+//! [oneshot]: crate::sync::oneshot
 //! [`Handle::block_on`]: crate::runtime::Handle::block_on()
 //! [std-unbounded]: std::sync::mpsc::channel
 //! [crossbeam-unbounded]: https://docs.rs/crossbeam/*/crossbeam/channel/fn.unbounded.html

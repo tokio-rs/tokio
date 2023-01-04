@@ -82,8 +82,8 @@ async fn task_panic_propagates() {
     assert!(result.is_err());
     let error = result.unwrap_err();
     assert!(error.is_panic());
-    let panic_str: &str = *error.into_panic().downcast().unwrap();
-    assert_eq!(panic_str, "Test panic");
+    let panic_str = error.into_panic().downcast::<&'static str>().unwrap();
+    assert_eq!(*panic_str, "Test panic");
 
     // Trying again with a "safe" task still works
     let join_handle = pool.spawn_pinned(|| async { "test" });
@@ -108,8 +108,8 @@ async fn callback_panic_does_not_kill_worker() {
     assert!(result.is_err());
     let error = result.unwrap_err();
     assert!(error.is_panic());
-    let panic_str: &str = *error.into_panic().downcast().unwrap();
-    assert_eq!(panic_str, "Test panic");
+    let panic_str = error.into_panic().downcast::<&'static str>().unwrap();
+    assert_eq!(*panic_str, "Test panic");
 
     // Trying again with a "safe" callback works
     let join_handle = pool.spawn_pinned(|| async { "test" });

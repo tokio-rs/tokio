@@ -174,12 +174,15 @@
 //! swapping the currently running task on each thread. However, this kind of
 //! swapping can only happen at `.await` points, so code that spends a long time
 //! without reaching an `.await` will prevent other tasks from running. To
-//! combat this, Tokio provides two kinds of threads: Core threads and blocking
-//! threads. The core threads are where all asynchronous code runs, and Tokio
-//! will by default spawn one for each CPU core. The blocking threads are
-//! spawned on demand, can be used to run blocking code that would otherwise
-//! block other tasks from running and are kept alive when not used for a certain
-//! amount of time which can be configured with [`thread_keep_alive`].
+//! combat this, Tokio provides two kinds of threads: Core threads and blocking threads.
+//!
+//! The core threads are where all asynchronous code runs, and Tokio will by default
+//! spawn one for each CPU core. You can use the environment variable `TOKIO_WORKER_THREADS`
+//! to override the default value.
+//!
+//! The blocking threads are spawned on demand, can be used to run blocking code
+//! that would otherwise block other tasks from running and are kept alive when
+//! not used for a certain amount of time which can be configured with [`thread_keep_alive`].
 //! Since it is not possible for Tokio to swap out blocking tasks, like it
 //! can do with asynchronous code, the upper limit on the number of blocking
 //! threads is very large. These limits can be configured on the [`Builder`].

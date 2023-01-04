@@ -24,10 +24,25 @@ const CONST_MUTEX_NEW_PROBE: &str = r#"
 }
 "#;
 
+const TARGET_HAS_ATOMIC_PROBE: &str = r#"
+{
+    #[cfg(target_has_atomic = "ptr")]
+    let _ = (); 
+}
+"#;
+
+const TARGET_ATOMIC_U64_PROBE: &str = r#"
+{
+    use std::sync::atomic::AtomicU64 as _;
+}
+"#;
+
 fn main() {
     let mut enable_const_thread_local = false;
     let mut enable_addr_of = false;
+    let mut enable_target_has_atomic = false;
     let mut enable_const_mutex_new = false;
+    let mut target_needs_atomic_u64_fallback = false;
 
     match AutoCfg::new() {
         Ok(ac) => {
@@ -64,6 +79,27 @@ fn main() {
                 if ac.probe_expression(ADDR_OF_PROBE) {
                     enable_addr_of = true;
                 }
+            }
+
+            // The `target_has_atomic` cfg was stabilized in 1.60.
+            if ac.probe_rustc_version(1, 61) {
+                enable_target_has_atomic = true;
+            } else if ac.probe_rustc_version(1, 60) {
+                // This compiler claims to be 1.60, but there are some nightly
+                // compilers that claim to be 1.60 without supporting the
+                // feature. Explicitly probe to check if code using them
+                // compiles.
+                //
+                // The oldest nightly that supports the feature is 2022-02-11.
+                if ac.probe_expression(TARGET_HAS_ATOMIC_PROBE) {
+                    enable_target_has_atomic = true;
+                }
+            }
+
+            // If we can't tell using `target_has_atomic`, tell if the target
+            // has `AtomicU64` by trying to use it.
+            if !enable_target_has_atomic && !ac.probe_expression(TARGET_ATOMIC_U64_PROBE) {
+                target_needs_atomic_u64_fallback = true;
             }
 
             // The `Mutex::new` method was made const in 1.63.
@@ -109,12 +145,28 @@ fn main() {
         autocfg::emit("tokio_no_addr_of")
     }
 
+    if !enable_target_has_atomic {
+        // To disable this feature on compilers that support it, you can
+        // explicitly pass this flag with the following environment variable:
+        //
+        // RUSTFLAGS="--cfg tokio_no_target_has_atomic"
+        autocfg::emit("tokio_no_target_has_atomic")
+    }
+
     if !enable_const_mutex_new {
         // To disable this feature on compilers that support it, you can
         // explicitly pass this flag with the following environment variable:
         //
         // RUSTFLAGS="--cfg tokio_no_const_mutex_new"
         autocfg::emit("tokio_no_const_mutex_new")
+    }
+
+    if target_needs_atomic_u64_fallback {
+        // To disable this feature on compilers that support it, you can
+        // explicitly pass this flag with the following environment variable:
+        //
+        // RUSTFLAGS="--cfg tokio_no_atomic_u64"
+        autocfg::emit("tokio_no_atomic_u64")
     }
 
     let target = ::std::env::var("TARGET").unwrap_or_default();

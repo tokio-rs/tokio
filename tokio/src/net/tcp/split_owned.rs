@@ -490,12 +490,12 @@ impl AsyncWrite for OwnedWriteHalf {
 
 impl AsRef<TcpStream> for OwnedReadHalf {
     fn as_ref(&self) -> &TcpStream {
-        &*self.inner
+        &self.inner
     }
 }
 
 impl AsRef<TcpStream> for OwnedWriteHalf {
     fn as_ref(&self) -> &TcpStream {
-        &*self.inner
+        &self.inner
     }
 }

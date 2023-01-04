@@ -2,7 +2,7 @@
 
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
-use crate::runtime::blocking::schedule::NoopSchedule;
+use crate::runtime::blocking::schedule::BlockingSchedule;
 use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
@@ -120,7 +120,7 @@ struct Shared {
 }
 
 pub(crate) struct Task {
-    task: task::UnownedTask<NoopSchedule>,
+    task: task::UnownedTask<BlockingSchedule>,
     mandatory: Mandatory,
 }
 
@@ -151,7 +151,7 @@ impl From<SpawnError> for io::Error {
 }
 
 impl Task {
-    pub(crate) fn new(task: task::UnownedTask<NoopSchedule>, mandatory: Mandatory) -> Task {
+    pub(crate) fn new(task: task::UnownedTask<BlockingSchedule>, mandatory: Mandatory) -> Task {
         Task { task, mandatory }
     }
 
@@ -379,7 +379,8 @@ impl Spawner {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
 
-        let (task, handle) = task::unowned(fut, NoopSchedule, id);
+        let (task, handle) = task::unowned(fut, BlockingSchedule::new(rt), id);
+
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
         (handle, spawned)
     }
