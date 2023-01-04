@@ -21,25 +21,28 @@ cfg_net_unix! {
 }
 
 impl Sender {
-    /// Open a writing end of a pipe from a FIFO file.
+    /// Creates a new `Sender` from a FIFO file.
     ///
-    /// This function will open the file at the specified path, check if the file
-    /// is a FIFO file and associate the pipe with the default event loop's handle
-    /// for writing.
+    /// This function will open the FIFO file at the specified path and associate the pipe
+    /// with the default event loop's handle for writing.
     ///
-    /// This function will fail with an OS error if there are no reading ends open.
+    /// This function will fail with an OS error if no one opened this pipe for reading.
     /// On Linux you can use [`open_dangling`] to work around this.
     ///
     /// [`open_dangling`]: Self::open_dangling
     ///
     /// # Errors
     ///
-    /// Returns an error if the specified file is not a FIFO file.
-    /// Will also result in an error if called outside of a [Tokio Runtime], or in
-    /// a runtime that has not [enabled I/O], or if any OS-specific I/O errors occur.
+    /// Returns an error if any OS-specific I/O errors occur.
     ///
-    /// [Tokio Runtime]: crate::runtime::Runtime
-    /// [enabled I/O]: crate::runtime::Builder::enable_io
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn open<P>(path: P) -> io::Result<Sender>
     where
         P: AsRef<Path>,
@@ -47,27 +50,22 @@ impl Sender {
         Sender::open_internal(path.as_ref(), false)
     }
 
-    /// Open a writing end of a pipe from a FIFO file without a present reader.
+    /// Creates a new `Sender` from a FIFO file without a present reader.
     ///
     /// This function will open the file at the specified path, check if the file
     /// is a FIFO file and associate the pipe with the default event loop's handle
     /// for writing.
     ///
-    /// Unlike [`open`], this will not error if there is no open reading end of the FIFO.
-    /// This is done by opening the FIFO file with access for both reading and writing.
-    /// Note that behavior of such operation is not defined by POSIX and is only
-    /// guaranteed to work on Linux.
+    /// Unlike [`open`], this function will not fail if there is no open reading end
+    /// of the FIFO. This is done by opening the FIFO file with access for both
+    /// reading and writing. Note that behavior of such operation is not defined by
+    /// the POSIX standard and is only guaranteed to work on Linux.
     ///
     /// [`open`]: Self::open
     ///
     /// # Errors
     ///
-    /// Returns an error if the specified file is not a FIFO file.
-    /// Will also result in an error if called outside of a [Tokio Runtime], or in
-    /// a runtime that has not [enabled I/O], or if any OS-specific I/O errors occur.
-    ///
-    /// [Tokio Runtime]: crate::runtime::Runtime
-    /// [enabled I/O]: crate::runtime::Builder::enable_io
+    /// Returns an error if any OS-specific I/O errors occur.
     ///
     /// # Examples
     ///
@@ -75,8 +73,8 @@ impl Sender {
     /// # use tokio::io::AsyncWriteExt;
     /// # use tokio::net::pipe::Sender;
     /// # use std::error::Error;
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn Error>> {
+    /// #
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
     /// # let dir = tempfile::tempdir().unwrap();
     /// # let new_fifo_path = dir.path().join("fifo");
     /// // Create a new FIFO file.
@@ -88,6 +86,16 @@ impl Sender {
     /// tx.write_all(b"hello world").await?;
     /// # Ok(())
     /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     /// ```
     pub fn open_dangling<P>(path: P) -> io::Result<Sender>
     where
@@ -113,9 +121,9 @@ impl Sender {
         Ok(Sender { io })
     }
 
-    /// Creates new `Sender` from a [`File`].
+    /// Creates a new `Sender` from a [`File`].
     ///
-    /// This function is intended to create a pipe from a File which represents
+    /// This function is intended to construct a pipe from a File which represents
     /// a special FIFO file. The conversion assumes nothing about the underlying
     /// file; it is left up to the user to open it with writing access and set it
     /// in non-blocking mode.
@@ -128,18 +136,31 @@ impl Sender {
     /// ```no_run
     /// use std::error::Error;
     /// use std::fs::OpenOptions;
+    /// use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
+    ///
     /// use tokio::net::pipe;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let file = OpenOptions::new()
     ///         .write(true)
-    ///         .open(path)?;
+    ///         .custom_flags(libc::O_NONBLOCK)
+    ///         .open("path/to/a/fifo")?;
     ///     if file.metadata()?.file_type().is_fifo() {
     ///         let tx = pipe::Sender::from_file(file)?;
     ///     }
     ///     Ok(())
     /// }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     /// ```
     pub fn from_file(file: File) -> io::Result<Sender> {
         let raw_fd = file.into_raw_fd();
@@ -393,20 +414,23 @@ cfg_net_unix! {
 }
 
 impl Receiver {
-    /// Open a reading end of a pipe from a FIFO file.
+    /// Creates a new `Receiver` from a FIFO file.
     ///
-    /// This function will open the file at the specified path, check if the file
-    /// is a FIFO file and associate the pipe with the default event loop's handle
-    /// for reading.
+    /// This function will open the FIFO file at the specified path and associate the pipe
+    /// with the default event loop's handle for reading.
     ///
     /// # Errors
     ///
-    /// Returns an error if the specified file is not a FIFO file.
-    /// Will also result in an error if called outside of a [Tokio Runtime], or in
-    /// a runtime that has not [enabled I/O], or if any OS-specific I/O errors occur.
+    /// Returns an error if any OS-specific I/O errors occur.
     ///
-    /// [Tokio Runtime]: crate::runtime::Runtime
-    /// [enabled I/O]: crate::runtime::Builder::enable_io
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn open<P>(path: P) -> io::Result<Receiver>
     where
         P: AsRef<Path>,
@@ -445,19 +469,30 @@ impl Receiver {
     /// ```no_run
     /// use std::error::Error;
     /// use std::fs::OpenOptions;
+    /// use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
     /// use tokio::net::pipe;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let file = OpenOptions::new()
     ///         .read(true)
-    ///         .open(path)?;
+    ///         .custom_flags(libc::O_NONBLOCK)
+    ///         .open("path/to/a/fifo")?;
     ///     if file.metadata()?.file_type().is_fifo() {
     ///         let rx = pipe::Receiver::from_file(file)?;
     ///     }
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_file(file: File) -> io::Result<Receiver> {
         let raw_fd = file.into_raw_fd();
         let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(raw_fd) };
