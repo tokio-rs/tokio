@@ -1,10 +1,10 @@
 //! Tokio support for Unix pipes.
 
-use crate::fs::File;
 use crate::io::interest::Interest;
-use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
+use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf, Ready};
 
 use mio::unix::pipe as mio_pipe;
+use std::fs::File;
 use std::io::{self, Read, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::prelude::OpenOptionsExt;
@@ -113,45 +113,49 @@ impl Sender {
         Ok(Sender { io })
     }
 
-    cfg_fs! {
-        /// Creates new `Sender` from a [`File`].
-        ///
-        /// This function is intended to create a pipe from a File which represents
-        /// a special FIFO file. The conversion assumes that the underlying file is
-        /// set in non-blocking mode. It is left up to the user to open it with
-        /// writing access.
-        ///
-        /// You can use [`File`] to first check if a file has the FIFO file type and then
-        /// convert it to a `Sender`.
-        ///
-        /// # Examples
-        ///
-        /// ```no_run
-        /// use std::error::Error;
-        /// use tokio::fs::OpenOptions;
-        /// use tokio::net::pipe;
-        ///
-        /// #[tokio::main]
-        /// async fn main() -> Result<(), Box<dyn Error>> {
-        ///     let file = OpenOptions::new()
-        ///         .write(true)
-        ///         .open(path)?;
-        ///     if file.metadata().await?.file_type().is_fifo() {
-        ///         let tx = pipe::Sender::from_file(file).await?;
-        ///     }
-        ///     Ok(())
-        /// }
-        /// ```
-        pub async fn from_file(file: File) -> io::Result<Sender> {
-            let raw_fd = file.into_std().await.into_raw_fd();
-            let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(raw_fd) };
-            Sender::from_mio(mio_tx)
-        }
+    /// Creates new `Sender` from a [`File`].
+    ///
+    /// This function is intended to create a pipe from a File which represents
+    /// a special FIFO file. The conversion assumes nothing about the underlying
+    /// file; it is left up to the user to open it with writing access and set it
+    /// in non-blocking mode.
+    ///
+    /// You can use [`File`] to check first if a file has the FIFO file type and then
+    /// convert it to a `Sender`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::error::Error;
+    /// use std::fs::OpenOptions;
+    /// use tokio::net::pipe;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let file = OpenOptions::new()
+    ///         .write(true)
+    ///         .open(path)?;
+    ///     if file.metadata()?.file_type().is_fifo() {
+    ///         let tx = pipe::Sender::from_file(file)?;
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn from_file(file: File) -> io::Result<Sender> {
+        let raw_fd = file.into_raw_fd();
+        let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(raw_fd) };
+        Sender::from_mio(mio_tx)
+    }
+
+    pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
+        let event = self.io.registration().readiness(interest).await?;
+        Ok(event.ready)
     }
 
     /// Waits for the pipe to become writable.
     ///
-    /// This function is usually paired with [`try_write()`].
+    /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
+    /// paired with [`try_write()`].
     ///
     /// [`try_write()`]: Self::try_write
     ///
@@ -190,7 +194,7 @@ impl Sender {
     /// }
     /// ```
     pub async fn writable(&self) -> io::Result<()> {
-        self.io.registration().readiness(Interest::WRITABLE).await?;
+        self.ready(Interest::WRITABLE).await?;
         Ok(())
     }
 
@@ -426,45 +430,49 @@ impl Receiver {
         Ok(Receiver { io })
     }
 
-    cfg_fs! {
-        /// Creates new `Receiver` from a [`File`].
-        ///
-        /// This function is intended to create a pipe from a File which represents
-        /// a special FIFO file. The conversion assumes that the underlying file is
-        /// set in non-blocking mode. It is left up to the user to open it with
-        /// reading access.
-        ///
-        /// You can use [`File`] to first check if a file has the FIFO file type and then
-        /// convert it to a `Receiver`.
-        ///
-        /// # Examples
-        ///
-        /// ```no_run
-        /// use std::error::Error;
-        /// use tokio::fs::OpenOptions;
-        /// use tokio::net::pipe;
-        ///
-        /// #[tokio::main]
-        /// async fn main() -> Result<(), Box<dyn Error>> {
-        ///     let file = OpenOptions::new()
-        ///         .read(true)
-        ///         .open(path)?;
-        ///     if file.metadata().await?.file_type().is_fifo() {
-        ///         let rx = pipe::Receiver::from_file(file).await?;
-        ///     }
-        ///     Ok(())
-        /// }
-        /// ```
-        pub async fn from_file(file: File) -> io::Result<Receiver> {
-            let raw_fd = file.into_std().await.into_raw_fd();
-            let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(raw_fd) };
-            Receiver::from_mio(mio_rx)
-        }
+    /// Creates new `Receiver` from a [`File`].
+    ///
+    /// This function is intended to create a pipe from a File which represents
+    /// a special FIFO file. The conversion assumes nothing about the underlying
+    /// file; it is left up to the user to open it with reading access and set it
+    /// in non-blocking mode.
+    ///
+    /// You can use [`File`] to first check if a file has the FIFO file type and then
+    /// convert it to a `Receiver`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::error::Error;
+    /// use std::fs::OpenOptions;
+    /// use tokio::net::pipe;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let file = OpenOptions::new()
+    ///         .read(true)
+    ///         .open(path)?;
+    ///     if file.metadata()?.file_type().is_fifo() {
+    ///         let rx = pipe::Receiver::from_file(file)?;
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn from_file(file: File) -> io::Result<Receiver> {
+        let raw_fd = file.into_raw_fd();
+        let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(raw_fd) };
+        Receiver::from_mio(mio_rx)
+    }
+
+    pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
+        let event = self.io.registration().readiness(interest).await?;
+        Ok(event.ready)
     }
 
     /// Waits for the pipe to become readable.
     ///
-    /// This function is usually paired with [`try_read()`].
+    /// This function is equivalent to `ready(Interest::READABLE)` and is usually
+    /// paired with [`try_read()`].
     ///
     /// [`try_read()`]: Self::try_read()
     ///
@@ -507,7 +515,7 @@ impl Receiver {
     /// }
     /// ```
     pub async fn readable(&self) -> io::Result<()> {
-        self.io.registration().readiness(Interest::READABLE).await?;
+        self.ready(Interest::READABLE).await?;
         Ok(())
     }
 

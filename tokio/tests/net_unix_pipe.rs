@@ -1,7 +1,6 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
 
-use tokio::fs::OpenOptions;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::pipe;
 use tokio::process::Command;
@@ -9,7 +8,9 @@ use tokio_test::task;
 use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 
 use std::convert::TryFrom;
+use std::fs::OpenOptions;
 use std::io;
+use std::os::unix::prelude::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
@@ -146,40 +147,41 @@ fn writable_by_poll(writer: &pipe::Sender) -> bool {
     task::spawn(writer.writable()).poll().is_ready()
 }
 
-/*
 #[tokio::test]
 async fn from_file() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
     let fifo = TempFifo::new("from_file")?;
 
-    let file = OpenOptions::new().read(true).open(&fifo).await?;
-    let mut reader = pipe::Receiver::from_file(file).await?;
+    // Construct a Receiver from a File.
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(&fifo)?;
+    let mut reader = pipe::Receiver::from_file(file)?;
 
-    let file = OpenOptions::new().write(true).open(&fifo).await?;
-    let mut writer = pipe::Sender::from_file(file).await?;
+    // Construct a Sender from a File.
+    let file = OpenOptions::new()
+        .write(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(&fifo)?;
+    let mut writer = pipe::Sender::from_file(file)?;
 
+    // Write and read some data to test async.
+    let mut read_fut = task::spawn(async move {
+        let mut buf = vec![0; DATA.len()];
+        reader.read_exact(&mut buf).await?;
+        Ok::<_, io::Error>(buf)
+    });
+    assert_pending!(read_fut.poll());
 
-    let read_fut = task::spawn(async move {
-        while
-    }))
+    writer.write_all(DATA).await?;
 
-    // Fill the pipe buffer to test async.
-    while writable_by_poll(&writer) {
-        match writer.try_write(DATA) {
-            Err(e) => {
-                assert_eq!(e.kind(), io::ErrorKind::WouldBlock);
-                break;
-            }
-            _ => {}
-        }
-    }
-    drop(writer);
-
+    let read_data = assert_ok!(read_fut.await);
+    assert_eq!(&read_data, DATA);
 
     Ok(())
 }
-*/
 
 #[tokio::test]
 async fn try_read_write() -> io::Result<()> {
