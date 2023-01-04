@@ -1705,11 +1705,10 @@ impl ServerOptions {
     ///
     /// [`dwPipeMode`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn pipe_mode(&mut self, pipe_mode: PipeMode) -> &mut Self {
-        self.pipe_mode = match pipe_mode {
-            PipeMode::Byte => windows_sys::PIPE_TYPE_BYTE,
-            PipeMode::Message => windows_sys::PIPE_TYPE_MESSAGE,
-        };
-
+        let is_msg = matches!(pipe_mode, PipeMode::Message);
+        // Pipe mode is implemented as a bit flag 0x4. Set is message and unset
+        // is byte.
+        bool_flag!(self.pipe_mode, is_msg, windows_sys::PIPE_TYPE_MESSAGE);
         self
     }
 
@@ -2553,4 +2552,49 @@ unsafe fn named_pipe_info(handle: RawHandle) -> io::Result<PipeInfo> {
         in_buffer_size,
         max_instances,
     })
+}
+
+#[cfg(test)]
+mod test {
+    use self::windows_sys::{PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE};
+    use super::*;
+
+    #[test]
+    fn opts_default_pipe_mode() {
+        let opts = ServerOptions::new();
+        assert_eq!(opts.pipe_mode, PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS);
+    }
+
+    #[test]
+    fn opts_unset_reject_remote() {
+        let mut opts = ServerOptions::new();
+        opts.reject_remote_clients(false);
+        assert_eq!(opts.pipe_mode & PIPE_REJECT_REMOTE_CLIENTS, 0);
+    }
+
+    #[test]
+    fn opts_set_pipe_mode_maintains_reject_remote_clients() {
+        let mut opts = ServerOptions::new();
+        opts.pipe_mode(PipeMode::Byte);
+        assert_eq!(opts.pipe_mode, PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS);
+
+        opts.reject_remote_clients(false);
+        opts.pipe_mode(PipeMode::Byte);
+        assert_eq!(opts.pipe_mode, PIPE_TYPE_BYTE);
+
+        opts.reject_remote_clients(true);
+        opts.pipe_mode(PipeMode::Byte);
+        assert_eq!(opts.pipe_mode, PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS);
+
+        opts.reject_remote_clients(false);
+        opts.pipe_mode(PipeMode::Message);
+        assert_eq!(opts.pipe_mode, PIPE_TYPE_MESSAGE);
+
+        opts.reject_remote_clients(true);
+        opts.pipe_mode(PipeMode::Message);
+        assert_eq!(
+            opts.pipe_mode,
+            PIPE_TYPE_MESSAGE | PIPE_REJECT_REMOTE_CLIENTS
+        );
+    }
 }
