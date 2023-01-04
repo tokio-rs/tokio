@@ -161,13 +161,6 @@ pub(crate) struct Pipe {
     fd: File,
 }
 
-impl<T: IntoRawFd> From<T> for Pipe {
-    fn from(fd: T) -> Self {
-        let fd = unsafe { File::from_raw_fd(fd.into_raw_fd()) };
-        Self { fd }
-    }
-}
-
 impl<'a> io::Read for &'a Pipe {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
         (&self.fd).read(bytes)
@@ -191,6 +184,19 @@ impl<'a> io::Write for &'a Pipe {
 impl AsRawFd for Pipe {
     fn as_raw_fd(&self) -> RawFd {
         self.fd.as_raw_fd()
+    }
+}
+
+impl IntoRawFd for Pipe {
+    fn into_raw_fd(self) -> RawFd {
+        self.fd.into_raw_fd()
+    }
+}
+
+impl FromRawFd for Pipe {
+    unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        let fd = File::from_raw_fd(fd.into_raw_fd());
+        Self { fd }
     }
 }
 
@@ -243,6 +249,14 @@ impl fmt::Debug for ChildStdio {
 impl AsRawFd for ChildStdio {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
+    }
+}
+
+#[cfg(feature = "net")]
+impl ChildStdio {
+    pub(super) fn into_fd(self) -> io::Result<RawFd> {
+        let pipe = self.inner.into_inner()?;
+        Ok(pipe.into_raw_fd())
     }
 }
 
@@ -314,8 +328,9 @@ pub(super) fn stdio<T>(io: T) -> io::Result<ChildStdio>
 where
     T: IntoRawFd,
 {
+    // Safety: we assume T correctly implements IntoRawFd
+    let mut pipe = unsafe { Pipe::from_raw_fd(io.into_raw_fd()) };
     // Set the fd to nonblocking before we pass it to the event loop
-    let mut pipe = Pipe::from(io);
     set_nonblocking(&mut pipe, true)?;
 
     PollEvented::new(pipe).map(|inner| ChildStdio { inner })

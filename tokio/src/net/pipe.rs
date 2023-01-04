@@ -9,11 +9,11 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::prelude::OpenOptionsExt;
 use std::path::Path;
 use std::pin::Pin;
-use std::process::{ChildStderr, ChildStdin, ChildStdout};
 use std::task::{Context, Poll};
 
 use crate::io::interest::Interest;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
+use crate::process::{ChildStderr, ChildStdin, ChildStdout};
 
 cfg_net_unix! {
     #[derive(Debug)]
@@ -114,7 +114,9 @@ impl AsyncWrite for Sender {
 impl TryFrom<ChildStdin> for Sender {
     type Error = io::Error;
     fn try_from(stdin: ChildStdin) -> io::Result<Sender> {
-        Sender::from_mio(stdin.into())
+        // Safety: ChildStdin has a valid fd to the writing end of a pipe.
+        let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(stdin.into_fd()?) };
+        Sender::from_mio(mio_tx)
     }
 }
 
@@ -183,7 +185,6 @@ impl AsyncRead for Receiver {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // TODO
         // Safety: `mio_pipe::Receiver` uses a `std::fs::File::read` underneath,
         // which correctly handles reads into uninitialized memory.
         unsafe { self.io.poll_read(cx, buf) }
@@ -193,14 +194,18 @@ impl AsyncRead for Receiver {
 impl TryFrom<ChildStdout> for Receiver {
     type Error = io::Error;
     fn try_from(stdout: ChildStdout) -> io::Result<Receiver> {
-        Receiver::from_mio(stdout.into())
+        // Safety: ChildStdout has a valid fd to the reading end of a pipe.
+        let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(stdout.into_fd()?) };
+        Receiver::from_mio(mio_rx)
     }
 }
 
 impl TryFrom<ChildStderr> for Receiver {
     type Error = io::Error;
     fn try_from(stderr: ChildStderr) -> io::Result<Receiver> {
-        Receiver::from_mio(stderr.into())
+        // Safety: ChildStderr has a valid fd to the reading end of a pipe.
+        let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(stderr.into_fd()?) };
+        Receiver::from_mio(mio_rx)
     }
 }
 

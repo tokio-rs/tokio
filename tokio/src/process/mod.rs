@@ -1392,6 +1392,7 @@ mod sys {
     use std::os::unix::io::{AsRawFd, RawFd};
 
     use super::{ChildStderr, ChildStdin, ChildStdout};
+    use crate::io;
 
     impl AsRawFd for ChildStdin {
         fn as_raw_fd(&self) -> RawFd {
@@ -1410,7 +1411,51 @@ mod sys {
             self.inner.as_raw_fd()
         }
     }
+
+    cfg_net! {
+        impl ChildStdin {
+            pub(crate) fn into_fd(self) -> io::Result<RawFd> {
+                self.inner.into_fd()
+            }
+        }
+
+        impl ChildStdout {
+            pub(crate) fn into_fd(self) -> io::Result<RawFd> {
+                self.inner.into_fd()
+            }
+        }
+
+        impl ChildStderr {
+            pub(crate) fn into_fd(self) -> io::Result<RawFd> {
+                self.inner.into_fd()
+            }
+        }
+    }
 }
+
+/*
+feature! {
+    #![all(unix, feature = "net")]
+
+    impl ChildStdin {
+        pub(crate) fn into_fd(self) -> io::Result<RawFd> {
+            self.inner.into_fd()
+        }
+    }
+
+    impl ChildStdout {
+        pub(crate) fn into_fd(self) -> io::Result<RawFd> {
+            self.inner.into_fd()
+        }
+    }
+
+    impl ChildStderr {
+        pub(crate) fn into_fd(self) -> io::Result<RawFd> {
+            self.inner.into_fd()
+        }
+    }
+}
+*/
 
 #[cfg(windows)]
 mod sys {
