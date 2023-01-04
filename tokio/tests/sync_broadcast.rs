@@ -526,3 +526,37 @@ fn resubscribe_to_closed_channel() {
     let mut rx_resub = rx.resubscribe();
     assert_closed!(rx_resub.try_recv());
 }
+
+#[test]
+fn sender_len() {
+    let (tx, mut rx1) = broadcast::channel(4);
+    let mut rx2 = tx.subscribe();
+
+    assert_eq!(tx.len(), 0);
+    assert!(tx.is_empty());
+
+    tx.send(1).unwrap();
+    tx.send(2).unwrap();
+    tx.send(3).unwrap();
+
+    assert_eq!(tx.len(), 3);
+    assert!(!tx.is_empty());
+
+    assert_recv!(rx1);
+    assert_recv!(rx1);
+
+    assert_eq!(tx.len(), 3);
+    assert!(!tx.is_empty());
+
+    assert_recv!(rx2);
+
+    assert_eq!(tx.len(), 2);
+    assert!(!tx.is_empty());
+
+    tx.send(4).unwrap();
+    tx.send(5).unwrap();
+    tx.send(6).unwrap();
+
+    assert_eq!(tx.len(), 4);
+    assert!(!tx.is_empty());
+}
