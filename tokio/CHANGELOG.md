@@ -1,3 +1,14 @@
+# 1.23.1 (January 4, 2022)
+
+This release forward ports changes from 1.18.4.
+
+### Fixed
+
+- net: fix Windows named pipe server builder to maintain option when toggling
+  pipe mode ([#5336]).
+
+[#5336]: https://github.com/tokio-rs/tokio/pull/5336
+
 # 1.23.0 (December 5, 2022)
 
 ### Fixed
