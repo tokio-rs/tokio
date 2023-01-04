@@ -1,6 +1,7 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
 
+use tokio::fs::OpenOptions;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::pipe;
 use tokio::process::Command;
@@ -8,7 +9,6 @@ use tokio_test::task;
 use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 
 use std::convert::TryFrom;
-use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -93,28 +93,6 @@ async fn fifo_simple_send_sender_first() -> io::Result<()> {
 }
 
 #[tokio::test]
-async fn detects_not_a_fifo() -> io::Result<()> {
-    let dir = tempfile::Builder::new()
-        .prefix("tokio-fifo-tests")
-        .tempdir()
-        .unwrap();
-    let path = dir.path().join("not_a_fifo");
-
-    // Create an ordinary file.
-    File::create(&path)?;
-
-    // Sender detects the invalid file type.
-    let err = assert_err!(pipe::Sender::open(&path));
-    assert_eq!(err.kind(), io::ErrorKind::Other);
-
-    // Receiver detects the invalid file type.
-    let err = assert_err!(pipe::Receiver::open(&path));
-    assert_eq!(err.kind(), io::ErrorKind::Other);
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn from_child_stdout() -> io::Result<()> {
     const MSG: &[u8] = b"hello_world";
 
@@ -167,6 +145,41 @@ async fn from_child_stdin() -> io::Result<()> {
 fn writable_by_poll(writer: &pipe::Sender) -> bool {
     task::spawn(writer.writable()).poll().is_ready()
 }
+
+/*
+#[tokio::test]
+async fn from_file() -> io::Result<()> {
+    const DATA: &[u8] = b"this is some data to write to the fifo";
+
+    let fifo = TempFifo::new("from_file")?;
+
+    let file = OpenOptions::new().read(true).open(&fifo).await?;
+    let mut reader = pipe::Receiver::from_file(file).await?;
+
+    let file = OpenOptions::new().write(true).open(&fifo).await?;
+    let mut writer = pipe::Sender::from_file(file).await?;
+
+
+    let read_fut = task::spawn(async move {
+        while
+    }))
+
+    // Fill the pipe buffer to test async.
+    while writable_by_poll(&writer) {
+        match writer.try_write(DATA) {
+            Err(e) => {
+                assert_eq!(e.kind(), io::ErrorKind::WouldBlock);
+                break;
+            }
+            _ => {}
+        }
+    }
+    drop(writer);
+
+
+    Ok(())
+}
+*/
 
 #[tokio::test]
 async fn try_read_write() -> io::Result<()> {
