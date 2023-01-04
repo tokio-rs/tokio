@@ -32,7 +32,7 @@ impl Sender {
     /// This function will fail with an OS error if there are no reading ends open.
     /// On Linux you can use [`open_dangling`] to work around this.
     ///
-    /// [`open_dangling`]: Sender::open_dangling
+    /// [`open_dangling`]: Self::open_dangling
     ///
     /// # Errors
     ///
@@ -60,7 +60,7 @@ impl Sender {
     /// Note that behavior of such operation is not defined by POSIX and is only
     /// guaranteed to work on Linux.
     ///
-    /// [`open`]: Sender::open
+    /// [`open`]: Self::open
     ///
     /// # Errors
     ///
@@ -74,26 +74,22 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
-    /// use std::error::Error;
-    /// use std::io;
+    /// # use tokio::io::AsyncWriteExt;
+    /// # use tokio::net::pipe::Sender;
+    /// # use std::error::Error;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn Error>> {
+    /// # let dir = tempfile::tempdir().unwrap();
+    /// # let new_fifo_path = dir.path().join("fifo");
+    /// // Create a new FIFO file.
+    /// nix::unistd::mkfifo(&new_fifo_path, nix::sys::stat::Mode::S_IRWXU)?;
     ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let dir = tempfile::tempdir().unwrap();
-    ///     let fifo_path = dir.path().join("fifo");
-    ///     nix::unistd::mkfifo(&fifo_path, nix::sys::stat::Mode::S_IRWXU)?;
-    ///
-    ///     let mut tx = pipe::Sender::open_dangling(&fifo_path)?;
-    ///     writer.write_all(b"hello world").await?;
-    ///
-    ///     let mut rx = pipe::Receiver::open(&fifo_path)?;
-    ///     let mut recv_data = vec![0; b"hello world".len()];
-    ///     rx.read_exact(&mut recv_data).await?;
-    ///     assert_eq!(&recv_data, b"hello_world");
-    ///
-    ///     Ok(())
-    /// }
+    /// // `Sender::open` would fail here, since there is no open reading end.
+    /// let mut tx = Sender::open_dangling(&new_fifo_path)?;
+    /// // We can asynchronously write to the pipe before any reader.
+    /// tx.write_all(b"hello world").await?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn open_dangling<P>(path: P) -> io::Result<Sender>
     where
@@ -125,7 +121,9 @@ impl Sender {
 
     /// Waits for the pipe to become writable.
     ///
-    /// This function is usually paired with `try_write()`.
+    /// This function is usually paired with [`try_write()`].
+    ///
+    /// [`try_write()`]: Self::try_write
     ///
     /// # Examples
     ///
@@ -181,7 +179,7 @@ impl Sender {
     /// via [`writable`] is not feasible. Where possible, using [`writable`] is
     /// preferred, as this supports polling from multiple tasks at once.
     ///
-    /// [`writable`]: Sender::writable
+    /// [`writable`]: Self::writable
     ///
     /// # Return value
     ///
@@ -206,7 +204,7 @@ impl Sender {
     ///
     /// This function is usually paired with [`writable`].
     ///
-    /// [`writable`]: Sender::writable
+    /// [`writable`]: Self::writable
     ///
     /// # Return
     ///
@@ -264,8 +262,8 @@ impl Sender {
     ///
     /// This function is usually paired with [`writable`].
     ///
-    /// [`try_write()`]: Sender::try_write()
-    /// [`writable`]: Sender::writable
+    /// [`try_write()`]: Self::try_write()
+    /// [`writable`]: Self::writable
     ///
     /// # Return
     ///
@@ -415,7 +413,7 @@ impl Receiver {
     ///
     /// This function is usually paired with [`try_read()`].
     ///
-    /// [`try_read()`]: Receiver::try_read()
+    /// [`try_read()`]: Self::try_read()
     ///
     /// # Examples
     ///
@@ -475,7 +473,7 @@ impl Receiver {
     /// via [`readable`] is not feasible. Where possible, using [`readable`] is
     /// preferred, as this supports polling from multiple tasks at once.
     ///
-    /// [`readable`]: Receiver::readable
+    /// [`readable`]: Self::readable
     ///
     /// # Return value
     ///
@@ -502,7 +500,7 @@ impl Receiver {
     ///
     /// Usually [`readable()`] is used with this function.
     ///
-    /// [`readable()`]: Receiver::readable()
+    /// [`readable()`]: Self::readable()
     ///
     /// # Return
     ///
@@ -574,8 +572,8 @@ impl Receiver {
     ///
     /// Usually, [`readable()`] is used with this function.
     ///
-    /// [`try_read()`]: Receiver::try_read()
-    /// [`readable()`]: Receiver::readable()
+    /// [`try_read()`]: Self::try_read()
+    /// [`readable()`]: Self::readable()
     ///
     /// # Return
     ///
