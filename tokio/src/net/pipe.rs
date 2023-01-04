@@ -29,11 +29,19 @@ impl Sender {
     /// is a FIFO file and associate the pipe with the default event loop's handles
     /// for writing.
     ///
+    /// This function will fail with an OS error if there are no reading ends open.
+    /// On Linux you can use [`open_dangling`] to work around this.
+    ///
+    /// [`open_dangling`]: Sender::open_dangling
+    ///
     /// # Errors
     ///
     /// Returns an error if the specified file is not a FIFO file.
     /// Will also result in an error if called outside of a [Tokio Runtime], or in
     /// a runtime that has not [enabled I/O], or if any OS-specific I/O errors occur.
+    ///
+    /// [Tokio Runtime]: crate::runtime::Runtime
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
     pub fn open<P>(path: P) -> io::Result<Sender>
     where
         P: AsRef<Path>,
@@ -52,11 +60,16 @@ impl Sender {
     /// Note that behavior of such operation is not defined by POSIX and is only
     /// guaranteed to work on Linux.
     ///
+    /// [`open`]: Sender::open
+    ///
     /// # Errors
     ///
     /// Returns an error if the specified file is not a FIFO file.
     /// Will also result in an error if called outside of a [Tokio Runtime], or in
     /// a runtime that has not [enabled I/O], or if any OS-specific I/O errors occur.
+    ///
+    /// [Tokio Runtime]: crate::runtime::Runtime
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
     ///
     /// # Examples
     ///
@@ -82,8 +95,6 @@ impl Sender {
     ///     Ok(())
     /// }
     /// ```
-    ///
-    /// [`open`]: method@Self::open
     pub fn open_dangling<P>(path: P) -> io::Result<Sender>
     where
         P: AsRef<Path>,
@@ -125,7 +136,7 @@ impl Sender {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a fifo
+    ///     // Open a writing end of a fifo
     ///     let pipe = Sender::open("path/to/a/fifo")?;
     ///
     ///     loop {
@@ -170,6 +181,8 @@ impl Sender {
     /// via [`writable`] is not feasible. Where possible, using [`writable`] is
     /// preferred, as this supports polling from multiple tasks at once.
     ///
+    /// [`writable`]: Sender::writable
+    ///
     /// # Return value
     ///
     /// The function returns:
@@ -181,8 +194,6 @@ impl Sender {
     /// # Errors
     ///
     /// This function may encounter any standard I/O error except `WouldBlock`.
-    ///
-    /// [`writable`]: method@Self::writable
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.io.registration().poll_write_ready(cx).map_ok(|_| ())
     }
@@ -193,7 +204,9 @@ impl Sender {
     /// The function will attempt to write the entire contents of `buf`, but
     /// only part of the buffer may be written.
     ///
-    /// This function is usually paired with `writable()`.
+    /// This function is usually paired with [`writable`].
+    ///
+    /// [`writable`]: Sender::writable
     ///
     /// # Return
     ///
@@ -210,7 +223,7 @@ impl Sender {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a fifo
+    ///     // Open a writing end of a fifo
     ///     let pipe = Sender::open("path/to/a/fifo")?;
     ///
     ///     loop {
@@ -249,9 +262,10 @@ impl Sender {
     /// equivalently to a single call to [`try_write()`] with concatenated
     /// buffers.
     ///
-    /// This function is usually paired with `writable()`.
+    /// This function is usually paired with [`writable`].
     ///
     /// [`try_write()`]: Sender::try_write()
+    /// [`writable`]: Sender::writable
     ///
     /// # Return
     ///
@@ -268,7 +282,7 @@ impl Sender {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a fifo
+    ///     // Open a writing end of a fifo
     ///     let pipe = Sender::open("path/to/a/fifo")?;
     ///
     ///     let bufs = [io::IoSlice::new(b"hello "), io::IoSlice::new(b"world")];
@@ -319,7 +333,6 @@ impl AsyncWrite for Sender {
         self.io.poll_write_vectored(cx, bufs)
     }
 
-    // TODO
     fn is_write_vectored(&self) -> bool {
         true
     }
@@ -361,6 +374,20 @@ cfg_net_unix! {
 }
 
 impl Receiver {
+    /// Open a reading end of a pipe from a FIFO file.
+    ///
+    /// This function will open the file at the specified path, check if the file
+    /// is a FIFO file and associate the pipe with the default event loop's handles
+    /// for reading.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the specified file is not a FIFO file.
+    /// Will also result in an error if called outside of a [Tokio Runtime], or in
+    /// a runtime that has not [enabled I/O], or if any OS-specific I/O errors occur.
+    ///
+    /// [Tokio Runtime]: crate::runtime::Runtime
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
     pub fn open<P>(path: P) -> io::Result<Receiver>
     where
         P: AsRef<Path>,
@@ -384,21 +411,223 @@ impl Receiver {
         Ok(Receiver { io })
     }
 
+    /// Waits for the pipe to become readable.
+    ///
+    /// This function is usually paired with [`try_read()`].
+    ///
+    /// [`try_read()`]: Receiver::try_read()
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::pipe::Receiver;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Open a reading end of a fifo
+    ///     let pipe = Receiver::open("path/to/a/fifo")?;
+    ///
+    ///     let mut msg = vec![0; 1024];
+    ///
+    ///     loop {
+    ///         // Wait for the pipe to be readable
+    ///         pipe.readable().await?;
+    ///
+    ///         // Try to read data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match pipe.try_read(&mut msg) {
+    ///             Ok(n) => {
+    ///                 msg.truncate(n);
+    ///                 break;
+    ///             }
+    ///             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     println!("GOT = {:?}", msg);
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn readable(&self) -> io::Result<()> {
         self.io.registration().readiness(Interest::READABLE).await?;
         Ok(())
     }
 
+    /// Polls for read readiness.
+    ///
+    /// If the pipe is not currently ready for reading, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the pipe
+    /// becomes ready for reading, `Waker::wake` will be called on the waker.
+    ///
+    /// Note that on multiple calls to `poll_read_ready` or `poll_read`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_write_ready` retains a
+    /// second, independent waker.)
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`readable`] is not feasible. Where possible, using [`readable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// [`readable`]: Receiver::readable
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the pipe is not ready for reading.
+    /// * `Poll::Ready(Ok(()))` if the pipe is ready for reading.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.io.registration().poll_read_ready(cx).map_ok(|_| ())
     }
 
+    /// Tries to read data from the pipe into the provided buffer, returning how
+    /// many bytes were read.
+    ///
+    /// Receives any pending data from the pipe but does not wait for new data
+    /// to arrive. On success, returns the number of bytes read. Because
+    /// `try_read()` is non-blocking, the buffer does not have to be stored by
+    /// the async task and can exist entirely on the stack.
+    ///
+    /// Usually [`readable()`] is used with this function.
+    ///
+    /// [`readable()`]: Receiver::readable()
+    ///
+    /// # Return
+    ///
+    /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+    /// number of bytes read. If `n` is `0`, then it can indicate one of two scenarios:
+    ///
+    /// 1. The pipe's read half is closed and will no longer yield data.
+    /// 2. The specified buffer was 0 bytes in length.
+    ///
+    /// If the pipe is not ready to read data,
+    /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::pipe::Receiver;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Open a reading end of a fifo
+    ///     let pipe = Receiver::open("path/to/a/fifo")?;
+    ///
+    ///     let mut msg = vec![0; 1024];
+    ///
+    ///     loop {
+    ///         // Wait for the pipe to be readable
+    ///         pipe.readable().await?;
+    ///
+    ///         // Try to read data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match pipe.try_read(&mut msg) {
+    ///             Ok(n) => {
+    ///                 msg.truncate(n);
+    ///                 break;
+    ///             }
+    ///             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     println!("GOT = {:?}", msg);
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn try_read(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
             .try_io(Interest::READABLE, || (&*self.io).read(buf))
     }
 
+    /// Tries to read data from the pipe into the provided buffers, returning
+    /// how many bytes were read.
+    ///
+    /// Data is copied to fill each buffer in order, with the final buffer
+    /// written to possibly being only partially filled. This method behaves
+    /// equivalently to a single call to [`try_read()`] with concatenated
+    /// buffers.
+    ///
+    /// Receives any pending data from the pipe but does not wait for new data
+    /// to arrive. On success, returns the number of bytes read. Because
+    /// `try_read_vectored()` is non-blocking, the buffer does not have to be
+    /// stored by the async task and can exist entirely on the stack.
+    ///
+    /// Usually, [`readable()`] is used with this function.
+    ///
+    /// [`try_read()`]: Receiver::try_read()
+    /// [`readable()`]: Receiver::readable()
+    ///
+    /// # Return
+    ///
+    /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+    /// number of bytes read. `Ok(0)` indicates the pipe's read half is closed
+    /// and will no longer yield data. If the pipe is not ready to read data
+    /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::pipe::Receiver;
+    /// use std::error::Error;
+    /// use std::io::{self, IoSliceMut};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Open a reading end of a fifo
+    ///     let pipe = Receiver::open("path/to/a/fifo")?;
+    ///
+    ///     loop {
+    ///         // Wait for the pipe to be readable
+    ///         pipe.readable().await?;
+    ///
+    ///         // Creating the buffer **after** the `await` prevents it from
+    ///         // being stored in the async task.
+    ///         let mut buf_a = [0; 512];
+    ///         let mut buf_b = [0; 1024];
+    ///         let mut bufs = [
+    ///             IoSliceMut::new(&mut buf_a),
+    ///             IoSliceMut::new(&mut buf_b),
+    ///         ];
+    ///
+    ///         // Try to read data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match pipe.try_read_vectored(&mut bufs) {
+    ///             Ok(0) => break,
+    ///             Ok(n) => {
+    ///                 println!("read {} bytes", n);
+    ///             }
+    ///             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn try_read_vectored(&self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
         self.io
             .registration()
