@@ -1,7 +1,10 @@
 //! Tokio support for Unix pipes.
 
+use crate::io::interest::Interest;
+use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
+
 use mio::unix::pipe as mio_pipe;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::os::unix::fs::FileTypeExt;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -9,9 +12,6 @@ use std::os::unix::prelude::OpenOptionsExt;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-
-use crate::io::interest::Interest;
-use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 
 cfg_net_unix! {
     /// Writing end of a Unix pipe.
@@ -25,7 +25,7 @@ impl Sender {
     /// Open a writing end of a pipe from a FIFO file.
     ///
     /// This function will open the file at the specified path, check if the file
-    /// is a FIFO file and associate the pipe with the default event loop's handles
+    /// is a FIFO file and associate the pipe with the default event loop's handle
     /// for writing.
     ///
     /// This function will fail with an OS error if there are no reading ends open.
@@ -45,13 +45,39 @@ impl Sender {
     where
         P: AsRef<Path>,
     {
-        Sender::open_with_read_access(path.as_ref(), false)
+        Sender::open_internal(path.as_ref(), true, false)
+    }
+
+    /// Open a writing end of a pipe from a FIFO file.
+    ///
+    /// This function will open the file at the specified path and associate the pipe
+    /// with the default event loop's handle for writing. It will **not** check if
+    /// the file is a FIFO file.
+    ///
+    /// This function will fail with an OS error if there are no reading ends open.
+    /// On Linux you can use [`open_dangling_unchecked`] to work around this.
+    ///
+    /// [`open_dangling_unchecked`]: Self::open_dangling_unchecked
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the specified file is not a FIFO file.
+    /// Will also result in an error if called outside of a [Tokio Runtime], or in
+    /// a runtime that has not [enabled I/O], or if any OS-specific I/O errors occur.
+    ///
+    /// [Tokio Runtime]: crate::runtime::Runtime
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
+    pub fn open_unchecked<P>(path: P) -> io::Result<Sender>
+    where
+        P: AsRef<Path>,
+    {
+        Sender::open_internal(path.as_ref(), false, false)
     }
 
     /// Open a writing end of a pipe from a FIFO file without a present reader.
     ///
     /// This function will open the file at the specified path, check if the file
-    /// is a FIFO file and associate the pipe with the default event loop's handles
+    /// is a FIFO file and associate the pipe with the default event loop's handle
     /// for writing.
     ///
     /// Unlike [`open`], this will not error if there is no open reading end of the FIFO.
@@ -94,22 +120,71 @@ impl Sender {
     where
         P: AsRef<Path>,
     {
-        Sender::open_with_read_access(path.as_ref(), true)
+        Sender::open_internal(path.as_ref(), true, true)
     }
 
-    fn open_with_read_access(path: &Path, read_access: bool) -> io::Result<Sender> {
+    /// Open a writing end of a pipe from a FIFO file without a present reader.
+    ///
+    /// This function will open the file at the specified path and associate the pipe
+    /// with the default event loop's handle for writing. It will **not** check if
+    /// the file is a FIFO file.
+    ///
+    /// Unlike [`open_unchecked`], this will not error if there is no open reading end of the FIFO.
+    /// This is done by opening the FIFO file with access for both reading and writing.
+    /// Note that behavior of such operation is not defined by POSIX and is only
+    /// guaranteed to work on Linux.
+    ///
+    /// [`open_unchecked`]: Self::open_unchecked
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the specified file is not a FIFO file.
+    /// Will also result in an error if called outside of a [Tokio Runtime], or in
+    /// a runtime that has not [enabled I/O], or if any OS-specific I/O errors occur.
+    ///
+    /// [Tokio Runtime]: crate::runtime::Runtime
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use tokio::io::AsyncWriteExt;
+    /// # use tokio::net::pipe::Sender;
+    /// # use std::error::Error;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn Error>> {
+    /// # let dir = tempfile::tempdir().unwrap();
+    /// # let new_fifo_path = dir.path().join("fifo");
+    /// // Create a new FIFO file.
+    /// nix::unistd::mkfifo(&new_fifo_path, nix::sys::stat::Mode::S_IRWXU)?;
+    ///
+    /// // `Sender::open_checked` would fail here, since there is no open reading end.
+    /// let mut tx = Sender::open_dangling_unchecked(&new_fifo_path)?;
+    /// // We can asynchronously write to the pipe before any reader.
+    /// tx.write_all(b"hello world").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn open_dangling_unchecked<P>(path: P) -> io::Result<Sender>
+    where
+        P: AsRef<Path>,
+    {
+        Sender::open_internal(path.as_ref(), false, true)
+    }
+
+    fn open_internal(path: &Path, check: bool, read_access: bool) -> io::Result<Sender> {
         let file = OpenOptions::new()
             .read(read_access)
             .write(true)
             .custom_flags(libc::O_NONBLOCK)
             .open(path)?;
-        if file.metadata()?.file_type().is_fifo() {
+        if check && !is_fifo(&file)? {
+            Err(io::Error::new(io::ErrorKind::Other, "file is not a fifo"))
+        } else {
             let raw_fd = file.into_raw_fd();
-            // Safety: We have just created the raw fd from a valid fifo file.
+            // Safety: Raw fd was created a valid fifo file.
             let pipe = unsafe { mio_pipe::Sender::from_raw_fd(raw_fd) };
             Sender::from_mio(pipe)
-        } else {
-            Err(io::Error::new(io::ErrorKind::Other, "file is not a fifo"))
         }
     }
 
@@ -361,7 +436,7 @@ impl Receiver {
     /// Open a reading end of a pipe from a FIFO file.
     ///
     /// This function will open the file at the specified path, check if the file
-    /// is a FIFO file and associate the pipe with the default event loop's handles
+    /// is a FIFO file and associate the pipe with the default event loop's handle
     /// for reading.
     ///
     /// # Errors
@@ -676,4 +751,9 @@ cfg_process! {
             Receiver::from_mio(mio_rx)
         }
     }
+}
+
+/// Checks if the given file is a FIFO.
+fn is_fifo(file: &File) -> io::Result<bool> {
+    Ok(file.metadata()?.file_type().is_fifo())
 }

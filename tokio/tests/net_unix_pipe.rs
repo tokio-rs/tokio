@@ -1,17 +1,17 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
 
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::pipe;
+use tokio::process::Command;
+use tokio_test::task;
+use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
+
 use std::convert::TryFrom;
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::pipe;
-
-use tokio::process::Command;
-use tokio_test::task;
-use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 
 /// Helper struct which will clean up temporary files once dropped.
 struct TempFifo {
