@@ -1,3 +1,30 @@
+# 1.24.0 (January 5, 2022)
+
+### Fixed
+ - rt: improve native `AtomicU64` support detection ([#5284])
+
+### Added
+ - rt: add configuration option for max number of I/O events polled from the OS
+   per tick ([#5186])
+ - rt: add an environment variable for configuring the default number of worker
+   threads per runtime instance ([#4250])
+
+### Changed
+ - sync: reduce MPSC channel stack usage ([#5294])
+ - io: reduce lock contention in I/O operations  ([#5300])
+ - fs: speed up `read_dir()` by chunking operations ([#5309])
+ - rt: use internal `ThreadId` implementation ([#5329])
+ - test: don't auto-advance time when a `spawn_blocking` task is running ([#5115])
+
+[#5186]: https://github.com/tokio-rs/tokio/pull/5186
+[#5294]: https://github.com/tokio-rs/tokio/pull/5294
+[#5284]: https://github.com/tokio-rs/tokio/pull/5284
+[#4250]: https://github.com/tokio-rs/tokio/pull/4250
+[#5300]: https://github.com/tokio-rs/tokio/pull/5300
+[#5329]: https://github.com/tokio-rs/tokio/pull/5329
+[#5115]: https://github.com/tokio-rs/tokio/pull/5115
+[#5309]: https://github.com/tokio-rs/tokio/pull/5309
+
 # 1.23.1 (January 4, 2022)
 
 This release forward ports changes from 1.18.4.
