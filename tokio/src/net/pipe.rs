@@ -27,17 +27,47 @@ cfg_net_unix! {
 impl Sender {
     /// Creates a new `Sender` from a FIFO file.
     ///
-    /// This function will open the FIFO file at the specified path and associate the pipe
-    /// with the default event loop's handle for writing.
+    /// This function will open the FIFO file at the specified path and associate
+    /// the pipe with the default event loop for writing.
     ///
-    /// This function will fail with an OS error if no one opened this pipe for reading.
-    /// On Linux you can use [`open_dangling`] to work around this.
+    /// This function will fail if no one has this pipe open for reading. You can
+    /// wait for a reader using sleeping in a loop. On Linux you can also use
+    /// [`open_rw`] to work around this.
     ///
-    /// [`open_dangling`]: Self::open_dangling
+    /// [`open_rw`]: Self::open_rw
     ///
     /// # Errors
     ///
-    /// Returns an error if any OS-specific I/O errors occur.
+    /// If the FIFO file is not open for reading this function will fail with
+    /// `ENXIO`. This function may also fail with other standard OS errors.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::pipe::Sender;
+    /// use tokio::time::{self, Duration};
+    /// use nix::{unistd::mkfifo, sys::stat::Mode};
+    /// # use std::error::Error;
+    ///
+    /// const FIFO_NAME: &str = "path/to/a/new/fifo";
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// // Create a new FIFO file.
+    /// mkfifo(FIFO_NAME, Mode::S_IRWXU)?;
+    ///
+    /// // Wait for a reader to open the file.
+    /// let tx = loop {
+    ///     match Sender::open(FIFO_NAME) {
+    ///         Ok(tx) => break tx,
+    ///         Err(e) if e.raw_os_error() == Some(libc::ENXIO) => {},
+    ///         Err(e) => return Err(e.into()),
+    ///     }
+    ///
+    ///     time::sleep(Duration::from_millis(50)).await;
+    /// };
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
@@ -56,36 +86,36 @@ impl Sender {
 
     /// Creates a new `Sender` from a FIFO file without a present reader.
     ///
-    /// This function will open the file at the specified path, check if the file
-    /// is a FIFO file and associate the pipe with the default event loop's handle
-    /// for writing.
+    /// This function will open the FIFO file at the specified path and associate
+    /// the pipe with the default event loop for writing.
     ///
-    /// Unlike [`open`], this function will not fail if there is no open reading end
-    /// of the FIFO. This is done by opening the FIFO file with access for both
-    /// reading and writing. Note that behavior of such operation is not defined by
-    /// the POSIX standard and is only guaranteed to work on Linux.
+    /// Unlike [`open`], this function will not fail if no one has this pipe open
+    /// for reading. This is done by opening the FIFO file with access for both
+    /// reading and writing. Note that the behavior of such operation is not defined
+    /// by the POSIX standard and is only guaranteed to work on Linux.
     ///
     /// [`open`]: Self::open
     ///
     /// # Errors
     ///
-    /// Returns an error if any OS-specific I/O errors occur.
+    /// Fails with any standard OS error if it occurs.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// # use tokio::io::AsyncWriteExt;
-    /// # use tokio::net::pipe::Sender;
+    /// use tokio::io::AsyncWriteExt;
+    /// use tokio::net::pipe::Sender;
+    /// use nix::{unistd::mkfifo, sys::stat::Mode};
     /// # use std::error::Error;
-    /// #
+    ///
+    /// const FIFO_NAME: &str = "path/to/a/new/fifo";
+    ///
     /// # async fn dox() -> Result<(), Box<dyn Error>> {
-    /// # let dir = tempfile::tempdir().unwrap();
-    /// # let new_fifo_path = dir.path().join("fifo");
     /// // Create a new FIFO file.
-    /// nix::unistd::mkfifo(&new_fifo_path, nix::sys::stat::Mode::S_IRWXU)?;
+    /// mkfifo(FIFO_NAME, Mode::S_IRWXU)?;
     ///
     /// // `Sender::open` would fail here, since there is no open reading end.
-    /// let mut tx = Sender::open_dangling(&new_fifo_path)?;
+    /// let mut tx = Sender::open_rw(FIFO_NAME)?;
     /// // We can asynchronously write to the pipe before any reader.
     /// tx.write_all(b"hello world").await?;
     /// # Ok(())
@@ -100,7 +130,7 @@ impl Sender {
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    pub fn open_dangling<P>(path: P) -> io::Result<Sender>
+    pub fn open_rw<P>(path: P) -> io::Result<Sender>
     where
         P: AsRef<Path>,
     {
@@ -131,29 +161,30 @@ impl Sender {
     /// file; it is left up to the user to open it with writing access and set it
     /// in non-blocking mode.
     ///
-    /// You can use [`File`] to check first if a file has the FIFO file type and then
-    /// convert it to a `Sender`.
+    /// You can check first if a [`File`] has the FIFO file type and then use this
+    /// function to get a `Sender`.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use std::error::Error;
+    /// use tokio::net::pipe;
     /// use std::fs::OpenOptions;
     /// use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
+    /// # use std::error::Error;
     ///
-    /// use tokio::net::pipe;
+    /// const FIFO_NAME: &str = "path/to/a/fifo";
     ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let file = OpenOptions::new()
-    ///         .write(true)
-    ///         .custom_flags(libc::O_NONBLOCK)
-    ///         .open("path/to/a/fifo")?;
-    ///     if file.metadata()?.file_type().is_fifo() {
-    ///         let tx = pipe::Sender::from_file(file)?;
-    ///     }
-    ///     Ok(())
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// let file = OpenOptions::new()
+    ///     .write(true)
+    ///     .custom_flags(libc::O_NONBLOCK)
+    ///     .open(FIFO_NAME)?;
+    /// if file.metadata()?.file_type().is_fifo() {
+    ///     let tx = pipe::Sender::from_file(file)?;
+    ///     /* use the Sender */
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// # Panics
@@ -436,12 +467,12 @@ cfg_net_unix! {
 impl Receiver {
     /// Creates a new `Receiver` from a FIFO file.
     ///
-    /// This function will open the FIFO file at the specified path and associate the pipe
-    /// with the default event loop's handle for reading.
+    /// This function will open the FIFO file at the specified path and associate
+    /// the pipe with the default event loop for reading.
     ///
     /// # Errors
     ///
-    /// Returns an error if any OS-specific I/O errors occur.
+    /// Fails with any standard OS error if it occurs.
     ///
     /// # Panics
     ///
@@ -481,28 +512,30 @@ impl Receiver {
     /// file; it is left up to the user to open it with reading access and set it
     /// in non-blocking mode.
     ///
-    /// You can use [`File`] to first check if a file has the FIFO file type and then
-    /// convert it to a `Receiver`.
+    /// You can check first if a [`File`] has the FIFO file type and then use this
+    /// function to get a `Receiver`.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use std::error::Error;
+    /// use tokio::net::pipe;
     /// use std::fs::OpenOptions;
     /// use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
-    /// use tokio::net::pipe;
+    /// # use std::error::Error;
     ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let file = OpenOptions::new()
-    ///         .read(true)
-    ///         .custom_flags(libc::O_NONBLOCK)
-    ///         .open("path/to/a/fifo")?;
-    ///     if file.metadata()?.file_type().is_fifo() {
-    ///         let rx = pipe::Receiver::from_file(file)?;
-    ///     }
-    ///     Ok(())
+    /// const FIFO_NAME: &str = "path/to/a/fifo";
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// let file = OpenOptions::new()
+    ///     .read(true)
+    ///     .custom_flags(libc::O_NONBLOCK)
+    ///     .open(FIFO_NAME)?;
+    /// if file.metadata()?.file_type().is_fifo() {
+    ///     let tx = pipe::Receiver::from_file(file)?;
+    ///     /* use the Receiver */
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// # Panics

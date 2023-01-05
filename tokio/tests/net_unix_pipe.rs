@@ -77,8 +77,8 @@ async fn fifo_simple_send_sender_first() -> io::Result<()> {
     let err = assert_err!(pipe::Sender::open(&fifo));
     assert_eq!(err.raw_os_error(), Some(libc::ENXIO));
 
-    // `open_dangling` should succeed and the pipe should be ready to write.
-    let mut writer = pipe::Sender::open_dangling(&fifo)?;
+    // `open_rw` should succeed and the pipe should be ready to write.
+    let mut writer = pipe::Sender::open_rw(&fifo)?;
     writer.write_all(DATA).await?;
 
     // Read the written data and validate.
