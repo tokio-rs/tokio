@@ -23,6 +23,7 @@
 [#5300]: https://github.com/tokio-rs/tokio/pull/5300
 [#5329]: https://github.com/tokio-rs/tokio/pull/5329
 [#5115]: https://github.com/tokio-rs/tokio/pull/5115
+[#5309]: https://github.com/tokio-rs/tokio/pull/5309
 
 # 1.23.1 (January 4, 2022)
 
