@@ -4,7 +4,7 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::pipe;
 use tokio_test::task;
-use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
+use tokio_test::{assert_ok, assert_pending, assert_ready_ok};
 
 use std::fs::OpenOptions;
 use std::io;
@@ -68,6 +68,8 @@ async fn fifo_simple_send() -> io::Result<()> {
 #[tokio::test]
 #[cfg(target_os = "linux")]
 async fn fifo_simple_send_sender_first() -> io::Result<()> {
+    use tokio_test::assert_err;
+
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
     // Create a new fifo file with *no reading ends open*.
