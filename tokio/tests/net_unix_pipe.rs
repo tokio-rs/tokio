@@ -3,16 +3,13 @@
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::pipe;
-use tokio::process::Command;
 use tokio_test::task;
 use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 
-use std::convert::TryFrom;
 use std::fs::OpenOptions;
 use std::io;
 use std::os::unix::prelude::OpenOptionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 
 /// Helper struct which will clean up temporary files once dropped.
 struct TempFifo {
@@ -89,56 +86,6 @@ async fn fifo_simple_send_sender_first() -> io::Result<()> {
     let mut read_data = vec![0; DATA.len()];
     reader.read_exact(&mut read_data).await?;
     assert_eq!(&read_data, DATA);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn from_child_stdout() -> io::Result<()> {
-    const MSG: &[u8] = b"hello_world";
-
-    // Spawn a child process which will print the message to its stdout.
-    let mut cmd = Command::new("sh");
-    cmd.arg("-c")
-        .arg(format!("echo -n {}", std::str::from_utf8(MSG).unwrap()))
-        .stdout(Stdio::piped());
-    let mut handle = cmd.spawn()?;
-
-    // Convert ChildStdout to a Sender pipe and receive the message.
-    let mut reader = pipe::Receiver::try_from(handle.stdout.take().unwrap())?;
-    let mut read_data = vec![0; MSG.len()];
-    reader.read_exact(&mut read_data).await?;
-    assert_eq!(&read_data, MSG);
-
-    // Check the status code.
-    let status = assert_ok!(handle.wait().await);
-    assert_eq!(status.code(), Some(0));
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn from_child_stdin() -> io::Result<()> {
-    const MSG: &[u8] = b"hello_world";
-
-    // Spawn a child process which will check its stdin.
-    let mut cmd = Command::new("sh");
-    cmd.arg("-c")
-        .arg(format!(
-            r#"x=$(cat); [ "$x" = "{}" ]"#,
-            std::str::from_utf8(MSG).unwrap()
-        ))
-        .stdin(Stdio::piped());
-    let mut handle = cmd.spawn()?;
-
-    // Convert ChildStdin to a Sender pipe and send the message.
-    let mut writer = pipe::Sender::try_from(handle.stdin.take().unwrap())?;
-    writer.write_all(MSG).await?;
-    drop(writer);
-
-    // Check the status code.
-    let status = assert_ok!(handle.wait().await);
-    assert_eq!(status.code(), Some(0));
 
     Ok(())
 }

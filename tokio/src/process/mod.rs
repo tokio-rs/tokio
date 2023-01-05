@@ -1437,26 +1437,6 @@ mod sys {
     }
 }
 
-cfg_net_unix! {
-    impl ChildStdin {
-        pub(crate) fn into_inner(self) -> imp::ChildStdio {
-            self.inner
-        }
-    }
-
-    impl ChildStdout {
-        pub(crate) fn into_inner(self) -> imp::ChildStdio {
-            self.inner
-        }
-    }
-
-    impl ChildStderr {
-        pub(crate) fn into_inner(self) -> imp::ChildStdio {
-            self.inner
-        }
-    }
-}
-
 #[cfg(all(test, not(loom)))]
 mod test {
     use super::kill::Kill;
