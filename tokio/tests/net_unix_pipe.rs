@@ -269,3 +269,43 @@ async fn try_read_write_vectored() -> io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn try_read_buf() -> std::io::Result<()> {
+    const DATA: &[u8] = b"this is some data to write to the fifo";
+
+    // Create a pipe pair over a fifo file.
+    let fifo = TempFifo::new("try_read_write_vectored")?;
+    let reader = pipe::Receiver::open(&fifo)?;
+    let writer = pipe::Sender::open(&fifo)?;
+
+    // Fill the pipe buffer with `try_write`.
+    let mut write_data = Vec::new();
+    while writable_by_poll(&writer) {
+        match writer.try_write(DATA) {
+            Ok(n) => write_data.extend(&DATA[..n]),
+            Err(e) => {
+                assert_eq!(e.kind(), io::ErrorKind::WouldBlock);
+                break;
+            }
+        }
+    }
+
+    // Drain the pipe buffer with `try_read_buf`.
+    let mut read_data = vec![0; write_data.len()];
+    let mut i = 0;
+    while i < write_data.len() {
+        reader.readable().await?;
+        match reader.try_read_buf(&mut read_data) {
+            Ok(n) => i += n,
+            Err(e) => {
+                assert_eq!(e.kind(), io::ErrorKind::WouldBlock);
+                continue;
+            }
+        }
+    }
+
+    assert_eq!(read_data, write_data);
+
+    Ok(())
+}

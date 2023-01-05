@@ -12,6 +12,10 @@ use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+cfg_io_util! {
+    use bytes::BufMut;
+}
+
 cfg_net_unix! {
     /// Writing end of a Unix pipe.
     #[derive(Debug)]
@@ -199,14 +203,14 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe::Sender;
+    /// use tokio::net::pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a writing end of a fifo
-    ///     let tx = Sender::open("path/to/a/fifo")?;
+    ///     let tx = pipe::Sender::open("path/to/a/fifo")?;
     ///
     ///     loop {
     ///         // Wait for the pipe to be writable
@@ -286,14 +290,14 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe::Sender;
+    /// use tokio::net::pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a writing end of a fifo
-    ///     let tx = Sender::open("path/to/a/fifo")?;
+    ///     let tx = pipe::Sender::open("path/to/a/fifo")?;
     ///
     ///     loop {
     ///         // Wait for the pipe to be writable
@@ -345,14 +349,14 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe::Sender;
+    /// use tokio::net::pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a writing end of a fifo
-    ///     let tx = Sender::open("path/to/a/fifo")?;
+    ///     let tx = pipe::Sender::open("path/to/a/fifo")?;
     ///
     ///     let bufs = [io::IoSlice::new(b"hello "), io::IoSlice::new(b"world")];
     ///
@@ -548,14 +552,14 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe::Receiver;
+    /// use tokio::net::pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a reading end of a fifo
-    ///     let rx = Receiver::open("path/to/a/fifo")?;
+    ///     let rx = pipe::Receiver::open("path/to/a/fifo")?;
     ///
     ///     let mut msg = vec![0; 1024];
     ///
@@ -646,14 +650,14 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe::Receiver;
+    /// use tokio::net::pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a reading end of a fifo
-    ///     let rx = Receiver::open("path/to/a/fifo")?;
+    ///     let rx = pipe::Receiver::open("path/to/a/fifo")?;
     ///
     ///     let mut msg = vec![0; 1024];
     ///
@@ -715,14 +719,14 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe::Receiver;
+    /// use tokio::net::pipe;
     /// use std::error::Error;
     /// use std::io::{self, IoSliceMut};
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a reading end of a fifo
-    ///     let rx = Receiver::open("path/to/a/fifo")?;
+    ///     let rx = pipe::Receiver::open("path/to/a/fifo")?;
     ///
     ///     loop {
     ///         // Wait for the pipe to be readable
@@ -760,6 +764,85 @@ impl Receiver {
         self.io
             .registration()
             .try_io(Interest::READABLE, || (&*self.io).read_vectored(bufs))
+    }
+
+    cfg_io_util! {
+        /// Tries to read data from the stream into the provided buffer, advancing the
+        /// buffer's internal cursor, returning how many bytes were read.
+        ///
+        /// Receives any pending data from the pipe but does not wait for new data
+        /// to arrive. On success, returns the number of bytes read. Because
+        /// `try_read_buf()` is non-blocking, the buffer does not have to be stored by
+        /// the async task and can exist entirely on the stack.
+        ///
+        /// Usually, [`readable()`] or [`ready()`] is used with this function.
+        ///
+        /// [`readable()`]: Self::readable
+        /// [`ready()`]: Self::ready
+        ///
+        /// # Return
+        ///
+        /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+        /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
+        /// and will no longer yield data. If the stream is not ready to read data
+        /// `Err(io::ErrorKind::WouldBlock)` is returned.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::pipe;
+        /// use std::error::Error;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> Result<(), Box<dyn Error>> {
+        ///     // Open a reading end of a fifo
+        ///     let rx = pipe::Receiver::open("path/to/a/fifo")?;
+        ///
+        ///     loop {
+        ///         // Wait for the pipe to be readable
+        ///         rx.readable().await?;
+        ///
+        ///         let mut buf = Vec::with_capacity(4096);
+        ///
+        ///         // Try to read data, this may still fail with `WouldBlock`
+        ///         // if the readiness event is a false positive.
+        ///         match rx.try_read_buf(&mut buf) {
+        ///             Ok(0) => break,
+        ///             Ok(n) => {
+        ///                 println!("read {} bytes", n);
+        ///             }
+        ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+        ///                 continue;
+        ///             }
+        ///             Err(e) => {
+        ///                 return Err(e.into());
+        ///             }
+        ///         }
+        ///     }
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().try_io(Interest::READABLE, || {
+                use std::io::Read;
+
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `mio_pipe::Receiver::read` to have filled up `n` bytes in the
+                // buffer.
+                let n = (&*self.io).read(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok(n)
+            })
+        }
     }
 }
 
