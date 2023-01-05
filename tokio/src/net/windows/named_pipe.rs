@@ -2272,6 +2272,7 @@ impl ServerOptions {
 pub struct ClientOptions {
     desired_access: u32,
     security_qos_flags: u32,
+    pipe_mode: PipeMode,
 }
 
 impl ClientOptions {
@@ -2293,6 +2294,7 @@ impl ClientOptions {
             desired_access: windows_sys::GENERIC_READ | windows_sys::GENERIC_WRITE,
             security_qos_flags: windows_sys::SECURITY_IDENTIFICATION
                 | windows_sys::SECURITY_SQOS_PRESENT,
+            pipe_mode: PipeMode::Byte,
         }
     }
 
@@ -2342,6 +2344,15 @@ impl ClientOptions {
     pub fn security_qos_flags(&mut self, flags: u32) -> &mut Self {
         // See: https://github.com/rust-lang/rust/pull/58216
         self.security_qos_flags = flags | windows_sys::SECURITY_SQOS_PRESENT;
+        self
+    }
+
+    /// The pipe mode.
+    ///
+    /// The default pipe mode is [`PipeMode::Byte`]. See [`PipeMode`] for
+    /// documentation of what each mode means.
+    pub fn pipe_mode(&mut self, pipe_mode: PipeMode) -> &mut Self {
+        self.pipe_mode = pipe_mode;
         self
     }
 
@@ -2439,6 +2450,20 @@ impl ClientOptions {
 
         if h == windows_sys::INVALID_HANDLE_VALUE {
             return Err(io::Error::last_os_error());
+        }
+
+        if matches!(self.pipe_mode, PipeMode::Message) {
+            let mut mode = windows_sys::PIPE_READMODE_MESSAGE;
+            let result = windows_sys::SetNamedPipeHandleState(
+                h,
+                &mut mode,
+                ptr::null_mut(),
+                ptr::null_mut(),
+            );
+
+            if result == 0 {
+                return Err(io::Error::last_os_error());
+            }
         }
 
         NamedPipeClient::from_raw_handle(h as _)
@@ -2560,7 +2585,9 @@ unsafe fn named_pipe_info(handle: RawHandle) -> io::Result<PipeInfo> {
 
 #[cfg(test)]
 mod test {
-    use self::windows_sys::{PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE, PIPE_READMODE_MESSAGE};
+    use self::windows_sys::{
+        PIPE_READMODE_MESSAGE, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE,
+    };
     use super::*;
 
     #[test]

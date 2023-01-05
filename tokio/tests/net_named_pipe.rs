@@ -349,9 +349,7 @@ async fn _named_pipe_mode_message(mode: PipeMode) -> io::Result<()> {
         .pipe_mode(mode)
         .create(&pipe_name)?;
 
-    let mut client = ClientOptions::new()
-        //.pipe_mode(mode)
-        .open(&pipe_name)?;
+    let mut client = ClientOptions::new().pipe_mode(mode).open(&pipe_name)?;
 
     server.connect().await?;
 
