@@ -90,7 +90,7 @@ impl Sender {
     /// the pipe with the default event loop for writing.
     ///
     /// Unlike [`open`], this function will not fail if no one has this pipe open
-    /// for reading. This is done by opening the FIFO file with access for both
+    /// for reading. This is done by opening the FIFO file with access to both
     /// reading and writing. Note that the behavior of such operation is not defined
     /// by the POSIX standard and is only guaranteed to work on Linux.
     ///
@@ -116,7 +116,7 @@ impl Sender {
     ///
     /// // `Sender::open` would fail here, since there is no open reading end.
     /// let mut tx = Sender::open_rw(FIFO_NAME)?;
-    /// // We can asynchronously write to the pipe before any reader.
+    /// // We can asynchronously write to the pipe before any readers.
     /// tx.write_all(b"hello world").await?;
     /// # Ok(())
     /// # }
