@@ -5,7 +5,7 @@
 
 ### Added
  - rt: add configuration option for max number of I/O events polled from the OS
-   per tick (#5186)
+   per tick ([#5186])
  - rt: add an environment variable for configuring the default number of worker
    threads per runtime instance ([#4250])
 
@@ -14,6 +14,7 @@
  - io: reduce lock contention in I/O operations  ([#5300])
  - fs: speed up `read_dir()` by chunking operations ([#5309])
  - rt: use internal `ThreadId` implementation ([#5329])
+ - test: don't auto-advance time when a `spawn_blocking` task is running ([#5115])
 
 [#5186]: https://github.com/tokio-rs/tokio/pull/5186
 [#5294]: https://github.com/tokio-rs/tokio/pull/5294
@@ -21,6 +22,7 @@
 [#4250]: https://github.com/tokio-rs/tokio/pull/4250
 [#5300]: https://github.com/tokio-rs/tokio/pull/5300
 [#5329]: https://github.com/tokio-rs/tokio/pull/5329
+[#5115]: https://github.com/tokio-rs/tokio/pull/5115
 
 # 1.23.1 (January 4, 2022)
 
