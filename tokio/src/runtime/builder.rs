@@ -461,16 +461,17 @@ impl Builder {
         self
     }
 
-    /// Sets the drop timeout.
+    /// Sets the maximal time dropping a [`Runtime`] will wait for pending threads.
     ///
-    /// This is intended to limit the time it could take to wait for threads that
-    /// are still stuck in [`spawn_blocking`].
+    /// This is intended to prevent threads that are stuck [`spawn_blocking`]
+    /// from blocking the program indefinitely.
     ///
     /// Important: After the timeout, the runtime stops waiting for those threads.
     /// It does **not** cancel those threads. This means it is no longer guaranteed
-    /// that all resources of this pool are properly released.
+    /// that when the Runtime object is gone, all resources of the Runtime are
+    /// properly released yet.
     ///
-    /// For that reason, this option is primarily intended for runtimes that are
+    /// For that reason, this option is primarily intended for Runtimes that are
     /// dropped right before the end of the program.
     ///
     /// # Examples
