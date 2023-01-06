@@ -1110,6 +1110,7 @@ impl fmt::Debug for Builder {
                 &"<dyn Fn() -> String + Send + Sync + 'static>",
             )
             .field("thread_stack_size", &self.thread_stack_size)
+            .field("drop_timeout", &self.drop_timeout)
             .field("after_start", &self.after_start.as_ref().map(|_| "..."))
             .field("before_stop", &self.before_stop.as_ref().map(|_| "..."))
             .field("before_park", &self.before_park.as_ref().map(|_| "..."))

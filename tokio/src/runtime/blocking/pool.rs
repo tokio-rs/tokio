@@ -233,7 +233,7 @@ impl BlockingPool {
                 }),
             },
             shutdown_rx,
-            drop_timeout: builder.drop_timeout.clone(),
+            drop_timeout: builder.drop_timeout,
         }
     }
 

@@ -1023,6 +1023,30 @@ rt_test! {
         Arc::try_unwrap(runtime).unwrap().shutdown_timeout(Duration::from_secs(10_000));
     }
 
+    #[cfg(not(target_os="wasi"))] // Wasi does not support threads
+    #[test]
+    fn drop_timeout() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .drop_timeout(Duration::from_nanos(0))
+            .build()
+            .unwrap();
+
+        runtime.block_on(async move {
+            let (tx, rx) = oneshot::channel();
+            task::spawn_blocking(move || {
+                tx.send(()).unwrap();
+                thread::sleep(Duration::from_secs(10));
+            });
+
+            rx.await.unwrap();
+        });
+
+        let now = Instant::now();
+        drop(runtime);
+        assert!(now.elapsed().as_secs() < 1);
+    }
+
     // This test is currently ignored on Windows because of a
     // rust-lang issue in thread local storage destructors.
     // See https://github.com/rust-lang/rust/issues/74875
