@@ -52,12 +52,24 @@ use std::fs::File as StdFile;
 /// Reading and writing to a `File` is usually done using the convenience
 /// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
 ///
+/// # Warning
+/// [`std::fs::File`][std] is often used to represent a generic Posix file.
+/// You might not want to do that here. This file implementation is specialized
+/// for filesystem access, which does not have a concept of readiness, and so does
+/// not use the normal pattern of nonblocking IO operations and epoll (instead
+/// relying on the blocking thread pool). You should not attempt to do this for
+/// files which support nonblocking IO and polling, such as tun devices.
+///
+/// For those sorts of APIs, it is recommended to store an [`std::fs::File`][std]
+/// inside an [`AsyncFd`] and set it to nonblocking mode.
+///
 /// [std]: struct@std::fs::File
 /// [`AsyncSeek`]: trait@crate::io::AsyncSeek
 /// [`flush`]: fn@crate::io::AsyncWriteExt::flush
 /// [`sync_all`]: fn@crate::fs::File::sync_all
 /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
 /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+/// [`AsyncFd`]: struct@crate::io::unix::AsyncFd
 ///
 /// # Examples
 ///
