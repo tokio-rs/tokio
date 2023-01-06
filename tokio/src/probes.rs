@@ -10,6 +10,7 @@ use probe::probe;
 
 /// Begin to poll a task.
 #[inline(never)]
+#[allow(unused_variables)] // probe!() doesn't use variables on non-supported targets
 pub(crate) fn task_poll_begin(id: Id) {
     let id = id.as_u64() as isize;
     probe!(tokio, task_poll_begin, id);
@@ -17,6 +18,7 @@ pub(crate) fn task_poll_begin(id: Id) {
 
 /// Finished to poll a task.
 #[inline(never)]
+#[allow(unused_variables)] // probe!() doesn't use variables on non-supported targets
 pub(crate) fn task_poll_end(id: Id, is_ready: bool, panicked: bool) {
     let id = id.as_u64() as isize;
     let is_ready = is_ready as isize;
@@ -26,6 +28,7 @@ pub(crate) fn task_poll_end(id: Id, is_ready: bool, panicked: bool) {
 
 /// Ended a task, so it will never be polled again.
 #[inline(never)]
+#[allow(unused_variables)] // probe!() doesn't use variables on non-supported targets
 pub(crate) fn task_finish(id: Id) {
     let id = id.as_u64() as isize;
     probe!(tokio, task_finish, id);
@@ -33,12 +36,14 @@ pub(crate) fn task_finish(id: Id) {
 
 /// Start blocking task.
 #[inline(never)]
+#[allow(unused_variables)] // probe!() doesn't use variables on non-supported targets
 pub(crate) fn task_blocking_begin() {
     probe!(tokio, task_blocking_begin);
 }
 
 /// Finish blocking task.
 #[inline(never)]
+#[allow(unused_variables)] // probe!() doesn't use variables on non-supported targets
 pub(crate) fn task_blocking_end() {
     probe!(tokio, task_blocking_end);
 }
