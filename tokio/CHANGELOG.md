@@ -1,3 +1,12 @@
+# 1.24.1 (January 6, 2022)
+
+This release fixes a compilation failure when using ([#5356])
+```
+RUSTFLAGS='--cfg tokio_no_atomic_u64 --cfg tokio_no_const_mutex_new'
+```
+
+[#5356]: https://github.com/tokio-rs/tokio/pull/5356
+
 # 1.24.0 (January 5, 2022)
 
 ### Fixed
