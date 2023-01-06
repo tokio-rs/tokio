@@ -1,3 +1,9 @@
+# 1.24.1 (January 6, 2022)
+
+This release fixes a compilation failure on targets without `AtomicU64` when using rustc older than 1.63. ([#5356])
+
+[#5356]: https://github.com/tokio-rs/tokio/pull/5356
+
 # 1.24.0 (January 5, 2022)
 
 ### Fixed
