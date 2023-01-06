@@ -1,9 +1,6 @@
 # 1.24.1 (January 6, 2022)
 
-This release fixes a compilation failure when using ([#5356])
-```
-RUSTFLAGS='--cfg tokio_no_atomic_u64 --cfg tokio_no_const_mutex_new'
-```
+This release fixes a compilation failure on targets without `AtomicU64` when using rustc older than 1.63. ([#5356])
 
 [#5356]: https://github.com/tokio-rs/tokio/pull/5356
 
