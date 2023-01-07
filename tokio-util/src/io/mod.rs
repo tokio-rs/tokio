@@ -21,10 +21,12 @@ cfg_io_util! {
     mod sync_bridge;
     pub use self::sync_bridge::SyncIoBridge;
 
-    #[cfg(unix)]
-    mod stream_fd;
-    #[cfg(unix)]
-    pub use stream_fd::*;
+    cfg_net! {
+        #[cfg(unix)]
+        mod stream_fd;
+        #[cfg(unix)]
+        pub use stream_fd::*;
+    }
 }
 
 pub use self::copy_to_bytes::CopyToBytes;
