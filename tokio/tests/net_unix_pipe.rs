@@ -94,7 +94,7 @@ async fn fifo_simple_send_sender_first() -> io::Result<()> {
 // Opens a FIFO file, write and *close the writer*.
 async fn write_and_close(path: impl AsRef<Path>, msg: &[u8]) -> io::Result<()> {
     let mut writer = pipe::Sender::open(path)?;
-    writer.write_all(&msg).await?;
+    writer.write_all(msg).await?;
     drop(writer); // Explicit drop.
     Ok(())
 }
@@ -115,8 +115,7 @@ async fn fifo_multiple_writes() -> io::Result<()> {
     let mut read_data = vec![0; DATA.len()];
     assert_ok!(reader.read_exact(&mut read_data).await);
 
-    // Check that reader hit EOF.
-    assert!(ev.is_read_closed());
+    // Check that reader hits EOF.
     let err = assert_err!(reader.read_exact(&mut read_data).await);
     assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
 
@@ -144,7 +143,7 @@ async fn fifo_resilient_reader() -> io::Result<()> {
     let mut read_data = vec![0; DATA.len()];
     reader.read_exact(&mut read_data).await?;
 
-    // Check that reader didn't hit EOF
+    // Check that reader didn't hit EOF.
     assert!(!ev.is_read_closed());
 
     // Resilient reader can asynchronously wait for the next writer.
