@@ -1,6 +1,6 @@
 use std::io;
 use std::io::{Error, Read, Write};
-use std::os::fd::AsRawFd;
+use std::os::unix::io::AsRawFd;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 use tokio::io::unix::AsyncFd;
