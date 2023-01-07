@@ -32,9 +32,7 @@ impl Sender {
     ///
     /// This function will fail if no one has this pipe open for reading. You can
     /// wait for a reader using sleeping in a loop. On Linux you can also use
-    /// [`open_rw`] to work around this.
-    ///
-    /// [`open_rw`]: Self::open_rw
+    /// `open_rw` to work around this.
     ///
     /// # Errors
     ///
