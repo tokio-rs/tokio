@@ -139,6 +139,6 @@ where
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
-        unimplemented!("Shutdown is not implemented for this type")
+        Poll::Ready(Ok(()))
     }
 }
