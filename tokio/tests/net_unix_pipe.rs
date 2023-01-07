@@ -1,13 +1,14 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
 use tokio::net::pipe;
 use tokio_test::task;
-use tokio_test::{assert_ok, assert_pending, assert_ready_ok};
+use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io;
+use std::os::fd::AsRawFd;
 use std::os::unix::prelude::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 
@@ -68,8 +69,6 @@ async fn fifo_simple_send() -> io::Result<()> {
 #[tokio::test]
 #[cfg(target_os = "linux")]
 async fn fifo_simple_send_sender_first() -> io::Result<()> {
-    use tokio_test::assert_err;
-
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
     // Create a new fifo file with *no reading ends open*.
@@ -92,8 +91,71 @@ async fn fifo_simple_send_sender_first() -> io::Result<()> {
     Ok(())
 }
 
-fn writable_by_poll(writer: &pipe::Sender) -> bool {
-    task::spawn(writer.writable()).poll().is_ready()
+// Opens a FIFO file, write and *close the writer*.
+async fn write_and_close(path: impl AsRef<Path>, msg: &[u8]) -> io::Result<()> {
+    let mut writer = pipe::Sender::open(path)?;
+    writer.write_all(&msg).await?;
+    drop(writer); // Explicit drop.
+    Ok(())
+}
+
+/// Checks EOF behavior with single reader and writers sequentially opening
+/// and closing a FIFO.
+#[tokio::test]
+async fn fifo_multiple_writes() -> io::Result<()> {
+    const DATA: &[u8] = b"this is some data to write to the fifo";
+
+    let fifo = TempFifo::new("fifo_multiple_writes")?;
+
+    let mut reader = pipe::Receiver::open(&fifo)?;
+
+    write_and_close(&fifo, DATA).await?;
+    let ev = reader.ready(Interest::READABLE).await?;
+    assert!(ev.is_readable());
+    let mut read_data = vec![0; DATA.len()];
+    assert_ok!(reader.read_exact(&mut read_data).await);
+
+    // Check that reader hit EOF.
+    assert!(ev.is_read_closed());
+    let err = assert_err!(reader.read_exact(&mut read_data).await);
+    assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
+
+    // Write more data and read again.
+    write_and_close(&fifo, DATA).await?;
+    assert_ok!(reader.read_exact(&mut read_data).await);
+
+    Ok(())
+}
+
+/// Checks behavior of a resilient reader (Receiver in O_RDWR access mode)
+/// with writers sequentially opening and closing a FIFO.
+#[tokio::test]
+#[cfg(target_os = "linux")]
+async fn fifo_resilient_reader() -> io::Result<()> {
+    const DATA: &[u8] = b"this is some data to write to the fifo";
+
+    let fifo = TempFifo::new("fifo_resilient_reader")?;
+
+    // Open reader in read-write access mode.
+    let mut reader = pipe::Receiver::open_rw(&fifo)?;
+
+    write_and_close(&fifo, DATA).await?;
+    let ev = reader.ready(Interest::READABLE).await?;
+    let mut read_data = vec![0; DATA.len()];
+    reader.read_exact(&mut read_data).await?;
+
+    // Check that reader didn't hit EOF
+    assert!(!ev.is_read_closed());
+
+    // Resilient reader can asynchronously wait for the next writer.
+    let mut second_read_fut = task::spawn(reader.read_exact(&mut read_data));
+    assert_pending!(second_read_fut.poll());
+
+    // Write more data and read again.
+    write_and_close(&fifo, DATA).await?;
+    assert_ok!(second_read_fut.await);
+
+    Ok(())
 }
 
 #[tokio::test]
@@ -130,6 +192,88 @@ async fn from_file() -> io::Result<()> {
     assert_eq!(&read_data, DATA);
 
     Ok(())
+}
+
+#[tokio::test]
+async fn from_file_detects_not_a_fifo() -> io::Result<()> {
+    let dir = tempfile::Builder::new()
+        .prefix("tokio-fifo-tests")
+        .tempdir()
+        .unwrap();
+    let path = dir.path().join("not_a_fifo");
+
+    // Create an ordinary file.
+    File::create(&path)?;
+
+    // Check if Sender detects invalid file type.
+    let file = OpenOptions::new().write(true).open(&path)?;
+    let err = assert_err!(pipe::Sender::from_file(file));
+    assert_eq!(err.kind(), io::ErrorKind::Other);
+
+    // Check if Receiver detects invalid file type.
+    let file = OpenOptions::new().read(true).open(&path)?;
+    let err = assert_err!(pipe::Receiver::from_file(file));
+    assert_eq!(err.kind(), io::ErrorKind::Other);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn from_file_detects_wrong_access_mode() -> io::Result<()> {
+    let fifo = TempFifo::new("wrong_access_mode")?;
+
+    // Open a read end to open the fifo for writing.
+    let _reader = pipe::Receiver::open(&fifo)?;
+
+    // Check if Receiver detects write-only access mode.
+    let wronly = OpenOptions::new()
+        .write(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(&fifo)?;
+    let err = assert_err!(pipe::Receiver::from_file(wronly));
+    assert_eq!(err.kind(), io::ErrorKind::Other);
+
+    // Check if Sender detects read-only access mode.
+    let rdonly = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(&fifo)?;
+    let err = assert_err!(pipe::Sender::from_file(rdonly));
+    assert_eq!(err.kind(), io::ErrorKind::Other);
+
+    Ok(())
+}
+
+fn is_nonblocking<T: AsRawFd>(fd: &T) -> io::Result<bool> {
+    let flags = nix::fcntl::fcntl(fd.as_raw_fd(), nix::fcntl::F_GETFL)?;
+    Ok((flags & libc::O_NONBLOCK) != 0)
+}
+
+#[tokio::test]
+async fn from_file_sets_nonblock() -> io::Result<()> {
+    let fifo = TempFifo::new("sets_nonblock")?;
+
+    // Open read and write ends to let blocking files open.
+    let _reader = pipe::Receiver::open(&fifo)?;
+    let _writer = pipe::Sender::open(&fifo)?;
+
+    // Check if Receiver sets the pipe in non-blocking mode.
+    let rdonly = OpenOptions::new().read(true).open(&fifo)?;
+    assert!(!is_nonblocking(&rdonly)?);
+    let reader = pipe::Receiver::from_file(rdonly)?;
+    assert!(is_nonblocking(&reader)?);
+
+    // Check if Sender sets the pipe in non-blocking mode.
+    let wronly = OpenOptions::new().write(true).open(&fifo)?;
+    assert!(!is_nonblocking(&wronly)?);
+    let writer = pipe::Sender::from_file(wronly)?;
+    assert!(is_nonblocking(&writer)?);
+
+    Ok(())
+}
+
+fn writable_by_poll(writer: &pipe::Sender) -> bool {
+    task::spawn(writer.writable()).poll().is_ready()
 }
 
 #[tokio::test]

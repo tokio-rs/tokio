@@ -6,8 +6,8 @@ use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf, Ready};
 use mio::unix::pipe as mio_pipe;
 use std::fs::File;
 use std::io::{self, Read, Write};
+use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::prelude::OpenOptionsExt;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -38,8 +38,8 @@ impl Sender {
     ///
     /// # Errors
     ///
-    /// If the FIFO file is not open for reading this function will fail with
-    /// `ENXIO`. This function may also fail with other standard OS errors.
+    /// If the FIFO file is not currently open for reading this function will fail
+    /// with `ENXIO`. This function may also fail with other standard OS errors.
     ///
     /// # Examples
     ///
@@ -84,15 +84,15 @@ impl Sender {
         Sender::open_internal(path.as_ref(), false)
     }
 
-    /// Creates a new `Sender` from a FIFO file without a present reader.
+    /// Creates a new `Sender` from a FIFO file in read-write access mode.
     ///
-    /// This function will open the FIFO file at the specified path and associate
-    /// the pipe with the default event loop for writing.
+    /// This function will open the FIFO file at the specified path in `O_RDWR` access
+    /// access mode and associate the pipe with the default event loop for writing.
     ///
     /// Unlike [`open`], this function will not fail if no one has this pipe open
-    /// for reading. This is done by opening the FIFO file with access to both
-    /// reading and writing. Note that the behavior of such operation is not defined
-    /// by the POSIX standard and is only guaranteed to work on Linux.
+    /// for reading. This is done by opening the file with both read and write access.
+    /// Note that the behavior of such operation is not defined by the POSIX standard
+    /// and is only guaranteed to work on Linux.
     ///
     /// [`open`]: Self::open
     ///
@@ -130,6 +130,8 @@ impl Sender {
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
     pub fn open_rw<P>(path: P) -> io::Result<Sender>
     where
         P: AsRef<Path>,
@@ -144,7 +146,7 @@ impl Sender {
             .custom_flags(libc::O_NONBLOCK)
             .open(path)?;
         let raw_fd = file.into_raw_fd();
-        // Safety: Raw fd was created a valid file.
+        // Safety: Raw fd was created from a valid file.
         let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(raw_fd) };
         Sender::from_mio(mio_tx)
     }
@@ -156,13 +158,46 @@ impl Sender {
 
     /// Creates a new `Sender` from a [`File`].
     ///
-    /// This function is intended to construct a pipe from a File which represents
-    /// a special FIFO file. The conversion assumes nothing about the underlying
-    /// file; it is left up to the user to open it with writing access and set it
-    /// in non-blocking mode.
+    /// This function is intended to construct a pipe from a [`File`] representing
+    /// a special FIFO file. It will check if the file is a pipe and has write access,
+    /// set it in non-blocking mode and perform the conversion.
     ///
-    /// You can check first if a [`File`] has the FIFO file type and then use this
-    /// function to get a `Sender`.
+    /// # Errors
+    ///
+    /// Fails with `io::ErrorKind::Other` if the file is not a pipe or it does not have
+    /// write access. Also fails with any standard OS error if it occurs.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    pub fn from_file(mut file: File) -> io::Result<Sender> {
+        if !is_fifo(&file)? {
+            return Err(io::Error::new(io::ErrorKind::Other, "not a pipe"));
+        }
+
+        let flags = get_file_flags(&file)?;
+        if has_write_access(flags) {
+            set_nonblocking(&mut file, flags)?;
+            Sender::from_file_unchecked(file)
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "not in O_WRONLY or O_RDWR access mode",
+            ))
+        }
+    }
+
+    /// Creates a new `Sender` from a [`File`] without checking pipe properties.
+    ///
+    /// This function is intended to construct a pipe from a File representing
+    /// a special FIFO file. The conversion assumes nothing about the underlying
+    /// file; it is left up to the user to make sure it is opened with writing access,
+    /// represents a pipe and is set in non-blocking mode.
     ///
     /// # Examples
     ///
@@ -180,7 +215,7 @@ impl Sender {
     ///     .custom_flags(libc::O_NONBLOCK)
     ///     .open(FIFO_NAME)?;
     /// if file.metadata()?.file_type().is_fifo() {
-    ///     let tx = pipe::Sender::from_file(file)?;
+    ///     let tx = pipe::Sender::from_file_unchecked(file)?;
     ///     /* use the Sender */
     /// }
     /// # Ok(())
@@ -195,7 +230,7 @@ impl Sender {
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    pub fn from_file(file: File) -> io::Result<Sender> {
+    pub fn from_file_unchecked(file: File) -> io::Result<Sender> {
         let raw_fd = file.into_raw_fd();
         let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(raw_fd) };
         Sender::from_mio(mio_tx)
@@ -458,6 +493,33 @@ impl AsRawFd for Sender {
 
 cfg_net_unix! {
     /// Reading end of a Unix pipe.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::pipe;
+    /// use tokio::io::{self, AsyncReadExt};
+    /// # use std::error::Error;
+    ///
+    /// const FIFO_NAME: &str = "path/to/a/fifo";
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// let mut rx = pipe::Receiver::open(FIFO_NAME)?;
+    /// loop {
+    ///     let mut msg = vec![0; 256];
+    ///     match rx.read_exact(&mut msg).await {
+    ///         Ok(_) => {
+    ///             /* handle message */
+    ///         }
+    ///         Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => {
+    ///             // Writing end has been closed, we should reopen the pipe.
+    ///             rx = pipe::Receiver::open(FIFO_NAME)?;
+    ///         }
+    ///         Err(e) => return Err(e.into()),
+    ///     }
+    /// }
+    /// # }
+    /// ```
     #[derive(Debug)]
     pub struct Receiver {
         io: PollEvented<mio_pipe::Receiver>,
@@ -486,16 +548,77 @@ impl Receiver {
     where
         P: AsRef<Path>,
     {
-        Receiver::open_internal(path.as_ref())
+        Receiver::open_internal(path.as_ref(), false)
     }
 
-    fn open_internal(path: &Path) -> io::Result<Receiver> {
+    /// Creates a new `Receiver` from a FIFO file in read-write access mode.
+    ///
+    /// This function will open the FIFO file at the specified path in `O_RDWR` access
+    /// mode and associate the pipe with the default event loop for reading.
+    ///
+    /// `Receiver` in read-write access mode can be used to implement resilient reading.
+    /// Unlike a `Receiver` opened in read-only mode with [`open`], pipe opened with
+    /// this function will not fail with `UnexpectedEof` during reading if the writing
+    /// end of the pipe closes the file.
+    ///
+    /// [`open`]: Self::open
+    ///
+    /// # Notes
+    ///
+    /// You should not use functions waiting for EOF such as [`read_to_end`] with
+    /// a `Receiver` in read-write access mode, since it may wait forever. `Receiver`
+    /// in this mode also holds an open writing end, which prevents receiving EOF.
+    ///
+    /// [`read_to_end`]: crate::io::AsyncReadExt::read_to_end
+    ///
+    /// # Errors
+    ///
+    /// Fails with any standard OS error if it occurs.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::pipe;
+    /// use tokio::io::AsyncReadExt;
+    /// # use std::error::Error;
+    ///
+    /// const FIFO_NAME: &str = "path/to/a/fifo";
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// let mut rx = pipe::Receiver::open_rw(FIFO_NAME)?;
+    /// loop {
+    ///     let mut msg = vec![0; 256];
+    ///     rx.read_exact(&mut msg).await?;
+    ///     /* handle message */
+    /// }
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
+    pub fn open_rw<P>(path: P) -> io::Result<Receiver>
+    where
+        P: AsRef<Path>,
+    {
+        Receiver::open_internal(path.as_ref(), true)
+    }
+
+    fn open_internal(path: &Path, write_access: bool) -> io::Result<Receiver> {
         let file = std::fs::OpenOptions::new()
             .read(true)
+            .write(write_access)
             .custom_flags(libc::O_NONBLOCK)
             .open(path)?;
         let raw_fd = file.into_raw_fd();
-        // Safety: Raw fd was created a valid file.
+        // Safety: Raw fd was created from a valid file.
         let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(raw_fd) };
         Receiver::from_mio(mio_rx)
     }
@@ -505,15 +628,48 @@ impl Receiver {
         Ok(Receiver { io })
     }
 
-    /// Creates new `Receiver` from a [`File`].
+    /// Creates a new `Receiver` from a [`File`].
     ///
-    /// This function is intended to create a pipe from a File which represents
+    /// This function is intended to construct a pipe from a [`File`] representing
+    /// a special FIFO file. It will check if the file is a pipe and has read access,
+    /// set it in non-blocking mode and perform the conversion.
+    ///
+    /// # Errors
+    ///
+    /// Fails with `io::ErrorKind::Other` if the file is not a pipe or it does not have
+    /// read access. Also fails with any standard OS error if it occurs.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    pub fn from_file(mut file: File) -> io::Result<Receiver> {
+        if !is_fifo(&file)? {
+            return Err(io::Error::new(io::ErrorKind::Other, "not a pipe"));
+        }
+
+        let flags = get_file_flags(&file)?;
+        if has_read_access(flags) {
+            set_nonblocking(&mut file, flags)?;
+            Receiver::from_file_unchecked(file)
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "not in O_RDONLY or O_RDWR access mode",
+            ))
+        }
+    }
+
+    /// Creates a new `Receiver` from a [`File`] without checking pipe properties.
+    ///
+    /// This function is intended to construct a pipe from a File representing
     /// a special FIFO file. The conversion assumes nothing about the underlying
-    /// file; it is left up to the user to open it with reading access and set it
-    /// in non-blocking mode.
-    ///
-    /// You can check first if a [`File`] has the FIFO file type and then use this
-    /// function to get a `Receiver`.
+    /// file; it is left up to the user to make sure it is opened with writing access,
+    /// represents a pipe and is set in non-blocking mode.
     ///
     /// # Examples
     ///
@@ -531,7 +687,7 @@ impl Receiver {
     ///     .custom_flags(libc::O_NONBLOCK)
     ///     .open(FIFO_NAME)?;
     /// if file.metadata()?.file_type().is_fifo() {
-    ///     let tx = pipe::Receiver::from_file(file)?;
+    ///     let rx = pipe::Receiver::from_file_unchecked(file)?;
     ///     /* use the Receiver */
     /// }
     /// # Ok(())
@@ -546,7 +702,7 @@ impl Receiver {
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    pub fn from_file(file: File) -> io::Result<Receiver> {
+    pub fn from_file_unchecked(file: File) -> io::Result<Receiver> {
         let raw_fd = file.into_raw_fd();
         let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(raw_fd) };
         Receiver::from_mio(mio_rx)
@@ -865,8 +1021,8 @@ impl Receiver {
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
-                // Safety: We trust `mio_pipe::Receiver::read` to have filled up `n` bytes in the
-                // buffer.
+                // Safety: `mio_pipe::Receiver` uses a `std::fs::File` underneath,
+                // which correctly handles reads into uninitialized memory.
                 let n = (&*self.io).read(dst)?;
 
                 unsafe {
@@ -895,4 +1051,48 @@ impl AsRawFd for Receiver {
     fn as_raw_fd(&self) -> RawFd {
         self.io.as_raw_fd()
     }
+}
+
+/// Checks if file is a FIFO
+fn is_fifo(file: &File) -> io::Result<bool> {
+    Ok(file.metadata()?.file_type().is_fifo())
+}
+
+/// Gets file descriptor's flags by fcntl.
+fn get_file_flags(file: &File) -> io::Result<libc::c_int> {
+    let fd = file.as_raw_fd();
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    if flags < 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(flags)
+    }
+}
+
+/// Checks for O_RDONLY or O_RDWR access mode.
+fn has_read_access(flags: libc::c_int) -> bool {
+    let mode = flags & libc::O_ACCMODE;
+    mode == libc::O_RDONLY || mode == libc::O_RDWR
+}
+
+/// Checks for O_WRONLY or O_RDWR access mode.
+fn has_write_access(flags: libc::c_int) -> bool {
+    let mode = flags & libc::O_ACCMODE;
+    mode == libc::O_WRONLY || mode == libc::O_RDWR
+}
+
+/// Sets file's flags with O_NONBLOCK by fcntl.
+fn set_nonblocking(file: &mut File, current_flags: libc::c_int) -> io::Result<()> {
+    let fd = file.as_raw_fd();
+
+    let flags = current_flags | libc::O_NONBLOCK;
+
+    if flags != current_flags {
+        let ret = unsafe { libc::fcntl(fd, libc::F_SETFL, flags) };
+        if ret < 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
+    Ok(())
 }
