@@ -2,9 +2,21 @@ use std::io;
 use std::io::{Error, Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 use tokio::io::unix::AsyncFd;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+
+#[macro_use]
+mod ready {
+    macro_rules! ready {
+        ($e:expr $(,)?) => {
+            match $e {
+                std::task::Poll::Ready(t) => t,
+                std::task::Poll::Pending => return std::task::Poll::Pending,
+            }
+        };
+    }
+}
 
 /// Provides async reading and writing semantics to a pollable file descriptor that is a byte
 /// stream.
