@@ -163,9 +163,9 @@ impl Runtime {
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
     ///
-    /// You do not have to `.await` the returned `JoinHandle` to make the
-    /// provided future start execution. It will start running in the
-    /// background immediately when `spawn` is called.
+    /// The provided future will start running in the background immediately
+    /// when `spawn` is called, even if you don't await the returned
+    /// `JoinHandle`.
     ///
     /// See [module level][mod] documentation for more details.
     ///

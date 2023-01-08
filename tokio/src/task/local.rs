@@ -289,9 +289,9 @@ cfg_rt! {
     ///
     /// The spawned future will run on the same thread that called `spawn_local`.
     ///
-    /// You do not have to `.await` the returned `JoinHandle` to make the
-    /// provided future start execution. It will start running in the background
-    /// immediately when `spawn_local` is called.
+    /// The provided future will start running in the background immediately
+    /// when `spawn_local` is called, even if you don't await the returned
+    /// `JoinHandle`.
     ///
     /// # Panics
     ///
@@ -417,10 +417,9 @@ impl LocalSet {
     /// This task is guaranteed to be run on the current thread.
     ///
     /// Unlike the free function [`spawn_local`], this method may be used to
-    /// spawn local tasks when the `LocalSet` is _not_ running. You do not have
-    /// to `.await` the returned `JoinHandle` to make the provided future start
-    /// execution. It will start running immediately whenever the `LocalSet` is
-    /// next started.
+    /// spawn local tasks when the `LocalSet` is _not_ running. The provided
+    /// future will start running once the `LocalSet` is next started, even if
+    /// you don't await the returned `JoinHandle`.
     ///
     /// # Examples
     ///
