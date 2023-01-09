@@ -49,7 +49,7 @@ cfg_io_util! {
 ///
 /// Opening a [`Sender`] on Linux when you are sure the file is a FIFO:
 ///
-/// ```no_run
+/// ```ignore
 /// use tokio::io::unix::pipe;
 /// use nix::{unistd::mkfifo, sys::stat::Mode};
 /// # use std::error::Error;
@@ -95,7 +95,7 @@ impl OpenOptions {
     ///
     /// Opening a [`Sender`] even if there are no open reading ends:
     ///
-    /// ```no_run
+    /// ```ignore
     /// use tokio::io::unix::pipe;
     ///
     /// let tx = pipe::OpenOptions::new()
@@ -109,7 +109,7 @@ impl OpenOptions {
     ///
     /// [`UnexpectedEof`]: std::io::ErrorKind::UnexpectedEof
     ///
-    /// ```no_run
+    /// ```ignore
     /// use tokio::io::unix::pipe;
     ///
     /// let tx = pipe::OpenOptions::new()
@@ -275,7 +275,7 @@ cfg_net_unix! {
     /// On Linux, you can open a named pipe in read-write access mode without
     /// waiting in a sleeping loop for a reading end to open the file.
     ///
-    /// ```no_run
+    /// ```ignore
     /// use tokio::io::AsyncWriteExt;
     /// use tokio::io::unix::pipe;
     /// use nix::{unistd::mkfifo, sys::stat::Mode};
@@ -681,7 +681,7 @@ cfg_net_unix! {
     /// reading if the last writing end of the pipe closes the file. This way,
     /// a `Receiver` can wait for the next writer to open the pipe.
     ///
-    /// ```no_run
+    /// ```ignore
     /// use tokio::io::unix::pipe;
     /// use tokio::io::AsyncReadExt;
     /// # use std::error::Error;
