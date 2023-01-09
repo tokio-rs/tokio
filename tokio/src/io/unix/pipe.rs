@@ -42,7 +42,7 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe::Sender;
+    /// use tokio::io::unix::pipe::Sender;
     /// use tokio::time::{self, Duration};
     /// use nix::{unistd::mkfifo, sys::stat::Mode};
     /// # use std::error::Error;
@@ -102,7 +102,7 @@ impl Sender {
     ///
     /// ```no_run
     /// use tokio::io::AsyncWriteExt;
-    /// use tokio::net::pipe::Sender;
+    /// use tokio::io::unix::pipe::Sender;
     /// use nix::{unistd::mkfifo, sys::stat::Mode};
     /// # use std::error::Error;
     ///
@@ -200,7 +200,7 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
+    /// use tokio::io::unix::pipe;
     /// use std::fs::OpenOptions;
     /// use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
     /// # use std::error::Error;
@@ -267,7 +267,7 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
+    /// use tokio::io::unix::pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
@@ -354,7 +354,7 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
+    /// use tokio::io::unix::pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
@@ -413,7 +413,7 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
+    /// use tokio::io::unix::pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
@@ -495,7 +495,7 @@ cfg_net_unix! {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
+    /// use tokio::io::unix::pipe;
     /// use tokio::io::{self, AsyncReadExt};
     /// # use std::error::Error;
     ///
@@ -576,7 +576,7 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
+    /// use tokio::io::unix::pipe;
     /// use tokio::io::AsyncReadExt;
     /// # use std::error::Error;
     ///
@@ -672,7 +672,7 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
+    /// use tokio::io::unix::pipe;
     /// use std::fs::OpenOptions;
     /// use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
     /// # use std::error::Error;
@@ -739,7 +739,7 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
+    /// use tokio::io::unix::pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
@@ -837,7 +837,7 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
+    /// use tokio::io::unix::pipe;
     /// use std::error::Error;
     /// use std::io;
     ///
@@ -906,7 +906,7 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::pipe;
+    /// use tokio::io::unix::pipe;
     /// use std::error::Error;
     /// use std::io::{self, IoSliceMut};
     ///
@@ -977,7 +977,7 @@ impl Receiver {
         /// # Examples
         ///
         /// ```no_run
-        /// use tokio::net::pipe;
+        /// use tokio::io::unix::pipe;
         /// use std::error::Error;
         /// use std::io;
         ///
