@@ -16,33 +16,238 @@ cfg_io_util! {
     use bytes::BufMut;
 }
 
-cfg_net_unix! {
-    /// Writing end of a Unix pipe.
-    #[derive(Debug)]
-    pub struct Sender {
-        io: PollEvented<mio_pipe::Sender>,
-    }
+/// Options and flags which can be used to configure how a FIFO file is opened.
+///
+/// This builder allows configuring how to create a pipe end from a FIFO file.
+/// Generally speaking, when using `OpenOptions`, you'll first call [`new`],
+/// then chain calls to methods to set each option, then call either
+/// [`open_receiver`] or [`open_sender`], passing the path of the FIFO file you
+/// are trying to open. This will give you a [`io::Result`][result] with a pipe
+/// end inside that you can further operate on.
+///
+/// [`new`]: OpenOptions::new
+/// [`open_receiver`]: OpenOptions::open_receiver
+/// [`open_sender`]: OpenOptions::open_sender
+/// [result]: std::io::Result
+///
+/// # Examples
+///
+/// Opening a pair of pipe ends from a FIFO file:
+///
+/// ```no_run
+/// use tokio::io::unix::pipe;
+/// # use std::error::Error;
+///
+/// const FIFO_NAME: &str = "path/to/a/fifo";
+///
+/// # async fn dox() -> Result<(), Box<dyn Error>> {
+/// let rx = pipe::OpenOptions::new().open_receiver(FIFO_NAME)?;
+/// let tx = pipe::OpenOptions::new().open_sender(FIFO_NAME)?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// Opening a [`Sender`] on Linux when you are sure the file is a FIFO:
+///
+/// ```no_run
+/// use tokio::io::unix::pipe;
+/// use nix::{unistd::mkfifo, sys::stat::Mode};
+/// # use std::error::Error;
+///
+/// // Our program has exclusive access to this path.
+/// const FIFO_NAME: &str = "path/to/a/new/fifo";
+///
+/// # async fn dox() -> Result<(), Box<dyn Error>> {
+/// mkfifo(FIFO_NAME, Mode::S_IRWXU)?;
+/// let tx = pipe::OpenOptions::new()
+///     .read_write(true)
+///     .unchecked(true)
+///     .open_sender(FIFO_NAME)?;
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone, Debug)]
+pub struct OpenOptions {
+    #[cfg(target_os = "linux")]
+    read_write: bool,
+    unchecked: bool,
 }
 
-impl Sender {
-    /// Creates a new `Sender` from a FIFO file.
+impl OpenOptions {
+    /// Creates a blank new set of options ready for configuration.
     ///
-    /// This function will open the FIFO file at the specified path and associate
-    /// the pipe with the default event loop for writing.
+    /// All options are initially set to `false`.
+    pub fn new() -> OpenOptions {
+        OpenOptions {
+            #[cfg(target_os = "linux")]
+            read_write: false,
+            unchecked: false,
+        }
+    }
+
+    /// Sets the option for read-write access.
     ///
-    /// This function will fail if no one has this pipe open for reading. You can
-    /// wait for a reader using sleeping in a loop. On Linux you can also use
-    /// `open_rw` to work around this.
+    /// This option, when true, will indicate that a FIFO file will be opened
+    /// in read-write access mode. This operation is not defined by the POSIX
+    /// standard and is only guaranteed to work on Linux.
     ///
-    /// # Errors
+    /// # Examples
     ///
-    /// If the FIFO file is not currently open for reading this function will fail
-    /// with `ENXIO`. This function may also fail with other standard OS errors.
+    /// Opening a [`Sender`] even if there are no open reading ends:
+    ///
+    /// ```no_run
+    /// use tokio::io::unix::pipe;
+    ///
+    /// let tx = pipe::OpenOptions::new()
+    ///     .read_write(true)
+    ///     .open_sender("path/to/a/fifo");
+    /// ```
+    ///
+    /// Opening a resilient [`Receiver`] i.e. a reading pipe end which will not
+    /// fail with [`UnexpectedEof`] during reading if a writing end of the pipe
+    /// closes the FIFO file.
+    ///
+    /// [`UnexpectedEof`]: std::io::ErrorKind::UnexpectedEof
+    ///
+    /// ```no_run
+    /// use tokio::io::unix::pipe;
+    ///
+    /// let tx = pipe::OpenOptions::new()
+    ///     .read_write(true)
+    ///     .open_receiver("path/to/a/fifo");
+    /// ```
+    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
+    pub fn read_write(&mut self, value: bool) -> &mut Self {
+        self.read_write = value;
+        self
+    }
+
+    /// Sets the option to skip the check for FIFO file type.
+    ///
+    /// By default, [`open_receiver`] and [`open_sender`] functions will check
+    /// if the opened file is a FIFO file. Set this option to `true` if you are
+    /// sure the file is a FIFO file.
+    ///
+    /// [`open_receiver`]: OpenOptions::open_receiver
+    /// [`open_sender`]: OpenOptions::open_sender
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io::unix::pipe::Sender;
+    /// use tokio::io::unix::pipe;
+    /// use nix::{unistd::mkfifo, sys::stat::Mode};
+    /// # use std::error::Error;
+    ///
+    /// // Our program has exclusive access to this path.
+    /// const FIFO_NAME: &str = "path/to/a/new/fifo";
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// mkfifo(FIFO_NAME, Mode::S_IRWXU)?;
+    /// let rx = pipe::OpenOptions::new()
+    ///     .unchecked(true)
+    ///     .open_receiver(FIFO_NAME)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn unchecked(&mut self, value: bool) -> &mut Self {
+        self.unchecked = value;
+        self
+    }
+
+    /// Creates a [`Receiver`] from a FIFO file with the options specified by `self`.
+    ///
+    /// This function will open the FIFO file at the specified path, possibly
+    /// check if it is a pipe, and associate the pipe with the default event
+    /// loop for reading.
+    ///
+    /// # Errors
+    ///
+    /// If the file type check fails, this function will fail with `io::ErrorKind::Other`.
+    /// This function may also fail with other standard OS errors.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    pub fn open_receiver<P: AsRef<Path>>(&self, path: P) -> io::Result<Receiver> {
+        let file = self.open(path.as_ref(), PipeEnd::Receiver)?;
+        Receiver::from_file_unchecked(file)
+    }
+
+    /// Creates a [`Sender`] from a FIFO file with the options specified by `self`.
+    ///
+    /// This function will open the FIFO file at the specified path, possibly
+    /// check if it is a pipe, and associate the pipe with the default event
+    /// loop for writing.
+    ///
+    /// # Errors
+    ///
+    /// If the file type check fails, this function will fail with `io::ErrorKind::Other`.
+    /// If the file is not opened in read-write access mode and the file is not
+    /// currently open for reading, this function will fail with `ENXIO`.
+    /// This function may also fail with other standard OS errors.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    pub fn open_sender<P: AsRef<Path>>(&self, path: P) -> io::Result<Sender> {
+        let file = self.open(path.as_ref(), PipeEnd::Sender)?;
+        Sender::from_file_unchecked(file)
+    }
+
+    fn open(&self, path: &Path, pipe_end: PipeEnd) -> io::Result<File> {
+        let mut options = std::fs::OpenOptions::new();
+        options
+            .read(pipe_end == PipeEnd::Receiver)
+            .write(pipe_end == PipeEnd::Sender)
+            .custom_flags(libc::O_NONBLOCK);
+
+        #[cfg(target_os = "linux")]
+        if self.read_write {
+            options.read(true).write(true);
+        }
+
+        let file = options.open(path)?;
+
+        if !self.unchecked && !is_fifo(&file)? {
+            return Err(io::Error::new(io::ErrorKind::Other, "not a pipe"));
+        }
+
+        Ok(file)
+    }
+}
+
+impl Default for OpenOptions {
+    fn default() -> OpenOptions {
+        OpenOptions::new()
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum PipeEnd {
+    Sender,
+    Receiver,
+}
+
+cfg_net_unix! {
+    /// Writing end of a Unix pipe.
+    ///
+    /// # Examples
+    ///
+    /// Opening a `Sender` from a named pipe:
+    ///
+    /// ```no_run
+    /// use tokio::io::unix::pipe;
     /// use tokio::time::{self, Duration};
     /// use nix::{unistd::mkfifo, sys::stat::Mode};
     /// # use std::error::Error;
@@ -55,7 +260,7 @@ impl Sender {
     ///
     /// // Wait for a reader to open the file.
     /// let tx = loop {
-    ///     match Sender::open(FIFO_NAME) {
+    ///     match pipe::OpenOptions::new().open_sender(FIFO_NAME) {
     ///         Ok(tx) => break tx,
     ///         Err(e) if e.raw_os_error() == Some(libc::ENXIO) => {},
     ///         Err(e) => return Err(e.into()),
@@ -67,42 +272,12 @@ impl Sender {
     /// # }
     /// ```
     ///
-    /// # Panics
-    ///
-    /// This function panics if it is not called from within a runtime with
-    /// IO enabled.
-    ///
-    /// The runtime is usually set implicitly when this function is called
-    /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    pub fn open<P>(path: P) -> io::Result<Sender>
-    where
-        P: AsRef<Path>,
-    {
-        Sender::open_internal(path.as_ref(), false)
-    }
-
-    /// Creates a new `Sender` from a FIFO file in read-write access mode.
-    ///
-    /// This function will open the FIFO file at the specified path in `O_RDWR` access
-    /// access mode and associate the pipe with the default event loop for writing.
-    ///
-    /// Unlike [`open`], this function will not fail if no one has this pipe open
-    /// for reading. This is done by opening the file with both read and write access.
-    /// Note that the behavior of such operation is not defined by the POSIX standard
-    /// and is only guaranteed to work on Linux.
-    ///
-    /// [`open`]: Self::open
-    ///
-    /// # Errors
-    ///
-    /// Fails with any standard OS error if it occurs.
-    ///
-    /// # Examples
+    /// On Linux, you can open a named pipe in read-write access mode without
+    /// waiting in a sleeping loop for a reading end to open the file.
     ///
     /// ```no_run
     /// use tokio::io::AsyncWriteExt;
-    /// use tokio::io::unix::pipe::Sender;
+    /// use tokio::io::unix::pipe;
     /// use nix::{unistd::mkfifo, sys::stat::Mode};
     /// # use std::error::Error;
     ///
@@ -112,43 +287,22 @@ impl Sender {
     /// // Create a new FIFO file.
     /// mkfifo(FIFO_NAME, Mode::S_IRWXU)?;
     ///
-    /// // `Sender::open` would fail here, since there is no open reading end.
-    /// let mut tx = Sender::open_rw(FIFO_NAME)?;
+    /// let mut tx = pipe::OpenOptions::new()
+    ///     .read_write(true)
+    ///     .open_sender(FIFO_NAME)?;
+    ///
     /// // We can asynchronously write to the pipe before any readers.
     /// tx.write_all(b"hello world").await?;
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Panics
-    ///
-    /// This function panics if it is not called from within a runtime with
-    /// IO enabled.
-    ///
-    /// The runtime is usually set implicitly when this function is called
-    /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    #[cfg(target_os = "linux")]
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
-    pub fn open_rw<P>(path: P) -> io::Result<Sender>
-    where
-        P: AsRef<Path>,
-    {
-        Sender::open_internal(path.as_ref(), true)
+    #[derive(Debug)]
+    pub struct Sender {
+        io: PollEvented<mio_pipe::Sender>,
     }
+}
 
-    fn open_internal(path: &Path, read_access: bool) -> io::Result<Sender> {
-        let file = std::fs::OpenOptions::new()
-            .read(read_access)
-            .write(true)
-            .custom_flags(libc::O_NONBLOCK)
-            .open(path)?;
-        let raw_fd = file.into_raw_fd();
-        // Safety: Raw fd was created from a valid file.
-        let mio_tx = unsafe { mio_pipe::Sender::from_raw_fd(raw_fd) };
-        Sender::from_mio(mio_tx)
-    }
-
+impl Sender {
     fn from_mio(mio_tx: mio_pipe::Sender) -> io::Result<Sender> {
         let io = PollEvented::new_with_interest(mio_tx, Interest::WRITABLE)?;
         Ok(Sender { io })
@@ -274,7 +428,7 @@ impl Sender {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a writing end of a fifo
-    ///     let tx = pipe::Sender::open("path/to/a/fifo")?;
+    ///     let tx = pipe::OpenOptions::new().open_sender("path/to/a/fifo")?;
     ///
     ///     loop {
     ///         // Wait for the pipe to be writable
@@ -361,7 +515,7 @@ impl Sender {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a writing end of a fifo
-    ///     let tx = pipe::Sender::open("path/to/a/fifo")?;
+    ///     let tx = pipe::OpenOptions::new().open_sender("path/to/a/fifo")?;
     ///
     ///     loop {
     ///         // Wait for the pipe to be writable
@@ -420,7 +574,7 @@ impl Sender {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a writing end of a fifo
-    ///     let tx = pipe::Sender::open("path/to/a/fifo")?;
+    ///     let tx = pipe::OpenOptions::new().open_sender("path/to/a/fifo")?;
     ///
     ///     let bufs = [io::IoSlice::new(b"hello "), io::IoSlice::new(b"world")];
     ///
@@ -494,6 +648,8 @@ cfg_net_unix! {
     ///
     /// # Examples
     ///
+    /// Receiving messages from a named pipe in a loop:
+    ///
     /// ```no_run
     /// use tokio::io::unix::pipe;
     /// use tokio::io::{self, AsyncReadExt};
@@ -502,78 +658,28 @@ cfg_net_unix! {
     /// const FIFO_NAME: &str = "path/to/a/fifo";
     ///
     /// # async fn dox() -> Result<(), Box<dyn Error>> {
-    /// let mut rx = pipe::Receiver::open(FIFO_NAME)?;
+    /// let mut rx = pipe::OpenOptions::new().open_receiver(FIFO_NAME)?;
     /// loop {
     ///     let mut msg = vec![0; 256];
     ///     match rx.read_exact(&mut msg).await {
     ///         Ok(_) => {
-    ///             /* handle message */
+    ///             /* handle the message */
     ///         }
     ///         Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => {
     ///             // Writing end has been closed, we should reopen the pipe.
-    ///             rx = pipe::Receiver::open(FIFO_NAME)?;
+    ///             rx = pipe::OpenOptions::new().open_receiver(FIFO_NAME)?;
     ///         }
     ///         Err(e) => return Err(e.into()),
     ///     }
     /// }
     /// # }
     /// ```
-    #[derive(Debug)]
-    pub struct Receiver {
-        io: PollEvented<mio_pipe::Receiver>,
-    }
-}
-
-impl Receiver {
-    /// Creates a new `Receiver` from a FIFO file.
     ///
-    /// This function will open the FIFO file at the specified path and associate
-    /// the pipe with the default event loop for reading.
-    ///
-    /// # Errors
-    ///
-    /// Fails with any standard OS error if it occurs.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if it is not called from within a runtime with
-    /// IO enabled.
-    ///
-    /// The runtime is usually set implicitly when this function is called
-    /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    pub fn open<P>(path: P) -> io::Result<Receiver>
-    where
-        P: AsRef<Path>,
-    {
-        Receiver::open_internal(path.as_ref(), false)
-    }
-
-    /// Creates a new `Receiver` from a FIFO file in read-write access mode.
-    ///
-    /// This function will open the FIFO file at the specified path in `O_RDWR` access
-    /// mode and associate the pipe with the default event loop for reading.
-    ///
-    /// `Receiver` in read-write access mode can be used to implement resilient reading.
-    /// Unlike a `Receiver` opened in read-only mode with [`open`], pipe opened with
-    /// this function will not fail with `UnexpectedEof` during reading if the writing
-    /// end of the pipe closes the file.
-    ///
-    /// [`open`]: Self::open
-    ///
-    /// # Notes
-    ///
-    /// You should not use functions waiting for EOF such as [`read_to_end`] with
-    /// a `Receiver` in read-write access mode, since it may wait forever. `Receiver`
-    /// in this mode also holds an open writing end, which prevents receiving EOF.
-    ///
-    /// [`read_to_end`]: crate::io::AsyncReadExt::read_to_end
-    ///
-    /// # Errors
-    ///
-    /// Fails with any standard OS error if it occurs.
-    ///
-    /// # Examples
+    /// On Linux, you can use a `Receiver` in read-write access mode to implement
+    /// resilient reading from a pipe. Unlike a `Receiver` opened in read-only
+    /// mode, a pipe in read-write mode will not fail with `UnexpectedEof` during
+    /// reading if the last writing end of the pipe closes the file. This way,
+    /// a `Receiver` can wait for the next writer to open the pipe.
     ///
     /// ```no_run
     /// use tokio::io::unix::pipe;
@@ -583,44 +689,31 @@ impl Receiver {
     /// const FIFO_NAME: &str = "path/to/a/fifo";
     ///
     /// # async fn dox() -> Result<(), Box<dyn Error>> {
-    /// let mut rx = pipe::Receiver::open_rw(FIFO_NAME)?;
+    /// let mut rx = pipe::OpenOptions::new()
+    ///     .read_write(true)
+    ///     .open_receiver(FIFO_NAME)?;
     /// loop {
     ///     let mut msg = vec![0; 256];
     ///     rx.read_exact(&mut msg).await?;
-    ///     /* handle message */
+    ///     /* handle the message */
     /// }
     /// # }
     /// ```
     ///
-    /// # Panics
+    /// # Notes
     ///
-    /// This function panics if it is not called from within a runtime with
-    /// IO enabled.
+    /// You should not use functions waiting for EOF such as [`read_to_end`] with
+    /// a `Receiver` in read-write access mode, since it may wait forever. `Receiver`
+    /// in this mode also holds an open writing end, which prevents receiving EOF.
     ///
-    /// The runtime is usually set implicitly when this function is called
-    /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    #[cfg(target_os = "linux")]
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
-    pub fn open_rw<P>(path: P) -> io::Result<Receiver>
-    where
-        P: AsRef<Path>,
-    {
-        Receiver::open_internal(path.as_ref(), true)
+    /// [`read_to_end`]: crate::io::AsyncReadExt::read_to_end
+    #[derive(Debug)]
+    pub struct Receiver {
+        io: PollEvented<mio_pipe::Receiver>,
     }
+}
 
-    fn open_internal(path: &Path, write_access: bool) -> io::Result<Receiver> {
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(write_access)
-            .custom_flags(libc::O_NONBLOCK)
-            .open(path)?;
-        let raw_fd = file.into_raw_fd();
-        // Safety: Raw fd was created from a valid file.
-        let mio_rx = unsafe { mio_pipe::Receiver::from_raw_fd(raw_fd) };
-        Receiver::from_mio(mio_rx)
-    }
-
+impl Receiver {
     fn from_mio(mio_rx: mio_pipe::Receiver) -> io::Result<Receiver> {
         let io = PollEvented::new_with_interest(mio_rx, Interest::READABLE)?;
         Ok(Receiver { io })
@@ -746,7 +839,7 @@ impl Receiver {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a reading end of a fifo
-    ///     let rx = pipe::Receiver::open("path/to/a/fifo")?;
+    ///     let rx = pipe::OpenOptions::new().open_receiver("path/to/a/fifo")?;
     ///
     ///     let mut msg = vec![0; 1024];
     ///
@@ -844,7 +937,7 @@ impl Receiver {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a reading end of a fifo
-    ///     let rx = pipe::Receiver::open("path/to/a/fifo")?;
+    ///     let rx = pipe::OpenOptions::new().open_receiver("path/to/a/fifo")?;
     ///
     ///     let mut msg = vec![0; 1024];
     ///
@@ -913,7 +1006,7 @@ impl Receiver {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Open a reading end of a fifo
-    ///     let rx = pipe::Receiver::open("path/to/a/fifo")?;
+    ///     let rx = pipe::OpenOptions::new().open_receiver("path/to/a/fifo")?;
     ///
     ///     loop {
     ///         // Wait for the pipe to be readable
@@ -984,7 +1077,7 @@ impl Receiver {
         /// #[tokio::main]
         /// async fn main() -> Result<(), Box<dyn Error>> {
         ///     // Open a reading end of a fifo
-        ///     let rx = pipe::Receiver::open("path/to/a/fifo")?;
+        ///     let rx = pipe::OpenOptions::new().open_receiver("path/to/a/fifo")?;
         ///
         ///     loop {
         ///         // Wait for the pipe to be readable
