@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! Unix pipe types.
 
 use crate::io::interest::Interest;
