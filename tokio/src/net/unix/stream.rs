@@ -720,6 +720,21 @@ impl UnixStream {
     ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixStream::set_nonblocking
     ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    /// use std::os::unix::net::UnixStream as StdUnixStream;
+    /// # use std::error::Error;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// let std_stream = StdUnixStream::connect("/path/to/the/socket")?;
+    /// std_stream.set_nonblocking(true)?;
+    /// let stream = UnixStream::from_std(std_stream)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Panics
     ///
     /// This function panics if it is not called from within a runtime with
