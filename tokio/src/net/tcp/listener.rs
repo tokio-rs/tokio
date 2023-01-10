@@ -206,7 +206,7 @@ impl TcpListener {
     ///
     /// The caller is responsible for ensuring that the listener is in
     /// non-blocking mode. Otherwise all I/O operations on the listener
-    /// will block the thread, what can cause unexpected behavior.
+    /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
     /// [`set_nonblocking`]: std::net::TcpListener::set_nonblocking
