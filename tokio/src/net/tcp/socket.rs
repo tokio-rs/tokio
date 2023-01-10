@@ -666,10 +666,18 @@ impl TcpSocket {
     /// socket must not have been connected prior to calling this function. This
     /// function is typically used together with crates such as [`socket2`] to
     /// configure socket options that are not available on `TcpSocket`.
-    /// It is left up to the user to set the socket in non-blocking mode.
     ///
     /// [`std::net::TcpStream`]: struct@std::net::TcpStream
     /// [`socket2`]: https://docs.rs/socket2/
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode. Otherwise all I/O operations on the socket
+    /// will block the thread, what can cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::net::TcpStream::set_nonblocking
     ///
     /// # Examples
     ///

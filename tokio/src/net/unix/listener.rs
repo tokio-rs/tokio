@@ -73,9 +73,16 @@ impl UnixListener {
     /// Creates new `UnixListener` from a `std::os::unix::net::UnixListener `.
     ///
     /// This function is intended to be used to wrap a UnixListener from the
-    /// standard library in the Tokio equivalent. The conversion assumes
-    /// nothing about the underlying listener; it is left up to the user to set
-    /// it in non-blocking mode.
+    /// standard library in the Tokio equivalent.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the listener is in
+    /// non-blocking mode. Otherwise all I/O operations on the listener
+    /// will block the thread, what can cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::os::unix::net::UnixListener::set_nonblocking
     ///
     /// # Panics
     ///
