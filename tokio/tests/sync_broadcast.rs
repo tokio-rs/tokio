@@ -11,6 +11,7 @@ use tokio_test::{
     assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
 };
 
+#[cfg(any(not(tokio_wasm), tokio_wasi))]
 use rand::Rng;
 use std::sync::Arc;
 
@@ -563,6 +564,7 @@ fn sender_len() {
 }
 
 #[test]
+#[cfg(any(not(tokio_wasm), tokio_wasi))]
 fn sender_len_random() {
     let (tx, mut rx1) = broadcast::channel(16);
     let mut rx2 = tx.subscribe();
