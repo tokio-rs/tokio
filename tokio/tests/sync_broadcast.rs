@@ -11,6 +11,7 @@ use tokio_test::{
     assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
 };
 
+use rand::Rng;
 use std::sync::Arc;
 
 macro_rules! assert_recv {
@@ -559,4 +560,27 @@ fn sender_len() {
 
     assert_eq!(tx.len(), 4);
     assert!(!tx.is_empty());
+}
+
+#[test]
+fn sender_len_random() {
+    let (tx, mut rx1) = broadcast::channel(16);
+    let mut rx2 = tx.subscribe();
+
+    for _ in 0..1000 {
+        match rand::thread_rng().gen_range(0..3) {
+            0 => {
+                let _ = rx1.try_recv();
+            }
+            1 => {
+                let _ = rx2.try_recv();
+            }
+            _ => {
+                tx.send(0).unwrap();
+            }
+        }
+
+        let expected_len = usize::min(usize::max(rx1.len(), rx2.len()), 16);
+        assert_eq!(tx.len(), expected_len);
+    }
 }
