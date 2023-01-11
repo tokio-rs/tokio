@@ -670,6 +670,15 @@ impl TcpSocket {
     /// [`std::net::TcpStream`]: struct@std::net::TcpStream
     /// [`socket2`]: https://docs.rs/socket2/
     ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode. Otherwise all I/O operations on the socket
+    /// will block the thread, which will cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::net::TcpStream::set_nonblocking
+    ///
     /// # Examples
     ///
     /// ```
@@ -678,8 +687,8 @@ impl TcpSocket {
     ///
     /// #[tokio::main]
     /// async fn main() -> std::io::Result<()> {
-    ///
     ///     let socket2_socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
+    ///     socket2_socket.set_nonblocking(true)?;
     ///
     ///     let socket = TcpSocket::from_std_stream(socket2_socket.into());
     ///

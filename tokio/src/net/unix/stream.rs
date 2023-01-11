@@ -709,9 +709,31 @@ impl UnixStream {
     /// Creates new `UnixStream` from a `std::os::unix::net::UnixStream`.
     ///
     /// This function is intended to be used to wrap a UnixStream from the
-    /// standard library in the Tokio equivalent. The conversion assumes
-    /// nothing about the underlying stream; it is left up to the user to set
-    /// it in non-blocking mode.
+    /// standard library in the Tokio equivalent.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the stream is in
+    /// non-blocking mode. Otherwise all I/O operations on the stream
+    /// will block the thread, which will cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::os::unix::net::UnixStream::set_nonblocking
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    /// use std::os::unix::net::UnixStream as StdUnixStream;
+    /// # use std::error::Error;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// let std_stream = StdUnixStream::connect("/path/to/the/socket")?;
+    /// std_stream.set_nonblocking(true)?;
+    /// let stream = UnixStream::from_std(std_stream)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
