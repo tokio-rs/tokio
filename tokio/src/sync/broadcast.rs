@@ -603,6 +603,97 @@ impl<T> Sender<T> {
         new_receiver(shared)
     }
 
+    /// Returns the number of queued values.
+    ///
+    /// A value is queued until it has either been seen by all receivers that were alive at the time
+    /// it was sent, or has been evicted from the queue by subsequent sends that exceeded the
+    /// queue's capacity.
+    ///
+    /// # Note
+    ///
+    /// In contrast to [`Receiver::len`], this method only reports queued values and not values that
+    /// have been evicted from the queue before being seen by all receivers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx1) = broadcast::channel(16);
+    ///     let mut rx2 = tx.subscribe();
+    ///
+    ///     tx.send(10).unwrap();
+    ///     tx.send(20).unwrap();
+    ///     tx.send(30).unwrap();
+    ///
+    ///     assert_eq!(tx.len(), 3);
+    ///
+    ///     rx1.recv().await.unwrap();
+    ///
+    ///     // The len is still 3 since rx2 hasn't seen the first value yet.
+    ///     assert_eq!(tx.len(), 3);
+    ///
+    ///     rx2.recv().await.unwrap();
+    ///
+    ///     assert_eq!(tx.len(), 2);
+    /// }
+    /// ```
+    pub fn len(&self) -> usize {
+        let tail = self.shared.tail.lock();
+
+        let base_idx = (tail.pos & self.shared.mask as u64) as usize;
+        let mut low = 0;
+        let mut high = self.shared.buffer.len();
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let idx = base_idx.wrapping_add(mid) & self.shared.mask;
+            if self.shared.buffer[idx].read().unwrap().rem.load(SeqCst) == 0 {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+
+        self.shared.buffer.len() - low
+    }
+
+    /// Returns true if there are no queued values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx1) = broadcast::channel(16);
+    ///     let mut rx2 = tx.subscribe();
+    ///
+    ///     assert!(tx.is_empty());
+    ///
+    ///     tx.send(10).unwrap();
+    ///
+    ///     assert!(!tx.is_empty());
+    ///
+    ///     rx1.recv().await.unwrap();
+    ///
+    ///     // The queue is still not empty since rx2 hasn't seen the value.
+    ///     assert!(!tx.is_empty());
+    ///
+    ///     rx2.recv().await.unwrap();
+    ///
+    ///     assert!(tx.is_empty());
+    /// }
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        let tail = self.shared.tail.lock();
+
+        let idx = (tail.pos.wrapping_sub(1) & self.shared.mask as u64) as usize;
+        self.shared.buffer[idx].read().unwrap().rem.load(SeqCst) == 0
+    }
+
     /// Returns the number of active receivers
     ///
     /// An active receiver is a [`Receiver`] handle returned from [`channel`] or
@@ -731,7 +822,7 @@ impl<T> Receiver<T> {
     ///     assert_eq!(rx1.len(), 2);
     ///     assert_eq!(rx1.recv().await.unwrap(), 10);
     ///     assert_eq!(rx1.len(), 1);
-    ///     assert_eq!(rx1.recv().await.unwrap(), 20);     
+    ///     assert_eq!(rx1.recv().await.unwrap(), 20);
     ///     assert_eq!(rx1.len(), 0);
     /// }
     /// ```
@@ -761,7 +852,7 @@ impl<T> Receiver<T> {
     ///
     ///     assert!(!rx1.is_empty());
     ///     assert_eq!(rx1.recv().await.unwrap(), 10);
-    ///     assert_eq!(rx1.recv().await.unwrap(), 20);     
+    ///     assert_eq!(rx1.recv().await.unwrap(), 20);
     ///     assert!(rx1.is_empty());
     /// }
     /// ```

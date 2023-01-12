@@ -526,3 +526,63 @@ fn resubscribe_to_closed_channel() {
     let mut rx_resub = rx.resubscribe();
     assert_closed!(rx_resub.try_recv());
 }
+
+#[test]
+fn sender_len() {
+    let (tx, mut rx1) = broadcast::channel(4);
+    let mut rx2 = tx.subscribe();
+
+    assert_eq!(tx.len(), 0);
+    assert!(tx.is_empty());
+
+    tx.send(1).unwrap();
+    tx.send(2).unwrap();
+    tx.send(3).unwrap();
+
+    assert_eq!(tx.len(), 3);
+    assert!(!tx.is_empty());
+
+    assert_recv!(rx1);
+    assert_recv!(rx1);
+
+    assert_eq!(tx.len(), 3);
+    assert!(!tx.is_empty());
+
+    assert_recv!(rx2);
+
+    assert_eq!(tx.len(), 2);
+    assert!(!tx.is_empty());
+
+    tx.send(4).unwrap();
+    tx.send(5).unwrap();
+    tx.send(6).unwrap();
+
+    assert_eq!(tx.len(), 4);
+    assert!(!tx.is_empty());
+}
+
+#[test]
+#[cfg(not(tokio_wasm_not_wasi))]
+fn sender_len_random() {
+    use rand::Rng;
+
+    let (tx, mut rx1) = broadcast::channel(16);
+    let mut rx2 = tx.subscribe();
+
+    for _ in 0..1000 {
+        match rand::thread_rng().gen_range(0..4) {
+            0 => {
+                let _ = rx1.try_recv();
+            }
+            1 => {
+                let _ = rx2.try_recv();
+            }
+            _ => {
+                tx.send(0).unwrap();
+            }
+        }
+
+        let expected_len = usize::min(usize::max(rx1.len(), rx2.len()), 16);
+        assert_eq!(tx.len(), expected_len);
+    }
+}
