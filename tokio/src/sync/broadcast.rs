@@ -611,7 +611,7 @@ impl<T> Sender<T> {
     ///
     /// # Note
     ///
-    /// In contrast to [`Receiver::len`], this method only reports queued values but not values that
+    /// In contrast to [`Receiver::len`], this method only reports queued values and not values that
     /// have been evicted from the queue before being seen by all receivers.
     ///
     /// # Examples
