@@ -11,8 +11,6 @@ use tokio_test::{
     assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
 };
 
-#[cfg(not(tokio_wasm_not_wasi))]
-use rand::Rng;
 use std::sync::Arc;
 
 macro_rules! assert_recv {
@@ -566,11 +564,13 @@ fn sender_len() {
 #[test]
 #[cfg(not(tokio_wasm_not_wasi))]
 fn sender_len_random() {
+    use rand::Rng;
+
     let (tx, mut rx1) = broadcast::channel(16);
     let mut rx2 = tx.subscribe();
 
     for _ in 0..1000 {
-        match rand::thread_rng().gen_range(0..3) {
+        match rand::thread_rng().gen_range(0..4) {
             0 => {
                 let _ = rx1.try_recv();
             }

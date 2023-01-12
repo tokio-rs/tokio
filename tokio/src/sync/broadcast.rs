@@ -605,6 +605,15 @@ impl<T> Sender<T> {
 
     /// Returns the number of queued values.
     ///
+    /// A value is queued until it has either been seen by all receivers that were alive at the time
+    /// it was sent, or has been evicted from the queue by subsequent sends that exceeded the
+    /// queue's capacity.
+    ///
+    /// # Note
+    ///
+    /// In contrast to [`Receiver::len`], this method only reports queued values but not values that
+    /// have been evicted from the queue before being seen by all receivers.
+    ///
     /// # Examples
     ///
     /// ```
