@@ -74,7 +74,10 @@ impl<T> ReadHalf<T> {
     /// same `split` operation this method will panic.
     /// This can be checked ahead of time by comparing the stream ID
     /// of the two halves.
-    pub fn unsplit(self, wr: WriteHalf<T>) -> T {
+    pub fn unsplit(self, wr: WriteHalf<T>) -> T
+    where
+        T: Unpin,
+    {
         if self.is_pair_of(&wr) {
             drop(wr);
 
