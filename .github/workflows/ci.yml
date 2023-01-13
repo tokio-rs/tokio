@@ -300,6 +300,8 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
           components: rust-src
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       # Install linker and libraries for i686-unknown-linux-gnu
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
