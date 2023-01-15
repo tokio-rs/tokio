@@ -298,9 +298,9 @@ impl Context {
             core = c;
         }
 
-        // This check will fail if `before_park` spawns a task for us to run
+        // This check will fail if `before_park` spawns a task or has awoken a task for us to run
         // instead of parking the thread
-        if core.tasks.is_empty() {
+        if core.tasks.is_empty() && ! handle.shared.woken.load(std::sync::atomic::Ordering::Relaxed) {
             // Park until the thread is signaled
             core.metrics.about_to_park();
             core.metrics.submit(&handle.shared.worker_metrics);
