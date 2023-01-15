@@ -11,9 +11,9 @@ cfg_rt! {
     /// An owned permission to join on a task (await its termination).
     ///
     /// This can be thought of as the equivalent of [`std::thread::JoinHandle`]
-    /// for a Tokio task rather than a thread. You do not need to `.await` the
-    /// `JoinHandle` to make the task execute — it will start running in the
-    /// background immediately.
+    /// for a Tokio task rather than a thread. Note that the background task
+    /// associated with this `JoinHandle` started running immediately when you
+    /// called spawn, even if you have not yet awaited the `JoinHandle`.
     ///
     /// A `JoinHandle` *detaches* the associated task when it is dropped, which
     /// means that there is no longer any handle to the task, and no way to `join`

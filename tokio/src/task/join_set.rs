@@ -120,9 +120,9 @@ impl<T: 'static> JoinSet<T> {
     /// Spawn the provided task on the `JoinSet`, returning an [`AbortHandle`]
     /// that can be used to remotely cancel the task.
     ///
-    /// You do not have to `.await` the returned `JoinHandle` to make the
-    /// provided future start execution. It will start running in the background
-    /// immediately when `spawn` is called.
+    /// The provided future will start running in the background immediately
+    /// when this method is called, even if you don't await anything on this
+    /// `JoinSet`.
     ///
     /// # Panics
     ///
@@ -143,9 +143,9 @@ impl<T: 'static> JoinSet<T> {
     /// `JoinSet` returning an [`AbortHandle`] that can be used to remotely
     /// cancel the task.
     ///
-    /// You do not have to `.await` the returned `JoinHandle` to make the
-    /// provided future start execution. It will start running in the background
-    /// immediately when `spawn_on` is called.
+    /// The provided future will start running in the background immediately
+    /// when this method is called, even if you don't await anything on this
+    /// `JoinSet`.
     ///
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
@@ -162,9 +162,9 @@ impl<T: 'static> JoinSet<T> {
     /// `JoinSet`, returning an [`AbortHandle`] that can be used to remotely
     /// cancel the task.
     ///
-    /// You do not have to `.await` the returned `JoinHandle` to make the
-    /// provided future start execution. It will start running in the background
-    /// immediately when `spawn_local` is called.
+    /// The provided future will start running in the background immediately
+    /// when this method is called, even if you don't await anything on this
+    /// `JoinSet`.
     ///
     /// # Panics
     ///
@@ -186,10 +186,8 @@ impl<T: 'static> JoinSet<T> {
     /// remotely cancel the task.
     ///
     /// Unlike the [`spawn_local`] method, this method may be used to spawn local
-    /// tasks when the `LocalSet` is _not_ running. You do not have to `.await`
-    /// the returned `JoinHandle` to make the provided future start execution.
-    /// It will start running immediately whenever the `LocalSet` is next
-    /// started.
+    /// tasks on a `LocalSet` that is _not_ currently running. The provided
+    /// future will start running whenever the `LocalSet` is next started.
     ///
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`AbortHandle`]: crate::task::AbortHandle
