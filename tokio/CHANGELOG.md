@@ -1,3 +1,13 @@
+# 1.24.2 (January 17, 2023)
+
+Forward ports 1.18.5 changes.
+
+### Fixed
+
+- io: fix unsoundness in `ReadHalf::unsplit` ([#5375])
+
+[#5375]: https://github.com/tokio-rs/tokio/pull/5375
+
 # 1.24.1 (January 6, 2022)
 
 This release fixes a compilation failure on targets without `AtomicU64` when using rustc older than 1.63. ([#5356])
