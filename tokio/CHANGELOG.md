@@ -1,3 +1,13 @@
+# 1.20.4 (January 17, 2023)
+
+Forward ports 1.18.5 changes.
+
+### Fixed
+
+- io: fix unsoundness in `ReadHalf::unsplit` ([#5375])
+
+[#5375]: https://github.com/tokio-rs/tokio/pull/5375
+
 # 1.20.3 (January 3, 2022)
 
 This release forward ports changes from 1.18.4.
