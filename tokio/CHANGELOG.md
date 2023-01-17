@@ -1,3 +1,11 @@
+# 1.18.5 (January 17, 2023)
+
+### Fixed
+
+- io: fix unsoundness in `ReadHalf::unsplit` ([#5375])
+
+[#5375]: https://github.com/tokio-rs/tokio/pull/5375
+
 # 1.18.4 (January 3, 2022)
 
 ### Fixed
@@ -136,7 +144,7 @@ performance improvements.
 - time: use bit manipulation instead of modulo to improve performance ([#4480])
 - net: use `std::future::Ready` instead of our own `Ready` future ([#4271])
 - replace deprecated `atomic::spin_loop_hint` with `hint::spin_loop` ([#4491])
-- fix miri failures in intrusive linked lists ([#4397]) 
+- fix miri failures in intrusive linked lists ([#4397])
 
 ### Documented
 
