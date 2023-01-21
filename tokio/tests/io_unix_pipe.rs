@@ -174,11 +174,11 @@ async fn open_detects_not_a_fifo() -> io::Result<()> {
 
     // Check if Sender detects invalid file type.
     let err = assert_err!(pipe::OpenOptions::new().open_sender(&path));
-    assert_eq!(err.kind(), io::ErrorKind::Other);
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
 
     // Check if Receiver detects invalid file type.
     let err = assert_err!(pipe::OpenOptions::new().open_sender(&path));
-    assert_eq!(err.kind(), io::ErrorKind::Other);
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
 
     Ok(())
 }
@@ -233,12 +233,12 @@ async fn from_file_detects_not_a_fifo() -> io::Result<()> {
     // Check if Sender detects invalid file type.
     let file = std::fs::OpenOptions::new().write(true).open(&path)?;
     let err = assert_err!(pipe::Sender::from_file(file));
-    assert_eq!(err.kind(), io::ErrorKind::Other);
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
 
     // Check if Receiver detects invalid file type.
     let file = std::fs::OpenOptions::new().read(true).open(&path)?;
     let err = assert_err!(pipe::Receiver::from_file(file));
-    assert_eq!(err.kind(), io::ErrorKind::Other);
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
 
     Ok(())
 }
@@ -256,7 +256,7 @@ async fn from_file_detects_wrong_access_mode() -> io::Result<()> {
         .custom_flags(libc::O_NONBLOCK)
         .open(&fifo)?;
     let err = assert_err!(pipe::Receiver::from_file(wronly));
-    assert_eq!(err.kind(), io::ErrorKind::Other);
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
 
     // Check if Sender detects read-only access mode.
     let rdonly = std::fs::OpenOptions::new()
@@ -264,7 +264,7 @@ async fn from_file_detects_wrong_access_mode() -> io::Result<()> {
         .custom_flags(libc::O_NONBLOCK)
         .open(&fifo)?;
     let err = assert_err!(pipe::Sender::from_file(rdonly));
-    assert_eq!(err.kind(), io::ErrorKind::Other);
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
 
     Ok(())
 }

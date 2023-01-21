@@ -106,8 +106,8 @@ impl OpenOptions {
     /// ```
     ///
     /// Opening a resilient [`Receiver`] i.e. a reading pipe end which will not
-    /// fail with [`UnexpectedEof`] during reading if a writing end of the pipe
-    /// closes the FIFO file.
+    /// fail with [`UnexpectedEof`] during reading if all writing ends of the
+    /// pipe close the FIFO file.
     ///
     /// [`UnexpectedEof`]: std::io::ErrorKind::UnexpectedEof
     ///
@@ -165,7 +165,7 @@ impl OpenOptions {
     ///
     /// # Errors
     ///
-    /// If the file type check fails, this function will fail with `io::ErrorKind::Other`.
+    /// If the file type check fails, this function will fail with `io::ErrorKind::InvalidInput`.
     /// This function may also fail with other standard OS errors.
     ///
     /// # Panics
@@ -189,7 +189,7 @@ impl OpenOptions {
     ///
     /// # Errors
     ///
-    /// If the file type check fails, this function will fail with `io::ErrorKind::Other`.
+    /// If the file type check fails, this function will fail with `io::ErrorKind::InvalidInput`.
     /// If the file is not opened in read-write access mode and the file is not
     /// currently open for reading, this function will fail with `ENXIO`.
     /// This function may also fail with other standard OS errors.
@@ -222,7 +222,7 @@ impl OpenOptions {
         let file = options.open(path)?;
 
         if !self.unchecked && !is_fifo(&file)? {
-            return Err(io::Error::new(io::ErrorKind::Other, "not a pipe"));
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "not a pipe"));
         }
 
         Ok(file)
@@ -241,67 +241,78 @@ enum PipeEnd {
     Receiver,
 }
 
-cfg_net_unix! {
-    /// Writing end of a Unix pipe.
-    ///
-    /// # Examples
-    ///
-    /// Opening a `Sender` from a named pipe:
-    ///
-    /// ```no_run
-    /// use tokio::io::unix::pipe;
-    /// use tokio::time::{self, Duration};
-    /// use nix::{unistd::mkfifo, sys::stat::Mode};
-    /// # use std::error::Error;
-    ///
-    /// const FIFO_NAME: &str = "path/to/a/new/fifo";
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn Error>> {
-    /// // Create a new FIFO file.
-    /// mkfifo(FIFO_NAME, Mode::S_IRWXU)?;
-    ///
-    /// // Wait for a reader to open the file.
-    /// let tx = loop {
-    ///     match pipe::OpenOptions::new().open_sender(FIFO_NAME) {
-    ///         Ok(tx) => break tx,
-    ///         Err(e) if e.raw_os_error() == Some(libc::ENXIO) => {},
-    ///         Err(e) => return Err(e.into()),
-    ///     }
-    ///
-    ///     time::sleep(Duration::from_millis(50)).await;
-    /// };
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// On Linux, you can open a named pipe in read-write access mode without
-    /// waiting in a sleeping loop for a reading end to open the file.
-    ///
-    /// ```ignore
-    /// use tokio::io::AsyncWriteExt;
-    /// use tokio::io::unix::pipe;
-    /// use nix::{unistd::mkfifo, sys::stat::Mode};
-    /// # use std::error::Error;
-    ///
-    /// const FIFO_NAME: &str = "path/to/a/new/fifo";
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn Error>> {
-    /// // Create a new FIFO file.
-    /// mkfifo(FIFO_NAME, Mode::S_IRWXU)?;
-    ///
-    /// let mut tx = pipe::OpenOptions::new()
-    ///     .read_write(true)
-    ///     .open_sender(FIFO_NAME)?;
-    ///
-    /// // We can asynchronously write to the pipe before any readers.
-    /// tx.write_all(b"hello world").await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[derive(Debug)]
-    pub struct Sender {
-        io: PollEvented<mio_pipe::Sender>,
-    }
+/// Writing end of a Unix pipe.
+///
+/// It can be constructed from a FIFO file with [`OpenOptions::open_sender`].
+///
+/// Opening a named pipe for writing involves a few steps.
+/// Call to [`OpenOptions::open_sender`] might fail with an error indicating
+/// different things:
+///
+/// * [`io::ErrorKind::InvalidInput`] - There is no FIFO file at specified path.
+/// * [`ENXIO`] - The file is a FIFO, but no process has it open for reading.
+///   Sleep for a while and try again.
+/// * Other OS errors not specific to opening FIFO files.
+///
+/// Opening a `Sender` from a FIFO file should look like this:
+///
+/// ```no_run
+/// use tokio::io::unix::pipe;
+/// use tokio::time::{self, Duration};
+///
+/// const FIFO_NAME: &str = "path/to/a/fifo";
+///
+/// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+/// // Wait for a reader to open the file.
+/// let tx = loop {
+///     match pipe::OpenOptions::new().open_sender(FIFO_NAME) {
+///         Ok(tx) => break tx,
+///         Err(e) if e.raw_os_error() == Some(libc::ENXIO) => {},
+///         Err(e) => return Err(e.into()),
+///     }
+///
+///     time::sleep(Duration::from_millis(50)).await;
+/// };
+/// # Ok(())
+/// # }
+/// ```
+///
+/// On Linux, it is possible to create a `Sender` without waiting in a sleeping
+/// loop. This is done by opening a named pipe in read-write access mode with
+/// [`OpenOptions::read_write`]. This way, a `Sender` can at the same time hold
+/// both a writing end and a reading end, and the latter allows to open a FIFO
+/// without [`ENXIO`] error since the pipe is open for reading as well.
+///
+/// `Sender` cannot be used to read from a pipe, so in practice the read access
+/// is only used when a FIFO is opened. However, using a `Sender` in read-write
+/// mode **may lead to lost data**, because written data will be dropped by the
+/// system as soon as all pipe ends are closed. To avoid lost data you have to
+/// make sure that a reading end has been opened before dropping a `Sender`.
+///
+/// Note that using read-write access mode with FIFO files is not defined by
+/// the POSIX standard and it is only guaranteed to work on Linux.
+///
+/// ```ignore
+/// use tokio::io::AsyncWriteExt;
+/// use tokio::io::unix::pipe;
+///
+/// const FIFO_NAME: &str = "path/to/a/fifo";
+///
+/// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+/// let mut tx = pipe::OpenOptions::new()
+///     .read_write(true)
+///     .open_sender(FIFO_NAME)?;
+///
+/// // Asynchronously write to the pipe before a reader.
+/// tx.write_all(b"hello world").await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [`ENXIO`]: https://docs.rs/libc/latest/libc/constant.ENXIO.html
+#[derive(Debug)]
+pub struct Sender {
+    io: PollEvented<mio_pipe::Sender>,
 }
 
 impl Sender {
@@ -318,8 +329,8 @@ impl Sender {
     ///
     /// # Errors
     ///
-    /// Fails with `io::ErrorKind::Other` if the file is not a pipe or it does not have
-    /// write access. Also fails with any standard OS error if it occurs.
+    /// Fails with `io::ErrorKind::InvalidInput` if the file is not a pipe or it
+    /// does not have write access. Also fails with any standard OS error if it occurs.
     ///
     /// # Panics
     ///
@@ -331,7 +342,7 @@ impl Sender {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_file(mut file: File) -> io::Result<Sender> {
         if !is_fifo(&file)? {
-            return Err(io::Error::new(io::ErrorKind::Other, "not a pipe"));
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "not a pipe"));
         }
 
         let flags = get_file_flags(&file)?;
@@ -340,7 +351,7 @@ impl Sender {
             Sender::from_file_unchecked(file)
         } else {
             Err(io::Error::new(
-                io::ErrorKind::Other,
+                io::ErrorKind::InvalidInput,
                 "not in O_WRONLY or O_RDWR access mode",
             ))
         }
@@ -350,7 +361,7 @@ impl Sender {
     ///
     /// This function is intended to construct a pipe from a File representing
     /// a special FIFO file. The conversion assumes nothing about the underlying
-    /// file; it is left up to the user to make sure it is opened with writing access,
+    /// file; it is left up to the user to make sure it is opened with write access,
     /// represents a pipe and is set in non-blocking mode.
     ///
     /// # Examples
@@ -392,21 +403,23 @@ impl Sender {
 
     /// Waits for any of the requested ready states.
     ///
-    /// This function can be used to wait for a [`WRITE_CLOSED`] event.
+    /// This function can be used to wait for for [`WRITABLE`] and [`WRITE_CLOSED`]
+    /// events.
     ///
-    /// The function may complete without the socket being ready. This is a
+    /// The function may complete without the pipe being ready. This is a
     /// false-positive and attempting an operation will return with
     /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
     /// [`Ready`] set, so you should always check the returned value and possibly
     /// wait again if the requested states are not set.
     ///
+    /// [`WRITABLE`]: Ready::WRITABLE
     /// [`WRITE_CLOSED`]: Ready::WRITE_CLOSED
     ///
     /// # Cancel safety
     ///
     /// This method is cancel safe. Once a readiness event occurs, the method
     /// will continue to return immediately until the readiness event is
-    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// consumed by an attempt to write that fails with `WouldBlock` or
     /// `Poll::Pending`.
     pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
         let event = self.io.registration().readiness(interest).await?;
@@ -424,11 +437,10 @@ impl Sender {
     ///
     /// ```no_run
     /// use tokio::io::unix::pipe;
-    /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Open a writing end of a fifo
     ///     let tx = pipe::OpenOptions::new().open_sender("path/to/a/fifo")?;
     ///
@@ -467,8 +479,7 @@ impl Sender {
     ///
     /// Note that on multiple calls to `poll_write_ready` or `poll_write`, only
     /// the `Waker` from the `Context` passed to the most recent call is
-    /// scheduled to receive a wakeup. (However, `poll_read_ready` retains a
-    /// second, independent waker.)
+    /// scheduled to receive a wakeup.
     ///
     /// This function is intended for cases where creating and pinning a future
     /// via [`writable`] is not feasible. Where possible, using [`writable`] is
@@ -495,7 +506,11 @@ impl Sender {
     /// written.
     ///
     /// The function will attempt to write the entire contents of `buf`, but
-    /// only part of the buffer may be written.
+    /// only part of the buffer may be written. If the length of `buf` is not
+    /// greater than `PIPE_BUF` (an OS constant, 4096 under Linux), then the
+    /// write is guaranteed to be atomic, i.e. either the entire content of
+    /// `buf` will be written or this method will fail with `WouldBlock`. There
+    /// is no such guarantee if `buf` is larger than `PIPE_BUF`.
     ///
     /// This function is usually paired with [`writable`].
     ///
@@ -511,11 +526,10 @@ impl Sender {
     ///
     /// ```no_run
     /// use tokio::io::unix::pipe;
-    /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Open a writing end of a fifo
     ///     let tx = pipe::OpenOptions::new().open_sender("path/to/a/fifo")?;
     ///
@@ -555,6 +569,12 @@ impl Sender {
     /// equivalently to a single call to [`try_write()`] with concatenated
     /// buffers.
     ///
+    /// If the total length of buffers is not greater than `PIPE_BUF` (an OS
+    /// constant, 4096 under Linux), then the write is guaranteed to be atomic,
+    /// i.e. either the entire contents of buffers will be written or this
+    /// method will fail with `WouldBlock`. There is no such guarantee if the
+    /// total length of buffers is greater than `PIPE_BUF`.
+    ///
     /// This function is usually paired with [`writable`].
     ///
     /// [`try_write()`]: Self::try_write()
@@ -563,18 +583,17 @@ impl Sender {
     /// # Return
     ///
     /// If data is successfully written, `Ok(n)` is returned, where `n` is the
-    /// number of bytes written. If the stream is not ready to write data,
+    /// number of bytes written. If the pipe is not ready to write data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use tokio::io::unix::pipe;
-    /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Open a writing end of a fifo
     ///     let tx = pipe::OpenOptions::new().open_sender("path/to/a/fifo")?;
     ///
@@ -645,74 +664,76 @@ impl AsRawFd for Sender {
     }
 }
 
-cfg_net_unix! {
-    /// Reading end of a Unix pipe.
-    ///
-    /// # Examples
-    ///
-    /// Receiving messages from a named pipe in a loop:
-    ///
-    /// ```no_run
-    /// use tokio::io::unix::pipe;
-    /// use tokio::io::{self, AsyncReadExt};
-    /// # use std::error::Error;
-    ///
-    /// const FIFO_NAME: &str = "path/to/a/fifo";
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn Error>> {
-    /// let mut rx = pipe::OpenOptions::new().open_receiver(FIFO_NAME)?;
-    /// loop {
-    ///     let mut msg = vec![0; 256];
-    ///     match rx.read_exact(&mut msg).await {
-    ///         Ok(_) => {
-    ///             /* handle the message */
-    ///         }
-    ///         Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => {
-    ///             // Writing end has been closed, we should reopen the pipe.
-    ///             rx = pipe::OpenOptions::new().open_receiver(FIFO_NAME)?;
-    ///         }
-    ///         Err(e) => return Err(e.into()),
-    ///     }
-    /// }
-    /// # }
-    /// ```
-    ///
-    /// On Linux, you can use a `Receiver` in read-write access mode to implement
-    /// resilient reading from a pipe. Unlike a `Receiver` opened in read-only
-    /// mode, a pipe in read-write mode will not fail with `UnexpectedEof` during
-    /// reading if the last writing end of the pipe closes the file. This way,
-    /// a `Receiver` can wait for the next writer to open the pipe.
-    ///
-    /// ```ignore
-    /// use tokio::io::unix::pipe;
-    /// use tokio::io::AsyncReadExt;
-    /// # use std::error::Error;
-    ///
-    /// const FIFO_NAME: &str = "path/to/a/fifo";
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn Error>> {
-    /// let mut rx = pipe::OpenOptions::new()
-    ///     .read_write(true)
-    ///     .open_receiver(FIFO_NAME)?;
-    /// loop {
-    ///     let mut msg = vec![0; 256];
-    ///     rx.read_exact(&mut msg).await?;
-    ///     /* handle the message */
-    /// }
-    /// # }
-    /// ```
-    ///
-    /// # Notes
-    ///
-    /// You should not use functions waiting for EOF such as [`read_to_end`] with
-    /// a `Receiver` in read-write access mode, since it may wait forever. `Receiver`
-    /// in this mode also holds an open writing end, which prevents receiving EOF.
-    ///
-    /// [`read_to_end`]: crate::io::AsyncReadExt::read_to_end
-    #[derive(Debug)]
-    pub struct Receiver {
-        io: PollEvented<mio_pipe::Receiver>,
-    }
+/// Reading end of a Unix pipe.
+///
+/// It can be constructed from a FIFO file with [`OpenOptions::open_receiver`].
+///
+/// # Examples
+///
+/// Receiving messages from a named pipe in a loop:
+///
+/// ```no_run
+/// use tokio::io::unix::pipe;
+/// use tokio::io::{self, AsyncReadExt};
+///
+/// const FIFO_NAME: &str = "path/to/a/fifo";
+///
+/// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+/// let mut rx = pipe::OpenOptions::new().open_receiver(FIFO_NAME)?;
+/// loop {
+///     let mut msg = vec![0; 256];
+///     match rx.read_exact(&mut msg).await {
+///         Ok(_) => {
+///             /* handle the message */
+///         }
+///         Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => {
+///             // Writing end has been closed, we should reopen the pipe.
+///             rx = pipe::OpenOptions::new().open_receiver(FIFO_NAME)?;
+///         }
+///         Err(e) => return Err(e.into()),
+///     }
+/// }
+/// # }
+/// ```
+///
+/// On Linux, you can use a `Receiver` in read-write access mode to implement
+/// resilient reading from a named pipe. Unlike `Receiver` opened in read-only
+/// mode, read from a pipe in read-write mode will not fail with `UnexpectedEof`
+/// when the writing end is closed. This way, a `Receiver` can asynchronously
+/// wait for the next writer to open the pipe.
+///
+/// You should not use functions waiting for EOF such as [`read_to_end`] with
+/// a `Receiver` in read-write access mode, since it **may wait forever**.
+/// `Receiver` in this mode also holds an open writing end, which prevents
+/// receiving EOF.
+///
+/// To set the read-write access mode you can use [`OpenOptions::read_write`].
+/// Note that using read-write access mode with FIFO files is not defined by
+/// the POSIX standard and it is only guaranteed to work on Linux.
+///
+/// ```ignore
+/// use tokio::io::unix::pipe;
+/// use tokio::io::AsyncReadExt;
+/// # use std::error::Error;
+///
+/// const FIFO_NAME: &str = "path/to/a/fifo";
+///
+/// # async fn dox() -> Result<(), Box<dyn Error>> {
+/// let mut rx = pipe::OpenOptions::new()
+///     .read_write(true)
+///     .open_receiver(FIFO_NAME)?;
+/// loop {
+///     let mut msg = vec![0; 256];
+///     rx.read_exact(&mut msg).await?;
+///     /* handle the message */
+/// }
+/// # }
+/// ```
+///
+/// [`read_to_end`]: crate::io::AsyncReadExt::read_to_end
+#[derive(Debug)]
+pub struct Receiver {
+    io: PollEvented<mio_pipe::Receiver>,
 }
 
 impl Receiver {
@@ -729,8 +750,8 @@ impl Receiver {
     ///
     /// # Errors
     ///
-    /// Fails with `io::ErrorKind::Other` if the file is not a pipe or it does not have
-    /// read access. Also fails with any standard OS error if it occurs.
+    /// Fails with `io::ErrorKind::InvalidInput` if the file is not a pipe or it
+    /// does not have read access. Also fails with any standard OS error if it occurs.
     ///
     /// # Panics
     ///
@@ -742,7 +763,7 @@ impl Receiver {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_file(mut file: File) -> io::Result<Receiver> {
         if !is_fifo(&file)? {
-            return Err(io::Error::new(io::ErrorKind::Other, "not a pipe"));
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "not a pipe"));
         }
 
         let flags = get_file_flags(&file)?;
@@ -751,7 +772,7 @@ impl Receiver {
             Receiver::from_file_unchecked(file)
         } else {
             Err(io::Error::new(
-                io::ErrorKind::Other,
+                io::ErrorKind::InvalidInput,
                 "not in O_RDONLY or O_RDWR access mode",
             ))
         }
@@ -761,7 +782,7 @@ impl Receiver {
     ///
     /// This function is intended to construct a pipe from a File representing
     /// a special FIFO file. The conversion assumes nothing about the underlying
-    /// file; it is left up to the user to make sure it is opened with writing access,
+    /// file; it is left up to the user to make sure it is opened with read access,
     /// represents a pipe and is set in non-blocking mode.
     ///
     /// # Examples
@@ -803,21 +824,22 @@ impl Receiver {
 
     /// Waits for any of the requested ready states.
     ///
-    /// This function can be used to wait for a [`READ_CLOSED`] event.
+    /// This function can be used to wait for [`READABLE`] and [`READ_CLOSED`] events.
     ///
-    /// The function may complete without the socket being ready. This is a
+    /// The function may complete without the pipe being ready. This is a
     /// false-positive and attempting an operation will return with
     /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
     /// [`Ready`] set, so you should always check the returned value and possibly
     /// wait again if the requested states are not set.
     ///
+    /// [`READABLE`]: Ready::READABLE
     /// [`READ_CLOSED`]: Ready::READ_CLOSED
     ///
     /// # Cancel safety
     ///
     /// This method is cancel safe. Once a readiness event occurs, the method
     /// will continue to return immediately until the readiness event is
-    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// consumed by an attempt to read that fails with `WouldBlock` or
     /// `Poll::Pending`.
     pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
         let event = self.io.registration().readiness(interest).await?;
@@ -835,11 +857,10 @@ impl Receiver {
     ///
     /// ```no_run
     /// use tokio::io::unix::pipe;
-    /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Open a reading end of a fifo
     ///     let rx = pipe::OpenOptions::new().open_receiver("path/to/a/fifo")?;
     ///
@@ -882,8 +903,7 @@ impl Receiver {
     ///
     /// Note that on multiple calls to `poll_read_ready` or `poll_read`, only
     /// the `Waker` from the `Context` passed to the most recent call is
-    /// scheduled to receive a wakeup. (However, `poll_write_ready` retains a
-    /// second, independent waker.)
+    /// scheduled to receive a wakeup.
     ///
     /// This function is intended for cases where creating and pinning a future
     /// via [`readable`] is not feasible. Where possible, using [`readable`] is
@@ -909,7 +929,7 @@ impl Receiver {
     /// Tries to read data from the pipe into the provided buffer, returning how
     /// many bytes were read.
     ///
-    /// Receives any pending data from the pipe but does not wait for new data
+    /// Reads any pending data from the pipe but does not wait for new data
     /// to arrive. On success, returns the number of bytes read. Because
     /// `try_read()` is non-blocking, the buffer does not have to be stored by
     /// the async task and can exist entirely on the stack.
@@ -923,7 +943,7 @@ impl Receiver {
     /// If data is successfully read, `Ok(n)` is returned, where `n` is the
     /// number of bytes read. If `n` is `0`, then it can indicate one of two scenarios:
     ///
-    /// 1. The pipe's read half is closed and will no longer yield data.
+    /// 1. The pipe's writing end is closed and will no longer write data.
     /// 2. The specified buffer was 0 bytes in length.
     ///
     /// If the pipe is not ready to read data,
@@ -933,11 +953,10 @@ impl Receiver {
     ///
     /// ```no_run
     /// use tokio::io::unix::pipe;
-    /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Open a reading end of a fifo
     ///     let rx = pipe::OpenOptions::new().open_receiver("path/to/a/fifo")?;
     ///
@@ -981,7 +1000,7 @@ impl Receiver {
     /// equivalently to a single call to [`try_read()`] with concatenated
     /// buffers.
     ///
-    /// Receives any pending data from the pipe but does not wait for new data
+    /// Reads any pending data from the pipe but does not wait for new data
     /// to arrive. On success, returns the number of bytes read. Because
     /// `try_read_vectored()` is non-blocking, the buffer does not have to be
     /// stored by the async task and can exist entirely on the stack.
@@ -994,19 +1013,18 @@ impl Receiver {
     /// # Return
     ///
     /// If data is successfully read, `Ok(n)` is returned, where `n` is the
-    /// number of bytes read. `Ok(0)` indicates the pipe's read half is closed
-    /// and will no longer yield data. If the pipe is not ready to read data
-    /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    /// number of bytes read. `Ok(0)` indicates the pipe's writing end is
+    /// closed and will no longer write data. If the pipe is not ready to read
+    /// data `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use tokio::io::unix::pipe;
-    /// use std::error::Error;
-    /// use std::io::{self, IoSliceMut};
+    /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Open a reading end of a fifo
     ///     let rx = pipe::OpenOptions::new().open_receiver("path/to/a/fifo")?;
     ///
@@ -1019,8 +1037,8 @@ impl Receiver {
     ///         let mut buf_a = [0; 512];
     ///         let mut buf_b = [0; 1024];
     ///         let mut bufs = [
-    ///             IoSliceMut::new(&mut buf_a),
-    ///             IoSliceMut::new(&mut buf_b),
+    ///             io::IoSliceMut::new(&mut buf_a),
+    ///             io::IoSliceMut::new(&mut buf_b),
     ///         ];
     ///
     ///         // Try to read data, this may still fail with `WouldBlock`
@@ -1049,10 +1067,10 @@ impl Receiver {
     }
 
     cfg_io_util! {
-        /// Tries to read data from the stream into the provided buffer, advancing the
+        /// Tries to read data from the pipe into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
-        /// Receives any pending data from the pipe but does not wait for new data
+        /// Reads any pending data from the pipe but does not wait for new data
         /// to arrive. On success, returns the number of bytes read. Because
         /// `try_read_buf()` is non-blocking, the buffer does not have to be stored by
         /// the async task and can exist entirely on the stack.
@@ -1065,19 +1083,18 @@ impl Receiver {
         /// # Return
         ///
         /// If data is successfully read, `Ok(n)` is returned, where `n` is the
-        /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
-        /// and will no longer yield data. If the stream is not ready to read data
-        /// `Err(io::ErrorKind::WouldBlock)` is returned.
+        /// number of bytes read. `Ok(0)` indicates the pipe's writing end is
+        /// closed and will no longer write data. If the pipe is not ready to read
+        /// data `Err(io::ErrorKind::WouldBlock)` is returned.
         ///
         /// # Examples
         ///
         /// ```no_run
         /// use tokio::io::unix::pipe;
-        /// use std::error::Error;
         /// use std::io;
         ///
         /// #[tokio::main]
-        /// async fn main() -> Result<(), Box<dyn Error>> {
+        /// async fn main() -> io::Result<()> {
         ///     // Open a reading end of a fifo
         ///     let rx = pipe::OpenOptions::new().open_receiver("path/to/a/fifo")?;
         ///
