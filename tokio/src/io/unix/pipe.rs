@@ -279,7 +279,7 @@ enum PipeEnd {
 ///
 /// On Linux, it is possible to create a `Sender` without waiting in a sleeping
 /// loop. This is done by opening a named pipe in read-write access mode with
-/// [`OpenOptions::read_write`]. This way, a `Sender` can at the same time hold
+/// `OpenOptions::read_write`. This way, a `Sender` can at the same time hold
 /// both a writing end and a reading end, and the latter allows to open a FIFO
 /// without [`ENXIO`] error since the pipe is open for reading as well.
 ///
@@ -707,7 +707,7 @@ impl AsRawFd for Sender {
 /// `Receiver` in this mode also holds an open writing end, which prevents
 /// receiving EOF.
 ///
-/// To set the read-write access mode you can use [`OpenOptions::read_write`].
+/// To set the read-write access mode you can use `OpenOptions::read_write`.
 /// Note that using read-write access mode with FIFO files is not defined by
 /// the POSIX standard and it is only guaranteed to work on Linux.
 ///
