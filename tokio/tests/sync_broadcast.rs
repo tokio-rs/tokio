@@ -291,6 +291,7 @@ fn capacity_too_big() {
 }
 
 #[test]
+#[cfg(panic = "unwind")]
 #[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn panic_in_clone() {
     use std::panic::{self, AssertUnwindSafe};
