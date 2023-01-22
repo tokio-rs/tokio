@@ -147,7 +147,6 @@ tempfile = "3.1.0"
 async-stream = "0.3"
 
 [target.'cfg(not(any(target_arch = "wasm32", target_arch = "wasm64")))'.dev-dependencies]
-proptest = "1"
 socket2 = "0.4"
 
 [target.'cfg(not(all(any(target_arch = "wasm32", target_arch = "wasm64"), target_os = "unknown")))'.dev-dependencies]
