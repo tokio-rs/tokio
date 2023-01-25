@@ -4,7 +4,8 @@
 #[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
-use tokio::sync::Notify;
+use std::sync::Arc;
+use tokio::sync::{oneshot, Notify};
 use tokio_test::task::spawn;
 use tokio_test::*;
 
@@ -224,4 +225,43 @@ fn test_waker_update() {
     notify.notify_one();
 
     assert!(future.is_woken());
+}
+
+// tokio-rs/tokio#5396
+#[tokio::test(flavor = "multi_thread")]
+async fn notify_waiters_sequential() {
+    let notify = Arc::new(Notify::new());
+
+    let (tx, rx) = oneshot::channel();
+
+    let receiver = tokio::spawn({
+        let notify = notify.clone();
+        async move {
+            notify.notified().await;
+
+            // Poll the second `Notified` future to try to insert
+            // it to the waiters queue.
+            let mut second_notified = spawn(notify.notified());
+            assert_pending!(second_notified.poll());
+
+            // Wait for the `notify_waiters` to end and check if we
+            // are woken up.
+            rx.await.unwrap();
+            assert_pending!(second_notified.poll());
+        }
+    });
+
+    for _ in 1..100000 {
+        let notify = notify.clone();
+        tokio::spawn(async move {
+            notify.notified().await;
+        });
+    }
+
+    tokio::task::yield_now().await;
+
+    notify.notify_waiters();
+    tx.send(()).unwrap();
+
+    receiver.await.unwrap();
 }

@@ -246,7 +246,9 @@ impl<L: Link> Default for LinkedList<L, L::Target> {
 
 // ===== impl DrainFilter =====
 
-cfg_io_readiness! {
+feature! {
+    #![any(feature = "net", feature = "sync")]
+
     pub(crate) struct DrainFilter<'a, T: Link, F> {
         list: &'a mut LinkedList<T, T::Target>,
         filter: F,
