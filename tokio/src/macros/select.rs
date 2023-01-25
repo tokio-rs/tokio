@@ -405,14 +405,14 @@ macro_rules! select {
     // without requiring the user to increase the recursion limit.
 
     // All input is normalized, now transform.
-    (@ {
+    (@@@
         // The index of the future to poll first (in bias mode), or the RNG
         // expression to use to pick a future to poll first.
         start=$start:expr;
 
         // One `_` for each branch in the `select!` macro. Passing this to
         // `count!` converts $skip to an integer.
-        ( $($count:tt)* )
+        ( $($count:tt)* );
 
         // Normalized select branches. `( $skip )` is a set of `_` characters.
         // There is one `_` for each select branch **before** this one. Given
@@ -420,12 +420,11 @@ macro_rules! select {
         // generating a pattern to reference the future for the current branch.
         // $skip is also used as an argument to `count!`, returning the index of
         // the current select branch.
-        $( ( $($skip:tt)* ) $bind:pat = $fut:expr, if $c:expr => $handle:expr, )+
+        $( (( $($skip:tt)* ) $(#[$branch_meta:meta])* $bind:pat = $fut:expr, if $c:expr => $handle:expr) )+
 
         // Fallback expression used when all select branches have been disabled.
         ; $else:expr
-
-    }) => {{
+    ) => {{
         // Enter a context where stable "function-like" proc macros can be used.
         //
         // This module is defined within a scope and should not leak out of this
@@ -433,7 +432,7 @@ macro_rules! select {
         #[doc(hidden)]
         mod __tokio_select_util {
             // Generate an enum with one variant per select branch
-            $crate::select_priv_declare_output_enum!( ( $($count)* ) );
+            $crate::select_priv_declare_output_enum!(( $($count)*));
         }
 
         // `tokio::macros::support` is a public, but doc(hidden) module
@@ -448,13 +447,12 @@ macro_rules! select {
 
         // First, invoke all the pre-conditions. For any that return true,
         // set the appropriate bit in `disabled`.
-        $(
+        $(  $(#[$branch_meta])*
             if !$c {
                 let mask: __tokio_select_util::Mask = 1 << $crate::count!( $($skip)* );
                 disabled |= mask;
             }
         )*
-
         // Create a scope to separate polling from handling the output. This
         // adds borrow checker flexibility when using the macro.
         let mut output = {
@@ -464,7 +462,7 @@ macro_rules! select {
             // We can't use the `pin!` macro for this because `futures` is a
             // tuple and the standard library provides no way to pin-project to
             // the fields of a tuple.
-            let mut futures = ( $( $fut , )+ );
+            let mut futures = ( $($fut , )+ );
 
             // This assignment makes sure that the `poll_fn` closure only has a
             // reference to the futures, instead of taking ownership of them.
@@ -491,7 +489,7 @@ macro_rules! select {
                         branch = (start + i) % BRANCHES;
                     }
                     match branch {
-                        $(
+                        $(  $(#[$branch_meta])*
                             #[allow(unreachable_code)]
                             $crate::count!( $($skip)* ) => {
                                 // First, if the future has previously been
@@ -507,7 +505,7 @@ macro_rules! select {
 
                                 // Extract the future for this branch from the
                                 // tuple
-                                let ( $($skip,)* fut, .. ) = &mut *futures;
+                                let ($($skip,)* fut, .. ) = &mut *futures;
 
                                 // Safety: future is stored on the stack above
                                 // and never moved.
@@ -554,7 +552,8 @@ macro_rules! select {
         };
 
         match output {
-            $(
+            $(  
+                $(#[$branch_meta])*
                 $crate::select_variant!(__tokio_select_util::Out, ($($skip)*) ($bind)) => $handle,
             )*
             __tokio_select_util::Out::Disabled => $else,
@@ -566,37 +565,23 @@ macro_rules! select {
 
     // These rules match a single `select!` branch and normalize it for
     // processing by the first rule.
-
-    (@ { start=$start:expr; $($t:tt)* } ) => {
-        // No `else` branch
-        $crate::select!(@{ start=$start; $($t)*; panic!("all branches are disabled and there is no else branch") })
+    (@ start={$start:expr} {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:block $(#[$m:meta])* $p:pat = $($t:tt)*}; $else:expr)=>{
+        $crate::select!(@@ start={$start}; ( _) {$(#[$m])* $p = $($t)* } (() $(#[$branch_meta])* $res = $async_expr, if $skip => $handle) $else)
     };
-    (@ { start=$start:expr; $($t:tt)* } else => $else:expr $(,)?) => {
-        $crate::select!(@{ start=$start; $($t)*; $else })
+    (@ start={$start:expr} {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:block $(#[$m:meta])* $p:pat = $($t:tt)*}; $else:expr)=>{
+        $crate::select!(@@ start={$start}; ( _) {$(#[$m])* $p = $($t)* } (() $(#[$branch_meta])* $res = $async_expr, if true => $handle) $else)
     };
-    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr, if $c:expr => $h:block, $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, } $($r)*)
+    (@@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:block $(#[$m:meta])* $p:pat = $($t:tt)*} $((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr ))+ $else:expr)=>{
+        $crate::select!(@@ start={$start}; ($($n)* _) {$(#[$m])* $p = $($t)*}(($($n)*) $(#[$branch_meta])* $res = $async_expr, $skip => $handle) $((($($l)*) $(#[$sm])* $sp     = $se, if $sk => $sh     ))+; $else)
     };
-    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr => $h:block, $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
+    (@@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:block $(#[$m:meta])* $p:pat = $($t:tt)*} $((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr ))+ $else:expr)=>{
+        $crate::select!(@@ start={$start}; ($($n)* _) {$(#[$m])* $p = $($t)*}(($($n)*) $(#[$branch_meta])* $res = $async_expr, if true => $handle) $((($($l)*) $(#[$sm])* $sp     = $se, if $sk => $sh     ))+; $else)
+    };                    
+    (@@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:block} $((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr,if $sk:expr => $sh:expr))+; $else:expr)=>{
+        $crate::select!(@@@ start={$start}; ($($n)* _); (($($n)*)$(#[$branch_meta])* $res = $async_expr, if $skip => $handle) $((($($l)*)$(#[$sm])* $sp = $se,if $sk => $sh))*; $else)
     };
-    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr, if $c:expr => $h:block $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, } $($r)*)
-    };
-    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr => $h:block $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
-    };
-    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr, if $c:expr => $h:expr ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, })
-    };
-    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr => $h:expr ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, })
-    };
-    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr, if $c:expr => $h:expr, $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, } $($r)*)
-    };
-    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr => $h:expr, $($r:tt)* ) => {
-        $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
+    (@@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:block} $((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))+; $else:expr)=>{
+        $crate::select!(@@@ start={$start}; ($($n)* _); (($($n)*)$(#[$branch_meta])* $res = $async_expr, if true => $handle) $((($($l)*)$(#[$sm])* $sp = $se, if $sk => $sh))*; $else)
     };
 
     // ===== Entry point =====
@@ -605,10 +590,10 @@ macro_rules! select {
         $crate::select!(@{ start=0; () } $p = $($t)*)
     };
 
-    ( $p:pat = $($t:tt)* ) => {
+    ( $(#[$first_meta:meta])* $p:pat = $($t:tt)* ) => { // No else branch
         // Randomly generate a starting point. This makes `select!` a bit more
         // fair and avoids always polling the first future.
-        $crate::select!(@{ start={ $crate::macros::support::thread_rng_n(BRANCHES) }; () } $p = $($t)*)
+        $crate::select!(@ start={ $crate::macros::support::thread_rng_n(BRANCHES) } {$(#[$first_meta])* $p = $($t)*}; panic!("all branches are disabled and there is no else branch"))
     };
     () => {
         compile_error!("select! requires at least one branch.")
