@@ -4,6 +4,11 @@ use loom::future::block_on;
 use loom::sync::Arc;
 use loom::thread;
 
+use tokio_test::{assert_pending, assert_ready};
+
+/// `util::wake_list::NUM_WAKERS`
+const WAKE_LIST_SIZE: usize = 32;
+
 #[test]
 fn notify_one() {
     loom::model(|| {
@@ -40,6 +45,110 @@ fn notify_waiters() {
 
         th.join().unwrap();
     });
+}
+
+fn notify_waiters_poll_consistency_variant(poll_setting: [bool; 2]) {
+    let notify = Arc::new(Notify::new());
+    let mut notified = [
+        tokio_test::task::spawn(notify.notified()),
+        tokio_test::task::spawn(notify.notified()),
+    ];
+    for i in 0..2 {
+        if poll_setting[i] {
+            assert_pending!(notified[i].poll());
+        }
+    }
+
+    let tx = notify.clone();
+    let th = thread::spawn(move || {
+        tx.notify_waiters();
+    });
+
+    let res1 = notified[0].poll();
+    let res2 = notified[1].poll();
+
+    // If res1 is ready, then res2 must also be ready.
+    assert!(res1.is_pending() || res2.is_ready());
+
+    th.join().unwrap();
+}
+
+#[test]
+fn notify_waiters_poll_consistency() {
+    // We test different scenarios where pending futures had or had not
+    // been polled before the call to `notify_waiters`.
+    loom::model(|| notify_waiters_poll_consistency_variant([false, false]));
+    loom::model(|| notify_waiters_poll_consistency_variant([true, false]));
+    loom::model(|| notify_waiters_poll_consistency_variant([false, true]));
+    loom::model(|| notify_waiters_poll_consistency_variant([true, true]));
+}
+
+fn notify_waiters_poll_consistency_wake_up_batches_variant(order: [usize; 2]) {
+    let notify = Arc::new(Notify::new());
+
+    let mut futs = (0..WAKE_LIST_SIZE + 1)
+        .map(|_| tokio_test::task::spawn(notify.notified()))
+        .collect::<Vec<_>>();
+
+    assert_pending!(futs[order[0]].poll());
+    for i in 2..futs.len() {
+        assert_pending!(futs[i].poll());
+    }
+    assert_pending!(futs[order[1]].poll());
+
+    let tx = notify.clone();
+    let th = thread::spawn(move || {
+        tx.notify_waiters();
+    });
+
+    let res1 = futs[0].poll();
+    let res2 = futs[1].poll();
+
+    // If res1 is ready, then res2 must also be ready.
+    assert!(res1.is_pending() || res2.is_ready());
+
+    th.join().unwrap();
+}
+
+#[test]
+fn notify_waiters_poll_consistency_wake_up_batches() {
+    // We test polling two futures in different batches in various orders.
+    loom::model(|| notify_waiters_poll_consistency_wake_up_batches_variant([0, 1]));
+    loom::model(|| notify_waiters_poll_consistency_wake_up_batches_variant([1, 0]));
+}
+
+fn notify_waiters_is_atomic_variant(wait_for_index: usize) {
+    let notify = Arc::new(Notify::new());
+
+    let mut futs = (0..WAKE_LIST_SIZE + 1)
+        .map(|_| tokio_test::task::spawn(notify.notified()))
+        .collect::<Vec<_>>();
+
+    for fut in &mut futs {
+        assert_pending!(fut.poll());
+    }
+
+    let tx = notify.clone();
+    let th = thread::spawn(move || {
+        tx.notify_waiters();
+    });
+
+    block_on(async {
+        futs.remove(wait_for_index).await;
+        let mut new_fut = tokio_test::task::spawn(notify.notified());
+        assert_pending!(new_fut.poll());
+        notify.notify_one();
+        assert_ready!(new_fut.poll());
+    });
+
+    th.join().unwrap();
+}
+
+#[test]
+fn notify_waiters_is_atomic() {
+    // We test polling two futures in different batches in various orders.
+    loom::model(|| notify_waiters_is_atomic_variant(0));
+    loom::model(|| notify_waiters_is_atomic_variant(32));
 }
 
 #[test]
@@ -136,5 +245,61 @@ fn notify_drop() {
 
         th1.join().unwrap();
         th2.join().unwrap();
+    });
+}
+
+#[test]
+fn notify_waiters_sequential() {
+    use crate::sync::oneshot;
+
+    loom::model(|| {
+        let notify = Arc::new(Notify::new());
+
+        let (tx_fst, rx_fst) = oneshot::channel();
+        let (tx_snd, rx_snd) = oneshot::channel();
+
+        let receiver = thread::spawn({
+            let notify = notify.clone();
+            move || {
+                block_on(async {
+                    // Poll the first `Notified` to put it as the first waiter
+                    // in the queue.
+                    let mut first_notified = tokio_test::task::spawn(notify.notified());
+                    assert_pending!(first_notified.poll());
+
+                    // Create additional waiters to force `notify_waiters` to
+                    // release the lock at least once.
+                    let _task_pile = (0..WAKE_LIST_SIZE + 1)
+                        .map(|_| {
+                            let mut fut = tokio_test::task::spawn(notify.notified());
+                            assert_pending!(fut.poll());
+                            fut
+                        })
+                        .collect::<Vec<_>>();
+
+                    // We are ready for the notify_waiters call.
+                    tx_fst.send(()).unwrap();
+
+                    first_notified.await;
+
+                    // Poll the second `Notified` future to try to insert
+                    // it to the waiters queue.
+                    let mut second_notified = tokio_test::task::spawn(notify.notified());
+                    assert_pending!(second_notified.poll());
+
+                    // Wait for the `notify_waiters` to end and check if we
+                    // are woken up.
+                    rx_snd.await.unwrap();
+                    assert_pending!(second_notified.poll());
+                });
+            }
+        });
+
+        // Wait for the signal and call `notify_waiters`.
+        block_on(rx_fst).unwrap();
+        notify.notify_waiters();
+        tx_snd.send(()).unwrap();
+
+        receiver.join().unwrap();
     });
 }

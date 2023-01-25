@@ -290,6 +290,56 @@ cfg_io_readiness! {
     }
 }
 
+// ===== impl Iter =====
+
+feature! {
+    #![any(
+        feature = "process",
+        feature = "sync",
+        feature = "rt",
+        feature = "signal",
+    )]
+
+    /// Iterates over list elements without consuming them.
+    pub(crate) struct Iter<'a, T: Link> {
+        curr: Option<NonNull<T::Target>>,
+        _list: &'a LinkedList<T, T::Target>,
+    }
+
+    impl<T: Link> LinkedList<T, T::Target> {
+        fn iter(&self) -> Iter<'_, T> {
+            let curr = self.head;
+            Iter {
+                curr,
+                _list: self,
+            }
+        }
+    }
+
+    impl<'a, T: Link> IntoIterator for &'a LinkedList<T, T::Target> {
+        type Item = NonNull<T::Target>;
+        type IntoIter = Iter<'a, T>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.iter()
+        }
+    }
+
+    impl<'a, T: Link> Iterator for Iter<'a, T> {
+        type Item = NonNull<T::Target>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if let Some(curr) = self.curr {
+                // safety: the pointer references data contained by the list
+                self.curr = unsafe { T::pointers(curr).as_ref() }.get_next();
+                Some(curr)
+            } else {
+                None
+            }
+        }
+    }
+}
+
 // ===== impl Pointers =====
 
 impl<T> Pointers<T> {
@@ -450,6 +500,35 @@ pub(crate) mod tests {
         assert_eq!([5, 7, 31].to_vec(), items);
 
         assert!(list.is_empty());
+    }
+
+    #[test]
+    fn iter() {
+        let a = entry(5);
+        let b = entry(7);
+        let c = entry(31);
+
+        let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
+        list.push_front(a.as_ref());
+        list.push_front(b.as_ref());
+        list.push_front(c.as_ref());
+
+        let mut iter = list.iter();
+        assert_eq!(
+            Some(31),
+            iter.next().map(|entry| unsafe { entry.as_ref().val })
+        );
+        assert_eq!(
+            Some(7),
+            iter.next().map(|entry| unsafe { entry.as_ref().val })
+        );
+        assert_eq!(
+            Some(5),
+            iter.next().map(|entry| unsafe { entry.as_ref().val })
+        );
+        assert_eq!(None, iter.next());
+
+        assert!(!list.is_empty());
     }
 
     #[test]
