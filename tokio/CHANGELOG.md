@@ -1,3 +1,13 @@
+# 1.24.2 (January 17, 2023)
+
+Forward ports 1.18.5 changes.
+
+### Fixed
+
+- io: fix unsoundness in `ReadHalf::unsplit` ([#5375])
+
+[#5375]: https://github.com/tokio-rs/tokio/pull/5375
+
 # 1.24.1 (January 6, 2022)
 
 This release fixes a compilation failure on targets without `AtomicU64` when using rustc older than 1.63. ([#5356])
@@ -306,6 +316,16 @@ wasm32-wasi target is given unstable support for the `net` feature.
 [#4956]: https://github.com/tokio-rs/tokio/pull/4956
 [#4959]: https://github.com/tokio-rs/tokio/pull/4959
 
+# 1.20.4 (January 17, 2023)
+
+Forward ports 1.18.5 changes.
+
+### Fixed
+
+- io: fix unsoundness in `ReadHalf::unsplit` ([#5375])
+
+[#5375]: https://github.com/tokio-rs/tokio/pull/5375
+
 # 1.20.3 (January 3, 2022)
 
 This release forward ports changes from 1.18.4.
@@ -441,6 +461,14 @@ This release fixes a bug in `Notified::enable`. ([#4747])
 [#4726]: https://github.com/tokio-rs/tokio/pull/4726
 [#4729]: https://github.com/tokio-rs/tokio/pull/4729
 [#4739]: https://github.com/tokio-rs/tokio/pull/4739
+
+# 1.18.5 (January 17, 2023)
+
+### Fixed
+
+- io: fix unsoundness in `ReadHalf::unsplit` ([#5375])
+
+[#5375]: https://github.com/tokio-rs/tokio/pull/5375
 
 # 1.18.4 (January 3, 2022)
 
@@ -578,7 +606,7 @@ performance improvements.
 - time: use bit manipulation instead of modulo to improve performance ([#4480])
 - net: use `std::future::Ready` instead of our own `Ready` future ([#4271])
 - replace deprecated `atomic::spin_loop_hint` with `hint::spin_loop` ([#4491])
-- fix miri failures in intrusive linked lists ([#4397]) 
+- fix miri failures in intrusive linked lists ([#4397])
 
 ### Documented
 

@@ -300,11 +300,21 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
           components: rust-src
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       # Install linker and libraries for i686-unknown-linux-gnu
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: i686-unknown-linux-gnu
       - run: cargo test -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_atomic_u64
+      # https://github.com/tokio-rs/tokio/pull/5356
+      # https://github.com/tokio-rs/tokio/issues/5373
+      - run: cargo hack build -p tokio --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_atomic_u64 --cfg tokio_no_const_mutex_new
+      - run: cargo hack build -p tokio --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_atomic_u64
 

@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.24.1"
+version = "1.24.2"
 edition = "2018"
 rust-version = "1.49"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -122,7 +122,7 @@ signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.42" }
-nix = { version = "0.24", default-features = false, features = ["fs", "socket"] }
+nix = { version = "0.26", default-features = false, features = ["fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.42.0"
