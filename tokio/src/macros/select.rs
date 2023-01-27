@@ -412,7 +412,7 @@ macro_rules! select {
 
         // One `_` for each branch in the `select!` macro. Passing this to
         // `count!` converts $skip to an integer.
-        ( $($count:tt)* );
+        ( $($count:tt)* )
 
         // Normalized select branches. `( $skip )` is a set of `_` characters.
         // There is one `_` for each select branch **before** this one. Given
@@ -566,49 +566,55 @@ macro_rules! select {
     // These rules match a single `select!` branch and normalize it for
     // processing by the first rule.
     // these lines may repeat several times before reaching the final step.
-    // with precondition and block
-    (@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:block$(,)? $(#[$m:meta])* $p:pat = $($t:tt)*} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*) )=>{
-        $crate::select!(@ start={$start};/*(total number of branches here)*/($($n)* _)/*{unsorted code here}*/{$(#[$m])* $p = $($t)*}/*(sorted branches here)*/((($($n)*) $(#[$branch_meta])* $res = $async_expr, $skip => $handle) $((($($l)*) $(#[$sm])* $sp = $se, if $sk => $sh))*))
+    // with precondition and block, comma included
+    (@ start=$start:expr; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:block, $($t:tt)*} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
+        $crate::select!(@ start=$start;/*(total number of branches here)*/($($n)* _)/*{unsorted code here}*/{ $($t)*}/*(sorted branches here)*/((($($n)*) $(#[$branch_meta])* $res = $async_expr, if $skip => $handle) $((($($l)*) $(#[$sm])* $sp = $se, if $sk => $sh))*))
+    };
+    (@ start=$start:expr; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:block $($t:tt)*} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
+        $crate::select!(@ start=$start;/*(total number of branches here)*/($($n)* _)/*{unsorted code here}*/{ $($t)*}/*(sorted branches here)*/((($($n)*) $(#[$branch_meta])* $res = $async_expr, if $skip => $handle) $((($($l)*) $(#[$sm])* $sp = $se, if $sk => $sh))*))
     };
     // with precondition and expression
-    (@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:expr, $(#[$m:meta])* $p:pat = $($t:tt)*} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
-        $crate::select!(@ start={$start}; ($($n)* _) {$(#[$m])* $p = $($t)*}((($($n)*) $(#[$branch_meta])* $res = $async_expr, $skip => $handle) $((($($l)*) $(#[$sm])* $sp = $se, if $sk => $sh))*))
+    (@ start=$start:expr; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:expr, $($t:tt)*} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
+        $crate::select!(@ start=$start; ($($n)* _) {$($t)*}((($($n)*) $(#[$branch_meta])* $res = $async_expr, if $skip => $handle) $((($($l)*) $(#[$sm])* $sp = $se, if $sk => $sh))*))
+    };
+    // without precondition and with block, comma included
+    (@ start=$start:expr; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:block, $($t:tt)*} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
+        $crate::select!(@ start=$start; ($($n)* _) {$($t)*}((($($n)*) $(#[$branch_meta])* $res = $async_expr, if {true} => $handle) $((($($l)*) $(#[$sm])* $sp = $se, if $sk => $sh))*))
     };
     // without precondition and with block
-    (@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:block$(,)? $(#[$m:meta])* $p:pat = $($t:tt)*} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr ))*))=>{
-        $crate::select!(@ start={$start}; ($($n)* _) {$(#[$m])* $p = $($t)*}((($($n)*) $(#[$branch_meta])* $res = $async_expr, if true => $handle) $((($($l)*) $(#[$sm])* $sp = $se, if $sk => $sh))*))
+    (@ start=$start:expr; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:block $($t:tt)*} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
+        $crate::select!(@ start=$start; ($($n)* _) {$($t)*}((($($n)*) $(#[$branch_meta])* $res = $async_expr, if {true} => $handle) $((($($l)*) $(#[$sm])* $sp = $se, if $sk => $sh))*))
     };
     // without precondition and with expression
-    (@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:expr, $(#[$m:meta])* $p:pat = $($t:tt)*} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr ))*) )=>{
-        $crate::select!(@ start={$start}; ($($n)* _){$(#[$m])* $p = $($t)*}((($($n)*) $(#[$branch_meta])* $res = $async_expr, if true => $handle) $((($($l)*) $(#[$sm])* $sp = $se, if $sk => $sh))*))
+    (@ start=$start:expr; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:expr, $($t:tt)*} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
+        $crate::select!(@ start=$start; ($($n)* _){ $($t)*}((($($n)*) $(#[$branch_meta])* $res = $async_expr, if {true} => $handle) $((($($l)*) $(#[$sm])* $sp = $se, if $sk => $sh))*))
     };
     
     // Final step of normalizing. Appending else branch if not exist.
-    // block, with precondition and else     
-    (@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:block$(,)? else => $else:expr$(,)?} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr,if $sk:expr => $sh:expr))*))=>{
-        $crate::select!(@ start={$start}; ($($n)* _); ((($($n)*)$(#[$branch_meta])* $res = $async_expr, if $skip => $handle) $((($($l)*)$(#[$sm])* $sp = $se,if $sk => $sh))*); $else)
-    };
     // expression, with precondition and else     
-    (@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:expr, else => $else:expr$(,)?} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr,if $sk:expr => $sh:expr))*))=>{
-        $crate::select!(@ start={$start}; ($($n)* _); ((($($n)*)$(#[$branch_meta])* $res = $async_expr, if $skip => $handle) $((($($l)*)$(#[$sm])* $sp = $se,if $sk => $sh))*); $else)
+    (@ start=$start:expr; ($($n:tt)*) {else => $else:expr$(,)?} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr,if $sk:expr => $sh:expr))*))=>{
+        $crate::select!(@ start=$start; ($($n)*) ($((($($l)*)$(#[$sm])* $sp = $se,if $sk => $sh))*); $else)
     };
-    // expression, with precondition but no else
-    (@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:expr$(,)?} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr,if $sk:expr => $sh:expr))*))=>{
-        $crate::select!(@ start={$start}; ($($n)* _); ((($($n)*)$(#[$branch_meta])* $res = $async_expr, if $skip => $handle) $((($($l)*)$(#[$sm])* $sp = $se,if $sk => $sh))*); panic!("all branches are disabled and there is no else branch"))
+    (@ start=$start:expr; ($($n:tt)*) {} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr,if $sk:expr => $sh:expr))+))=>{
+        $crate::select!(@ start=$start; ($($n)*) ($((($($l)*)$(#[$sm])* $sp = $se,if $sk => $sh))*); panic!("all branches are disabled and there is no else branch"))
     };
-    // expression, without precondition but with else   
-    (@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:expr, else => $else:expr$(,)?} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
-        $crate::select!(@ start={$start}; ($($n)* _); ((($($n)*)$(#[$branch_meta])* $res = $async_expr, if true => $handle) $((($($l)*)$(#[$sm])* $sp = $se, if $sk => $sh))*); $else)
-    };
-    // expression, without precondition and else
-    (@ start={$start:expr}; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:expr$(,)?} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
-        $crate::select!(@ start={$start}; ($($n)* _); ((($($n)*)$(#[$branch_meta])* $res = $async_expr, if true => $handle) $((($($l)*)$(#[$sm])* $sp = $se, if $sk => $sh))*); panic!("all branches are disabled and there is no else branch"))
-    };
+    // // expression, with precondition but no else
+    // (@ start=$start:expr; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr, if $skip:expr => $handle:expr$(,)?} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr,if $sk:expr => $sh:expr))*))=>{
+    //     $crate::select!(@ start=$start; ($($n)* _) ((($($n)*)$(#[$branch_meta])* $res = $async_expr, if $skip => $handle) $((($($l)*)$(#[$sm])* $sp = $se,if $sk => $sh))*); panic!("all branches are disabled and there is no else branch"))
+    // };
+    // // expression, without precondition but with else   
+    // (@ start=$start:expr; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:expr, else => $else:expr$(,)?} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
+    //     $crate::select!(@ start=$start; ($($n)* _) ((($($n)*)$(#[$branch_meta])* $res = $async_expr, if true => $handle) $((($($l)*)$(#[$sm])* $sp = $se, if $sk => $sh))*); $else)
+    // };
+    // // expression, without precondition and else
+    // (@ start=$start:expr; ($($n:tt)*) {$(#[$branch_meta:meta])* $res:pat = $async_expr:expr => $handle:expr$(,)?} ($((($($l:tt)*) $(#[$sm:meta])* $sp:pat = $se:expr, if $sk:expr => $sh:expr))*))=>{
+    //     $crate::select!(@ start=$start; ($($n)* _) ((($($n)*)$(#[$branch_meta])* $res = $async_expr, if true => $handle) $((($($l)*)$(#[$sm])* $sp = $se, if $sk => $sh))*); panic!("all branches are disabled and there is no else branch"))
+    // };
 
     // ===== Entry point =====
 
     (biased;$(#[$branch_meta:meta])* $p:pat = $($t:tt)* ) => {
-        $crate::select!(@ start={0};() {$(#[$branch_meta:meta])* $p = $($t)*} ())
+        $crate::select!(@ start={0}; () {$(#[$branch_meta:meta])* $p = $($t)*} ())
     };
     ( $(#[$branch_meta:meta])* $p:pat = $($t:tt)* ) => {
         // Randomly generate a starting point. This makes `select!` a bit more
