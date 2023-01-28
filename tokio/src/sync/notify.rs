@@ -292,7 +292,8 @@ fn get_num_notify_waiters_calls(data: usize) -> usize {
 }
 
 fn atomic_fetch_inc_num_notify_waiters_calls(data: &AtomicUsize) -> usize {
-    data.fetch_add(1 << NOTIFY_WAITERS_SHIFT, SeqCst)
+    let state = data.fetch_add(1 << NOTIFY_WAITERS_SHIFT, SeqCst);
+    get_num_notify_waiters_calls(state)
 }
 
 impl Notify {
