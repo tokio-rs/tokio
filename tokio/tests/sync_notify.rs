@@ -4,8 +4,7 @@
 #[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
-use std::sync::Arc;
-use tokio::sync::{oneshot, Notify};
+use tokio::sync::Notify;
 use tokio_test::task::spawn;
 use tokio_test::*;
 
@@ -229,7 +228,11 @@ fn test_waker_update() {
 
 // tokio-rs/tokio#5396
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(all(feature = "full", not(tokio_wasi)))]
 async fn notify_waiters_sequential() {
+    use std::sync::Arc;
+    use tokio::sync::oneshot;
+
     let notify = Arc::new(Notify::new());
 
     let (tx, rx) = oneshot::channel();

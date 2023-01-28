@@ -247,7 +247,7 @@ impl<L: Link> Default for LinkedList<L, L::Target> {
 // ===== impl DrainFilter =====
 
 feature! {
-    #![any(feature = "net", feature = "sync")]
+    #![any(feature = "net", feature = "process", feature = "sync", feature = "rt", feature = "signal")]
 
     pub(crate) struct DrainFilter<'a, T: Link, F> {
         list: &'a mut LinkedList<T, T::Target>,
