@@ -138,3 +138,61 @@ fn notify_drop() {
         th2.join().unwrap();
     });
 }
+
+#[test]
+fn notify_waiters_sequential() {
+    use crate::sync::oneshot;
+    use tokio_test::assert_pending;
+
+    loom::model(|| {
+        let notify = Arc::new(Notify::new());
+
+        let (tx_fst, rx_fst) = oneshot::channel();
+        let (tx_snd, rx_snd) = oneshot::channel();
+
+        let receiver = thread::spawn({
+            let notify = notify.clone();
+            move || {
+                block_on(async {
+                    // Poll the first `Notified` to put it as the first waiter
+                    // in the queue.
+                    let mut first_notified = tokio_test::task::spawn(notify.notified());
+                    assert_pending!(first_notified.poll());
+
+                    // Create additional waiters to force `notify_waiters` to
+                    // release the lock at least once.
+                    const WAKE_LIST_SIZE: usize = 32;
+                    let _task_pile = (0..WAKE_LIST_SIZE + 1)
+                        .map(|_| {
+                            let mut fut = tokio_test::task::spawn(notify.notified());
+                            assert_pending!(fut.poll());
+                            fut
+                        })
+                        .collect::<Vec<_>>();
+
+                    // We are ready for the notify_waiters call.
+                    tx_fst.send(()).unwrap();
+
+                    first_notified.await;
+
+                    // Poll the second `Notified` future to try to insert
+                    // it to the waiters queue.
+                    let mut second_notified = tokio_test::task::spawn(notify.notified());
+                    assert_pending!(second_notified.poll());
+
+                    // Wait for the `notify_waiters` to end and check if we
+                    // are woken up.
+                    rx_snd.await.unwrap();
+                    assert_pending!(second_notified.poll());
+                });
+            }
+        });
+
+        // Wait for the signal and call `notify_waiters`.
+        block_on(rx_fst).unwrap();
+        notify.notify_waiters();
+        tx_snd.send(()).unwrap();
+
+        receiver.join().unwrap();
+    });
+}
