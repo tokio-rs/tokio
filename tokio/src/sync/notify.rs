@@ -198,10 +198,16 @@ type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
 /// [`Semaphore`]: crate::sync::Semaphore
 #[derive(Debug)]
 pub struct Notify {
-    // This uses 2 bits to store one of `EMPTY`,
+    // `state` uses 2 bits to store one of `EMPTY`,
     // `WAITING` or `NOTIFIED`. The rest of the bits
     // are used to store the number of times `notify_waiters`
     // was called.
+    //
+    // Throughout the code there are two assumptions:
+    // - state can be transitioned *from* `WAITING` only if
+    //   `waiters` lock is held
+    // - number of times `notify_waiters` was called can
+    //   be modified only if `waiters` lock is held
     state: AtomicUsize,
     waiters: Mutex<WaitList>,
 }
@@ -383,7 +389,7 @@ impl Notify {
     /// ```
     pub fn notified(&self) -> Notified<'_> {
         // we load the number of times notify_waiters
-        // was called and store that in our initial state
+        // was called and store that in our waiter
         let state = self.state.load(SeqCst);
         Notified {
             notify: self,
@@ -391,7 +397,7 @@ impl Notify {
             waiter: UnsafeCell::new(Waiter {
                 pointers: linked_list::Pointers::new(),
                 waker: None,
-                notify_waiters_calls: state >> NOTIFY_WAITERS_SHIFT,
+                notify_waiters_calls: get_num_notify_waiters_calls(state),
                 notification: None,
                 _p: PhantomPinned,
             }),
@@ -501,10 +507,9 @@ impl Notify {
     /// }
     /// ```
     pub fn notify_waiters(&self) {
-        // There are waiters, the lock must be acquired to notify.
         let mut waiters = self.waiters.lock();
 
-        // The state must be reloaded while the lock is held. The state may only
+        // The state must loaded while the lock is held. The state may only
         // transition out of WAITING while the lock is held.
         let mut curr = self.state.load(SeqCst);
 
@@ -518,10 +523,6 @@ impl Notify {
         }
 
         let mut wakers = WakeList::new();
-
-        // At this point we are holding the lock, but we may release it
-        // inside the loop, so the state can concurrently change out
-        // of `WAITING`.
         'outer: loop {
             // Filter out waiters created *after* this call.
             let mut iter = waiters.drain_filter(|w| w.notify_waiters_calls <= call_num_bound);
@@ -546,17 +547,21 @@ impl Notify {
                 }
             }
 
+            // Here the lock gets released. Before we acquire it again anything
+            // can happen: the state can be modified arbitrarily and number of calls
+            // to `notify_waiters` can be incremented. We take it into account from
+            // now on.
             drop(waiters);
 
             wakers.wake_all();
 
             // Acquire the lock again.
             waiters = self.waiters.lock();
-
-            // The state must be reloaded as it could have changed while
-            // the lock was released.
-            curr = self.state.load(SeqCst);
         }
+
+        // The state must be reloaded as it could have changed while
+        // the lock was released.
+        curr = self.state.load(SeqCst);
 
         // If all waiters have been notified, the state must be transitioned to
         // `EMPTY`. As transitioning **from** `WAITING` requires the lock to be
