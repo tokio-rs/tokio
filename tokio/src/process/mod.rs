@@ -309,7 +309,8 @@ impl Command {
     ///
     /// ```no_run
     /// use tokio::process::Command;
-    /// let command = Command::new("sh");
+    /// let mut command = Command::new("sh");
+    /// # let _ = command.output(); // assert borrow checker
     /// ```
     ///
     /// [rust-lang/rust#37519]: https://github.com/rust-lang/rust/issues/37519
@@ -328,16 +329,20 @@ impl Command {
     /// Only one argument can be passed per use. So instead of:
     ///
     /// ```no_run
-    /// tokio::process::Command::new("sh")
-    ///   .arg("-C /path/to/repo");
+    /// let mut command = tokio::process::Command::new("sh");
+    /// command.arg("-C /path/to/repo");
+    ///
+    /// # let _ = command.output(); // assert borrow checker
     /// ```
     ///
     /// usage would be:
     ///
     /// ```no_run
-    /// tokio::process::Command::new("sh")
-    ///   .arg("-C")
-    ///   .arg("/path/to/repo");
+    /// let mut command = tokio::process::Command::new("sh");
+    /// command.arg("-C");
+    /// command.arg("/path/to/repo");
+    ///
+    /// # let _ = command.output(); // assert borrow checker
     /// ```
     ///
     /// To pass multiple arguments see [`args`].
@@ -349,11 +354,15 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     ///
-    /// let command = Command::new("ls")
+    /// let output = Command::new("ls")
     ///         .arg("-l")
-    ///         .arg("-a");
+    ///         .arg("-a")
+    ///         .output().await.unwrap();
+    /// # }
+    ///
     /// ```
     pub fn arg<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut Command {
         self.std.arg(arg);
@@ -371,10 +380,13 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     ///
-    /// let command = Command::new("ls")
-    ///         .args(&["-l", "-a"]);
+    /// let output = Command::new("ls")
+    ///         .args(&["-l", "-a"])
+    ///         .output().await.unwrap();
+    /// # }
     /// ```
     pub fn args<I, S>(&mut self, args: I) -> &mut Command
     where
@@ -395,10 +407,13 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     ///
-    /// let command = Command::new("ls")
-    ///         .env("PATH", "/bin");
+    /// let output = Command::new("ls")
+    ///         .env("PATH", "/bin")
+    ///         .output().await.unwrap();
+    /// # }
     /// ```
     pub fn env<K, V>(&mut self, key: K, val: V) -> &mut Command
     where
@@ -416,6 +431,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     /// use std::process::{Stdio};
     /// use std::env;
@@ -426,11 +442,13 @@ impl Command {
     ///         k == "TERM" || k == "TZ" || k == "LANG" || k == "PATH"
     ///     ).collect();
     ///
-    /// let command = Command::new("printenv")
+    /// let output = Command::new("printenv")
     ///         .stdin(Stdio::null())
     ///         .stdout(Stdio::inherit())
     ///         .env_clear()
-    ///         .envs(&filtered_env);
+    ///         .envs(&filtered_env)
+    ///         .output().await.unwrap();
+    /// # }
     /// ```
     pub fn envs<I, K, V>(&mut self, vars: I) -> &mut Command
     where
@@ -449,10 +467,13 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     ///
-    /// let command = Command::new("ls")
-    ///         .env_remove("PATH");
+    /// let output = Command::new("ls")
+    ///         .env_remove("PATH")
+    ///         .output().await.unwrap();
+    /// # }
     /// ```
     pub fn env_remove<K: AsRef<OsStr>>(&mut self, key: K) -> &mut Command {
         self.std.env_remove(key);
@@ -466,10 +487,13 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     ///
-    /// let command = Command::new("ls")
-    ///         .env_clear();
+    /// let output = Command::new("ls")
+    ///         .env_clear()
+    ///         .output().await.unwrap();
+    /// # }
     /// ```
     pub fn env_clear(&mut self) -> &mut Command {
         self.std.env_clear();
@@ -493,10 +517,13 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     ///
-    /// let command = Command::new("ls")
-    ///         .current_dir("/bin");
+    /// let output = Command::new("ls")
+    ///         .current_dir("/bin")
+    ///         .output().await.unwrap();
+    /// # }
     /// ```
     pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Command {
         self.std.current_dir(dir);
@@ -516,11 +543,14 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use std::process::{Stdio};
     /// use tokio::process::Command;
     ///
-    /// let command = Command::new("ls")
-    ///         .stdin(Stdio::null());
+    /// let output = Command::new("ls")
+    ///         .stdin(Stdio::null())
+    ///         .output().await.unwrap();
+    /// # }
     /// ```
     pub fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
         self.std.stdin(cfg);
@@ -540,11 +570,14 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     /// use std::process::Stdio;
     ///
-    /// let command = Command::new("ls")
-    ///         .stdout(Stdio::null());
+    /// let output = Command::new("ls")
+    ///         .stdout(Stdio::null())
+    ///         .output().await.unwrap();
+    /// # }
     /// ```
     pub fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
         self.std.stdout(cfg);
@@ -564,11 +597,14 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     /// use std::process::{Stdio};
     ///
-    /// let command = Command::new("ls")
-    ///         .stderr(Stdio::null());
+    /// let output = Command::new("ls")
+    ///         .stderr(Stdio::null())
+    ///         .output().await.unwrap();
+    /// # }
     /// ```
     pub fn stderr<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
         self.std.stderr(cfg);
@@ -707,10 +743,13 @@ impl Command {
     /// [`tokio::process::Command`]: crate::process::Command
     ///
     /// ```no_run
+    /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     ///
-    /// let command = Command::new("ls")
-    ///         .process_group(0);
+    /// let output = Command::new("ls")
+    ///         .process_group(0)
+    ///         .output().await.unwrap();
+    /// # }
     /// ```
     #[cfg(unix)]
     #[cfg(tokio_unstable)]
