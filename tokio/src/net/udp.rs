@@ -1329,7 +1329,7 @@ impl UdpSocket {
     /// flag is cleared and the socket readiness is awaited again. This loop
     /// repeated until the closure returns an `Ok` or an error that doesn't
     /// have the `WouldBlock` value.
-    /// 
+    ///
     /// The closure should only return a `WouldBlock` error if it has performed
     /// an IO operation on the socket that failed due to the socket not being
     /// ready. Returning a `WouldBlock` error in any other situation will
