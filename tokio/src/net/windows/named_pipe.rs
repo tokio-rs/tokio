@@ -2627,5 +2627,8 @@ mod test {
             opts.pipe_mode,
             PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_REJECT_REMOTE_CLIENTS
         );
+
+        opts.pipe_mode(PipeMode::Byte);
+        assert_eq!(opts.pipe_mode, PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS);
     }
 }
