@@ -42,6 +42,44 @@ fn notify_waiters() {
     });
 }
 
+fn notify_waiters_poll_consistency_variant(poll_setting: [bool; 2]) {
+    use tokio_test::assert_pending;
+
+    let notify = Arc::new(Notify::new());
+    let mut notified = [
+        tokio_test::task::spawn(notify.notified()),
+        tokio_test::task::spawn(notify.notified()),
+    ];
+    for i in 0..2 {
+        if poll_setting[i] {
+            assert_pending!(notified[i].poll());
+        }
+    }
+
+    let tx = notify.clone();
+    let th = thread::spawn(move || {
+        tx.notify_waiters();
+    });
+
+    let res1 = notified[0].poll();
+    let res2 = notified[1].poll();
+
+    // If res1 is ready, then res2 must also be ready.
+    assert!(res1.is_pending() || res2.is_ready());
+
+    th.join().unwrap();
+}
+
+#[test]
+fn notify_waiters_poll_consistency() {
+    // We test different scenarios where pending futures had or had not
+    // been polled before the call to `notify_waiters`.
+    loom::model(|| notify_waiters_poll_consistency_variant([false, false]));
+    loom::model(|| notify_waiters_poll_consistency_variant([true, false]));
+    loom::model(|| notify_waiters_poll_consistency_variant([false, true]));
+    loom::model(|| notify_waiters_poll_consistency_variant([true, true]));
+}
+
 #[test]
 fn notify_waiters_and_one() {
     loom::model(|| {
