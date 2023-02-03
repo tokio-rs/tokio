@@ -164,6 +164,7 @@ pub struct MutexGuard<'a, T: ?Sized> {
 /// point `lock` will succeed yet again.
 ///
 /// [`Arc`]: std::sync::Arc
+#[clippy::has_significant_drop]
 pub struct OwnedMutexGuard<T: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
@@ -175,6 +176,7 @@ pub struct OwnedMutexGuard<T: ?Sized> {
 /// This can be used to hold a subfield of the protected data.
 ///
 /// [`MutexGuard::map`]: method@MutexGuard::map
+#[clippy::has_significant_drop]
 #[must_use = "if unused the Mutex will immediately unlock"]
 pub struct MappedMutexGuard<'a, T: ?Sized> {
     s: &'a semaphore::Semaphore,

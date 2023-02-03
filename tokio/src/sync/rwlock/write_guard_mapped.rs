@@ -13,6 +13,7 @@ use std::ops;
 ///
 /// [mapping]: method@crate::sync::RwLockWriteGuard::map
 /// [`RwLockWriteGuard`]: struct@crate::sync::RwLockWriteGuard
+#[clippy::has_significant_drop]
 pub struct RwLockMappedWriteGuard<'a, T: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) resource_span: tracing::Span,
