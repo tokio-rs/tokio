@@ -4,6 +4,9 @@ use loom::future::block_on;
 use loom::sync::Arc;
 use loom::thread;
 
+/// `util::wake_list::NUM_WAKERS`
+const WAKE_LIST_SIZE: usize = 32;
+
 #[test]
 fn notify_one() {
     loom::model(|| {
@@ -78,6 +81,37 @@ fn notify_waiters_poll_consistency() {
     loom::model(|| notify_waiters_poll_consistency_variant([true, false]));
     loom::model(|| notify_waiters_poll_consistency_variant([false, true]));
     loom::model(|| notify_waiters_poll_consistency_variant([true, true]));
+}
+
+#[test]
+fn notify_waiters_poll_consistency_wake_up_batches() {
+    use tokio_test::assert_pending;
+    loom::model(|| {
+        let notify = Arc::new(Notify::new());
+
+        let mut futs = (0..WAKE_LIST_SIZE + 1)
+            .map(|_| tokio_test::task::spawn(notify.notified()))
+            .collect::<Vec<_>>();
+
+        assert_pending!(futs[1].poll());
+        for i in 2..33 {
+            assert_pending!(futs[i].poll());
+        }
+        assert_pending!(futs[0].poll());
+
+        let tx = notify.clone();
+        let th = thread::spawn(move || {
+            tx.notify_waiters();
+        });
+
+        let res1 = futs[0].poll();
+        let res2 = futs[1].poll();
+
+        // If res1 is ready, then res2 must also be ready.
+        assert!(res1.is_pending() || res2.is_ready());
+
+        th.join().unwrap();
+    });
 }
 
 #[test]
@@ -199,7 +233,6 @@ fn notify_waiters_sequential() {
 
                     // Create additional waiters to force `notify_waiters` to
                     // release the lock at least once.
-                    const WAKE_LIST_SIZE: usize = 32;
                     let _task_pile = (0..WAKE_LIST_SIZE + 1)
                         .map(|_| {
                             let mut fut = tokio_test::task::spawn(notify.notified());
