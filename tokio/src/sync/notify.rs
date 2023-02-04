@@ -877,16 +877,33 @@ impl Notified<'_> {
                     // `notify.waiters`). In order to access the waker fields,
                     // we must hold the lock.
 
-                    let waiters = notify.waiters.lock();
+                    let mut waiters = notify.waiters.lock();
+
+                    // Load the state with the lock held.
+                    let curr = notify.state.load(SeqCst);
 
                     // Safety: called while locked
                     let w = unsafe { &mut *waiter.get() };
 
                     if w.notification.is_some() {
                         // Our waker has been notified and our waiter is already removed from
-                        // the list. Reset the fields and convert to `Done`.
-                        w.waker = None;
+                        // the list. Reset the notification and convert to `Done`.
                         w.notification = None;
+                        *state = Done;
+                    } else if get_num_notify_waiters_calls(curr) != w.notify_waiters_calls {
+                        // There is a call to `notify_waiters` in progress. Since we already
+                        // have the lock, remove our entry from the waiter list.
+
+                        w.waker.take();
+
+                        // `waiters.remove` safety: the waiter is only added to `waiters` by
+                        // virtue of it being the only `LinkedList` available to the type.
+                        unsafe { waiters.remove(NonNull::new_unchecked(w)) };
+
+                        // `store` is sufficient if we hold the lock and transition from `WAITING`.
+                        if waiters.is_empty() && get_state(curr) == WAITING {
+                            notify.state.store(set_state(curr, EMPTY), SeqCst);
+                        }
 
                         *state = Done;
                     } else {
