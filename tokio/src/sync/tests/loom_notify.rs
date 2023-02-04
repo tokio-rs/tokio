@@ -94,7 +94,7 @@ fn notify_waiters_poll_consistency_wake_up_batches() {
             .collect::<Vec<_>>();
 
         assert_pending!(futs[1].poll());
-        for i in 2..33 {
+        for i in 2..futs.len() {
             assert_pending!(futs[i].poll());
         }
         assert_pending!(futs[0].poll());
