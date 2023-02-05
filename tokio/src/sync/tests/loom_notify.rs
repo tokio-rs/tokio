@@ -83,35 +83,40 @@ fn notify_waiters_poll_consistency() {
     loom::model(|| notify_waiters_poll_consistency_variant([true, true]));
 }
 
+fn notify_waiters_poll_consistency_wake_up_batches_variant(order: [usize; 2]) {
+    use tokio_test::assert_pending;
+
+    let notify = Arc::new(Notify::new());
+
+    let mut futs = (0..WAKE_LIST_SIZE + 1)
+        .map(|_| tokio_test::task::spawn(notify.notified()))
+        .collect::<Vec<_>>();
+
+    assert_pending!(futs[order[0]].poll());
+    for i in 2..futs.len() {
+        assert_pending!(futs[i].poll());
+    }
+    assert_pending!(futs[order[1]].poll());
+
+    let tx = notify.clone();
+    let th = thread::spawn(move || {
+        tx.notify_waiters();
+    });
+
+    let res1 = futs[0].poll();
+    let res2 = futs[1].poll();
+
+    // If res1 is ready, then res2 must also be ready.
+    assert!(res1.is_pending() || res2.is_ready());
+
+    th.join().unwrap();
+}
+
 #[test]
 fn notify_waiters_poll_consistency_wake_up_batches() {
-    use tokio_test::assert_pending;
-    loom::model(|| {
-        let notify = Arc::new(Notify::new());
-
-        let mut futs = (0..WAKE_LIST_SIZE + 1)
-            .map(|_| tokio_test::task::spawn(notify.notified()))
-            .collect::<Vec<_>>();
-
-        assert_pending!(futs[1].poll());
-        for i in 2..futs.len() {
-            assert_pending!(futs[i].poll());
-        }
-        assert_pending!(futs[0].poll());
-
-        let tx = notify.clone();
-        let th = thread::spawn(move || {
-            tx.notify_waiters();
-        });
-
-        let res1 = futs[0].poll();
-        let res2 = futs[1].poll();
-
-        // If res1 is ready, then res2 must also be ready.
-        assert!(res1.is_pending() || res2.is_ready());
-
-        th.join().unwrap();
-    });
+    // We test polling two futures in different batches in various orders.
+    loom::model(|| notify_waiters_poll_consistency_wake_up_batches_variant([0, 1]));
+    loom::model(|| notify_waiters_poll_consistency_wake_up_batches_variant([1, 0]));
 }
 
 #[test]
