@@ -29,30 +29,30 @@ cfg_not_test_util! {
 
 cfg_test_util! {
     use crate::time::{Duration, Instant};
-    use crate::loom::sync::{Arc, Mutex};
+    use crate::loom::sync::Mutex;
 
     cfg_rt! {
-        fn clock() -> Option<Clock> {
+        fn with_clock<R>(f: impl FnOnce(Option<&Clock>) -> R) -> R {
             use crate::runtime::Handle;
 
             match Handle::try_current() {
-                Ok(handle) => Some(handle.inner.driver().clock().clone()),
-                Err(ref e) if e.is_missing_context() => None,
+                Ok(handle) => f(Some(handle.inner.driver().clock())),
+                Err(ref e) if e.is_missing_context() => f(None),
                 Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
             }
         }
     }
 
     cfg_not_rt! {
-        fn clock() -> Option<Clock> {
-            None
+        fn with_clock<R>(f: impl FnOnce(Option<&Clock>) -> R) -> R {
+            f(None)
         }
     }
 
     /// A handle to a source of time.
-    #[derive(Debug, Clone)]
+    #[derive(Debug)]
     pub(crate) struct Clock {
-        inner: Arc<Mutex<Inner>>,
+        inner: Mutex<Inner>,
     }
 
     #[derive(Debug)]
@@ -107,8 +107,10 @@ cfg_test_util! {
     /// [`advance`]: crate::time::advance
     #[track_caller]
     pub fn pause() {
-        let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
-        clock.pause();
+        with_clock(|maybe_clock| {
+            let clock = maybe_clock.expect("time cannot be frozen from outside the Tokio runtime");
+            clock.pause();
+        })
     }
 
     /// Resumes time.
@@ -122,14 +124,16 @@ cfg_test_util! {
     /// runtime.
     #[track_caller]
     pub fn resume() {
-        let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
-        let mut inner = clock.inner.lock();
+        with_clock(|maybe_clock| {
+            let clock = maybe_clock.expect("time cannot be frozen from outside the Tokio runtime");
+            let mut inner = clock.inner.lock();
 
-        if inner.unfrozen.is_some() {
-            panic!("time is not frozen");
-        }
+            if inner.unfrozen.is_some() {
+                panic!("time is not frozen");
+            }
 
-        inner.unfrozen = Some(std::time::Instant::now());
+            inner.unfrozen = Some(std::time::Instant::now());
+        })
     }
 
     /// Advances time.
@@ -164,19 +168,23 @@ cfg_test_util! {
     ///
     /// [`sleep`]: fn@crate::time::sleep
     pub async fn advance(duration: Duration) {
-        let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
-        clock.advance(duration);
+        with_clock(|maybe_clock| {
+            let clock = maybe_clock.expect("time cannot be frozen from outside the Tokio runtime");
+            clock.advance(duration);
+        });
 
         crate::task::yield_now().await;
     }
 
     /// Returns the current instant, factoring in frozen time.
     pub(crate) fn now() -> Instant {
-        if let Some(clock) = clock() {
-            clock.now()
-        } else {
-            Instant::from_std(std::time::Instant::now())
-        }
+        with_clock(|maybe_clock| {
+            if let Some(clock) = maybe_clock {
+                clock.now()
+            } else {
+                Instant::from_std(std::time::Instant::now())
+            }
+        })
     }
 
     impl Clock {
@@ -186,12 +194,12 @@ cfg_test_util! {
             let now = std::time::Instant::now();
 
             let clock = Clock {
-                inner: Arc::new(Mutex::new(Inner {
+                inner: Mutex::new(Inner {
                     enable_pausing,
                     base: now,
                     unfrozen: Some(now),
                     auto_advance_inhibit_count: 0,
-                })),
+                }),
             };
 
             if start_paused {
