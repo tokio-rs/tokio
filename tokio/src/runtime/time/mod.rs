@@ -231,7 +231,9 @@ impl Driver {
                 // advance the clock.
                 if !handle.did_wake() {
                     // Simulate advancing time
-                    clock.advance(duration);
+                    if let Err(msg) = clock.advance(duration) {
+                        panic!("{}", msg);
+                    }
                 }
             } else {
                 self.park.park_timeout(rt_handle, duration);
