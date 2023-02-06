@@ -49,7 +49,7 @@ async fn watch_stream_new_on_change() {
 
     let task = tokio::spawn(async move {
         let value = stream.next().await.unwrap();
-        if (value != "bye") {
+        if value != "bye" {
             panic!("received unexpected value: {:?}", value);
         }
     });
