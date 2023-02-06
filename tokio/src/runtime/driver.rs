@@ -289,7 +289,7 @@ cfg_time! {
         clock: &Clock,
     ) -> (TimeDriver, TimeHandle) {
         if enable {
-            let (driver, handle) = crate::runtime::time::Driver::new(io_stack, &clock);
+            let (driver, handle) = crate::runtime::time::Driver::new(io_stack, clock);
 
             (TimeDriver::Enabled { driver }, Some(handle))
         } else {
