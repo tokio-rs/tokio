@@ -261,10 +261,11 @@ impl Sleep {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
+            let clock = handle.driver().clock();
             let handle = &handle.driver().time();
             let time_source = handle.time_source();
             let deadline_tick = time_source.deadline_to_tick(deadline);
-            let duration = deadline_tick.saturating_sub(time_source.now());
+            let duration = deadline_tick.saturating_sub(time_source.now(clock));
 
             let location = location.expect("should have location if tracing");
             let resource_span = tracing::trace_span!(
@@ -370,8 +371,9 @@ impl Sleep {
                 tracing::trace_span!("runtime.resource.async_op.poll");
 
             let duration = {
+                let clock = me.entry.clock();
                 let time_source = me.entry.driver().time_source();
-                let now = time_source.now();
+                let now = time_source.now(clock);
                 let deadline_tick = time_source.deadline_to_tick(deadline);
                 deadline_tick.saturating_sub(now)
             };

@@ -579,6 +579,12 @@ impl TimerEntry {
     pub(crate) fn driver(&self) -> &super::Handle {
         self.driver.driver().time()
     }
+
+    cfg_unstable! {
+        pub(crate) fn clock(&self) -> &super::Clock {
+            self.driver.driver().clock()
+        }
+    }
 }
 
 impl TimerHandle {
