@@ -234,16 +234,24 @@ jobs:
   semver:
     name: semver
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crate:
+          - tokio
+          - tokio-macros
+          - tokio-test
+          - tokio-stream
+          - tokio-util
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
-      - name: Install cargo-semver-checks
-        run: cargo install cargo-semver-checks --locked
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo semver-checks check-release
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v1
+        with:
+          crate-name: ${{ matrix.crate }}
 
   cross-check:
     name: cross-check
