@@ -5,15 +5,13 @@ use std::convert::TryInto;
 /// A structure which handles conversion from Instants to u64 timestamps.
 #[derive(Debug)]
 pub(crate) struct TimeSource {
-    pub(crate) clock: Clock,
     start_time: Instant,
 }
 
 impl TimeSource {
-    pub(crate) fn new(clock: Clock) -> Self {
+    pub(crate) fn new(clock: &Clock) -> Self {
         Self {
             start_time: clock.now(),
-            clock,
         }
     }
 
@@ -36,7 +34,7 @@ impl TimeSource {
         Duration::from_millis(t)
     }
 
-    pub(crate) fn now(&self) -> u64 {
-        self.instant_to_tick(self.clock.now())
+    pub(crate) fn now(&self, clock: &Clock) -> u64 {
+        self.instant_to_tick(clock.now())
     }
 }

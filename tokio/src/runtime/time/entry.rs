@@ -579,6 +579,11 @@ impl TimerEntry {
     pub(crate) fn driver(&self) -> &super::Handle {
         self.driver.driver().time()
     }
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(crate) fn clock(&self) -> &super::Clock {
+        self.driver.driver().clock()
+    }
 }
 
 impl TimerHandle {
