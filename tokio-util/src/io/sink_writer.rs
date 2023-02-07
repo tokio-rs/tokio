@@ -1,3 +1,4 @@
+use futures_core::ready;
 use futures_sink::Sink;
 
 use pin_project_lite::pin_project;
@@ -98,20 +99,12 @@ where
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
         let mut this = self.project();
-        match this.inner.as_mut().poll_ready(cx) {
-            Poll::Ready(Ok(())) => {
-                if let Err(e) = this.inner.as_mut().start_send(buf) {
-                    Poll::Ready(Err(e.into()))
-                } else {
-                    Poll::Ready(Ok(buf.len()))
-                }
-            }
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e.into())),
-            Poll::Pending => {
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        }
+
+        ready!(this.inner.as_mut().poll_ready(cx).map_err(Into::into))?;
+        Poll::Ready(match this.inner.as_mut().start_send(buf) {
+            Ok(()) => Ok(buf.len()),
+            Err(e) => Err(e.into()),
+        })
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
