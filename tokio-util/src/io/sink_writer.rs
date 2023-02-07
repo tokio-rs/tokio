@@ -101,10 +101,10 @@ where
         let mut this = self.project();
 
         ready!(this.inner.as_mut().poll_ready(cx).map_err(Into::into))?;
-        Poll::Ready(match this.inner.as_mut().start_send(buf) {
-            Ok(()) => Ok(buf.len()),
-            Err(e) => Err(e.into()),
-        })
+        match this.inner.as_mut().start_send(buf) {
+            Ok(()) => Poll::Ready(Ok(buf.len())),
+            Err(e) => Poll::Ready(Err(e.into())),
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
