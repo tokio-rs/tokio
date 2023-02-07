@@ -59,7 +59,7 @@ use std::task::{self, Poll};
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_until"))]
 #[track_caller]
-pub fn sleep_until(deadline: Instant) -> Sleep {
+pub fn sleep_until(deadline: Instant, val: u32) -> Sleep {
     return Sleep::new_timeout(deadline, trace::caller_location());
 }
 
