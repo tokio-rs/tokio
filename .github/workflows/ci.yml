@@ -42,6 +42,7 @@ jobs:
       - test-unstable
       - miri
       - asan
+      - semver
       - cross-check
       - cross-test
       - no-atomic-u64
@@ -229,6 +230,28 @@ jobs:
           RUSTFLAGS: -Z sanitizer=address
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
           TRYBUILD: overwrite
+
+  semver:
+    name: semver
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.rust_stable }}
+      - name: Install cargo-semver-checks
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks
+      - name: Check semver compatibility
+        run: |
+          cargo semver-checks check-release \
+              --exclude benches \
+              --exclude examples \
+              --exclude stress-test \
+              --exclude tests-build \
+              --exclude tests-integration
 
   cross-check:
     name: cross-check
