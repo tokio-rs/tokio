@@ -241,7 +241,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_stable }}
       - name: Install cargo-semver-checks
-        run: cargo install cargo-semver-checks --locked
+        uses: taiki-e/install-action@cargo-semver-checks
       - name: Check semver compatibility
         run: |
           cargo semver-checks check-release \
