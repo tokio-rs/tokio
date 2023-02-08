@@ -42,7 +42,6 @@ jobs:
       - test-unstable
       - miri
       - asan
-      - semver
       - cross-check
       - cross-test
       - no-atomic-u64
