@@ -235,7 +235,6 @@ pin_project! {
 cfg_trace! {
     #[derive(Debug)]
     struct Inner {
-        deadline: Instant,
         ctx: trace::AsyncOpTracingCtx,
     }
 }
@@ -243,7 +242,6 @@ cfg_trace! {
 cfg_not_trace! {
     #[derive(Debug)]
     struct Inner {
-        deadline: Instant,
     }
 }
 
@@ -297,11 +295,11 @@ impl Sleep {
                 resource_span,
             };
 
-            Inner { deadline, ctx }
+            Inner { ctx }
         };
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = Inner { deadline };
+        let inner = Inner {};
 
         Sleep { inner, entry }
     }
@@ -312,7 +310,7 @@ impl Sleep {
 
     /// Returns the instant at which the future will complete.
     pub fn deadline(&self) -> Instant {
-        self.inner.deadline
+        self.entry.deadline()
     }
 
     /// Returns `true` if `Sleep` has elapsed.
@@ -358,7 +356,6 @@ impl Sleep {
     fn reset_inner(self: Pin<&mut Self>, deadline: Instant) {
         let mut me = self.project();
         me.entry.as_mut().reset(deadline);
-        (me.inner).deadline = deadline;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
