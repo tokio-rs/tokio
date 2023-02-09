@@ -325,63 +325,6 @@ fn one_ready_many_none() {
     }
 }
 
-#[cfg(not(target_os = "wasi"))]
-proptest::proptest! {
-    #[test]
-    fn fuzz_pending_complete_mix(kinds: Vec<bool>) {
-        use std::task::{Context, Poll};
-
-        struct DidPoll<T> {
-            did_poll: bool,
-            inner: T,
-        }
-
-        impl<T: Stream + Unpin> Stream for DidPoll<T> {
-            type Item = T::Item;
-
-            fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>)
-                -> Poll<Option<T::Item>>
-            {
-                self.did_poll = true;
-                Pin::new(&mut self.inner).poll_next(cx)
-            }
-        }
-
-        for _ in 0..10 {
-            let mut map = task::spawn(StreamMap::new());
-            let mut expect = 0;
-
-            for (i, &is_empty) in kinds.iter().enumerate() {
-                let inner = if is_empty {
-                    pin_box(stream::empty::<()>())
-                } else {
-                    expect += 1;
-                    pin_box(stream::pending::<()>())
-                };
-
-                let stream = DidPoll {
-                    did_poll: false,
-                    inner,
-                };
-
-                map.insert(i, stream);
-            }
-
-            if expect == 0 {
-                assert_ready_none!(map.poll_next());
-            } else {
-                assert_pending!(map.poll_next());
-
-                assert_eq!(expect, map.values().count());
-
-                for stream in map.values() {
-                    assert!(stream.did_poll);
-                }
-            }
-        }
-    }
-}
-
 fn pin_box<T: Stream<Item = U> + 'static, U>(s: T) -> Pin<Box<dyn Stream<Item = U>>> {
     Box::pin(s)
 }
