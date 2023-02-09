@@ -14,6 +14,7 @@ use std::sync::Arc;
 ///
 /// [`read_owned`]: method@crate::sync::RwLock::read_owned
 /// [`RwLock`]: struct@crate::sync::RwLock
+#[clippy::has_significant_drop]
 pub struct OwnedRwLockReadGuard<T: ?Sized, U: ?Sized = T> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) resource_span: tracing::Span,
