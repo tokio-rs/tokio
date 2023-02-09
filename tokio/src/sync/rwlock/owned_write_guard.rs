@@ -15,6 +15,7 @@ use std::sync::Arc;
 ///
 /// [`write_owned`]: method@crate::sync::RwLock::write_owned
 /// [`RwLock`]: struct@crate::sync::RwLock
+#[clippy::has_significant_drop]
 pub struct OwnedRwLockWriteGuard<T: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) resource_span: tracing::Span,
