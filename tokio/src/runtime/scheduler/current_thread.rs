@@ -290,7 +290,10 @@ impl Context {
     fn park(&self, mut core: Box<Core>, handle: &Handle) -> Box<Core> {
         let mut driver = core.driver.take().expect("driver missing");
 
-        let before = handle.shared.woken.load(std::sync::atomic::Ordering::Relaxed);
+        let before = handle
+            .shared
+            .woken
+            .load(std::sync::atomic::Ordering::Relaxed);
         if let Some(f) = &handle.shared.config.before_park {
             // Incorrect lint, the closures are actually different types so `f`
             // cannot be passed as an argument to `enter`.
@@ -299,9 +302,15 @@ impl Context {
             core = c;
         }
 
-        // This check will succeed and we will park if `before_park` didn't spawn any task and
-        // didn't add to an empty set of awoken tasks.
-        if core.tasks.is_empty() && (before || ! handle.shared.woken.load(std::sync::atomic::Ordering::Relaxed)) {
+        // This check will succeed and we will park if `before_park` didn't spawn any
+        // task and didn't add to an empty set of awoken tasks.
+        if core.tasks.is_empty()
+            && (before
+                || !handle
+                    .shared
+                    .woken
+                    .load(std::sync::atomic::Ordering::Relaxed))
+        {
             // Park until the thread is signaled
             core.metrics.about_to_park();
             core.metrics.submit(&handle.shared.worker_metrics);
