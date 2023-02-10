@@ -1,3 +1,10 @@
+# 0.7.6 (February 10, 2023)
+
+This release fixes a compilation failure in 0.7.5 when it is used together with
+Tokio version 1.21 and unstable features are enabled. ([#5445])
+
+[#5445]: https://github.com/tokio-rs/tokio/pull/5445
+
 # 0.7.5 (February 9, 2023)
 
 This release fixes an accidental breaking change where `UnwindSafe` was
