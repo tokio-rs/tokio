@@ -298,9 +298,11 @@ pub(crate) struct TimerEntry {
     /// This is manipulated only under the inner mutex. TODO: Can we use loom
     /// cells for this?
     inner: StdUnsafeCell<TimerShared>,
-    /// Initial deadline for the timer. This is used to register on the first
+    /// Deadline for the timer. This is used to register on the first
     /// poll, as we can't register prior to being pinned.
-    initial_deadline: Option<Instant>,
+    deadline: Instant,
+    /// Whether the deadline has been registered.
+    registered: bool,
     /// Ensure the type is !Unpin
     _m: std::marker::PhantomPinned,
 }
@@ -504,7 +506,8 @@ impl TimerEntry {
         Self {
             driver,
             inner: StdUnsafeCell::new(TimerShared::new()),
-            initial_deadline: Some(deadline),
+            deadline,
+            registered: false,
             _m: std::marker::PhantomPinned,
         }
     }
@@ -513,8 +516,12 @@ impl TimerEntry {
         unsafe { &*self.inner.get() }
     }
 
+    pub(crate) fn deadline(&self) -> Instant {
+        self.deadline
+    }
+
     pub(crate) fn is_elapsed(&self) -> bool {
-        !self.inner().state.might_be_registered() && self.initial_deadline.is_none()
+        !self.inner().state.might_be_registered() && self.registered
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
@@ -545,7 +552,8 @@ impl TimerEntry {
     }
 
     pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant) {
-        unsafe { self.as_mut().get_unchecked_mut() }.initial_deadline = None;
+        unsafe { self.as_mut().get_unchecked_mut() }.deadline = new_time;
+        unsafe { self.as_mut().get_unchecked_mut() }.registered = true;
 
         let tick = self.driver().time_source().deadline_to_tick(new_time);
 
@@ -567,7 +575,8 @@ impl TimerEntry {
             panic!("{}", crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR);
         }
 
-        if let Some(deadline) = self.initial_deadline {
+        if !self.registered {
+            let deadline = self.deadline;
             self.as_mut().reset(deadline);
         }
 
@@ -578,6 +587,11 @@ impl TimerEntry {
 
     pub(crate) fn driver(&self) -> &super::Handle {
         self.driver.driver().time()
+    }
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(crate) fn clock(&self) -> &super::Clock {
+        self.driver.driver().clock()
     }
 }
 

@@ -4,7 +4,7 @@ name = "tokio-util"
 # - Remove path dependencies
 # - Update CHANGELOG.md.
 # - Create "tokio-util-0.7.x" git tag.
-version = "0.7.4"
+version = "0.7.6"
 edition = "2018"
 rust-version = "1.49"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -34,7 +34,7 @@ rt = ["tokio/rt", "tokio/sync", "futures-util", "hashbrown"]
 __docs_rs = ["futures-util"]
 
 [dependencies]
-tokio = { version = "1.21.0", path = "../tokio", features = ["sync"] }
+tokio = { version = "1.22.0", path = "../tokio", features = ["sync"] }
 bytes = "1.0.0"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
