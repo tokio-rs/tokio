@@ -7,7 +7,7 @@ use std::task::Context;
 use tokio::sync::watch;
 use tokio_stream::wrappers::WatchStream;
 use tokio_stream::{Stream, StreamExt};
-use tokio_test::{assert_pending};
+use tokio_test::assert_pending;
 
 #[tokio::test]
 async fn watch_stream_message_not_twice() {
