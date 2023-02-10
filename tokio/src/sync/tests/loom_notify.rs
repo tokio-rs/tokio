@@ -4,6 +4,8 @@ use loom::future::block_on;
 use loom::sync::Arc;
 use loom::thread;
 
+use tokio_test::{assert_pending, assert_ready};
+
 /// `util::wake_list::NUM_WAKERS`
 const WAKE_LIST_SIZE: usize = 32;
 
@@ -46,8 +48,6 @@ fn notify_waiters() {
 }
 
 fn notify_waiters_poll_consistency_variant(poll_setting: [bool; 2]) {
-    use tokio_test::assert_pending;
-
     let notify = Arc::new(Notify::new());
     let mut notified = [
         tokio_test::task::spawn(notify.notified()),
@@ -84,8 +84,6 @@ fn notify_waiters_poll_consistency() {
 }
 
 fn notify_waiters_poll_consistency_wake_up_batches_variant(order: [usize; 2]) {
-    use tokio_test::assert_pending;
-
     let notify = Arc::new(Notify::new());
 
     let mut futs = (0..WAKE_LIST_SIZE + 1)
@@ -117,6 +115,40 @@ fn notify_waiters_poll_consistency_wake_up_batches() {
     // We test polling two futures in different batches in various orders.
     loom::model(|| notify_waiters_poll_consistency_wake_up_batches_variant([0, 1]));
     loom::model(|| notify_waiters_poll_consistency_wake_up_batches_variant([1, 0]));
+}
+
+fn notify_waiters_is_atomic_variant(wait_for_index: usize) {
+    let notify = Arc::new(Notify::new());
+
+    let mut futs = (0..WAKE_LIST_SIZE + 1)
+        .map(|_| tokio_test::task::spawn(notify.notified()))
+        .collect::<Vec<_>>();
+
+    for fut in &mut futs {
+        assert_pending!(fut.poll());
+    }
+
+    let tx = notify.clone();
+    let th = thread::spawn(move || {
+        tx.notify_waiters();
+    });
+
+    block_on(async {
+        futs.remove(wait_for_index).await;
+        let mut new_fut = tokio_test::task::spawn(notify.notified());
+        assert_pending!(new_fut.poll());
+        notify.notify_one();
+        assert_ready!(new_fut.poll());
+    });
+
+    th.join().unwrap();
+}
+
+#[test]
+fn notify_waiters_is_atomic() {
+    // We test polling two futures in different batches in various orders.
+    loom::model(|| notify_waiters_is_atomic_variant(0));
+    loom::model(|| notify_waiters_is_atomic_variant(32));
 }
 
 #[test]
@@ -219,7 +251,6 @@ fn notify_drop() {
 #[test]
 fn notify_waiters_sequential() {
     use crate::sync::oneshot;
-    use tokio_test::assert_pending;
 
     loom::model(|| {
         let notify = Arc::new(Notify::new());
