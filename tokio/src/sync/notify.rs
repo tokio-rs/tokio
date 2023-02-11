@@ -552,11 +552,9 @@ impl Notify {
 
         let mut wakers = WakeList::new();
         'outer: loop {
-            // Safety: we hold the `waiters` lock.
-            let waiters_list_ref = unsafe { &mut *waiters_to_notify.get() };
-
             while wakers.can_push() {
-                match waiters_list_ref.pop_back() {
+                // Safety: we hold the `waiters` lock.
+                match unsafe { &mut *waiters_to_notify.get() }.pop_back() {
                     Some(mut waiter) => {
                         // Safety: we hold the `waiters` lock, which is required to access
                         // `waiters_to_notify` list.
@@ -577,11 +575,8 @@ impl Notify {
                 }
             }
 
-            // Drop all refs to the list inside `waiters_to_notify` cell before
-            // releasing the mutex.
-            drop(waiters_list_ref);
-
-            // Release the lock before notifying.
+            // Release the lock before notifying. All refs to the list inside
+            // `waiters_to_notify` cell are already dropped.
             drop(waiters);
 
             wakers.wake_all();
@@ -907,13 +902,16 @@ impl Notified<'_> {
                         // There is a call to `notify_waiters` in progress. Since we already
                         // have the lock, remove our entry from the waiter list.
 
-                        // Safety: we hold the `waiters` lock.
-                        let notify_waiters_list =
-                            unsafe { w.notify_waiters_queue.take().unwrap().as_mut() };
+                        let mut notify_waiters_list = w.notify_waiters_queue.take().unwrap();
 
-                        // safety: the waiter *MUST* be stored in the `notify_waiters_list`
+                        // as_mut safety: we hold the `waiters` lock.
+                        // remove safety: the waiter *MUST* be stored in the `notify_waiters_list`
                         // because it had a pointer to it.
-                        unsafe { notify_waiters_list.remove(NonNull::new_unchecked(w)) };
+                        unsafe {
+                            notify_waiters_list
+                                .as_mut()
+                                .remove(NonNull::new_unchecked(w))
+                        };
 
                         *state = Done;
                     } else {
