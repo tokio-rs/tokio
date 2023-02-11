@@ -246,15 +246,7 @@ impl<L: Link> Default for LinkedList<L, L::Target> {
 
 // ===== impl DrainFilter =====
 
-feature! {
-    #![any(
-        feature = "net",
-        feature = "process",
-        feature = "sync",
-        feature = "rt",
-        feature = "signal",
-    )]
-
+cfg_io_readiness! {
     pub(crate) struct DrainFilter<'a, T: Link, F> {
         list: &'a mut LinkedList<T, T::Target>,
         filter: F,
@@ -294,6 +286,55 @@ feature! {
             }
 
             None
+        }
+    }
+}
+
+// ===== impl Iter =====
+
+feature! {
+    #![any(
+        feature = "process",
+        feature = "sync",
+        feature = "rt",
+        feature = "signal",
+    )]
+
+    pub(crate) struct Iter<'a, T: Link> {
+        curr: Option<NonNull<T::Target>>,
+        _list: &'a LinkedList<T, T::Target>,
+    }
+
+    impl<T: Link> LinkedList<T, T::Target> {
+        fn iter(&self) -> Iter<'_, T> {
+            let curr = self.head;
+            Iter {
+                curr,
+                _list: self,
+            }
+        }
+    }
+
+    impl<'a, T: Link> IntoIterator for &'a LinkedList<T, T::Target> {
+        type Item = NonNull<T::Target>;
+        type IntoIter = Iter<'a, T>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.iter()
+        }
+    }
+
+    impl<'a, T: Link> Iterator for Iter<'a, T> {
+        type Item = NonNull<T::Target>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if let Some(curr) = self.curr {
+                // safety: the pointer references data contained by the list
+                self.curr = unsafe { T::pointers(curr).as_ref() }.get_next();
+                Some(curr)
+            } else {
+                None
+            }
         }
     }
 }
