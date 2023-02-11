@@ -526,57 +526,73 @@ impl Notify {
             return;
         }
 
-        // Move all waiters to a list owned by this function call to ensure atomicity.
-        // This list will still be protected by the `waiters` lock.
-        let waiters_to_notify = UnsafeCell::new(std::mem::take(&mut *waiters));
-        pin!(waiters_to_notify);
-
-        // Inform every waiter that the list it is stored in has been moved by storing
-        // a raw pointer to the list. The list is pinned to the stack of this function
-        // call, so a pointer will remain valid.
-        //
-        // Safety: we hold the `waiters` lock.
-        for mut waiter in unsafe { &*waiters_to_notify.get() } {
-            // Safety: we hold the `waiters` lock.
-            let waiter = unsafe { waiter.as_mut() };
-
-            // Safety: address of `waiters_to_notify` is not null.
-            waiter.notify_waiters_queue =
-                unsafe { Some(NonNull::new_unchecked(waiters_to_notify.get())) };
-        }
-
         // Increment the number of times this method was called
         // and transition to empty.
         let new_state = set_state(inc_num_notify_waiters_calls(curr), EMPTY);
         self.state.store(new_state, SeqCst);
 
+        let decoupled_list: Option<UnsafeCell<WaitList>> = None;
+        pin!(decoupled_list);
+
         let mut wakers = WakeList::new();
         'outer: loop {
-            while wakers.can_push() {
-                // Safety: we hold the `waiters` lock.
-                match unsafe { &mut *waiters_to_notify.get() }.pop_back() {
-                    Some(mut waiter) => {
-                        // Safety: we hold the `waiters` lock, which is required to access
-                        // `waiters_to_notify` list.
-                        let waiter = unsafe { waiter.as_mut() };
+            {
+                let queue = if let Some(decoupled) = (*decoupled_list).as_ref() {
+                    // Safety: we hold the `waiters` lock, so we can
+                    // mutably borrow the decoupled queue.
+                    unsafe { &mut *decoupled.get() }
+                } else {
+                    &mut *waiters
+                };
 
-                        assert!(waiter.notification.is_none());
+                while wakers.can_push() {
+                    match queue.pop_back() {
+                        Some(mut waiter) => {
+                            // Safety: `waiters` lock is still held.
+                            let waiter = unsafe { waiter.as_mut() };
 
-                        waiter.notification = Some(NotificationType::AllWaiters);
-                        waiter.notify_waiters_queue = None;
+                            assert!(waiter.notification.is_none());
 
-                        if let Some(waker) = waiter.waker.take() {
-                            wakers.push(waker);
+                            waiter.notification = Some(NotificationType::AllWaiters);
+                            waiter.notify_waiters_queue = None;
+
+                            if let Some(waker) = waiter.waker.take() {
+                                wakers.push(waker);
+                            }
                         }
-                    }
-                    None => {
-                        break 'outer;
+                        None => {
+                            break 'outer;
+                        }
                     }
                 }
             }
 
-            // Release the lock before notifying. All refs to the list inside
-            // `waiters_to_notify` cell are already dropped.
+            // If there are more batches than one, decouple the list before releasing
+            // the lock to provide atomicity. Decoupled list will still be protected
+            // by the `waiters` lock.
+            if decoupled_list.is_none() {
+                // Store the list directly in the pinned stack variable.
+                *decoupled_list = Some(UnsafeCell::new(std::mem::take(&mut *waiters)));
+                let list_ref = (*decoupled_list).as_ref().unwrap();
+
+                // Inform every waiter that the list it is stored in has been moved by storing
+                // a raw pointer to the list. The list is pinned to the stack of this function
+                // call, so every pointer will remain valid.
+                //
+                // Safety: we hold the `waiters` lock, so we can borrow the decoupled queue
+                // and access its entries.
+                for mut waiter in unsafe { &*list_ref.get() } {
+                    let waiter = unsafe { waiter.as_mut() };
+
+                    // Safety: address of the `decoupled_list` is not null. The list is borrowed,
+                    // but the new raw pointer is not cast to a reference.
+                    waiter.notify_waiters_queue =
+                        unsafe { Some(NonNull::new_unchecked(list_ref.get())) };
+                }
+            }
+
+            // Release the lock before notifying.
+            // There are no longer any borrows of the list inside `decoupled_list` cell.
             drop(waiters);
 
             wakers.wake_all();
@@ -902,13 +918,16 @@ impl Notified<'_> {
                         // There is a call to `notify_waiters` in progress. Since we already
                         // have the lock, remove our entry from the waiter list.
 
-                        let mut notify_waiters_list = w.notify_waiters_queue.take().unwrap();
+                        w.waker.take();
 
-                        // as_mut safety: we hold the `waiters` lock.
-                        // remove safety: the waiter *MUST* be stored in the `notify_waiters_list`
+                        let mut decoupled_list_ptr = w.notify_waiters_queue.take().unwrap();
+
+                        // as_mut safety: we hold the `waiters` lock, so we can mutably
+                        // borrow the decoupled list.
+                        // remove safety: the waiter *MUST* be stored in the `decoupled_list`
                         // because it had a pointer to it.
                         unsafe {
-                            notify_waiters_list
+                            decoupled_list_ptr
                                 .as_mut()
                                 .remove(NonNull::new_unchecked(w))
                         };
@@ -968,13 +987,13 @@ impl Drop for Notified<'_> {
             // Safety: called while locked
             let w = unsafe { &mut *waiter.get() };
 
-            if let Some(mut notify_waiters_list_ptr) = w.notify_waiters_queue.take() {
+            if let Some(mut decoupled_list_ptr) = w.notify_waiters_queue.take() {
                 // We hold the `waiters` lock.
-                let notify_waiters_list = unsafe { notify_waiters_list_ptr.as_mut() };
+                let decoupled_list = unsafe { decoupled_list_ptr.as_mut() };
 
-                // safety: the waiter *MUST* be stored in the `notify_waiters_list`
+                // safety: the waiter *MUST* be stored in the `decoupled_list`
                 // because it had a pointer to it.
-                unsafe { notify_waiters_list.remove(NonNull::new_unchecked(w)) };
+                unsafe { decoupled_list.remove(NonNull::new_unchecked(w)) };
             } else {
                 let mut notify_state = notify.state.load(SeqCst);
 
