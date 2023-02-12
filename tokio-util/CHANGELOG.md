@@ -1,3 +1,10 @@
+# 0.7.7 (February 12, 2023)
+
+This release reverts the removal of the `Encoder` bound on the `FramedParts`
+constructor from [#5280] since it turned out to be a breaking change. ([#5450])
+
+[#5450]: https://github.com/tokio-rs/tokio/pull/5450
+
 # 0.7.6 (February 10, 2023)
 
 This release fixes a compilation failure in 0.7.5 when it is used together with
