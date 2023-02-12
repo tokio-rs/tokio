@@ -1,13 +1,10 @@
 #![cfg(feature = "sync")]
 
-use futures::task::noop_waker;
-use std::pin::Pin;
-use std::task::Context;
-
 use tokio::sync::watch;
 use tokio_stream::wrappers::WatchStream;
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::StreamExt;
 use tokio_test::assert_pending;
+use tokio_test::task::spawn;
 
 #[tokio::test]
 async fn watch_stream_message_not_twice() {
@@ -52,7 +49,7 @@ async fn watch_stream_new_on_change() {
 
     let mut stream = WatchStream::new_on_changed(rx);
 
-    assert_pending!(Pin::new(&mut stream).poll_next(&mut Context::from_waker(&noop_waker())));
+    assert_pending!(spawn(&mut stream).poll_next());
 
     tx.send("bye").unwrap();
 
