@@ -27,12 +27,13 @@ const CONST_MUTEX_NEW_PROBE: &str = r#"
 const TARGET_HAS_ATOMIC_PROBE: &str = r#"
 {
     #[cfg(target_has_atomic = "ptr")]
-    let _ = (); 
+    let _ = ();
 }
 "#;
 
 const TARGET_ATOMIC_U64_PROBE: &str = r#"
 {
+    #[allow(unused_imports)]
     use std::sync::atomic::AtomicU64 as _;
 }
 "#;

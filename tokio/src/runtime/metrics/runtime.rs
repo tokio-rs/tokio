@@ -210,10 +210,57 @@ impl RuntimeMetrics {
             .load(Relaxed)
     }
 
+    /// Returns the number of tasks the given worker thread stole from
+    /// another worker thread.
+    ///
+    /// This metric only applies to the **multi-threaded** runtime and will
+    /// always return `0` when using the current thread runtime.
+    ///
+    /// The worker steal count starts at zero when the runtime is created and
+    /// increases by `N` each time the worker has processed its scheduled queue
+    /// and successfully steals `N` more pending tasks from another worker.
+    ///
+    /// The counter is monotonically increasing. It is never decremented or
+    /// reset to zero.
+    ///
+    /// # Arguments
+    ///
+    /// `worker` is the index of the worker being queried. The given value must
+    /// be between 0 and `num_workers()`. The index uniquely identifies a single
+    /// worker and will continue to identify the worker throughout the lifetime
+    /// of the runtime instance.
+    ///
+    /// # Panics
+    ///
+    /// The method panics when `worker` represents an invalid worker, i.e. is
+    /// greater than or equal to `num_workers()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let metrics = Handle::current().metrics();
+    ///
+    ///     let n = metrics.worker_steal_count(0);
+    ///     println!("worker 0 has stolen {} tasks", n);
+    /// }
+    /// ```
+    pub fn worker_steal_count(&self, worker: usize) -> u64 {
+        self.handle
+            .inner
+            .worker_metrics(worker)
+            .steal_count
+            .load(Relaxed)
+    }
+
     /// Returns the number of times the given worker thread stole tasks from
     /// another worker thread.
     ///
-    /// This metric only applies to the **multi-threaded** runtime and will always return `0` when using the current thread runtime.
+    /// This metric only applies to the **multi-threaded** runtime and will
+    /// always return `0` when using the current thread runtime.
     ///
     /// The worker steal count starts at zero when the runtime is created and
     /// increases by one each time the worker has processed its scheduled queue
@@ -243,15 +290,15 @@ impl RuntimeMetrics {
     /// async fn main() {
     ///     let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.worker_noop_count(0);
+    ///     let n = metrics.worker_steal_operations(0);
     ///     println!("worker 0 has stolen tasks {} times", n);
     /// }
     /// ```
-    pub fn worker_steal_count(&self, worker: usize) -> u64 {
+    pub fn worker_steal_operations(&self, worker: usize) -> u64 {
         self.handle
             .inner
             .worker_metrics(worker)
-            .steal_count
+            .steal_operations
             .load(Relaxed)
     }
 
@@ -328,8 +375,8 @@ impl RuntimeMetrics {
     /// async fn main() {
     ///     let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.worker_poll_count(0);
-    ///     println!("worker 0 has polled {} tasks", n);
+    ///     let n = metrics.worker_total_busy_duration(0);
+    ///     println!("worker 0 was busy for a total of {:?}", n);
     /// }
     /// ```
     pub fn worker_total_busy_duration(&self, worker: usize) -> Duration {

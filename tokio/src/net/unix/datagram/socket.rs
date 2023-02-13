@@ -426,9 +426,16 @@ impl UnixDatagram {
     /// Creates new `UnixDatagram` from a `std::os::unix::net::UnixDatagram`.
     ///
     /// This function is intended to be used to wrap a UnixDatagram from the
-    /// standard library in the Tokio equivalent. The conversion assumes
-    /// nothing about the underlying datagram; it is left up to the user to set
-    /// it in non-blocking mode.
+    /// standard library in the Tokio equivalent.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socker is in
+    /// non-blocking mode. Otherwise all I/O operations on the socket
+    /// will block the thread, which will cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::os::unix::net::UnixDatagram::set_nonblocking
     ///
     /// # Panics
     ///
@@ -470,21 +477,19 @@ impl UnixDatagram {
     /// Turns a [`tokio::net::UnixDatagram`] into a [`std::os::unix::net::UnixDatagram`].
     ///
     /// The returned [`std::os::unix::net::UnixDatagram`] will have nonblocking
-    /// mode set as `true`.  Use [`set_nonblocking`] to change the blocking mode
+    /// mode set as `true`. Use [`set_nonblocking`] to change the blocking mode
     /// if needed.
     ///
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use std::error::Error;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let tokio_socket = tokio::net::UnixDatagram::bind("127.0.0.1:0")?;
-    ///     let std_socket = tokio_socket.into_std()?;
-    ///     std_socket.set_nonblocking(false)?;
-    ///     Ok(())
-    /// }
+    /// # use std::error::Error;
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// let tokio_socket = tokio::net::UnixDatagram::bind("/path/to/the/socket")?;
+    /// let std_socket = tokio_socket.into_std()?;
+    /// std_socket.set_nonblocking(false)?;
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// [`tokio::net::UnixDatagram`]: UnixDatagram

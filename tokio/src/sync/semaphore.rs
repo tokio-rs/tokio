@@ -89,6 +89,7 @@ pub struct Semaphore {
 ///
 /// [`acquire`]: crate::sync::Semaphore::acquire()
 #[must_use]
+#[clippy::has_significant_drop]
 #[derive(Debug)]
 pub struct SemaphorePermit<'a> {
     sem: &'a Semaphore,
@@ -101,6 +102,7 @@ pub struct SemaphorePermit<'a> {
 ///
 /// [`acquire_owned`]: crate::sync::Semaphore::acquire_owned()
 #[must_use]
+#[clippy::has_significant_drop]
 #[derive(Debug)]
 pub struct OwnedSemaphorePermit {
     sem: Arc<Semaphore>,
