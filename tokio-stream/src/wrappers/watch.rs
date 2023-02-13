@@ -53,13 +53,18 @@ use tokio::sync::watch::error::RecvError;
 /// ```
 /// # #[tokio::main]
 /// # async fn main() {
-/// use tokio_stream::{StreamExt, wrappers::WatchStream};
+/// use futures::task::Poll;
+/// use futures_test::task::noop_context;
+/// use std::pin::Pin;
 /// use tokio::sync::watch;
+/// use tokio_stream::{Stream, StreamExt, wrappers::WatchStream};
 ///
 /// let (tx, rx) = watch::channel("hello");
 /// let mut rx = WatchStream::new_on_changed(rx);
 ///
 /// // no output from rx is available at this point
+/// let from_poll = Pin::new(&mut rx).poll_next(&mut noop_context());
+/// assert_eq!(from_poll, Poll::Pending);
 ///
 /// tx.send("goodbye").unwrap();
 /// assert_eq!(rx.next().await, Some("goodbye"));
