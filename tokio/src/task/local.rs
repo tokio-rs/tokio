@@ -34,14 +34,14 @@ cfg_rt! {
     /// async fn main() {
     ///     // `Rc` does not implement `Send`, and thus may not be sent between
     ///     // threads safely.
-    ///     let unsend_data = Rc::new("my unsend data...");
+    ///     let unsent_data = Rc::new("my unsent data...");
     ///
-    ///     let unsend_data = unsend_data.clone();
-    ///     // Because the `async` block here moves `unsend_data`, the future is `!Send`.
+    ///     let unsent_data = unsent_data.clone();
+    ///     // Because the `async` block here moves `unsent_data`, the future is `!Send`.
     ///     // Since `tokio::spawn` requires the spawned future to implement `Send`, this
     ///     // will not compile.
     ///     tokio::spawn(async move {
-    ///         println!("{}", unsend_data);
+    ///         println!("{}", unsent_data);
     ///         // ...
     ///     }).await.unwrap();
     /// }
