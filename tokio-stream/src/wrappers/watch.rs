@@ -41,6 +41,26 @@ use tokio::sync::watch::error::RecvError;
 /// let (tx, rx) = watch::channel("hello");
 /// let mut rx = WatchStream::new(rx);
 ///
+/// // existing rx output with "hello" is ignored here
+///
+/// tx.send("goodbye").unwrap();
+/// assert_eq!(rx.next().await, Some("goodbye"));
+/// # }
+/// ```
+///
+/// Example with [`WatchStream<T>::new_on_changed`]:
+///
+/// ```
+/// # #[tokio::main]
+/// # async fn main() {
+/// use tokio_stream::{StreamExt, wrappers::WatchStream};
+/// use tokio::sync::watch;
+///
+/// let (tx, rx) = watch::channel("hello");
+/// let mut rx = WatchStream::new_on_changed(rx);
+///
+/// // no output from rx is available at this point
+///
 /// tx.send("goodbye").unwrap();
 /// assert_eq!(rx.next().await, Some("goodbye"));
 /// # }
