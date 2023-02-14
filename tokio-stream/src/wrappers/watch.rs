@@ -62,9 +62,9 @@ use tokio::sync::watch::error::RecvError;
 /// let (tx, rx) = watch::channel("hello");
 /// let mut rx = WatchStream::new_on_changed(rx);
 ///
-/// // no output from rx is available at this point
-/// let from_poll = Pin::new(&mut rx).poll_next(&mut noop_context());
-/// assert_eq!(from_poll, Poll::Pending);
+/// // no output from rx is available at this point - let's check:
+/// let first_poll = Pin::new(&mut rx).poll_next(&mut noop_context());
+/// assert_eq!(first_poll, Poll::Pending);
 ///
 /// tx.send("goodbye").unwrap();
 /// assert_eq!(rx.next().await, Some("goodbye"));
