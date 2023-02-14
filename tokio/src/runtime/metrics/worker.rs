@@ -17,8 +17,11 @@ pub(crate) struct WorkerMetrics {
     /// Number of times the worker woke then parked again without doing work.
     pub(crate) noop_count: AtomicU64,
 
-    /// Number of times the worker attempted to steal.
+    /// Number of tasks the worker stole.
     pub(crate) steal_count: AtomicU64,
+
+    /// Number of times the worker stole
+    pub(crate) steal_operations: AtomicU64,
 
     /// Number of tasks the worker polled.
     pub(crate) poll_count: AtomicU64,
@@ -43,6 +46,7 @@ impl WorkerMetrics {
             park_count: AtomicU64::new(0),
             noop_count: AtomicU64::new(0),
             steal_count: AtomicU64::new(0),
+            steal_operations: AtomicU64::new(0),
             poll_count: AtomicU64::new(0),
             overflow_count: AtomicU64::new(0),
             busy_duration_total: AtomicU64::new(0),

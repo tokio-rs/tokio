@@ -352,9 +352,9 @@ impl<T> fmt::Debug for Pointers<T> {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, fuzzing))]
 #[cfg(not(loom))]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     use std::pin::Pin;
@@ -623,31 +623,21 @@ mod tests {
         }
     }
 
-    #[cfg(not(tokio_wasm))]
-    proptest::proptest! {
-        #[test]
-        fn fuzz_linked_list(ops: Vec<usize>) {
-            run_fuzz(ops);
-        }
-    }
-
-    #[cfg(not(tokio_wasm))]
-    fn run_fuzz(ops: Vec<usize>) {
-        use std::collections::VecDeque;
-
-        #[derive(Debug)]
+    #[cfg(fuzzing)]
+    pub fn fuzz_linked_list(ops: &[u8]) {
         enum Op {
             Push,
             Pop,
             Remove(usize),
         }
+        use std::collections::VecDeque;
 
         let ops = ops
             .iter()
-            .map(|i| match i % 3 {
+            .map(|i| match i % 3u8 {
                 0 => Op::Push,
                 1 => Op::Pop,
-                2 => Op::Remove(i / 3),
+                2 => Op::Remove((i / 3u8) as usize),
                 _ => unreachable!(),
             })
             .collect::<Vec<_>>();

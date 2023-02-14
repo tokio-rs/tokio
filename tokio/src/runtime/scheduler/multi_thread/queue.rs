@@ -353,6 +353,7 @@ impl<T> Steal<T> {
         }
 
         dst_metrics.incr_steal_count(n as u16);
+        dst_metrics.incr_steal_operations();
 
         // We are returning a task here
         n -= 1;

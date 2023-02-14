@@ -187,7 +187,7 @@ LOOM_MAX_PREEMPTIONS=1 RUSTFLAGS="--cfg loom" \
 
 You can run miri tests with
 ```
-MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tag-raw-pointers" PROPTEST_CASES=10 \
+MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tag-raw-pointers" \
     cargo +nightly miri test --features full --lib
 ```
 
@@ -208,6 +208,31 @@ utilities available to use in tests, no matter the crate being tested.
 
 The best strategy for writing a new integration test is to look at existing
 integration tests in the crate and follow the style.
+
+#### Fuzz tests
+
+Some of our crates include a set of fuzz tests, this will be marked by a
+directory `fuzz`. It is a good idea to run fuzz tests after each change.
+To get started with fuzz testing you'll need to install 
+[cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz).
+
+`cargo install cargo-fuzz`
+
+To list the available fuzzing harnesses you can run;
+
+```bash
+$ cd tokio
+$ cargo fuzz list
+fuzz_linked_list
+````
+
+Running a fuzz test is as simple as;
+
+`cargo fuzz run fuzz_linked_list`
+
+**NOTE**: Keep in mind that by default when running a fuzz test the fuzz
+harness will run forever and will only exit if you `ctrl-c` or it finds
+a bug.
 
 #### Documentation tests
 

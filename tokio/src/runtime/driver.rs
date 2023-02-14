@@ -45,8 +45,7 @@ impl Driver {
 
         let clock = create_clock(cfg.enable_pause_time, cfg.start_paused);
 
-        let (time_driver, time_handle) =
-            create_time_driver(cfg.enable_time, io_stack, clock.clone());
+        let (time_driver, time_handle) = create_time_driver(cfg.enable_time, io_stack, &clock);
 
         Ok((
             Self { inner: time_driver },
@@ -111,10 +110,8 @@ impl Handle {
                 .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
         }
 
-        cfg_test_util! {
-            pub(crate) fn clock(&self) -> &Clock {
-                &self.clock
-            }
+        pub(crate) fn clock(&self) -> &Clock {
+            &self.clock
         }
     }
 }
@@ -289,7 +286,7 @@ cfg_time! {
     fn create_time_driver(
         enable: bool,
         io_stack: IoStack,
-        clock: Clock,
+        clock: &Clock,
     ) -> (TimeDriver, TimeHandle) {
         if enable {
             let (driver, handle) = crate::runtime::time::Driver::new(io_stack, clock);
@@ -337,7 +334,7 @@ cfg_not_time! {
     fn create_time_driver(
         _enable: bool,
         io_stack: IoStack,
-        _clock: Clock,
+        _clock: &Clock,
     ) -> (TimeDriver, TimeHandle) {
         (io_stack, ())
     }
