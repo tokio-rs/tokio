@@ -247,6 +247,7 @@ jobs:
       - name: Check semver compatibility
         run: |
           cargo semver-checks check-release \
+              --release-type minor \
               --exclude benches \
               --exclude examples \
               --exclude stress-test \
