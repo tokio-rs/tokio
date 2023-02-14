@@ -249,7 +249,8 @@ enum PipeEnd {
 /// Call to [`OpenOptions::open_sender`] might fail with an error indicating
 /// different things:
 ///
-/// * [`io::ErrorKind::InvalidInput`] - There is no FIFO file at specified path.
+/// * [`io::ErrorKind::NotFound`] - There is no file at the specified path.
+/// * [`io::ErrorKind::InvalidInput`] - The file exists, but it is not a FIFO.
 /// * [`ENXIO`] - The file is a FIFO, but no process has it open for reading.
 ///   Sleep for a while and try again.
 /// * Other OS errors not specific to opening FIFO files.
