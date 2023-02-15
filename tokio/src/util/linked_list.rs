@@ -179,11 +179,11 @@ impl<L: Link> LinkedList<L, L::Target> {
     /// # Safety
     ///
     /// The caller **must** ensure that exactly one of the following is true:
-    /// - `node` is currently contained by `self`
-    /// - `node` is currently contained by some other list, but `node` is
-    ///    neither the first node nor the last node from that list **and**
-    ///    the caller has an exclusive access to that list.
-    /// - `node` is not contained by any list.
+    /// - `node` is currently contained by `self`,
+    /// - `node` is not contained by any list,
+    /// - `node` is currently contained by some other `GuardedLinkedList` **and**
+    ///   the caller has an exclusive access to that list. This condition is
+    ///   used by the linked list in `sync::Notify`.
     pub(crate) unsafe fn remove(&mut self, node: NonNull<L::Target>) -> Option<L::Handle> {
         if let Some(prev) = L::pointers(node).as_ref().get_prev() {
             debug_assert_eq!(L::pointers(prev).as_ref().get_next(), Some(node));
@@ -319,13 +319,12 @@ feature! {
         _marker: PhantomData<*const L>,
     }
 
-    impl<L: Link> LinkedList<L, L::Target> {
+    impl<U, L: Link<Handle = NonNull<U>>> LinkedList<L, L::Target> {
         /// Turns a linked list into the guarded version by linking the guard node
         /// with the head and tail nodes. Like with other nodes, you should guarantee
         /// that the guard node is pinned in memory.
         pub(crate) fn into_guarded(self, guard_handle: L::Handle) -> GuardedLinkedList<L, L::Target> {
-            // The guard should not be dropped, as it is being linked with other nodes in the list.
-            let guard_handle = ManuallyDrop::new(guard_handle);
+            // `guard_handle` is a NonNull pointer, we don't have to care about dropping it.
             let guard = L::as_raw(&guard_handle);
 
             unsafe {

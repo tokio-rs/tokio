@@ -536,9 +536,12 @@ impl Notify {
 
         let decoupled_list = std::mem::take(&mut *waiters);
 
+        // It is critical for `GuardedLinkedList` safety that the guard node is
+        // pinned in memory and is not dropped until the guarded list is dropped.
         let guard = UnsafeCell::new(Waiter::new());
-        // Safety: the pointer is not null. Additionally, we have made sure
-        // that `guard` will not be moved until the guarded list is dropped.
+        pin!(guard);
+
+        // Safety: the pointer is not null.
         let mut guarded_list =
             unsafe { decoupled_list.into_guarded(NonNull::new_unchecked(guard.get())) };
 
@@ -895,7 +898,7 @@ impl Notified<'_> {
                         // it means that there is a call to `notify_waiters` in progress and this
                         // waiter must be contained by a guarded list used in `notify_waiters`.
                         // We can treat the waiter as notified and remove it from the list, as
-                        // it would have been notified be the `notify_waiters` call anyways.
+                        // it would have been notified in the `notify_waiters` call anyways.
 
                         w.waker.take();
 
