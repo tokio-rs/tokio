@@ -228,9 +228,6 @@ struct Waiter {
     /// Waiting task's waker.
     waker: Option<Waker>,
 
-    /// Number of calls to `notify_waiters` at the time of creation.
-    notify_waiters_calls: usize,
-
     /// `true` if the notification has been assigned to this waiter.
     notified: Option<NotificationType>,
 
@@ -239,11 +236,10 @@ struct Waiter {
 }
 
 impl Waiter {
-    fn new(notify_waiters_calls: usize) -> Waiter {
+    fn new() -> Waiter {
         Waiter {
             pointers: linked_list::Pointers::new(),
             waker: None,
-            notify_waiters_calls,
             notified: None,
             _p: PhantomPinned,
         }
@@ -269,6 +265,9 @@ pub struct Notified<'a> {
 
     /// The current state of the receiving process.
     state: State,
+
+    /// Number of calls to `notify_waiters` at the time of creation.
+    notify_waiters_calls: usize,
 
     /// Entry in the waiter `LinkedList`.
     waiter: UnsafeCell<Waiter>,
@@ -404,12 +403,13 @@ impl Notify {
     /// ```
     pub fn notified(&self) -> Notified<'_> {
         // we load the number of times notify_waiters
-        // was called and store that in our waiter.
+        // was called and store that in the future.
         let state = self.state.load(SeqCst);
         Notified {
             notify: self,
             state: State::Init,
-            waiter: UnsafeCell::new(Waiter::new(get_num_notify_waiters_calls(state))),
+            notify_waiters_calls: get_num_notify_waiters_calls(state),
+            waiter: UnsafeCell::new(Waiter::new()),
         }
     }
 
@@ -536,8 +536,7 @@ impl Notify {
 
         let decoupled_list = std::mem::take(&mut *waiters);
 
-        // The number of calls does not matter for the guarding waiter.
-        let guard = UnsafeCell::new(Waiter::new(0));
+        let guard = UnsafeCell::new(Waiter::new());
         // Safety: the pointer is not null. Additionally, we have made sure
         // that `guard` will not be moved until the guarded list is dropped.
         let mut guarded_list =
@@ -751,22 +750,28 @@ impl Notified<'_> {
 
     /// A custom `project` implementation is used in place of `pin-project-lite`
     /// as a custom drop implementation is needed.
-    fn project(self: Pin<&mut Self>) -> (&Notify, &mut State, &UnsafeCell<Waiter>) {
+    fn project(self: Pin<&mut Self>) -> (&Notify, &mut State, &usize, &UnsafeCell<Waiter>) {
         unsafe {
-            // Safety: both `notify` and `state` are `Unpin`.
+            // Safety: `notify`, `state` and `notify_waiters_calls` are `Unpin`.
 
             is_unpin::<&Notify>();
             is_unpin::<AtomicUsize>();
+            is_unpin::<usize>();
 
             let me = self.get_unchecked_mut();
-            (me.notify, &mut me.state, &me.waiter)
+            (
+                me.notify,
+                &mut me.state,
+                &me.notify_waiters_calls,
+                &me.waiter,
+            )
         }
     }
 
     fn poll_notified(self: Pin<&mut Self>, waker: Option<&Waker>) -> Poll<()> {
         use State::*;
 
-        let (notify, state, waiter) = self.project();
+        let (notify, state, notify_waiters_calls, waiter) = self.project();
 
         loop {
             match *state {
@@ -800,10 +805,7 @@ impl Notified<'_> {
 
                     // if notify_waiters has been called after the future
                     // was created, then we are done
-                    // safety: we hold the lock + the waiter is not even inserted into the list.
-                    let initial_notify_waiters_calls =
-                        unsafe { &*waiter.get() }.notify_waiters_calls;
-                    if get_num_notify_waiters_calls(curr) != initial_notify_waiters_calls {
+                    if get_num_notify_waiters_calls(curr) != *notify_waiters_calls {
                         *state = Done;
                         return Poll::Ready(());
                     }
@@ -887,13 +889,13 @@ impl Notified<'_> {
                         // the list. Reset the notification and convert to `Done`.
                         w.notified = None;
                         *state = Done;
-                    } else if get_num_notify_waiters_calls(curr) != w.notify_waiters_calls {
+                    } else if get_num_notify_waiters_calls(curr) != *notify_waiters_calls {
                         // Before we add a waiter to the list we check if these numbers are
                         // different while holding the lock. If these numbers are different now,
                         // it means that there is a call to `notify_waiters` in progress and this
                         // waiter must be contained by a guarded list used in `notify_waiters`.
                         // We can treat the waiter as notified and remove it from the list, as
-                        // it would be notified be the `notify_waiters` call anyways.
+                        // it would have been notified be the `notify_waiters` call anyways.
 
                         w.waker.take();
 
@@ -945,7 +947,7 @@ impl Drop for Notified<'_> {
         use State::*;
 
         // Safety: The type only transitions to a "Waiting" state when pinned.
-        let (notify, state, waiter) = unsafe { Pin::new_unchecked(self).project() };
+        let (notify, state, _, waiter) = unsafe { Pin::new_unchecked(self).project() };
 
         // This is where we ensure safety. The `Notified` value is being
         // dropped, which means we must ensure that the waiter entry is no
