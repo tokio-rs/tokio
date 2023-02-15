@@ -178,8 +178,12 @@ impl<L: Link> LinkedList<L, L::Target> {
     ///
     /// # Safety
     ///
-    /// The caller **must** ensure that `node` is currently contained by
-    /// `self` or not contained by any other list.
+    /// The caller **must** ensure that exactly one of the following is true:
+    /// - `node` is currently contained by `self`
+    /// - `node` is currently contained by some other list, but `node` is
+    ///    neither the first node nor the last node from that list **and**
+    ///    the caller has an exclusive access to that list.
+    /// - `node` is not contained by any list.
     pub(crate) unsafe fn remove(&mut self, node: NonNull<L::Target>) -> Option<L::Handle> {
         if let Some(prev) = L::pointers(node).as_ref().get_prev() {
             debug_assert_eq!(L::pointers(prev).as_ref().get_next(), Some(node));
@@ -290,7 +294,7 @@ cfg_io_readiness! {
     }
 }
 
-// ===== impl Iter =====
+// ===== impl GuardedLinkedList =====
 
 feature! {
     #![any(
@@ -300,41 +304,82 @@ feature! {
         feature = "signal",
     )]
 
-    /// Iterates over list elements without consuming them.
-    pub(crate) struct Iter<'a, T: Link> {
-        curr: Option<NonNull<T::Target>>,
-        _list: &'a LinkedList<T, T::Target>,
+    /// An intrusive linked list, but instead of keeping pointers to the head
+    /// and tail nodes, it uses a special guard node linked with those nodes.
+    /// It means that the list is circular and every pointer of a node from
+    /// the list is not `None`, including pointers from the guard node.
+    ///
+    /// If a list is empty, then both pointers of the guard node are pointing
+    /// at the guard node itself.
+    pub(crate) struct GuardedLinkedList<L, T> {
+        /// Pointer to the guard node.
+        guard: NonNull<T>,
+
+        /// Node type marker.
+        _marker: PhantomData<*const L>,
     }
 
-    impl<T: Link> LinkedList<T, T::Target> {
-        fn iter(&self) -> Iter<'_, T> {
-            let curr = self.head;
-            Iter {
-                curr,
-                _list: self,
+    impl<L: Link> LinkedList<L, L::Target> {
+        /// Turns a linked list into the guarded version by linking the guard node
+        /// with the head and tail nodes. Like with other nodes, you should guarantee
+        /// that the guard node is pinned in memory.
+        pub(crate) fn into_guarded(self, guard_handle: L::Handle) -> GuardedLinkedList<L, L::Target> {
+            // The guard should not be dropped, as it is being linked with other nodes in the list.
+            let guard_handle = ManuallyDrop::new(guard_handle);
+            let guard = L::as_raw(&guard_handle);
+
+            unsafe {
+                if let Some(head) = self.head {
+                    debug_assert!(L::pointers(head).as_ref().get_prev().is_none());
+                    L::pointers(head).as_mut().set_prev(Some(guard));
+                    L::pointers(guard).as_mut().set_next(Some(head));
+
+                    // The list is not empty, so the tail cannot be `None`.
+                    let tail = self.tail.unwrap();
+                    debug_assert!(L::pointers(tail).as_ref().get_next().is_none());
+                    L::pointers(tail).as_mut().set_next(Some(guard));
+                    L::pointers(guard).as_mut().set_prev(Some(tail));
+                } else {
+                    // The list is empty.
+                    L::pointers(guard).as_mut().set_prev(Some(guard));
+                    L::pointers(guard).as_mut().set_next(Some(guard));
+                }
             }
+
+            GuardedLinkedList { guard, _marker: PhantomData }
         }
     }
 
-    impl<'a, T: Link> IntoIterator for &'a LinkedList<T, T::Target> {
-        type Item = NonNull<T::Target>;
-        type IntoIter = Iter<'a, T>;
+    impl<L: Link> GuardedLinkedList<L, L::Target> {
+        fn tail(&self) -> Option<NonNull<L::Target>> {
+            let tail_ptr = unsafe {
+                L::pointers(self.guard).as_ref().get_prev().unwrap()
+            };
 
-        fn into_iter(self) -> Self::IntoIter {
-            self.iter()
-        }
-    }
-
-    impl<'a, T: Link> Iterator for Iter<'a, T> {
-        type Item = NonNull<T::Target>;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            if let Some(curr) = self.curr {
-                // safety: the pointer references data contained by the list
-                self.curr = unsafe { T::pointers(curr).as_ref() }.get_next();
-                Some(curr)
+            // Compare the tail pointer with the address of the guard node itself.
+            // If the guard points at itself, then there are no other nodes and
+            // the list is considered empty.
+            if tail_ptr != self.guard {
+                Some(tail_ptr)
             } else {
                 None
+            }
+        }
+
+        /// Removes the last element from a list and returns it, or None if it is
+        /// empty.
+        pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
+            unsafe {
+                let last = self.tail()?;
+                let before_last = L::pointers(last).as_ref().get_prev().unwrap();
+
+                L::pointers(self.guard).as_mut().set_prev(Some(before_last));
+                L::pointers(before_last).as_mut().set_next(Some(self.guard));
+
+                L::pointers(last).as_mut().set_prev(None);
+                L::pointers(last).as_mut().set_next(None);
+
+                Some(L::from_raw(last))
             }
         }
     }
@@ -500,35 +545,6 @@ pub(crate) mod tests {
         assert_eq!([5, 7, 31].to_vec(), items);
 
         assert!(list.is_empty());
-    }
-
-    #[test]
-    fn iter() {
-        let a = entry(5);
-        let b = entry(7);
-        let c = entry(31);
-
-        let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
-        list.push_front(a.as_ref());
-        list.push_front(b.as_ref());
-        list.push_front(c.as_ref());
-
-        let mut iter = list.iter();
-        assert_eq!(
-            Some(31),
-            iter.next().map(|entry| unsafe { entry.as_ref().val })
-        );
-        assert_eq!(
-            Some(7),
-            iter.next().map(|entry| unsafe { entry.as_ref().val })
-        );
-        assert_eq!(
-            Some(5),
-            iter.next().map(|entry| unsafe { entry.as_ref().val })
-        );
-        assert_eq!(None, iter.next());
-
-        assert!(!list.is_empty());
     }
 
     #[test]
