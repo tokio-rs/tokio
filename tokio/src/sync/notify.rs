@@ -539,7 +539,7 @@ impl Notify {
         // The number of calls does not matter for the guarding waiter.
         let guard = UnsafeCell::new(Waiter::new(0));
         // Safety: the pointer is not null. Additionally, we have made sure
-        // that `guard` will not but moved until the guarded list is dropped.
+        // that `guard` will not be moved until the guarded list is dropped.
         let mut guarded_list =
             unsafe { decoupled_list.into_guarded(NonNull::new_unchecked(guard.get())) };
 

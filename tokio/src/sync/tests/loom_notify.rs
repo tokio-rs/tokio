@@ -144,10 +144,9 @@ fn notify_drop() {
     });
 }
 
-/// Polls two `Notified` futures and checks if poll results are
-/// consistent with each other. If one of the futures was notifed
-/// by the `notify_waiters` call, then the other one must be notified
-/// as well.
+/// Polls two `Notified` futures and checks if poll results are consistent
+/// with each other. If the first future is notified by a `notify_waiters`
+/// call, then the second one must be notified as well.
 #[test]
 fn notify_waiters_poll_consistency() {
     fn notify_waiters_poll_consistency_variant(poll_setting: [bool; 2]) {
@@ -184,13 +183,12 @@ fn notify_waiters_poll_consistency() {
     loom::model(|| notify_waiters_poll_consistency_variant([true, true]));
 }
 
-/// Polls two `Notified` futures and checks if poll results are
-/// consistent with each other. If one of the futures was notifed
-/// by the `notify_waiters` call, then the other one must be notified
-/// as well.
+/// Polls two `Notified` futures and checks if poll results are consistent
+/// with each other. If the first future is notified by a `notify_waiters`
+/// call, then the second one must be notified as well.
 ///
-/// Here we also add other `Notified` futures in between to force the
-/// two tested futures to end up in different chunks.
+/// Here we also add other `Notified` futures in between to force the two
+/// tested futures to end up in different chunks.
 #[test]
 fn notify_waiters_poll_consistency_many() {
     fn notify_waiters_poll_consistency_many_variant(order: [usize; 2]) {
@@ -225,8 +223,8 @@ fn notify_waiters_poll_consistency_many() {
     loom::model(|| notify_waiters_poll_consistency_many_variant([1, 0]));
 }
 
-/// Checks if a call to `notify_waiters` is observed as atomic when combined with
-/// concurrent calls to `notify_one`.
+/// Checks if a call to `notify_waiters` is observed as atomic when combined
+/// with a concurrent call to `notify_one`.
 #[test]
 fn notify_waiters_is_atomic() {
     fn notify_waiters_is_atomic_variant(tested_fut_index: usize) {
