@@ -47,110 +47,6 @@ fn notify_waiters() {
     });
 }
 
-fn notify_waiters_poll_consistency_variant(poll_setting: [bool; 2]) {
-    let notify = Arc::new(Notify::new());
-    let mut notified = [
-        tokio_test::task::spawn(notify.notified()),
-        tokio_test::task::spawn(notify.notified()),
-    ];
-    for i in 0..2 {
-        if poll_setting[i] {
-            assert_pending!(notified[i].poll());
-        }
-    }
-
-    let tx = notify.clone();
-    let th = thread::spawn(move || {
-        tx.notify_waiters();
-    });
-
-    let res1 = notified[0].poll();
-    let res2 = notified[1].poll();
-
-    // If res1 is ready, then res2 must also be ready.
-    assert!(res1.is_pending() || res2.is_ready());
-
-    th.join().unwrap();
-}
-
-#[test]
-fn notify_waiters_poll_consistency() {
-    // We test different scenarios where pending futures had or had not
-    // been polled before the call to `notify_waiters`.
-    loom::model(|| notify_waiters_poll_consistency_variant([false, false]));
-    loom::model(|| notify_waiters_poll_consistency_variant([true, false]));
-    loom::model(|| notify_waiters_poll_consistency_variant([false, true]));
-    loom::model(|| notify_waiters_poll_consistency_variant([true, true]));
-}
-
-fn notify_waiters_poll_consistency_wake_up_batches_variant(order: [usize; 2]) {
-    let notify = Arc::new(Notify::new());
-
-    let mut futs = (0..WAKE_LIST_SIZE + 1)
-        .map(|_| tokio_test::task::spawn(notify.notified()))
-        .collect::<Vec<_>>();
-
-    assert_pending!(futs[order[0]].poll());
-    for i in 2..futs.len() {
-        assert_pending!(futs[i].poll());
-    }
-    assert_pending!(futs[order[1]].poll());
-
-    let tx = notify.clone();
-    let th = thread::spawn(move || {
-        tx.notify_waiters();
-    });
-
-    let res1 = futs[0].poll();
-    let res2 = futs[1].poll();
-
-    // If res1 is ready, then res2 must also be ready.
-    assert!(res1.is_pending() || res2.is_ready());
-
-    th.join().unwrap();
-}
-
-#[test]
-fn notify_waiters_poll_consistency_wake_up_batches() {
-    // We test polling two futures in different batches in various orders.
-    loom::model(|| notify_waiters_poll_consistency_wake_up_batches_variant([0, 1]));
-    loom::model(|| notify_waiters_poll_consistency_wake_up_batches_variant([1, 0]));
-}
-
-fn notify_waiters_is_atomic_variant(wait_for_index: usize) {
-    let notify = Arc::new(Notify::new());
-
-    let mut futs = (0..WAKE_LIST_SIZE + 1)
-        .map(|_| tokio_test::task::spawn(notify.notified()))
-        .collect::<Vec<_>>();
-
-    for fut in &mut futs {
-        assert_pending!(fut.poll());
-    }
-
-    let tx = notify.clone();
-    let th = thread::spawn(move || {
-        tx.notify_waiters();
-    });
-
-    block_on(async {
-        futs.remove(wait_for_index).await;
-        let mut new_fut = tokio_test::task::spawn(notify.notified());
-        assert_pending!(new_fut.poll());
-        notify.notify_one();
-        assert_ready!(new_fut.poll());
-    });
-
-    th.join().unwrap();
-}
-
-#[test]
-fn notify_waiters_is_atomic() {
-    // We test polling two futures in different batches in various orders.
-    loom::model(|| notify_waiters_is_atomic_variant(0));
-    loom::model(|| notify_waiters_is_atomic_variant(32));
-}
-
 #[test]
 fn notify_waiters_and_one() {
     loom::model(|| {
@@ -248,8 +144,140 @@ fn notify_drop() {
     });
 }
 
+/// Polls two `Notified` futures and checks if poll results are
+/// consistent with each other. If one of the futures was notifed
+/// by the `notify_waiters` call, then the other one must be notified
+/// as well.
 #[test]
-fn notify_waiters_sequential() {
+fn notify_waiters_poll_consistency() {
+    fn notify_waiters_poll_consistency_variant(poll_setting: [bool; 2]) {
+        let notify = Arc::new(Notify::new());
+        let mut notified = [
+            tokio_test::task::spawn(notify.notified()),
+            tokio_test::task::spawn(notify.notified()),
+        ];
+        for i in 0..2 {
+            if poll_setting[i] {
+                assert_pending!(notified[i].poll());
+            }
+        }
+
+        let tx = notify.clone();
+        let th = thread::spawn(move || {
+            tx.notify_waiters();
+        });
+
+        let res1 = notified[0].poll();
+        let res2 = notified[1].poll();
+
+        // If res1 is ready, then res2 must also be ready.
+        assert!(res1.is_pending() || res2.is_ready());
+
+        th.join().unwrap();
+    }
+
+    // We test different scenarios in which pending futures had or had not
+    // been polled before the call to `notify_waiters`.
+    loom::model(|| notify_waiters_poll_consistency_variant([false, false]));
+    loom::model(|| notify_waiters_poll_consistency_variant([true, false]));
+    loom::model(|| notify_waiters_poll_consistency_variant([false, true]));
+    loom::model(|| notify_waiters_poll_consistency_variant([true, true]));
+}
+
+/// Polls two `Notified` futures and checks if poll results are
+/// consistent with each other. If one of the futures was notifed
+/// by the `notify_waiters` call, then the other one must be notified
+/// as well.
+///
+/// Here we also add other `Notified` futures in between to force the
+/// two tested futures to end up in different chunks.
+#[test]
+fn notify_waiters_poll_consistency_many() {
+    fn notify_waiters_poll_consistency_many_variant(order: [usize; 2]) {
+        let notify = Arc::new(Notify::new());
+
+        let mut futs = (0..WAKE_LIST_SIZE + 1)
+            .map(|_| tokio_test::task::spawn(notify.notified()))
+            .collect::<Vec<_>>();
+
+        assert_pending!(futs[order[0]].poll());
+        for i in 2..futs.len() {
+            assert_pending!(futs[i].poll());
+        }
+        assert_pending!(futs[order[1]].poll());
+
+        let tx = notify.clone();
+        let th = thread::spawn(move || {
+            tx.notify_waiters();
+        });
+
+        let res1 = futs[0].poll();
+        let res2 = futs[1].poll();
+
+        // If res1 is ready, then res2 must also be ready.
+        assert!(res1.is_pending() || res2.is_ready());
+
+        th.join().unwrap();
+    }
+
+    // We test different scenarios in which futures are polled in different order.
+    loom::model(|| notify_waiters_poll_consistency_many_variant([0, 1]));
+    loom::model(|| notify_waiters_poll_consistency_many_variant([1, 0]));
+}
+
+/// Checks if a call to `notify_waiters` is observed as atomic when combined with
+/// concurrent calls to `notify_one`.
+#[test]
+fn notify_waiters_is_atomic() {
+    fn notify_waiters_is_atomic_variant(tested_fut_index: usize) {
+        let notify = Arc::new(Notify::new());
+
+        let mut futs = (0..WAKE_LIST_SIZE + 1)
+            .map(|_| tokio_test::task::spawn(notify.notified()))
+            .collect::<Vec<_>>();
+
+        for fut in &mut futs {
+            assert_pending!(fut.poll());
+        }
+
+        let tx = notify.clone();
+        let th = thread::spawn(move || {
+            tx.notify_waiters();
+        });
+
+        block_on(async {
+            // If awaiting one of the futures completes, then we should be
+            // able to assume that all pending futures are notified. Therefore
+            // a notification from a subsequent `notify_one` call should not
+            // be consumed by an old future.
+            futs.remove(tested_fut_index).await;
+
+            let mut new_fut = tokio_test::task::spawn(notify.notified());
+            assert_pending!(new_fut.poll());
+
+            notify.notify_one();
+
+            // `new_fut` must consume the notification from `notify_one`.
+            assert_ready!(new_fut.poll());
+        });
+
+        th.join().unwrap();
+    }
+
+    // We test different scenarios in which the tested future is at the beginning
+    // or at the end of the waiters queue used by `Notify`.
+    loom::model(|| notify_waiters_is_atomic_variant(0));
+    loom::model(|| notify_waiters_is_atomic_variant(32));
+}
+
+/// Checks if a single call to `notify_waiters` does not get through two `Notified`
+/// futures created and awaited sequentially like this:
+/// ```ignore
+/// notify.notified().await;
+/// notify.notified().await;
+/// ```
+#[test]
+fn notify_waiters_sequential_notified_await() {
     use crate::sync::oneshot;
 
     loom::model(|| {
