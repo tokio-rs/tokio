@@ -87,13 +87,13 @@ async fn test_buffered_reader() {
     let nread = reader.read(&mut buf).await.unwrap();
     assert_eq!(nread, 3);
     assert_eq!(buf, [5, 6, 7]);
-    assert_eq!(reader.buffer(), []);
+    assert_eq!(reader.buffer(), [0; 0]);
 
     let mut buf = [0, 0];
     let nread = reader.read(&mut buf).await.unwrap();
     assert_eq!(nread, 2);
     assert_eq!(buf, [0, 1]);
-    assert_eq!(reader.buffer(), []);
+    assert_eq!(reader.buffer(), [0; 0]);
 
     let mut buf = [0];
     let nread = reader.read(&mut buf).await.unwrap();
@@ -105,12 +105,12 @@ async fn test_buffered_reader() {
     let nread = reader.read(&mut buf).await.unwrap();
     assert_eq!(nread, 1);
     assert_eq!(buf, [3, 0, 0]);
-    assert_eq!(reader.buffer(), []);
+    assert_eq!(reader.buffer(), [0; 0]);
 
     let nread = reader.read(&mut buf).await.unwrap();
     assert_eq!(nread, 1);
     assert_eq!(buf, [4, 0, 0]);
-    assert_eq!(reader.buffer(), []);
+    assert_eq!(reader.buffer(), [0; 0]);
 
     assert_eq!(reader.read(&mut buf).await.unwrap(), 0);
 }
@@ -231,13 +231,13 @@ async fn maybe_pending() {
     let nread = reader.read(&mut buf).await.unwrap();
     assert_eq!(nread, 3);
     assert_eq!(buf, [5, 6, 7]);
-    assert_eq!(reader.buffer(), []);
+    assert_eq!(reader.buffer(), [0; 0]);
 
     let mut buf = [0, 0];
     let nread = reader.read(&mut buf).await.unwrap();
     assert_eq!(nread, 2);
     assert_eq!(buf, [0, 1]);
-    assert_eq!(reader.buffer(), []);
+    assert_eq!(reader.buffer(), [0; 0]);
 
     let mut buf = [0];
     let nread = reader.read(&mut buf).await.unwrap();
@@ -249,12 +249,12 @@ async fn maybe_pending() {
     let nread = reader.read(&mut buf).await.unwrap();
     assert_eq!(nread, 1);
     assert_eq!(buf, [3, 0, 0]);
-    assert_eq!(reader.buffer(), []);
+    assert_eq!(reader.buffer(), [0; 0]);
 
     let nread = reader.read(&mut buf).await.unwrap();
     assert_eq!(nread, 1);
     assert_eq!(buf, [4, 0, 0]);
-    assert_eq!(reader.buffer(), []);
+    assert_eq!(reader.buffer(), [0; 0]);
 
     assert_eq!(reader.read(&mut buf).await.unwrap(), 0);
 }
@@ -274,7 +274,7 @@ async fn maybe_pending_buf_read() {
     assert_eq!(v, [0]);
     v.clear();
     reader.read_until(9, &mut v).await.unwrap();
-    assert_eq!(v, []);
+    assert_eq!(v, [0; 0]);
 }
 
 // https://github.com/rust-lang/futures-rs/pull/1573#discussion_r281162309

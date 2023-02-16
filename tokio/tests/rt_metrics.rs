@@ -216,7 +216,7 @@ fn worker_poll_count() {
     });
     drop(rt);
     // Account for the `block_on` task
-    let n = (0..metrics.num_workers())
+    let n: u64 = (0..metrics.num_workers())
         .map(|i| metrics.worker_poll_count(i))
         .sum();
 

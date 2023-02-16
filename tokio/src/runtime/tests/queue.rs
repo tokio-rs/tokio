@@ -141,7 +141,7 @@ fn stress1() {
             }
 
             cfg_metrics! {
-                assert_metrics!(metrics, steal_count == n as _);
+                assert_metrics!(metrics, steal_count == n as u64);
             }
 
             n

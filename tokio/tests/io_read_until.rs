@@ -20,7 +20,7 @@ async fn read_until() {
     buf.clear();
     let n = assert_ok!(rd.read_until(b' ', &mut buf).await);
     assert_eq!(n, 0);
-    assert_eq!(buf, []);
+    assert_eq!(buf, [0; 0]);
 }
 
 #[tokio::test]

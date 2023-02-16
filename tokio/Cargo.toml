@@ -85,6 +85,10 @@ signal = [
   "windows-sys/Win32_System_Console",
 ]
 sync = []
+taskdump = [
+  "serde",
+  "serde_json",
+]
 test-util = ["rt", "sync", "time"]
 time = []
 
@@ -115,6 +119,8 @@ socket2 = { version = "0.4.4", optional = true, features = [ "all" ] }
 # Requires `--cfg tokio_unstable` to enable.
 [target.'cfg(tokio_unstable)'.dependencies]
 tracing = { version = "0.1.25", default-features = false, features = ["std"], optional = true } # Not in full
+serde = { version = "1.0", optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.42", optional = true }
