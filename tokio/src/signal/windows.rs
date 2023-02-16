@@ -52,11 +52,11 @@ pub fn ctrl_c() -> io::Result<CtrlC> {
 
 /// Represents an event which receives "ctrl-c" notifications sent to the process
 /// via `SetConsoleCtrlHandler`.
-/// 
+///
 /// This event can be turned into a `Stream` using [`CtrlCStream`].
 ///
 /// [`CtrlCStream`]: https://docs.rs/tokio-stream/latest/tokio_stream/wrappers/struct.CtrlCStream.html
-/// 
+///
 /// A notification to this process notifies *all* receivers for
 /// this event. Moreover, the notifications **are coalesced** if they aren't processed
 /// quickly enough. This means that if two notifications are received back-to-back,

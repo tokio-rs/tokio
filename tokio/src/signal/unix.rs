@@ -297,7 +297,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
 /// The signal can be turned into a `Stream` using [`SignalStream`].
 ///
 /// [`SignalStream`]: https://docs.rs/tokio-stream/latest/tokio_stream/wrappers/struct.SignalStream.html
-/// 
+///
 /// In general signal handling on Unix is a pretty tricky topic, and this
 /// structure is no exception! There are some important limitations to keep in
 /// mind when using `Signal` streams:
