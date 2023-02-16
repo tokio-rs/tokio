@@ -261,3 +261,7 @@ cfg_rt! {
     /// After thread starts / before thread stops
     type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
 }
+
+cfg_taskdump! {
+    mod taskdump;
+}

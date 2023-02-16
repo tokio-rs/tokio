@@ -321,6 +321,22 @@ cfg_metrics! {
     }
 }
 
+cfg_taskdump! {
+    /// # Task Dumps
+    /// 
+    /// Display-formatting a `Handle` produces a JSON dump of the runtime's internal state.
+    /// 
+    /// This feature is in very early development, and its API and output is subject to change.
+    impl fmt::Display for Handle {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            use serde_json::to_string_pretty;
+            let serializable = super::taskdump::Runtime::from(&self);
+            let json = to_string_pretty(&serializable).map_err(|_| fmt::Error)?;
+            f.write_str(&json)
+        }
+    }
+}
+
 /// Error returned by `try_current` when no Runtime has been started
 #[derive(Debug)]
 pub struct TryCurrentError {

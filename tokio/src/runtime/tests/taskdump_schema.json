@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "CurrentThreadMetrics": {
+      "description": "Metrics for a current-thread runtime.",
+      "properties": {
+        "io_driver": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IODriverMetrics"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "IO driver metrics."
+        },
+        "remote_schedule_count": {
+          "description": "The total number of tasks scheduled from outside of the runtime.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "remote_schedule_count"
+      ],
+      "type": "object"
+    },
+    "IODriverMetrics": {
+      "properties": {
+        "fd_deregistered_count": {
+          "description": "The number of file descriptors that have been deregistered by the runtime’s I/O driver",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "fd_registered_count": {
+          "description": "The number of file descriptors that have been registered with the runtime’s I/O driver.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "fd_deregistered_count",
+        "fd_registered_count"
+      ],
+      "type": "object"
+    },
+    "MultiThreadMetrics": {
+      "description": "Metrics for a multi-thread runtime.",
+      "properties": {
+        "io_driver": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IODriverMetrics"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "IO driver metrics."
+        },
+        "num_blocking_threads": {
+          "description": "The number of additional threads spawned by the runtime.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "num_idle_blocking_threads": {
+          "description": "The number of idle threads, which have spawned for spawn_blocking calls.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "num_workers": {
+          "description": "The number of worker threads used by the runtime.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "remote_schedule_count": {
+          "description": "The total number of tasks scheduled from outside of the runtime.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "num_blocking_threads",
+        "num_idle_blocking_threads",
+        "num_workers",
+        "remote_schedule_count"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "A taskdump of a Tokio runtime.",
+  "oneOf": [
+    {
+      "description": "A taskdump of a current-thread runtime.",
+      "properties": {
+        "flavor": {
+          "enum": [
+            "CurrentThread"
+          ],
+          "type": "string"
+        },
+        "metrics": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/CurrentThreadMetrics"
+            }
+          ],
+          "description": "Runtime metrics."
+        }
+      },
+      "required": [
+        "flavor",
+        "metrics"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "A taskdump of a multi-thread runtime.",
+      "properties": {
+        "flavor": {
+          "enum": [
+            "MultiThread"
+          ],
+          "type": "string"
+        },
+        "metrics": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/MultiThreadMetrics"
+            }
+          ],
+          "description": "Runtime metrics."
+        }
+      },
+      "required": [
+        "flavor",
+        "metrics"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "Runtime"
+}

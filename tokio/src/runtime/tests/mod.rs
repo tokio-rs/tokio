@@ -70,4 +70,8 @@ cfg_not_loom! {
 
     #[cfg(miri)]
     mod task;
+
+    cfg_taskdump! {
+        mod taskdump;
+    }
 }
