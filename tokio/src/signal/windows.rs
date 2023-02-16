@@ -22,7 +22,7 @@ pub(crate) use self::imp::{OsExtraData, OsStorage};
 #[path = "windows/stub.rs"]
 mod imp;
 
-/// Creates a new stream which receives "ctrl-c" notifications sent to the
+/// Creates a new event which receives "ctrl-c" notifications sent to the
 /// process.
 ///
 /// # Examples
@@ -50,14 +50,18 @@ pub fn ctrl_c() -> io::Result<CtrlC> {
     })
 }
 
-/// Represents a stream which receives "ctrl-c" notifications sent to the process
+/// Represents an event which receives "ctrl-c" notifications sent to the process
 /// via `SetConsoleCtrlHandler`.
+/// 
+/// This event can be turned into a `Stream` using [`CtrlCStream`].
 ///
-/// A notification to this process notifies *all* streams listening for
+/// [`CtrlCStream`]: https://docs.rs/tokio-stream/latest/tokio_stream/wrappers/struct.CtrlCStream.html
+/// 
+/// A notification to this process notifies *all* receivers for
 /// this event. Moreover, the notifications **are coalesced** if they aren't processed
 /// quickly enough. This means that if two notifications are received back-to-back,
-/// then the stream may only receive one item about the two notifications.
-#[must_use = "streams do nothing unless polled"]
+/// then the receiver may only receive one item about the two notifications.
+#[must_use = "events do nothing unless polled"]
 #[derive(Debug)]
 pub struct CtrlC {
     inner: RxFuture,
@@ -66,7 +70,7 @@ pub struct CtrlC {
 impl CtrlC {
     /// Receives the next signal notification event.
     ///
-    /// `None` is returned if no more events can be received by this stream.
+    /// `None` is returned if no more events can be received by the `RxFuture`.
     ///
     /// # Examples
     ///
@@ -75,12 +79,11 @@ impl CtrlC {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     // An infinite stream of CTRL-C events.
-    ///     let mut stream = ctrl_c()?;
+    ///     let mut signal = ctrl_c()?;
     ///
     ///     // Print whenever a CTRL-C event is received.
     ///     for countdown in (0..3).rev() {
-    ///         stream.recv().await;
+    ///         signal.recv().await;
     ///         println!("got CTRL-C. {} more to exit", countdown);
     ///     }
     ///
@@ -94,7 +97,7 @@ impl CtrlC {
     /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
-    /// `None` is returned if no more events can be received by this stream.
+    /// `None` is returned if no more events can be received.
     ///
     /// # Examples
     ///
@@ -127,11 +130,15 @@ impl CtrlC {
 /// Represents a stream which receives "ctrl-break" notifications sent to the process
 /// via `SetConsoleCtrlHandler`.
 ///
-/// A notification to this process notifies *all* streams listening for
+/// This event can be turned into a `Stream` using [`CtrlBreakStream`].
+///
+/// [`CtrlBreakStream`]: https://docs.rs/tokio-stream/latest/tokio_stream/wrappers/struct.CtrlBreakStream.html
+///
+/// A notification to this process notifies *all* receivers for
 /// this event. Moreover, the notifications **are coalesced** if they aren't processed
 /// quickly enough. This means that if two notifications are received back-to-back,
-/// then the stream may only receive one item about the two notifications.
-#[must_use = "streams do nothing unless polled"]
+/// then the receiver may only receive one item about the two notifications.
+#[must_use = "events do nothing unless polled"]
 #[derive(Debug)]
 pub struct CtrlBreak {
     inner: RxFuture,
