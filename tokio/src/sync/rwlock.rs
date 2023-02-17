@@ -447,6 +447,7 @@ impl<T: ?Sized> RwLock<T> {
             false,
         );
 
+        #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
         let guard = acquire_fut.await;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -594,6 +595,7 @@ impl<T: ?Sized> RwLock<T> {
             false,
         );
 
+        #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
         let guard = acquire_fut.await;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -787,6 +789,7 @@ impl<T: ?Sized> RwLock<T> {
             false,
         );
 
+        #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
         let guard = acquire_fut.await;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -921,6 +924,7 @@ impl<T: ?Sized> RwLock<T> {
             false,
         );
 
+        #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
         let guard = acquire_fut.await;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
