@@ -22,6 +22,7 @@ pub struct OwnedRwLockReadGuard<T: ?Sized, U: ?Sized = T> {
     pub(super) _p: PhantomData<T>,
 }
 
+#[allow(dead_code)] // Unused fields are still used in Drop.
 struct Inner<T: ?Sized, U: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
@@ -72,7 +73,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
     /// # }
     /// ```
     #[inline]
-    pub fn map<F, V: ?Sized>(mut this: Self, f: F) -> OwnedRwLockReadGuard<T, V>
+    pub fn map<F, V: ?Sized>(this: Self, f: F) -> OwnedRwLockReadGuard<T, V>
     where
         F: FnOnce(&U) -> &V,
     {
@@ -119,7 +120,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
     /// # }
     /// ```
     #[inline]
-    pub fn try_map<F, V: ?Sized>(mut this: Self, f: F) -> Result<OwnedRwLockReadGuard<T, V>, Self>
+    pub fn try_map<F, V: ?Sized>(this: Self, f: F) -> Result<OwnedRwLockReadGuard<T, V>, Self>
     where
         F: FnOnce(&U) -> Option<&V>,
     {

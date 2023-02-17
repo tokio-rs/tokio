@@ -25,6 +25,7 @@ pub struct OwnedRwLockWriteGuard<T: ?Sized> {
     pub(super) _p: PhantomData<T>,
 }
 
+#[allow(dead_code)] // Unused fields are still used in Drop.
 struct Inner<T: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
@@ -203,7 +204,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
     /// assert_eq!(*lock.read().await, 2, "second writer obtained write lock");
     /// # }
     /// ```
-    pub fn downgrade(mut self) -> OwnedRwLockReadGuard<T> {
+    pub fn downgrade(self) -> OwnedRwLockReadGuard<T> {
         let this = self.skip_drop();
         let guard = OwnedRwLockReadGuard {
             lock: this.lock,
@@ -215,10 +216,10 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
 
         // Release all but one of the permits held by the write guard
         let to_release = (this.permits_acquired - 1) as usize;
-        this.lock.s.release(to_release);
+        guard.lock.s.release(to_release);
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
+        guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             write_locked = false,
@@ -227,7 +228,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         });
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
+        guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             current_readers = 1,

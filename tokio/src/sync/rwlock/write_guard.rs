@@ -25,6 +25,7 @@ pub struct RwLockWriteGuard<'a, T: ?Sized> {
     pub(super) marker: PhantomData<&'a mut T>,
 }
 
+#[allow(dead_code)] // Unused fields are still used in Drop.
 struct Inner<'a, T: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
@@ -222,11 +223,11 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         };
 
         // Release all but one of the permits held by the write guard
-        let to_release = (self.permits_acquired - 1) as usize;
+        let to_release = (this.permits_acquired - 1) as usize;
         this.s.release(to_release);
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
+        guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             write_locked = false,
@@ -235,7 +236,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         });
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
+        guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             current_readers = 1,

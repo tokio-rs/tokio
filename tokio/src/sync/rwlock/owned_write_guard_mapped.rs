@@ -24,6 +24,7 @@ pub struct OwnedRwLockMappedWriteGuard<T: ?Sized, U: ?Sized = T> {
     pub(super) _p: PhantomData<T>,
 }
 
+#[allow(dead_code)] // Unused fields are still used in Drop.
 struct Inner<T: ?Sized, U: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,

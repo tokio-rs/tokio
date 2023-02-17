@@ -192,6 +192,7 @@ pub struct MappedMutexGuard<'a, T: ?Sized> {
 
 /// A helper type used when taking apart a `MutexGuard` without running its
 /// Drop implementation.
+#[allow(dead_code)] // Unused fields are still used in Drop.
 struct MutexGuardInner<'a, T: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
@@ -200,6 +201,7 @@ struct MutexGuardInner<'a, T: ?Sized> {
 
 /// A helper type used when taking apart a `MappedMutexGuard` without running
 /// its Drop implementation.
+#[allow(dead_code)] // Unused fields are still used in Drop.
 struct MappedMutexGuardInner<'a, T: ?Sized> {
     s: &'a semaphore::Semaphore,
     data: *mut T,
