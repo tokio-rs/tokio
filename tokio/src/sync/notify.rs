@@ -296,7 +296,7 @@ impl<'a> NotifyWaitersList<'a> {
 impl Drop for NotifyWaitersList<'_> {
     fn drop(&mut self) {
         // If the list is not empty, we unlink all waiters from it.
-        // We do call wakers to avoid double panic.
+        // We do not wake the waiters to avoid double panics.
         if !self.is_empty {
             let _lock_guard = self.notify.waiters.lock();
             while let Some(mut waiter) = self.list.pop_back() {
