@@ -46,6 +46,7 @@ fn notify_clones_waker_before_lock() {
     let _ = future.poll(&mut cx);
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn notify_waiters_handles_panicking_waker() {
     use futures::task::ArcWake;
