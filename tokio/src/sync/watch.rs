@@ -235,7 +235,7 @@ pub mod error {
 
 mod big_notify {
     use super::*;
-    use crate::sync::futures::Notified;
+    use crate::sync::notify::Notified;
 
     // To avoid contention on the lock inside the `Notify`, we store multiple
     // copies of it. Then, we use either circular access or randomness to spread
