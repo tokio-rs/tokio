@@ -53,10 +53,9 @@ use tokio::sync::watch::error::RecvError;
 /// ```
 /// # #[tokio::main]
 /// # async fn main() {
-/// use futures_test::task::noop_context;
-/// use std::pin::Pin;
+/// use futures_util::future::FutureExt;
 /// use tokio::sync::watch;
-/// use tokio_stream::{Stream, StreamExt, wrappers::WatchStream};
+/// use tokio_stream::{StreamExt, wrappers::WatchStream};
 ///
 /// let (tx, rx) = watch::channel("hello");
 /// let mut rx = WatchStream::new_on_changed(rx);

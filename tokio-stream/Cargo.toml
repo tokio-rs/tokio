@@ -38,6 +38,7 @@ parking_lot = "0.12.0"
 tokio-test = { path = "../tokio-test" }
 futures = { version = "0.3", default-features = false }
 futures-test = "0.3.26"
+futures-util = "0.3.26"
 
 [package.metadata.docs.rs]
 all-features = true
