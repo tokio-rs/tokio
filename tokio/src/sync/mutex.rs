@@ -8,7 +8,7 @@ use std::cell::UnsafeCell;
 use std::error::Error;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use std::{fmt, marker, mem};
+use std::{fmt, marker, mem, ptr};
 
 /// An asynchronous `Mutex`-like type.
 ///
@@ -144,6 +144,8 @@ pub struct Mutex<T: ?Sized> {
 #[clippy::has_significant_drop]
 #[must_use = "if unused the Mutex will immediately unlock"]
 pub struct MutexGuard<'a, T: ?Sized> {
+    // When changing the fields in this struct, make sure to update the
+    // `skip_drop` method.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
     lock: &'a Mutex<T>,
@@ -179,10 +181,26 @@ pub struct OwnedMutexGuard<T: ?Sized> {
 #[clippy::has_significant_drop]
 #[must_use = "if unused the Mutex will immediately unlock"]
 pub struct MappedMutexGuard<'a, T: ?Sized> {
+    // When changing the fields in this struct, make sure to update the
+    // `skip_drop` method.
     s: &'a semaphore::Semaphore,
     data: *mut T,
     // Needed to tell the borrow checker that we are holding a `&mut T`
     marker: marker::PhantomData<&'a mut T>,
+}
+
+/// A helper type used when taking apart a `MutexGuard` without running its
+/// Drop implementation.
+struct MutexGuardInner<'a, T: ?Sized> {
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
+    lock: &'a Mutex<T>,
+}
+
+/// A helper type used when taking apart a `MappedMutexGuard` without running
+/// its Drop implementation.
+struct MappedMutexGuardInner<'a> {
+    s: &'a semaphore::Semaphore,
 }
 
 // As long as T: Send, it's fine to send and share Mutex<T> between threads.
@@ -713,6 +731,17 @@ where
 // === impl MutexGuard ===
 
 impl<'a, T: ?Sized> MutexGuard<'a, T> {
+    fn skip_drop(self) -> MutexGuardInner<'a, T> {
+        let me = mem::ManuallyDrop::new(self);
+        // SAFETY: This duplicates the `resource_span` and then forgets the
+        // original. In the end, we have not duplicated or forgotten any values.
+        MutexGuardInner {
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: unsafe { ptr::read(&me.resource_span) },
+            lock: me.lock,
+        }
+    }
+
     /// Makes a new [`MappedMutexGuard`] for a component of the locked data.
     ///
     /// This operation cannot fail as the [`MutexGuard`] passed in already locked the mutex.
@@ -749,10 +778,9 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
         F: FnOnce(&mut T) -> &mut U,
     {
         let data = f(&mut *this) as *mut U;
-        let s = &this.lock.s;
-        mem::forget(this);
+        let inner = this.skip_drop();
         MappedMutexGuard {
-            s,
+            s: &inner.lock.s,
             data,
             marker: marker::PhantomData,
         }
@@ -799,10 +827,9 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
             Some(data) => data as *mut U,
             None => return Err(this),
         };
-        let s = &this.lock.s;
-        mem::forget(this);
+        let inner = this.skip_drop();
         Ok(MappedMutexGuard {
-            s,
+            s: &inner.lock.s,
             data,
             marker: marker::PhantomData,
         })
@@ -945,6 +972,15 @@ impl<T: ?Sized + fmt::Display> fmt::Display for OwnedMutexGuard<T> {
 // === impl MappedMutexGuard ===
 
 impl<'a, T: ?Sized> MappedMutexGuard<'a, T> {
+    fn skip_drop(self) -> MappedMutexGuardInner<'a> {
+        let me = mem::ManuallyDrop::new(self);
+        // SAFETY: This duplicates the values in every field of the mutex guard,
+        // then forgets the originals, so in the end no value is duplicated.
+        MappedMutexGuardInner {
+            s: me.s,
+        }
+    }
+
     /// Makes a new [`MappedMutexGuard`] for a component of the locked data.
     ///
     /// This operation cannot fail as the [`MappedMutexGuard`] passed in already locked the mutex.
@@ -959,10 +995,9 @@ impl<'a, T: ?Sized> MappedMutexGuard<'a, T> {
         F: FnOnce(&mut T) -> &mut U,
     {
         let data = f(&mut *this) as *mut U;
-        let s = this.s;
-        mem::forget(this);
+        let inner = this.skip_drop();
         MappedMutexGuard {
-            s,
+            s: inner.s,
             data,
             marker: marker::PhantomData,
         }
@@ -986,10 +1021,9 @@ impl<'a, T: ?Sized> MappedMutexGuard<'a, T> {
             Some(data) => data as *mut U,
             None => return Err(this),
         };
-        let s = this.s;
-        mem::forget(this);
+        let inner = this.skip_drop();
         Ok(MappedMutexGuard {
-            s,
+            s: inner.s,
             data,
             marker: marker::PhantomData,
         })
