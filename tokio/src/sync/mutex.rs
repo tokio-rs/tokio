@@ -8,7 +8,7 @@ use std::cell::UnsafeCell;
 use std::error::Error;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use std::{fmt, marker, mem, ptr};
+use std::{fmt, marker, mem};
 
 /// An asynchronous `Mutex`-like type.
 ///
@@ -737,7 +737,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
         // original. In the end, we have not duplicated or forgotten any values.
         MutexGuardInner {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: unsafe { ptr::read(&me.resource_span) },
+            resource_span: unsafe { std::ptr::read(&me.resource_span) },
             lock: me.lock,
         }
     }
@@ -976,9 +976,7 @@ impl<'a, T: ?Sized> MappedMutexGuard<'a, T> {
         let me = mem::ManuallyDrop::new(self);
         // SAFETY: This duplicates the values in every field of the mutex guard,
         // then forgets the originals, so in the end no value is duplicated.
-        MappedMutexGuardInner {
-            s: me.s,
-        }
+        MappedMutexGuardInner { s: me.s }
     }
 
     /// Makes a new [`MappedMutexGuard`] for a component of the locked data.
