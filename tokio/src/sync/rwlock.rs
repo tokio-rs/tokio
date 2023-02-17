@@ -5,7 +5,6 @@ use crate::util::trace;
 use std::cell::UnsafeCell;
 use std::marker;
 use std::marker::PhantomData;
-use std::mem::ManuallyDrop;
 use std::sync::Arc;
 
 pub(crate) mod owned_read_guard;
@@ -596,7 +595,7 @@ impl<T: ?Sized> RwLock<T> {
 
         OwnedRwLockReadGuard {
             data: self.c.get(),
-            lock: ManuallyDrop::new(self),
+            lock: self,
             _p: PhantomData,
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
@@ -719,7 +718,7 @@ impl<T: ?Sized> RwLock<T> {
 
         Ok(OwnedRwLockReadGuard {
             data: self.c.get(),
-            lock: ManuallyDrop::new(self),
+            lock: self,
             _p: PhantomData,
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
@@ -916,7 +915,7 @@ impl<T: ?Sized> RwLock<T> {
         OwnedRwLockWriteGuard {
             permits_acquired: self.mr,
             data: self.c.get(),
-            lock: ManuallyDrop::new(self),
+            lock: self,
             _p: PhantomData,
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,
@@ -1024,7 +1023,7 @@ impl<T: ?Sized> RwLock<T> {
         Ok(OwnedRwLockWriteGuard {
             permits_acquired: self.mr,
             data: self.c.get(),
-            lock: ManuallyDrop::new(self),
+            lock: self,
             _p: PhantomData,
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span,

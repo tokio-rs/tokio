@@ -6,9 +6,10 @@ use crate::util::trace;
 
 use std::cell::UnsafeCell;
 use std::error::Error;
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use std::{fmt, marker, mem};
+use std::{fmt, mem};
 
 /// An asynchronous `Mutex`-like type.
 ///
@@ -186,7 +187,7 @@ pub struct MappedMutexGuard<'a, T: ?Sized> {
     s: &'a semaphore::Semaphore,
     data: *mut T,
     // Needed to tell the borrow checker that we are holding a `&mut T`
-    marker: marker::PhantomData<&'a mut T>,
+    marker: PhantomData<&'a mut T>,
 }
 
 /// A helper type used when taking apart a `MutexGuard` without running its
@@ -199,8 +200,9 @@ struct MutexGuardInner<'a, T: ?Sized> {
 
 /// A helper type used when taking apart a `MappedMutexGuard` without running
 /// its Drop implementation.
-struct MappedMutexGuardInner<'a> {
+struct MappedMutexGuardInner<'a, T: ?Sized> {
     s: &'a semaphore::Semaphore,
+    data: *mut T,
 }
 
 // As long as T: Send, it's fine to send and share Mutex<T> between threads.
@@ -782,7 +784,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
         MappedMutexGuard {
             s: &inner.lock.s,
             data,
-            marker: marker::PhantomData,
+            marker: PhantomData,
         }
     }
 
@@ -831,7 +833,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
         Ok(MappedMutexGuard {
             s: &inner.lock.s,
             data,
-            marker: marker::PhantomData,
+            marker: PhantomData,
         })
     }
 
@@ -972,11 +974,12 @@ impl<T: ?Sized + fmt::Display> fmt::Display for OwnedMutexGuard<T> {
 // === impl MappedMutexGuard ===
 
 impl<'a, T: ?Sized> MappedMutexGuard<'a, T> {
-    fn skip_drop(self) -> MappedMutexGuardInner<'a> {
+    fn skip_drop(self) -> MappedMutexGuardInner<'a, T> {
         let me = mem::ManuallyDrop::new(self);
-        // SAFETY: This duplicates the values in every field of the mutex guard,
-        // then forgets the originals, so in the end no value is duplicated.
-        MappedMutexGuardInner { s: me.s }
+        MappedMutexGuardInner {
+            s: me.s,
+            data: me.data,
+        }
     }
 
     /// Makes a new [`MappedMutexGuard`] for a component of the locked data.
@@ -997,7 +1000,7 @@ impl<'a, T: ?Sized> MappedMutexGuard<'a, T> {
         MappedMutexGuard {
             s: inner.s,
             data,
-            marker: marker::PhantomData,
+            marker: PhantomData,
         }
     }
 
@@ -1023,7 +1026,7 @@ impl<'a, T: ?Sized> MappedMutexGuard<'a, T> {
         Ok(MappedMutexGuard {
             s: inner.s,
             data,
-            marker: marker::PhantomData,
+            marker: PhantomData,
         })
     }
 }
