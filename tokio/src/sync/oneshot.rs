@@ -1056,6 +1056,7 @@ impl<T> Receiver<T> {
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(alias = "recv_blocking"))]
     pub fn blocking_recv(self) -> Result<T, RecvError> {
         crate::future::block_on(self)
     }
