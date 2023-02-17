@@ -235,7 +235,7 @@ mod big_notify {
     // When the random number generator is not available, we fall back to
     // circular access.
 
-    #[derive(Debug)]
+    #[derive(Default, Debug)]
     pub(super) struct BigNotify {
         #[cfg(not(all(feature = "sync", any(feature = "rt", feature = "macros"))))]
         next: AtomicUsize,
@@ -244,18 +244,7 @@ mod big_notify {
 
     impl BigNotify {
         pub(super) fn new() -> Self {
-            Self {
-                inner: [
-                    Notify::new(),
-                    Notify::new(),
-                    Notify::new(),
-                    Notify::new(),
-                    Notify::new(),
-                    Notify::new(),
-                    Notify::new(),
-                    Notify::new(),
-                ],
-            }
+            Self::default()
         }
 
         pub(super) fn notify_waiters(&self) {
