@@ -237,7 +237,7 @@ mod big_notify {
 
     #[derive(Debug)]
     pub(super) struct BigNotify {
-        #[cfg(not(any(feature = "rt", feature = "macros")))]
+        #[cfg(not(all(feature = "sync", any(feature = "rt", feature = "macros"))))]
         next: AtomicUsize,
         inner: [Notify; 8],
     }
@@ -265,14 +265,14 @@ mod big_notify {
         }
 
         /// This function implements the case where randomness is not available.
-        #[cfg(not(any(feature = "rt", feature = "macros")))]
+        #[cfg(not(all(feature = "sync", any(feature = "rt", feature = "macros"))))]
         pub(super) async fn notified(&self) {
             let i = self.next.fetch_add(1, Relaxed) % 8;
             self.inner[i].notified().await;
         }
 
         /// This function implements the case where randomness is available.
-        #[cfg(any(feature = "rt", feature = "macros"))]
+        #[cfg(all(feature = "sync", any(feature = "rt", feature = "macros")))]
         pub(super) async fn notified(&self) {
             let i = crate::runtime::context::thread_rng_n(8) as usize;
             self.inner[i].notified().await;
