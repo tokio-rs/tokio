@@ -62,7 +62,7 @@ use tokio::sync::watch::error::RecvError;
 /// let mut rx = WatchStream::new_on_changed(rx);
 ///
 /// // no output from rx is available at this point - let's check this:
-/// assert!(Pin::new(&mut rx).poll_next(&mut noop_context()).is_pending());
+/// assert!(rx.next().now_or_never().is_none());
 ///
 /// tx.send("goodbye").unwrap();
 /// assert_eq!(rx.next().await, Some("goodbye"));
