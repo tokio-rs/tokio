@@ -248,7 +248,7 @@ mod big_notify {
     // circular access.
 
     pub(super) struct BigNotify {
-        #[cfg(not(all(feature = "sync", any(feature = "rt", feature = "macros"))))]
+        #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
         next: AtomicUsize,
         inner: [Notify; 8],
     }
@@ -256,7 +256,11 @@ mod big_notify {
     impl BigNotify {
         pub(super) fn new() -> Self {
             Self {
-                #[cfg(not(all(feature = "sync", any(feature = "rt", feature = "macros"))))]
+                #[cfg(not(all(
+                    not(loom),
+                    feature = "sync",
+                    any(feature = "rt", feature = "macros")
+                )))]
                 next: AtomicUsize::new(0),
                 inner: Default::default(),
             }
@@ -269,14 +273,14 @@ mod big_notify {
         }
 
         /// This function implements the case where randomness is not available.
-        #[cfg(not(all(feature = "sync", any(feature = "rt", feature = "macros"))))]
+        #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
         pub(super) async fn notified(&self) {
             let i = self.next.fetch_add(1, Relaxed) % 8;
             self.inner[i].notified().await;
         }
 
         /// This function implements the case where randomness is available.
-        #[cfg(all(feature = "sync", any(feature = "rt", feature = "macros")))]
+        #[cfg(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros")))]
         pub(super) async fn notified(&self) {
             let i = crate::runtime::context::thread_rng_n(8) as usize;
             self.inner[i].notified().await;
