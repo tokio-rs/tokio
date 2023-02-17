@@ -243,6 +243,7 @@ impl<T> UnboundedReceiver<T> {
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(alias = "recv_blocking"))]
     pub fn blocking_recv(&mut self) -> Option<T> {
         crate::future::block_on(self.recv())
     }
