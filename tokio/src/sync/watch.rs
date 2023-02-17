@@ -254,17 +254,10 @@ mod big_notify {
     }
 
     impl BigNotify {
-        #[cfg(not(all(feature = "sync", any(feature = "rt", feature = "macros"))))]
         pub(super) fn new() -> Self {
             Self {
+                #[cfg(not(all(feature = "sync", any(feature = "rt", feature = "macros"))))]
                 next: AtomicUsize::new(0),
-                inner: Default::default(),
-            }
-        }
-
-        #[cfg(all(feature = "sync", any(feature = "rt", feature = "macros")))]
-        pub(super) fn new() -> Self {
-            Self {
                 inner: Default::default(),
             }
         }
