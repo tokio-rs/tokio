@@ -94,7 +94,7 @@ pub(super) struct StateCell {
     /// without holding the driver lock is undefined behavior.
     result: UnsafeCell<TimerResult>,
     /// The currently-registered waker
-    waker: CachePadded<AtomicWaker>,
+    waker: AtomicWaker,
 }
 
 impl Default for StateCell {
@@ -114,7 +114,7 @@ impl StateCell {
         Self {
             state: AtomicU64::new(STATE_DEREGISTERED),
             result: UnsafeCell::new(Ok(())),
-            waker: CachePadded(AtomicWaker::new()),
+            waker: AtomicWaker::new(),
         }
     }
 
@@ -139,7 +139,7 @@ impl StateCell {
         // We must register first. This ensures that either `fire` will
         // observe the new waker, or we will observe a racing fire to have set
         // the state, or both.
-        self.waker.0.register_by_ref(waker);
+        self.waker.register_by_ref(waker);
 
         self.read_state()
     }
@@ -227,7 +227,7 @@ impl StateCell {
 
         self.state.store(STATE_DEREGISTERED, Ordering::Release);
 
-        self.waker.0.take_waker()
+        self.waker.take_waker()
     }
 
     /// Marks the timer as registered (poll will return None) and sets the
@@ -331,11 +331,20 @@ pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, Ti
 /// frontend (`Entry`) and driver backend.
 ///
 /// Note that this structure is located inside the `TimerEntry` structure.
-#[derive(Debug)]
-#[repr(C)]
 pub(crate) struct TimerShared {
-    /// Data manipulated by the driver thread itself, only.
-    driver_state: CachePadded<TimerSharedPadded>,
+    /// A link within the doubly-linked list of timers on a particular level and
+    /// slot. Valid only if state is equal to Registered.
+    ///
+    /// Only accessed under the entry lock.
+    pointers: linked_list::Pointers<TimerShared>,
+
+    /// The expiration time for which this entry is currently registered.
+    /// Generally owned by the driver, but is accessed by the entry when not
+    /// registered.
+    cached_when: AtomicU64,
+
+    /// The true expiration time. Set by the timer future, read by the driver.
+    true_when: AtomicU64,
 
     /// Current state. This records whether the timer entry is currently under
     /// the ownership of the driver, and if not, its current state (not
@@ -345,10 +354,23 @@ pub(crate) struct TimerShared {
     _p: PhantomPinned,
 }
 
+unsafe impl Send for TimerShared {}
+unsafe impl Sync for TimerShared {}
+
+impl std::fmt::Debug for TimerShared {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TimerShared")
+            .field("when", &self.true_when.load(Ordering::Relaxed))
+            .field("cached_when", &self.cached_when.load(Ordering::Relaxed))
+            .field("state", &self.state)
+            .finish()
+    }
+}
+
 generate_addr_of_methods! {
     impl<> TimerShared {
         unsafe fn addr_of_pointers(self: NonNull<Self>) -> NonNull<linked_list::Pointers<TimerShared>> {
-            &self.driver_state.0.pointers
+            &self.pointers
         }
     }
 }
@@ -356,8 +378,10 @@ generate_addr_of_methods! {
 impl TimerShared {
     pub(super) fn new() -> Self {
         Self {
+            cached_when: AtomicU64::new(0),
+            true_when: AtomicU64::new(0),
+            pointers: linked_list::Pointers::new(),
             state: StateCell::default(),
-            driver_state: CachePadded(TimerSharedPadded::new()),
             _p: PhantomPinned,
         }
     }
@@ -365,7 +389,7 @@ impl TimerShared {
     /// Gets the cached time-of-expiration value.
     pub(super) fn cached_when(&self) -> u64 {
         // Cached-when is only accessed under the driver lock, so we can use relaxed
-        self.driver_state.0.cached_when.load(Ordering::Relaxed)
+        self.cached_when.load(Ordering::Relaxed)
     }
 
     /// Gets the true time-of-expiration value, and copies it into the cached
@@ -376,10 +400,7 @@ impl TimerShared {
     pub(super) unsafe fn sync_when(&self) -> u64 {
         let true_when = self.true_when();
 
-        self.driver_state
-            .0
-            .cached_when
-            .store(true_when, Ordering::Relaxed);
+        self.cached_when.store(true_when, Ordering::Relaxed);
 
         true_when
     }
@@ -389,10 +410,7 @@ impl TimerShared {
     /// SAFETY: Must be called with the driver lock held, and when this entry is
     /// not in any timer wheel lists.
     unsafe fn set_cached_when(&self, when: u64) {
-        self.driver_state
-            .0
-            .cached_when
-            .store(when, Ordering::Relaxed);
+        self.cached_when.store(when, Ordering::Relaxed);
     }
 
     /// Returns the true time-of-expiration value, with relaxed memory ordering.
@@ -407,7 +425,7 @@ impl TimerShared {
     /// in the timer wheel.
     pub(super) unsafe fn set_expiration(&self, t: u64) {
         self.state.set_expiration(t);
-        self.driver_state.0.cached_when.store(t, Ordering::Relaxed);
+        self.cached_when.store(t, Ordering::Relaxed);
     }
 
     /// Sets the true time-of-expiration only if it is after the current.
@@ -430,48 +448,6 @@ impl TimerShared {
         self.state.might_be_registered()
     }
 }
-
-/// Additional shared state between the driver and the timer which is cache
-/// padded. This contains the information that the driver thread accesses most
-/// frequently to minimize contention. In particular, we move it away from the
-/// waker, as the waker is updated on every poll.
-struct TimerSharedPadded {
-    /// A link within the doubly-linked list of timers on a particular level and
-    /// slot. Valid only if state is equal to Registered.
-    ///
-    /// Only accessed under the entry lock.
-    pointers: linked_list::Pointers<TimerShared>,
-
-    /// The expiration time for which this entry is currently registered.
-    /// Generally owned by the driver, but is accessed by the entry when not
-    /// registered.
-    cached_when: AtomicU64,
-
-    /// The true expiration time. Set by the timer future, read by the driver.
-    true_when: AtomicU64,
-}
-
-impl std::fmt::Debug for TimerSharedPadded {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TimerSharedPadded")
-            .field("when", &self.true_when.load(Ordering::Relaxed))
-            .field("cached_when", &self.cached_when.load(Ordering::Relaxed))
-            .finish()
-    }
-}
-
-impl TimerSharedPadded {
-    fn new() -> Self {
-        Self {
-            cached_when: AtomicU64::new(0),
-            true_when: AtomicU64::new(0),
-            pointers: linked_list::Pointers::new(),
-        }
-    }
-}
-
-unsafe impl Send for TimerShared {}
-unsafe impl Sync for TimerShared {}
 
 unsafe impl linked_list::Link for TimerShared {
     type Handle = TimerHandle;
@@ -660,74 +636,3 @@ impl Drop for TimerEntry {
         unsafe { Pin::new_unchecked(self) }.as_mut().cancel()
     }
 }
-
-// Copied from [crossbeam/cache_padded](https://github.com/crossbeam-rs/crossbeam/blob/fa35346b7c789bba045ad789e894c68c466d1779/crossbeam-utils/src/cache_padded.rs#L62-L127)
-//
-// Starting from Intel's Sandy Bridge, spatial prefetcher is now pulling pairs of 64-byte cache
-// lines at a time, so we have to align to 128 bytes rather than 64.
-//
-// Sources:
-// - https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-optimization-manual.pdf
-// - https://github.com/facebook/folly/blob/1b5288e6eea6df074758f877c849b6e73bbb9fbb/folly/lang/Align.h#L107
-//
-// ARM's big.LITTLE architecture has asymmetric cores and "big" cores have 128-byte cache line size.
-//
-// Sources:
-// - https://www.mono-project.com/news/2016/09/12/arm64-icache/
-//
-// powerpc64 has 128-byte cache line size.
-//
-// Sources:
-// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_ppc64x.go#L9
-#[cfg_attr(
-    any(
-        target_arch = "x86_64",
-        target_arch = "aarch64",
-        target_arch = "powerpc64",
-    ),
-    repr(align(128))
-)]
-// arm, mips, mips64, and riscv64 have 32-byte cache line size.
-//
-// Sources:
-// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_arm.go#L7
-// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mips.go#L7
-// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mipsle.go#L7
-// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mips64x.go#L9
-// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_riscv64.go#L7
-#[cfg_attr(
-    any(
-        target_arch = "arm",
-        target_arch = "mips",
-        target_arch = "mips64",
-        target_arch = "riscv64",
-    ),
-    repr(align(32))
-)]
-// s390x has 256-byte cache line size.
-//
-// Sources:
-// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_s390x.go#L7
-#[cfg_attr(target_arch = "s390x", repr(align(256)))]
-// x86 and wasm have 64-byte cache line size.
-//
-// Sources:
-// - https://github.com/golang/go/blob/dda2991c2ea0c5914714469c4defc2562a907230/src/internal/cpu/cpu_x86.go#L9
-// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_wasm.go#L7
-//
-// All others are assumed to have 64-byte cache line size.
-#[cfg_attr(
-    not(any(
-        target_arch = "x86_64",
-        target_arch = "aarch64",
-        target_arch = "powerpc64",
-        target_arch = "arm",
-        target_arch = "mips",
-        target_arch = "mips64",
-        target_arch = "riscv64",
-        target_arch = "s390x",
-    )),
-    repr(align(64))
-)]
-#[derive(Debug, Default)]
-struct CachePadded<T>(T);
