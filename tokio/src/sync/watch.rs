@@ -235,6 +235,7 @@ pub mod error {
 
 mod big_notify {
     use super::*;
+    use crate::sync::futures::Notified;
 
     // To avoid contention on the lock inside the `Notify`, we store multiple
     // copies of it. Then, we use either circular access or randomness to spread
@@ -274,16 +275,16 @@ mod big_notify {
 
         /// This function implements the case where randomness is not available.
         #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
-        pub(super) async fn notified(&self) {
+        pub(super) fn notified(&self) -> Notified<'_> {
             let i = self.next.fetch_add(1, Relaxed) % 8;
-            self.inner[i].notified().await;
+            self.inner[i].notified()
         }
 
         /// This function implements the case where randomness is available.
         #[cfg(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros")))]
-        pub(super) async fn notified(&self) {
+        pub(super) fn notified(&self) -> Notified<'_> {
             let i = crate::runtime::context::thread_rng_n(8) as usize;
-            self.inner[i].notified().await;
+            self.inner[i].notified()
         }
     }
 }
