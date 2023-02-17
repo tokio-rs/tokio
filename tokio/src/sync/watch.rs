@@ -59,6 +59,7 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::Relaxed;
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::mem;
+use std::fmt;
 use std::ops;
 use std::panic;
 
@@ -166,7 +167,6 @@ impl<'a, T> Ref<'a, T> {
     }
 }
 
-#[derive(Debug)]
 struct Shared<T> {
     /// The most recent value.
     value: RwLock<T>,
@@ -185,6 +185,18 @@ struct Shared<T> {
 
     /// Notifies any task listening for `Receiver` dropped events.
     notify_tx: Notify,
+}
+
+impl<T: fmt::Debug> fmt::Debug for Shared<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let state = self.state.load();
+        f.debug_struct("Shared")
+            .field("value", &self.value)
+            .field("version", &state.version())
+            .field("is_closed", &state.is_closed())
+            .field("ref_count_rx", &self.ref_count_rx)
+            .finish()
+    }
 }
 
 pub mod error {
@@ -235,7 +247,7 @@ mod big_notify {
     // When the random number generator is not available, we fall back to
     // circular access.
 
-    #[derive(Default, Debug)]
+    #[derive(Default)]
     pub(super) struct BigNotify {
         #[cfg(not(all(feature = "sync", any(feature = "rt", feature = "macros"))))]
         next: AtomicUsize,
