@@ -44,10 +44,10 @@ async fn watch_stream_from_rx() {
 }
 
 #[tokio::test]
-async fn watch_stream_new_on_change() {
+async fn watch_stream_from_changes() {
     let (tx, rx) = watch::channel("hello");
 
-    let mut stream = WatchStream::new_on_changed(rx);
+    let mut stream = WatchStream::from_changes(rx);
 
     assert_pending!(spawn(&mut stream).poll_next());
 

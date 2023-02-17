@@ -12,7 +12,7 @@ use tokio::sync::watch::error::RecvError;
 ///
 /// This stream will start by yielding the current value when the WatchStream is polled,
 /// regardless of whether it was the initial value or sent afterwards,
-/// unless you use [`WatchStream<T>::new_on_changed`].
+/// unless you use [`WatchStream<T>::from_changes`].
 ///
 /// # Examples
 ///
@@ -48,7 +48,7 @@ use tokio::sync::watch::error::RecvError;
 /// # }
 /// ```
 ///
-/// Example with [`WatchStream<T>::new_on_changed`]:
+/// Example with [`WatchStream<T>::from_changes`]:
 ///
 /// ```
 /// # #[tokio::main]
@@ -58,7 +58,7 @@ use tokio::sync::watch::error::RecvError;
 /// use tokio_stream::{StreamExt, wrappers::WatchStream};
 ///
 /// let (tx, rx) = watch::channel("hello");
-/// let mut rx = WatchStream::new_on_changed(rx);
+/// let mut rx = WatchStream::from_changes(rx);
 ///
 /// // no output from rx is available at this point - let's check this:
 /// assert!(rx.next().now_or_never().is_none());
@@ -91,7 +91,7 @@ impl<T: 'static + Clone + Send + Sync> WatchStream<T> {
     }
 
     /// Create a new `WatchStream` that waits for the value to be changed.
-    pub fn new_on_changed(rx: Receiver<T>) -> Self {
+    pub fn from_changes(rx: Receiver<T>) -> Self {
         Self {
             inner: ReusableBoxFuture::new(make_future(rx)),
         }
