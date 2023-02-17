@@ -7,7 +7,7 @@
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
-use crate::util::linked_list::{self, LinkedList};
+use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 use crate::util::WakeList;
 
 use std::cell::UnsafeCell;
@@ -20,6 +20,7 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll, Waker};
 
 type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
+type GuardedWaitList = GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
 
 /// Notifies a single task to wake up.
 ///
@@ -250,6 +251,59 @@ generate_addr_of_methods! {
     impl<> Waiter {
         unsafe fn addr_of_pointers(self: NonNull<Self>) -> NonNull<linked_list::Pointers<Waiter>> {
             &self.pointers
+        }
+    }
+}
+
+/// List used in `Notify::notify_waiters`. It wraps a guarded linked list
+/// and gates the access to it on `notify.waiters` mutex. It also empties
+/// the list on drop.
+struct NotifyWaitersList<'a> {
+    list: GuardedWaitList,
+    is_empty: bool,
+    notify: &'a Notify,
+}
+
+impl<'a> NotifyWaitersList<'a> {
+    fn new(
+        unguarded_list: WaitList,
+        guard: Pin<&'a mut UnsafeCell<Waiter>>,
+        notify: &'a Notify,
+    ) -> NotifyWaitersList<'a> {
+        // Safety: pointer to the guarding waiter is not null.
+        let guard_ptr = unsafe { NonNull::new_unchecked(guard.get()) };
+        let list = unguarded_list.into_guarded(guard_ptr);
+        NotifyWaitersList {
+            list,
+            is_empty: false,
+            notify,
+        }
+    }
+
+    /// Removes the last element from the guarded list. Modifying this list
+    /// requires an exclusive access to the main list in `Notify`.
+    fn pop_back_locked(&mut self, _waiters: &mut WaitList) -> Option<NonNull<Waiter>> {
+        let result = self.list.pop_back();
+        if result.is_none() {
+            // Save information about emptiness to avoid waiting for lock
+            // in the destructor.
+            self.is_empty = true;
+        }
+        result
+    }
+}
+
+impl Drop for NotifyWaitersList<'_> {
+    fn drop(&mut self) {
+        // If the list is not empty, we unlink all waiters from it.
+        // We do call wakers to avoid double panic.
+        if !self.is_empty {
+            let _lock_guard = self.notify.waiters.lock();
+            while let Some(mut waiter) = self.list.pop_back() {
+                // Safety: we hold the lock.
+                let waiter = unsafe { waiter.as_mut() };
+                waiter.notified = Some(NotificationType::AllWaiters);
+            }
         }
     }
 }
@@ -534,21 +588,25 @@ impl Notify {
         let new_state = set_state(inc_num_notify_waiters_calls(curr), EMPTY);
         self.state.store(new_state, SeqCst);
 
-        let decoupled_list = std::mem::take(&mut *waiters);
-
         // It is critical for `GuardedLinkedList` safety that the guard node is
         // pinned in memory and is not dropped until the guarded list is dropped.
         let guard = UnsafeCell::new(Waiter::new());
         pin!(guard);
 
-        // Safety: the pointer is not null.
-        let mut guarded_list =
-            unsafe { decoupled_list.into_guarded(NonNull::new_unchecked(guard.get())) };
+        // We move all waiters to a secondary list. It uses a `GuardedLinkedList`
+        // underneath to allow every waiter to safely remove itself from it.
+        //
+        // * This list will be still guarded by the `waiters` lock.
+        //   `NotifyWaitersList` wrapper makes sure we hold the lock to modify it.
+        // * This wrapper will empty the list on drop. It is critical for safety
+        //   that we will not leave any list entry with a pointer to the local
+        //   guard node after this function returns / panics.
+        let mut list = NotifyWaitersList::new(std::mem::take(&mut *waiters), guard, self);
 
         let mut wakers = WakeList::new();
         'outer: loop {
             while wakers.can_push() {
-                match guarded_list.pop_back() {
+                match list.pop_back_locked(&mut waiters) {
                     Some(mut waiter) => {
                         // Safety: `waiters` lock is still held.
                         let waiter = unsafe { waiter.as_mut() };
@@ -568,9 +626,10 @@ impl Notify {
             }
 
             // Release the lock before notifying.
-            // `guarded_list` is no longer used.
             drop(waiters);
 
+            // One of the wakers may panic, but the remaining waiters will still
+            // be unlinked from the list in `NotifyWaitersList` destructor.
             wakers.wake_all();
 
             // Acquire the lock again.
@@ -891,6 +950,7 @@ impl Notified<'_> {
                         // Our waker has been notified and our waiter is already removed from
                         // the list. Reset the notification and convert to `Done`.
                         w.notified = None;
+                        w.waker = None;
                         *state = Done;
                     } else if get_num_notify_waiters_calls(curr) != *notify_waiters_calls {
                         // Before we add a waiter to the list we check if these numbers are
@@ -900,7 +960,7 @@ impl Notified<'_> {
                         // We can treat the waiter as notified and remove it from the list, as
                         // it would have been notified in the `notify_waiters` call anyways.
 
-                        w.waker.take();
+                        w.waker = None;
 
                         // Safety: we hold the lock, so we have an exclusive access to the list.
                         // The list is used in `notify_waiters`, so it must be guarded.
