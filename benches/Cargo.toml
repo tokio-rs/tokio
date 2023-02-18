@@ -28,6 +28,16 @@ path = "sync_mpsc.rs"
 harness = false
 
 [[bench]]
+name = "sync_mpsc_oneshot"
+path = "sync_mpsc_oneshot.rs"
+harness = false
+
+[[bench]]
+name = "sync_watch"
+path = "sync_watch.rs"
+harness = false
+
+[[bench]]
 name = "rt_multi_threaded"
 path = "rt_multi_threaded.rs"
 harness = false
