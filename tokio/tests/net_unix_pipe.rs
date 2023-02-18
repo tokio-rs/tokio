@@ -1,7 +1,7 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
 
-use tokio::io::unix::pipe;
+use tokio::net::unix::pipe;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
 use tokio_test::task;
 use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};

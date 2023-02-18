@@ -235,8 +235,12 @@ cfg_aio! {
 }
 
 cfg_net_unix! {
-    /// Asynchronous IO structures specific to Unix-like operating systems.
-    pub mod unix;
+    mod async_fd;
+
+    pub mod unix {
+        //! Asynchronous IO structures specific to Unix-like operating systems.
+        pub use super::async_fd::{AsyncFd, AsyncFdReadyGuard, AsyncFdReadyMutGuard, TryIoError};
+    }
 }
 
 cfg_io_std! {

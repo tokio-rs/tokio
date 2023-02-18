@@ -1,5 +1,3 @@
-#![cfg(not(loom))]
-
 //! Unix pipe types.
 
 use crate::io::interest::Interest;
@@ -37,7 +35,7 @@ cfg_io_util! {
 /// Opening a pair of pipe ends from a FIFO file:
 ///
 /// ```no_run
-/// use tokio::io::unix::pipe;
+/// use tokio::net::unix::pipe;
 /// # use std::error::Error;
 ///
 /// const FIFO_NAME: &str = "path/to/a/fifo";
@@ -52,7 +50,7 @@ cfg_io_util! {
 /// Opening a [`Sender`] on Linux when you are sure the file is a FIFO:
 ///
 /// ```ignore
-/// use tokio::io::unix::pipe;
+/// use tokio::net::unix::pipe;
 /// use nix::{unistd::mkfifo, sys::stat::Mode};
 /// # use std::error::Error;
 ///
@@ -98,7 +96,7 @@ impl OpenOptions {
     /// Opening a [`Sender`] even if there are no open reading ends:
     ///
     /// ```ignore
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     ///
     /// let tx = pipe::OpenOptions::new()
     ///     .read_write(true)
@@ -112,7 +110,7 @@ impl OpenOptions {
     /// [`UnexpectedEof`]: std::io::ErrorKind::UnexpectedEof
     ///
     /// ```ignore
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     ///
     /// let tx = pipe::OpenOptions::new()
     ///     .read_write(true)
@@ -137,7 +135,7 @@ impl OpenOptions {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     /// use nix::{unistd::mkfifo, sys::stat::Mode};
     /// # use std::error::Error;
     ///
@@ -258,7 +256,7 @@ enum PipeEnd {
 /// Opening a `Sender` from a FIFO file should look like this:
 ///
 /// ```no_run
-/// use tokio::io::unix::pipe;
+/// use tokio::net::unix::pipe;
 /// use tokio::time::{self, Duration};
 ///
 /// const FIFO_NAME: &str = "path/to/a/fifo";
@@ -295,7 +293,7 @@ enum PipeEnd {
 ///
 /// ```ignore
 /// use tokio::io::AsyncWriteExt;
-/// use tokio::io::unix::pipe;
+/// use tokio::net::unix::pipe;
 ///
 /// const FIFO_NAME: &str = "path/to/a/fifo";
 ///
@@ -368,7 +366,7 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     /// use std::fs::OpenOptions;
     /// use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
     /// # use std::error::Error;
@@ -437,7 +435,7 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     /// use std::io;
     ///
     /// #[tokio::main]
@@ -526,7 +524,7 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     /// use std::io;
     ///
     /// #[tokio::main]
@@ -590,7 +588,7 @@ impl Sender {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     /// use std::io;
     ///
     /// #[tokio::main]
@@ -674,7 +672,7 @@ impl AsRawFd for Sender {
 /// Receiving messages from a named pipe in a loop:
 ///
 /// ```no_run
-/// use tokio::io::unix::pipe;
+/// use tokio::net::unix::pipe;
 /// use tokio::io::{self, AsyncReadExt};
 ///
 /// const FIFO_NAME: &str = "path/to/a/fifo";
@@ -713,7 +711,7 @@ impl AsRawFd for Sender {
 /// the POSIX standard and it is only guaranteed to work on Linux.
 ///
 /// ```ignore
-/// use tokio::io::unix::pipe;
+/// use tokio::net::unix::pipe;
 /// use tokio::io::AsyncReadExt;
 /// # use std::error::Error;
 ///
@@ -789,7 +787,7 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     /// use std::fs::OpenOptions;
     /// use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
     /// # use std::error::Error;
@@ -857,7 +855,7 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     /// use std::io;
     ///
     /// #[tokio::main]
@@ -953,7 +951,7 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     /// use std::io;
     ///
     /// #[tokio::main]
@@ -1021,7 +1019,7 @@ impl Receiver {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io::unix::pipe;
+    /// use tokio::net::unix::pipe;
     /// use std::io;
     ///
     /// #[tokio::main]
@@ -1091,7 +1089,7 @@ impl Receiver {
         /// # Examples
         ///
         /// ```no_run
-        /// use tokio::io::unix::pipe;
+        /// use tokio::net::unix::pipe;
         /// use std::io;
         ///
         /// #[tokio::main]
