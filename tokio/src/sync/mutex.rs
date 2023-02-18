@@ -1001,7 +1001,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::sync::{Mutex, MutexGuard};
+    /// use tokio::sync::{Mutex, OwnedMutexGuard};
     /// use std::sync::Arc;
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1012,7 +1012,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
     /// let foo = Arc::new(Mutex::new(Foo(1)));
     ///
     /// {
-    ///     let mut mapped = OwnedMutexGuard::map(foo.lock_owned().await, |f| &mut f.0);
+    ///     let mut mapped = OwnedMutexGuard::map(foo.clone().lock_owned().await, |f| &mut f.0);
     ///     *mapped = 2;
     /// }
     ///
@@ -1048,7 +1048,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::sync::{Mutex, MutexGuard};
+    /// use tokio::sync::{Mutex, OwnedMutexGuard};
     /// use std::sync::Arc;
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1059,7 +1059,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
     /// let foo = Arc::new(Mutex::new(Foo(1)));
     ///
     /// {
-    ///     let mut mapped = OwnedMutexGuard::try_map(foo.lock_owned().await, |f| Some(&mut f.0))
+    ///     let mut mapped = OwnedMutexGuard::try_map(foo.clone().lock_owned().await, |f| Some(&mut f.0))
     ///         .expect("should not fail");
     ///     *mapped = 2;
     /// }
