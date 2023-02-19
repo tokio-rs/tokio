@@ -53,7 +53,7 @@ use tokio::sync::watch::error::RecvError;
 /// ```
 /// # #[tokio::main]
 /// # async fn main() {
-/// use futures_util::future::FutureExt;
+/// use futures::future::FutureExt;
 /// use tokio::sync::watch;
 /// use tokio_stream::{StreamExt, wrappers::WatchStream};
 ///
