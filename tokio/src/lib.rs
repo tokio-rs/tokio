@@ -384,7 +384,14 @@
 //! [unstable features]: https://internals.rust-lang.org/t/feature-request-unstable-opt-in-non-transitive-crate-features/16193#why-not-a-crate-feature-2
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 //!
-//! ## WASM support
+//! ## Supported platforms
+//!
+//! Tokio supports any platform that mio supports. You can find the list [in
+//! mio's documentation][mio-supported].
+//!
+//! [mio-supported]: https://crates.io/crates/mio#platforms
+//!
+//! ### WASM support
 //!
 //! Tokio has some limited support for the WASM platform. Without the
 //! `tokio_unstable` flag, the following features are supported:
