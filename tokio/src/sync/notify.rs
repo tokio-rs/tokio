@@ -917,10 +917,14 @@ impl Notified<'_> {
                         }
                     }
 
+                    let mut old_waker = None;
                     if waker.is_some() {
                         // Safety: called while locked.
+                        //
+                        // The use of `old_waiter` here is not necessary, as the field is always
+                        // None when we reach this line.
                         unsafe {
-                            (*waiter.get()).waker = waker;
+                            old_waker = std::mem::replace(&mut (*waiter.get()).waker, waker);
                         }
                     }
 
@@ -930,6 +934,9 @@ impl Notified<'_> {
                     waiters.push_front(unsafe { NonNull::new_unchecked(waiter.get()) });
 
                     *state = Waiting;
+
+                    drop(waiters);
+                    drop(old_waker);
 
                     return Poll::Pending;
                 }
@@ -945,12 +952,13 @@ impl Notified<'_> {
 
                     // Safety: called while locked
                     let w = unsafe { &mut *waiter.get() };
+                    let mut old_waker = None;
 
                     if w.notified.is_some() {
                         // Our waker has been notified and our waiter is already removed from
                         // the list. Reset the notification and convert to `Done`.
+                        old_waker = std::mem::take(&mut w.waker);
                         w.notified = None;
-                        w.waker = None;
                         *state = Done;
                     } else if get_num_notify_waiters_calls(curr) != *notify_waiters_calls {
                         // Before we add a waiter to the list we check if these numbers are
@@ -960,7 +968,7 @@ impl Notified<'_> {
                         // We can treat the waiter as notified and remove it from the list, as
                         // it would have been notified in the `notify_waiters` call anyways.
 
-                        w.waker = None;
+                        old_waker = std::mem::take(&mut w.waker);
 
                         // Safety: we hold the lock, so we have an exclusive access to the list.
                         // The list is used in `notify_waiters`, so it must be guarded.
@@ -975,9 +983,13 @@ impl Notified<'_> {
                                 None => true,
                             };
                             if should_update {
-                                w.waker = Some(waker.clone());
+                                old_waker = std::mem::replace(&mut w.waker, Some(waker.clone()));
                             }
                         }
+
+                        // Drop the old waker after releasing the lock.
+                        drop(waiters);
+                        drop(old_waker);
 
                         return Poll::Pending;
                     }
@@ -988,6 +1000,9 @@ impl Notified<'_> {
                     // is helpful to visualize the scope of the critical
                     // section.
                     drop(waiters);
+
+                    // Drop the old waker after releasing the lock.
+                    drop(old_waker);
                 }
                 Done => {
                     return Poll::Ready(());
