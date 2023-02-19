@@ -65,8 +65,8 @@ use std::{task::Context, task::Poll};
 /// # Examples
 ///
 /// This example shows how to turn [`std::net::TcpStream`] asynchronous using
-/// `AsyncFd`.  It implements `read` as an async fn, and `AsyncWrite` as a trait
-/// to show how to implement both approaches.
+/// `AsyncFd`.  It implements the read/write operations both as an `async fn`
+/// and using the IO traits [`AsyncRead`] and [`AsyncWrite`].
 ///
 /// ```no_run
 /// use futures::ready;
@@ -74,7 +74,7 @@ use std::{task::Context, task::Poll};
 /// use std::net::TcpStream;
 /// use std::pin::Pin;
 /// use std::task::{Context, Poll};
-/// use tokio::io::AsyncWrite;
+/// use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 /// use tokio::io::unix::AsyncFd;
 ///
 /// pub struct AsyncTcpStream {
@@ -95,6 +95,39 @@ use std::{task::Context, task::Poll};
 ///
 ///             match guard.try_io(|inner| inner.get_ref().read(out)) {
 ///                 Ok(result) => return result,
+///                 Err(_would_block) => continue,
+///             }
+///         }
+///     }
+///
+///     pub async fn write(&self, buf: &[u8]) -> io::Result<usize> {
+///         loop {
+///             let mut guard = self.inner.writable().await?;
+///
+///             match guard.try_io(|inner| inner.get_ref().write(buf)) {
+///                 Ok(result) => return result,
+///                 Err(_would_block) => continue,
+///             }
+///         }
+///     }
+/// }
+///
+/// impl AsyncRead for AsyncTcpStream {
+///     fn poll_read(
+///         self: Pin<&mut Self>,
+///         cx: &mut Context<'_>,
+///         buf: &mut ReadBuf<'_>
+///     ) -> Poll<io::Result<()>> {
+///         loop {
+///             let mut guard = ready!(self.inner.poll_read_ready(cx))?;
+///
+///             let unfilled = buf.initialize_unfilled();
+///             match guard.try_io(|inner| inner.get_ref().read(unfilled)) {
+///                 Ok(Ok(len)) => {
+///                     buf.advance(len);
+///                     return Poll::Ready(Ok(()));
+///                 },
+///                 Ok(Err(err)) => return Poll::Ready(Err(err)),
 ///                 Err(_would_block) => continue,
 ///             }
 ///         }
@@ -139,6 +172,8 @@ use std::{task::Context, task::Poll};
 /// [`writable`]: method@Self::writable
 /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
 /// [`TcpStream::poll_read_ready`]: struct@crate::net::TcpStream
+/// [`AsyncRead`]: trait@crate::io::AsyncRead
+/// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 pub struct AsyncFd<T: AsRawFd> {
     registration: Registration,
     inner: Option<T>,
