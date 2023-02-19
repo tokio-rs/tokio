@@ -405,7 +405,8 @@
 //! documentation][mio-supported]. However, these additional platforms may
 //! become unsupported in the future.
 //!
-//! Note that although Windows is supported, we do not support Wine.
+//! Note that Wine is considered to be a different platform from Windows. See
+//! mio's documentation for more information on Wine support.
 //!
 //! [mio-supported]: https://crates.io/crates/mio#platforms
 //!
