@@ -402,8 +402,8 @@ impl Sender {
 
     /// Waits for any of the requested ready states.
     ///
-    /// This function can be used to wait for for [`WRITABLE`] and [`WRITE_CLOSED`]
-    /// events.
+    /// This function can be used instead of [`writable()`] to check the returned
+    /// ready set for [`Ready::WRITABLE`] and [`Ready::WRITE_CLOSED`] events.
     ///
     /// The function may complete without the pipe being ready. This is a
     /// false-positive and attempting an operation will return with
@@ -411,8 +411,7 @@ impl Sender {
     /// [`Ready`] set, so you should always check the returned value and possibly
     /// wait again if the requested states are not set.
     ///
-    /// [`WRITABLE`]: Ready::WRITABLE
-    /// [`WRITE_CLOSED`]: Ready::WRITE_CLOSED
+    /// [`writable()`]: Self::writable
     ///
     /// # Cancel safety
     ///
@@ -823,7 +822,8 @@ impl Receiver {
 
     /// Waits for any of the requested ready states.
     ///
-    /// This function can be used to wait for [`READABLE`] and [`READ_CLOSED`] events.
+    /// This function can be used instead of [`readable()`] to check the returned
+    /// ready set for [`Ready::READABLE`] and [`Ready::READ_CLOSED`] events.
     ///
     /// The function may complete without the pipe being ready. This is a
     /// false-positive and attempting an operation will return with
@@ -831,8 +831,7 @@ impl Receiver {
     /// [`Ready`] set, so you should always check the returned value and possibly
     /// wait again if the requested states are not set.
     ///
-    /// [`READABLE`]: Ready::READABLE
-    /// [`READ_CLOSED`]: Ready::READ_CLOSED
+    /// [`readable()`]: Self::readable
     ///
     /// # Cancel safety
     ///
