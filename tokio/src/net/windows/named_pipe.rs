@@ -1701,14 +1701,18 @@ impl ServerOptions {
     /// The default pipe mode is [`PipeMode::Byte`]. See [`PipeMode`] for
     /// documentation of what each mode means.
     ///
-    /// This corresponding to specifying [`dwPipeMode`].
+    /// This corresponds to specifying `PIPE_TYPE_` and `PIPE_READMODE_` in  [`dwPipeMode`].
     ///
     /// [`dwPipeMode`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn pipe_mode(&mut self, pipe_mode: PipeMode) -> &mut Self {
         let is_msg = matches!(pipe_mode, PipeMode::Message);
         // Pipe mode is implemented as a bit flag 0x4. Set is message and unset
         // is byte.
-        bool_flag!(self.pipe_mode, is_msg, windows_sys::PIPE_TYPE_MESSAGE);
+        bool_flag!(
+            self.pipe_mode,
+            is_msg,
+            windows_sys::PIPE_TYPE_MESSAGE | windows_sys::PIPE_READMODE_MESSAGE
+        );
         self
     }
 
@@ -2268,6 +2272,7 @@ impl ServerOptions {
 pub struct ClientOptions {
     desired_access: u32,
     security_qos_flags: u32,
+    pipe_mode: PipeMode,
 }
 
 impl ClientOptions {
@@ -2289,6 +2294,7 @@ impl ClientOptions {
             desired_access: windows_sys::GENERIC_READ | windows_sys::GENERIC_WRITE,
             security_qos_flags: windows_sys::SECURITY_IDENTIFICATION
                 | windows_sys::SECURITY_SQOS_PRESENT,
+            pipe_mode: PipeMode::Byte,
         }
     }
 
@@ -2338,6 +2344,15 @@ impl ClientOptions {
     pub fn security_qos_flags(&mut self, flags: u32) -> &mut Self {
         // See: https://github.com/rust-lang/rust/pull/58216
         self.security_qos_flags = flags | windows_sys::SECURITY_SQOS_PRESENT;
+        self
+    }
+
+    /// The pipe mode.
+    ///
+    /// The default pipe mode is [`PipeMode::Byte`]. See [`PipeMode`] for
+    /// documentation of what each mode means.
+    pub fn pipe_mode(&mut self, pipe_mode: PipeMode) -> &mut Self {
+        self.pipe_mode = pipe_mode;
         self
     }
 
@@ -2435,6 +2450,20 @@ impl ClientOptions {
 
         if h == windows_sys::INVALID_HANDLE_VALUE {
             return Err(io::Error::last_os_error());
+        }
+
+        if matches!(self.pipe_mode, PipeMode::Message) {
+            let mut mode = windows_sys::PIPE_READMODE_MESSAGE;
+            let result = windows_sys::SetNamedPipeHandleState(
+                h,
+                &mut mode,
+                ptr::null_mut(),
+                ptr::null_mut(),
+            );
+
+            if result == 0 {
+                return Err(io::Error::last_os_error());
+            }
         }
 
         NamedPipeClient::from_raw_handle(h as _)
@@ -2556,7 +2585,9 @@ unsafe fn named_pipe_info(handle: RawHandle) -> io::Result<PipeInfo> {
 
 #[cfg(test)]
 mod test {
-    use self::windows_sys::{PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE};
+    use self::windows_sys::{
+        PIPE_READMODE_MESSAGE, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE,
+    };
     use super::*;
 
     #[test]
@@ -2588,13 +2619,16 @@ mod test {
 
         opts.reject_remote_clients(false);
         opts.pipe_mode(PipeMode::Message);
-        assert_eq!(opts.pipe_mode, PIPE_TYPE_MESSAGE);
+        assert_eq!(opts.pipe_mode, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE);
 
         opts.reject_remote_clients(true);
         opts.pipe_mode(PipeMode::Message);
         assert_eq!(
             opts.pipe_mode,
-            PIPE_TYPE_MESSAGE | PIPE_REJECT_REMOTE_CLIENTS
+            PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_REJECT_REMOTE_CLIENTS
         );
+
+        opts.pipe_mode(PipeMode::Byte);
+        assert_eq!(opts.pipe_mode, PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS);
     }
 }

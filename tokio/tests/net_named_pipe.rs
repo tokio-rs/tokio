@@ -5,7 +5,7 @@ use std::io;
 use std::mem;
 use std::os::windows::io::AsRawHandle;
 use std::time::Duration;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::windows::named_pipe::{ClientOptions, PipeMode, ServerOptions};
 use tokio::time;
 use windows_sys::Win32::Foundation::{ERROR_NO_DATA, ERROR_PIPE_BUSY, NO_ERROR, UNICODE_STRING};
@@ -327,17 +327,51 @@ async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
     Ok(())
 }
 
-// This tests what happens when a client tries to disconnect.
+// This tests that message mode works as expected.
 #[tokio::test]
 async fn test_named_pipe_mode_message() -> io::Result<()> {
-    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-mode-message";
+    // it's easy to accidentally get a seemingly working test here because byte pipes
+    // often return contents at write boundaries. to make sure we're doing the right thing we
+    // explicitly test that it doesn't work in byte mode.
+    _named_pipe_mode_message(PipeMode::Message).await?;
+    _named_pipe_mode_message(PipeMode::Byte).await
+}
 
-    let server = ServerOptions::new()
-        .pipe_mode(PipeMode::Message)
-        .create(PIPE_NAME)?;
+async fn _named_pipe_mode_message(mode: PipeMode) -> io::Result<()> {
+    let pipe_name = format!(
+        r"\\.\pipe\test-named-pipe-mode-message-{}",
+        matches!(mode, PipeMode::Message)
+    );
+    let mut buf = [0u8; 32];
 
-    let _ = ClientOptions::new().open(PIPE_NAME)?;
+    let mut server = ServerOptions::new()
+        .first_pipe_instance(true)
+        .pipe_mode(mode)
+        .create(&pipe_name)?;
+
+    let mut client = ClientOptions::new().pipe_mode(mode).open(&pipe_name)?;
+
     server.connect().await?;
+
+    // this needs a few iterations, presumably Windows waits for a few calls before merging buffers
+    for _ in 0..10 {
+        client.write_all(b"hello").await?;
+        server.write_all(b"world").await?;
+    }
+    for _ in 0..10 {
+        let n = server.read(&mut buf).await?;
+        if buf[..n] != b"hello"[..] {
+            assert!(matches!(mode, PipeMode::Byte));
+            return Ok(());
+        }
+        let n = client.read(&mut buf).await?;
+        if buf[..n] != b"world"[..] {
+            assert!(matches!(mode, PipeMode::Byte));
+            return Ok(());
+        }
+    }
+    // byte mode should have errored before.
+    assert!(matches!(mode, PipeMode::Message));
     Ok(())
 }
 
