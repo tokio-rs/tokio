@@ -79,7 +79,7 @@ tokio_thread_local! {
     }
 }
 
-#[cfg(feature = "macros")]
+#[cfg(any(feature = "macros", all(feature = "sync", feature = "rt")))]
 pub(crate) fn thread_rng_n(n: u32) -> u32 {
     CONTEXT.with(|ctx| ctx.rng.fastrand_n(n))
 }
