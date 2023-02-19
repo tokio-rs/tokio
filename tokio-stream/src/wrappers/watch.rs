@@ -10,8 +10,9 @@ use tokio::sync::watch::error::RecvError;
 
 /// A wrapper around [`tokio::sync::watch::Receiver`] that implements [`Stream`].
 ///
-/// This stream will always start by yielding the current value when the WatchStream is polled,
-/// regardless of whether it was the initial value or sent afterwards.
+/// This stream will start by yielding the current value when the WatchStream is polled,
+/// regardless of whether it was the initial value or sent afterwards,
+/// unless you use [`WatchStream<T>::from_changes`].
 ///
 /// # Examples
 ///
@@ -40,6 +41,28 @@ use tokio::sync::watch::error::RecvError;
 /// let (tx, rx) = watch::channel("hello");
 /// let mut rx = WatchStream::new(rx);
 ///
+/// // existing rx output with "hello" is ignored here
+///
+/// tx.send("goodbye").unwrap();
+/// assert_eq!(rx.next().await, Some("goodbye"));
+/// # }
+/// ```
+///
+/// Example with [`WatchStream<T>::from_changes`]:
+///
+/// ```
+/// # #[tokio::main]
+/// # async fn main() {
+/// use futures::future::FutureExt;
+/// use tokio::sync::watch;
+/// use tokio_stream::{StreamExt, wrappers::WatchStream};
+///
+/// let (tx, rx) = watch::channel("hello");
+/// let mut rx = WatchStream::from_changes(rx);
+///
+/// // no output from rx is available at this point - let's check this:
+/// assert!(rx.next().now_or_never().is_none());
+///
 /// tx.send("goodbye").unwrap();
 /// assert_eq!(rx.next().await, Some("goodbye"));
 /// # }
@@ -64,6 +87,13 @@ impl<T: 'static + Clone + Send + Sync> WatchStream<T> {
     pub fn new(rx: Receiver<T>) -> Self {
         Self {
             inner: ReusableBoxFuture::new(async move { (Ok(()), rx) }),
+        }
+    }
+
+    /// Create a new `WatchStream` that waits for the value to be changed.
+    pub fn from_changes(rx: Receiver<T>) -> Self {
+        Self {
+            inner: ReusableBoxFuture::new(make_future(rx)),
         }
     }
 }
