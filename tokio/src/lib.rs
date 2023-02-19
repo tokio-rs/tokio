@@ -386,8 +386,23 @@
 //!
 //! ## Supported platforms
 //!
-//! Tokio supports any platform that mio supports. You can find the list [in
-//! mio's documentation][mio-supported].
+//! Tokio currently guarantees support for the following platforms:
+//!
+//!  * Linux
+//!  * Windows
+//!  * Android (API level 21)
+//!  * macOS
+//!  * iOS
+//!  * FreeBSD
+//!
+//! Tokio will continue to support these platforms in the future. However,
+//! future releases may bump things like the minimum required libc version on
+//! Linux or the API level on Android.
+//!
+//! Beyond the above platforms, Tokio is intended to work on all platforms
+//! supported by the mio crate. You can find a longer list [in mio's
+//! documentation][mio-supported]. However, these additional platforms may
+//! become unsupported in the future.
 //!
 //! [mio-supported]: https://crates.io/crates/mio#platforms
 //!
