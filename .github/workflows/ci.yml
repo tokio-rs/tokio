@@ -209,7 +209,6 @@ jobs:
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
-          PROPTEST_CASES: 10
 
   asan:
     name: asan
