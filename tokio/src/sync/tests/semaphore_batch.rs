@@ -255,11 +255,10 @@ fn cancel_acquire_releases_permits() {
 
 #[test]
 fn release_permits_at_drop() {
+    use crate::sync::semaphore::*;
     use futures::task::ArcWake;
     use std::future::Future;
     use std::sync::Arc;
-    
-    use crate::sync::semaphore::*;
 
     let sem = Arc::new(Semaphore::new(1));
 

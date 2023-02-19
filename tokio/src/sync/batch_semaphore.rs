@@ -444,7 +444,6 @@ impl Semaphore {
         }
 
         assert_eq!(acquired, 0);
-        
         let mut old_waker = None;
 
         // Otherwise, register the waker & enqueue the node.
