@@ -921,11 +921,8 @@ impl Notified<'_> {
                     if waker.is_some() {
                         // Safety: called while locked.
                         //
-                        // This code makes the following assignment, but it
-                        // stores the old waker in `old_waker` so that we can
-                        // drop it after releasing the mutex.
-                        //
-                        // (*waiter.get()).waker = waker;
+                        // The use of `old_waiter` here is not necessary, as the field is always
+                        // None when we reach this line.
                         unsafe {
                             old_waker = std::mem::replace(&mut (*waiter.get()).waker, waker);
                         }
