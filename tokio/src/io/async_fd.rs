@@ -66,7 +66,7 @@ use std::{task::Context, task::Poll};
 ///
 /// This example shows how to turn [`std::net::TcpStream`] asynchronous using
 /// `AsyncFd`.  It implements the read/write operations both as an `async fn`
-/// and using the IO traits.
+/// and using the IO traits [`AsyncRead`] and [`AsyncWrite`].
 ///
 /// ```no_run
 /// use futures::ready;
@@ -172,6 +172,8 @@ use std::{task::Context, task::Poll};
 /// [`writable`]: method@Self::writable
 /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
 /// [`TcpStream::poll_read_ready`]: struct@crate::net::TcpStream
+/// [`AsyncRead`]: trait@crate::io::AsyncRead
+/// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 pub struct AsyncFd<T: AsRawFd> {
     registration: Registration,
     inner: Option<T>,
