@@ -14,8 +14,8 @@ async fn try_exists() {
     fs::write(&existing_path, b"Hello File!").await.unwrap();
     let nonexisting_path = dir.path().join("bar.txt");
 
-    assert_eq!(fs::try_exists(existing_path).await.unwrap(), true);
-    assert_eq!(fs::try_exists(nonexisting_path).await.unwrap(), false);
+    assert!(fs::try_exists(existing_path).await.unwrap());
+    assert!(!fs::try_exists(nonexisting_path).await.unwrap());
 
     let permission_denied_directory_path = dir.path().join("baz");
     fs::create_dir(&permission_denied_directory_path)
