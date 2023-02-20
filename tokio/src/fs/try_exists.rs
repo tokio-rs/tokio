@@ -1,4 +1,6 @@
 use crate::fs::asyncify;
+
+use std::io;
 use std::path::Path;
 
 /// Returns `Ok(true)` if the path points at an existing entity.
@@ -6,9 +8,9 @@ use std::path::Path;
 /// This function will traverse symbolic links to query information about the
 /// destination file. In case of broken symbolic links this will return `Ok(false)`.
 ///
-/// This is the async equivalent of [`std::fs::try_exists`][std].
+/// This is the async equivalent of [`std::path::Path::try_exists`][std].
 ///
-/// [std]: fn@std::fs::try_exists
+/// [std]: fn@std::path::Path::try_exists
 ///
 /// # Examples
 ///
@@ -21,11 +23,7 @@ use std::path::Path;
 /// # }
 /// ```
 
-pub async fn try_exists(path: impl AsRef<Path>) -> Result<bool, std::io::Error> {
+pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
     let path = path.as_ref().to_owned();
-    match asyncify(move || std::fs::metadata(path)).await {
-        Ok(_) => Ok(true),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(error),
-    }
+    asyncify(move || path.as_path().try_exists()).await
 }
