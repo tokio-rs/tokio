@@ -22,8 +22,11 @@ use std::path::Path;
 /// # Ok(())
 /// # }
 /// ```
-
 pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
     let path = path.as_ref().to_owned();
-    asyncify(move || path.as_path().try_exists()).await
+    match asyncify(move || std::fs::metadata(path)).await {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
+    }
 }
