@@ -1,3 +1,11 @@
+# 0.1.12 (January 20, 2022)
+
+- time: remove `Unpin` bound on `Throttle` methods ([#5105])
+- time: document that `throttle` operates on ms granularity ([#5101])
+
+[#5105]: https://github.com/tokio-rs/tokio/pull/5105
+[#5101]: https://github.com/tokio-rs/tokio/pull/5101
+
 # 0.1.11 (October 11, 2022)
 
 - time: allow `StreamExt::chunks_timeout` outside of a runtime ([#5036])
