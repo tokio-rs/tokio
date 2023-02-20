@@ -1,4 +1,4 @@
-# 0.1.12 (January 20, 2022)
+# 0.1.12 (January 20, 2023)
 
 - time: remove `Unpin` bound on `Throttle` methods ([#5105])
 - time: document that `throttle` operates on ms granularity ([#5101])
