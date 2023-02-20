@@ -1,8 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support file operations
 
-use std::os::unix::prelude::PermissionsExt;
-
 use tempfile::tempdir;
 use tokio::fs;
 
@@ -16,26 +14,30 @@ async fn try_exists() {
 
     assert!(fs::try_exists(existing_path).await.unwrap());
     assert!(!fs::try_exists(nonexisting_path).await.unwrap());
+    #[cfg(unix)]
+    {
+        use std::os::unix::prelude::PermissionsExt;
+        let permission_denied_directory_path = dir.path().join("baz");
+        fs::create_dir(&permission_denied_directory_path)
+            .await
+            .unwrap();
+        let permission_denied_file_path = permission_denied_directory_path.join("baz.txt");
+        fs::write(&permission_denied_file_path, b"Hello File!")
+            .await
+            .unwrap();
+        let mut perms = tokio::fs::metadata(&permission_denied_directory_path)
+            .await
+            .unwrap()
+            .permissions();
 
-    let permission_denied_directory_path = dir.path().join("baz");
-    fs::create_dir(&permission_denied_directory_path)
-        .await
-        .unwrap();
-    let permission_denied_file_path = permission_denied_directory_path.join("baz.txt");
-    fs::write(&permission_denied_file_path, b"Hello File!")
-        .await
-        .unwrap();
-    let mut perms = tokio::fs::metadata(&permission_denied_directory_path)
-        .await
-        .unwrap()
-        .permissions();
-    perms.set_mode(0o244);
-    fs::set_permissions(&permission_denied_directory_path, perms)
-        .await
-        .unwrap();
-    let permission_denied_result = fs::try_exists(permission_denied_file_path).await;
-    assert_eq!(
-        permission_denied_result.err().unwrap().kind(),
-        std::io::ErrorKind::PermissionDenied
-    );
+        perms.set_mode(0o244);
+        fs::set_permissions(&permission_denied_directory_path, perms)
+            .await
+            .unwrap();
+        let permission_denied_result = fs::try_exists(permission_denied_file_path).await;
+        assert_eq!(
+            permission_denied_result.err().unwrap().kind(),
+            std::io::ErrorKind::PermissionDenied
+        );
+    }
 }
