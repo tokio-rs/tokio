@@ -384,7 +384,33 @@
 //! [unstable features]: https://internals.rust-lang.org/t/feature-request-unstable-opt-in-non-transitive-crate-features/16193#why-not-a-crate-feature-2
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 //!
-//! ## WASM support
+//! ## Supported platforms
+//!
+//! Tokio currently guarantees support for the following platforms:
+//!
+//!  * Linux
+//!  * Windows
+//!  * Android (API level 21)
+//!  * macOS
+//!  * iOS
+//!  * FreeBSD
+//!
+//! Tokio will continue to support these platforms in the future. However,
+//! future releases may change requirements such as the minimum required libc
+//! version on Linux, the API level on Android, or the supported FreeBSD
+//! release.
+//!
+//! Beyond the above platforms, Tokio is intended to work on all platforms
+//! supported by the mio crate. You can find a longer list [in mio's
+//! documentation][mio-supported]. However, these additional platforms may
+//! become unsupported in the future.
+//!
+//! Note that Wine is considered to be a different platform from Windows. See
+//! mio's documentation for more information on Wine support.
+//!
+//! [mio-supported]: https://crates.io/crates/mio#platforms
+//!
+//! ### WASM support
 //!
 //! Tokio has some limited support for the WASM platform. Without the
 //! `tokio_unstable` flag, the following features are supported:
