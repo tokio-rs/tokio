@@ -56,7 +56,7 @@ async fn open_options_create_new() {
 #[cfg(unix)]
 async fn open_options_mode() {
     // TEST HACK: use Debug output to check the stored data
-    assert!(format!("{:?}", OpenOptions::new().mode(0o644)).contains("mode: 420"));
+    assert!(format!("{:?}", OpenOptions::new().mode(0o644)).contains("mode: 420 "));
 }
 
 #[tokio::test]
@@ -75,6 +75,6 @@ async fn open_options_custom_flags_bsd_family() {
     // TEST HACK: use Debug output to check the stored data
     assert!(
         format!("{:?}", OpenOptions::new().custom_flags(libc::O_NOFOLLOW))
-            .contains("custom_flags: 256")
+            .contains("custom_flags: 256,")
     );
 }
