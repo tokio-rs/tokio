@@ -70,8 +70,8 @@ async fn open_options_custom_flags_linux() {
 }
 
 #[tokio::test]
-#[cfg(any(target_os = "freebsd", target_os = "macos")]
-async fn open_options_custom_flags_bsd() {
+#[cfg(any(target_os = "freebsd", target_os = "macos"))]
+async fn open_options_custom_flags_unix() {
     // TEST HACK: use Debug output to check the stored data
     assert!(
         format!("{:?}", OpenOptions::new().custom_flags(libc::O_NOFOLLOW))
