@@ -130,7 +130,6 @@ feature! {
         /// builder.mode(0o775);
         /// ```
         pub fn mode(&mut self, mode: u32) -> &mut Self {
-            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.mode = Some(mode);
             self
         }

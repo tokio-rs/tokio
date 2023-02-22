@@ -46,6 +46,27 @@ async fn build_dir() {
 }
 
 #[tokio::test]
+#[cfg(unix)]
+async fn build_dir_mode_read_only() {
+    let base_dir = tempdir().unwrap();
+    let new_dir = base_dir.path().join("abc");
+
+    assert_ok!(
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o444)
+            .create(&new_dir)
+            .await
+    );
+
+    assert!(fs::metadata(new_dir)
+        .await
+        .expect("metadata result")
+        .permissions()
+        .readonly());
+}
+
+#[tokio::test]
 async fn remove() {
     let base_dir = tempdir().unwrap();
     let new_dir = base_dir.path().join("foo");
