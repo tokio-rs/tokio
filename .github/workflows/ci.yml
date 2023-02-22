@@ -245,13 +245,7 @@ jobs:
           tool: cargo-semver-checks
       - name: Check semver compatibility
         run: |
-          cargo semver-checks check-release \
-              --release-type minor \
-              --exclude benches \
-              --exclude examples \
-              --exclude stress-test \
-              --exclude tests-build \
-              --exclude tests-integration
+          cargo semver-checks check-release --release-type minor
 
   cross-check:
     name: cross-check
