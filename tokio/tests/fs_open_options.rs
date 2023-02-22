@@ -59,20 +59,19 @@ async fn open_options_mode() {
     assert!(format!("{:?}", OpenOptions::new().mode(0o644)).contains("mode: 420"));
 }
 
-// XXX TODO resolve CI issue with CI / cross-test (aarch64-unknown-linux-gnu)
-// #[tokio::test]
-// #[cfg(target_os = "linux")]
-// async fn open_options_custom_flags_linux() {
-//     // TEST HACK: use Debug output to check the stored data
-//     assert!(
-//         format!("{:?}", OpenOptions::new().custom_flags(libc::O_NOFOLLOW))
-//             .contains("custom_flags: 131072")
-//     );
-// }
+#[tokio::test]
+#[cfg(target_os = "linux")]
+async fn open_options_custom_flags_linux() {
+    // TEST HACK: use Debug output to check the stored data
+    assert!(
+        format!("{:?}", OpenOptions::new().custom_flags(libc::O_TRUNC))
+            .contains("custom_flags: 512,")
+    );
+}
 
 #[tokio::test]
 #[cfg(any(target_os = "freebsd", target_os = "macos"))]
-async fn open_options_custom_flags_unix() {
+async fn open_options_custom_flags_bsd_family() {
     // TEST HACK: use Debug output to check the stored data
     assert!(
         format!("{:?}", OpenOptions::new().custom_flags(libc::O_NOFOLLOW))
