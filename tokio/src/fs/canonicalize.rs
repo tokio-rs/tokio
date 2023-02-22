@@ -46,7 +46,6 @@ use std::path::{Path, PathBuf};
 /// }
 /// ```
 pub async fn canonicalize(path: impl AsRef<Path>) -> io::Result<PathBuf> {
-    assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
     let path = path.as_ref().to_owned();
     asyncify(move || std::fs::canonicalize(path)).await
 }
