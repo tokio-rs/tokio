@@ -96,6 +96,7 @@ impl OpenOptions {
     /// let future = options.read(true).open("foo.txt");
     /// ```
     pub fn new() -> OpenOptions {
+        assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
         OpenOptions(StdOpenOptions::new())
     }
 
@@ -125,6 +126,7 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn read(&mut self, read: bool) -> &mut OpenOptions {
+        assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
         self.0.read(read);
         self
     }
@@ -155,6 +157,7 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn write(&mut self, write: bool) -> &mut OpenOptions {
+        assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
         self.0.write(write);
         self
     }
@@ -214,6 +217,7 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn append(&mut self, append: bool) -> &mut OpenOptions {
+        assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
         self.0.append(append);
         self
     }
@@ -247,6 +251,7 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn truncate(&mut self, truncate: bool) -> &mut OpenOptions {
+        assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
         self.0.truncate(truncate);
         self
     }
@@ -283,6 +288,7 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn create(&mut self, create: bool) -> &mut OpenOptions {
+        assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
         self.0.create(create);
         self
     }
@@ -326,6 +332,7 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn create_new(&mut self, create_new: bool) -> &mut OpenOptions {
+        assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
         self.0.create_new(create_new);
         self
     }
@@ -383,6 +390,7 @@ impl OpenOptions {
     /// [`Other`]: std::io::ErrorKind::Other
     /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
     pub async fn open(&self, path: impl AsRef<Path>) -> io::Result<File> {
+        assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
         let path = path.as_ref().to_owned();
         let opts = self.0.clone();
 
@@ -392,6 +400,7 @@ impl OpenOptions {
 
     /// Returns a mutable reference to the underlying `std::fs::OpenOptions`
     pub(super) fn as_inner_mut(&mut self) -> &mut StdOpenOptions {
+        assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
         &mut self.0
     }
 }
@@ -426,6 +435,7 @@ feature! {
         /// }
         /// ```
         pub fn mode(&mut self, mode: u32) -> &mut OpenOptions {
+            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().mode(mode);
             self
         }
@@ -458,6 +468,7 @@ feature! {
         /// }
         /// ```
         pub fn custom_flags(&mut self, flags: i32) -> &mut OpenOptions {
+            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().custom_flags(flags);
             self
         }
@@ -494,6 +505,7 @@ feature! {
         ///
         /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
         pub fn access_mode(&mut self, access: u32) -> &mut OpenOptions {
+            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().access_mode(access);
             self
         }
@@ -527,6 +539,7 @@ feature! {
         ///
         /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
         pub fn share_mode(&mut self, share: u32) -> &mut OpenOptions {
+            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().share_mode(share);
             self
         }
@@ -559,6 +572,7 @@ feature! {
         /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
         /// [`CreateFile2`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfile2
         pub fn custom_flags(&mut self, flags: u32) -> &mut OpenOptions {
+            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().custom_flags(flags);
             self
         }
@@ -598,6 +612,7 @@ feature! {
         /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
         /// [`CreateFile2`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfile2
         pub fn attributes(&mut self, attributes: u32) -> &mut OpenOptions {
+            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().attributes(attributes);
             self
         }
@@ -646,6 +661,7 @@ feature! {
         /// [Impersonation Levels]:
         ///     https://docs.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-security_impersonation_level
         pub fn security_qos_flags(&mut self, flags: u32) -> &mut OpenOptions {
+            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().security_qos_flags(flags);
             self
         }
