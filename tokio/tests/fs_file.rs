@@ -152,7 +152,10 @@ async fn file_debug_fmt() {
 
     let file = File::open(tempfile.path()).await.unwrap();
 
-    assert_eq!(&format!("{:?}", file)[0..33], "tokio::fs::File { std: File { fd:");
+    assert_eq!(
+        &format!("{:?}", file)[0..33],
+        "tokio::fs::File { std: File { fd:"
+    );
 }
 
 #[tokio::test]
@@ -162,7 +165,10 @@ async fn file_debug_fmt() {
 
     let file = File::open(tempfile.path()).await.unwrap();
 
-    assert_eq!(&format!("{:?}", file)[0..37], "tokio::fs::File { std: File { handle:");
+    assert_eq!(
+        &format!("{:?}", file)[0..37],
+        "tokio::fs::File { std: File { handle:"
+    );
 }
 
 #[tokio::test]
