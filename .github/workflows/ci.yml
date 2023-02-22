@@ -32,35 +32,35 @@ permissions:
 
 jobs:
   # Depends on all action sthat are required for a "successful" CI run.
-  #tests-pass:
-  #  name: all systems go
-  #  runs-on: ubuntu-latest
-  #  needs:
-  #    - test
-  #    - test-parking_lot
-  #    - valgrind
-  #    - test-unstable
-  #    - miri
-  #    - asan
-  #      #- semver
-  #    - cross-check
-  #    - cross-test
-  #    - no-atomic-u64
-  #    - features
-  #    - minrust
-  #    - minimal-versions
-  #    - fmt
-  #    - clippy
-  #    - docs
-  #    - loom-compile
-  #    - check-readme
-  #    - test-hyper
-  #    - x86_64-fortanix-unknown-sgx
-  #    - wasm32-unknown-unknown
-  #    - wasm32-wasi
-  #    - check-external-types
-  #  steps:
-  #    - run: exit 0
+  tests-pass:
+    name: all systems go
+    runs-on: ubuntu-latest
+    needs:
+      - test
+      - test-parking_lot
+      - valgrind
+      - test-unstable
+      - miri
+      - asan
+      - semver
+      - cross-check
+      - cross-test
+      - no-atomic-u64
+      - features
+      - minrust
+      - minimal-versions
+      - fmt
+      - clippy
+      - docs
+      - loom-compile
+      - check-readme
+      - test-hyper
+      - x86_64-fortanix-unknown-sgx
+      - wasm32-unknown-unknown
+      - wasm32-wasi
+      - check-external-types
+    steps:
+      - run: exit 0
 
   test:
     name: test tokio full
@@ -230,28 +230,28 @@ jobs:
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
           TRYBUILD: overwrite
 
-#  semver:
-#    name: semver
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - name: Install Rust ${{ env.rust_stable }}
-#        uses: dtolnay/rust-toolchain@master
-#        with:
-#          toolchain: ${{ env.rust_stable }}
-#      - name: Install cargo-semver-checks
-#        uses: taiki-e/install-action@v2
-#        with:
-#          tool: cargo-semver-checks
-#      - name: Check semver compatibility
-#        run: |
-#          cargo semver-checks check-release \
-#              --release-type minor \
-#              --exclude benches \
-#              --exclude examples \
-#              --exclude stress-test \
-#              --exclude tests-build \
-#              --exclude tests-integration
+  semver:
+    name: semver
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.rust_stable }}
+      - name: Install cargo-semver-checks
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks
+      - name: Check semver compatibility
+        run: |
+          cargo semver-checks check-release \
+              --release-type minor \
+              --exclude benches \
+              --exclude examples \
+              --exclude stress-test \
+              --exclude tests-build \
+              --exclude tests-integration
 
   cross-check:
     name: cross-check
