@@ -12,7 +12,6 @@ use std::path::Path;
 ///
 /// [std]: std::os::windows::fs::symlink_file
 pub async fn symlink_file(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
-    assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
     let src = src.as_ref().to_owned();
     let dst = dst.as_ref().to_owned();
 
