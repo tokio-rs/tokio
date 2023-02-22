@@ -561,7 +561,6 @@ feature! {
         /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
         /// [`CreateFile2`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfile2
         pub fn custom_flags(&mut self, flags: u32) -> &mut OpenOptions {
-            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().custom_flags(flags);
             self
         }
