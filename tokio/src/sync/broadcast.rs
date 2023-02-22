@@ -54,6 +54,10 @@
 //! all values retained by the channel, the next call to [`recv`] will return
 //! with [`RecvError::Closed`].
 //!
+//! When a [`Receiver`] handle is dropped, any messages not read by the receiver
+//! will be marked as read. If this receiver was the only one not to have read
+//! that message, the message will be dropped at this point.
+//!
 //! [`Sender`]: crate::sync::broadcast::Sender
 //! [`Sender::subscribe`]: crate::sync::broadcast::Sender::subscribe
 //! [`Receiver`]: crate::sync::broadcast::Receiver
