@@ -240,6 +240,13 @@ impl Runtime {
     /// complete, and yielding its resolved result. Any tasks or timers
     /// which the future spawns internally will be executed on the runtime.
     ///
+    /// # Non-worker future
+    ///
+    /// Note that the future required by this function does not run as a
+    /// worker. The expectation is that other tasks are spawned by the future here.
+    /// Awaiting on other futures from the future provided here will not
+    /// perform as fast as those spawned as workers.
+    ///
     /// # Multi thread scheduler
     ///
     /// When the multi thread scheduler is used this will allow futures
