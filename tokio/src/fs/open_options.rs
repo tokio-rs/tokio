@@ -494,7 +494,6 @@ feature! {
         ///
         /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
         pub fn access_mode(&mut self, access: u32) -> &mut OpenOptions {
-            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().access_mode(access);
             self
         }
@@ -528,7 +527,6 @@ feature! {
         ///
         /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
         pub fn share_mode(&mut self, share: u32) -> &mut OpenOptions {
-            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().share_mode(share);
             self
         }
@@ -561,7 +559,6 @@ feature! {
         /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
         /// [`CreateFile2`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfile2
         pub fn custom_flags(&mut self, flags: u32) -> &mut OpenOptions {
-            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().custom_flags(flags);
             self
         }
@@ -601,7 +598,6 @@ feature! {
         /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
         /// [`CreateFile2`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfile2
         pub fn attributes(&mut self, attributes: u32) -> &mut OpenOptions {
-            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().attributes(attributes);
             self
         }
@@ -650,7 +646,6 @@ feature! {
         /// [Impersonation Levels]:
         ///     https://docs.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-security_impersonation_level
         pub fn security_qos_flags(&mut self, flags: u32) -> &mut OpenOptions {
-            assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
             self.as_inner_mut().security_qos_flags(flags);
             self
         }
