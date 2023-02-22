@@ -6,23 +6,14 @@ use tokio::fs;
 #[tokio::test]
 #[cfg(unix)]
 async fn canonicalize_root_dir_unix() {
-    assert_eq!(
-        fs::canonicalize("/.")
-            .await
-            .unwrap()
-            .to_str()
-            .unwrap(),
-        "/"
-    );
+    assert_eq!(fs::canonicalize("/.").await.unwrap().to_str().unwrap(), "/");
 }
 
 #[tokio::test]
 #[cfg(windows)]
 async fn canonicalize_root_dir_windows() {
     // 2-step let bindings due to Rust memory semantics
-    let dir_path = fs::canonicalize("C:\\.\\")
-        .await
-        .unwrap();
+    let dir_path = fs::canonicalize("C:\\.\\").await.unwrap();
 
     let dir_name = dir_path.to_str().unwrap();
 
