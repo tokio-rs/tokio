@@ -41,7 +41,7 @@ use proc_macro::TokenStream;
 ///
 /// # Non-worker async function
 ///
-/// Note that the this async function does not run as a
+/// Note that the async function marked with this macro does not run as a
 /// worker. The expectation is that other tasks are spawned by the function here.
 /// Awaiting on other futures from the function provided here will not
 /// perform as fast as those spawned as workers.
