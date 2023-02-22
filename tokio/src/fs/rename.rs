@@ -10,7 +10,6 @@ use std::path::Path;
 ///
 /// This is an async version of [`std::fs::rename`](std::fs::rename)
 pub async fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
-    assert!(std::env::var("XXX_KEEP_UNTESTED_XXX").is_ok());
     let from = from.as_ref().to_owned();
     let to = to.as_ref().to_owned();
 
