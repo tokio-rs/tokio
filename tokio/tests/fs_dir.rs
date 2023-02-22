@@ -106,3 +106,21 @@ async fn read_inherent() {
         vec!["aa".to_string(), "bb".to_string(), "cc".to_string()]
     );
 }
+
+#[tokio::test]
+async fn read_dir_entry_info() {
+    let temp_dir = tempdir().unwrap();
+
+    let file_path = temp_dir.path().join("a.txt");
+
+    fs::write(&file_path, b"Hello File!").await.unwrap();
+
+    let mut dir = fs::read_dir(temp_dir.path()).await.unwrap();
+
+    let first_entry = dir.next_entry().await.unwrap().unwrap();
+
+    assert_eq!(first_entry.path(), file_path);
+    assert_eq!(first_entry.file_name(), "a.txt");
+    assert!(first_entry.metadata().await.unwrap().is_file());
+    assert!(first_entry.file_type().await.unwrap().is_file());
+}
