@@ -8,9 +8,24 @@ use tokio::fs;
 async fn remove_dir_all() {
     let temp_dir = tempdir().unwrap();
 
-    let file_path = temp_dir.path().join("a.txt");
+    let test_dir = temp_dir.path().join("test");
+    fs::create_dir(&test_dir).await.unwrap();
+
+    let file_path = test_dir.as_path().join("a.txt");
 
     fs::write(&file_path, b"Hello File!").await.unwrap();
 
-    fs::remove_dir_all(temp_dir.path()).await.unwrap();
+    fs::remove_dir_all(test_dir.as_path()).await.unwrap();
+
+    // test dir should no longer exist
+    match fs::try_exists(test_dir).await {
+        Ok(exists) => assert!(!exists),
+        Err(_) => println!("ignoring try_exists error after remove_dir_all"),
+    };
+
+    // contents should no longer exist
+    match fs::try_exists(file_path).await {
+        Ok(exists) => assert!(!exists),
+        Err(_) => println!("ignoring try_exists error after remove_dir_all"),
+    };
 }
