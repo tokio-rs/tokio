@@ -60,11 +60,21 @@ async fn open_options_mode() {
 }
 
 #[tokio::test]
-#[cfg(unix)]
-async fn open_options_custom_flags() {
+#[cfg(target_os = "linux")]
+async fn open_options_custom_flags_linux() {
     // TEST HACK: use Debug output to check the stored data
     assert!(
-        format!("{:?}", OpenOptions::new().custom_flags(libc::O_TRUNC))
-            .contains("custom_flags: 1024")
+        format!("{:?}", OpenOptions::new().custom_flags(libc::O_NOFOLLOW))
+            .contains("custom_flags: 131072")
+    );
+}
+
+#[tokio::test]
+#[cfg(any(target_os = "freebsd", target_os = "macos")]
+async fn open_options_custom_flags_bsd() {
+    // TEST HACK: use Debug output to check the stored data
+    assert!(
+        format!("{:?}", OpenOptions::new().custom_flags(libc::O_NOFOLLOW))
+            .contains("custom_flags: 256")
     );
 }
