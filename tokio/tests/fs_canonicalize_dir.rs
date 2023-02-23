@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support directory operations
+#![cfg(all(feature = "full", not(tokio_wasi)))] // WASI does not support all fs operations
 
 use tokio::fs;
 
