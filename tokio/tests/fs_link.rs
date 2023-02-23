@@ -20,7 +20,12 @@ async fn test_hard_link() {
 
     let dst_2 = dst.clone();
 
-    assert!(fs::hard_link(src, dst_2.clone()).await.is_ok());
+    assert!(fs::hard_link(src.clone(), dst_2.clone()).await.is_ok());
+
+    {
+        let mut file = std::fs::File::create(&src).unwrap();
+        file.write_all(b"new-data").unwrap();
+    }
 
     let mut content = String::new();
 
@@ -30,7 +35,10 @@ async fn test_hard_link() {
         reader.read_to_string(&mut content).unwrap();
     }
 
-    assert!(content == "hello");
+    assert_eq!(content, "new-data");
+
+    // test that this is not a symlink:
+    assert!(fs::read_link(dst_2.clone()).await.is_err());
 }
 
 #[cfg(unix)]
@@ -50,6 +58,11 @@ async fn test_symlink() {
 
     assert!(fs::symlink(src_2.clone(), dst_2.clone()).await.is_ok());
 
+    {
+        let mut file = std::fs::File::create(&src).unwrap();
+        file.write_all(b"new-data").unwrap();
+    }
+
     let mut content = String::new();
 
     {
@@ -58,7 +71,7 @@ async fn test_symlink() {
         reader.read_to_string(&mut content).unwrap();
     }
 
-    assert!(content == "hello");
+    assert_eq!(content, "new-data");
 
     let read = fs::read_link(dst.clone()).await.unwrap();
     assert!(read == src);
