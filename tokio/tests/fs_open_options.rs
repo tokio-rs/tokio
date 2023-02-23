@@ -24,45 +24,45 @@ async fn open_with_open_options_and_read() {
 
 #[tokio::test]
 async fn open_options_write() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(format!("{:?}", OpenOptions::new().write(true)).contains("write: true"));
 }
 
 #[tokio::test]
 async fn open_options_append() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(format!("{:?}", OpenOptions::new().append(true)).contains("append: true"));
 }
 
 #[tokio::test]
 async fn open_options_truncate() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(format!("{:?}", OpenOptions::new().truncate(true)).contains("truncate: true"));
 }
 
 #[tokio::test]
 async fn open_options_create() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(format!("{:?}", OpenOptions::new().create(true)).contains("create: true"));
 }
 
 #[tokio::test]
 async fn open_options_create_new() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(format!("{:?}", OpenOptions::new().create_new(true)).contains("create_new: true"));
 }
 
 #[tokio::test]
 #[cfg(unix)]
 async fn open_options_mode() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(format!("{:?}", OpenOptions::new().mode(0o644)).contains("mode: 420 "));
 }
 
 #[tokio::test]
 #[cfg(target_os = "linux")]
 async fn open_options_custom_flags_linux() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(
         format!("{:?}", OpenOptions::new().custom_flags(libc::O_TRUNC))
             .contains("custom_flags: 512,")
@@ -72,7 +72,7 @@ async fn open_options_custom_flags_linux() {
 #[tokio::test]
 #[cfg(any(target_os = "freebsd", target_os = "macos"))]
 async fn open_options_custom_flags_bsd_family() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(
         format!("{:?}", OpenOptions::new().custom_flags(libc::O_NOFOLLOW))
             .contains("custom_flags: 256,")

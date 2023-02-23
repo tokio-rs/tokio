@@ -8,21 +8,21 @@ use windows_sys::Win32::Storage::FileSystem;
 #[tokio::test]
 #[cfg(windows)]
 async fn open_options_windows_access_mode() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(format!("{:?}", OpenOptions::new().access_mode(0)).contains("access_mode: Some(0)"));
 }
 
 #[tokio::test]
 #[cfg(windows)]
 async fn open_options_windows_share_mode() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(format!("{:?}", OpenOptions::new().share_mode(0)).contains("share_mode: 0,"));
 }
 
 #[tokio::test]
 #[cfg(windows)]
 async fn open_options_windows_custom_flags() {
-    // TEST HACK: use Debug output to check the stored data
+    // TESTING HACK: use Debug output to check the stored data
     assert!(format!(
         "{:?}",
         OpenOptions::new().custom_flags(FileSystem::FILE_FLAG_DELETE_ON_CLOSE)

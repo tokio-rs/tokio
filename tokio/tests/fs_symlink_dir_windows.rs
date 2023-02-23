@@ -15,7 +15,6 @@ async fn symlink_file_windows() {
     fs::create_dir(&dir1).await.unwrap();
 
     let file1 = dir1.as_path().join(FILE_NAME);
-
     fs::write(&file1, b"Hello File!").await.unwrap();
 
     let dir2 = temp_dir.path().join("b");
