@@ -20,12 +20,12 @@ async fn remove_dir_all() {
     // test dir should no longer exist
     match fs::try_exists(test_dir).await {
         Ok(exists) => assert!(!exists),
-        Err(_) => println!("ignoring try_exists error after remove_dir_all"),
+        Err(_) => println!("ignored try_exists error after remove_dir_all"),
     };
 
     // contents should no longer exist
     match fs::try_exists(file_path).await {
         Ok(exists) => assert!(!exists),
-        Err(_) => println!("ignoring try_exists error after remove_dir_all"),
+        Err(_) => println!("ignored try_exists error after remove_dir_all"),
     };
 }

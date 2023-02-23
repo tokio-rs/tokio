@@ -23,6 +23,6 @@ async fn rename_file() {
     // original file should no longer exist
     match fs::try_exists(file_path).await {
         Ok(exists) => assert!(!exists),
-        Err(info) => println!("ignoring try_exists error after rename"),
+        Err(_) => println!("ignored try_exists error after rename"),
     };
 }

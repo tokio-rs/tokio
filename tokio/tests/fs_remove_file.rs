@@ -19,6 +19,6 @@ async fn remove_file() {
     // should no longer exist
     match fs::try_exists(file_path).await {
         Ok(exists) => assert!(!exists),
-        Err(info) => println!("ignoring try_exists error after remove_file"),
+        Err(_) => println!("ignored try_exists error after remove_file"),
     };
 }
