@@ -940,7 +940,7 @@ impl Notified<'_> {
                 drop(waiters);
                 drop(old_waker);
 
-                return Poll::Pending;
+                Poll::Pending
             }
             Waiting => {
                 if waiter.notification.load(Acquire) != NOTIFICATION_NONE {
@@ -1006,7 +1006,7 @@ impl Notified<'_> {
                     drop(old_waker);
 
                     *state = Done;
-                    return Poll::Ready(());
+                    Poll::Ready(())
                 } else {
                     // Safety: we hold the lock, so we can modify the waker.
                     unsafe {
@@ -1027,12 +1027,10 @@ impl Notified<'_> {
                     drop(waiters);
                     drop(old_waker);
 
-                    return Poll::Pending;
+                    Poll::Pending
                 }
             }
-            Done => {
-                return Poll::Ready(());
-            }
+            Done => Poll::Ready(()),
         }
     }
 }
