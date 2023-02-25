@@ -12,5 +12,7 @@ pub use split::{ReadHalf, WriteHalf};
 mod split_owned;
 pub use split_owned::{OwnedReadHalf, OwnedWriteHalf, ReuniteError};
 
+mod lockless_split;
+
 pub(crate) mod stream;
 pub(crate) use stream::TcpStream;
