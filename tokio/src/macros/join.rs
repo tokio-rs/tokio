@@ -158,7 +158,9 @@ macro_rules! join {
 
     // ===== Entry point =====
 
-    ( $($e:expr),* $(,)?) => {
+    ( $($e:expr),+ $(,)?) => {
         $crate::join!(@{ () (0) } $($e,)*)
     };
+
+    () => { async {}.await }
 }
