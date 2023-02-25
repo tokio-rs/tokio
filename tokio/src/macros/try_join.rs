@@ -210,7 +210,9 @@ macro_rules! try_join {
 
     // ===== Entry point =====
 
-    ( $($e:expr),* $(,)?) => {
+    ( $($e:expr),+ $(,)?) => {
         $crate::try_join!(@{ () (0) } $($e,)*)
     };
+
+    () => { async { Ok(()) }.await }
 }
