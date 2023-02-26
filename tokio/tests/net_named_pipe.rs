@@ -417,7 +417,7 @@ fn num_instances(pipe_name: impl AsRef<str>) -> io::Result<u32> {
 
     let status = unsafe {
         ntioapi::NtQueryDirectoryFile(
-            root.as_raw_handle(),
+            root.as_raw_handle().cast(),
             std::ptr::null_mut(),
             None,
             std::ptr::null_mut(),
