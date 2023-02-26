@@ -292,9 +292,9 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     }
 }
 
-/// An event for receiving a particular type of OS signal.
+/// An listener for receiving a particular type of OS signal.
 ///
-/// The signal can be turned into a `Stream` using [`SignalStream`].
+/// The listener can be turned into a `Stream` using [`SignalStream`].
 ///
 /// [`SignalStream`]: https://docs.rs/tokio-stream/latest/tokio_stream/wrappers/struct.SignalStream.html
 ///
@@ -310,6 +310,9 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
 ///   signal notifications are coalesced into one item returned from `poll`.
 ///   Once `poll` has been called, however, a further signal is guaranteed to
 ///   be yielded as an item.
+///
+///   Put another way, any element pulled off the returned listener corresponds to
+///   *at least one* signal, but possibly more.
 ///
 /// * Signal handling in general is relatively inefficient. Although some
 ///   improvements are possible in this crate, it's recommended to not plan on
@@ -361,7 +364,7 @@ pub struct Signal {
     inner: RxFuture,
 }
 
-/// Creates a new signal which will receive notifications when the current
+/// Creates a new listener which will receive notifications when the current
 /// process receives the specified signal `kind`.
 ///
 /// This function will create a new stream which binds to the default reactor.
