@@ -136,7 +136,8 @@ features = [
 ]
 
 [target.'cfg(windows)'.dev-dependencies.ntapi]
-version = "0.3.6"
+version = "0.4.0"
+features = ["std"]
 
 [dev-dependencies]
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
