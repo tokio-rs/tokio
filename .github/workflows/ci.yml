@@ -582,6 +582,8 @@ jobs:
 
       - name: Install cargo-wasi
         run: cargo install cargo-wasi
+      - name: Cargo tree
+        run: cargo tree -p tokio --target wasm32-wasi --features full
 
       - name: WASI test tokio full
         run: cargo test -p tokio --target wasm32-wasi --features full
