@@ -176,6 +176,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_splitter() {
         let data = str::repeat("█", MAX_BUF);
         let mut wr = super::SplitByUtf8BoundaryIfWindows::new(TextMockWriter);
@@ -189,6 +190,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_pseudo_text() {
         // In this test we write a piece of binary data, whose beginning is
         // text though. We then validate that even in this corner case buffer
