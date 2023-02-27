@@ -135,6 +135,92 @@ async fn send_to_peek_from_poll() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+async fn peek_sender() -> std::io::Result<()> {
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let sender_addr = sender.local_addr()?;
+    let receiver_addr = receiver.local_addr()?;
+
+    let msg = b"Hello, world!";
+    sender.send_to(msg, receiver_addr).await?;
+
+    let peeked_sender = receiver.peek_sender().await?;
+    assert_eq!(peeked_sender, sender_addr);
+
+    // Assert that `peek_sender()` returns the right sender but
+    // doesn't remove from the receive queue.
+    let mut recv_buf = [0u8; 32];
+    let (read, received_sender) = receiver.recv_from(&mut recv_buf).await?;
+
+    assert_eq!(&recv_buf[..read], msg);
+    assert_eq!(received_sender, peeked_sender);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn poll_peek_sender() -> std::io::Result<()> {
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let sender_addr = sender.local_addr()?;
+    let receiver_addr = receiver.local_addr()?;
+
+    let msg = b"Hello, world!";
+    poll_fn(|cx| sender.poll_send_to(cx, msg, receiver_addr)).await?;
+
+    let peeked_sender = poll_fn(|cx| receiver.poll_peek_sender(cx)).await?;
+    assert_eq!(peeked_sender, sender_addr);
+
+    // Assert that `poll_peek_sender()` returns the right sender but
+    // doesn't remove from the receive queue.
+    let mut recv_buf = [0u8; 32];
+    let mut read = ReadBuf::new(&mut recv_buf);
+    let received_sender = poll_fn(|cx| receiver.poll_recv_from(cx, &mut read)).await?;
+
+    assert_eq!(read.filled(), msg);
+    assert_eq!(received_sender, peeked_sender);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn try_peek_sender() -> std::io::Result<()> {
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let sender_addr = sender.local_addr()?;
+    let receiver_addr = receiver.local_addr()?;
+
+    let msg = b"Hello, world!";
+    sender.send_to(msg, receiver_addr).await?;
+
+    let peeked_sender = loop {
+        match receiver.try_peek_sender() {
+            Ok(peeked_sender) => break peeked_sender,
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                receiver.readable().await?;
+            }
+            Err(e) => return Err(e),
+        }
+    };
+
+    assert_eq!(peeked_sender, sender_addr);
+
+    // Assert that `try_peek_sender()` returns the right sender but
+    // didn't remove from the receive queue.
+    let mut recv_buf = [0u8; 32];
+    // We already peeked the sender so there must be data in the receive queue.
+    let (read, received_sender) = receiver.try_recv_from(&mut recv_buf).unwrap();
+
+    assert_eq!(&recv_buf[..read], msg);
+    assert_eq!(received_sender, peeked_sender);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn split() -> std::io::Result<()> {
     let socket = UdpSocket::bind("127.0.0.1:0").await?;
     let s = Arc::new(socket);

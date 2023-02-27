@@ -1331,6 +1331,11 @@ impl UdpSocket {
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///
+    /// MacOS will return an error if you pass a zero-sized buffer.
+    ///
+    /// If you're merely interested in learning the sender of the data at the head of the queue,
+    /// try [`peek_sender`].
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -1349,6 +1354,8 @@ impl UdpSocket {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// [`peek_sender`]: method@Self::peek_sender
     pub async fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
@@ -1371,6 +1378,11 @@ impl UdpSocket {
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///
+    /// MacOS will return an error if you pass a zero-sized buffer.
+    ///
+    /// If you're merely interested in learning the sender of the data at the head of the queue,
+    /// try [`poll_peek_sender`].
+    ///
     /// # Return value
     ///
     /// The function returns:
@@ -1382,6 +1394,8 @@ impl UdpSocket {
     /// # Errors
     ///
     /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`poll_peek_sender`]: method@Self::poll_peek_sender
     pub fn poll_peek_from(
         &self,
         cx: &mut Context<'_>,
@@ -1402,6 +1416,61 @@ impl UdpSocket {
         }
         buf.advance(n);
         Poll::Ready(Ok(addr))
+    }
+
+    /// Retrieve the sender of the data at the head of the input queue, waiting if empty.
+    ///
+    /// This is equivalent to calling [`peek_from`] with a zero-sized buffer,
+    /// but suppresses the `WSAEMSGSIZE` error on Windows and the "invalid argument" error on macOS.
+    ///
+    /// [`peek_from`]: method@Self::peek_from
+    pub async fn peek_sender(&self) -> io::Result<SocketAddr> {
+        self.io
+            .registration()
+            .async_io(Interest::READABLE, || self.peek_sender_inner())
+            .await
+    }
+
+    /// Retrieve the sender of the data at the head of the input queue,
+    /// scheduling a wakeup if empty.
+    ///
+    /// This is equivalent to calling [`poll_peek_from`] with a zero-sized buffer,
+    /// but suppresses the `WSAEMSGSIZE` error on Windows and the "invalid argument" error on macOS.
+    ///
+    /// # Notes
+    ///
+    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup.
+    ///
+    /// [`poll_peek_from`]: method@Self::poll_peek_from
+    pub fn poll_peek_sender(&self, cx: &mut Context<'_>) -> Poll<io::Result<SocketAddr>> {
+        self.io
+            .registration()
+            .poll_read_io(cx, || self.peek_sender_inner())
+    }
+
+    /// Try to retrieve the sender of the data at the head of the input queue.
+    ///
+    /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
+    /// returned. This function is usually paired with `readable()`.
+    pub fn try_peek_sender(&self) -> io::Result<SocketAddr> {
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || self.peek_sender_inner())
+    }
+
+    #[inline]
+    fn peek_sender_inner(&self) -> io::Result<SocketAddr> {
+        self.io.try_io(|| {
+            self.as_socket()
+                .peek_sender()?
+                // May be `None` if the platform doesn't populate the sender for some reason.
+                // In testing, that only occurred on macOS if you pass a zero-sized buffer,
+                // but the implementation of `Socket::peek_sender()` covers that.
+                .as_socket()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "sender not available"))
+        })
     }
 
     /// Gets the value of the `SO_BROADCAST` option for this socket.
