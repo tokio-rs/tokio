@@ -1310,14 +1310,15 @@ impl UdpSocket {
             .try_io(interest, || self.io.try_io(f))
     }
     
+    /// lol
     pub async fn async_io<R>(
         &self, 
         interest: Interest, 
-        f: impl FnMut() -> io::Result<R>,
+        mut f: impl FnMut() -> io::Result<R>,
     ) -> io::Result<R> {
         self.io
             .registration()
-            .async_io(interest, || self.io.async_io(f) )
+            .async_io(interest, || self.io.try_io(&mut f) )
             .await
     }
 
