@@ -256,13 +256,9 @@ cfg_io_std! {
     pub use stdout::{stdout, Stdout};
 }
 
-cfg_net_or_io_util_or_gat! {
-    mod lockless_split;
-    pub use lockless_split::{LocklessSplitableBorrowed, LocklessReadHalf, LocklessWriteHalf};
-}
-
 cfg_net_or_io_util! {
-    pub use lockless_split::{Shutdown, LocklessSplitableOwned, LocklessSplit, LocklessOwnedReadHalf, LocklessOwnedWriteHalf};
+    mod lockless_split;
+    pub use lockless_split::{Shutdown, LocklessSplitable, LocklessSplit, LocklessOwnedReadHalf, LocklessOwnedWriteHalf};
 }
 
 cfg_io_util! {

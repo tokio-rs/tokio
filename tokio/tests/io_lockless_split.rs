@@ -3,10 +3,8 @@
 
 use tokio::io::{
     AsyncRead, AsyncWrite, LocklessOwnedReadHalf, LocklessOwnedWriteHalf, LocklessSplit,
-    LocklessSplitableOwned, ReadBuf, Shutdown,
+    LocklessSplitable, ReadBuf, Shutdown,
 };
-#[cfg(gat)]
-use tokio::io::{LocklessReadHalf, LocklessWriteHalf};
 
 use std::io;
 use std::pin::Pin;
@@ -52,10 +50,6 @@ impl Shutdown for RW {}
 fn is_send_and_sync() {
     fn assert_bound<T: Send + Sync>() {}
 
-    #[cfg(gat)]
-    assert_bound::<LocklessReadHalf<'_, RW>>();
-    #[cfg(gat)]
-    assert_bound::<LocklessWriteHalf<'_, RW>>();
     assert_bound::<LocklessOwnedReadHalf<RW>>();
     assert_bound::<LocklessOwnedWriteHalf<RW>>();
 }

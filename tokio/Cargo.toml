@@ -87,7 +87,6 @@ signal = [
 sync = []
 test-util = ["rt", "sync", "time"]
 time = []
-gat = []
 
 # Technically, removing this is a breaking change even though it only ever did
 # anything with the unstable flag on. It is probably safe to get rid of it after

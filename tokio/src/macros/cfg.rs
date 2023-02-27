@@ -226,16 +226,6 @@ macro_rules! cfg_net_or_io_util {
     }
 }
 
-macro_rules! cfg_net_or_io_util_or_gat {
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(feature = "net", feature = "io-util", feature = "gat"))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "net", feature = "io-util", feature = "gat"))))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_net {
     ($($item:item)*) => {
         $(
