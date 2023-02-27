@@ -20,9 +20,6 @@ fn time_now_current_thread(bench: &mut Bencher) {
     })
 }
 
-bencher::benchmark_group!(
-    time_now,
-    time_now_current_thread,
-);
+bencher::benchmark_group!(time_now, time_now_current_thread,);
 
 bencher::benchmark_main!(time_now);

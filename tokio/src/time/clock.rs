@@ -30,7 +30,8 @@ cfg_not_test_util! {
 cfg_test_util! {
     use crate::time::{Duration, Instant};
     use crate::loom::sync::Mutex;
-    use crate::loom::sync::atomic::{AtomicBool, Ordering};
+    use crate::loom::sync::atomic::Ordering;
+    use std::sync::atomic::AtomicBool as StdAtomicBool;
 
     cfg_rt! {
         #[track_caller]
@@ -70,8 +71,10 @@ cfg_test_util! {
     // avoid touching the mutex if `test-util` was accidentally enabled in
     // release mode.
     //
-    // A static is used so we can avoid accessing the thread-local as well.
-    static DID_PAUSE_CLOCK: AtomicBool = AtomicBool::new(false);
+    // A static is used so we can avoid accessing the thread-local as well. The
+    // `std` AtomicBool is used directly because loom does not support static
+    // atomics.
+    static DID_PAUSE_CLOCK: StdAtomicBool = StdAtomicBool::new(false);
 
     #[derive(Debug)]
     struct Inner {
