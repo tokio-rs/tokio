@@ -1309,6 +1309,17 @@ impl UdpSocket {
             .registration()
             .try_io(interest, || self.io.try_io(f))
     }
+    
+    pub async fn async_io<R>(
+        &self, 
+        interest: Interest, 
+        f: impl FnMut() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.io
+            .registration()
+            .async_io(interest, || self.io.async_io(f) )
+            .await
+    }
 
     /// Receives data from the socket, without removing it from the input queue.
     /// On success, returns the number of bytes read and the address from whence
