@@ -15,15 +15,16 @@ permissions:
 jobs:
   security-audit:
     permissions:
-      checks: write  # for actions-rs/audit-check to create check
+      checks: write  # for rustsec/audit-check to create check
       contents: read  # for actions/checkout to fetch code
-      issues: write  # for actions-rs/audit-check to create issues
+      issues: write  # for rustsec/audit-check to create issues
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, 'ci skip')"
     steps:
       - uses: actions/checkout@v3
 
       - name: Audit Check
-        uses: actions-rs/audit-check@v1
+        # https://github.com/rustsec/audit-check/issues/2
+        uses: rustsec/audit-check@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

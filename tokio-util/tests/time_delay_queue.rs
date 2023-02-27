@@ -1,4 +1,4 @@
-#![allow(clippy::blacklisted_name)]
+#![allow(clippy::disallowed_names)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 

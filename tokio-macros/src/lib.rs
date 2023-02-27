@@ -39,6 +39,13 @@ use proc_macro::TokenStream;
 /// function is called often, it is preferable to create the runtime using the
 /// runtime builder so the runtime can be reused across calls.
 ///
+/// # Non-worker async function
+///
+/// Note that the async function marked with this macro does not run as a
+/// worker. The expectation is that other tasks are spawned by the function here.
+/// Awaiting on other futures from the function provided here will not
+/// perform as fast as those spawned as workers.
+///
 /// # Multi-threaded runtime
 ///
 /// To use the multi-threaded runtime, the macro can be configured using

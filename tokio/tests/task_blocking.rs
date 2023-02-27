@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
 
-use tokio::{runtime, task};
+use tokio::{runtime, task, time};
 use tokio_test::assert_ok;
 
 use std::thread;
@@ -225,4 +225,85 @@ fn coop_disabled_in_block_in_place_in_block_on() {
     });
 
     done_rx.recv().unwrap().unwrap();
+}
+
+#[cfg(feature = "test-util")]
+#[tokio::test(start_paused = true)]
+async fn blocking_when_paused() {
+    // Do not auto-advance time when we have started a blocking task that has
+    // not yet finished.
+    time::timeout(
+        Duration::from_secs(3),
+        task::spawn_blocking(|| thread::sleep(Duration::from_millis(1))),
+    )
+    .await
+    .expect("timeout should not trigger")
+    .expect("blocking task should finish");
+
+    // Really: Do not auto-advance time, even if the timeout is short and the
+    // blocking task runs for longer than that. It doesn't matter: Tokio time
+    // is paused; system time is not.
+    time::timeout(
+        Duration::from_millis(1),
+        task::spawn_blocking(|| thread::sleep(Duration::from_millis(50))),
+    )
+    .await
+    .expect("timeout should not trigger")
+    .expect("blocking task should finish");
+}
+
+#[cfg(feature = "test-util")]
+#[tokio::test(start_paused = true)]
+async fn blocking_task_wakes_paused_runtime() {
+    let t0 = std::time::Instant::now();
+    time::timeout(
+        Duration::from_secs(15),
+        task::spawn_blocking(|| thread::sleep(Duration::from_millis(1))),
+    )
+    .await
+    .expect("timeout should not trigger")
+    .expect("blocking task should finish");
+    assert!(
+        t0.elapsed() < Duration::from_secs(10),
+        "completing a spawn_blocking should wake the scheduler if it's parked while time is paused"
+    );
+}
+
+#[cfg(feature = "test-util")]
+#[tokio::test(start_paused = true)]
+async fn unawaited_blocking_task_wakes_paused_runtime() {
+    let t0 = std::time::Instant::now();
+
+    // When this task finishes, time should auto-advance, even though the
+    // JoinHandle has not been awaited yet.
+    let a = task::spawn_blocking(|| {
+        thread::sleep(Duration::from_millis(1));
+    });
+
+    crate::time::sleep(Duration::from_secs(15)).await;
+    a.await.expect("blocking task should finish");
+    assert!(
+        t0.elapsed() < Duration::from_secs(10),
+        "completing a spawn_blocking should wake the scheduler if it's parked while time is paused"
+    );
+}
+
+#[cfg(feature = "test-util")]
+#[tokio::test(start_paused = true)]
+async fn panicking_blocking_task_wakes_paused_runtime() {
+    let t0 = std::time::Instant::now();
+    let result = time::timeout(
+        Duration::from_secs(15),
+        task::spawn_blocking(|| {
+            thread::sleep(Duration::from_millis(1));
+            panic!("blocking task panicked");
+        }),
+    )
+    .await
+    .expect("timeout should not trigger");
+    assert!(result.is_err(), "blocking task should have panicked");
+    assert!(
+        t0.elapsed() < Duration::from_secs(10),
+        "completing a spawn_blocking should wake the scheduler if it's parked while time is paused"
+    );
 }

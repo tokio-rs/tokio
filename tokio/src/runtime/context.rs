@@ -15,6 +15,10 @@ cfg_rt! {
 }
 
 struct Context {
+    /// Uniquely identifies the current thread
+    #[cfg(feature = "rt")]
+    thread_id: Cell<Option<ThreadId>>,
+
     /// Handle to the runtime scheduler running on the current thread.
     #[cfg(feature = "rt")]
     handle: RefCell<Option<scheduler::Handle>>,
@@ -46,6 +50,9 @@ struct Context {
 tokio_thread_local! {
     static CONTEXT: Context = {
         Context {
+            #[cfg(feature = "rt")]
+            thread_id: Cell::new(None),
+
             /// Tracks the current runtime handle to use when spawning,
             /// accessing drivers, etc...
             #[cfg(feature = "rt")]
@@ -72,7 +79,7 @@ tokio_thread_local! {
     }
 }
 
-#[cfg(feature = "macros")]
+#[cfg(any(feature = "macros", all(feature = "sync", feature = "rt")))]
 pub(crate) fn thread_rng_n(n: u32) -> u32 {
     CONTEXT.with(|ctx| ctx.rng.fastrand_n(n))
 }
@@ -82,9 +89,22 @@ pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, A
 }
 
 cfg_rt! {
-    use crate::runtime::TryCurrentError;
+    use crate::runtime::{ThreadId, TryCurrentError};
 
     use std::fmt;
+
+    pub(crate) fn thread_id() -> Result<ThreadId, AccessError> {
+        CONTEXT.try_with(|ctx| {
+            match ctx.thread_id.get() {
+                Some(id) => id,
+                None => {
+                    let id = ThreadId::next();
+                    ctx.thread_id.set(Some(id));
+                    id
+                }
+            }
+        })
+    }
 
     #[derive(Debug, Clone, Copy)]
     #[must_use]

@@ -102,6 +102,9 @@ pub use self::write::write;
 mod copy;
 pub use self::copy::copy;
 
+mod try_exists;
+pub use self::try_exists::try_exists;
+
 #[cfg(test)]
 mod mocks;
 

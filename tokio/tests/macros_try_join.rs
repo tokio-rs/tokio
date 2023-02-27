@@ -1,5 +1,5 @@
 #![cfg(feature = "macros")]
-#![allow(clippy::blacklisted_name)]
+#![allow(clippy::disallowed_names)]
 
 use std::sync::Arc;
 
@@ -182,4 +182,9 @@ async fn a_different_future_is_polled_first_every_time_poll_fn_is_polled() {
         vec![1, 2, 3, 2, 3, 1, 3, 1, 2, 1, 2, 3],
         *poll_order.lock().unwrap()
     );
+}
+
+#[tokio::test]
+async fn empty_try_join() {
+    assert_eq!(tokio::try_join!() as Result<_, ()>, Ok(()));
 }

@@ -1,3 +1,95 @@
+# 1.25.0 (January 28, 2023)
+
+### Fixed
+
+- rt: fix runtime metrics reporting ([#5330])
+
+### Added
+
+- sync: add `broadcast::Sender::len` ([#5343])
+
+### Changed
+
+- fs: increase maximum read buffer size to 2MiB ([#5397])
+
+[#5330]: https://github.com/tokio-rs/tokio/pull/5330
+[#5343]: https://github.com/tokio-rs/tokio/pull/5343
+[#5397]: https://github.com/tokio-rs/tokio/pull/5397
+
+# 1.24.2 (January 17, 2023)
+
+Forward ports 1.18.5 changes.
+
+### Fixed
+
+- io: fix unsoundness in `ReadHalf::unsplit` ([#5375])
+
+[#5375]: https://github.com/tokio-rs/tokio/pull/5375
+
+# 1.24.1 (January 6, 2022)
+
+This release fixes a compilation failure on targets without `AtomicU64` when using rustc older than 1.63. ([#5356])
+
+[#5356]: https://github.com/tokio-rs/tokio/pull/5356
+
+# 1.24.0 (January 5, 2022)
+
+### Fixed
+ - rt: improve native `AtomicU64` support detection ([#5284])
+
+### Added
+ - rt: add configuration option for max number of I/O events polled from the OS
+   per tick ([#5186])
+ - rt: add an environment variable for configuring the default number of worker
+   threads per runtime instance ([#4250])
+
+### Changed
+ - sync: reduce MPSC channel stack usage ([#5294])
+ - io: reduce lock contention in I/O operations  ([#5300])
+ - fs: speed up `read_dir()` by chunking operations ([#5309])
+ - rt: use internal `ThreadId` implementation ([#5329])
+ - test: don't auto-advance time when a `spawn_blocking` task is running ([#5115])
+
+[#5186]: https://github.com/tokio-rs/tokio/pull/5186
+[#5294]: https://github.com/tokio-rs/tokio/pull/5294
+[#5284]: https://github.com/tokio-rs/tokio/pull/5284
+[#4250]: https://github.com/tokio-rs/tokio/pull/4250
+[#5300]: https://github.com/tokio-rs/tokio/pull/5300
+[#5329]: https://github.com/tokio-rs/tokio/pull/5329
+[#5115]: https://github.com/tokio-rs/tokio/pull/5115
+[#5309]: https://github.com/tokio-rs/tokio/pull/5309
+
+# 1.23.1 (January 4, 2022)
+
+This release forward ports changes from 1.18.4.
+
+### Fixed
+
+- net: fix Windows named pipe server builder to maintain option when toggling
+  pipe mode ([#5336]).
+
+[#5336]: https://github.com/tokio-rs/tokio/pull/5336
+
+# 1.23.0 (December 5, 2022)
+
+### Fixed
+
+ - net: fix Windows named pipe connect ([#5208])
+ - io: support vectored writes for `ChildStdin` ([#5216])
+ - io: fix `async fn ready()` false positive for OS-specific events ([#5231])
+
+ ### Changed
+ - runtime: `yield_now` defers task until after driver poll ([#5223])
+ - runtime: reduce amount of codegen needed per spawned task ([#5213])
+ - windows: replace `winapi` dependency with `windows-sys` ([#5204])
+
+ [#5208]: https://github.com/tokio-rs/tokio/pull/5208
+ [#5216]: https://github.com/tokio-rs/tokio/pull/5216
+ [#5213]: https://github.com/tokio-rs/tokio/pull/5213
+ [#5204]: https://github.com/tokio-rs/tokio/pull/5204
+ [#5223]: https://github.com/tokio-rs/tokio/pull/5223
+ [#5231]: https://github.com/tokio-rs/tokio/pull/5231
+
 # 1.22.0 (November 17, 2022)
 
 ### Added
@@ -242,6 +334,27 @@ wasm32-wasi target is given unstable support for the `net` feature.
 [#4956]: https://github.com/tokio-rs/tokio/pull/4956
 [#4959]: https://github.com/tokio-rs/tokio/pull/4959
 
+# 1.20.4 (January 17, 2023)
+
+Forward ports 1.18.5 changes.
+
+### Fixed
+
+- io: fix unsoundness in `ReadHalf::unsplit` ([#5375])
+
+[#5375]: https://github.com/tokio-rs/tokio/pull/5375
+
+# 1.20.3 (January 3, 2022)
+
+This release forward ports changes from 1.18.4.
+
+### Fixed
+
+- net: fix Windows named pipe server builder to maintain option when toggling
+  pipe mode ([#5336]).
+
+[#5336]: https://github.com/tokio-rs/tokio/pull/5336
+
 # 1.20.2 (September 27, 2022)
 
 This release removes the dependency on the `once_cell` crate to restore the MSRV
@@ -366,6 +479,23 @@ This release fixes a bug in `Notified::enable`. ([#4747])
 [#4726]: https://github.com/tokio-rs/tokio/pull/4726
 [#4729]: https://github.com/tokio-rs/tokio/pull/4729
 [#4739]: https://github.com/tokio-rs/tokio/pull/4739
+
+# 1.18.5 (January 17, 2023)
+
+### Fixed
+
+- io: fix unsoundness in `ReadHalf::unsplit` ([#5375])
+
+[#5375]: https://github.com/tokio-rs/tokio/pull/5375
+
+# 1.18.4 (January 3, 2022)
+
+### Fixed
+
+- net: fix Windows named pipe server builder to maintain option when toggling
+  pipe mode ([#5336]).
+
+[#5336]: https://github.com/tokio-rs/tokio/pull/5336
 
 # 1.18.3 (September 27, 2022)
 
@@ -494,7 +624,7 @@ performance improvements.
 - time: use bit manipulation instead of modulo to improve performance ([#4480])
 - net: use `std::future::Ready` instead of our own `Ready` future ([#4271])
 - replace deprecated `atomic::spin_loop_hint` with `hint::spin_loop` ([#4491])
-- fix miri failures in intrusive linked lists ([#4397]) 
+- fix miri failures in intrusive linked lists ([#4397])
 
 ### Documented
 

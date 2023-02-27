@@ -168,18 +168,19 @@
 // unstable. This should be removed once `JoinSet` is stabilized.
 #![cfg_attr(not(tokio_unstable), allow(dead_code))]
 
-use crate::runtime::context;
-
 mod core;
 use self::core::Cell;
 use self::core::Header;
 
 mod error;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::error::JoinError;
 
 mod harness;
 use self::harness::Harness;
+
+mod id;
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+pub use id::{id, try_id, Id};
 
 cfg_rt_multi_thread! {
     mod inject;
@@ -191,10 +192,8 @@ mod abort;
 mod join;
 
 #[cfg(feature = "rt")]
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::abort::AbortHandle;
 
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
 
 mod list;
@@ -214,70 +213,6 @@ use crate::util::linked_list;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{fmt, mem};
-
-/// An opaque ID that uniquely identifies a task relative to all other currently
-/// running tasks.
-///
-/// # Notes
-///
-/// - Task IDs are unique relative to other *currently running* tasks. When a
-///   task completes, the same ID may be used for another task.
-/// - Task IDs are *not* sequential, and do not indicate the order in which
-///   tasks are spawned, what runtime a task is spawned on, or any other data.
-/// - The task ID of the currently running task can be obtained from inside the
-///   task via the [`task::try_id()`](crate::task::try_id()) and
-///   [`task::id()`](crate::task::id()) functions and from outside the task via
-///   the [`JoinHandle::id()`](crate::task::JoinHandle::id()) function.
-///
-/// **Note**: This is an [unstable API][unstable]. The public API of this type
-/// may break in 1.x releases. See [the documentation on unstable
-/// features][unstable] for details.
-///
-/// [unstable]: crate#unstable-features
-#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
-pub struct Id(u64);
-
-/// Returns the [`Id`] of the currently running task.
-///
-/// # Panics
-///
-/// This function panics if called from outside a task. Please note that calls
-/// to `block_on` do not have task IDs, so the method will panic if called from
-/// within a call to `block_on`. For a version of this function that doesn't
-/// panic, see [`task::try_id()`](crate::runtime::task::try_id()).
-///
-/// **Note**: This is an [unstable API][unstable]. The public API of this type
-/// may break in 1.x releases. See [the documentation on unstable
-/// features][unstable] for details.
-///
-/// [task ID]: crate::task::Id
-/// [unstable]: crate#unstable-features
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-#[track_caller]
-pub fn id() -> Id {
-    context::current_task_id().expect("Can't get a task id when not inside a task")
-}
-
-/// Returns the [`Id`] of the currently running task, or `None` if called outside
-/// of a task.
-///
-/// This function is similar to  [`task::id()`](crate::runtime::task::id()), except
-/// that it returns `None` rather than panicking if called outside of a task
-/// context.
-///
-/// **Note**: This is an [unstable API][unstable]. The public API of this type
-/// may break in 1.x releases. See [the documentation on unstable
-/// features][unstable] for details.
-///
-/// [task ID]: crate::task::Id
-/// [unstable]: crate#unstable-features
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-#[track_caller]
-pub fn try_id() -> Option<Id> {
-    context::current_task_id()
-}
 
 /// An owned handle to the task, tracked by ref count.
 #[repr(transparent)]
@@ -552,68 +487,5 @@ unsafe impl<S> linked_list::Link for Task<S> {
 
     unsafe fn pointers(target: NonNull<Header>) -> NonNull<linked_list::Pointers<Header>> {
         self::core::Trailer::addr_of_owned(Header::get_trailer(target))
-    }
-}
-
-impl fmt::Display for Id {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl Id {
-    // When 64-bit atomics are available, use a static `AtomicU64` counter to
-    // generate task IDs.
-    //
-    // Note(eliza): we _could_ just use `crate::loom::AtomicU64`, which switches
-    // between an atomic and mutex-based implementation here, rather than having
-    // two separate functions for targets with and without 64-bit atomics.
-    // However, because we can't use the mutex-based implementation in a static
-    // initializer directly, the 32-bit impl also has to use a `OnceCell`, and I
-    // thought it was nicer to avoid the `OnceCell` overhead on 64-bit
-    // platforms...
-    cfg_has_atomic_u64! {
-        pub(crate) fn next() -> Self {
-            use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
-            static NEXT_ID: AtomicU64 = AtomicU64::new(1);
-            Self(NEXT_ID.fetch_add(1, Relaxed))
-        }
-    }
-
-    cfg_not_has_atomic_u64! {
-        cfg_has_const_mutex_new! {
-            pub(crate) fn next() -> Self {
-                use crate::loom::sync::Mutex;
-                static NEXT_ID: Mutex<u64> = Mutex::const_new(1);
-
-                let mut lock = NEXT_ID.lock();
-                let id = *lock;
-                *lock += 1;
-                Self(id)
-            }
-        }
-
-        cfg_not_has_const_mutex_new! {
-            pub(crate) fn next() -> Self {
-                use crate::util::once_cell::OnceCell;
-                use crate::loom::sync::Mutex;
-
-                fn init_next_id() -> Mutex<u64> {
-                    Mutex::new(1)
-                }
-
-                static NEXT_ID: OnceCell<Mutex<u64>> = OnceCell::new();
-
-                let next_id = NEXT_ID.get(init_next_id);
-                let mut lock = next_id.lock();
-                let id = *lock;
-                *lock += 1;
-                Self(id)
-            }
-        }
-    }
-
-    pub(crate) fn as_u64(&self) -> u64 {
-        self.0
     }
 }

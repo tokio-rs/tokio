@@ -18,9 +18,9 @@ impl LeakedBuffers {
         }
     }
     pub unsafe fn create<'a>(&mut self, size: usize) -> &'a mut [u8] {
-        let mut new_mem = vec![0u8; size].into_boxed_slice();
-        let slice = std::slice::from_raw_parts_mut(new_mem.as_mut_ptr(), new_mem.len());
+        let new_mem = vec![0u8; size].into_boxed_slice();
         self.leaked_vecs.push(new_mem);
-        slice
+        let new_mem = self.leaked_vecs.last_mut().unwrap();
+        std::slice::from_raw_parts_mut(new_mem.as_mut_ptr(), new_mem.len())
     }
 }

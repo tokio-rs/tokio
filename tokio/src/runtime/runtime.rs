@@ -24,16 +24,29 @@ cfg_rt_multi_thread! {
 ///
 /// # Shutdown
 ///
-/// Shutting down the runtime is done by dropping the value. The current
-/// thread will block until the shut down operation has completed.
+/// Shutting down the runtime is done by dropping the value, or calling
+/// [`Runtime::shutdown_background`] or [`Runtime::shutdown_timeout`].
 ///
-/// * Drain any scheduled work queues.
-/// * Drop any futures that have not yet completed.
-/// * Drop the reactor.
+/// Tasks spawned through [`Runtime::spawn`] keep running until they yield.
+/// Then they are dropped. They are not *guaranteed* to run to completion, but
+/// *might* do so if they do not yield until completion.
 ///
-/// Once the reactor has dropped, any outstanding I/O resources bound to
-/// that reactor will no longer function. Calling any method on them will
-/// result in an error.
+/// Blocking functions spawned through [`Runtime::spawn_blocking`] keep running
+/// until they return.
+///
+/// The thread initiating the shutdown blocks until all spawned work has been
+/// stopped. This can take an indefinite amount of time. The `Drop`
+/// implementation waits forever for this.
+///
+/// `shutdown_background` and `shutdown_timeout` can be used if waiting forever
+/// is undesired. When the timeout is reached, spawned work that did not stop
+/// in time and threads running it are leaked. The work continues to run until
+/// one of the stopping conditions is fulfilled, but the thread initiating the
+/// shutdown is unblocked.
+///
+/// Once the runtime has been dropped, any outstanding I/O resources bound to
+/// it will no longer function. Calling any method on them will result in an
+/// error.
 ///
 /// # Sharing
 ///
@@ -138,6 +151,9 @@ impl Runtime {
     /// The returned handle can be used to spawn tasks that run on this runtime, and can
     /// be cloned to allow moving the `Handle` to other threads.
     ///
+    /// Calling [`Handle::block_on`] on a handle to a `current_thread` runtime is error-prone.
+    /// Refer to the documentation of [`Handle::block_on`] for more.
+    ///
     /// # Examples
     ///
     /// ```
@@ -160,9 +176,9 @@ impl Runtime {
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
     ///
-    /// You do not have to `.await` the returned `JoinHandle` to make the
-    /// provided future start execution. It will start running in the
-    /// background immediately when `spawn` is called.
+    /// The provided future will start running in the background immediately
+    /// when `spawn` is called, even if you don't await the returned
+    /// `JoinHandle`.
     ///
     /// See [module level][mod] documentation for more details.
     ///
@@ -223,6 +239,13 @@ impl Runtime {
     /// This runs the given future on the current thread, blocking until it is
     /// complete, and yielding its resolved result. Any tasks or timers
     /// which the future spawns internally will be executed on the runtime.
+    ///
+    /// # Non-worker future
+    ///
+    /// Note that the future required by this function does not run as a
+    /// worker. The expectation is that other tasks are spawned by the future here.
+    /// Awaiting on other futures from the future provided here will not
+    /// perform as fast as those spawned as workers.
     ///
     /// # Multi thread scheduler
     ///
@@ -319,18 +342,9 @@ impl Runtime {
     }
 
     /// Shuts down the runtime, waiting for at most `duration` for all spawned
-    /// task to shutdown.
+    /// work to stop.
     ///
-    /// Usually, dropping a `Runtime` handle is sufficient as tasks are able to
-    /// shutdown in a timely fashion. However, dropping a `Runtime` will wait
-    /// indefinitely for all tasks to terminate, and there are cases where a long
-    /// blocking task has been spawned, which can block dropping `Runtime`.
-    ///
-    /// In this case, calling `shutdown_timeout` with an explicit wait timeout
-    /// can work. The `shutdown_timeout` will signal all tasks to shutdown and
-    /// will wait for at most `duration` for all spawned tasks to terminate. If
-    /// `timeout` elapses before all tasks are dropped, the function returns and
-    /// outstanding tasks are potentially leaked.
+    /// See the [struct level documentation](Runtime#shutdown) for more details.
     ///
     /// # Examples
     ///
@@ -359,7 +373,7 @@ impl Runtime {
         self.blocking_pool.shutdown(Some(duration));
     }
 
-    /// Shuts down the runtime, without waiting for any spawned tasks to shutdown.
+    /// Shuts down the runtime, without waiting for any spawned work to stop.
     ///
     /// This can be useful if you want to drop a runtime from within another runtime.
     /// Normally, dropping a runtime will block indefinitely for spawned blocking tasks
@@ -369,6 +383,8 @@ impl Runtime {
     /// Note however, that because we do not wait for any blocking tasks to complete, this
     /// may result in a resource leak (in that any blocking tasks are still running until they
     /// return.
+    ///
+    /// See the [struct level documentation](Runtime#shutdown) for more details.
     ///
     /// This function is equivalent to calling `shutdown_timeout(Duration::from_nanos(0))`.
     ///

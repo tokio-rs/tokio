@@ -6,7 +6,12 @@ cfg_io_driver! {
 #[cfg(feature = "rt")]
 pub(crate) mod atomic_cell;
 
-#[cfg(any(feature = "rt", feature = "signal", feature = "process"))]
+#[cfg(any(
+    feature = "rt",
+    feature = "signal",
+    feature = "process",
+    tokio_no_const_mutex_new,
+))]
 pub(crate) mod once_cell;
 
 #[cfg(any(
