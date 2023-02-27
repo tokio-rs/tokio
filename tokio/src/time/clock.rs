@@ -30,6 +30,8 @@ cfg_not_test_util! {
 cfg_test_util! {
     use crate::time::{Duration, Instant};
     use crate::loom::sync::Mutex;
+    use crate::loom::sync::atomic::Ordering;
+    use std::sync::atomic::AtomicBool as StdAtomicBool;
 
     cfg_rt! {
         #[track_caller]
@@ -64,6 +66,15 @@ cfg_test_util! {
     pub(crate) struct Clock {
         inner: Mutex<Inner>,
     }
+
+    // Used to track if the clock was ever paused. This is an optimization to
+    // avoid touching the mutex if `test-util` was accidentally enabled in
+    // release mode.
+    //
+    // A static is used so we can avoid accessing the thread-local as well. The
+    // `std` AtomicBool is used directly because loom does not support static
+    // atomics.
+    static DID_PAUSE_CLOCK: StdAtomicBool = StdAtomicBool::new(false);
 
     #[derive(Debug)]
     struct Inner {
@@ -199,6 +210,10 @@ cfg_test_util! {
 
     /// Returns the current instant, factoring in frozen time.
     pub(crate) fn now() -> Instant {
+        if !DID_PAUSE_CLOCK.load(Ordering::Acquire) {
+            return Instant::from_std(std::time::Instant::now());
+        }
+
         with_clock(|maybe_clock| {
             Ok(if let Some(clock) = maybe_clock {
                 clock.now()
@@ -240,6 +255,9 @@ cfg_test_util! {
                 return Err("`time::pause()` requires the `current_thread` Tokio runtime. \
                         This is the default Runtime used by `#[tokio::test].");
             }
+
+            // Track that we paused the clock
+            DID_PAUSE_CLOCK.store(true, Ordering::Release);
 
             let elapsed = match inner.unfrozen.as_ref() {
                 Some(v) => v.elapsed(),
