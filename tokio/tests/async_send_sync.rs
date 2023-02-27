@@ -263,6 +263,19 @@ mod unix_datagram {
     async_assert_fn!(UnixStream::writable(_): Send & Sync & !Unpin);
 }
 
+#[cfg(unix)]
+mod unix_pipe {
+    use super::*;
+    use tokio::net::unix::pipe::*;
+    assert_value!(OpenOptions: Send & Sync & Unpin);
+    assert_value!(Receiver: Send & Sync & Unpin);
+    assert_value!(Sender: Send & Sync & Unpin);
+    async_assert_fn!(Receiver::readable(_): Send & Sync & !Unpin);
+    async_assert_fn!(Receiver::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+    async_assert_fn!(Sender::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+    async_assert_fn!(Sender::writable(_): Send & Sync & !Unpin);
+}
+
 #[cfg(windows)]
 mod windows_named_pipe {
     use super::*;
