@@ -43,6 +43,7 @@ fn main() {
     let mut enable_addr_of = false;
     let mut enable_target_has_atomic = false;
     let mut enable_const_mutex_new = false;
+    let mut enable_as_fd = false;
     let mut target_needs_atomic_u64_fallback = false;
 
     match AutoCfg::new() {
@@ -106,6 +107,7 @@ fn main() {
             // The `Mutex::new` method was made const in 1.63.
             if ac.probe_rustc_version(1, 64) {
                 enable_const_mutex_new = true;
+                enable_as_fd = true;
             } else if ac.probe_rustc_version(1, 63) {
                 // This compiler claims to be 1.63, but there are some nightly
                 // compilers that claim to be 1.63 without supporting the
@@ -115,6 +117,7 @@ fn main() {
                 // The oldest nightly that supports the feature is 2022-06-20.
                 if ac.probe_expression(CONST_MUTEX_NEW_PROBE) {
                     enable_const_mutex_new = true;
+                    enable_as_fd = true;
                 }
             }
         }
@@ -160,6 +163,14 @@ fn main() {
         //
         // RUSTFLAGS="--cfg tokio_no_const_mutex_new"
         autocfg::emit("tokio_no_const_mutex_new")
+    }
+
+    if !enable_as_fd {
+        // To disable this feature on compilers that support it, you can
+        // explicitly pass this flag with the following environment variable:
+        //
+        // RUSTFLAGS="--cfg tokio_no_as_fd"
+        autocfg::emit("tokio_no_as_fd");
     }
 
     if target_needs_atomic_u64_fallback {
