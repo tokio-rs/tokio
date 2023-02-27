@@ -28,6 +28,11 @@ use std::task::{self, Poll};
 /// This function returns a future whose return type is [`Result`]`<T,`[`Elapsed`]`>`, where `T` is the
 /// return type of the provided future.
 ///
+/// If the provided future completes immediatelly, then the future returned from
+/// this function is guaranteed to complete immediatelly with an [`Ok`] variant
+/// no matter the provided duration.
+///
+/// [`Ok`]: std::result::Result::Ok
 /// [`Result`]: std::result::Result
 /// [`Elapsed`]: crate::time::error::Elapsed
 ///
@@ -100,6 +105,11 @@ where
 /// This function returns a future whose return type is [`Result`]`<T,`[`Elapsed`]`>`, where `T` is the
 /// return type of the provided future.
 ///
+/// If the provided future completes immediatelly, then the future returned from
+/// this function is guaranteed to complete immediatelly with an [`Ok`] variant
+/// no matter the provided deadline.
+///
+/// [`Ok`]: std::result::Result::Ok
 /// [`Result`]: std::result::Result
 /// [`Elapsed`]: crate::time::error::Elapsed
 ///
