@@ -177,6 +177,10 @@ cfg_coop! {
                 cell.set(budget);
                 Poll::Ready(restore)
             } else {
+                if let Ok(handle) = context::try_current() {
+                    handle.scheduler_metrics().inc_budget_forced_yield_count();
+                }
+
                 cx.waker().wake_by_ref();
                 Poll::Pending
             }
