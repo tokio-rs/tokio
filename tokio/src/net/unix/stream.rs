@@ -731,12 +731,6 @@ impl UnixStream {
     /// The closure should perform only one type of IO operation, so it should not
     /// require more than one ready state. This method may panic or sleep forever
     /// if it is called with a combined interest.
-    ///
-    /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
-    ///
-    /// [`readable()`]: UnixStream::readable()
-    /// [`writable()`]: UnixStream::writable()
-    /// [`ready()`]: UnixStream::ready()
     pub async fn async_io<R>(
         &self, 
         interest: Interest, 
