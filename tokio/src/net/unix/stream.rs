@@ -10,7 +10,7 @@ use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
 #[cfg(not(tokio_no_as_fd))]
-use std::os::fd::{AsFd, BorrowedFd};
+use std::os::unix::io::{AsFd, BorrowedFd};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;

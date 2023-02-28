@@ -40,7 +40,7 @@ use std::fs::File;
 use std::future::Future;
 use std::io;
 #[cfg(not(tokio_no_as_fd))]
-use std::os::fd::{AsFd, BorrowedFd};
+use std::os::unix::io::{AsFd, BorrowedFd};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::pin::Pin;
 use std::process::{Child as StdChild, ExitStatus, Stdio};

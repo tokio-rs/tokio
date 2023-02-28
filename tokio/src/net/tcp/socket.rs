@@ -5,7 +5,7 @@ use std::io;
 use std::net::SocketAddr;
 
 #[cfg(all(unix, not(tokio_no_as_fd)))]
-use std::os::fd::{AsFd, BorrowedFd};
+use std::os::unix::io::{AsFd, BorrowedFd};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]

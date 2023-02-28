@@ -1429,7 +1429,7 @@ impl TryInto<Stdio> for ChildStderr {
 #[cfg(unix)]
 mod sys {
     #[cfg(not(tokio_no_as_fd))]
-    use std::os::fd::{AsFd, BorrowedFd};
+    use std::os::unix::io::{AsFd, BorrowedFd};
     use std::os::unix::io::{AsRawFd, RawFd};
 
     use super::{ChildStderr, ChildStdin, ChildStdout};
@@ -1490,7 +1490,7 @@ mod sys {
 
     #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for ChildStdin {
-        fn as_fd(&self) -> BorrowedHandle<'_> {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
             unsafe { BorrowedHandle::borrow_raw(self.as_raw_fd()) }
         }
     }
@@ -1503,7 +1503,7 @@ mod sys {
 
     #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for ChildStdout {
-        fn as_fd(&self) -> BorrowedHandle<'_> {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
             unsafe { BorrowedHandle::borrow_raw(self.as_raw_fd()) }
         }
     }
@@ -1516,7 +1516,7 @@ mod sys {
 
     #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for ChildStderr {
-        fn as_fd(&self) -> BorrowedHandle<'_> {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
             unsafe { BorrowedHandle::borrow_raw(self.as_raw_fd()) }
         }
     }

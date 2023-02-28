@@ -449,7 +449,7 @@ mod sys {
     }
 
     #[cfg(not(tokio_no_as_fd))]
-    impl AsSocket for UdpSocket {
+    impl AsSocket for TcpListener {
         fn as_socket(&self) -> BorrowedSocket<'_> {
             unsafe { BorrowedSocket::borrow_raw(self.as_raw_socket()) }
         }

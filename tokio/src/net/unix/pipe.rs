@@ -6,9 +6,9 @@ use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf, Ready};
 use mio::unix::pipe as mio_pipe;
 use std::fs::File;
 use std::io::{self, Read, Write};
-#[cfg(not(tokio_no_as_fd))]
-use std::os::fd::{AsFd, BorrowedFd};
 use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
+#[cfg(not(tokio_no_as_fd))]
+use std::os::unix::io::{AsFd, BorrowedFd};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::path::Path;
 use std::pin::Pin;
