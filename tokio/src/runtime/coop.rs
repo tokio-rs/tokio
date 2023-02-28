@@ -185,16 +185,23 @@ cfg_coop! {
         }).unwrap_or(Poll::Ready(RestoreOnPending(Cell::new(Budget::unconstrained()))))
     }
 
-    cfg_metrics! {
-        #[inline(always)]
-        fn inc_budget_forced_yield_count() {
-            if let Ok(handle) = context::try_current() {
-                handle.scheduler_metrics().inc_budget_forced_yield_count();
+    cfg_rt! {
+        cfg_metrics! {
+            #[inline(always)]
+            fn inc_budget_forced_yield_count() {
+                if let Ok(handle) = context::try_current() {
+                    handle.scheduler_metrics().inc_budget_forced_yield_count();
+                }
             }
+        }
+
+        cfg_not_metrics! {
+            #[inline(always)]
+            fn inc_budget_forced_yield_count() {}
         }
     }
 
-    cfg_not_metrics! {
+    cfg_not_rt! {
         #[inline(always)]
         fn inc_budget_forced_yield_count() {}
     }
