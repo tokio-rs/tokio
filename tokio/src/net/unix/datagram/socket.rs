@@ -1278,7 +1278,7 @@ impl UnixDatagram {
     /// behave incorrectly.
     ///
     /// The closure should not perform the IO operation using any of the methods
-    /// defined on the Tokio `UdpSocket` type, as this will mess with the
+    /// defined on the Tokio `UnixDatagram` type, as this will mess with the
     /// readiness flag and can cause the socket to behave incorrectly.
     ///
     /// This method is not intended to be used with combined interests.
@@ -1288,9 +1288,9 @@ impl UnixDatagram {
     ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
-    /// [`readable()`]: UdpSocket::readable()
-    /// [`writable()`]: UdpSocket::writable()
-    /// [`ready()`]: UdpSocket::ready()
+    /// [`readable()`]: UnixDatagram::readable()
+    /// [`writable()`]: UnixDatagram::writable()
+    /// [`ready()`]: UnixDatagram::ready()
     pub async fn async_io<R>(
         &self, 
         interest: Interest, 

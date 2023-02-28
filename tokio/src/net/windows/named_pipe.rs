@@ -870,7 +870,7 @@ impl NamedPipeServer {
     /// behave incorrectly.
     ///
     /// The closure should not perform the IO operation using any of the methods
-    /// defined on the Tokio `UdpSocket` type, as this will mess with the
+    /// defined on the Tokio `NamedPipeServer` type, as this will mess with the
     /// readiness flag and can cause the socket to behave incorrectly.
     ///
     /// This method is not intended to be used with combined interests.
@@ -880,9 +880,9 @@ impl NamedPipeServer {
     ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
-    /// [`readable()`]: UdpSocket::readable()
-    /// [`writable()`]: UdpSocket::writable()
-    /// [`ready()`]: UdpSocket::ready()
+    /// [`readable()`]: NamedPipeServer::readable()
+    /// [`writable()`]: NamedPipeServer::writable()
+    /// [`ready()`]: NamedPipeServer::ready()
     pub async fn async_io<R>(
         &self, 
         interest: Interest, 
@@ -1662,7 +1662,7 @@ impl NamedPipeClient {
     /// behave incorrectly.
     ///
     /// The closure should not perform the IO operation using any of the methods
-    /// defined on the Tokio `UdpSocket` type, as this will mess with the
+    /// defined on the Tokio `NamedPipeClient` type, as this will mess with the
     /// readiness flag and can cause the socket to behave incorrectly.
     ///
     /// This method is not intended to be used with combined interests.
@@ -1672,9 +1672,9 @@ impl NamedPipeClient {
     ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
-    /// [`readable()`]: UdpSocket::readable()
-    /// [`writable()`]: UdpSocket::writable()
-    /// [`ready()`]: UdpSocket::ready()
+    /// [`readable()`]: NamedPipeClient::readable()
+    /// [`writable()`]: NamedPipeClient::writable()
+    /// [`ready()`]: NamedPipeClient::ready()
     pub async fn async_io<R>(
         &self, 
         interest: Interest, 

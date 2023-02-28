@@ -724,7 +724,7 @@ impl UnixStream {
     /// behave incorrectly.
     ///
     /// The closure should not perform the IO operation using any of the methods
-    /// defined on the Tokio `UdpSocket` type, as this will mess with the
+    /// defined on the Tokio `UnixStream` type, as this will mess with the
     /// readiness flag and can cause the socket to behave incorrectly.
     ///
     /// This method is not intended to be used with combined interests.
@@ -734,9 +734,9 @@ impl UnixStream {
     ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
-    /// [`readable()`]: UdpSocket::readable()
-    /// [`writable()`]: UdpSocket::writable()
-    /// [`ready()`]: UdpSocket::ready()
+    /// [`readable()`]: UnixStream::readable()
+    /// [`writable()`]: UnixStream::writable()
+    /// [`ready()`]: UnixStream::ready()
     pub async fn async_io<R>(
         &self, 
         interest: Interest, 
