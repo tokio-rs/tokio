@@ -1266,10 +1266,10 @@ impl UnixDatagram {
     /// the provided closure is called. The closure should attempt to perform
     /// IO operation on the socket by manually calling the appropriate syscall.
     /// If the operation fails because the socket is not actually ready,
-    /// then the closure should return a `WouldBlock` error, the readiness
-    /// flag is cleared and the socket readiness is awaited again. This loop
-    /// repeated until the closure returns an `Ok` or an error that doesn't
-    /// have the `WouldBlock` value.
+    /// then the closure should return a `WouldBlock` error. In such case the
+    /// readiness flag is cleared and the socket readiness is awaited again.
+    /// This loop is repeated until the closure returns an `Ok` or an error
+    /// other than `WouldBlock`.
     ///
     /// The closure should only return a `WouldBlock` error if it has performed
     /// an IO operation on the socket that failed due to the socket not being
