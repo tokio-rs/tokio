@@ -852,26 +852,26 @@ impl NamedPipeServer {
         self.io.registration().try_io(interest, f)
     }
     
-    /// Reads or writes from the socket using a user-provided IO operation.
+    /// Reads or writes from the pipe using a user-provided IO operation.
     ///
-    /// The readiness of the socket is awaited and when the socket is ready,
+    /// The readiness of the pipe is awaited and when the pipe is ready,
     /// the provided closure is called. The closure should attempt to perform
-    /// IO operation on the socket by manually calling the appropriate syscall.
-    /// If the operation fails because the socket is not actually ready,
+    /// IO operation on the pipe by manually calling the appropriate syscall.
+    /// If the operation fails because the pipe is not actually ready,
     /// then the closure should return a `WouldBlock` error, the readiness
-    /// flag is cleared and the socket readiness is awaited again. This loop
+    /// flag is cleared and the pipe readiness is awaited again. This loop
     /// repeated until the closure returns an `Ok` or an error that doesn't
     /// have the `WouldBlock` value.
     ///
     /// The closure should only return a `WouldBlock` error if it has performed
-    /// an IO operation on the socket that failed due to the socket not being
+    /// an IO operation on the pipe that failed due to the pipe not being
     /// ready. Returning a `WouldBlock` error in any other situation will
-    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// incorrectly clear the readiness flag, which can cause the pipe to
     /// behave incorrectly.
     ///
     /// The closure should not perform the IO operation using any of the methods
     /// defined on the Tokio `NamedPipeServer` type, as this will mess with the
-    /// readiness flag and can cause the socket to behave incorrectly.
+    /// readiness flag and can cause the pipe to behave incorrectly.
     ///
     /// This method is not intended to be used with combined interests.
     /// The closure should perform only one type of IO operation, so it should not
@@ -1638,26 +1638,26 @@ impl NamedPipeClient {
         self.io.registration().try_io(interest, f)
     }
     
-    /// Reads or writes from the socket using a user-provided IO operation.
+    /// Reads or writes from the pipe using a user-provided IO operation.
     ///
-    /// The readiness of the socket is awaited and when the socket is ready,
+    /// The readiness of the pipe is awaited and when the pipe is ready,
     /// the provided closure is called. The closure should attempt to perform
-    /// IO operation on the socket by manually calling the appropriate syscall.
-    /// If the operation fails because the socket is not actually ready,
+    /// IO operation on the pipe by manually calling the appropriate syscall.
+    /// If the operation fails because the pipe is not actually ready,
     /// then the closure should return a `WouldBlock` error, the readiness
-    /// flag is cleared and the socket readiness is awaited again. This loop
+    /// flag is cleared and the pipe readiness is awaited again. This loop
     /// repeated until the closure returns an `Ok` or an error that doesn't
     /// have the `WouldBlock` value.
     ///
     /// The closure should only return a `WouldBlock` error if it has performed
-    /// an IO operation on the socket that failed due to the socket not being
+    /// an IO operation on the pipe that failed due to the pipe not being
     /// ready. Returning a `WouldBlock` error in any other situation will
-    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// incorrectly clear the readiness flag, which can cause the pipe to
     /// behave incorrectly.
     ///
     /// The closure should not perform the IO operation using any of the methods
     /// defined on the Tokio `NamedPipeClient` type, as this will mess with the
-    /// readiness flag and can cause the socket to behave incorrectly.
+    /// readiness flag and can cause the pipe to behave incorrectly.
     ///
     /// This method is not intended to be used with combined interests.
     /// The closure should perform only one type of IO operation, so it should not
