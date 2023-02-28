@@ -878,14 +878,11 @@ impl NamedPipeServer {
     /// require more than one ready state. This method may panic or sleep forever
     /// if it is called with a combined interest.
     pub async fn async_io<R>(
-        &self, 
-        interest: Interest, 
+        &self,
+        interest: Interest,
         mut f: impl FnMut() -> io::Result<R>,
     ) -> io::Result<R> {
-        self.io
-            .registration()
-            .async_io(interest, || self.io.try_io(&mut f) )
-            .await
+        self.io.registration().async_io(interest, f).await
     }
 }
 
@@ -1664,14 +1661,11 @@ impl NamedPipeClient {
     /// require more than one ready state. This method may panic or sleep forever
     /// if it is called with a combined interest.
     pub async fn async_io<R>(
-        &self, 
-        interest: Interest, 
+        &self,
+        interest: Interest,
         mut f: impl FnMut() -> io::Result<R>,
     ) -> io::Result<R> {
-        self.io
-            .registration()
-            .async_io(interest, || self.io.try_io(&mut f) )
-            .await
+        self.io.registration().async_io(interest, || f).await
     }
 }
 
