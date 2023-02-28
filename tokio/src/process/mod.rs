@@ -1491,7 +1491,7 @@ mod sys {
     #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for ChildStdin {
         fn as_handle(&self) -> BorrowedHandle<'_> {
-            unsafe { BorrowedHandle::borrow_raw(self.as_raw_fd()) }
+            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
         }
     }
 
@@ -1504,7 +1504,7 @@ mod sys {
     #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for ChildStdout {
         fn as_handle(&self) -> BorrowedHandle<'_> {
-            unsafe { BorrowedHandle::borrow_raw(self.as_raw_fd()) }
+            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
         }
     }
 
@@ -1517,7 +1517,7 @@ mod sys {
     #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for ChildStderr {
         fn as_handle(&self) -> BorrowedHandle<'_> {
-            unsafe { BorrowedHandle::borrow_raw(self.as_raw_fd()) }
+            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
         }
     }
 }
