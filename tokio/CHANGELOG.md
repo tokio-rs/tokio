@@ -1,3 +1,86 @@
+# 1.26.0 (March 1st, 2023)
+
+### Fixed
+
+- macros: fix empty `join!` and `try_join!` ([#5504])
+- sync: don't leak tracing spans in mutex guards ([#5469])
+- sync: drop wakers after unlocking the mutex in Notify ([#5471])
+- sync: drop wakers outside lock in semaphore ([#5475])
+
+### Added
+
+- fs: add `fs::try_exists` ([#4299])
+- net: add types for named unix pipes ([#5351])
+- sync: add `MappedOwnedMutexGuard` ([#5474])
+
+### Changed
+
+- chore: update windows-sys to 0.45 ([#5386])
+- net: use Message Read Mode for named pipes ([#5350])
+- sync: mark lock guards with `#[clippy::has_significant_drop]` ([#5422])
+- sync: reduce contention in watch channel ([#5464])
+- time: remove cache padding in timer entries ([#5468])
+- time: Improve `Instant::now()` perf with test-util ([#5513])
+
+### Internal Changes
+
+- io: use `poll_fn` in `copy_bidirectional` ([#5486])
+- net: refactor named pipe builders to not use bitfields ([#5477])
+- rt: remove Arc from Clock ([#5434])
+- sync: make `notify_waiters` calls atomic ([#5458])
+- time: don't store deadline twice in sleep entries ([#5410])
+
+### Unstable
+
+- metrics: add a new metric for budget exhaustion yields ([#5517])
+
+### Documented
+
+- io: improve AsyncFd example ([#5481])
+- runtime: document the nature of the main future ([#5494])
+- runtime: remove extra period in docs ([#5511])
+- signal: updated Documentation for Signals ([#5459])
+- sync: add doc aliases for `blocking_*` methods ([#5448])
+- sync: fix docs for Send/Sync bounds in broadcast ([#5480])
+- sync: document drop behavior for channels ([#5497])
+- task: clarify what happens to spawned work during runtime shutdown ([#5394])
+- task: clarify `process::Command` docs ([#5413])
+- task: fix wording with 'unsend' ([#5452])
+- time: document immediate completion guarantee for timeouts ([#5509])
+- tokio: document supported platforms ([#5483])
+
+[#4299]: https://github.com/tokio-rs/tokio/pull/4299
+[#5350]: https://github.com/tokio-rs/tokio/pull/5350
+[#5351]: https://github.com/tokio-rs/tokio/pull/5351
+[#5386]: https://github.com/tokio-rs/tokio/pull/5386
+[#5394]: https://github.com/tokio-rs/tokio/pull/5394
+[#5410]: https://github.com/tokio-rs/tokio/pull/5410
+[#5413]: https://github.com/tokio-rs/tokio/pull/5413
+[#5422]: https://github.com/tokio-rs/tokio/pull/5422
+[#5434]: https://github.com/tokio-rs/tokio/pull/5434
+[#5448]: https://github.com/tokio-rs/tokio/pull/5448
+[#5452]: https://github.com/tokio-rs/tokio/pull/5452
+[#5458]: https://github.com/tokio-rs/tokio/pull/5458
+[#5459]: https://github.com/tokio-rs/tokio/pull/5459
+[#5464]: https://github.com/tokio-rs/tokio/pull/5464
+[#5468]: https://github.com/tokio-rs/tokio/pull/5468
+[#5469]: https://github.com/tokio-rs/tokio/pull/5469
+[#5471]: https://github.com/tokio-rs/tokio/pull/5471
+[#5474]: https://github.com/tokio-rs/tokio/pull/5474
+[#5475]: https://github.com/tokio-rs/tokio/pull/5475
+[#5477]: https://github.com/tokio-rs/tokio/pull/5477
+[#5480]: https://github.com/tokio-rs/tokio/pull/5480
+[#5481]: https://github.com/tokio-rs/tokio/pull/5481
+[#5483]: https://github.com/tokio-rs/tokio/pull/5483
+[#5486]: https://github.com/tokio-rs/tokio/pull/5486
+[#5494]: https://github.com/tokio-rs/tokio/pull/5494
+[#5497]: https://github.com/tokio-rs/tokio/pull/5497
+[#5504]: https://github.com/tokio-rs/tokio/pull/5504
+[#5509]: https://github.com/tokio-rs/tokio/pull/5509
+[#5511]: https://github.com/tokio-rs/tokio/pull/5511
+[#5513]: https://github.com/tokio-rs/tokio/pull/5513
+[#5517]: https://github.com/tokio-rs/tokio/pull/5517
+
 # 1.25.0 (January 28, 2023)
 
 ### Fixed
