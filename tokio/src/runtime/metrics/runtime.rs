@@ -124,6 +124,21 @@ impl RuntimeMetrics {
             .load(Relaxed)
     }
 
+    /// Returns the number of times that tasks have been forced to yield back to the scheduler
+    /// after exhausting their task budgets.
+    ///
+    /// This count starts at zero when the runtime is created and increases by one each time a task yields due to exhausting its budget.
+    ///
+    /// The counter is monotonically increasing. It is never decremented or
+    /// reset to zero.
+    pub fn budget_forced_yield_count(&self) -> u64 {
+        self.handle
+            .inner
+            .scheduler_metrics()
+            .budget_forced_yield_count
+            .load(Relaxed)
+    }
+
     /// Returns the total number of times the given worker thread has parked.
     ///
     /// The worker park count starts at zero when the runtime is created and
