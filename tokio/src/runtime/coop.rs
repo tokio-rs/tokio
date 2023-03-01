@@ -36,6 +36,11 @@ use crate::runtime::context;
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct Budget(Option<u8>);
 
+pub(crate) struct BudgetDecrement {
+    success: bool,
+    hit_zero: bool,
+}
+
 impl Budget {
     /// Budget assigned to a task on each poll.
     ///
@@ -172,13 +177,19 @@ cfg_coop! {
         context::budget(|cell| {
             let mut budget = cell.get();
 
-            if budget.decrement() {
+            let decrement = budget.decrement();
+
+            if decrement.success {
                 let restore = RestoreOnPending(Cell::new(cell.get()));
                 cell.set(budget);
+
+                // avoid double counting
+                if decrement.hit_zero {
+                    inc_budget_forced_yield_count();
+                }
+
                 Poll::Ready(restore)
             } else {
-                inc_budget_forced_yield_count();
-
                 cx.waker().wake_by_ref();
                 Poll::Pending
             }
@@ -209,16 +220,19 @@ cfg_coop! {
     impl Budget {
         /// Decrements the budget. Returns `true` if successful. Decrementing fails
         /// when there is not enough remaining budget.
-        fn decrement(&mut self) -> bool {
+        fn decrement(&mut self) -> BudgetDecrement {
             if let Some(num) = &mut self.0 {
                 if *num > 0 {
                     *num -= 1;
-                    true
+
+                    let hit_zero = *num == 0;
+
+                    BudgetDecrement { success: true, hit_zero }
                 } else {
-                    false
+                    BudgetDecrement { success: false, hit_zero: false }
                 }
             } else {
-                true
+                BudgetDecrement { success: true, hit_zero: false }
             }
         }
 

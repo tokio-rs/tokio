@@ -464,6 +464,51 @@ fn budget_exhaustion_yield() {
     assert_eq!(1, rt.metrics().budget_forced_yield_count());
 }
 
+#[test]
+fn budget_exhaustion_yield_with_joins() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+
+    assert_eq!(0, metrics.budget_forced_yield_count());
+
+    let mut did_yield_1 = false;
+    let mut did_yield_2 = false;
+
+    // block on a task which consumes budget until it yields
+    rt.block_on(async {
+        tokio::join!(
+            poll_fn(|cx| loop {
+                if did_yield_1 {
+                    return Poll::Ready(());
+                }
+
+                let fut = consume_budget();
+                tokio::pin!(fut);
+
+                if fut.poll(cx).is_pending() {
+                    did_yield_1 = true;
+                    return Poll::Pending;
+                }
+            }),
+            poll_fn(|cx| loop {
+                if did_yield_2 {
+                    return Poll::Ready(());
+                }
+
+                let fut = consume_budget();
+                tokio::pin!(fut);
+
+                if fut.poll(cx).is_pending() {
+                    did_yield_2 = true;
+                    return Poll::Pending;
+                }
+            })
+        )
+    });
+
+    assert_eq!(1, rt.metrics().budget_forced_yield_count());
+}
+
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[test]
 fn io_driver_fd_count() {
