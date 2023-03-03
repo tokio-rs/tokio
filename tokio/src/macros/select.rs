@@ -130,7 +130,7 @@
 /// cancelled, that always happens at an `.await`. If your function behaves
 /// correctly even if it is restarted while waiting at an `.await`, then it is
 /// cancellation safe.
-/// 
+///
 /// Cancellation safety can be defined in the following way: If you have a
 /// future that has not yet completed, then it must be a no-op to drop that
 /// future and recreate it.
