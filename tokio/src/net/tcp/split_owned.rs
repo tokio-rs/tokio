@@ -196,9 +196,9 @@ impl OwnedReadHalf {
 
     /// Waits for any of the requested ready states.
     ///
-    /// This function is usually paired with `try_read()` or `try_write()`. It
-    /// can be used to concurrently read / write to the same socket on a single
-    /// task without splitting the socket.
+    /// This function is usually paired with [`try_read()`]. It can be used instead
+    /// of [`readable()`] to check the returned ready set for [`Ready::READABLE`]
+    /// and [`Ready::READ_CLOSED`] events.
     ///
     /// The function may complete without the socket being ready. This is a
     /// false-positive and attempting an operation will return with
@@ -207,6 +207,9 @@ impl OwnedReadHalf {
     /// wait again if the requested states are not set.
     ///
     /// This function is equivalent to [`TcpStream::ready`].
+    ///
+    /// [`try_read()`]: Self::try_read
+    /// [`readable()`]: Self::readable
     ///
     /// # Cancel safety
     ///
@@ -357,9 +360,9 @@ impl OwnedWriteHalf {
 
     /// Waits for any of the requested ready states.
     ///
-    /// This function is usually paired with `try_read()` or `try_write()`. It
-    /// can be used to concurrently read / write to the same socket on a single
-    /// task without splitting the socket.
+    /// This function is usually paired with [`try_write()`]. It can be used instead
+    /// of [`writable()`] to check the returned ready set for [`Ready::WRITABLE`]
+    /// and [`Ready::WRITE_CLOSED`] events.
     ///
     /// The function may complete without the socket being ready. This is a
     /// false-positive and attempting an operation will return with
@@ -368,6 +371,9 @@ impl OwnedWriteHalf {
     /// wait again if the requested states are not set.
     ///
     /// This function is equivalent to [`TcpStream::ready`].
+    ///
+    /// [`try_write()`]: Self::try_write
+    /// [`writable()`]: Self::writable
     ///
     /// # Cancel safety
     ///
