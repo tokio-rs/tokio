@@ -193,6 +193,7 @@ async fn read_file_from_unix_fd() {
     let file1 = File::open(tempfile.path()).await.unwrap();
     let raw_fd = file1.as_raw_fd();
     assert!(raw_fd > 0);
+    std::mem::forget(file1);
 
     let mut file2 = unsafe { File::from_raw_fd(raw_fd) };
 
