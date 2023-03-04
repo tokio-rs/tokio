@@ -190,10 +190,8 @@ async fn read_file_from_unix_fd() {
     tempfile.write_all(HELLO).unwrap();
 
     let file1 = File::open(tempfile.path()).await.unwrap();
-    let raw_fd = file1.as_raw_fd();
-    assert!(raw_fd > 0);
-
     let raw_fd = file1.into_std().await.into_raw_fd();
+    assert!(raw_fd > 0);
     let mut file2 = unsafe { File::from_raw_fd(raw_fd) };
 
     let mut buf = [0; 1024];
