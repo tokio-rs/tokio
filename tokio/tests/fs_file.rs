@@ -184,7 +184,7 @@ async fn unix_fd_is_valid() {
 #[tokio::test]
 #[cfg(unix)]
 async fn read_file_from_unix_fd() {
-    use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
+    use std::os::unix::io::{FromRawFd, IntoRawFd};
 
     let mut tempfile = tempfile();
     tempfile.write_all(HELLO).unwrap();
@@ -192,6 +192,7 @@ async fn read_file_from_unix_fd() {
     let file1 = File::open(tempfile.path()).await.unwrap();
     let raw_fd = file1.into_std().await.into_raw_fd();
     assert!(raw_fd > 0);
+
     let mut file2 = unsafe { File::from_raw_fd(raw_fd) };
 
     let mut buf = [0; 1024];
