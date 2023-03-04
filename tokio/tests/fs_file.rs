@@ -184,8 +184,7 @@ async fn unix_fd_is_valid() {
 #[tokio::test]
 #[cfg(unix)]
 async fn read_file_from_unix_fd() {
-    use std::os::unix::io::AsRawFd;
-    use std::os::unix::io::FromRawFd;
+    use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 
     let mut tempfile = tempfile();
     tempfile.write_all(HELLO).unwrap();
@@ -194,9 +193,7 @@ async fn read_file_from_unix_fd() {
     let raw_fd = file1.as_raw_fd();
     assert!(raw_fd > 0);
 
-    // We will reuse the raw file descriptor.
-    std::mem::forget(file1.into_std().await);
-
+    let raw_fd = file1.into_std().await.into_raw_fd();
     let mut file2 = unsafe { File::from_raw_fd(raw_fd) };
 
     let mut buf = [0; 1024];
