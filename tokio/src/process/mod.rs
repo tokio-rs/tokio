@@ -217,7 +217,7 @@
 //! from being spawned.
 //!
 //! The tokio runtime will, on a best-effort basis, attempt to reap and clean up
-//! any process which it has spawned. No additional guarantees are made with regards
+//! any process which it has spawned. No additional guarantees are made with regard to
 //! how quickly or how often this procedure will take place.
 //!
 //! It is recommended to avoid dropping a [`Child`] process handle before it has been
@@ -631,7 +631,7 @@ impl Command {
     /// operation, the resulting zombie process cannot be `.await`ed inside of the
     /// destructor to avoid blocking other tasks. The tokio runtime will, on a
     /// best-effort basis, attempt to reap and clean up such processes in the
-    /// background, but makes no additional guarantees are made with regards
+    /// background, but no additional guarantees are made with regard to
     /// how quickly or how often this procedure will take place.
     ///
     /// If stronger guarantees are required, it is recommended to avoid dropping
@@ -811,7 +811,7 @@ impl Command {
     /// from being spawned.
     ///
     /// The tokio runtime will, on a best-effort basis, attempt to reap and clean up
-    /// any process which it has spawned. No additional guarantees are made with regards
+    /// any process which it has spawned. No additional guarantees are made with regard to
     /// how quickly or how often this procedure will take place.
     ///
     /// It is recommended to avoid dropping a [`Child`] process handle before it has been
