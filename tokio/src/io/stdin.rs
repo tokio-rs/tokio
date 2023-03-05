@@ -55,10 +55,13 @@ impl std::os::unix::io::AsRawFd for Stdin {
     }
 }
 
-#[cfg(windows)]
-impl std::os::windows::io::AsRawHandle for Stdin {
-    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
-        std::io::stdin().as_raw_handle()
+cfg_windows! {
+    use crate::os::windows::io::{AsRawHandle, RawHandle};
+
+    impl AsRawHandle for Stdin {
+        fn as_raw_handle(&self) -> RawHandle {
+            std::io::stdin().as_raw_handle()
+        }
     }
 }
 

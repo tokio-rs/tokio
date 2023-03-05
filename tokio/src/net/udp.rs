@@ -1691,7 +1691,7 @@ impl fmt::Debug for UdpSocket {
     }
 }
 
-#[cfg(all(unix))]
+#[cfg(unix)]
 mod sys {
     use super::UdpSocket;
     use std::os::unix::prelude::*;
@@ -1703,10 +1703,8 @@ mod sys {
     }
 }
 
-#[cfg(windows)]
-mod sys {
-    use super::UdpSocket;
-    use std::os::windows::prelude::*;
+cfg_windows! {
+    use crate::os::windows::io::{AsRawSocket, RawSocket};
 
     impl AsRawSocket for UdpSocket {
         fn as_raw_socket(&self) -> RawSocket {

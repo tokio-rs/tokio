@@ -79,10 +79,13 @@ impl std::os::unix::io::AsRawFd for Stdout {
     }
 }
 
-#[cfg(windows)]
-impl std::os::windows::io::AsRawHandle for Stdout {
-    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
-        std::io::stdout().as_raw_handle()
+cfg_windows! {
+    use crate::os::windows::io::{AsRawHandle, RawHandle};
+
+    impl AsRawHandle for Stdout {
+        fn as_raw_handle(&self) -> RawHandle {
+            std::io::stdout().as_raw_handle()
+        }
     }
 }
 

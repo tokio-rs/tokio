@@ -13,7 +13,7 @@ pub mod windows {
 
         /// See [std::os::windows::io::AsRawHandle](https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html)
         pub trait AsRawHandle {
-            /// See [std::os::windows::io::FromRawHandle::from_raw_handle](https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html#tymethod.as_raw_handle)
+            /// See [std::os::windows::io::AsRawHandle::as_raw_handle](https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html#tymethod.as_raw_handle)
             fn as_raw_handle(&self) -> RawHandle;
         }
 
@@ -21,6 +21,27 @@ pub mod windows {
         pub trait FromRawHandle {
             /// See [std::os::windows::io::FromRawHandle::from_raw_handle](https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html#tymethod.from_raw_handle)
             unsafe fn from_raw_handle(handle: RawHandle) -> Self;
+        }
+
+        /// See [std::os::windows::io::RawSocket](https://doc.rust-lang.org/std/os/windows/io/type.RawSocket.html)
+        pub type RawSocket = crate::doc::NotDefinedHere;
+
+        /// See [std::os::windows::io::AsRawSocket](https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html)
+        pub trait AsRawSocket {
+            /// See [std::os::windows::io::AsRawSocket::as_raw_socket](https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html#tymethod.as_raw_socket)
+            fn as_raw_socket(&self) -> RawSocket;
+        }
+
+        /// See [std::os::windows::io::FromRawSocket](https://doc.rust-lang.org/std/os/windows/io/trait.FromRawSocket.html)
+        pub trait FromRawSocket {
+            /// See [std::os::windows::io::FromRawSocket::from_raw_socket](https://doc.rust-lang.org/std/os/windows/io/trait.FromRawSocket.html#tymethod.from_raw_socket)
+            unsafe fn from_raw_socket(sock: RawSocket) -> Self;
+        }
+
+        /// See [std::os::windows::io::IntoRawSocket](https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawSocket.html)
+        pub trait IntoRawSocket {
+            /// See [std::os::windows::io::IntoRawSocket::into_raw_socket](https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawSocket.html#tymethod.into_raw_socket)
+            fn into_raw_socket(self) -> RawSocket;
         }
     }
 }

@@ -732,17 +732,19 @@ impl std::os::unix::io::FromRawFd for File {
     }
 }
 
-#[cfg(windows)]
-impl std::os::windows::io::AsRawHandle for File {
-    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
-        self.std.as_raw_handle()
-    }
-}
+cfg_windows! {
+    use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 
-#[cfg(windows)]
-impl std::os::windows::io::FromRawHandle for File {
-    unsafe fn from_raw_handle(handle: std::os::windows::io::RawHandle) -> Self {
-        StdFile::from_raw_handle(handle).into()
+    impl AsRawHandle for File {
+        fn as_raw_handle(&self) -> RawHandle {
+            self.std.as_raw_handle()
+        }
+    }
+
+    impl FromRawHandle for File {
+        unsafe fn from_raw_handle(handle: RawHandle) -> Self {
+            StdFile::from_raw_handle(handle).into()
+        }
     }
 }
 
