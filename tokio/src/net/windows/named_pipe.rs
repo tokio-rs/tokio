@@ -882,7 +882,7 @@ impl NamedPipeServer {
         interest: Interest,
         mut f: impl FnMut() -> io::Result<R>,
     ) -> io::Result<R> {
-        self.io.registration().async_io(interest, f()).await
+        self.io.registration().async_io(interest, f).await
     }
 }
 
