@@ -1318,7 +1318,7 @@ impl UdpSocket {
             .registration()
             .try_io(interest, || self.io.try_io(f))
     }
-    
+
     /// Reads or writes from the socket using a user-provided IO operation.
     ///
     /// The readiness of the socket is awaited and when the socket is ready,

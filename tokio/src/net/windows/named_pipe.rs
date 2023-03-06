@@ -851,7 +851,7 @@ impl NamedPipeServer {
     ) -> io::Result<R> {
         self.io.registration().try_io(interest, f)
     }
-    
+
     /// Reads or writes from the pipe using a user-provided IO operation.
     ///
     /// The readiness of the pipe is awaited and when the pipe is ready,
@@ -1634,7 +1634,7 @@ impl NamedPipeClient {
     ) -> io::Result<R> {
         self.io.registration().try_io(interest, f)
     }
-    
+
     /// Reads or writes from the pipe using a user-provided IO operation.
     ///
     /// The readiness of the pipe is awaited and when the pipe is ready,
