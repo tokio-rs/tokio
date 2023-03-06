@@ -1632,7 +1632,7 @@ impl NamedPipeClient {
         interest: Interest,
         f: impl FnOnce() -> io::Result<R>,
     ) -> io::Result<R> {
-        self.io.registration().try_io(interest, f())
+        self.io.registration().try_io(interest, f)
     }
     
     /// Reads or writes from the pipe using a user-provided IO operation.
