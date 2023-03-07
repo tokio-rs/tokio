@@ -1364,7 +1364,7 @@ impl UdpSocket {
     }
 
     /// Receives data from the socket, without removing it from the input queue.
-    /// On success, returns the number of bytes read.
+    /// On success, returns the sending address of the datagram.
     ///
     /// # Notes
     ///
@@ -1416,6 +1416,33 @@ impl UdpSocket {
         }
         buf.advance(n);
         Poll::Ready(Ok(addr))
+    }
+
+    /// Tries to receive data on the socket without removing it from the input queue.
+    /// On success, returns the number of bytes read and the sending address of the
+    /// datagram.
+    ///
+    /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
+    /// returned. This function is usually paired with `readable()`.
+    ///
+    /// # Notes
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and peek returns the error
+    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
+    ///
+    /// MacOS will return an error if you pass a zero-sized buffer.
+    ///
+    /// If you're merely interested in learning the sender of the data at the head of the queue,
+    /// try [`try_peek_sender`].
+    ///
+    /// [`try_peek_sender`]: method@Self::try_peek_sender
+    pub fn try_peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || self.io.peek_from(buf))
     }
 
     /// Retrieve the sender of the data at the head of the input queue, waiting if empty.

@@ -107,6 +107,45 @@ async fn send_to_peek_from() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+async fn send_to_try_peek_from() -> std::io::Result<()> {
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let receiver_addr = receiver.local_addr()?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, receiver_addr)).await?;
+
+    // peek
+    let mut recv_buf = [0u8; 32];
+
+    loop {
+        match receiver.try_peek_from(&mut recv_buf) {
+            Ok((n, addr)) => {
+                assert_eq!(&recv_buf[..n], MSG);
+                assert_eq!(addr, sender.local_addr()?);
+                break;
+            }
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                receiver.readable().await?;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    // peek
+    let mut recv_buf = [0u8; 32];
+    let (n, addr) = receiver.peek_from(&mut recv_buf).await?;
+    assert_eq!(&recv_buf[..n], MSG);
+    assert_eq!(addr, sender.local_addr()?);
+
+    let mut recv_buf = [0u8; 32];
+    let (n, addr) = receiver.recv_from(&mut recv_buf).await?;
+    assert_eq!(&recv_buf[..n], MSG);
+    assert_eq!(addr, sender.local_addr()?);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn send_to_peek_from_poll() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
