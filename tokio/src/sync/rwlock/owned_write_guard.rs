@@ -125,7 +125,8 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
     /// # async fn main() {
     /// let lock = Arc::new(RwLock::new(Foo(1)));
     ///
-    /// let mapped = OwnedRwLockWriteGuard::downgrade_map(Arc::clone(&lock).write_owned().await, |f| &f.0);
+    /// let guard = Arc::clone(&lock).write_owned().await;
+    /// let mapped = OwnedRwLockWriteGuard::downgrade_map(guard, |f| &f.0);
     /// let foo = lock.read_owned().await;
     /// assert_eq!(foo.0, *mapped);
     /// # }
@@ -258,7 +259,8 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
     /// # async fn main() {
     /// let lock = Arc::new(RwLock::new(Foo(1)));
     ///
-    /// let guard = OwnedRwLockWriteGuard::try_downgrade_map(Arc::clone(&lock).write_owned().await, |f| Some(&f.0)).expect("should not fail");
+    /// let guard = Arc::clone(&lock).write_owned().await;
+    /// let guard = OwnedRwLockWriteGuard::try_downgrade_map(guard, |f| Some(&f.0)).expect("should not fail");
     /// let foo = lock.read_owned().await;
     /// assert_eq!(foo.0, *guard);
     /// # }
