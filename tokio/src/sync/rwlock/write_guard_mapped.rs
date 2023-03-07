@@ -160,6 +160,9 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
             resource_span: this.resource_span,
         })
     }
+
+    // Note: No `downgrade`, `downgrade_map` nor `try_downgrade_map` because they would be unsound, as we're already
+    //       potentially been mapped with internal mutability.
 }
 
 impl<T: ?Sized> ops::Deref for RwLockMappedWriteGuard<'_, T> {
