@@ -954,6 +954,15 @@ impl UdpSocket {
         /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
         /// returned. This function is usually paired with `readable()`.
         ///
+        /// # Notes
+        /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+        /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+        /// Because UDP is stateless and does not validate the origin of a packet,
+        /// the attacker does not need to be able to intercept traffic in order to interfere.
+        /// It is important to be aware of this when designing your application-level protocol.
+        ///
+        /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+        ///
         /// # Examples
         ///
         /// ```no_run
@@ -1177,6 +1186,15 @@ impl UdpSocket {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// # Notes
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
@@ -1201,6 +1219,15 @@ impl UdpSocket {
     /// # Errors
     ///
     /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// # Notes
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub fn poll_recv_from(
         &self,
         cx: &mut Context<'_>,
@@ -1232,6 +1259,16 @@ impl UdpSocket {
     ///
     /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
     /// returned. This function is usually paired with `readable()`.
+    ///
+    /// # Notes
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     ///
     /// # Examples
     ///
@@ -1336,6 +1373,12 @@ impl UdpSocket {
     /// If you're merely interested in learning the sender of the data at the head of the queue,
     /// try [`peek_sender`].
     ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -1356,6 +1399,7 @@ impl UdpSocket {
     /// ```
     ///
     /// [`peek_sender`]: method@Self::peek_sender
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub async fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
@@ -1383,6 +1427,12 @@ impl UdpSocket {
     /// If you're merely interested in learning the sender of the data at the head of the queue,
     /// try [`poll_peek_sender`].
     ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
     /// # Return value
     ///
     /// The function returns:
@@ -1396,6 +1446,7 @@ impl UdpSocket {
     /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`poll_peek_sender`]: method@Self::poll_peek_sender
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub fn poll_peek_from(
         &self,
         cx: &mut Context<'_>,
@@ -1438,7 +1489,14 @@ impl UdpSocket {
     /// If you're merely interested in learning the sender of the data at the head of the queue,
     /// try [`try_peek_sender`].
     ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
     /// [`try_peek_sender`]: method@Self::try_peek_sender
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub fn try_peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
@@ -1450,7 +1508,14 @@ impl UdpSocket {
     /// This is equivalent to calling [`peek_from`] with a zero-sized buffer,
     /// but suppresses the `WSAEMSGSIZE` error on Windows and the "invalid argument" error on macOS.
     ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
     /// [`peek_from`]: method@Self::peek_from
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub async fn peek_sender(&self) -> io::Result<SocketAddr> {
         self.io
             .registration()
@@ -1470,7 +1535,14 @@ impl UdpSocket {
     /// `Waker` from the `Context` passed to the most recent call will be scheduled to
     /// receive a wakeup.
     ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
     /// [`poll_peek_from`]: method@Self::poll_peek_from
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub fn poll_peek_sender(&self, cx: &mut Context<'_>) -> Poll<io::Result<SocketAddr>> {
         self.io
             .registration()
@@ -1481,6 +1553,14 @@ impl UdpSocket {
     ///
     /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
     /// returned. This function is usually paired with `readable()`.
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub fn try_peek_sender(&self) -> io::Result<SocketAddr> {
         self.io
             .registration()
