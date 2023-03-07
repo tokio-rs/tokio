@@ -135,7 +135,8 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// let lock = RwLock::new(Foo(1));
     ///
     /// let mapped = RwLockWriteGuard::downgrade_map(lock.write().await, |f| &f.0);
-    /// assert_eq!(1, *mapped);
+    /// let foo = lock.read().await;
+    /// assert_eq!(foo.0, *mapped);
     /// # }
     /// ```
     #[inline]
@@ -145,14 +146,37 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     {
         let data = f(&*this) as *const U;
         let this = this.skip_drop();
-
-        RwLockReadGuard {
+        let guard = RwLockReadGuard {
             s: this.s,
             data,
             marker: PhantomData,
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: this.resource_span,
-        }
+        };
+
+        // Release all but one of the permits held by the write guard
+        let to_release = (this.permits_acquired - 1) as usize;
+        this.s.release(to_release);
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            write_locked = false,
+            write_locked.op = "override",
+            )
+        });
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            current_readers = 1,
+            current_readers.op = "add",
+            )
+        });
+
+        guard
     }
 
     /// Attempts to make a new [`RwLockMappedWriteGuard`] for a component of
@@ -255,7 +279,8 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// let lock = RwLock::new(Foo(1));
     ///
     /// let guard = RwLockWriteGuard::try_downgrade_map(lock.write().await, |f| Some(&f.0)).expect("should not fail");
-    /// assert_eq!(1, *guard);
+    /// let foo = lock.read().await;
+    /// assert_eq!(foo.0, *guard);
     /// # }
     /// ```
     #[inline]
@@ -268,14 +293,37 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
             None => return Err(this),
         };
         let this = this.skip_drop();
-
-        Ok(RwLockReadGuard {
+        let guard = RwLockReadGuard {
             s: this.s,
             data,
             marker: PhantomData,
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: this.resource_span,
-        })
+        };
+
+        // Release all but one of the permits held by the write guard
+        let to_release = (this.permits_acquired - 1) as usize;
+        this.s.release(to_release);
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            write_locked = false,
+            write_locked.op = "override",
+            )
+        });
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            current_readers = 1,
+            current_readers.op = "add",
+            )
+        });
+
+        Ok(guard)
     }
 
     /// Converts this `RwLockWriteGuard` into an `RwLockMappedWriteGuard`. This
