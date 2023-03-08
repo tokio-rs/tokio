@@ -100,7 +100,78 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         }
     }
 
-    /// Attempts to make  a new [`OwnedRwLockMappedWriteGuard`] for a component
+    /// Makes a new [`OwnedRwLockReadGuard`] for a component of the locked data.
+    ///
+    /// This operation cannot fail as the `OwnedRwLockWriteGuard` passed in already
+    /// locked the data.
+    ///
+    /// This is an associated function that needs to be used as
+    /// `OwnedRwLockWriteGuard::downgrade_map(..)`. A method would interfere with methods of
+    /// the same name on the contents of the locked data.
+    ///
+    /// Inside of `f`, you retain exclusive access to the data, despite only being given a `&T`. Handing out a
+    /// `&mut T` would result in unsoundness, as you could use interior mutability.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(Foo(1)));
+    ///
+    /// let guard = Arc::clone(&lock).write_owned().await;
+    /// let mapped = OwnedRwLockWriteGuard::downgrade_map(guard, |f| &f.0);
+    /// let foo = lock.read_owned().await;
+    /// assert_eq!(foo.0, *mapped);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn downgrade_map<F, U: ?Sized>(this: Self, f: F) -> OwnedRwLockReadGuard<T, U>
+    where
+        F: FnOnce(&T) -> &U,
+    {
+        let data = f(&*this) as *const U;
+        let this = this.skip_drop();
+        let guard = OwnedRwLockReadGuard {
+            lock: this.lock,
+            data,
+            _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: this.resource_span,
+        };
+
+        // Release all but one of the permits held by the write guard
+        let to_release = (this.permits_acquired - 1) as usize;
+        guard.lock.s.release(to_release);
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            write_locked = false,
+            write_locked.op = "override",
+            )
+        });
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            current_readers = 1,
+            current_readers.op = "add",
+            )
+        });
+
+        guard
+    }
+
+    /// Attempts to make a new [`OwnedRwLockMappedWriteGuard`] for a component
     /// of the locked data. The original guard is returned if the closure
     /// returns `None`.
     ///
@@ -157,6 +228,87 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: this.resource_span,
         })
+    }
+
+    /// Attempts to make a new [`OwnedRwLockReadGuard`] for a component of
+    /// the locked data. The original guard is returned if the closure returns
+    /// `None`.
+    ///
+    /// This operation cannot fail as the `OwnedRwLockWriteGuard` passed in already
+    /// locked the data.
+    ///
+    /// This is an associated function that needs to be
+    /// used as `OwnedRwLockWriteGuard::try_downgrade_map(...)`. A method would interfere with
+    /// methods of the same name on the contents of the locked data.
+    ///
+    /// Inside of `f`, you retain exclusive access to the data, despite only being given a `&T`. Handing out a
+    /// `&mut T` would result in unsoundness, as you could use interior mutability.
+    ///
+    /// If this function returns `Err(...)`, the lock is never unlocked nor downgraded.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(Foo(1)));
+    ///
+    /// let guard = Arc::clone(&lock).write_owned().await;
+    /// let guard = OwnedRwLockWriteGuard::try_downgrade_map(guard, |f| Some(&f.0)).expect("should not fail");
+    /// let foo = lock.read_owned().await;
+    /// assert_eq!(foo.0, *guard);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn try_downgrade_map<F, U: ?Sized>(
+        this: Self,
+        f: F,
+    ) -> Result<OwnedRwLockReadGuard<T, U>, Self>
+    where
+        F: FnOnce(&T) -> Option<&U>,
+    {
+        let data = match f(&*this) {
+            Some(data) => data as *const U,
+            None => return Err(this),
+        };
+        let this = this.skip_drop();
+        let guard = OwnedRwLockReadGuard {
+            lock: this.lock,
+            data,
+            _p: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: this.resource_span,
+        };
+
+        // Release all but one of the permits held by the write guard
+        let to_release = (this.permits_acquired - 1) as usize;
+        guard.lock.s.release(to_release);
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            write_locked = false,
+            write_locked.op = "override",
+            )
+        });
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            current_readers = 1,
+            current_readers.op = "add",
+            )
+        });
+
+        Ok(guard)
     }
 
     /// Converts this `OwnedRwLockWriteGuard` into an
