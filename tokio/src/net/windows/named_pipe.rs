@@ -1663,7 +1663,7 @@ impl NamedPipeClient {
     pub async fn async_io<R>(
         &self,
         interest: Interest,
-        mut f: impl FnMut() -> io::Result<R>,
+        f: impl FnMut() -> io::Result<R>,
     ) -> io::Result<R> {
         self.io.registration().async_io(interest, f).await
     }
