@@ -197,8 +197,13 @@ If the change being proposed alters code (as opposed to only documentation for
 example), it is either adding new functionality to Tokio or it is fixing
 existing, broken functionality. In both of these cases, the pull request should
 include one or more tests to ensure that Tokio does not regress in the future.
-There are two ways to write tests: integration tests and documentation tests
-(Tokio avoids unit tests as much as possible).
+There are two ways to write tests: [integration tests](https://doc.rust-lang.org/rust-by-example/testing/integration_testing.html) and [documentation tests](https://doc.rust-lang.org/rust-by-example/testing/doc_testing.html)
+(Tokio avoids [unit tests](https://doc.rust-lang.org/rust-by-example/testing/unit_testing.html) as much as possible).
+
+Tokio uses [conditional compilation attributes](https://doc.rust-lang.org/reference/conditional-compilation.html) throughout the codebase, to modify rustc's behavior. They are passed to the compiler using RUSTFLAGS and RUSTDOC_FLAGS environment variables. One of the most prevalent ones is the cfg option. To run tests in a particular file, check first what options #![cfg] declaration defines for that file.
+
+For instance, to run a test marked with the 'tokio_unstable' cfg option, you must pass this flag to the compiler when running the test.
+`% RUSTFLAGS="--cfg tokio_unstable" cargo test -p tokio --features=full --test rt_metrics`
 
 #### Integration tests
 
