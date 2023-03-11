@@ -24,6 +24,19 @@ const CONST_MUTEX_NEW_PROBE: &str = r#"
 }
 "#;
 
+const AS_FD_PROBE: &str = r#"
+{
+    #![allow(unused_imports)]
+
+    #[cfg(unix)]
+    use std::os::unix::prelude::AsFd as _;
+    #[cfg(windows)]
+    use std::os::windows::prelude::AsSocket as _;
+    #[cfg(target = "wasm32-wasi")]
+    use std::os::wasi::prelude::AsFd as _;
+}
+"#;
+
 const TARGET_HAS_ATOMIC_PROBE: &str = r#"
 {
     #[cfg(target_has_atomic = "ptr")]
@@ -107,7 +120,6 @@ fn main() {
             // The `Mutex::new` method was made const in 1.63.
             if ac.probe_rustc_version(1, 64) {
                 enable_const_mutex_new = true;
-                enable_as_fd = true;
             } else if ac.probe_rustc_version(1, 63) {
                 // This compiler claims to be 1.63, but there are some nightly
                 // compilers that claim to be 1.63 without supporting the
@@ -117,6 +129,20 @@ fn main() {
                 // The oldest nightly that supports the feature is 2022-06-20.
                 if ac.probe_expression(CONST_MUTEX_NEW_PROBE) {
                     enable_const_mutex_new = true;
+                }
+            }
+
+            // The `AsFd` family of traits were made stable in 1.63.
+            if ac.probe_rustc_version(1, 64) {
+                enable_as_fd = true;
+            } else if ac.probe_rustc_version(1, 63) {
+                // This compiler claims to be 1.63, but there are some nightly
+                // compilers that claim to be 1.63 without supporting the
+                // feature. Explicitly probe to check if code using them
+                // compiles.
+                //
+                // The oldest nightly that supports the feature is 2022-06-16.
+                if ac.probe_expression(AS_FD_PROBE) {
                     enable_as_fd = true;
                 }
             }
