@@ -1428,6 +1428,8 @@ impl TryInto<Stdio> for ChildStderr {
 
 #[cfg(unix)]
 mod sys {
+    #[cfg(not(tokio_no_as_fd))]
+    use std::os::unix::io::{AsFd, BorrowedFd};
     use std::os::unix::io::{AsRawFd, RawFd};
 
     use super::{ChildStderr, ChildStdin, ChildStdout};
@@ -1438,9 +1440,23 @@ mod sys {
         }
     }
 
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for ChildStdin {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
+    }
+
     impl AsRawFd for ChildStdout {
         fn as_raw_fd(&self) -> RawFd {
             self.inner.as_raw_fd()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for ChildStdout {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
         }
     }
 
@@ -1449,10 +1465,19 @@ mod sys {
             self.inner.as_raw_fd()
         }
     }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for ChildStderr {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
+    }
 }
 
 #[cfg(windows)]
 mod sys {
+    #[cfg(not(tokio_no_as_fd))]
+    use std::os::windows::io::{AsHandle, BorrowedHandle};
     use std::os::windows::io::{AsRawHandle, RawHandle};
 
     use super::{ChildStderr, ChildStdin, ChildStdout};
@@ -1463,15 +1488,36 @@ mod sys {
         }
     }
 
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsHandle for ChildStdin {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
+        }
+    }
+
     impl AsRawHandle for ChildStdout {
         fn as_raw_handle(&self) -> RawHandle {
             self.inner.as_raw_handle()
         }
     }
 
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsHandle for ChildStdout {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
+        }
+    }
+
     impl AsRawHandle for ChildStderr {
         fn as_raw_handle(&self) -> RawHandle {
             self.inner.as_raw_handle()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsHandle for ChildStderr {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
         }
     }
 }

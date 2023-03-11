@@ -407,6 +407,13 @@ mod sys {
             self.io.as_raw_fd()
         }
     }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for TcpListener {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
+    }
 }
 
 cfg_unstable! {
@@ -420,6 +427,13 @@ cfg_unstable! {
                 self.io.as_raw_fd()
             }
         }
+
+        #[cfg(not(tokio_no_as_fd))]
+        impl AsFd for TcpListener {
+            fn as_fd(&self) -> BorrowedFd<'_> {
+                unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+            }
+        }
     }
 }
 
@@ -431,6 +445,13 @@ mod sys {
     impl AsRawSocket for TcpListener {
         fn as_raw_socket(&self) -> RawSocket {
             self.io.as_raw_socket()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsSocket for TcpListener {
+        fn as_socket(&self) -> BorrowedSocket<'_> {
+            unsafe { BorrowedSocket::borrow_raw(self.as_raw_socket()) }
         }
     }
 }
