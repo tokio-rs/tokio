@@ -203,7 +203,9 @@ There are two ways to write tests: [integration tests](https://doc.rust-lang.org
 Tokio uses [conditional compilation attributes](https://doc.rust-lang.org/reference/conditional-compilation.html) throughout the codebase, to modify rustc's behavior. They are passed to the compiler using RUSTFLAGS and RUSTDOC_FLAGS environment variables. One of the most prevalent ones is the cfg option. To run tests in a particular file, check first what options #![cfg] declaration defines for that file.
 
 For instance, to run a test marked with the 'tokio_unstable' cfg option, you must pass this flag to the compiler when running the test.
-`% RUSTFLAGS="--cfg tokio_unstable" cargo test -p tokio --features=full --test rt_metrics`
+```
+$ RUSTFLAGS="--cfg tokio_unstable" cargo test -p tokio --features=full --test rt_metrics`
+```
 
 #### Integration tests
 
