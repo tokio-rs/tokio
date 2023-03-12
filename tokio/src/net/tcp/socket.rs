@@ -4,12 +4,16 @@ use std::fmt;
 use std::io;
 use std::net::SocketAddr;
 
+#[cfg(all(unix, not(tokio_no_as_fd)))]
+use std::os::unix::io::{AsFd, BorrowedFd};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::time::Duration;
 
 cfg_windows! {
     use crate::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+    #[cfg(not(tokio_no_as_fd))]
+    use crate::os::windows::io::{AsSocket, BorrowedSocket};
 }
 
 cfg_net! {
@@ -739,6 +743,13 @@ impl AsRawFd for TcpSocket {
     }
 }
 
+#[cfg(all(unix, not(tokio_no_as_fd)))]
+impl AsFd for TcpSocket {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+    }
+}
+
 #[cfg(unix)]
 impl FromRawFd for TcpSocket {
     /// Converts a `RawFd` to a `TcpSocket`.
@@ -770,6 +781,13 @@ cfg_windows! {
     impl AsRawSocket for TcpSocket {
         fn as_raw_socket(&self) -> RawSocket {
             self.inner.as_raw_socket()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsSocket for TcpSocket {
+        fn as_socket(&self) -> BorrowedSocket<'_> {
+            unsafe { BorrowedSocket::borrow_raw(self.as_raw_socket()) }
         }
     }
 

@@ -43,5 +43,27 @@ pub mod windows {
             /// See [std::os::windows::io::IntoRawSocket::into_raw_socket](https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawSocket.html#tymethod.into_raw_socket)
             fn into_raw_socket(self) -> RawSocket;
         }
+
+        /// See [std::os::windows::io::BorrowedHandle](https://doc.rust-lang.org/stable/std/os/windows/io/struct.BorrowedHandle.html)
+        #[cfg(not(tokio_no_as_fd))]
+        pub type BorrowedHandle<'handle> = crate::doc::NotDefinedHere;
+
+        /// See [std::os::windows::io::AsHandle](https://doc.rust-lang.org/stable/std/os/windows/io/trait.AsHandle.html)
+        #[cfg(not(tokio_no_as_fd))]
+        pub trait AsHandle {
+            /// See [std::os::windows::io::AsHandle::as_handle](https://doc.rust-lang.org/stable/std/os/windows/io/trait.AsHandle.html#tymethod.as_handle)
+            fn as_handle(&self) -> BorrowedHandle<'_>;
+        }
+
+        /// See [std::os::windows::io::BorrowedSocket](https://doc.rust-lang.org/stable/std/os/windows/io/struct.BorrowedSocket.html)
+        #[cfg(not(tokio_no_as_fd))]
+        pub type BorrowedSocket<'socket> = crate::doc::NotDefinedHere;
+
+        /// See [std::os::windows::io::AsSocket](https://doc.rust-lang.org/stable/std/os/windows/io/trait.AsSocket.html)
+        #[cfg(not(tokio_no_as_fd))]
+        pub trait AsSocket {
+            /// See [std::os::windows::io::AsSocket::as_socket](https://doc.rust-lang.org/stable/std/os/windows/io/trait.AsSocket.html#tymethod.as_socket)
+            fn as_socket(&self) -> BorrowedSocket<'_>;
+        }
     }
 }

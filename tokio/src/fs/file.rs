@@ -725,6 +725,15 @@ impl std::os::unix::io::AsRawFd for File {
     }
 }
 
+#[cfg(all(unix, not(tokio_no_as_fd)))]
+impl std::os::unix::io::AsFd for File {
+    fn as_fd(&self) -> std::os::unix::io::BorrowedFd<'_> {
+        unsafe {
+            std::os::unix::io::BorrowedFd::borrow_raw(std::os::unix::io::AsRawFd::as_raw_fd(self))
+        }
+    }
+}
+
 #[cfg(unix)]
 impl std::os::unix::io::FromRawFd for File {
     unsafe fn from_raw_fd(fd: std::os::unix::io::RawFd) -> Self {
@@ -734,10 +743,23 @@ impl std::os::unix::io::FromRawFd for File {
 
 cfg_windows! {
     use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
+    #[cfg(not(tokio_no_as_fd))]
+    use crate::os::windows::io::{AsHandle, BorrowedHandle};
 
     impl AsRawHandle for File {
         fn as_raw_handle(&self) -> RawHandle {
             self.std.as_raw_handle()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsHandle for File {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            unsafe {
+                BorrowedHandle::borrow_raw(
+                    AsRawHandle::as_raw_handle(self),
+                )
+            }
         }
     }
 

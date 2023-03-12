@@ -24,6 +24,19 @@ const CONST_MUTEX_NEW_PROBE: &str = r#"
 }
 "#;
 
+const AS_FD_PROBE: &str = r#"
+{
+    #![allow(unused_imports)]
+
+    #[cfg(unix)]
+    use std::os::unix::prelude::AsFd as _;
+    #[cfg(windows)]
+    use std::os::windows::prelude::AsSocket as _;
+    #[cfg(target = "wasm32-wasi")]
+    use std::os::wasi::prelude::AsFd as _;
+}
+"#;
+
 const TARGET_HAS_ATOMIC_PROBE: &str = r#"
 {
     #[cfg(target_has_atomic = "ptr")]
@@ -43,6 +56,7 @@ fn main() {
     let mut enable_addr_of = false;
     let mut enable_target_has_atomic = false;
     let mut enable_const_mutex_new = false;
+    let mut enable_as_fd = false;
     let mut target_needs_atomic_u64_fallback = false;
 
     match AutoCfg::new() {
@@ -117,6 +131,21 @@ fn main() {
                     enable_const_mutex_new = true;
                 }
             }
+
+            // The `AsFd` family of traits were made stable in 1.63.
+            if ac.probe_rustc_version(1, 64) {
+                enable_as_fd = true;
+            } else if ac.probe_rustc_version(1, 63) {
+                // This compiler claims to be 1.63, but there are some nightly
+                // compilers that claim to be 1.63 without supporting the
+                // feature. Explicitly probe to check if code using them
+                // compiles.
+                //
+                // The oldest nightly that supports the feature is 2022-06-16.
+                if ac.probe_expression(AS_FD_PROBE) {
+                    enable_as_fd = true;
+                }
+            }
         }
 
         Err(e) => {
@@ -160,6 +189,14 @@ fn main() {
         //
         // RUSTFLAGS="--cfg tokio_no_const_mutex_new"
         autocfg::emit("tokio_no_const_mutex_new")
+    }
+
+    if !enable_as_fd {
+        // To disable this feature on compilers that support it, you can
+        // explicitly pass this flag with the following environment variable:
+        //
+        // RUSTFLAGS="--cfg tokio_no_as_fd"
+        autocfg::emit("tokio_no_as_fd");
     }
 
     if target_needs_atomic_u64_fallback {
