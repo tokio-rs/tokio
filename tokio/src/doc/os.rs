@@ -13,7 +13,7 @@ pub mod windows {
 
         /// See [std::os::windows::io::AsRawHandle](https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html)
         pub trait AsRawHandle {
-            /// See [std::os::windows::io::FromRawHandle::from_raw_handle](https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html#tymethod.as_raw_handle)
+            /// See [std::os::windows::io::AsRawHandle::as_raw_handle](https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html#tymethod.as_raw_handle)
             fn as_raw_handle(&self) -> RawHandle;
         }
 
@@ -21,6 +21,15 @@ pub mod windows {
         pub trait FromRawHandle {
             /// See [std::os::windows::io::FromRawHandle::from_raw_handle](https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html#tymethod.from_raw_handle)
             unsafe fn from_raw_handle(handle: RawHandle) -> Self;
+        }
+
+        /// See [std::os::windows::io::BorrowedHandle](https://doc.rust-lang.org/std/os/windows/io/struct.BorrowedHandle.html)
+        pub type BorrowedHandle<'handle> = crate::doc::NotDefinedHere;
+
+        /// See [std::os::windows::io::AsHandle](https://doc.rust-lang.org/std/os/windows/io/trait.AsHandle.html)
+        pub trait AsHandle {
+            /// See [std::os::windows::io::AsHandle::as_handle](https://doc.rust-lang.org/std/os/windows/io/trait.AsHandle.html#tymethod.as_handle)
+            fn as_handle(&self) -> BorrowedHandle<'_>;
         }
     }
 }
