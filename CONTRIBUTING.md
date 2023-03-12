@@ -204,7 +204,7 @@ Tokio uses [conditional compilation attributes](https://doc.rust-lang.org/refere
 
 For instance, to run a test marked with the 'tokio_unstable' cfg option, you must pass this flag to the compiler when running the test.
 ```
-$ RUSTFLAGS="--cfg tokio_unstable" cargo test -p tokio --features=full --test rt_metrics`
+$ RUSTFLAGS="--cfg tokio_unstable" cargo test -p tokio --all-features --test rt_metrics
 ```
 
 #### Integration tests
