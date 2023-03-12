@@ -197,11 +197,11 @@ If the change being proposed alters code (as opposed to only documentation for
 example), it is either adding new functionality to Tokio or it is fixing
 existing, broken functionality. In both of these cases, the pull request should
 include one or more tests to ensure that Tokio does not regress in the future.
-There are two ways to write tests: [integration tests](integration-tests)
-and [documentation tests](documentation-tests).
-(Tokio avoids [unit tests](unit-tests) as much as possible).
+There are two ways to write tests: [integration tests][integration-tests]
+and [documentation tests][documentation-tests].
+(Tokio avoids [unit tests][unit-tests] as much as possible).
 
-Tokio uses [conditional compilation attributes](conditional-compilation)
+Tokio uses [conditional compilation attributes][conditional-compilation]
 throughout the codebase, to modify rustc's behavior. Code marked with such
 attributes can be enabled using RUSTFLAGS and RUSTDOCFLAGS environment
 variables. One of the most prevalent flags passed in these variables is
