@@ -508,6 +508,39 @@ impl<T: AsRawFd> AsyncFd<T> {
     pub async fn writable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
         self.readiness_mut(Interest::WRITABLE).await
     }
+
+    /// Reads or writes from the file descriptor using a user-provided IO operation.
+    ///
+    /// The readiness of the file descriptor is awaited and when the file descriptor is ready,
+    /// the provided closure is called. The closure should attempt to perform
+    /// IO operation on the file descriptor by manually calling the appropriate syscall.
+    /// If the operation fails because the file descriptor is not actually ready,
+    /// then the closure should return a `WouldBlock` error. In such case the
+    /// readiness flag is cleared and the file descriptor readiness is awaited again.
+    /// This loop is repeated until the closure returns an `Ok` or an error
+    /// other than `WouldBlock`.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the file descriptor that failed due to the file descriptor not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the file descriptor to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `AsyncFd` type, as this will mess with the
+    /// readiness flag and can cause the file descriptor to behave incorrectly.
+    ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
+    pub async fn async_io<R>(
+        &self,
+        interest: Interest,
+        f: impl FnMut() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.registration.async_io(interest, f).await
+    }
 }
 
 impl<T: AsRawFd> AsRawFd for AsyncFd<T> {
