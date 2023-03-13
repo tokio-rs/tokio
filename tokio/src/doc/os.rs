@@ -44,21 +44,21 @@ pub mod windows {
             fn into_raw_socket(self) -> RawSocket;
         }
 
-        /// See [std::os::windows::io::BorrowedHandle](https://doc.rust-lang.org/stable/std/os/windows/io/struct.BorrowedHandle.html)
+        /// See [std::os::windows::io::BorrowedHandle](https://doc.rust-lang.org/std/os/windows/io/struct.BorrowedHandle.html)
         pub type BorrowedHandle<'handle> = crate::doc::NotDefinedHere;
 
-        /// See [std::os::windows::io::AsHandle](https://doc.rust-lang.org/stable/std/os/windows/io/trait.AsHandle.html)
+        /// See [std::os::windows::io::AsHandle](https://doc.rust-lang.org/std/os/windows/io/trait.AsHandle.html)
         pub trait AsHandle {
-            /// See [std::os::windows::io::AsHandle::as_handle](https://doc.rust-lang.org/stable/std/os/windows/io/trait.AsHandle.html#tymethod.as_handle)
+            /// See [std::os::windows::io::AsHandle::as_handle](https://doc.rust-lang.org/std/os/windows/io/trait.AsHandle.html#tymethod.as_handle)
             fn as_handle(&self) -> BorrowedHandle<'_>;
         }
 
-        /// See [std::os::windows::io::BorrowedSocket](https://doc.rust-lang.org/stable/std/os/windows/io/struct.BorrowedSocket.html)
+        /// See [std::os::windows::io::BorrowedSocket](https://doc.rust-lang.org/std/os/windows/io/struct.BorrowedSocket.html)
         pub type BorrowedSocket<'socket> = crate::doc::NotDefinedHere;
 
-        /// See [std::os::windows::io::AsSocket](https://doc.rust-lang.org/stable/std/os/windows/io/trait.AsSocket.html)
+        /// See [std::os::windows::io::AsSocket](https://doc.rust-lang.org/std/os/windows/io/trait.AsSocket.html)
         pub trait AsSocket {
-            /// See [std::os::windows::io::AsSocket::as_socket](https://doc.rust-lang.org/stable/std/os/windows/io/trait.AsSocket.html#tymethod.as_socket)
+            /// See [std::os::windows::io::AsSocket::as_socket](https://doc.rust-lang.org/std/os/windows/io/trait.AsSocket.html#tymethod.as_socket)
             fn as_socket(&self) -> BorrowedSocket<'_>;
         }
     }
