@@ -49,18 +49,42 @@ cfg_io_std! {
 }
 
 #[cfg(unix)]
-impl std::os::unix::io::AsRawFd for Stdin {
-    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
-        std::io::stdin().as_raw_fd()
+mod sys {
+    #[cfg(not(tokio_no_as_fd))]
+    use std::os::unix::io::{AsFd, BorrowedFd};
+    use std::os::unix::io::{AsRawFd, RawFd};
+
+    use super::Stdin;
+
+    impl AsRawFd for Stdin {
+        fn as_raw_fd(&self) -> RawFd {
+            std::io::stdin().as_raw_fd()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for Stdin {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
     }
 }
 
 cfg_windows! {
+    #[cfg(not(tokio_no_as_fd))]
+    use crate::os::windows::io::{AsHandle, BorrowedHandle};
     use crate::os::windows::io::{AsRawHandle, RawHandle};
 
     impl AsRawHandle for Stdin {
         fn as_raw_handle(&self) -> RawHandle {
             std::io::stdin().as_raw_handle()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsHandle for Stdin {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
         }
     }
 }
