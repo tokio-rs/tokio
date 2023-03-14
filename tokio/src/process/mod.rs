@@ -249,17 +249,22 @@ use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;
-#[cfg(unix)]
-use std::os::unix::process::CommandExt;
-#[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, RawHandle};
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::pin::Pin;
 use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
 use std::task::Context;
 use std::task::Poll;
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+cfg_windows! {
+    use crate::os::windows::io::{AsRawHandle, RawHandle};
+    #[cfg(not(tokio_no_as_fd))]
+    use crate::os::windows::io::{AsHandle, BorrowedHandle};
+}
 
 /// This structure mimics the API of [`std::process::Command`] found in the standard library, but
 /// replaces functions that create a process with an asynchronous variant. The main provided
@@ -642,16 +647,16 @@ impl Command {
         self
     }
 
-    /// Sets the [process creation flags][1] to be passed to `CreateProcess`.
-    ///
-    /// These will always be ORed with `CREATE_UNICODE_ENVIRONMENT`.
-    ///
-    /// [1]: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863(v=vs.85).aspx
-    #[cfg(windows)]
-    #[cfg_attr(docsrs, doc(cfg(windows)))]
-    pub fn creation_flags(&mut self, flags: u32) -> &mut Command {
-        self.std.creation_flags(flags);
-        self
+    cfg_windows! {
+        /// Sets the [process creation flags][1] to be passed to `CreateProcess`.
+        ///
+        /// These will always be ORed with `CREATE_UNICODE_ENVIRONMENT`.
+        ///
+        /// [1]: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863(v=vs.85).aspx
+        pub fn creation_flags(&mut self, flags: u32) -> &mut Command {
+            self.std.creation_flags(flags);
+            self
+        }
     }
 
     /// Sets the child process's user ID. This translates to a
@@ -1082,13 +1087,14 @@ impl Child {
         }
     }
 
-    /// Extracts the raw handle of the process associated with this child while
-    /// it is still running. Returns `None` if the child has exited.
-    #[cfg(windows)]
-    pub fn raw_handle(&self) -> Option<RawHandle> {
-        match &self.child {
-            FusedChild::Child(c) => Some(c.inner.as_raw_handle()),
-            FusedChild::Done(_) => None,
+    cfg_windows! {
+        /// Extracts the raw handle of the process associated with this child while
+        /// it is still running. Returns `None` if the child has exited.
+        pub fn raw_handle(&self) -> Option<RawHandle> {
+            match &self.child {
+                FusedChild::Child(c) => Some(c.inner.as_raw_handle()),
+                FusedChild::Done(_) => None,
+            }
         }
     }
 
@@ -1323,7 +1329,7 @@ impl ChildStdin {
 }
 
 impl ChildStdout {
-    /// Creates an asynchronous `ChildStderr` from a synchronous one.
+    /// Creates an asynchronous `ChildStdout` from a synchronous one.
     ///
     /// # Errors
     ///
@@ -1474,14 +1480,7 @@ mod sys {
     }
 }
 
-#[cfg(windows)]
-mod sys {
-    #[cfg(not(tokio_no_as_fd))]
-    use std::os::windows::io::{AsHandle, BorrowedHandle};
-    use std::os::windows::io::{AsRawHandle, RawHandle};
-
-    use super::{ChildStderr, ChildStdin, ChildStdout};
-
+cfg_windows! {
     impl AsRawHandle for ChildStdin {
         fn as_raw_handle(&self) -> RawHandle {
             self.inner.as_raw_handle()

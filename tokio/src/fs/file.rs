@@ -741,28 +741,32 @@ impl std::os::unix::io::FromRawFd for File {
     }
 }
 
-#[cfg(windows)]
-impl std::os::windows::io::AsRawHandle for File {
-    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
-        self.std.as_raw_handle()
-    }
-}
+cfg_windows! {
+    use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
+    #[cfg(not(tokio_no_as_fd))]
+    use crate::os::windows::io::{AsHandle, BorrowedHandle};
 
-#[cfg(all(windows, not(tokio_no_as_fd)))]
-impl std::os::windows::io::AsHandle for File {
-    fn as_handle(&self) -> std::os::windows::io::BorrowedHandle<'_> {
-        unsafe {
-            std::os::windows::io::BorrowedHandle::borrow_raw(
-                std::os::windows::io::AsRawHandle::as_raw_handle(self),
-            )
+    impl AsRawHandle for File {
+        fn as_raw_handle(&self) -> RawHandle {
+            self.std.as_raw_handle()
         }
     }
-}
 
-#[cfg(windows)]
-impl std::os::windows::io::FromRawHandle for File {
-    unsafe fn from_raw_handle(handle: std::os::windows::io::RawHandle) -> Self {
-        StdFile::from_raw_handle(handle).into()
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsHandle for File {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            unsafe {
+                BorrowedHandle::borrow_raw(
+                    AsRawHandle::as_raw_handle(self),
+                )
+            }
+        }
+    }
+
+    impl FromRawHandle for File {
+        unsafe fn from_raw_handle(handle: RawHandle) -> Self {
+            StdFile::from_raw_handle(handle).into()
+        }
     }
 }
 

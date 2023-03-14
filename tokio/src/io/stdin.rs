@@ -70,13 +70,10 @@ mod sys {
     }
 }
 
-#[cfg(windows)]
-mod sys {
+cfg_windows! {
     #[cfg(not(tokio_no_as_fd))]
-    use std::os::windows::io::{AsHandle, BorrowedHandle};
-    use std::os::windows::io::{AsRawHandle, RawHandle};
-
-    use super::Stdin;
+    use crate::os::windows::io::{AsHandle, BorrowedHandle};
+    use crate::os::windows::io::{AsRawHandle, RawHandle};
 
     impl AsRawHandle for Stdin {
         fn as_raw_handle(&self) -> RawHandle {
