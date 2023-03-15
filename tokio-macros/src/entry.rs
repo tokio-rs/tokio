@@ -51,7 +51,7 @@ struct Configuration {
 }
 
 impl Configuration {
-    fn new(is_test: bool, rt_multi_thread: bool) -> Self {
+    const fn new(is_test: bool, rt_multi_thread: bool) -> Self {
         Configuration {
             rt_multi_thread_available: rt_multi_thread,
             default_flavor: match is_test {
@@ -117,7 +117,7 @@ impl Configuration {
         Ok(())
     }
 
-    fn macro_name(&self) -> &'static str {
+    const fn macro_name(&self) -> &'static str {
         if self.is_test {
             "tokio::test"
         } else {
