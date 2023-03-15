@@ -874,6 +874,33 @@ impl<T> DelayQueue<T> {
         self.slab.compact();
     }
 
+    /// Gets the [`Key`] that will expire next.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage
+    ///
+    /// ```rust
+    /// use tokio_util::time::DelayQueue;
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut delay_queue = DelayQueue::new();
+    ///
+    /// let key1 = delay_queue.insert("foo", Duration::from_secs(10));
+    /// let key2 = delay_queue.insert("bar", Duration::from_secs(5));
+    /// let key3 = delay_queue.insert("baz", Duration::from_secs(15));
+    ///
+    /// assert_eq!(delay_queue.next_expiring().unwrap(), key2);
+    /// # }
+    /// ```
+    ///
+    /// [`Key`]: struct@Key
+    pub fn next_expiring(&self) -> Option<Key> {
+        self.wheel.next_expiring_entry()
+    }
+
     /// Returns the next time to poll as determined by the wheel
     fn next_deadline(&mut self) -> Option<Instant> {
         self.wheel
@@ -1164,6 +1191,10 @@ impl<T> wheel::Stack for Stack<T> {
         } else {
             None
         }
+    }
+
+    fn peek(&self) -> Option<Self::Owned> {
+        self.head
     }
 
     #[track_caller]
