@@ -184,6 +184,7 @@ impl<T> JoinHandle<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
+    /// #  tokio::time::pause();
     ///    let mut handles = Vec::new();
     ///
     ///    handles.push(tokio::spawn(async {
@@ -262,6 +263,7 @@ impl<T> JoinHandle<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
+    /// #  tokio::time::pause();
     ///    let mut handles = Vec::new();
     ///
     ///    handles.push(tokio::spawn(async {
