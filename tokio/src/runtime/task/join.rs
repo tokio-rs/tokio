@@ -182,8 +182,8 @@ impl<T> JoinHandle<T> {
     /// ```rust
     /// use tokio::time;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
     /// #  tokio::time::pause();
     ///    let mut handles = Vec::new();
     ///
@@ -204,7 +204,7 @@ impl<T> JoinHandle<T> {
     ///    for handle in handles {
     ///        assert!(handle.await.unwrap_err().is_cancelled());
     ///    }
-    /// }
+    /// # }
     /// ```
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     pub fn abort(&self) {
@@ -261,9 +261,9 @@ impl<T> JoinHandle<T> {
     /// ```rust
     /// use tokio::{time, task};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    /// #  tokio::time::pause();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// #  time::pause();
     ///    let mut handles = Vec::new();
     ///
     ///    handles.push(tokio::spawn(async {
@@ -285,7 +285,7 @@ impl<T> JoinHandle<T> {
     ///    for handle in handles {
     ///        assert!(handle.await.unwrap_err().is_cancelled());
     ///    }
-    /// }
+    /// # }
     /// ```
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     pub fn abort_handle(&self) -> super::AbortHandle {
