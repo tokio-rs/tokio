@@ -511,29 +511,88 @@ impl<T: AsRawFd> AsyncFd<T> {
 
     /// Reads or writes from the file descriptor using a user-provided IO operation.
     ///
+    /// This method is useful to retry an operation that might block (by returning
+    /// a [`WouldBlock`] error) until it doesn't block any more:
+    ///
+    /// ```no_run
+    /// use tokio::io::unix::AsyncFd;
+    ///
+    /// use std::io;
+    /// use std::net::UdpSocket;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let socket = UdpSocket::bind("0.0.0.0:8080")?;
+    ///     socket.set_nonblocking(true)?;
+    ///     let async_fd = AsyncFd::new(socket)?;
+    ///
+    ///     let written = loop {
+    ///         let mut guard = async_fd.writable().await?;
+    ///         match guard.try_io(|inner| inner.get_ref().send(&[1, 2])) {
+    ///             Ok(result) => {
+    ///                 break result?;
+    ///             }
+    ///             Err(_would_block) => {
+    ///                 continue;
+    ///             }
+    ///         }
+    ///     };
+    ///
+    ///     println!("wrote {written} bytes");
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// Using this method, this logic can instead be written as:
+    ///
+    /// ```no_run
+    /// use tokio::io::{Interest, unix::AsyncFd};
+    ///
+    /// use std::io;
+    /// use std::net::UdpSocket;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let socket = UdpSocket::bind("0.0.0.0:8080")?;
+    ///     socket.set_nonblocking(true)?;
+    ///     let async_fd = AsyncFd::new(socket)?;
+    ///
+    ///     let written = async_fd
+    ///         .async_io(Interest::WRITABLE, || async_fd.get_ref().send(&[1, 2]))
+    ///         .await?;
+    ///
+    ///     println!("wrote {written} bytes");
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
     /// The readiness of the file descriptor is awaited and when the file descriptor is ready,
     /// the provided closure is called. The closure should attempt to perform
     /// IO operation on the file descriptor by manually calling the appropriate syscall.
     /// If the operation fails because the file descriptor is not actually ready,
-    /// then the closure should return a `WouldBlock` error. In such case the
+    /// then the closure should return a [`WouldBlock`] error. In such case the
     /// readiness flag is cleared and the file descriptor readiness is awaited again.
     /// This loop is repeated until the closure returns an `Ok` or an error
-    /// other than `WouldBlock`.
+    /// other than [`WouldBlock`].
     ///
-    /// The closure should only return a `WouldBlock` error if it has performed
+    /// The closure should only return a [`WouldBlock`] error if it has performed
     /// an IO operation on the file descriptor that failed due to the file descriptor not being
-    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// ready. Returning a [`WouldBlock`] error in any other situation will
     /// incorrectly clear the readiness flag, which can cause the file descriptor to
     /// behave incorrectly.
     ///
     /// The closure should not perform the IO operation using any of the methods
-    /// defined on the Tokio `AsyncFd` type, as this will mess with the
+    /// defined on the Tokio [`AsyncFd`] type, as this will mess with the
     /// readiness flag and can cause the file descriptor to behave incorrectly.
     ///
     /// This method is not intended to be used with combined interests.
     /// The closure should perform only one type of IO operation, so it should not
     /// require more than one ready state. This method may panic or sleep forever
     /// if it is called with a combined interest.
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub async fn async_io<R>(
         &self,
         interest: Interest,
