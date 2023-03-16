@@ -182,28 +182,28 @@ impl<T> JoinHandle<T> {
     /// ```rust
     /// use tokio::time;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///    let mut handles = Vec::new();
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// # async fn main() {
+    /// let mut handles = Vec::new();
     ///
-    ///    handles.push(tokio::spawn(async {
-    ///       time::sleep(time::Duration::from_secs(10)).await;
-    ///       true
-    ///    }));
+    /// handles.push(tokio::spawn(async {
+    ///    time::sleep(time::Duration::from_secs(10)).await;
+    ///    true
+    /// }));
     ///
-    ///    handles.push(tokio::spawn(async {
-    ///       time::sleep(time::Duration::from_secs(10)).await;
-    ///       false
-    ///    }));
+    /// handles.push(tokio::spawn(async {
+    ///    time::sleep(time::Duration::from_secs(10)).await;
+    ///    false
+    /// }));
     ///
-    ///    for handle in &handles {
-    ///        handle.abort();
-    ///    }
-    ///
-    ///    for handle in handles {
-    ///        assert!(handle.await.unwrap_err().is_cancelled());
-    ///    }
+    /// for handle in &handles {
+    ///     handle.abort();
     /// }
+    ///
+    /// for handle in handles {
+    ///     assert!(handle.await.unwrap_err().is_cancelled());
+    /// }
+    /// # }
     /// ```
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     pub fn abort(&self) {
@@ -220,9 +220,8 @@ impl<T> JoinHandle<T> {
     /// ```rust
     /// use tokio::time;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// # async fn main() {
-    /// # time::pause();
     /// let handle1 = tokio::spawn(async {
     ///     // do some stuff here
     /// });
@@ -252,7 +251,41 @@ impl<T> JoinHandle<T> {
     }
 
     /// Returns a new `AbortHandle` that can be used to remotely abort this task.
-    pub(crate) fn abort_handle(&self) -> super::AbortHandle {
+    ///
+    /// Awaiting a task cancelled by the `AbortHandle` might complete as usual if the task was
+    /// already completed at the time it was cancelled, but most likely it
+    /// will fail with a [cancelled] `JoinError`.
+    ///
+    /// ```rust
+    /// use tokio::{time, task};
+    ///
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// # async fn main() {
+    /// let mut handles = Vec::new();
+    ///
+    /// handles.push(tokio::spawn(async {
+    ///    time::sleep(time::Duration::from_secs(10)).await;
+    ///    true
+    /// }));
+    ///
+    /// handles.push(tokio::spawn(async {
+    ///    time::sleep(time::Duration::from_secs(10)).await;
+    ///    false
+    /// }));
+    ///
+    /// let abort_handles: Vec<task::AbortHandle> = handles.iter().map(|h| h.abort_handle()).collect();
+    ///
+    /// for handle in abort_handles {
+    ///     handle.abort();
+    /// }
+    ///
+    /// for handle in handles {
+    ///     assert!(handle.await.unwrap_err().is_cancelled());
+    /// }
+    /// # }
+    /// ```
+    /// [cancelled]: method@super::error::JoinError::is_cancelled
+    pub fn abort_handle(&self) -> super::AbortHandle {
         self.raw.ref_inc();
         super::AbortHandle::new(self.raw)
     }
