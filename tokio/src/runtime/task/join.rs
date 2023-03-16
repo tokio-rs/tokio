@@ -184,26 +184,26 @@ impl<T> JoinHandle<T> {
     ///
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
-    /// #  tokio::time::pause();
-    ///    let mut handles = Vec::new();
+    /// # tokio::time::pause();
+    /// let mut handles = Vec::new();
     ///
-    ///    handles.push(tokio::spawn(async {
-    ///       time::sleep(time::Duration::from_secs(10)).await;
-    ///       true
-    ///    }));
+    /// handles.push(tokio::spawn(async {
+    ///    time::sleep(time::Duration::from_secs(10)).await;
+    ///    true
+    /// }));
     ///
-    ///    handles.push(tokio::spawn(async {
-    ///       time::sleep(time::Duration::from_secs(10)).await;
-    ///       false
-    ///    }));
+    /// handles.push(tokio::spawn(async {
+    ///    time::sleep(time::Duration::from_secs(10)).await;
+    ///    false
+    /// }));
     ///
-    ///    for handle in &handles {
-    ///        handle.abort();
-    ///    }
+    /// for handle in &handles {
+    ///     handle.abort();
+    /// }
     ///
-    ///    for handle in handles {
-    ///        assert!(handle.await.unwrap_err().is_cancelled());
-    ///    }
+    /// for handle in handles {
+    ///     assert!(handle.await.unwrap_err().is_cancelled());
+    /// }
     /// # }
     /// ```
     /// [cancelled]: method@super::error::JoinError::is_cancelled
@@ -264,27 +264,27 @@ impl<T> JoinHandle<T> {
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// #  time::pause();
-    ///    let mut handles = Vec::new();
+    /// let mut handles = Vec::new();
     ///
-    ///    handles.push(tokio::spawn(async {
-    ///       time::sleep(time::Duration::from_secs(10)).await;
-    ///       true
-    ///    }));
+    /// handles.push(tokio::spawn(async {
+    ///    time::sleep(time::Duration::from_secs(10)).await;
+    ///    true
+    /// }));
     ///
-    ///    handles.push(tokio::spawn(async {
-    ///       time::sleep(time::Duration::from_secs(10)).await;
-    ///       false
-    ///    }));
+    /// handles.push(tokio::spawn(async {
+    ///    time::sleep(time::Duration::from_secs(10)).await;
+    ///    false
+    /// }));
     ///
-    ///    let abort_handles: Vec<task::AbortHandle> = handles.iter().map(|h| h.abort_handle()).collect();
+    /// let abort_handles: Vec<task::AbortHandle> = handles.iter().map(|h| h.abort_handle()).collect();
     ///
-    ///    for handle in abort_handles {
-    ///        handle.abort();
-    ///    }
+    /// for handle in abort_handles {
+    ///     handle.abort();
+    /// }
     ///
-    ///    for handle in handles {
-    ///        assert!(handle.await.unwrap_err().is_cancelled());
-    ///    }
+    /// for handle in handles {
+    ///     assert!(handle.await.unwrap_err().is_cancelled());
+    /// }
     /// # }
     /// ```
     /// [cancelled]: method@super::error::JoinError::is_cancelled
