@@ -182,9 +182,8 @@ impl<T> JoinHandle<T> {
     /// ```rust
     /// use tokio::time;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// # async fn main() {
-    /// # tokio::time::pause();
     /// let mut handles = Vec::new();
     ///
     /// handles.push(tokio::spawn(async {
@@ -221,9 +220,8 @@ impl<T> JoinHandle<T> {
     /// ```rust
     /// use tokio::time;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// # async fn main() {
-    /// # time::pause();
     /// let handle1 = tokio::spawn(async {
     ///     // do some stuff here
     /// });
@@ -261,9 +259,8 @@ impl<T> JoinHandle<T> {
     /// ```rust
     /// use tokio::{time, task};
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// # async fn main() {
-    /// #  time::pause();
     /// let mut handles = Vec::new();
     ///
     /// handles.push(tokio::spawn(async {
