@@ -1,6 +1,9 @@
 #![warn(rust_2018_idioms)]
 
-use std::io;
+use std::{
+    io,
+    time::{Duration, Instant},
+};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_test::io::Builder;
 
@@ -83,4 +86,68 @@ async fn mock_panics_read_data_left() {
 async fn mock_panics_write_data_left() {
     use tokio_test::io::Builder;
     Builder::new().write(b"write").build();
+}
+
+#[tokio::test]
+async fn wait() {
+    // 200ms should be enough to ensure no other factors are causing the delay
+    const FIRST_WAIT: Duration = Duration::from_millis(200);
+
+    let mut mock = Builder::new()
+        .wait(FIRST_WAIT)
+        .read(b"hello ")
+        .read(b"world!")
+        .build();
+
+    let mut buf = [0; 256];
+
+    let start = Instant::now(); // record the time the read call takes
+                                //
+    let n = mock.read(&mut buf).await.expect("read 1");
+    assert_eq!(&buf[..n], b"hello ");
+    println!("time elapsed after first read {:?}", start.elapsed());
+
+    let n = mock.read(&mut buf).await.expect("read 2");
+    assert_eq!(&buf[..n], b"world!");
+    println!("time elapsed after second read {:?}", start.elapsed());
+
+    // make sure the .wait() instruction worked
+    assert!(
+        start.elapsed() >= FIRST_WAIT,
+        "consuming the whole mock only took {}ms",
+        start.elapsed().as_millis()
+    );
+}
+
+#[tokio::test]
+async fn multiple_wait() {
+    // 200ms should be enough to ensure no other factors are causing the delay
+    const FIRST_WAIT: Duration = Duration::from_millis(200);
+    const SECOND_WAIT: Duration = Duration::from_millis(200);
+
+    let mut mock = Builder::new()
+        .wait(FIRST_WAIT)
+        .read(b"hello ")
+        .wait(SECOND_WAIT)
+        .read(b"world!")
+        .build();
+
+    let mut buf = [0; 256];
+
+    let start = Instant::now(); // record the time it takes to consume the mock
+
+    let n = mock.read(&mut buf).await.expect("read 1");
+    assert_eq!(&buf[..n], b"hello ");
+    println!("time elapsed after first read {:?}", start.elapsed());
+
+    let n = mock.read(&mut buf).await.expect("read 2");
+    assert_eq!(&buf[..n], b"world!");
+    println!("time elapsed after second read {:?}", start.elapsed());
+
+    // make sure the .wait() instruction worked
+    assert!(
+        start.elapsed() >= FIRST_WAIT + SECOND_WAIT,
+        "consuming the whole mock only took {}ms",
+        start.elapsed().as_millis()
+    );
 }
