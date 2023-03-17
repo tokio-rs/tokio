@@ -16,7 +16,7 @@ use std::marker::PhantomPinned;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
+use std::sync::atomic::Ordering::{self, Acquire, Relaxed, Release, SeqCst};
 use std::task::{Context, Poll, Waker};
 
 type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
@@ -218,12 +218,16 @@ struct Waiter {
     /// Intrusive linked-list pointers.
     pointers: linked_list::Pointers<Waiter>,
 
-    /// Waiting task's waker.
+    /// Waiting task's waker. This field is either protected by
+    /// the `waiters` lock in `Notify` or exclusively owned by
+    /// the enclosing `Waiter`, depending on the value of `notification`.
     waker: UnsafeCell<Option<Waker>>,
 
-    /// Notification for this waiter. It is an enum and uses
-    /// `NOTIFICATION_{NONE, ONE, ALL}` values.
-    notification: AtomicUsize,
+    /// Notification for this waiter. If it is `None`, then `waker` is
+    /// protected by the `waiters` lock. If it is `Some`, the waker is
+    /// exclusively owned by the enclosing `Waiter` and can be
+    /// accessed without locking.
+    notification: AtomicNotification,
 
     /// Should not be `Unpin`.
     _p: PhantomPinned,
@@ -234,7 +238,7 @@ impl Waiter {
         Waiter {
             pointers: linked_list::Pointers::new(),
             waker: UnsafeCell::new(None),
-            notification: AtomicUsize::new(NOTIFICATION_NONE),
+            notification: AtomicNotification::none(),
             _p: PhantomPinned,
         }
     }
@@ -256,6 +260,47 @@ const NOTIFICATION_ONE: usize = 1;
 
 // Notification type used by `notify_waiters`.
 const NOTIFICATION_ALL: usize = 2;
+
+/// Notification for a `Waiter`.
+/// This struct is equivalent to `Option<Notification>`, but uses
+/// `AtomicUsize` for atomic operations.
+#[derive(Debug)]
+struct AtomicNotification(AtomicUsize);
+
+impl AtomicNotification {
+    fn none() -> Self {
+        AtomicNotification(AtomicUsize::new(NOTIFICATION_NONE))
+    }
+
+    /// Store-release a notification.
+    /// This method should be called exactly once.
+    fn store_release(&self, notification: Notification) {
+        self.0.store(notification as usize, Release);
+    }
+
+    fn load(&self, ordering: Ordering) -> Option<Notification> {
+        match self.0.load(ordering) {
+            NOTIFICATION_NONE => None,
+            NOTIFICATION_ONE => Some(Notification::One),
+            NOTIFICATION_ALL => Some(Notification::All),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Clears the notification. This method is used by a `Notified`
+    /// future to consume the notification. It uses relaxed ordering
+    /// and should be only used once this variable is no longer shared.
+    fn clear(&self) {
+        self.0.store(NOTIFICATION_NONE, Relaxed);
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+#[repr(usize)]
+enum Notification {
+    One = NOTIFICATION_ONE,
+    All = NOTIFICATION_ALL,
+}
 
 /// List used in `Notify::notify_waiters`. It wraps a guarded linked list
 /// and gates the access to it on `notify.waiters` mutex. It also empties
@@ -301,9 +346,9 @@ impl Drop for NotifyWaitersList<'_> {
         if !self.is_empty {
             let _lock_guard = self.notify.waiters.lock();
             while let Some(waiter) = self.list.pop_back() {
-                // Safety: `Waiter` is only mutated through a shared reference.
+                // Safety: we never make mutable references to waiters.
                 let waiter = unsafe { waiter.as_ref() };
-                waiter.notification.store(NOTIFICATION_ALL, Release);
+                waiter.notification.store_release(Notification::All);
             }
         }
     }
@@ -609,10 +654,10 @@ impl Notify {
             while wakers.can_push() {
                 match list.pop_back_locked(&mut waiters) {
                     Some(waiter) => {
-                        // Safety: `Waiter` is only mutated through a shared reference.
+                        // Safety: we never make mutable references to waiters.
                         let waiter = unsafe { waiter.as_ref() };
 
-                        // Safety: We hold the lock, so we can access the waker.
+                        // Safety: we hold the lock, so we can access the waker.
                         if let Some(waker) =
                             unsafe { waiter.waker.with_mut(|waker| (*waker).take()) }
                         {
@@ -620,7 +665,7 @@ impl Notify {
                         }
 
                         // This waiter is unlinked and will not be shared ever again, release it.
-                        waiter.notification.store(NOTIFICATION_ALL, Release);
+                        waiter.notification.store_release(Notification::All);
                     }
                     None => {
                         break 'outer;
@@ -679,14 +724,14 @@ fn notify_locked(waiters: &mut WaitList, state: &AtomicUsize, curr: usize) -> Op
                 // Get a pending waiter
                 let waiter = waiters.pop_back().unwrap();
 
-                // Safety: `Waiter` is only mutated through a shared reference.
+                // Safety: we never make mutable references to waiters.
                 let waiter = unsafe { waiter.as_ref() };
 
-                // Safety: We hold the lock, so we can access the waker.
+                // Safety: we hold the lock, so we can access the waker.
                 let waker = unsafe { waiter.waker.with_mut(|waker| (*waker).take()) };
 
                 // This waiter is unlinked and will not be shared ever again, release it.
-                waiter.notification.store(NOTIFICATION_ONE, Release);
+                waiter.notification.store_release(Notification::One);
 
                 if waiters.is_empty() {
                     // As this the **final** waiter in the list, the state
@@ -944,13 +989,12 @@ impl Notified<'_> {
                     return Poll::Pending;
                 }
                 Waiting => {
-                    if waiter.notification.load(Acquire) != NOTIFICATION_NONE {
+                    if waiter.notification.load(Acquire).is_some() {
                         // Safety: waiter is already unlinked and will not be shared again,
                         // so we have an exclusive access to `waker`.
-                        unsafe {
-                            waiter.waker.with_mut(|waker| (*waker).take());
-                        }
-                        waiter.notification.store(NOTIFICATION_NONE, Relaxed);
+                        drop(unsafe { waiter.waker.with_mut(|waker| (*waker).take()) });
+
+                        waiter.notification.clear();
                         *state = Done;
                         return Poll::Ready(());
                     }
@@ -965,12 +1009,12 @@ impl Notified<'_> {
                     // We hold the lock and notifications are set only with the lock held,
                     // so this can be relaxed, because the happens-before relationship is
                     // established through the mutex.
-                    if waiter.notification.load(Relaxed) != NOTIFICATION_NONE {
+                    if waiter.notification.load(Relaxed).is_some() {
                         // Safety: waiter is already unlinked and will not be shared again,
                         // so we have an exclusive access to `waker`.
                         old_waker = unsafe { waiter.waker.with_mut(|waker| (*waker).take()) };
 
-                        waiter.notification.store(NOTIFICATION_NONE, Relaxed);
+                        waiter.notification.clear();
 
                         // Drop the old waker after releasing the lock.
                         drop(waiters);
@@ -1062,10 +1106,10 @@ impl Drop for Notified<'_> {
             let mut waiters = notify.waiters.lock();
             let mut notify_state = notify.state.load(SeqCst);
 
-            // Safety: we hold the lock, so this field is not concurrently accessed
-            // by `notify_*` functions. We will unlink the waiter and drop it shortly,
-            // so this field will not be mutated ever again.
-            let notification = unsafe { waiter.notification.unsync_load() };
+            // We hold the lock, so this field is not concurrently accessed by
+            // `notify_*` functions. We will unlink the waiter and drop it shortly,
+            // so we can used relaxed ordering.
+            let notification = waiter.notification.load(Relaxed);
 
             // remove the entry from the list (if not already removed)
             //
@@ -1082,7 +1126,7 @@ impl Drop for Notified<'_> {
             // See if the node was notified but not received. In this case, if
             // the notification was triggered via `notify_one`, it must be sent
             // to the next waiter.
-            if notification == NOTIFICATION_ONE {
+            if notification == Some(Notification::One) {
                 if let Some(waker) = notify_locked(&mut waiters, &notify.state, notify_state) {
                     drop(waiters);
                     waker.wake();
