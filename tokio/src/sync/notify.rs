@@ -218,15 +218,15 @@ struct Waiter {
     /// Intrusive linked-list pointers.
     pointers: linked_list::Pointers<Waiter>,
 
-    /// Waiting task's waker. This field is either protected by
-    /// the `waiters` lock in `Notify` or exclusively owned by
-    /// the enclosing `Waiter`, depending on the value of `notification`.
+    /// Waiting task's waker. Depending on the value of `notification`,
+    /// this field is either protected by the `waiters` lock in
+    /// `Notify`, or it is exclusively owned by the enclosing `Waiter`.
     waker: UnsafeCell<Option<Waker>>,
 
-    /// Notification for this waiter. If it is `None`, then `waker` is
-    /// protected by the `waiters` lock. If it is `Some`, the waker is
-    /// exclusively owned by the enclosing `Waiter` and can be
-    /// accessed without locking.
+    /// Notification for this waiter.
+    /// * if it's `None`, then `waker` is protected by the `waiters` lock.
+    /// * if it's `Some`, then `waker` is exclusively owned by the
+    ///   enclosing `Waiter` and can be accessed without locking.
     notification: AtomicNotification,
 
     /// Should not be `Unpin`.
@@ -263,7 +263,7 @@ const NOTIFICATION_ALL: usize = 2;
 
 /// Notification for a `Waiter`.
 /// This struct is equivalent to `Option<Notification>`, but uses
-/// `AtomicUsize` for atomic operations.
+/// `AtomicUsize` inside for atomic operations.
 #[derive(Debug)]
 struct AtomicNotification(AtomicUsize);
 
@@ -287,9 +287,10 @@ impl AtomicNotification {
         }
     }
 
-    /// Clears the notification. This method is used by a `Notified`
-    /// future to consume the notification. It uses relaxed ordering
-    /// and should be only used once this variable is no longer shared.
+    /// Clears the notification.
+    /// This method is used by a `Notified` future to consume the
+    /// notification. It uses relaxed ordering and should be only
+    /// used once the atomic notification is no longer shared.
     fn clear(&self) {
         self.0.store(NOTIFICATION_NONE, Relaxed);
     }
