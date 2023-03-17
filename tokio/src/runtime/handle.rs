@@ -152,7 +152,7 @@ impl Handle {
         self.spawn_named(future, None)
     }
 
-    /// Runs the provided function on an executor dedicated to blocking.
+    /// Runs the provided function on an executor dedicated to blocking
     /// operations.
     ///
     /// # Examples

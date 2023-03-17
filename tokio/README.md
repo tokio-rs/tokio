@@ -56,7 +56,7 @@ Make sure you activated the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.25.0", features = ["full"] }
+tokio = { version = "1.26.0", features = ["full"] }
 ```
 Then, on your main.rs:
 
@@ -204,6 +204,7 @@ releases are:
 
  * `1.18.x` - LTS release until June 2023
  * `1.20.x` - LTS release until September 2023.
+ * `1.25.x` - LTS release until March 2024
 
 Each LTS release will continue to receive backported fixes for at least a year.
 If you wish to use a fixed minor release in your project, we recommend that you

@@ -217,7 +217,7 @@
 //! from being spawned.
 //!
 //! The tokio runtime will, on a best-effort basis, attempt to reap and clean up
-//! any process which it has spawned. No additional guarantees are made with regards
+//! any process which it has spawned. No additional guarantees are made with regard to
 //! how quickly or how often this procedure will take place.
 //!
 //! It is recommended to avoid dropping a [`Child`] process handle before it has been
@@ -249,17 +249,22 @@ use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;
-#[cfg(unix)]
-use std::os::unix::process::CommandExt;
-#[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, RawHandle};
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::pin::Pin;
 use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
 use std::task::Context;
 use std::task::Poll;
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+cfg_windows! {
+    use crate::os::windows::io::{AsRawHandle, RawHandle};
+    #[cfg(not(tokio_no_as_fd))]
+    use crate::os::windows::io::{AsHandle, BorrowedHandle};
+}
 
 /// This structure mimics the API of [`std::process::Command`] found in the standard library, but
 /// replaces functions that create a process with an asynchronous variant. The main provided
@@ -631,7 +636,7 @@ impl Command {
     /// operation, the resulting zombie process cannot be `.await`ed inside of the
     /// destructor to avoid blocking other tasks. The tokio runtime will, on a
     /// best-effort basis, attempt to reap and clean up such processes in the
-    /// background, but makes no additional guarantees are made with regards
+    /// background, but no additional guarantees are made with regard to
     /// how quickly or how often this procedure will take place.
     ///
     /// If stronger guarantees are required, it is recommended to avoid dropping
@@ -642,16 +647,16 @@ impl Command {
         self
     }
 
-    /// Sets the [process creation flags][1] to be passed to `CreateProcess`.
-    ///
-    /// These will always be ORed with `CREATE_UNICODE_ENVIRONMENT`.
-    ///
-    /// [1]: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863(v=vs.85).aspx
-    #[cfg(windows)]
-    #[cfg_attr(docsrs, doc(cfg(windows)))]
-    pub fn creation_flags(&mut self, flags: u32) -> &mut Command {
-        self.std.creation_flags(flags);
-        self
+    cfg_windows! {
+        /// Sets the [process creation flags][1] to be passed to `CreateProcess`.
+        ///
+        /// These will always be ORed with `CREATE_UNICODE_ENVIRONMENT`.
+        ///
+        /// [1]: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863(v=vs.85).aspx
+        pub fn creation_flags(&mut self, flags: u32) -> &mut Command {
+            self.std.creation_flags(flags);
+            self
+        }
     }
 
     /// Sets the child process's user ID. This translates to a
@@ -811,7 +816,7 @@ impl Command {
     /// from being spawned.
     ///
     /// The tokio runtime will, on a best-effort basis, attempt to reap and clean up
-    /// any process which it has spawned. No additional guarantees are made with regards
+    /// any process which it has spawned. No additional guarantees are made with regard to
     /// how quickly or how often this procedure will take place.
     ///
     /// It is recommended to avoid dropping a [`Child`] process handle before it has been
@@ -1082,13 +1087,14 @@ impl Child {
         }
     }
 
-    /// Extracts the raw handle of the process associated with this child while
-    /// it is still running. Returns `None` if the child has exited.
-    #[cfg(windows)]
-    pub fn raw_handle(&self) -> Option<RawHandle> {
-        match &self.child {
-            FusedChild::Child(c) => Some(c.inner.as_raw_handle()),
-            FusedChild::Done(_) => None,
+    cfg_windows! {
+        /// Extracts the raw handle of the process associated with this child while
+        /// it is still running. Returns `None` if the child has exited.
+        pub fn raw_handle(&self) -> Option<RawHandle> {
+            match &self.child {
+                FusedChild::Child(c) => Some(c.inner.as_raw_handle()),
+                FusedChild::Done(_) => None,
+            }
         }
     }
 
@@ -1323,7 +1329,7 @@ impl ChildStdin {
 }
 
 impl ChildStdout {
-    /// Creates an asynchronous `ChildStderr` from a synchronous one.
+    /// Creates an asynchronous `ChildStdout` from a synchronous one.
     ///
     /// # Errors
     ///
@@ -1428,6 +1434,8 @@ impl TryInto<Stdio> for ChildStderr {
 
 #[cfg(unix)]
 mod sys {
+    #[cfg(not(tokio_no_as_fd))]
+    use std::os::unix::io::{AsFd, BorrowedFd};
     use std::os::unix::io::{AsRawFd, RawFd};
 
     use super::{ChildStderr, ChildStdin, ChildStdout};
@@ -1438,9 +1446,23 @@ mod sys {
         }
     }
 
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for ChildStdin {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
+    }
+
     impl AsRawFd for ChildStdout {
         fn as_raw_fd(&self) -> RawFd {
             self.inner.as_raw_fd()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for ChildStdout {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
         }
     }
 
@@ -1449,17 +1471,26 @@ mod sys {
             self.inner.as_raw_fd()
         }
     }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for ChildStderr {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
+    }
 }
 
-#[cfg(windows)]
-mod sys {
-    use std::os::windows::io::{AsRawHandle, RawHandle};
-
-    use super::{ChildStderr, ChildStdin, ChildStdout};
-
+cfg_windows! {
     impl AsRawHandle for ChildStdin {
         fn as_raw_handle(&self) -> RawHandle {
             self.inner.as_raw_handle()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsHandle for ChildStdin {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
         }
     }
 
@@ -1469,9 +1500,23 @@ mod sys {
         }
     }
 
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsHandle for ChildStdout {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
+        }
+    }
+
     impl AsRawHandle for ChildStderr {
         fn as_raw_handle(&self) -> RawHandle {
             self.inner.as_raw_handle()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsHandle for ChildStderr {
+        fn as_handle(&self) -> BorrowedHandle<'_> {
+            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
         }
     }
 }

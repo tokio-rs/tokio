@@ -1108,7 +1108,7 @@ impl Drop for Notified<'_> {
 
             // We hold the lock, so this field is not concurrently accessed by
             // `notify_*` functions. We will unlink the waiter and drop it shortly,
-            // so we can used relaxed ordering.
+            // so we can use relaxed ordering.
             let notification = waiter.notification.load(Relaxed);
 
             // remove the entry from the list (if not already removed)

@@ -10,6 +10,8 @@ use std::ptr;
 use std::task::{Context, Poll};
 
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
+#[cfg(not(tokio_no_as_fd))]
+use crate::os::windows::io::{AsHandle, BorrowedHandle};
 use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 
 cfg_io_util! {
@@ -851,6 +853,39 @@ impl NamedPipeServer {
     ) -> io::Result<R> {
         self.io.registration().try_io(interest, f)
     }
+
+    /// Reads or writes from the pipe using a user-provided IO operation.
+    ///
+    /// The readiness of the pipe is awaited and when the pipe is ready,
+    /// the provided closure is called. The closure should attempt to perform
+    /// IO operation on the pipe by manually calling the appropriate syscall.
+    /// If the operation fails because the pipe is not actually ready,
+    /// then the closure should return a `WouldBlock` error. In such case the
+    /// readiness flag is cleared and the pipe readiness is awaited again.
+    /// This loop is repeated until the closure returns an `Ok` or an error
+    /// other than `WouldBlock`.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the pipe that failed due to the pipe not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the pipe to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `NamedPipeServer` type, as this will mess with the
+    /// readiness flag and can cause the pipe to behave incorrectly.
+    ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
+    pub async fn async_io<R>(
+        &self,
+        interest: Interest,
+        f: impl FnMut() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.io.registration().async_io(interest, f).await
+    }
 }
 
 impl AsyncRead for NamedPipeServer {
@@ -892,6 +927,13 @@ impl AsyncWrite for NamedPipeServer {
 impl AsRawHandle for NamedPipeServer {
     fn as_raw_handle(&self) -> RawHandle {
         self.io.as_raw_handle()
+    }
+}
+
+#[cfg(not(tokio_no_as_fd))]
+impl AsHandle for NamedPipeServer {
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
     }
 }
 
@@ -1601,6 +1643,39 @@ impl NamedPipeClient {
     ) -> io::Result<R> {
         self.io.registration().try_io(interest, f)
     }
+
+    /// Reads or writes from the pipe using a user-provided IO operation.
+    ///
+    /// The readiness of the pipe is awaited and when the pipe is ready,
+    /// the provided closure is called. The closure should attempt to perform
+    /// IO operation on the pipe by manually calling the appropriate syscall.
+    /// If the operation fails because the pipe is not actually ready,
+    /// then the closure should return a `WouldBlock` error. In such case the
+    /// readiness flag is cleared and the pipe readiness is awaited again.
+    /// This loop is repeated until the closure returns an `Ok` or an error
+    /// other than `WouldBlock`.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the pipe that failed due to the pipe not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the pipe to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `NamedPipeClient` type, as this will mess with the
+    /// readiness flag and can cause the pipe to behave incorrectly.
+    ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
+    pub async fn async_io<R>(
+        &self,
+        interest: Interest,
+        f: impl FnMut() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.io.registration().async_io(interest, f).await
+    }
 }
 
 impl AsyncRead for NamedPipeClient {
@@ -1642,6 +1717,13 @@ impl AsyncWrite for NamedPipeClient {
 impl AsRawHandle for NamedPipeClient {
     fn as_raw_handle(&self) -> RawHandle {
         self.io.as_raw_handle()
+    }
+}
+
+#[cfg(not(tokio_no_as_fd))]
+impl AsHandle for NamedPipeClient {
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
     }
 }
 

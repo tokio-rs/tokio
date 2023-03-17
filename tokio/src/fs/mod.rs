@@ -115,9 +115,7 @@ feature! {
     pub use self::symlink::symlink;
 }
 
-feature! {
-    #![windows]
-
+cfg_windows! {
     mod symlink_dir;
     pub use self::symlink_dir::symlink_dir;
 

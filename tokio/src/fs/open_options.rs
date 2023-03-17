@@ -10,6 +10,11 @@ use mock_open_options::MockOpenOptions as StdOpenOptions;
 #[cfg(not(test))]
 use std::fs::OpenOptions as StdOpenOptions;
 
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+#[cfg(windows)]
+use std::os::windows::fs::OpenOptionsExt;
+
 /// Options and flags which can be used to configure how a file is opened.
 ///
 /// This builder exposes the ability to configure how a [`File`] is opened and
@@ -399,8 +404,6 @@ impl OpenOptions {
 feature! {
     #![unix]
 
-    use std::os::unix::fs::OpenOptionsExt;
-
     impl OpenOptions {
         /// Sets the mode bits that a new file will be created with.
         ///
@@ -464,11 +467,7 @@ feature! {
     }
 }
 
-feature! {
-    #![windows]
-
-    use std::os::windows::fs::OpenOptionsExt;
-
+cfg_windows! {
     impl OpenOptions {
         /// Overrides the `dwDesiredAccess` argument to the call to [`CreateFile`]
         /// with the specified value.

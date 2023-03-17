@@ -1,9 +1,13 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", tokio_unstable, not(tokio_wasi)))]
 
+use std::future::Future;
 use std::sync::{Arc, Mutex};
+use std::task::Poll;
+use tokio::macros::support::poll_fn;
 
 use tokio::runtime::Runtime;
+use tokio::task::consume_budget;
 use tokio::time::{self, Duration};
 
 #[test]
@@ -431,6 +435,78 @@ fn worker_local_queue_depth() {
         .await
         .unwrap();
     });
+}
+
+#[test]
+fn budget_exhaustion_yield() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+
+    assert_eq!(0, metrics.budget_forced_yield_count());
+
+    let mut did_yield = false;
+
+    // block on a task which consumes budget until it yields
+    rt.block_on(poll_fn(|cx| loop {
+        if did_yield {
+            return Poll::Ready(());
+        }
+
+        let fut = consume_budget();
+        tokio::pin!(fut);
+
+        if fut.poll(cx).is_pending() {
+            did_yield = true;
+            return Poll::Pending;
+        }
+    }));
+
+    assert_eq!(1, rt.metrics().budget_forced_yield_count());
+}
+
+#[test]
+fn budget_exhaustion_yield_with_joins() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+
+    assert_eq!(0, metrics.budget_forced_yield_count());
+
+    let mut did_yield_1 = false;
+    let mut did_yield_2 = false;
+
+    // block on a task which consumes budget until it yields
+    rt.block_on(async {
+        tokio::join!(
+            poll_fn(|cx| loop {
+                if did_yield_1 {
+                    return Poll::Ready(());
+                }
+
+                let fut = consume_budget();
+                tokio::pin!(fut);
+
+                if fut.poll(cx).is_pending() {
+                    did_yield_1 = true;
+                    return Poll::Pending;
+                }
+            }),
+            poll_fn(|cx| loop {
+                if did_yield_2 {
+                    return Poll::Ready(());
+                }
+
+                let fut = consume_budget();
+                tokio::pin!(fut);
+
+                if fut.poll(cx).is_pending() {
+                    did_yield_2 = true;
+                    return Poll::Pending;
+                }
+            })
+        )
+    });
+
+    assert_eq!(1, rt.metrics().budget_forced_yield_count());
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
