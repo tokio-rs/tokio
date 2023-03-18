@@ -4,7 +4,7 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse::Parser, Ident, Path};
 
 // syn::AttributeArgs does not implement syn::Parse
-type AttributeArgs = syn::punctuated::Punctuated<syn::NestedMeta, syn::Token![,]>;
+type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
 
 #[derive(Clone, Copy, PartialEq)]
 enum RuntimeFlavor {
@@ -478,7 +478,11 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
         Ok(it) => it,
         Err(e) => return token_stream_with_error(item, e),
     };
-    let config = if let Some(attr) = input.attrs.iter().find(|attr| attr.path.is_ident("test")) {
+    let config = if let Some(attr) = input
+        .attrs
+        .iter()
+        .find(|attr| attr.meta.path().is_ident("test"))
+    {
         let msg = "second test attribute is supplied";
         Err(syn::Error::new_spanned(attr, msg))
     } else {
