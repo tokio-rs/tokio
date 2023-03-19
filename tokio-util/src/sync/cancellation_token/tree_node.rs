@@ -178,7 +178,7 @@ where
                 locked_node = node.inner.lock().unwrap();
                 locked_parent
             }
-            Err(err @ TryLockError::Poisoned(_)) => Err(err).unwrap(),
+            Err(TryLockError::Poisoned(err)) => Err(err).unwrap(),
         };
 
         // If we unlocked the child, then the parent may have changed. Check
