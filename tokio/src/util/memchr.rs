@@ -1,13 +1,14 @@
 //! Search for a byte in a byte array using libc.
 //!
-//! When nothing pulls in libc, then just use a trivial implementation.
+//! When nothing pulls in libc, then just use a trivial implementation. Note
+//! that we only depend on libc on unix.
 
-#[cfg(not(feature = "libc"))]
+#[cfg(not(all(unix, feature = "libc")))]
 pub(crate) fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
     haystack.iter().position(|val| needle == *val)
 }
 
-#[cfg(feature = "libc")]
+#[cfg(all(unix, feature = "libc"))]
 pub(crate) fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
     let start = haystack.as_ptr();
 
