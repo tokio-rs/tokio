@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use std::io;
-use std::time::{Duration, Instant};
+use tokio::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_test::io::Builder;
 
@@ -86,10 +86,9 @@ async fn mock_panics_write_data_left() {
     Builder::new().write(b"write").build();
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn wait() {
-    // 200ms should be enough to ensure no other factors are causing the delay
-    const FIRST_WAIT: Duration = Duration::from_millis(200);
+    const FIRST_WAIT: Duration = Duration::from_secs(1);
 
     let mut mock = Builder::new()
         .wait(FIRST_WAIT)
@@ -117,11 +116,10 @@ async fn wait() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn multiple_wait() {
-    // 200ms should be enough to ensure no other factors are causing the delay
-    const FIRST_WAIT: Duration = Duration::from_millis(200);
-    const SECOND_WAIT: Duration = Duration::from_millis(200);
+    const FIRST_WAIT: Duration = Duration::from_secs(1);
+    const SECOND_WAIT: Duration = Duration::from_secs(1);
 
     let mut mock = Builder::new()
         .wait(FIRST_WAIT)
