@@ -7,8 +7,8 @@ name = "tokio"
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
 version = "1.26.0"
-edition = "2018"
-rust-version = "1.49"
+edition = "2021"
+rust-version = "1.56"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"

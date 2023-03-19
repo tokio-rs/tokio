@@ -7,7 +7,7 @@ use tokio::net::TcpStream;
 use tokio_test::assert_ok;
 
 use std::thread;
-use std::{convert::TryInto, io::Write, net};
+use std::{io::Write, net};
 
 #[tokio::test]
 async fn peek() {

@@ -1,7 +1,6 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::unix::SocketAddr;
 
-use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;

@@ -156,7 +156,6 @@
 //! ```no_run
 //! use tokio::join;
 //! use tokio::process::Command;
-//! use std::convert::TryInto;
 //! use std::process::Stdio;
 //!
 //! #[tokio::main]
@@ -245,7 +244,6 @@ mod kill;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::process::kill::Kill;
 
-use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;
