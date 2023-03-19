@@ -13,9 +13,7 @@ pub(crate) fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
     let start = haystack.as_ptr();
 
     // SAFETY: `start` is valid for `haystack.len()` bytes.
-    let ptr = unsafe {
-        libc::memchr(start.cast(), needle as _, haystack.len())
-    };
+    let ptr = unsafe { libc::memchr(start.cast(), needle as _, haystack.len()) };
 
     if ptr.is_null() {
         None
