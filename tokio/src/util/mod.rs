@@ -76,3 +76,6 @@ cfg_rt_multi_thread! {
 pub(crate) mod trace;
 
 pub(crate) mod error;
+
+#[cfg(feature = "io-util")]
+pub(crate) mod memchr;
