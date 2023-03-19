@@ -1,8 +1,8 @@
 #![warn(rust_2018_idioms)]
 
 use std::io;
-use tokio::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::time::{Duration, Instant};
 use tokio_test::io::Builder;
 
 #[tokio::test]
