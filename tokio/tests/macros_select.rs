@@ -220,7 +220,7 @@ async fn struct_size() {
         }
     };
 
-    assert_eq!(mem::size_of_val(&fut), 40);
+    assert_eq!(mem::size_of_val(&fut), 32);
 
     let fut = async {
         let ready1 = future::ready(0i32);
