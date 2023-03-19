@@ -1,4 +1,5 @@
 use crate::io::AsyncBufRead;
+use crate::util::memchr;
 
 use pin_project_lite::pin_project;
 use std::future::Future;

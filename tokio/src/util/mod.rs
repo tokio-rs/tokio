@@ -90,3 +90,6 @@ pub use self::rand::thread_rng_n;
     all(unix, feature = "signal")
 ))]
 pub(crate) mod error;
+
+#[cfg(feature = "io-util")]
+pub(crate) mod memchr;
