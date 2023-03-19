@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
-use proc_macro2::{Ident, Span};
+use proc_macro2::Span;
 use quote::{quote, quote_spanned, ToTokens};
-use syn::parse::Parser;
+use syn::{parse::Parser, Ident, Path};
 
 // syn::AttributeArgs does not implement syn::Parse
 type AttributeArgs = syn::punctuated::Punctuated<syn::NestedMeta, syn::Token![,]>;
@@ -29,7 +29,7 @@ struct FinalConfig {
     flavor: RuntimeFlavor,
     worker_threads: Option<usize>,
     start_paused: Option<bool>,
-    crate_name: Option<String>,
+    crate_name: Option<Path>,
 }
 
 /// Config used in case of the attribute not being able to build a valid config
@@ -47,7 +47,7 @@ struct Configuration {
     worker_threads: Option<(usize, Span)>,
     start_paused: Option<(bool, Span)>,
     is_test: bool,
-    crate_name: Option<String>,
+    crate_name: Option<Path>,
 }
 
 impl Configuration {
@@ -112,8 +112,8 @@ impl Configuration {
         if self.crate_name.is_some() {
             return Err(syn::Error::new(span, "`crate` set multiple times."));
         }
-        let name_ident = parse_ident(name, span, "crate")?;
-        self.crate_name = Some(name_ident.to_string());
+        let name_path = parse_path(name, span, "crate")?;
+        self.crate_name = Some(name_path);
         Ok(())
     }
 
@@ -199,23 +199,22 @@ fn parse_string(int: syn::Lit, span: Span, field: &str) -> Result<String, syn::E
     }
 }
 
-fn parse_ident(lit: syn::Lit, span: Span, field: &str) -> Result<Ident, syn::Error> {
+fn parse_path(lit: syn::Lit, span: Span, field: &str) -> Result<Path, syn::Error> {
     match lit {
         syn::Lit::Str(s) => {
             let err = syn::Error::new(
                 span,
                 format!(
-                    "Failed to parse value of `{}` as ident: \"{}\"",
+                    "Failed to parse value of `{}` as path: \"{}\"",
                     field,
                     s.value()
                 ),
             );
-            let path = s.parse::<syn::Path>().map_err(|_| err.clone())?;
-            path.get_ident().cloned().ok_or(err)
+            s.parse::<syn::Path>().map_err(|_| err.clone())
         }
         _ => Err(syn::Error::new(
             span,
-            format!("Failed to parse value of `{}` as ident.", field),
+            format!("Failed to parse value of `{}` as path.", field),
         )),
     }
 }
@@ -354,16 +353,17 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
         (start, end)
     };
 
-    let crate_name = config.crate_name.as_deref().unwrap_or("tokio");
-
-    let crate_ident = Ident::new(crate_name, last_stmt_start_span);
+    let crate_path = config
+        .crate_name
+        .map(ToTokens::into_token_stream)
+        .unwrap_or_else(|| Ident::new("tokio", last_stmt_start_span).into_token_stream());
 
     let mut rt = match config.flavor {
         RuntimeFlavor::CurrentThread => quote_spanned! {last_stmt_start_span=>
-            #crate_ident::runtime::Builder::new_current_thread()
+            #crate_path::runtime::Builder::new_current_thread()
         },
         RuntimeFlavor::Threaded => quote_spanned! {last_stmt_start_span=>
-            #crate_ident::runtime::Builder::new_multi_thread()
+            #crate_path::runtime::Builder::new_multi_thread()
         },
     };
     if let Some(v) = config.worker_threads {
@@ -414,7 +414,7 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
         };
         quote! {
             let body = async #body;
-            #crate_ident::pin!(body);
+            #crate_path::pin!(body);
             let body: ::std::pin::Pin<&mut dyn ::std::future::Future<Output = #output_type>> = body;
         }
     } else {
