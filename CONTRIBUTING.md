@@ -187,7 +187,7 @@ LOOM_MAX_PREEMPTIONS=1 RUSTFLAGS="--cfg loom" \
 
 You can run miri tests with
 ```
-MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tag-raw-pointers" PROPTEST_CASES=10 \
+MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tag-raw-pointers" \
     cargo +nightly miri test --features full --lib
 ```
 
@@ -197,8 +197,22 @@ If the change being proposed alters code (as opposed to only documentation for
 example), it is either adding new functionality to Tokio or it is fixing
 existing, broken functionality. In both of these cases, the pull request should
 include one or more tests to ensure that Tokio does not regress in the future.
-There are two ways to write tests: integration tests and documentation tests
-(Tokio avoids unit tests as much as possible).
+There are two ways to write tests: [integration tests][integration-tests]
+and [documentation tests][documentation-tests].
+(Tokio avoids [unit tests][unit-tests] as much as possible).
+
+Tokio uses [conditional compilation attributes][conditional-compilation]
+throughout the codebase, to modify rustc's behavior. Code marked with such
+attributes can be enabled using RUSTFLAGS and RUSTDOCFLAGS environment
+variables. One of the most prevalent flags passed in these variables is
+the `--cfg` option. To run tests in a particular file, check first what
+options #![cfg] declaration defines for that file.
+
+For instance, to run a test marked with the 'tokio_unstable' cfg option,
+you must pass this flag to the compiler when running the test.
+```
+$ RUSTFLAGS="--cfg tokio_unstable" cargo test -p tokio --all-features --test rt_metrics
+```
 
 #### Integration tests
 
@@ -208,6 +222,31 @@ utilities available to use in tests, no matter the crate being tested.
 
 The best strategy for writing a new integration test is to look at existing
 integration tests in the crate and follow the style.
+
+#### Fuzz tests
+
+Some of our crates include a set of fuzz tests, this will be marked by a
+directory `fuzz`. It is a good idea to run fuzz tests after each change.
+To get started with fuzz testing you'll need to install 
+[cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz).
+
+`cargo install cargo-fuzz`
+
+To list the available fuzzing harnesses you can run;
+
+```bash
+$ cd tokio
+$ cargo fuzz list
+fuzz_linked_list
+````
+
+Running a fuzz test is as simple as;
+
+`cargo fuzz run fuzz_linked_list`
+
+**NOTE**: Keep in mind that by default when running a fuzz test the fuzz
+harness will run forever and will only exit if you `ctrl-c` or it finds
+a bug.
 
 #### Documentation tests
 
@@ -633,3 +672,7 @@ When releasing a new version of a crate, follow these steps:
    entry for that release version into your editor and close the window.
 
 [keep-a-changelog]: https://github.com/olivierlacan/keep-a-changelog/blob/master/CHANGELOG.md
+[unit-tests]: https://doc.rust-lang.org/rust-by-example/testing/unit_testing.html
+[integration-tests]: https://doc.rust-lang.org/rust-by-example/testing/integration_testing.html
+[documentation-tests]: https://doc.rust-lang.org/rust-by-example/testing/doc_testing.html
+[conditional-compilation]: https://doc.rust-lang.org/reference/conditional-compilation.html

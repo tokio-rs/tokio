@@ -11,8 +11,11 @@ pub(crate) struct MetricsBatch {
     /// Number of times the worker woke w/o doing work.
     noop_count: u64,
 
-    /// Number of times stolen.
+    /// Number of tasks stolen.
     steal_count: u64,
+
+    /// Number of times tasks where stolen.
+    steal_operations: u64,
 
     /// Number of tasks that were polled by the worker.
     poll_count: u64,
@@ -39,6 +42,7 @@ impl MetricsBatch {
             park_count: 0,
             noop_count: 0,
             steal_count: 0,
+            steal_operations: 0,
             poll_count: 0,
             poll_count_on_last_park: 0,
             local_schedule_count: 0,
@@ -52,6 +56,9 @@ impl MetricsBatch {
         worker.park_count.store(self.park_count, Relaxed);
         worker.noop_count.store(self.noop_count, Relaxed);
         worker.steal_count.store(self.steal_count, Relaxed);
+        worker
+            .steal_operations
+            .store(self.steal_operations, Relaxed);
         worker.poll_count.store(self.poll_count, Relaxed);
 
         worker
@@ -96,6 +103,10 @@ cfg_rt_multi_thread! {
     impl MetricsBatch {
         pub(crate) fn incr_steal_count(&mut self, by: u16) {
             self.steal_count += by as u64;
+        }
+
+        pub(crate) fn incr_steal_operations(&mut self) {
+            self.steal_operations += 1;
         }
 
         pub(crate) fn incr_overflow_count(&mut self) {

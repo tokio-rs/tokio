@@ -33,7 +33,7 @@ const CHUNK_SIZE: usize = 32;
 pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
     let path = path.as_ref().to_owned();
     asyncify(|| -> io::Result<ReadDir> {
-        let mut std = std::fs::read_dir(path)?;
+        let mut std = std::fs::read_dir(path)?.fuse();
         let mut buf = VecDeque::with_capacity(CHUNK_SIZE);
         ReadDir::next_chunk(&mut buf, &mut std);
 
@@ -64,10 +64,12 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
 #[must_use = "streams do nothing unless polled"]
 pub struct ReadDir(State);
 
+type StdReadDir = std::iter::Fuse<std::fs::ReadDir>;
+
 #[derive(Debug)]
 enum State {
-    Idle(Option<(VecDeque<io::Result<DirEntry>>, std::fs::ReadDir)>),
-    Pending(JoinHandle<(VecDeque<io::Result<DirEntry>>, std::fs::ReadDir)>),
+    Idle(Option<(VecDeque<io::Result<DirEntry>>, StdReadDir)>),
+    Pending(JoinHandle<(VecDeque<io::Result<DirEntry>>, StdReadDir)>),
 }
 
 impl ReadDir {
@@ -133,7 +135,7 @@ impl ReadDir {
         }
     }
 
-    fn next_chunk(buf: &mut VecDeque<io::Result<DirEntry>>, std: &mut std::fs::ReadDir) {
+    fn next_chunk(buf: &mut VecDeque<io::Result<DirEntry>>, std: &mut StdReadDir) {
         for ret in std.by_ref().take(CHUNK_SIZE) {
             let success = ret.is_ok();
 

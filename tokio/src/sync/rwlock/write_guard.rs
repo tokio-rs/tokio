@@ -1,10 +1,8 @@
 use crate::sync::batch_semaphore::Semaphore;
 use crate::sync::rwlock::read_guard::RwLockReadGuard;
 use crate::sync::rwlock::write_guard_mapped::RwLockMappedWriteGuard;
-use std::fmt;
-use std::marker;
-use std::mem;
-use std::ops;
+use std::marker::PhantomData;
+use std::{fmt, mem, ops};
 
 /// RAII structure used to release the exclusive write access of a lock when
 /// dropped.
@@ -14,17 +12,42 @@ use std::ops;
 ///
 /// [`write`]: method@crate::sync::RwLock::write
 /// [`RwLock`]: struct@crate::sync::RwLock
+#[clippy::has_significant_drop]
 #[must_use = "if unused the RwLock will immediately unlock"]
 pub struct RwLockWriteGuard<'a, T: ?Sized> {
+    // When changing the fields in this struct, make sure to update the
+    // `skip_drop` method.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) resource_span: tracing::Span,
     pub(super) permits_acquired: u32,
     pub(super) s: &'a Semaphore,
     pub(super) data: *mut T,
-    pub(super) marker: marker::PhantomData<&'a mut T>,
+    pub(super) marker: PhantomData<&'a mut T>,
+}
+
+#[allow(dead_code)] // Unused fields are still used in Drop.
+struct Inner<'a, T: ?Sized> {
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    resource_span: tracing::Span,
+    permits_acquired: u32,
+    s: &'a Semaphore,
+    data: *mut T,
 }
 
 impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
+    fn skip_drop(self) -> Inner<'a, T> {
+        let me = mem::ManuallyDrop::new(self);
+        // SAFETY: This duplicates the values in every field of the guard, then
+        // forgets the originals, so in the end no value is duplicated.
+        Inner {
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: unsafe { std::ptr::read(&me.resource_span) },
+            permits_acquired: me.permits_acquired,
+            s: me.s,
+            data: me.data,
+        }
+    }
+
     /// Makes a new [`RwLockMappedWriteGuard`] for a component of the locked data.
     ///
     /// This operation cannot fail as the `RwLockWriteGuard` passed in already
@@ -67,23 +90,96 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         F: FnOnce(&mut T) -> &mut U,
     {
         let data = f(&mut *this) as *mut U;
-        let s = this.s;
-        let permits_acquired = this.permits_acquired;
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = this.resource_span.clone();
-        // NB: Forget to avoid drop impl from being called.
-        mem::forget(this);
+        let this = this.skip_drop();
+
         RwLockMappedWriteGuard {
-            permits_acquired,
-            s,
+            permits_acquired: this.permits_acquired,
+            s: this.s,
             data,
-            marker: marker::PhantomData,
+            marker: PhantomData,
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
+            resource_span: this.resource_span,
         }
     }
 
-    /// Attempts to make  a new [`RwLockMappedWriteGuard`] for a component of
+    /// Makes a new [`RwLockReadGuard`] for a component of the locked data.
+    ///
+    /// This operation cannot fail as the `RwLockWriteGuard` passed in already
+    /// locked the data.
+    ///
+    /// This is an associated function that needs to be used as
+    /// `RwLockWriteGuard::downgrade_map(..)`. A method would interfere with methods of
+    /// the same name on the contents of the locked data.
+    ///
+    /// This is equivalent to a combination of asynchronous [`RwLockWriteGuard::map`] and [`RwLockWriteGuard::downgrade`]
+    /// from the [`parking_lot` crate].
+    ///
+    /// Inside of `f`, you retain exclusive access to the data, despite only being given a `&T`. Handing out a
+    /// `&mut T` would result in unsoundness, as you could use interior mutability.
+    ///
+    /// [`RwLockMappedWriteGuard`]: struct@crate::sync::RwLockMappedWriteGuard
+    /// [`RwLockWriteGuard::map`]: https://docs.rs/lock_api/latest/lock_api/struct.RwLockWriteGuard.html#method.map
+    /// [`RwLockWriteGuard::downgrade`]: https://docs.rs/lock_api/latest/lock_api/struct.RwLockWriteGuard.html#method.downgrade
+    /// [`parking_lot` crate]: https://crates.io/crates/parking_lot
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::{RwLock, RwLockWriteGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = RwLock::new(Foo(1));
+    ///
+    /// let mapped = RwLockWriteGuard::downgrade_map(lock.write().await, |f| &f.0);
+    /// let foo = lock.read().await;
+    /// assert_eq!(foo.0, *mapped);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn downgrade_map<F, U: ?Sized>(this: Self, f: F) -> RwLockReadGuard<'a, U>
+    where
+        F: FnOnce(&T) -> &U,
+    {
+        let data = f(&*this) as *const U;
+        let this = this.skip_drop();
+        let guard = RwLockReadGuard {
+            s: this.s,
+            data,
+            marker: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: this.resource_span,
+        };
+
+        // Release all but one of the permits held by the write guard
+        let to_release = (this.permits_acquired - 1) as usize;
+        this.s.release(to_release);
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            write_locked = false,
+            write_locked.op = "override",
+            )
+        });
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            current_readers = 1,
+            current_readers.op = "add",
+            )
+        });
+
+        guard
+    }
+
+    /// Attempts to make a new [`RwLockMappedWriteGuard`] for a component of
     /// the locked data. The original guard is returned if the closure returns
     /// `None`.
     ///
@@ -134,20 +230,100 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
             Some(data) => data as *mut U,
             None => return Err(this),
         };
-        let s = this.s;
-        let permits_acquired = this.permits_acquired;
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = this.resource_span.clone();
-        // NB: Forget to avoid drop impl from being called.
-        mem::forget(this);
+        let this = this.skip_drop();
+
         Ok(RwLockMappedWriteGuard {
-            permits_acquired,
-            s,
+            permits_acquired: this.permits_acquired,
+            s: this.s,
             data,
-            marker: marker::PhantomData,
+            marker: PhantomData,
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
+            resource_span: this.resource_span,
         })
+    }
+
+    /// Attempts to make a new [`RwLockReadGuard`] for a component of
+    /// the locked data. The original guard is returned if the closure returns
+    /// `None`.
+    ///
+    /// This operation cannot fail as the `RwLockWriteGuard` passed in already
+    /// locked the data.
+    ///
+    /// This is an associated function that needs to be
+    /// used as `RwLockWriteGuard::try_downgrade_map(...)`. A method would interfere with
+    /// methods of the same name on the contents of the locked data.
+    ///
+    /// This is equivalent to a combination of asynchronous [`RwLockWriteGuard::try_map`] and [`RwLockWriteGuard::downgrade`]
+    /// from the [`parking_lot` crate].
+    ///
+    /// Inside of `f`, you retain exclusive access to the data, despite only being given a `&T`. Handing out a
+    /// `&mut T` would result in unsoundness, as you could use interior mutability.
+    ///
+    /// If this function returns `Err(...)`, the lock is never unlocked nor downgraded.
+    ///
+    /// [`RwLockMappedWriteGuard`]: struct@crate::sync::RwLockMappedWriteGuard
+    /// [`RwLockWriteGuard::map`]: https://docs.rs/lock_api/latest/lock_api/struct.RwLockWriteGuard.html#method.map
+    /// [`RwLockWriteGuard::downgrade`]: https://docs.rs/lock_api/latest/lock_api/struct.RwLockWriteGuard.html#method.downgrade
+    /// [`parking_lot` crate]: https://crates.io/crates/parking_lot
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::{RwLock, RwLockWriteGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = RwLock::new(Foo(1));
+    ///
+    /// let guard = RwLockWriteGuard::try_downgrade_map(lock.write().await, |f| Some(&f.0)).expect("should not fail");
+    /// let foo = lock.read().await;
+    /// assert_eq!(foo.0, *guard);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn try_downgrade_map<F, U: ?Sized>(this: Self, f: F) -> Result<RwLockReadGuard<'a, U>, Self>
+    where
+        F: FnOnce(&T) -> Option<&U>,
+    {
+        let data = match f(&*this) {
+            Some(data) => data as *const U,
+            None => return Err(this),
+        };
+        let this = this.skip_drop();
+        let guard = RwLockReadGuard {
+            s: this.s,
+            data,
+            marker: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: this.resource_span,
+        };
+
+        // Release all but one of the permits held by the write guard
+        let to_release = (this.permits_acquired - 1) as usize;
+        this.s.release(to_release);
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            write_locked = false,
+            write_locked.op = "override",
+            )
+        });
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        guard.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            current_readers = 1,
+            current_readers.op = "add",
+            )
+        });
+
+        Ok(guard)
     }
 
     /// Converts this `RwLockWriteGuard` into an `RwLockMappedWriteGuard`. This
@@ -198,12 +374,21 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     ///
     /// [`RwLock`]: struct@crate::sync::RwLock
     pub fn downgrade(self) -> RwLockReadGuard<'a, T> {
-        let RwLockWriteGuard { s, data, .. } = self;
-        let to_release = (self.permits_acquired - 1) as usize;
+        let this = self.skip_drop();
+        let guard = RwLockReadGuard {
+            s: this.s,
+            data: this.data,
+            marker: PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: this.resource_span,
+        };
+
         // Release all but one of the permits held by the write guard
-        s.release(to_release);
+        let to_release = (this.permits_acquired - 1) as usize;
+        this.s.release(to_release);
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
+        guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             write_locked = false,
@@ -212,7 +397,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         });
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
+        guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             current_readers = 1,
@@ -220,18 +405,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = self.resource_span.clone();
-        // NB: Forget to avoid drop impl from being called.
-        mem::forget(self);
-
-        RwLockReadGuard {
-            s,
-            data,
-            marker: marker::PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
-        }
+        guard
     }
 }
 

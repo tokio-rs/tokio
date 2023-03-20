@@ -131,6 +131,13 @@
 /// correctly even if it is restarted while waiting at an `.await`, then it is
 /// cancellation safe.
 ///
+/// Cancellation safety can be defined in the following way: If you have a
+/// future that has not yet completed, then it must be a no-op to drop that
+/// future and recreate it. This definition is motivated by the situation where
+/// a `select!` is used in a loop. Without this guarantee, you would lose your
+/// progress when another branch completes and you restart the `select!` by
+/// going around the loop.
+///
 /// Be aware that cancelling something that is not cancellation safe is not
 /// necessarily wrong. For example, if you are cancelling a task because the
 /// application is shutting down, then you probably don't care that partially

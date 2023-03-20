@@ -444,6 +444,7 @@ impl Semaphore {
         }
 
         assert_eq!(acquired, 0);
+        let mut old_waker = None;
 
         // Otherwise, register the waker & enqueue the node.
         node.waker.with_mut(|waker| {
@@ -455,7 +456,7 @@ impl Semaphore {
                 .map(|waker| !waker.will_wake(cx.waker()))
                 .unwrap_or(true)
             {
-                *waker = Some(cx.waker().clone());
+                old_waker = std::mem::replace(waker, Some(cx.waker().clone()));
             }
         });
 
@@ -468,6 +469,8 @@ impl Semaphore {
 
             waiters.queue.push_front(node);
         }
+        drop(waiters);
+        drop(old_waker);
 
         Pending
     }

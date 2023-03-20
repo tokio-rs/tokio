@@ -4,6 +4,8 @@ use crate::net::unix::{SocketAddr, UnixStream};
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
+#[cfg(not(tokio_no_as_fd))]
+use std::os::unix::io::{AsFd, BorrowedFd};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
@@ -73,9 +75,31 @@ impl UnixListener {
     /// Creates new `UnixListener` from a `std::os::unix::net::UnixListener `.
     ///
     /// This function is intended to be used to wrap a UnixListener from the
-    /// standard library in the Tokio equivalent. The conversion assumes
-    /// nothing about the underlying listener; it is left up to the user to set
-    /// it in non-blocking mode.
+    /// standard library in the Tokio equivalent.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the listener is in
+    /// non-blocking mode. Otherwise all I/O operations on the listener
+    /// will block the thread, which will cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::os::unix::net::UnixListener::set_nonblocking
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixListener;
+    /// use std::os::unix::net::UnixListener as StdUnixListener;
+    /// # use std::error::Error;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// let std_listener = StdUnixListener::bind("/path/to/the/socket")?;
+    /// std_listener.set_nonblocking(true)?;
+    /// let listener = UnixListener::from_std(std_listener)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
@@ -95,20 +119,18 @@ impl UnixListener {
     /// Turns a [`tokio::net::UnixListener`] into a [`std::os::unix::net::UnixListener`].
     ///
     /// The returned [`std::os::unix::net::UnixListener`] will have nonblocking mode
-    /// set as `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.
+    /// set as `true`. Use [`set_nonblocking`] to change the blocking mode if needed.
     ///
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use std::error::Error;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let tokio_listener = tokio::net::UnixListener::bind("127.0.0.1:0")?;
-    ///     let std_listener = tokio_listener.into_std()?;
-    ///     std_listener.set_nonblocking(false)?;
-    ///     Ok(())
-    /// }
+    /// # use std::error::Error;
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// let tokio_listener = tokio::net::UnixListener::bind("/path/to/the/socket")?;
+    /// let std_listener = tokio_listener.into_std()?;
+    /// std_listener.set_nonblocking(false)?;
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// [`tokio::net::UnixListener`]: UnixListener
@@ -186,5 +208,12 @@ impl fmt::Debug for UnixListener {
 impl AsRawFd for UnixListener {
     fn as_raw_fd(&self) -> RawFd {
         self.io.as_raw_fd()
+    }
+}
+
+#[cfg(not(tokio_no_as_fd))]
+impl AsFd for UnixListener {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
     }
 }

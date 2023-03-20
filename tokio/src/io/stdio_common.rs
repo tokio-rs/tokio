@@ -108,13 +108,12 @@ where
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
+    use crate::io::blocking::MAX_BUF;
     use crate::io::AsyncWriteExt;
     use std::io;
     use std::pin::Pin;
     use std::task::Context;
     use std::task::Poll;
-
-    const MAX_BUF: usize = 16 * 1024;
 
     struct TextMockWriter;
 
@@ -177,6 +176,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_splitter() {
         let data = str::repeat("█", MAX_BUF);
         let mut wr = super::SplitByUtf8BoundaryIfWindows::new(TextMockWriter);
@@ -190,6 +190,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_pseudo_text() {
         // In this test we write a piece of binary data, whose beginning is
         // text though. We then validate that even in this corner case buffer

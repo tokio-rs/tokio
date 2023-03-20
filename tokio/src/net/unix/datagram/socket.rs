@@ -5,6 +5,8 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
+#[cfg(not(tokio_no_as_fd))]
+use std::os::unix::io::{AsFd, BorrowedFd};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
@@ -426,9 +428,16 @@ impl UnixDatagram {
     /// Creates new `UnixDatagram` from a `std::os::unix::net::UnixDatagram`.
     ///
     /// This function is intended to be used to wrap a UnixDatagram from the
-    /// standard library in the Tokio equivalent. The conversion assumes
-    /// nothing about the underlying datagram; it is left up to the user to set
-    /// it in non-blocking mode.
+    /// standard library in the Tokio equivalent.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socker is in
+    /// non-blocking mode. Otherwise all I/O operations on the socket
+    /// will block the thread, which will cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::os::unix::net::UnixDatagram::set_nonblocking
     ///
     /// # Panics
     ///
@@ -470,21 +479,19 @@ impl UnixDatagram {
     /// Turns a [`tokio::net::UnixDatagram`] into a [`std::os::unix::net::UnixDatagram`].
     ///
     /// The returned [`std::os::unix::net::UnixDatagram`] will have nonblocking
-    /// mode set as `true`.  Use [`set_nonblocking`] to change the blocking mode
+    /// mode set as `true`. Use [`set_nonblocking`] to change the blocking mode
     /// if needed.
     ///
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use std::error::Error;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let tokio_socket = tokio::net::UnixDatagram::bind("127.0.0.1:0")?;
-    ///     let std_socket = tokio_socket.into_std()?;
-    ///     std_socket.set_nonblocking(false)?;
-    ///     Ok(())
-    /// }
+    /// # use std::error::Error;
+    /// # async fn dox() -> Result<(), Box<dyn Error>> {
+    /// let tokio_socket = tokio::net::UnixDatagram::bind("/path/to/the/socket")?;
+    /// let std_socket = tokio_socket.into_std()?;
+    /// std_socket.set_nonblocking(false)?;
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// [`tokio::net::UnixDatagram`]: UnixDatagram
@@ -1255,6 +1262,42 @@ impl UnixDatagram {
             .try_io(interest, || self.io.try_io(f))
     }
 
+    /// Reads or writes from the socket using a user-provided IO operation.
+    ///
+    /// The readiness of the socket is awaited and when the socket is ready,
+    /// the provided closure is called. The closure should attempt to perform
+    /// IO operation on the socket by manually calling the appropriate syscall.
+    /// If the operation fails because the socket is not actually ready,
+    /// then the closure should return a `WouldBlock` error. In such case the
+    /// readiness flag is cleared and the socket readiness is awaited again.
+    /// This loop is repeated until the closure returns an `Ok` or an error
+    /// other than `WouldBlock`.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `UnixDatagram` type, as this will mess with the
+    /// readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
+    pub async fn async_io<R>(
+        &self,
+        interest: Interest,
+        mut f: impl FnMut() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.io
+            .registration()
+            .async_io(interest, || self.io.try_io(&mut f))
+            .await
+    }
+
     /// Returns the local address that this socket is bound to.
     ///
     /// # Examples
@@ -1429,5 +1472,12 @@ impl fmt::Debug for UnixDatagram {
 impl AsRawFd for UnixDatagram {
     fn as_raw_fd(&self) -> RawFd {
         self.io.as_raw_fd()
+    }
+}
+
+#[cfg(not(tokio_no_as_fd))]
+impl AsFd for UnixDatagram {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
     }
 }

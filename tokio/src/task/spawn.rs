@@ -7,9 +7,9 @@ cfg_rt! {
     /// Spawns a new asynchronous task, returning a
     /// [`JoinHandle`](super::JoinHandle) for it.
     ///
-    /// You do not have to `.await` the returned `JoinHandle` to make the
-    /// provided future start execution. It will start running in the background
-    /// immediately when `spawn` is called.
+    /// The provided future will start running in the background immediately
+    /// when `spawn` is called, even if you don't await the returned
+    /// `JoinHandle`.
     ///
     /// Spawning a task enables the task to execute concurrently to other tasks. The
     /// spawned task may execute on the current thread, or it may be sent to a

@@ -156,9 +156,11 @@
 //! multi-thread scheduler spawns threads to schedule tasks and for `spawn_blocking`
 //! calls.
 //!
-//! While the `Runtime` is active, threads may shutdown after periods of being
-//! idle. Once `Runtime` is dropped, all runtime threads are forcibly shutdown.
-//! Any tasks that have not yet completed will be dropped.
+//! While the `Runtime` is active, threads may shut down after periods of being
+//! idle. Once `Runtime` is dropped, all runtime threads have usually been
+//! terminated, but in the presence of unstoppable spawned work are not
+//! guaranteed to have been terminated. See the
+//! [struct level documentation](Runtime#shutdown) for more details.
 //!
 //! [tasks]: crate::task
 //! [`Runtime`]: Runtime
@@ -236,6 +238,9 @@ cfg_rt! {
 
     mod runtime;
     pub use runtime::{Runtime, RuntimeFlavor};
+
+    mod thread_id;
+    pub(crate) use thread_id::ThreadId;
 
     cfg_metrics! {
         mod metrics;

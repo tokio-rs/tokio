@@ -213,6 +213,7 @@ fn reopened_after_subscribe() {
 }
 
 #[test]
+#[cfg(panic = "unwind")]
 #[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn send_modify_panic() {
     let (tx, mut rx) = watch::channel("one");
