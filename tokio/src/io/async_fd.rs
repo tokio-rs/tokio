@@ -521,6 +521,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// [`AsyncFdReadyGuard`].
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
     pub async fn priority<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
         self.readiness(Interest::PRIORITY).await
     }
@@ -533,6 +534,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
     pub async fn priority_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
         self.readiness_mut(Interest::PRIORITY).await
     }

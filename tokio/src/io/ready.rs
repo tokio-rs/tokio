@@ -163,6 +163,8 @@ impl Ready {
     /// assert!(!Ready::WRITABLE.is_priority());
     /// assert!(Ready::PRIORITY.is_priority());
     /// ```
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
     pub fn is_priority(self) -> bool {
         self.contains(Ready::PRIORITY)
     }

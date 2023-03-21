@@ -46,6 +46,7 @@ impl Interest {
 
     /// Returns a `Interest` set representing priority completion interests.
     #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
     pub const PRIORITY: Interest = Interest(mio::Interest::PRIORITY);
 
     /// Returns true if the value includes readable interest.
