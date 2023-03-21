@@ -239,11 +239,7 @@ fn remove_child(parent: &mut Inner, mut node: MutexGuard<'_, Inner>) {
 
     let len = parent.children.len();
     if 4 * len <= parent.children.capacity() {
-        // equal to:
-        //    parent.children.shrink_to(2 * len);
-        // but shrink_to was not yet stabilized in our minimal compatible version
-        let old_children = std::mem::replace(&mut parent.children, Vec::with_capacity(2 * len));
-        parent.children.extend(old_children);
+        parent.children.shrink_to(2 * len);
     }
 }
 

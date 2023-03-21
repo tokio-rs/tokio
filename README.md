@@ -187,7 +187,20 @@ When updating this, also update:
 
 Tokio will keep a rolling MSRV (minimum supported rust version) policy of **at
 least** 6 months. When increasing the MSRV, the new Rust version must have been
-released at least six months ago. The current MSRV is 1.49.0.
+released at least six months ago. The current MSRV is 1.56.0.
+
+Note that the MSRV is not increased automatically, and only as part of a minor
+release. The MSRV history for past minor releases can be found below:
+
+ * 1.27 to now - Rust 1.56
+ * 1.17 to 1.26 - Rust 1.49
+ * 1.15 to 1.16 - Rust 1.46
+ * 1.0 to 1.14 - Rust 1.45
+
+Note that although we try to avoid the situation where a dependency transitively
+increases the MSRV of Tokio, we do not guarantee that this does not happen.
+However, every minor release will have some set of versions of dependencies that
+works with the MSRV of that minor release.
 
 ## Release schedule
 
@@ -202,9 +215,9 @@ warrants a patch release with a fix for the bug, it will be backported and
 released as a new patch release for each LTS minor version. Our current LTS
 releases are:
 
- * `1.18.x` - LTS release until June 2023
- * `1.20.x` - LTS release until September 2023.
- * `1.25.x` - LTS release until March 2024
+ * `1.18.x` - LTS release until June 2023. (MSRV 1.49)
+ * `1.20.x` - LTS release until September 2023. (MSRV 1.49)
+ * `1.25.x` - LTS release until March 2024. (MSRV 1.49)
 
 Each LTS release will continue to receive backported fixes for at least a year.
 If you wish to use a fixed minor release in your project, we recommend that you

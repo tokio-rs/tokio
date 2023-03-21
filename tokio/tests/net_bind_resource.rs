@@ -3,7 +3,6 @@
 
 use tokio::net::TcpListener;
 
-use std::convert::TryFrom;
 use std::net;
 
 #[test]

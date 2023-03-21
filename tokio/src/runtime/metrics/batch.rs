@@ -1,6 +1,5 @@
 use crate::runtime::WorkerMetrics;
 
-use std::convert::TryFrom;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::Instant;
 

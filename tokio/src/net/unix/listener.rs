@@ -1,7 +1,6 @@
 use crate::io::{Interest, PollEvented};
 use crate::net::unix::{SocketAddr, UnixStream};
 
-use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 #[cfg(not(tokio_no_as_fd))]

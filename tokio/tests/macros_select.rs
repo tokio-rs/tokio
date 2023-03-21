@@ -206,47 +206,56 @@ async fn nested() {
     assert_eq!(res, 3);
 }
 
-#[maybe_tokio_test]
 #[cfg(target_pointer_width = "64")]
-async fn struct_size() {
+mod pointer_64_tests {
+    use super::maybe_tokio_test;
     use futures::future;
     use std::mem;
 
-    let fut = async {
-        let ready = future::ready(0i32);
+    #[maybe_tokio_test]
+    async fn struct_size_1() {
+        let fut = async {
+            let ready = future::ready(0i32);
 
-        tokio::select! {
-            _ = ready => {},
-        }
-    };
+            tokio::select! {
+                _ = ready => {},
+            }
+        };
 
-    assert_eq!(mem::size_of_val(&fut), 40);
+        assert_eq!(mem::size_of_val(&fut), 32);
+    }
 
-    let fut = async {
-        let ready1 = future::ready(0i32);
-        let ready2 = future::ready(0i32);
+    #[maybe_tokio_test]
+    async fn struct_size_2() {
+        let fut = async {
+            let ready1 = future::ready(0i32);
+            let ready2 = future::ready(0i32);
 
-        tokio::select! {
-            _ = ready1 => {},
-            _ = ready2 => {},
-        }
-    };
+            tokio::select! {
+                _ = ready1 => {},
+                _ = ready2 => {},
+            }
+        };
 
-    assert_eq!(mem::size_of_val(&fut), 48);
+        assert_eq!(mem::size_of_val(&fut), 40);
+    }
 
-    let fut = async {
-        let ready1 = future::ready(0i32);
-        let ready2 = future::ready(0i32);
-        let ready3 = future::ready(0i32);
+    #[maybe_tokio_test]
+    async fn struct_size_3() {
+        let fut = async {
+            let ready1 = future::ready(0i32);
+            let ready2 = future::ready(0i32);
+            let ready3 = future::ready(0i32);
 
-        tokio::select! {
-            _ = ready1 => {},
-            _ = ready2 => {},
-            _ = ready3 => {},
-        }
-    };
+            tokio::select! {
+                _ = ready1 => {},
+                _ = ready2 => {},
+                _ = ready3 => {},
+            }
+        };
 
-    assert_eq!(mem::size_of_val(&fut), 56);
+        assert_eq!(mem::size_of_val(&fut), 48);
+    }
 }
 
 #[maybe_tokio_test]

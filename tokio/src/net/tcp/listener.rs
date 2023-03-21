@@ -5,7 +5,6 @@ cfg_not_wasi! {
     use crate::net::{to_socket_addrs, ToSocketAddrs};
 }
 
-use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{self, SocketAddr};
