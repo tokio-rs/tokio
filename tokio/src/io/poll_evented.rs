@@ -83,7 +83,10 @@ impl<E: Source> PollEvented<E> {
     #[track_caller]
     #[cfg_attr(feature = "signal", allow(unused))]
     pub(crate) fn new(io: E) -> io::Result<Self> {
-        PollEvented::new_with_interest(io, Interest::READABLE | Interest::WRITABLE)
+        PollEvented::new_with_interest(
+            io,
+            Interest::READABLE | Interest::WRITABLE | Interest::PRIORITY,
+        )
     }
 
     /// Creates a new `PollEvented` associated with the default reactor, for

@@ -82,6 +82,23 @@ impl Interest {
         self.0.is_writable()
     }
 
+    /// Returns true if the value includes priority interest.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::Interest;
+    ///
+    /// assert!(!Interest::READABLE.is_priority());
+    /// assert!(Interest::PRIORITY.is_priority());
+    ///
+    /// let both = Interest::READABLE | Interest::PRIORITY;
+    /// assert!(both.is_priority());
+    /// ```
+    pub const fn is_priority(self) -> bool {
+        self.0.is_priority()
+    }
+
     /// Add together two `Interest` values.
     ///
     /// This function works from a `const` context.
@@ -108,6 +125,7 @@ impl Interest {
         match self {
             Interest::READABLE => Ready::READABLE | Ready::READ_CLOSED,
             Interest::WRITABLE => Ready::WRITABLE | Ready::WRITE_CLOSED,
+            Interest::PRIORITY => Ready::PRIORITY,
             _ => Ready::EMPTY,
         }
     }

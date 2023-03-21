@@ -201,7 +201,9 @@ pub struct AsyncFdReadyMutGuard<'a, T: AsRawFd> {
     event: Option<ReadyEvent>,
 }
 
-const ALL_INTEREST: Interest = Interest::READABLE.add(Interest::WRITABLE);
+const ALL_INTEREST: Interest = Interest::READABLE
+    .add(Interest::WRITABLE)
+    .add(Interest::PRIORITY);
 
 impl<T: AsRawFd> AsyncFd<T> {
     /// Creates an AsyncFd backed by (and taking ownership of) an object

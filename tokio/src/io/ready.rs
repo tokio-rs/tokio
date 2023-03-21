@@ -7,6 +7,7 @@ const READABLE: usize = 0b0_01;
 const WRITABLE: usize = 0b0_10;
 const READ_CLOSED: usize = 0b0_0100;
 const WRITE_CLOSED: usize = 0b0_1000;
+const PRIORITY: usize = 0b1_0000;
 
 /// Describes the readiness state of an I/O resources.
 ///
@@ -31,8 +32,11 @@ impl Ready {
     /// Returns a `Ready` representing write closed readiness.
     pub const WRITE_CLOSED: Ready = Ready(WRITE_CLOSED);
 
+    /// Returns a `Ready` representing priority readiness.
+    pub const PRIORITY: Ready = Ready(PRIORITY);
+
     /// Returns a `Ready` representing readiness for all operations.
-    pub const ALL: Ready = Ready(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED);
+    pub const ALL: Ready = Ready(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED | PRIORITY);
 
     // Must remain crate-private to avoid adding a public dependency on Mio.
     pub(crate) fn from_mio(event: &mio::event::Event) -> Ready {
@@ -63,6 +67,10 @@ impl Ready {
 
         if event.is_write_closed() {
             ready |= Ready::WRITE_CLOSED;
+        }
+
+        if event.is_priority() {
+            ready |= Ready::PRIORITY;
         }
 
         ready
@@ -144,6 +152,21 @@ impl Ready {
         self.contains(Ready::WRITE_CLOSED)
     }
 
+    /// Returns `true` if the value includes priority `readiness`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::Ready;
+    ///
+    /// assert!(!Ready::EMPTY.is_priority());
+    /// assert!(!Ready::WRITABLE.is_priority());
+    /// assert!(Ready::PRIORITY.is_priority());
+    /// ```
+    pub fn is_priority(self) -> bool {
+        self.contains(Ready::PRIORITY)
+    }
+
     /// Returns true if `self` is a superset of `other`.
     ///
     /// `other` may represent more than one readiness operations, in which case
@@ -189,6 +212,10 @@ cfg_io_readiness! {
             if interest.is_writable() {
                 ready |= Ready::WRITABLE;
                 ready |= Ready::WRITE_CLOSED;
+            }
+
+            if interest.is_priority() {
+                ready |= Ready::PRIORITY;
             }
 
             ready
@@ -245,6 +272,7 @@ impl fmt::Debug for Ready {
             .field("is_writable", &self.is_writable())
             .field("is_read_closed", &self.is_read_closed())
             .field("is_write_closed", &self.is_write_closed())
+            .field("is_priority", &self.is_priority())
             .finish()
     }
 }
