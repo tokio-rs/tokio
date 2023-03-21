@@ -568,7 +568,7 @@ where
     }
 }
 
-impl<K, V> std::iter::FromIterator<(K, V)> for StreamMap<K, V>
+impl<K, V> FromIterator<(K, V)> for StreamMap<K, V>
 where
     K: Hash + Eq,
 {
