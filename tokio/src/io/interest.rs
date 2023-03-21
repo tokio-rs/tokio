@@ -96,6 +96,8 @@ impl Interest {
     /// let both = Interest::READABLE | Interest::PRIORITY;
     /// assert!(both.is_priority());
     /// ```
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
     pub const fn is_priority(self) -> bool {
         self.0.is_priority()
     }
@@ -126,6 +128,7 @@ impl Interest {
         match self {
             Interest::READABLE => Ready::READABLE | Ready::READ_CLOSED,
             Interest::WRITABLE => Ready::WRITABLE | Ready::WRITE_CLOSED,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             Interest::PRIORITY => Ready::PRIORITY,
             _ => Ready::EMPTY,
         }

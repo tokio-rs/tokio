@@ -1,12 +1,11 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support bind
+#![cfg(all(feature = "full", any(target_os = "linux", target_os = "android")))]
 
 use std::os::unix::io::AsRawFd;
 use tokio::io::{self, Interest};
 use tokio::net::{TcpListener, TcpStream};
 
 #[tokio::test]
-#[cfg(any(target_os = "linux", target_os = "android"))]
 async fn await_priority() {
     use std::net::SocketAddr;
 
@@ -25,7 +24,6 @@ async fn await_priority() {
     let _ = client.ready(Interest::PRIORITY).await.unwrap();
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
 fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
     unsafe {
         let res = libc::send(

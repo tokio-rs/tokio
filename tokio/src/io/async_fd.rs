@@ -201,6 +201,10 @@ pub struct AsyncFdReadyMutGuard<'a, T: AsRawFd> {
     event: Option<ReadyEvent>,
 }
 
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+const ALL_INTEREST: Interest = Interest::READABLE.add(Interest::WRITABLE);
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
 const ALL_INTEREST: Interest = Interest::READABLE
     .add(Interest::WRITABLE)
     .add(Interest::PRIORITY);

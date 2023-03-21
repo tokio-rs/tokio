@@ -7,6 +7,7 @@ const READABLE: usize = 0b0_01;
 const WRITABLE: usize = 0b0_10;
 const READ_CLOSED: usize = 0b0_0100;
 const WRITE_CLOSED: usize = 0b0_1000;
+#[cfg(any(target_os = "linux", target_os = "android"))]
 const PRIORITY: usize = 0b1_0000;
 
 /// Describes the readiness state of an I/O resources.
@@ -33,10 +34,17 @@ impl Ready {
     pub const WRITE_CLOSED: Ready = Ready(WRITE_CLOSED);
 
     /// Returns a `Ready` representing priority readiness.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
     pub const PRIORITY: Ready = Ready(PRIORITY);
 
     /// Returns a `Ready` representing readiness for all operations.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub const ALL: Ready = Ready(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED | PRIORITY);
+
+    /// Returns a `Ready` representing readiness for all operations.
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    pub const ALL: Ready = Ready(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED);
 
     // Must remain crate-private to avoid adding a public dependency on Mio.
     pub(crate) fn from_mio(event: &mio::event::Event) -> Ready {
@@ -69,8 +77,11 @@ impl Ready {
             ready |= Ready::WRITE_CLOSED;
         }
 
-        if event.is_priority() {
-            ready |= Ready::PRIORITY;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        {
+            if event.is_priority() {
+                ready |= Ready::PRIORITY;
+            }
         }
 
         ready
@@ -216,6 +227,7 @@ cfg_io_readiness! {
                 ready |= Ready::WRITE_CLOSED;
             }
 
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             if interest.is_priority() {
                 ready |= Ready::PRIORITY;
             }
@@ -269,12 +281,25 @@ impl ops::Sub<Ready> for Ready {
 
 impl fmt::Debug for Ready {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Ready")
-            .field("is_readable", &self.is_readable())
-            .field("is_writable", &self.is_writable())
-            .field("is_read_closed", &self.is_read_closed())
-            .field("is_write_closed", &self.is_write_closed())
-            .field("is_priority", &self.is_priority())
-            .finish()
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        {
+            fmt.debug_struct("Ready")
+                .field("is_readable", &self.is_readable())
+                .field("is_writable", &self.is_writable())
+                .field("is_read_closed", &self.is_read_closed())
+                .field("is_write_closed", &self.is_write_closed())
+                .field("is_priority", &self.is_priority())
+                .finish()
+        }
+
+        #[cfg(not(any(target_os = "linux", target_os = "android")))]
+        {
+            fmt.debug_struct("Ready")
+                .field("is_readable", &self.is_readable())
+                .field("is_writable", &self.is_writable())
+                .field("is_read_closed", &self.is_read_closed())
+                .field("is_write_closed", &self.is_write_closed())
+                .finish()
+        }
     }
 }
