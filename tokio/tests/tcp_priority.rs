@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support bind
 
-use std::os::fd::AsRawFd;
+use std::os::unix::io::AsRawFd;
 use tokio::io::{self, Interest};
 use tokio::net::{TcpListener, TcpStream};
 
