@@ -559,7 +559,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///     let async_fd = AsyncFd::new(socket)?;
     ///
     ///     let written = async_fd
-    ///         .async_io(Interest::WRITABLE, |inner| inner.send(&[1, 2]))
+    ///         .async_io(Interest::WRITABLE, || async_fd.get_ref().send(&[1, 2]))
     ///         .await?;
     ///
     ///     println!("wrote {written} bytes");
@@ -596,11 +596,9 @@ impl<T: AsRawFd> AsyncFd<T> {
     pub async fn async_io<R>(
         &self,
         interest: Interest,
-        mut f: impl FnMut(&T) -> io::Result<R>,
+        f: impl FnMut() -> io::Result<R>,
     ) -> io::Result<R> {
-        self.registration
-            .async_io(interest, || f(self.get_ref()))
-            .await
+        self.registration.async_io(interest, f).await
     }
 }
 
