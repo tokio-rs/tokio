@@ -149,13 +149,12 @@ impl Wheel {
             }
 
             match self.next_expiration() {
-                Some(ref expiration) if expiration.deadline > now => return None,
-                Some(ref expiration) => {
+                Some(ref expiration) if expiration.deadline <= now => {
                     self.process_expiration(expiration);
 
                     self.set_elapsed(expiration.deadline);
                 }
-                None => {
+                _ => {
                     // in this case the poll did not indicate an expiration
                     // _and_ we were not able to find a next expiration in
                     // the current list of timers.  advance to the poll's
