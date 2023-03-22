@@ -371,7 +371,9 @@ impl Spawner {
                 task.name = %name.unwrap_or_default(),
                 task.id = id.as_u64(),
                 "fn" = %std::any::type_name::<F>(),
-                spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
+                loc.file = location.file(),
+                loc.line = location.line(),
+                loc.col = location.column(),
             );
             fut.instrument(span)
         };
