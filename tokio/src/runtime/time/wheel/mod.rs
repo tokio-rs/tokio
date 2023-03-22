@@ -148,16 +148,7 @@ impl Wheel {
                 return Some(handle);
             }
 
-            // under what circumstances is poll.expiration Some vs. None?
-            let expiration = self.next_expiration().and_then(|expiration| {
-                if expiration.deadline > now {
-                    None
-                } else {
-                    Some(expiration)
-                }
-            });
-
-            match expiration {
+            match self.next_expiration() {
                 Some(ref expiration) if expiration.deadline > now => return None,
                 Some(ref expiration) => {
                     self.process_expiration(expiration);
