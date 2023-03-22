@@ -1,6 +1,8 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", any(target_os = "linux", target_os = "android")))]
 
+use socket2::SockRef;
+use std::mem::MaybeUninit;
 use std::os::unix::io::AsRawFd;
 use tokio::io::{self, Interest};
 use tokio::net::{TcpListener, TcpStream};
@@ -19,9 +21,27 @@ async fn await_priority() {
     let (stream, _) = listener.accept().await.unwrap();
 
     // Sending out of band data should trigger priority event.
-    send_oob_data(&stream, b"hello").unwrap();
+    send_oob_data(&stream, &[41, 42]).unwrap();
 
-    let _ = client.ready(Interest::PRIORITY).await.unwrap();
+    let mut buf = [MaybeUninit::new(0u8); 5];
+
+    // using try_io here (instead of e.g. `client.async_io`) for better test coverage
+    let bytes_received = loop {
+        client.ready(Interest::PRIORITY).await.unwrap();
+
+        let result = client.try_io(Interest::PRIORITY, || {
+            SockRef::from(&client).recv_out_of_band(&mut buf)
+        });
+
+        match result {
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
+            other => break other.unwrap(),
+        }
+    };
+
+    // only the most recent byte is received OOB
+    assert_eq!(bytes_received, 1);
+    assert_eq!(unsafe { buf[0].assume_init() }, 42);
 }
 
 fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
