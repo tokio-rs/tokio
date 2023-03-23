@@ -24,11 +24,17 @@ cfg_io_util! {
     ///
     /// This function returns a future that will continuously read data from
     /// `reader` and then write it into `writer` in a streaming fashion until
-    /// `reader` returns EOF.
+    /// `reader` returns EOF or fails.
     ///
     /// On success, the total number of bytes that were copied from `reader` to
     /// `writer` is returned.
     ///
+    /// This is a [`tokio::io::copy`] alternative for [`AsyncBufRead`] readers
+    /// with no extra buffer allocation, since [`AsyncBufRead`] allow access
+    /// to the reader's inner buffer.
+    ///
+    /// [`tokio::io::copy`]: crate::io::copy
+    /// [`AsyncBufRead`]: crate::io::AsyncBufRead
     ///
     /// # Errors
     ///

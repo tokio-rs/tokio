@@ -153,14 +153,22 @@ cfg_io_util! {
     ///
     /// This function returns a future that will continuously read data from
     /// `reader` and then write it into `writer` in a streaming fashion until
-    /// `reader` returns EOF.
+    /// `reader` returns EOF or fails.
     ///
     /// On success, the total number of bytes that were copied from `reader` to
     /// `writer` is returned.
     ///
     /// This is an asynchronous version of [`std::io::copy`][std].
     ///
+    /// A heap-allocated copy buffer with 8 KB is created to take data from the
+    /// reader to the writer, check [`copy_buf`] if you want an alternative for
+    /// [`AsyncBufRead`]. You can use `copy_buf` with [`BufReader`] to change the
+    /// buffer capacity.
+    ///
     /// [std]: std::io::copy
+    /// [`copy_buf`]: crate::io::copy_buf
+    /// [`AsyncBufRead`]: crate::io::AsyncBufRead
+    /// [`BufReader`]: crate::io::BufReader
     ///
     /// # Errors
     ///
