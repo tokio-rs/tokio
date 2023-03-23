@@ -162,7 +162,7 @@ cfg_io_util! {
     ///
     /// A heap-allocated copy buffer with 8 KB is created to take data from the
     /// reader to the writer, check [`copy_buf`] if you want an alternative for
-    /// [`AsyncBufRead`], you can use it with [`BufReader`] to change the copy
+    /// [`AsyncBufRead`]. You can use `copy_buf` with [`BufReader`] to change the
     /// buffer capacity.
     ///
     /// [std]: std::io::copy
