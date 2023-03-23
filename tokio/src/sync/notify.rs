@@ -1108,8 +1108,7 @@ impl Drop for Notified<'_> {
             let mut notify_state = notify.state.load(SeqCst);
 
             // We hold the lock, so this field is not concurrently accessed by
-            // `notify_*` functions. We will unlink the waiter and drop it shortly,
-            // so we can use relaxed ordering.
+            // `notify_*` functions and we can use the relaxed ordering.
             let notification = waiter.notification.load(Relaxed);
 
             // remove the entry from the list (if not already removed)
