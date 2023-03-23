@@ -46,10 +46,11 @@ pub(crate) fn clean_pattern_macro(input: TokenStream) -> TokenStream {
     // If this isn't a pattern, we return the token stream as-is. The select!
     // macro is using it in a location requiring a pattern, so an error will be
     // emitted there.
-    let mut input: syn::Pat = match syn::parse(input.clone()) {
-        Ok(it) => it,
-        Err(_) => return input,
-    };
+    let mut input: syn::Pat =
+        match syn::parse::Parser::parse(syn::Pat::parse_multi_with_leading_vert, input.clone()) {
+            Ok(it) => it,
+            Err(_) => return input,
+        };
 
     clean_pattern(&mut input);
     quote::ToTokens::into_token_stream(input).into()
@@ -58,7 +59,6 @@ pub(crate) fn clean_pattern_macro(input: TokenStream) -> TokenStream {
 // Removes any occurrences of ref or mut in the provided pattern.
 fn clean_pattern(pat: &mut syn::Pat) {
     match pat {
-        syn::Pat::Box(_box) => {}
         syn::Pat::Lit(_literal) => {}
         syn::Pat::Macro(_macro) => {}
         syn::Pat::Path(_path) => {}
@@ -94,7 +94,7 @@ fn clean_pattern(pat: &mut syn::Pat) {
             }
         }
         syn::Pat::TupleStruct(tuple) => {
-            for elem in tuple.pat.elems.iter_mut() {
+            for elem in tuple.elems.iter_mut() {
                 clean_pattern(elem);
             }
         }
