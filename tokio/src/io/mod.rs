@@ -145,8 +145,8 @@
 //! [`AsyncRead`]/[`AsyncWrite`] into a [`Stream`]/[`Sink`], see [`Decoder`] and
 //! [`Encoder`] in the [tokio-util::codec] module.
 //!
-//! [tokio-util]: https://docs.rs/tokio-util/0.6
-//! [tokio-util::codec]: https://docs.rs/tokio-util/0.6/tokio_util/codec/index.html
+//! [tokio-util]: https://docs.rs/tokio-util
+//! [tokio-util::codec]: https://docs.rs/tokio-util/latest/tokio_util/codec/index.html
 //!
 //! # Standard input and output
 //!
@@ -171,11 +171,11 @@
 //! [`AsyncWrite`]: trait@AsyncWrite
 //! [`AsyncReadExt`]: trait@AsyncReadExt
 //! [`AsyncWriteExt`]: trait@AsyncWriteExt
-//! ["codec"]: https://docs.rs/tokio-util/0.6/tokio_util/codec/index.html
-//! [`Encoder`]: https://docs.rs/tokio-util/0.6/tokio_util/codec/trait.Encoder.html
-//! [`Decoder`]: https://docs.rs/tokio-util/0.6/tokio_util/codec/trait.Decoder.html
-//! [`ReaderStream`]: https://docs.rs/tokio-util/0.6/tokio_util/io/struct.ReaderStream.html
-//! [`StreamReader`]: https://docs.rs/tokio-util/0.6/tokio_util/io/struct.StreamReader.html
+//! ["codec"]: https://docs.rs/tokio-util/latest/tokio_util/codec/index.html
+//! [`Encoder`]: https://docs.rs/tokio-util/latest/tokio_util/codec/trait.Encoder.html
+//! [`Decoder`]: https://docs.rs/tokio-util/latest/tokio_util/codec/trait.Decoder.html
+//! [`ReaderStream`]: https://docs.rs/tokio-util/latest/tokio_util/io/struct.ReaderStream.html
+//! [`StreamReader`]: https://docs.rs/tokio-util/latest/tokio_util/io/struct.StreamReader.html
 //! [`Error`]: struct@Error
 //! [`ErrorKind`]: enum@ErrorKind
 //! [`Result`]: type@Result
