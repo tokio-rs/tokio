@@ -974,14 +974,14 @@ pub trait StreamExt: Stream {
     ///
     /// // Once a timeout error is received, no further events will be received
     /// // unless the wrapped stream yields a value (timeouts do not repeat).
-    /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(23)));
-    /// let timeout_stream = interval_stream.timeout(Duration::from_millis(9));
+    /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(100)));
+    /// let timeout_stream = interval_stream.timeout(Duration::from_millis(10));
     /// tokio::pin!(timeout_stream);
     ///
     /// // Only one timeout will be received between values in the source stream.
     /// assert!(timeout_stream.try_next().await.is_ok());
-    /// assert!(timeout_stream.try_next().await.is_err());
-    /// assert!(timeout_stream.try_next().await.is_ok());
+    /// assert!(timeout_stream.try_next().await.is_err(), "expected one timeout");
+    /// assert!(timeout_stream.try_next().await.is_ok(), "expected no more timeouts");
     /// # }
     /// ```
     #[cfg(all(feature = "time"))]
@@ -1052,15 +1052,25 @@ pub trait StreamExt: Stream {
     ///
     /// // Timeout errors will be continuously produced at the specified
     /// // interval until the wrapped stream yields a value.
-    /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(23)));
-    /// let timeout_stream = interval_stream.timeout_repeating(Duration::from_millis(9));
+    /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(100)));
+    /// let timeout_stream = interval_stream.timeout_repeating(Duration::from_millis(10));
     /// tokio::pin!(timeout_stream);
     ///
     /// // Multiple timeouts will be received between values in the source stream.
     /// assert!(timeout_stream.try_next().await.is_ok());
-    /// assert!(timeout_stream.try_next().await.is_err());
-    /// assert!(timeout_stream.try_next().await.is_err());
-    /// assert!(timeout_stream.try_next().await.is_ok());
+    /// assert!(timeout_stream.try_next().await.is_err(), "expected one timeout");
+    /// assert!(timeout_stream.try_next().await.is_err(), "expected a second timeout");
+    /// // Will eventually receive another value from the source stream...
+    /// # let mut count = 0;
+    /// loop {
+    ///   if timeout_stream.try_next().await.is_ok() {
+    ///     break;
+    ///   }
+    /// # count += 1;
+    /// # if count > 20 {
+    /// #   panic!("did not receive another event from the wrapped stream")
+    /// # }
+    /// }
     /// # }
     /// ```
     #[cfg(all(feature = "time"))]
