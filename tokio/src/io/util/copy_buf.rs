@@ -29,7 +29,7 @@ cfg_io_util! {
     /// On success, the total number of bytes that were copied from `reader` to
     /// `writer` is returned.
     ///
-    /// This is a [`tokio::io::copy`] alternative for [`AsyncBufRead`] readers,
+    /// This is a [`tokio::io::copy`] alternative for [`AsyncBufRead`] readers
     /// with no extra buffer allocation, since [`AsyncBufRead`] allow access
     /// to the reader's inner buffer.
     ///

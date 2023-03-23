@@ -160,13 +160,15 @@ cfg_io_util! {
     ///
     /// This is an asynchronous version of [`std::io::copy`][std].
     ///
-    /// A heap-allocated buffer with 8 KB is created to take data from the
-    /// reader to the writer, check [`copy_buf`] if you want an alternative
-    /// for [`AsyncBufRead`].
+    /// A heap-allocated copy buffer with 8 KB is created to take data from the
+    /// reader to the writer, check [`copy_buf`] if you want an alternative for
+    /// [`AsyncBufRead`], you can use it with [`BufReader`] to change the copy
+    /// buffer capacity.
     ///
     /// [std]: std::io::copy
     /// [`copy_buf`]: crate::io::copy_buf
     /// [`AsyncBufRead`]: crate::io::AsyncBufRead
+    /// [`BufReader`]: crate::io::BufReader
     ///
     /// # Errors
     ///
