@@ -941,7 +941,7 @@ pub trait StreamExt: Stream {
     /// ```
     /// # #[tokio::main]
     /// # async fn main() {
-    /// use tokio_stream::{self as stream, StreamExt};
+    /// use tokio_stream::{self as stream, StreamExt, wrappers::IntervalStream};
     /// use std::time::Duration;
     /// # let int_stream = stream::iter(1..=3);
     ///
@@ -969,6 +969,17 @@ pub trait StreamExt: Stream {
     ///
     /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));
     /// assert_eq!(int_stream.try_next().await, Ok(None));
+    ///
+    /// // Once a timeout error is received, no further events will be received
+    /// // unless the wrapped stream yields a value (timeouts do not repeat).
+    /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(23)));
+    /// let timeout_stream = interval_stream.timeout(Duration::from_millis(9));
+    /// tokio::pin!(timeout_stream);
+    ///
+    /// // Only one timeout will be received between values in the source stream.
+    /// assert!(timeout_stream.try_next().await.is_ok());
+    /// assert!(timeout_stream.try_next().await.is_err());
+    /// assert!(timeout_stream.try_next().await.is_ok());
     /// # }
     /// ```
     #[cfg(all(feature = "time"))]
