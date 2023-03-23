@@ -4,7 +4,7 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse::Parser, Ident, Path};
 
 // syn::AttributeArgs does not implement syn::Parse
-type AttributeArgs = syn::punctuated::Punctuated<syn::NestedMeta, syn::Token![,]>;
+type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
 
 #[derive(Clone, Copy, PartialEq)]
 enum RuntimeFlavor {
@@ -245,7 +245,7 @@ fn build_config(
 
     for arg in args {
         match arg {
-            syn::NestedMeta::Meta(syn::Meta::NameValue(namevalue)) => {
+            syn::Meta::NameValue(namevalue) => {
                 let ident = namevalue
                     .path
                     .get_ident()
@@ -254,34 +254,26 @@ fn build_config(
                     })?
                     .to_string()
                     .to_lowercase();
+                let lit = match &namevalue.value {
+                    syn::Expr::Lit(syn::ExprLit { lit, .. }) => lit,
+                    expr => return Err(syn::Error::new_spanned(expr, "Must be a literal")),
+                };
                 match ident.as_str() {
                     "worker_threads" => {
-                        config.set_worker_threads(
-                            namevalue.lit.clone(),
-                            syn::spanned::Spanned::span(&namevalue.lit),
-                        )?;
+                        config.set_worker_threads(lit.clone(), syn::spanned::Spanned::span(lit))?;
                     }
                     "flavor" => {
-                        config.set_flavor(
-                            namevalue.lit.clone(),
-                            syn::spanned::Spanned::span(&namevalue.lit),
-                        )?;
+                        config.set_flavor(lit.clone(), syn::spanned::Spanned::span(lit))?;
                     }
                     "start_paused" => {
-                        config.set_start_paused(
-                            namevalue.lit.clone(),
-                            syn::spanned::Spanned::span(&namevalue.lit),
-                        )?;
+                        config.set_start_paused(lit.clone(), syn::spanned::Spanned::span(lit))?;
                     }
                     "core_threads" => {
                         let msg = "Attribute `core_threads` is renamed to `worker_threads`";
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
                     "crate" => {
-                        config.set_crate_name(
-                            namevalue.lit.clone(),
-                            syn::spanned::Spanned::span(&namevalue.lit),
-                        )?;
+                        config.set_crate_name(lit.clone(), syn::spanned::Spanned::span(lit))?;
                     }
                     name => {
                         let msg = format!(
@@ -292,7 +284,7 @@ fn build_config(
                     }
                 }
             }
-            syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
+            syn::Meta::Path(path) => {
                 let name = path
                     .get_ident()
                     .ok_or_else(|| syn::Error::new_spanned(&path, "Must have specified ident"))?
@@ -478,7 +470,11 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
         Ok(it) => it,
         Err(e) => return token_stream_with_error(item, e),
     };
-    let config = if let Some(attr) = input.attrs.iter().find(|attr| attr.path.is_ident("test")) {
+    let config = if let Some(attr) = input
+        .attrs
+        .iter()
+        .find(|attr| attr.meta.path().is_ident("test"))
+    {
         let msg = "second test attribute is supplied";
         Err(syn::Error::new_spanned(attr, msg))
     } else {
