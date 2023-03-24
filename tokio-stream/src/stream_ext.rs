@@ -941,7 +941,7 @@ pub trait StreamExt: Stream {
     /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt, wrappers::IntervalStream};
     /// use std::time::Duration;
@@ -1019,7 +1019,7 @@ pub trait StreamExt: Stream {
     /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt, wrappers::IntervalStream};
     /// use std::time::Duration;
@@ -1052,8 +1052,8 @@ pub trait StreamExt: Stream {
     ///
     /// // Timeout errors will be continuously produced at the specified
     /// // interval until the wrapped stream yields a value.
-    /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(100)));
-    /// let timeout_stream = interval_stream.timeout_repeating(Duration::from_millis(10));
+    /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(23)));
+    /// let timeout_stream = interval_stream.timeout_repeating(Duration::from_millis(9));
     /// tokio::pin!(timeout_stream);
     ///
     /// // Multiple timeouts will be received between values in the source stream.
@@ -1061,16 +1061,7 @@ pub trait StreamExt: Stream {
     /// assert!(timeout_stream.try_next().await.is_err(), "expected one timeout");
     /// assert!(timeout_stream.try_next().await.is_err(), "expected a second timeout");
     /// // Will eventually receive another value from the source stream...
-    /// # let mut count = 0;
-    /// loop {
-    ///   if timeout_stream.try_next().await.is_ok() {
-    ///     break;
-    ///   }
-    /// # count += 1;
-    /// # if count > 20 {
-    /// #   panic!("did not receive another event from the wrapped stream")
-    /// # }
-    /// }
+    /// assert!(timeout_stream.try_next().await.is_ok(), "expected non-timeout");
     /// # }
     /// ```
     #[cfg(all(feature = "time"))]
