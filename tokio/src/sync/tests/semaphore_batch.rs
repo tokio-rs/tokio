@@ -1,6 +1,8 @@
 use crate::sync::batch_semaphore::Semaphore;
 use tokio_test::*;
 
+const MAX_PERMITS: usize = crate::sync::Semaphore::MAX_PERMITS;
+
 #[cfg(tokio_wasm_not_wasi)]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
@@ -169,11 +171,15 @@ fn poll_acquire_one_zero_permits() {
 }
 
 #[test]
+fn max_permits_doesnt_panic() {
+    Semaphore::new(MAX_PERMITS);
+}
+
+#[test]
 #[should_panic]
 #[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
 fn validates_max_permits() {
-    use std::usize;
-    Semaphore::new((usize::MAX >> 2) + 1);
+    Semaphore::new(MAX_PERMITS + 1);
 }
 
 #[test]
