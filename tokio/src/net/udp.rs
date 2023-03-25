@@ -885,6 +885,8 @@ impl UdpSocket {
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
+        /// No byte array buf initialization is required.
+        ///
         /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
         /// returned. This function is usually paired with `readable()`.
         ///
@@ -943,12 +945,62 @@ impl UdpSocket {
             })
         }
 
+        /// Receives a single datagram message on the socket from the remote address
+        /// to which it is connected, advancing the buffer's internal cursor,
+        /// returning how many bytes were read.
+        ///
+        /// The function must be called with valid byte array buf of sufficient size
+        /// to hold the message bytes. If a message is too long to fit in the
+        /// supplied buffer, excess bytes may be discarded.
+        ///
+        /// No byte array buf initialization is required.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::UdpSocket;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     // Connect to a peer
+        ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
+        ///     socket.connect("127.0.0.1:8081").await?;
+        ///
+        ///     let mut buf = Vec::with_capacity(512);
+        ///     let len = socket.recv_buf(&mut buf).await?;
+        ///
+        ///     println!("received {} bytes {:?}", len, &buf[..len]);
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub async fn recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().async_io(Interest::READABLE, || {
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `UdpSocket::recv` to have filled up `n` bytes in the
+                // buffer.
+                let n = (*self.io).recv(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok(n)
+            }).await
+        }
+
         /// Tries to receive a single datagram message on the socket. On success,
         /// returns the number of bytes read and the origin.
         ///
         /// The function must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
+        ///
+        /// No byte array buf initialization is required.
         ///
         /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
         /// returned. This function is usually paired with `readable()`.
@@ -1014,6 +1066,62 @@ impl UdpSocket {
 
                 Ok((n, addr))
             })
+        }
+
+        /// Receives a single datagram message on the socket, advancing the
+        /// buffer's internal cursor, returning how many bytes were read and the origin.
+        ///
+        /// The function must be called with valid byte array buf of sufficient size
+        /// to hold the message bytes. If a message is too long to fit in the
+        /// supplied buffer, excess bytes may be discarded.
+        ///
+        /// No byte array buf initialization is required.
+        ///
+        /// # Notes
+        /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+        /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+        /// Because UDP is stateless and does not validate the origin of a packet,
+        /// the attacker does not need to be able to intercept traffic in order to interfere.
+        /// It is important to be aware of this when designing your application-level protocol.
+        ///
+        /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::UdpSocket;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     // Connect to a peer
+        ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
+        ///     socket.connect("127.0.0.1:8081").await?;
+        ///
+        ///     let mut buf = Vec::with_capacity(512);
+        ///     let (len, addr) = socket.recv_buf_from(&mut buf).await?;
+        ///
+        ///     println!("received {:?} bytes from {:?}", len, addr);
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub async fn recv_buf_from<B: BufMut>(&self, buf: &mut B) -> io::Result<(usize, SocketAddr)> {
+            self.io.registration().async_io(Interest::READABLE, || {
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `UdpSocket::recv_from` to have filled up `n` bytes in the
+                // buffer.
+                let (n, addr) = (*self.io).recv_from(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok((n,addr))
+            }).await
         }
     }
 
