@@ -3,10 +3,9 @@
 This major release updates the dependency on the syn crate to 2.0.0, and
 increases the MSRV to 1.56.
 
-As part of this release, we are adopting a policy of incrementing the
-tokio-macros major version more often. This reduces the chance of issues where
-people are confused about the same version of Tokio not behaving in the same
-way, if you happen to be using two different versions of tokio-macros.
+As part of this release, we are adopting a policy of depending on a specific minor
+release of tokio-macros. This prevents Tokio from being able to pull in many different
+versions of tokio-macros.
 
 - macros: update `syn` ([#5572])
 - macros: accept path as crate rename ([#5557])
