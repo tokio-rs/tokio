@@ -353,9 +353,22 @@ impl Sleep {
         self.reset_inner(deadline)
     }
 
+    /// Resets the `Sleep` instance to a new deadline without reregistering it
+    /// to be woken up.
+    ///
+    /// Calling this function allows changing the instant at which the `Sleep`
+    /// future completes without having to create new associated state and
+    /// without having it registered. This is required in e.g. the
+    /// [crate::time::Interval] where we want to reset the internal [Sleep]
+    /// without having it wake up the last task that polled it.
+    pub(crate) fn reset_without_reregister(self: Pin<&mut Self>, deadline: Instant) {
+        let mut me = self.project();
+        me.entry.as_mut().reset(deadline, false);
+    }
+
     fn reset_inner(self: Pin<&mut Self>, deadline: Instant) {
         let mut me = self.project();
-        me.entry.as_mut().reset(deadline);
+        me.entry.as_mut().reset(deadline, true);
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
