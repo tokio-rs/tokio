@@ -14,6 +14,7 @@ This release bumps the MSRV of Tokio to 1.56. ([#5559])
 
 - io: use `memchr` from `libc` ([#5558])
 - macros: accept path as crate rename in `#[tokio::main]` ([#5557])
+- macros: update to syn 2.0.0 ([#5572])
 - time: don't register for a wakeup when `Interval` returns `Ready` ([#5553])
 
 ### Fixed
@@ -40,6 +41,7 @@ This release bumps the MSRV of Tokio to 1.56. ([#5559])
 [#5557]: https://github.com/tokio-rs/tokio/pull/5557
 [#5558]: https://github.com/tokio-rs/tokio/pull/5558
 [#5559]: https://github.com/tokio-rs/tokio/pull/5559
+[#5572]: https://github.com/tokio-rs/tokio/pull/5572
 [#5573]: https://github.com/tokio-rs/tokio/pull/5573
 [#5574]: https://github.com/tokio-rs/tokio/pull/5574
 [#5575]: https://github.com/tokio-rs/tokio/pull/5575
