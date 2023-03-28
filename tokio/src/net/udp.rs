@@ -982,7 +982,7 @@ impl UdpSocket {
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
                 let n = (*self.io).recv(dst)?;
-                
+
                 // Safety: We trust `UdpSocket::recv` to have filled up `n` bytes in the
                 // buffer.
                 unsafe {
