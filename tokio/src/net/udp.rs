@@ -825,7 +825,7 @@ impl UdpSocket {
     /// address to which it is connected. On success, returns the number of
     /// bytes read.
     ///
-    /// The function must be called with valid byte array buf of sufficient size
+    /// This method must be called with valid byte array buf of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
     ///
@@ -881,11 +881,11 @@ impl UdpSocket {
         /// Tries to receive data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
-        /// The function must be called with valid byte array buf of sufficient size
+        /// This method must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
-        /// No byte array buf initialization is required.
+        /// This method can be used even if `buf` is uninitialized.
         ///
         /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
         /// returned. This function is usually paired with `readable()`.
@@ -933,10 +933,10 @@ impl UdpSocket {
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
-                // Safety: We trust `UdpSocket::recv` to have filled up `n` bytes in the
-                // buffer.
                 let n = (*self.io).recv(dst)?;
 
+                // Safety: We trust `UdpSocket::recv` to have filled up `n` bytes in the
+                // buffer.
                 unsafe {
                     buf.advance_mut(n);
                 }
@@ -949,11 +949,11 @@ impl UdpSocket {
         /// to which it is connected, advancing the buffer's internal cursor,
         /// returning how many bytes were read.
         ///
-        /// The function must be called with valid byte array buf of sufficient size
+        /// This method must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
-        /// No byte array buf initialization is required.
+        /// This method can be used even if `buf` is uninitialized.
         ///
         /// # Examples
         ///
@@ -981,10 +981,10 @@ impl UdpSocket {
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
+                let n = (*self.io).recv(dst)?;
+                
                 // Safety: We trust `UdpSocket::recv` to have filled up `n` bytes in the
                 // buffer.
-                let n = (*self.io).recv(dst)?;
-
                 unsafe {
                     buf.advance_mut(n);
                 }
@@ -996,11 +996,11 @@ impl UdpSocket {
         /// Tries to receive a single datagram message on the socket. On success,
         /// returns the number of bytes read and the origin.
         ///
-        /// The function must be called with valid byte array buf of sufficient size
+        /// This method must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
-        /// No byte array buf initialization is required.
+        /// This method can be used even if `buf` is uninitialized.
         ///
         /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
         /// returned. This function is usually paired with `readable()`.
@@ -1056,10 +1056,10 @@ impl UdpSocket {
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
-                // Safety: We trust `UdpSocket::recv_from` to have filled up `n` bytes in the
-                // buffer.
                 let (n, addr) = (*self.io).recv_from(dst)?;
 
+                // Safety: We trust `UdpSocket::recv_from` to have filled up `n` bytes in the
+                // buffer.
                 unsafe {
                     buf.advance_mut(n);
                 }
@@ -1071,11 +1071,11 @@ impl UdpSocket {
         /// Receives a single datagram message on the socket, advancing the
         /// buffer's internal cursor, returning how many bytes were read and the origin.
         ///
-        /// The function must be called with valid byte array buf of sufficient size
+        /// This method must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
-        /// No byte array buf initialization is required.
+        /// This method can be used even if `buf` is uninitialized.
         ///
         /// # Notes
         /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
@@ -1112,10 +1112,10 @@ impl UdpSocket {
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
-                // Safety: We trust `UdpSocket::recv_from` to have filled up `n` bytes in the
-                // buffer.
                 let (n, addr) = (*self.io).recv_from(dst)?;
 
+                // Safety: We trust `UdpSocket::recv_from` to have filled up `n` bytes in the
+                // buffer.
                 unsafe {
                     buf.advance_mut(n);
                 }
@@ -1360,7 +1360,7 @@ impl UdpSocket {
     /// Tries to receive a single datagram message on the socket. On success,
     /// returns the number of bytes read and the origin.
     ///
-    /// The function must be called with valid byte array buf of sufficient size
+    /// This method must be called with valid byte array buf of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
     ///

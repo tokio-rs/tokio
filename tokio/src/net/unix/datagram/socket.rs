@@ -807,7 +807,7 @@ impl UnixDatagram {
     cfg_io_util! {
         /// Tries to receive data from the socket without waiting.
         ///
-        /// No byte array buf initialization is required.
+        /// This method can be used even if `buf` is uninitialized.
         ///
         /// # Examples
         ///
@@ -871,7 +871,7 @@ impl UnixDatagram {
         /// Receives from the socket, advances the
         /// buffer's internal cursor and returns how many bytes were read and the origin.
         ///
-        /// No byte array buf initialization is required.
+        /// This method can be used even if `buf` is uninitialized.
         ///
         /// # Examples
         /// ```
@@ -924,7 +924,7 @@ impl UnixDatagram {
         /// Tries to read data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
-        /// No byte array buf initialization is required.
+        /// This method can be used even if `buf` is uninitialized.
         ///
         /// # Examples
         ///
@@ -987,7 +987,7 @@ impl UnixDatagram {
         /// Receives data from the socket from the address to which it is connected,
         /// advancing the buffer's internal cursor, returning how many bytes were read.
         ///
-        /// No byte array buf initialization is required.
+        /// This method can be used even if `buf` is uninitialized.
         ///
         /// # Examples
         /// ```
