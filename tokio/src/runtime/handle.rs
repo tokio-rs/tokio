@@ -274,6 +274,8 @@ impl Handle {
         F::Output: Send + 'static,
     {
         let id = crate::runtime::task::Id::next();
+        #[cfg(all(tokio_unstable, feature = "taskdump"))]
+        let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", _name, id.as_u64());
         self.inner.spawn(future, id)
@@ -317,6 +319,20 @@ cfg_metrics! {
         /// is performing.
         pub fn metrics(&self) -> RuntimeMetrics {
             RuntimeMetrics::new(self.clone())
+        }
+    }
+}
+
+cfg_taskdump! {
+    impl Handle {
+        /// Capture a snapshot of this runtime's state.
+        pub fn dump(&self) -> crate::runtime::Dump {
+            match &self.inner {
+                scheduler::Handle::CurrentThread(handle) => handle.dump(),
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                scheduler::Handle::MultiThread(_) =>
+                    unimplemented!("taskdumps are unsupported on the multi-thread runtime"),
+            }
         }
     }
 }

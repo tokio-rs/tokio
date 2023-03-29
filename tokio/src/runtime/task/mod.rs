@@ -207,6 +207,10 @@ use self::state::State;
 
 mod waker;
 
+cfg_taskdump! {
+    pub(crate) mod trace;
+}
+
 use crate::future::Future;
 use crate::util::linked_list;
 
@@ -338,6 +342,11 @@ impl<S: 'static> Task<S> {
             raw: RawTask::from_raw(ptr),
             _p: PhantomData,
         }
+    }
+
+    #[cfg(all(tokio_unstable, feature = "taskdump"))]
+    pub(crate) fn as_raw(&self) -> RawTask {
+        self.raw
     }
 
     fn header(&self) -> &Header {

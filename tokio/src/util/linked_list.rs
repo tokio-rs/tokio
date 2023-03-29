@@ -294,6 +294,32 @@ cfg_io_readiness! {
     }
 }
 
+cfg_taskdump! {
+    impl<T: Link> LinkedList<T, T::Target> {
+        pub(crate) fn for_each<F>(&mut self, mut f: F)
+        where
+            F: FnMut(&T::Handle),
+        {
+            let mut addr = 0;
+            if let Some(first) = self.pop_back() {
+                addr = T::as_raw(&first).as_ptr() as usize;
+                f(&first);
+                self.push_front(first);
+            }
+
+            while let Some(handle) = self.pop_back() {
+                if addr == T::as_raw(&handle).as_ptr() as usize {
+                    self.push_front(handle);
+                    break;
+                } else {
+                    f(&handle);
+                    self.push_front(handle);
+                }
+            }
+        }
+    }
+}
+
 // ===== impl GuardedLinkedList =====
 
 feature! {

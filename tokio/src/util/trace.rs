@@ -10,7 +10,7 @@ cfg_trace! {
 
         #[inline]
         #[track_caller]
-        pub(crate) fn task<F>(task: F, kind: &'static str, name: Option<&str>, id: u64) -> Instrumented<F> {
+        pub(crate) fn task<F>(task: F, kind: &'static str, name: Option<&str>, id: u64) -> Instrumented<crate::runtime::task::trace::Root<F>> {
             use tracing::instrument::Instrument;
             let location = std::panic::Location::caller();
             let span = tracing::trace_span!(
@@ -23,6 +23,7 @@ cfg_trace! {
                 loc.line = location.line(),
                 loc.col = location.column(),
             );
+            let task = crate::runtime::task::trace::Trace::root(task);
             task.instrument(span)
         }
 

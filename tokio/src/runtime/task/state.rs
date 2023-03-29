@@ -4,7 +4,7 @@ use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::usize;
 
-pub(super) struct State {
+pub(crate) struct State {
     val: AtomicUsize,
 }
 
@@ -88,7 +88,7 @@ pub(super) enum TransitionToNotifiedByVal {
 }
 
 #[must_use]
-pub(super) enum TransitionToNotifiedByRef {
+pub(crate) enum TransitionToNotifiedByRef {
     DoNothing,
     Submit,
 }
@@ -268,6 +268,16 @@ impl State {
                 (TransitionToNotifiedByRef::Submit, Some(snapshot))
             }
         })
+    }
+
+    /// Transitions the state to `NOTIFIED`, unconditionally increasing the ref count.
+    #[cfg(all(tokio_unstable, feature = "taskdump"))]
+    pub(crate) fn transition_to_notified_for_tracing(&self) {
+        self.fetch_update_action(|mut snapshot| {
+            snapshot.set_notified();
+            snapshot.ref_inc();
+            ((), Some(snapshot))
+        });
     }
 
     /// Sets the cancelled bit and transitions the state to `NOTIFIED` if idle.

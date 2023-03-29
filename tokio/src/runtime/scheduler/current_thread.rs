@@ -377,6 +377,46 @@ impl Handle {
         handle
     }
 
+    /// Capture a snapshot of this runtime's state.
+    #[cfg(all(tokio_unstable, feature = "taskdump"))]
+    pub(crate) fn dump(&self) -> crate::runtime::Dump {
+        use crate::runtime::{dump, task::trace::Trace};
+
+        let mut snapshots = vec![];
+
+        // todo: how to make this work outside of a runtime context?
+        CURRENT.with(|maybe_context| {
+            // drain the local queue
+            let Some(context) = maybe_context else { return };
+            let mut maybe_core = context.core.borrow_mut();
+            let Some(core) = maybe_core.as_mut() else { return };
+            let local = &mut core.tasks;
+            let _ = local.drain(..);
+
+            // drain the injection queue
+            if let Some(injection) = self.shared.queue.lock().as_mut() {
+                let _ = injection.drain(..);
+            }
+
+            // notify each task
+            let mut tasks = vec![];
+            self.shared.owned.for_each(|task| {
+                // set the notified bit
+                let _ = task.as_raw().state().transition_to_notified_for_tracing();
+                // store the raw tasks into a vec
+                tasks.push(task.as_raw());
+            });
+
+            // trace each task
+            for task in tasks {
+                let ((), trace) = Trace::capture(|| task.poll());
+                snapshots.push(dump::Task::new(trace));
+            }
+        });
+
+        dump::Dump::new(snapshots)
+    }
+
     fn pop(&self) -> Option<task::Notified<Arc<Handle>>> {
         match self.shared.queue.lock().as_mut() {
             Some(queue) => queue.pop_front(),

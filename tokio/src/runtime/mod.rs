@@ -233,6 +233,11 @@ cfg_rt! {
     mod defer;
     pub(crate) use defer::Defer;
 
+    cfg_taskdump! {
+        pub mod dump;
+        pub use dump::Dump;
+    }
+
     mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};
 
