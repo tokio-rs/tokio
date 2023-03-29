@@ -585,12 +585,36 @@ where
     }
 }
 
-impl<K, V> Extend<(K, V)> for StreamMap<K, V> {
-    fn extend<T>(&mut self, iter: T)
+impl<K, V> StreamMap<K, V> {
+    /// Extends the StreamMap with an iterable container like vector.
+    ///
+    /// A naive polynomial time complexity implementation that might be unworkable.
+    /// However, this implementation does not allow duplicate keys and would overwrite
+    /// existing ones similar to from_iter() behaviour.
+    ///
+    /// Initially introduced: PR #4272 - <https://github.com/tokio-rs/tokio/pull/4272>
+    ///
+    /// Note: can not implement Extend trait, since this method has stricter
+    /// requirements than trait, as Extend does not require Key to be 'Eq + Hash'
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Issue #4774 - https://github.com/tokio-rs/tokio/issues/4774
+    /// let mut map = tokio_stream::StreamMap::new();
+    /// map.insert("key", tokio_stream::pending::<u8>());
+    /// map.extend(vec![ ("key", tokio_stream::pending::<u8>()) ]);
+    ///
+    /// assert_eq!(map.len(), 1);
+    /// ```
+    pub fn extend<T>(&mut self, iter: T)
     where
         T: IntoIterator<Item = (K, V)>,
+        K: Eq + Hash,
     {
-        self.entries.extend(iter);
+        for (key, value) in iter.into_iter() {
+            self.insert(key, value);
+        }
     }
 }
 
