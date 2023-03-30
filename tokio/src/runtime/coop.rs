@@ -169,7 +169,7 @@ cfg_coop! {
     /// that the budget empties appropriately.
     ///
     /// Note that `RestoreOnPending` restores the budget **as it was before `poll_proceed`**.
-    /// Therefore, if the budget is _fCURRENT.withurther_ adjusted between when `poll_proceed` returns and
+    /// Therefore, if the budget is _further_ adjusted between when `poll_proceed` returns and
     /// `RestRestoreOnPending` is dropped, those adjustments are erased unless the caller indicates
     /// that progress was made.
     #[inline]
