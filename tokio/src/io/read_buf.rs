@@ -1,5 +1,9 @@
 use std::fmt;
 use std::mem::MaybeUninit;
+use bytes::{
+    BufMut, 
+    buf::UninitSlice,
+};
 
 /// A wrapper around a byte buffer that is incrementally filled and initialized.
 ///
@@ -267,6 +271,22 @@ impl<'a> ReadBuf<'a> {
             self.initialized = end;
         }
         self.filled = end;
+    }
+}
+
+unsafe impl<'a> BufMut for ReadBuf<'a> {
+    fn remaining_mut(&self) -> usize { 
+        self.remaining() 
+    }
+    
+    unsafe fn advance_mut(&mut self, cnt: usize) {
+        self.advance(cnt);
+    }
+    
+    fn chunk_mut(&mut self) -> &mut UninitSlice {
+        unsafe {
+            UninitSlice::from_raw_parts_mut(10 as *mut u8, 10)
+        }
     }
 }
 
