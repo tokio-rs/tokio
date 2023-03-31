@@ -284,10 +284,9 @@ unsafe impl<'a> BufMut for ReadBuf<'a> {
     }
 
     fn chunk_mut(&mut self) -> &mut UninitSlice {
-        let ptr = 10 as *mut u8; // any ideas?
         let len = self.filled().len();
-        unsafe { UninitSlice::from_raw_parts_mut(ptr, len) }
-
+        let ptr = unsafe { self.unfilled_mut().as_mut_ptr() };
+        unsafe { UninitSlice::from_raw_parts_mut(ptr as *mut u8, len) }
     }
 }
 
