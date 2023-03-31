@@ -1,4 +1,6 @@
+#[cfg(feature = "bytes")]
 use bytes::{buf::UninitSlice, BufMut};
+
 use std::fmt;
 use std::mem::MaybeUninit;
 
@@ -271,6 +273,7 @@ impl<'a> ReadBuf<'a> {
     }
 }
 
+#[cfg(feature = "bytes")]
 unsafe impl<'a> BufMut for ReadBuf<'a> {
     fn remaining_mut(&self) -> usize {
         self.remaining()
