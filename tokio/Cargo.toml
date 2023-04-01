@@ -124,11 +124,11 @@ libc = { version = "0.2.42" }
 nix = { version = "0.26", default-features = false, features = ["fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.45"
+version = "0.48"
 optional = true
 
 [target.'cfg(docsrs)'.dependencies.windows-sys]
-version = "0.45"
+version = "0.48"
 features = [
     "Win32_Foundation",
     "Win32_Security_Authorization",
