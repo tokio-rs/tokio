@@ -36,10 +36,9 @@ use windows_sys::{
         DuplicateHandle, BOOLEAN, DUPLICATE_SAME_ACCESS, HANDLE, INVALID_HANDLE_VALUE,
     },
     Win32::System::Threading::{
-        GetCurrentProcess, RegisterWaitForSingleObject, UnregisterWaitEx, WT_EXECUTEINWAITTHREAD,
-        WT_EXECUTEONLYONCE,
+        GetCurrentProcess, RegisterWaitForSingleObject, UnregisterWaitEx, INFINITE,
+        WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE,
     },
-    Win32::System::WindowsProgramming::INFINITE,
 };
 
 #[must_use = "futures do nothing unless polled"]
