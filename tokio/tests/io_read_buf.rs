@@ -37,7 +37,6 @@ async fn read_buf() {
 
 #[tokio::test]
 #[cfg(feature = "io-util")]
-#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 async fn issue_5588() {
     use bytes::BufMut;
 
