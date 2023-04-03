@@ -85,5 +85,4 @@ async fn issue_5588() {
     } // should be effectively no-op
     assert_eq!(uninit.remaining_mut(), 8);
     assert_eq!(uninit.chunk_mut().len(), 8);
-    
 }
