@@ -44,22 +44,22 @@ async fn issue_5588() {
     let mut buf = [0; 8];
     let mut read_buf = ReadBuf::new(&mut buf);
     assert_eq!(read_buf.remaining_mut(), 8);
-    assert_eq!(read_buf.remaining_mut(), 8);
+    assert_eq!(read_buf.chunk_mut().len(), 8);
     unsafe {
         read_buf.advance_mut(1);
     }
     assert_eq!(read_buf.remaining_mut(), 7);
-    assert_eq!(read_buf.remaining_mut(), 7);
+    assert_eq!(read_buf.chunk_mut().len(), 7);
     unsafe {
         read_buf.advance_mut(5);
     }
     assert_eq!(read_buf.remaining_mut(), 2);
-    assert_eq!(read_buf.remaining_mut(), 2);
+    assert_eq!(read_buf.chunk_mut().len(), 2);
     unsafe {
         read_buf.advance_mut(2);
     }
     assert_eq!(read_buf.remaining_mut(), 0);
-    assert_eq!(read_buf.remaining_mut(), 0);
+    assert_eq!(read_buf.chunk_mut().len(), 0);
 
     // directly to zero
     let mut buf = [0; 8];
@@ -71,4 +71,10 @@ async fn issue_5588() {
     }
     assert_eq!(read_buf.remaining_mut(), 0);
     assert_eq!(read_buf.chunk_mut().len(), 0);
+
+    // uninit
+    let mut buf = [std::mem::MaybeUninit::new(1); 8];
+    let mut uninit = ReadBuf::uninit(&mut buf);
+    assert_eq!(read_buf.remaining_mut(), 0);
+    assert_eq!(uninit.chunk_mut().len(), 8);
 }
