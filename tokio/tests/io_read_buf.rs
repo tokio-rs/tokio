@@ -34,3 +34,42 @@ async fn read_buf() {
     assert_eq!(n, 11);
     assert_eq!(buf[..], b"hello world"[..]);
 }
+
+#[tokio::test]
+#[cfg(feature = "io-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+async fn issue_5588() {
+    use bytes::BufMut;
+
+    // steps to zero
+    let mut buf = [0; 8];
+    let mut read_buf = ReadBuf::new(&mut buf);
+    assert_eq!(read_buf.remaining_mut(), 8);
+    assert_eq!(read_buf.remaining_mut(), 8);
+    unsafe {
+        read_buf.advance_mut(1);
+    }
+    assert_eq!(read_buf.remaining_mut(), 7);
+    assert_eq!(read_buf.remaining_mut(), 7);
+    unsafe {
+        read_buf.advance_mut(5);
+    }
+    assert_eq!(read_buf.remaining_mut(), 2);
+    assert_eq!(read_buf.remaining_mut(), 2);
+    unsafe {
+        read_buf.advance_mut(2);
+    }
+    assert_eq!(read_buf.remaining_mut(), 0);
+    assert_eq!(read_buf.remaining_mut(), 0);
+
+    // directly to zero
+    let mut buf = [0; 8];
+    let mut read_buf = ReadBuf::new(&mut buf);
+    assert_eq!(read_buf.remaining_mut(), 8);
+    assert_eq!(read_buf.chunk_mut().len(), 8);
+    unsafe {
+        read_buf.advance_mut(8);
+    }
+    assert_eq!(read_buf.remaining_mut(), 0);
+    assert_eq!(read_buf.chunk_mut().len(), 0);
+}

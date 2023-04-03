@@ -1,6 +1,3 @@
-#[cfg(feature = "bytes")]
-use bytes::{buf::UninitSlice, BufMut};
-
 use std::fmt;
 use std::mem::MaybeUninit;
 
@@ -273,8 +270,9 @@ impl<'a> ReadBuf<'a> {
     }
 }
 
-#[cfg(feature = "bytes")]
-unsafe impl<'a> BufMut for ReadBuf<'a> {
+#[cfg(feature = "io-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+unsafe impl<'a> bytes::BufMut for ReadBuf<'a> {
     fn remaining_mut(&self) -> usize {
         self.remaining()
     }
@@ -283,11 +281,11 @@ unsafe impl<'a> BufMut for ReadBuf<'a> {
         self.advance(cnt);
     }
 
-    fn chunk_mut(&mut self) -> &mut UninitSlice {
+    fn chunk_mut(&mut self) -> &mut bytes::buf::UninitSlice {
         unsafe {
             let len = self.unfilled_mut().len();
             let ptr = self.unfilled_mut().as_mut_ptr();
-            UninitSlice::from_raw_parts_mut(ptr as *mut u8, len)
+            bytes::buf::UninitSlice::from_raw_parts_mut(ptr as *mut u8, len)
         }
     }
 }
