@@ -282,10 +282,17 @@ unsafe impl<'a> bytes::BufMut for ReadBuf<'a> {
     }
 
     fn chunk_mut(&mut self) -> &mut bytes::buf::UninitSlice {
+        // SAFETY: No region of `unfilled` will be deinitialized because it is
+        // exposed as an `UninitSlice`, whose API guarantees that the memory is
+        // never deinitialized.
+        let unfilled = unsafe { self.unfilled_mut() };
+        let len = unfilled.len();
+        let ptr = unfilled.as_mut_ptr() as *mut u8;
+        
+        // SAFETY: The pointer is valid for `len` bytes because it comes from a
+        // slice of that length.
         unsafe {
-            let len = self.unfilled_mut().len();
-            let ptr = self.unfilled_mut().as_mut_ptr();
-            bytes::buf::UninitSlice::from_raw_parts_mut(ptr as *mut u8, len)
+            bytes::buf::UninitSlice::from_raw_parts_mut(ptr, len)
         }
     }
 }
