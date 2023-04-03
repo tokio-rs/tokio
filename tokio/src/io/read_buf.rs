@@ -288,12 +288,10 @@ unsafe impl<'a> bytes::BufMut for ReadBuf<'a> {
         let unfilled = unsafe { self.unfilled_mut() };
         let len = unfilled.len();
         let ptr = unfilled.as_mut_ptr() as *mut u8;
-        
+
         // SAFETY: The pointer is valid for `len` bytes because it comes from a
         // slice of that length.
-        unsafe {
-            bytes::buf::UninitSlice::from_raw_parts_mut(ptr, len)
-        }
+        unsafe { bytes::buf::UninitSlice::from_raw_parts_mut(ptr, len) }
     }
 }
 
