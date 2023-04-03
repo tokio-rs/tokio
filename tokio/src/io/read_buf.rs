@@ -278,7 +278,9 @@ unsafe impl<'a> bytes::BufMut for ReadBuf<'a> {
     }
 
     unsafe fn advance_mut(&mut self, cnt: usize) {
-        self.advance(cnt);
+        if self.initialized > 0 {
+            self.advance(cnt);
+        }
     }
 
     fn chunk_mut(&mut self) -> &mut bytes::buf::UninitSlice {
