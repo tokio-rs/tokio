@@ -81,8 +81,14 @@ async fn issue_5588() {
     let mut buf = [std::mem::MaybeUninit::uninit(); 8];
     let mut uninit = ReadBuf::uninit(&mut buf);
     unsafe {
-        uninit.advance_mut(8);
+        uninit.advance_mut(4);
     }
+    assert_eq!(uninit.remaining_mut(), 4);
+    assert_eq!(uninit.chunk_mut().len(), 4);
+    uninit.put_u8(1);
+    assert_eq!(uninit.remaining_mut(), 3);
+    assert_eq!(uninit.chunk_mut().len(), 3);
+    uninit.put_slice(&[1, 2, 3]);
     assert_eq!(uninit.remaining_mut(), 0);
     assert_eq!(uninit.chunk_mut().len(), 0);
 }
