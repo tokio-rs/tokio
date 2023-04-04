@@ -82,7 +82,7 @@ async fn issue_5588() {
     let mut uninit = ReadBuf::uninit(&mut buf);
     unsafe {
         uninit.advance_mut(100000);
-    } // should be effectively no-op
+    }
     assert_eq!(uninit.remaining_mut(), 8);
     assert_eq!(uninit.chunk_mut().len(), 8);
 }

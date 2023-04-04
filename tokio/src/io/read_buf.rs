@@ -277,10 +277,10 @@ unsafe impl<'a> bytes::BufMut for ReadBuf<'a> {
         self.remaining()
     }
 
+    // SAFETY: The caller guarantees that at least `cnt` unfilled bytes have been initialized.
     unsafe fn advance_mut(&mut self, cnt: usize) {
-        if self.initialized > 0 {
-            self.advance(cnt);
-        }
+        self.assume_init(cnt);
+        self.advance(cnt);
     }
 
     fn chunk_mut(&mut self) -> &mut bytes::buf::UninitSlice {
