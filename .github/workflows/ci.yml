@@ -31,7 +31,7 @@ permissions:
   contents: read
 
 jobs:
-  # Depends on all action sthat are required for a "successful" CI run.
+  # Depends on all actions that are required for a "successful" CI run.
   tests-pass:
     name: all systems go
     runs-on: ubuntu-latest
