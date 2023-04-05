@@ -215,8 +215,7 @@ impl TcpListener {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let std_listener = std::net::TcpListener::bind("127.0.0.1:0")?;
-    ///     std_listener.set_nonblocking(true)?;
-    ///     let listener = TcpListener::from_std(std_listener)?;
+    ///     let listener = TcpListener::from_tcp(std_listener)?;
     ///     Ok(())
     /// }
     /// ```
@@ -235,20 +234,15 @@ impl TcpListener {
         Self::from_tcp_unchecked(listener)
     }
 
-    /// Creates new `TcpListener` from a `std::net::TcpListener`.
+    /// Creates new `TcpListener` from a `std::net::TcpListener` without
+    /// checking that it's non-blocking.
     ///
     /// This function is intended to be used to wrap a TCP listener from the
-    /// standard library in the Tokio equivalent.
+    /// standard library in the Tokio equivalent. However, it does not check
+    /// that it's already in non-blocking mode.
     ///
-    /// This API is typically paired with the `socket2` crate and the `Socket`
-    /// type to build up and customize a listener before it's shipped off to the
-    /// backing event loop. This allows configuration of options like
-    /// `SO_REUSEPORT`, binding to multiple addresses, etc.
-    ///
-    /// # Notes
-    ///
-    /// The caller is responsible for ensuring that the listener is in
-    /// non-blocking mode. Otherwise all I/O operations on the listener
+    /// Instead, the caller is responsible for ensuring that the listener is in
+    /// non-blocking mode, otherwise all I/O operations on the listener
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
@@ -267,7 +261,7 @@ impl TcpListener {
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let std_listener = std::net::TcpListener::bind("127.0.0.1:0")?;
     ///     std_listener.set_nonblocking(true)?;
-    ///     let listener = TcpListener::from_std(std_listener)?;
+    ///     let listener = TcpListener::from_tcp_unchecked(std_listener)?;
     ///     Ok(())
     /// }
     /// ```
@@ -289,12 +283,15 @@ impl TcpListener {
 
     /// Creates new `TcpListener` from a `std::net::TcpListener`.
     ///
-    /// Deprecated because easy to misuse and naming doesn't warn enough about it
-    /// (you may want to favor using
-    /// [`from_tcp`](TcpListener::from_tcp) instead of
-    /// [`from_tcp_unchecked`](TcpListener::from_tcp_unchecked))
+    /// This function is deprecated because it's easy to misuse,
+    /// and naming doesn't warn enough about it.
     ///
-    /// This has the same behavior as [`TcpListener::from_tcp_unchecked`].
+    /// You should typically favor using
+    /// [`from_tcp`](TcpListener::from_tcp) instead of
+    /// [`from_tcp_unchecked`](TcpListener::from_tcp_unchecked.
+    ///
+    /// This function however has the same behavior as
+    /// [`TcpListener::from_tcp_unchecked`].
     #[track_caller]
     #[deprecated = "Easy to misuse - use from_tcp or from_tcp_unchecked instead"]
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
