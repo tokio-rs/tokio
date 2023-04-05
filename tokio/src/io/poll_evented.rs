@@ -70,16 +70,11 @@ cfg_io_driver! {
 
 // ===== impl PollEvented =====
 
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-const ALL_INTEREST: Interest = Interest::READABLE.add(Interest::WRITABLE);
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-const ALL_INTEREST: Interest = Interest::READABLE
-    .add(Interest::WRITABLE)
-    .add(Interest::PRIORITY);
-
 impl<E: Source> PollEvented<E> {
     /// Creates a new `PollEvented` associated with the default reactor.
+    ///
+    /// The returned `PollEvented` has readable and writable interests. For more control, use
+    /// [`Self::new_with_interest`].
     ///
     /// # Panics
     ///
@@ -91,7 +86,7 @@ impl<E: Source> PollEvented<E> {
     #[track_caller]
     #[cfg_attr(feature = "signal", allow(unused))]
     pub(crate) fn new(io: E) -> io::Result<Self> {
-        PollEvented::new_with_interest(io, ALL_INTEREST)
+        PollEvented::new_with_interest(io, Interest::READABLE | Interest::WRITABLE)
     }
 
     /// Creates a new `PollEvented` associated with the default reactor, for
