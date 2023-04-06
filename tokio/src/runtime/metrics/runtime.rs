@@ -68,7 +68,7 @@ impl RuntimeMetrics {
         self.handle.inner.num_blocking_threads()
     }
 
-    /// Returns the number of idle threads, which hve spawned by the runtime
+    /// Returns the number of idle threads, which have spawned by the runtime
     /// for `spawn_blocking` calls.
     ///
     /// # Examples
