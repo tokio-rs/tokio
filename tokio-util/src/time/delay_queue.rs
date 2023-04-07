@@ -877,12 +877,9 @@ impl<T> DelayQueue<T> {
     /// Gets the [`Key`] that [`poll_expired`] will pull out of the queue next, without
     /// pulling it out or waiting for the deadline to expire.
     ///
-    /// If entries are already expired at insertion, they are returned in order of
-    /// insertion, not by how far in the past their deadline would have expired.
-    ///
-    /// The next expiring key is only recalculated when the queue is polled, therefore
-    /// this method will potentially return already expired keys if the queue is not
-    /// polled regularly.
+    /// Entries that have already expired may be returned in any order, but it is
+    /// guaranteed that this method returns them in the same order as when items
+    /// are popped from the `DelayQueue`.
     ///
     /// # Examples
     ///
