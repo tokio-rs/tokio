@@ -739,6 +739,29 @@ impl<T> Sender<T> {
         tail.rx_cnt
     }
 
+    /// Returns `true` if senders belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, _rx) = broadcast::channel::<()>(16);
+    ///     let tx2 = tx.clone();
+    ///
+    ///     assert!(tx.same_channel(&tx2));
+    ///
+    ///     let (tx3, _rx3) = broadcast::channel::<()>(16);
+    ///
+    ///     assert!(!tx3.same_channel(&tx2));
+    /// }
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
+    }
+
     fn close_channel(&self) {
         let mut tail = self.shared.tail.lock();
         tail.closed = true;
@@ -862,6 +885,29 @@ impl<T> Receiver<T> {
     /// ```
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Returns `true` if receivers belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = broadcast::channel::<()>(16);
+    ///     let rx2 = tx.subscribe();
+    ///
+    ///     assert!(rx.same_channel(&rx2));
+    ///
+    ///     let (_tx3, rx3) = broadcast::channel::<()>(16);
+    ///
+    ///     assert!(!rx3.same_channel(&rx2));
+    /// }
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
     }
 
     /// Locks the next value if there is one.
