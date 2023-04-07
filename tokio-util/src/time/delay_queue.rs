@@ -909,9 +909,7 @@ impl<T> DelayQueue<T> {
     pub fn peek(&self) -> Option<Key> {
         use self::wheel::Stack;
 
-        self.expired
-            .peek()
-            .or_else(|| self.wheel.peek())
+        self.expired.peek().or_else(|| self.wheel.peek())
     }
 
     /// Returns the next time to poll as determined by the wheel
