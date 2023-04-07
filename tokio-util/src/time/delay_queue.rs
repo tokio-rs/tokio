@@ -876,8 +876,6 @@ impl<T> DelayQueue<T> {
 
     /// Gets the [`Key`] that will expire next.
     ///
-    /// This will not consider keys that are already marked as expired by the queue,
-    /// such as entries that are inserted when their deadline has already been reached.
     /// The next expiring key is only recalculated when the queue is polled, therefore
     /// this method will potentially return already expired keys if the queue is not
     /// polled regularly.
@@ -904,7 +902,11 @@ impl<T> DelayQueue<T> {
     ///
     /// [`Key`]: struct@Key
     pub fn next_expiring(&self) -> Option<Key> {
-        self.wheel.next_expiring_entry()
+        use self::wheel::Stack;
+
+        self.expired
+            .peek()
+            .or_else(|| self.wheel.next_expiring_entry())
     }
 
     /// Returns the next time to poll as determined by the wheel

@@ -830,7 +830,7 @@ async fn next_expiring() {
     let now = Instant::now();
 
     let key = queue.insert_at("foo", now + ms(5));
-    let key2 = queue.insert_at("bar", now + ms(1));
+    let key2 = queue.insert_at("bar", now);
     let key3 = queue.insert_at("baz", now + ms(10));
 
     assert_eq!(queue.next_expiring(), Some(key2));
