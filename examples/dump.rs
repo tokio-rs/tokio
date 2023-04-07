@@ -1,3 +1,5 @@
+#![cfg(tokio_unstable)]
+
 //! This example demonstrates tokio's experimental taskdumping functionality.
 
 use std::hint::black_box;
