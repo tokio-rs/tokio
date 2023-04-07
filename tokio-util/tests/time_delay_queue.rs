@@ -824,7 +824,7 @@ async fn remove_after_compact_poll() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn next_expiring() {
+async fn peek() {
     let mut queue = task::spawn(DelayQueue::new());
 
     let now = Instant::now();
@@ -833,52 +833,32 @@ async fn next_expiring() {
     let key2 = queue.insert_at("bar", now);
     let key3 = queue.insert_at("baz", now + ms(10));
 
-    assert_eq!(queue.next_expiring(), Some(key2));
+    assert_eq!(queue.peek(), Some(key2));
 
     sleep(ms(6)).await;
 
-    assert_eq!(queue.next_expiring(), Some(key2));
+    assert_eq!(queue.peek(), Some(key2));
 
     let entry = assert_ready_some!(poll!(queue));
     assert_eq!(entry.get_ref(), &"bar");
 
-    assert_eq!(queue.next_expiring(), Some(key));
+    assert_eq!(queue.peek(), Some(key));
 
     let entry = assert_ready_some!(poll!(queue));
     assert_eq!(entry.get_ref(), &"foo");
 
-    assert_eq!(queue.next_expiring(), Some(key3));
+    assert_eq!(queue.peek(), Some(key3));
 
     assert_pending!(poll!(queue));
 
     sleep(ms(5)).await;
 
-    assert_eq!(queue.next_expiring(), Some(key3));
+    assert_eq!(queue.peek(), Some(key3));
 
     let entry = assert_ready_some!(poll!(queue));
     assert_eq!(entry.get_ref(), &"baz");
 
-    assert!(queue.next_expiring().is_none());
-}
-
-#[tokio::test(start_paused = true)]
-async fn next_expiring_expired_in_order() {
-    let mut queue = task::spawn(DelayQueue::new());
-
-    let now = Instant::now();
-
-    let key1 = queue.insert_at("foo", now - ms(5));
-    let key2 = queue.insert_at("bar", now);
-    let key3 = queue.insert_at("baz", now - ms(10));
-
-    for (key, value) in [(key3, "baz"), (key2, "bar"), (key1, "foo")].into_iter() {
-        assert_eq!(queue.next_expiring(), Some(key));
-
-        let entry = assert_ready_some!(poll!(queue));
-        assert_eq!(entry.get_ref(), &value);
-    }
-
-    assert!(queue.next_expiring().is_none());
+    assert!(queue.peek().is_none());
 }
 
 fn ms(n: u64) -> Duration {

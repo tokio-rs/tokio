@@ -874,7 +874,11 @@ impl<T> DelayQueue<T> {
         self.slab.compact();
     }
 
-    /// Gets the [`Key`] that will expire next.
+    /// Gets the [`Key`] that [`poll_expired`] will pull out of the queue next, without
+    /// pulling it out or waiting for the deadline to expire.
+    ///
+    /// If entries are already expired at insertion, they are returned in order of
+    /// insertion, not by how far in the past their deadline would have expired.
     ///
     /// The next expiring key is only recalculated when the queue is polled, therefore
     /// this method will potentially return already expired keys if the queue is not
@@ -896,17 +900,18 @@ impl<T> DelayQueue<T> {
     /// let key2 = delay_queue.insert("bar", Duration::from_secs(5));
     /// let key3 = delay_queue.insert("baz", Duration::from_secs(15));
     ///
-    /// assert_eq!(delay_queue.next_expiring().unwrap(), key2);
+    /// assert_eq!(delay_queue.peek().unwrap(), key2);
     /// # }
     /// ```
     ///
     /// [`Key`]: struct@Key
-    pub fn next_expiring(&self) -> Option<Key> {
+    /// [`poll_expired`]: method@Self::poll_expired
+    pub fn peek(&self) -> Option<Key> {
         use self::wheel::Stack;
 
         self.expired
             .peek()
-            .or_else(|| self.wheel.next_expiring_entry())
+            .or_else(|| self.wheel.peek())
     }
 
     /// Returns the next time to poll as determined by the wheel

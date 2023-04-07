@@ -140,7 +140,7 @@ where
     }
 
     /// Next key that will expire
-    pub(crate) fn next_expiring_entry(&self) -> Option<T::Owned> {
+    pub(crate) fn peek(&self) -> Option<T::Owned> {
         self.next_expiration()
             .and_then(|expiration| self.peek_entry(&expiration))
     }
