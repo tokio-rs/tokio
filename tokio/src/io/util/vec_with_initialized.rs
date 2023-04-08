@@ -53,23 +53,15 @@ where
         }
     }
 
-    // Returns a boolean telling the caller to try reading into a small local buffer first if true.
-    // Doing so would avoid overallocating when vec is filled to capacity and we reached EOF.
-    pub(crate) fn reserve(&mut self, num_bytes: usize) -> bool {
+    pub(crate) fn reserve(&mut self, num_bytes: usize) {
         let vec = self.vec.as_mut();
         if vec.capacity() - vec.len() >= num_bytes {
-            return false;
+            return;
         }
-
-        if self.starting_capacity == vec.capacity() && self.starting_capacity >= num_bytes {
-            return true;
-        }
-
         // SAFETY: Setting num_initialized to `vec.len()` is correct as
         // `reserve` does not change the length of the vector.
         self.num_initialized = vec.len();
         vec.reserve(num_bytes);
-        false
     }
 
     #[cfg(feature = "io-util")]
@@ -120,6 +112,15 @@ where
             self.num_initialized = parts.initialized;
             vec.set_len(parts.len);
         }
+    }
+
+    // Returns a boolean telling the caller to try reading into a small local buffer first if true.
+    // Doing so would avoid overallocating when vec is filled to capacity and we reached EOF.
+    pub(crate) fn try_small_read_first(&self, num_bytes: usize) -> bool {
+        let vec = self.vec.as_ref();
+        vec.capacity() - vec.len() < num_bytes
+            && self.starting_capacity == vec.capacity()
+            && self.starting_capacity >= num_bytes
     }
 }
 
