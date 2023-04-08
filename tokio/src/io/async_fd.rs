@@ -511,71 +511,35 @@ impl<T: AsRawFd> AsyncFd<T> {
 
     /// Reads or writes from the file descriptor using a user-provided IO operation.
     ///
-    /// This method is useful to retry an operation that might block (by returning
-    /// a [`WouldBlock`] error) until it doesn't block any more:
+    /// The `async_io` method is a convenience utility that waits for the file
+    /// descriptor to become ready, and then executes the provided IO operation.
+    /// Since file descriptors may be marked ready spuriously, the closure will
+    /// be called repeatedly until it returns something other than a
+    /// [`WouldBlock`] error. This is done using the following loop:
     ///
     /// ```no_run
-    /// use tokio::io::unix::AsyncFd;
+    /// # use std::io::{self, Result};
+    /// # struct Dox<T> { inner: T }
+    /// # impl<T> Dox<T> {
+    /// #     async fn writable(&self) -> Result<&Self> {
+    /// #         Ok(self)
+    /// #     }
+    /// #     fn try_io<R>(&self, _: impl FnMut(&T) -> Result<R>) -> Result<Result<R>> {
+    /// #         panic!()
+    /// #     }
+    /// async fn async_io<R>(&self, mut f: impl FnMut(&T) -> io::Result<R>) -> io::Result<R> {
+    ///     loop {
+    ///         // or `readable` if called with the read interest.
+    ///         let guard = self.writable().await?;
     ///
-    /// use std::io;
-    /// use std::net::UdpSocket;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let socket = UdpSocket::bind("0.0.0.0:8080")?;
-    ///     socket.set_nonblocking(true)?;
-    ///     let async_fd = AsyncFd::new(socket)?;
-    ///
-    ///     let written = loop {
-    ///         let mut guard = async_fd.writable().await?;
-    ///         match guard.try_io(|inner| inner.get_ref().send(&[1, 2])) {
-    ///             Ok(result) => {
-    ///                 break result?;
-    ///             }
-    ///             Err(_would_block) => {
-    ///                 continue;
-    ///             }
+    ///         match guard.try_io(&mut f) {
+    ///             Ok(result) => return result,
+    ///             Err(_would_block) => continue,
     ///         }
-    ///     };
-    ///
-    ///     println!("wrote {written} bytes");
-    ///
-    ///     Ok(())
+    ///     }
     /// }
+    /// # }
     /// ```
-    ///
-    /// Using this method, this logic can instead be written as:
-    ///
-    /// ```no_run
-    /// use tokio::io::{Interest, unix::AsyncFd};
-    ///
-    /// use std::io;
-    /// use std::net::UdpSocket;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let socket = UdpSocket::bind("0.0.0.0:8080")?;
-    ///     socket.set_nonblocking(true)?;
-    ///     let async_fd = AsyncFd::new(socket)?;
-    ///
-    ///     let written = async_fd
-    ///         .async_io(Interest::WRITABLE, || async_fd.get_ref().send(&[1, 2]))
-    ///         .await?;
-    ///
-    ///     println!("wrote {written} bytes");
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// The readiness of the file descriptor is awaited and when the file descriptor is ready,
-    /// the provided closure is called. The closure should attempt to perform
-    /// IO operation on the file descriptor by manually calling the appropriate syscall.
-    /// If the operation fails because the file descriptor is not actually ready,
-    /// then the closure should return a [`WouldBlock`] error. In such case the
-    /// readiness flag is cleared and the file descriptor readiness is awaited again.
-    /// This loop is repeated until the closure returns an `Ok` or an error
-    /// other than [`WouldBlock`].
     ///
     /// The closure should only return a [`WouldBlock`] error if it has performed
     /// an IO operation on the file descriptor that failed due to the file descriptor not being
@@ -592,13 +556,60 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// require more than one ready state. This method may panic or sleep forever
     /// if it is called with a combined interest.
     ///
+    /// # Examples
+    ///
+    /// This example sends some bytes on the inner [`std::net::UdpSocket`]. The `async_io`
+    /// method waits for readiness, and retries if the send operation does block. This example
+    /// is equivalent to the one given for [`try_io`].
+    ///
+    /// ```no_run
+    /// use tokio::io::{Interest, unix::AsyncFd};
+    ///
+    /// use std::io;
+    /// use std::net::UdpSocket;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let socket = UdpSocket::bind("0.0.0.0:8080")?;
+    ///     socket.set_nonblocking(true)?;
+    ///     let async_fd = AsyncFd::new(socket)?;
+    ///
+    ///     let written = async_fd
+    ///         .async_io(Interest::WRITABLE, |inner| inner.send(&[1, 2]))
+    ///         .await?;
+    ///
+    ///     println!("wrote {written} bytes");
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`try_io`]: AsyncFdReadyGuard::try_io
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub async fn async_io<R>(
         &self,
         interest: Interest,
-        f: impl FnMut() -> io::Result<R>,
+        mut f: impl FnMut(&T) -> io::Result<R>,
     ) -> io::Result<R> {
-        self.registration.async_io(interest, f).await
+        self.registration
+            .async_io(interest, || f(self.get_ref()))
+            .await
+    }
+
+    /// Reads or writes from the file descriptor using a user-provided IO operation.
+    ///
+    /// The behavior is the same as [`async_io`], except that the closure can mutate the inner
+    /// value of the [`AsyncFd`].
+    ///
+    /// [`async_io`]: AsyncFd::async_io
+    pub async fn async_io_mut<R>(
+        &mut self,
+        interest: Interest,
+        mut f: impl FnMut(&mut T) -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.registration
+            .async_io(interest, || f(self.inner.as_mut().unwrap()))
+            .await
     }
 }
 
@@ -669,6 +680,43 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// returns [`WouldBlock`] only if the file descriptor that originated this
     /// `AsyncFdReadyGuard` no longer expresses the readiness state that was queried to
     /// create this `AsyncFdReadyGuard`.
+    ///
+    /// # Examples
+    ///
+    /// This example sends some bytes to the inner [`std::net::UdpSocket`]. Waiting
+    /// for write-readiness and retrying when the send operation does block are explicit.
+    /// This example can be written more succinctly using [`AsyncFd::async_io`].
+    ///
+    /// ```no_run
+    /// use tokio::io::unix::AsyncFd;
+    ///
+    /// use std::io;
+    /// use std::net::UdpSocket;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let socket = UdpSocket::bind("0.0.0.0:8080")?;
+    ///     socket.set_nonblocking(true)?;
+    ///     let async_fd = AsyncFd::new(socket)?;
+    ///
+    ///     let written = loop {
+    ///         let mut guard = async_fd.writable().await?;
+    ///         match guard.try_io(|inner| inner.get_ref().send(&[1, 2])) {
+    ///             Ok(result) => {
+    ///                 break result?;
+    ///             }
+    ///             Err(_would_block) => {
+    ///                 // try_io already cleared the file descriptor's readiness state
+    ///                 continue;
+    ///             }
+    ///         }
+    ///     };
+    ///
+    ///     println!("wrote {written} bytes");
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     // Alias for old name in 0.x
