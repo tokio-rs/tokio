@@ -5,6 +5,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
 use tokio_test::assert_ok;
+use tokio_test::io::Builder;
 
 #[tokio::test]
 async fn read_to_end() {
@@ -75,4 +76,15 @@ async fn read_to_end_uninit() {
 
     test.read_to_end(&mut buf).await.unwrap();
     assert_eq!(buf.len(), 33);
+}
+
+#[tokio::test]
+async fn read_to_end_doesnt_grow_with_capacity() {
+    let bytes = b"imlargerthan32bytessoIcanhelpwiththetest";
+    let mut mock = Builder::new().read(bytes).build();
+    let mut buf = Vec::with_capacity(bytes.len());
+    AsyncReadExt::read_to_end(&mut mock, &mut buf)
+        .await
+        .unwrap();
+    assert_eq!(bytes.len(), buf.capacity());
 }
