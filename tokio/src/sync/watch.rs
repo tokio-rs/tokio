@@ -610,6 +610,49 @@ impl<T> Receiver<T> {
         }
     }
 
+    /// This function is similar to [`changed`], but it takes a closure that is
+    /// called with a reference to the new value. If the closure returns `true`,
+    /// then the function returns immediately. Otherwise, it waits for a new
+    /// value and calls the closure again.
+    /// 
+    /// # Examples
+    /// ```
+    /// use tokio::sync::watch;
+    /// 
+    /// #[tokio::main]
+    /// 
+    /// async fn main() {
+    ///     let (tx, _rx) = watch::channel("hello");
+    /// 
+    ///     tx.send("goodbye").unwrap();
+    ///     
+    ///     // here we subscribe to a second receiver
+    ///     // now in case of using `changed` we would have
+    ///     // to first check the current value and then wait
+    ///     // for changes or else `changed` would hang.
+    ///     let mut rx2 = tx.subscribe();
+    ///     
+    ///     // in place of changed we have use `wait_for` 
+    ///     // which would automatically check the current value
+    ///     // and wait for changes until the closure returns true.
+    ///     assert!(rx2.wait_for(|val| *val == "goodbye").await.is_ok());
+    ///     assert_eq!(*rx2.borrow(), "goodbye");
+    /// }
+    /// ```
+
+    pub async fn wait_for(&mut self, mut f: impl FnMut(&T) -> bool) -> Result<bool, error::RecvError> {
+        loop {
+            if f(&self.borrow_and_update()) {
+                return Ok(true);
+            }
+
+            let changed = self.changed().await;
+            if changed.is_err() {
+                return Ok(false);
+            }
+        }
+    }
+
     /// Returns `true` if receivers belong to the same channel.
     ///
     /// # Examples
