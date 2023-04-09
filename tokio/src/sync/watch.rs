@@ -614,16 +614,16 @@ impl<T> Receiver<T> {
     /// called with a reference to the new value. If the closure returns `true`,
     /// then the function returns immediately. Otherwise, it waits for a new
     /// value and calls the closure again.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use tokio::sync::watch;
-    /// 
+    ///
     /// #[tokio::main]
-    /// 
+    ///
     /// async fn main() {
     ///     let (tx, _rx) = watch::channel("hello");
-    /// 
+    ///
     ///     tx.send("goodbye").unwrap();
     ///     
     ///     // here we subscribe to a second receiver
@@ -632,7 +632,7 @@ impl<T> Receiver<T> {
     ///     // for changes or else `changed` would hang.
     ///     let mut rx2 = tx.subscribe();
     ///     
-    ///     // in place of changed we have use `wait_for` 
+    ///     // in place of changed we have use `wait_for`
     ///     // which would automatically check the current value
     ///     // and wait for changes until the closure returns true.
     ///     assert!(rx2.wait_for(|val| *val == "goodbye").await.is_ok());
@@ -640,7 +640,10 @@ impl<T> Receiver<T> {
     /// }
     /// ```
 
-    pub async fn wait_for(&mut self, mut f: impl FnMut(&T) -> bool) -> Result<bool, error::RecvError> {
+    pub async fn wait_for(
+        &mut self,
+        mut f: impl FnMut(&T) -> bool,
+    ) -> Result<bool, error::RecvError> {
         loop {
             if f(&self.borrow_and_update()) {
                 return Ok(true);
