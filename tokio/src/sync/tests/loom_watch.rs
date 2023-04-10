@@ -34,3 +34,25 @@ fn smoke() {
         th.join().unwrap();
     })
 }
+
+#[test]
+fn wait_for_test() {
+    loom::model(move || {
+        let (tx, mut rx) = watch::channel(0);
+        
+        // here we repeatedly send values to the channel
+        // to trigger its loop
+        let th = thread::spawn(move || {
+            for i in 0..10 {
+                tx.send(i).unwrap();
+            }
+        });
+
+        // here we block the main thread until the
+        // value is 9
+        let result = block_on(rx.wait_for(|x| *x == 9));
+        assert_eq!(result.unwrap(), true);
+
+        th.join().unwrap();
+    });
+}
