@@ -1,7 +1,7 @@
 only_if: $CIRRUS_TAG == '' && ($CIRRUS_PR != '' || $CIRRUS_BRANCH == 'master' || $CIRRUS_BRANCH =~ 'tokio-.*')
 auto_cancellation: $CIRRUS_BRANCH != 'master' && $CIRRUS_BRANCH !=~ 'tokio-.*'
 freebsd_instance:
-  image_family: freebsd-12-4
+  image_family: freebsd-13-1
 env:
   RUST_STABLE: stable
   RUST_NIGHTLY: nightly-2022-10-25
