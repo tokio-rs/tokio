@@ -31,7 +31,7 @@ task:
     RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
     RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
   setup_script:
-    - pkg install -y bash curl
+    - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
     - . $HOME/.cargo/env
@@ -45,7 +45,7 @@ task:
 task:
   name: FreeBSD 32-bit
   setup_script:
-    - pkg install -y bash curl
+    - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
     - . $HOME/.cargo/env
