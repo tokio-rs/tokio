@@ -610,15 +610,15 @@ impl<T> Receiver<T> {
         }
     }
 
-    /// This function is similar to [`changed`], but it takes a closure that is
+    /// This function is similar to [`Receiver::changed()`], but it takes a closure that is
     /// called with a reference to the new value. If the closure returns `true`,
     /// then the function returns immediately. Otherwise, it waits for a new
     /// value and calls the closure again.
-    /// 
-    /// [`changed`]: Receiver::changed
+    ///
+    /// [`Receiver::changed()`]: crate::sync::watch::Receiver::changed
     ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use tokio::sync::watch;
     ///
