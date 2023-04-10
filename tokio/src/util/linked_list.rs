@@ -507,7 +507,7 @@ pub(crate) mod tests {
         }
     }
 
-    #[allow(unused_macros)] // This macro is used inside unsafe block but clippy doesn't see that.
+    // #[allow(unused_macros)] // This macro is used inside unsafe block but clippy doesn't see that.
     macro_rules! assert_clean {
         ($e:ident) => {{
             assert!($e.pointers.get_next().is_none());
@@ -515,7 +515,7 @@ pub(crate) mod tests {
         }};
     }
 
-    #[allow(unused_macros)] // This macro is used inside unsafe block but clippy doesn't see that.
+    // #[allow(unused_macros)] // This macro is used inside unsafe block but clippy doesn't see that.
     macro_rules! assert_ptr_eq {
         ($a:expr, $b:expr) => {{
             // Deal with mapping a Pin<&mut T> -> Option<NonNull<T>>
