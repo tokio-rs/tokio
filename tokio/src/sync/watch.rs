@@ -614,8 +614,11 @@ impl<T> Receiver<T> {
     /// called with a reference to the new value. If the closure returns `true`,
     /// then the function returns immediately. Otherwise, it waits for a new
     /// value and calls the closure again.
+    /// 
+    /// [`changed`]: Receiver::changed
     ///
     /// # Examples
+    /// 
     /// ```
     /// use tokio::sync::watch;
     ///
