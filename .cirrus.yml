@@ -14,7 +14,7 @@ env:
 task:
   name: FreeBSD 64-bit
   setup_script:
-    - pkg install -y bash curl
+    - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
     - . $HOME/.cargo/env
