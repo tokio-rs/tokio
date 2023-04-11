@@ -610,8 +610,7 @@ impl<T> Receiver<T> {
         }
     }
 
-    /// Takes a simple closure and waits for change notifications and returns once the
-    /// closure returns `true` for one of the changed values.
+    /// Takes a closure and waits until the provided closure returns true.
     /// 
     /// This function is similar to [`Receiver::changed()`], but it takes a closure that is
     /// called with a reference to the new value. If the closure returns `true`,
