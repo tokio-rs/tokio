@@ -1,9 +1,7 @@
 use backtrace::BacktraceSymbol;
-use std::{
-    fmt,
-    hash::{Hash, Hasher},
-    ptr,
-};
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::ptr;
 
 /// A symbol in a backtrace.
 ///

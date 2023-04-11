@@ -1,16 +1,14 @@
 use crate::loom::sync::Arc;
 use crate::runtime::scheduler::current_thread;
 use backtrace::BacktraceFrame;
+use std::cell::Cell;
 use std::collections::VecDeque;
+use std::ffi::c_void;
+use std::fmt;
 use std::future::Future;
-use std::{
-    cell::Cell,
-    ffi::c_void,
-    fmt,
-    pin::Pin,
-    ptr::{self, NonNull},
-    task::{self, Poll},
-};
+use std::pin::Pin;
+use std::ptr::{self, NonNull};
+use std::task::{self, Poll};
 
 mod symbol;
 mod tree;

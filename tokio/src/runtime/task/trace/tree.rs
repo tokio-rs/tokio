@@ -1,8 +1,6 @@
-use std::{
-    collections::{hash_map::DefaultHasher, HashMap as Map, HashSet as Set},
-    fmt,
-    hash::{Hash, Hasher},
-};
+use std::collections::{hash_map::DefaultHasher, HashMap as Map, HashSet as Set};
+use std::fmt;
+use std::hash::{Hash, Hasher};
 
 use super::{Backtrace, Symbol, SymbolTrace, Trace};
 
