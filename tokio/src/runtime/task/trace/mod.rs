@@ -1,4 +1,7 @@
+use crate::loom::sync::Arc;
+use crate::runtime::scheduler::current_thread;
 use backtrace::BacktraceFrame;
+use std::collections::VecDeque;
 use std::future::Future;
 use std::{
     cell::Cell,
@@ -14,6 +17,8 @@ mod tree;
 
 use symbol::Symbol;
 use tree::Tree;
+
+use super::{Notified, OwnedTasks};
 
 type Backtrace = Vec<BacktraceFrame>;
 type SymbolTrace = Vec<Symbol>;
@@ -212,4 +217,32 @@ impl<T: Future> Future for Root<T> {
             this.future.poll(cx)
         }
     }
+}
+
+/// Trace and poll all tasks of the current_thread runtime.
+pub(in crate::runtime) fn trace_current_thread(
+    owned: &OwnedTasks<Arc<current_thread::Handle>>,
+    local: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
+    injection: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
+) -> Vec<Trace> {
+    // drain the local and injection queues
+    let _ = local.drain(..);
+    let _ = injection.drain(..);
+
+    // notify each task
+    let mut tasks = vec![];
+    owned.for_each(|task| {
+        // set the notified bit
+        let _ = task.as_raw().state().transition_to_notified_for_tracing();
+        // store the raw tasks into a vec
+        tasks.push(task.as_raw());
+    });
+
+    tasks
+        .into_iter()
+        .map(|task| {
+            let ((), trace) = Trace::capture(|| task.poll());
+            trace
+        })
+        .collect()
 }

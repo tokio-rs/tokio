@@ -272,7 +272,7 @@ impl State {
 
     /// Transitions the state to `NOTIFIED`, unconditionally increasing the ref count.
     #[cfg(all(tokio_unstable, feature = "taskdump"))]
-    pub(crate) fn transition_to_notified_for_tracing(&self) {
+    pub(super) fn transition_to_notified_for_tracing(&self) {
         self.fetch_update_action(|mut snapshot| {
             snapshot.set_notified();
             snapshot.ref_inc();
