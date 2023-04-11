@@ -387,9 +387,17 @@ impl Handle {
         // todo: how to make this work outside of a runtime context?
         CURRENT.with(|maybe_context| {
             // drain the local queue
-            let Some(context) = maybe_context else { return };
+            let context = if let Some(context) = maybe_context {
+                context
+            } else {
+                return
+            };
             let mut maybe_core = context.core.borrow_mut();
-            let Some(core) = maybe_core.as_mut() else { return };
+            let core = if let Some(core) = maybe_core.as_mut() {
+                core
+            } else {
+                return
+            };
             let local = &mut core.tasks;
             let _ = local.drain(..);
 
