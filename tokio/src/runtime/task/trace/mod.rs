@@ -231,7 +231,7 @@ pub(in crate::runtime) fn trace_current_thread(
     let mut tasks = vec![];
     owned.for_each(|task| {
         // set the notified bit
-        let _ = task.as_raw().state().transition_to_notified_for_tracing();
+        task.as_raw().state().transition_to_notified_for_tracing();
         // store the raw tasks into a vec
         tasks.push(task.as_raw());
     });
