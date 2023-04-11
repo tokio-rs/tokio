@@ -647,16 +647,13 @@ impl<T> Receiver<T> {
     pub async fn wait_for(
         &mut self,
         mut f: impl FnMut(&T) -> bool,
-    ) -> Result<bool, error::RecvError> {
+    ) -> Result<(), error::RecvError> {
         loop {
             if f(&self.borrow_and_update()) {
-                return Ok(true);
+                return Ok(());
             }
 
-            let changed = self.changed().await;
-            if changed.is_err() {
-                return Ok(false);
-            }
+            self.changed().await?;
         }
     }
 
