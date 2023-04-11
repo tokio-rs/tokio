@@ -642,7 +642,6 @@ impl<T> Receiver<T> {
     ///     assert_eq!(*rx2.borrow(), "goodbye");
     /// }
     /// ```
-
     pub async fn wait_for(
         &mut self,
         mut f: impl FnMut(&T) -> bool,
