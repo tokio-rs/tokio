@@ -28,7 +28,7 @@ fn pin_box<T: Stream<Item = U> + 'static, U>(s: T) -> Pin<Box<dyn Stream<Item = 
     Box::pin(s)
 }
 
-fuzz_target!(|data: &[u8]| {
+fuzz_target!(|data: [bool; 64]| {
     use std::task::{Context, Poll};
 
     struct DidPoll<T> {
@@ -45,11 +45,12 @@ fuzz_target!(|data: &[u8]| {
         }
     }
 
-    for _ in 0..10 {
+    // Try the test with each possible length.
+    for len in 0..data.len() {
         let mut map = task::spawn(StreamMap::new());
         let mut expect = 0;
 
-        for (i, is_empty) in data.iter().map(|x| *x != 0).enumerate() {
+        for (i, is_empty) in data[..len].iter().copied().enumerate() {
             let inner = if is_empty {
                 pin_box(stream::empty::<()>())
             } else {
