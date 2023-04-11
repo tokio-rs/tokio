@@ -47,14 +47,7 @@ fn wait_for_test() {
 
         let th1 = thread::spawn(move || {
             for _ in 0..3 {
-                tx1.send_modify(|x| {
-                    // here we avoid unsetting the value in case
-                    // the value is already set to true.
-                    if !*x {
-                        // force the loop to run.
-                        *x = false;
-                    }
-                });
+                tx1.send_modify(|_x| {});
             }
         });
 
