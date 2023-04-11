@@ -3,7 +3,6 @@ use crate::sync::watch;
 use loom::future::block_on;
 use loom::thread;
 use std::sync::Arc;
-use std::time::Duration;
 
 #[test]
 fn smoke() {
@@ -47,14 +46,19 @@ fn wait_for_test() {
         let tx2 = tx_arc.clone();
 
         let th1 = thread::spawn(move || {
-            for _ in 0..10 {
-                tx1.send(false).unwrap();
-                std::thread::sleep(Duration::from_millis(10));
+            for _ in 0..3 {
+                tx1.send_modify(|x| {
+                    // here we avoid unsetting the value in case
+                    // the value is already set to true.
+                    if !*x {
+                        // force the loop to run.
+                        *x = false;
+                    }
+                });
             }
         });
 
         let th2 = thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(10));
             tx2.send(true).unwrap();
         });
 
