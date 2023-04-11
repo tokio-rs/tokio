@@ -4,21 +4,18 @@ use std::fmt;
 
 /// A snapshot of a runtime's state.
 #[derive(Debug)]
-
 pub struct Dump {
     tasks: Tasks,
 }
 
 /// Snapshots of tasks.
 #[derive(Debug)]
-
 pub struct Tasks {
     tasks: Vec<Task>,
 }
 
 /// A snapshot of a task.
 #[derive(Debug)]
-
 pub struct Task {
     trace: Trace,
 }
