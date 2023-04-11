@@ -288,6 +288,9 @@ impl Runtime {
     /// [handle]: fn@Handle::block_on
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        #[cfg(all(tokio_unstable, feature = "taskdump", target_os = "linux"))]
+        let future = super::task::trace::Trace::root(future);
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(
             future,

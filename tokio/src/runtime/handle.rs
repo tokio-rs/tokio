@@ -252,6 +252,9 @@ impl Handle {
     /// [`tokio::time`]: crate::time
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        #[cfg(all(tokio_unstable, feature = "taskdump", target_os = "linux"))]
+        let future = super::task::trace::Trace::root(future);
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future =
             crate::util::trace::task(future, "block_on", None, super::task::Id::next().as_u64());
