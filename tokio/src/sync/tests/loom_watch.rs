@@ -45,7 +45,7 @@ fn wait_for_test() {
         let tx_arc = Arc::new(tx);
         let tx1 = tx_arc.clone();
         let tx2 = tx_arc.clone();
-        
+
         let th1 = thread::spawn(move || {
             for _ in 0..10 {
                 tx1.send(false).unwrap();
@@ -55,7 +55,7 @@ fn wait_for_test() {
 
         let th2 = thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(10));
-           tx2.send(true).unwrap();
+            tx2.send(true).unwrap();
         });
 
         let result = block_on(rx.wait_for(|x| *x));
