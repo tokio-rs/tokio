@@ -2,6 +2,8 @@ use crate::sync::watch;
 
 use loom::future::block_on;
 use loom::thread;
+use std::sync::Arc;
+use std::time::Duration;
 
 #[test]
 fn smoke() {
@@ -38,21 +40,28 @@ fn smoke() {
 #[test]
 fn wait_for_test() {
     loom::model(move || {
-        let (tx, mut rx) = watch::channel(0);
+        let (tx, mut rx) = watch::channel(false);
+
+        let tx_arc = Arc::new(tx);
+        let tx1 = tx_arc.clone();
+        let tx2 = tx_arc.clone();
         
-        // here we repeatedly send values to the channel
-        // to trigger its loop
-        let th = thread::spawn(move || {
-            for i in 0..10 {
-                tx.send(i).unwrap();
+        let th1 = thread::spawn(move || {
+            for _ in 0..10 {
+                tx1.send(false).unwrap();
+                std::thread::sleep(Duration::from_millis(10));
             }
         });
 
-        // here we block the main thread until the
-        // value is 9
-        let result = block_on(rx.wait_for(|x| *x == 9));
+        let th2 = thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(10));
+           tx2.send(true).unwrap();
+        });
+
+        let result = block_on(rx.wait_for(|x| *x));
         assert_eq!(result.unwrap(), true);
 
-        th.join().unwrap();
+        th1.join().unwrap();
+        th2.join().unwrap();
     });
 }
