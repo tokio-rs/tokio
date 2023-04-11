@@ -85,7 +85,7 @@ signal = [
   "windows-sys/Win32_System_Console",
 ]
 sync = []
-taskdump = ["backtrace"]
+taskdump = ["rt", "backtrace"]
 test-util = ["rt", "sync", "time"]
 time = []
 
