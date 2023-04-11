@@ -1,4 +1,4 @@
-#![cfg(all(feature = "taskdump", tokio_unstable))]
+#![cfg(all(feature = "taskdump", tokio_unstable, target_os = "linux"))]
 
 use std::hint::black_box;
 use tokio::runtime;

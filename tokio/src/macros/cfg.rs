@@ -376,8 +376,8 @@ macro_rules! cfg_not_rt_multi_thread {
 macro_rules! cfg_taskdump {
     ($($item:item)*) => {
         $(
-            #[cfg(all(tokio_unstable, feature = "taskdump"))]
-            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "taskdump"))))]
+            #[cfg(all(tokio_unstable, feature = "taskdump", target_os = "linux"))]
+            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "taskdump", target_os = "linux"))))]
             $item
         )*
     };

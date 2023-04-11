@@ -50,7 +50,7 @@ struct Context {
     /// the sheduler
     budget: Cell<coop::Budget>,
 
-    #[cfg(all(tokio_unstable, feature = "taskdump"))]
+    #[cfg(all(tokio_unstable, feature = "taskdump", target_os = "linux"))]
     trace: trace::Context,
 }
 
@@ -83,7 +83,7 @@ tokio_thread_local! {
 
             budget: Cell::new(coop::Budget::unconstrained()),
 
-            #[cfg(all(tokio_unstable, feature = "taskdump"))]
+            #[cfg(all(tokio_unstable, feature = "taskdump", target_os = "linux"))]
             trace: trace::Context::new(),
         }
     }

@@ -274,7 +274,7 @@ impl Handle {
         F::Output: Send + 'static,
     {
         let id = crate::runtime::task::Id::next();
-        #[cfg(all(tokio_unstable, feature = "taskdump"))]
+        #[cfg(all(tokio_unstable, feature = "taskdump", target_os = "linux"))]
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", _name, id.as_u64());

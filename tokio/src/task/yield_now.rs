@@ -46,7 +46,7 @@ pub async fn yield_now() {
         type Output = ();
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-            #[cfg(all(tokio_unstable, feature = "taskdump"))]
+            #[cfg(all(tokio_unstable, feature = "taskdump", target_os = "linux"))]
             crate::runtime::task::trace::Trace::leaf();
 
             if self.yielded {
