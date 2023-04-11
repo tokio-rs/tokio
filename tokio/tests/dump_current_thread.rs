@@ -42,9 +42,9 @@ fn test() {
 
     for task in tasks {
         let trace = task.trace().to_string();
-        assert!(trace.contains("dump::a"));
-        assert!(trace.contains("dump::b"));
-        assert!(trace.contains("dump::c"));
+        assert!(trace.contains("dump_current_thread::a"));
+        assert!(trace.contains("dump_current_thread::b"));
+        assert!(trace.contains("dump_current_thread::c"));
         assert!(trace.contains("tokio::task::yield_now"));
     }
 }
