@@ -378,7 +378,12 @@ impl Handle {
     }
 
     /// Capture a snapshot of this runtime's state.
-    #[cfg(all(tokio_unstable, feature = "taskdump", target_os = "linux"))]
+    #[cfg(all(
+        tokio_unstable,
+        feature = "taskdump",
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+    ))]
     pub(crate) fn dump(&self) -> crate::runtime::Dump {
         use crate::runtime::dump;
         use task::trace::trace_current_thread;

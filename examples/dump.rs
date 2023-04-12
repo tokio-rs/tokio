@@ -1,6 +1,10 @@
 //! This example demonstrates tokio's experimental taskdumping functionality.
 
-#[cfg(all(tokio_unstable, target_os = "linux"))]
+#[cfg(all(
+    tokio_unstable,
+    target_os = "linux",
+    any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+))]
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     use std::hint::black_box;
@@ -34,7 +38,11 @@ async fn main() {
     }
 }
 
-#[cfg(not(all(tokio_unstable, target_os = "linux")))]
+#[cfg(not(all(
+    tokio_unstable,
+    target_os = "linux",
+    any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+)))]
 fn main() {
     println!("task dumps are not available")
 }

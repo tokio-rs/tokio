@@ -344,7 +344,12 @@ impl<S: 'static> Task<S> {
         }
     }
 
-    #[cfg(all(tokio_unstable, feature = "taskdump", target_os = "linux"))]
+    #[cfg(all(
+        tokio_unstable,
+        feature = "taskdump",
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+    ))]
     pub(crate) fn as_raw(&self) -> RawTask {
         self.raw
     }
