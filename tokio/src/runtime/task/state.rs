@@ -4,7 +4,7 @@ use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::usize;
 
-pub(crate) struct State {
+pub(super) struct State {
     val: AtomicUsize,
 }
 

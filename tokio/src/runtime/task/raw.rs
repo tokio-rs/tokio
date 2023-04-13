@@ -190,7 +190,7 @@ impl RawTask {
     }
 
     /// Returns a reference to the task's state.
-    pub(crate) fn state(&self) -> &State {
+    pub(super) fn state(&self) -> &State {
         &self.header().state
     }
 

@@ -350,7 +350,7 @@ impl<S: 'static> Task<S> {
         target_os = "linux",
         any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
     ))]
-    pub(crate) fn as_raw(&self) -> RawTask {
+    pub(super) fn as_raw(&self) -> RawTask {
         self.raw
     }
 
