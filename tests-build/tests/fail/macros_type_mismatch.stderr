@@ -1,47 +1,46 @@
 error[E0308]: mismatched types
- --> $DIR/macros_type_mismatch.rs:5:5
+ --> tests/fail/macros_type_mismatch.rs:5:5
   |
-4 | async fn missing_semicolon_or_return_type() {
-  |                                             - help: a return type might be missing here: `-> _`
 5 |     Ok(())
-  |     ^^^^^^ expected `()`, found enum `Result`
+  |     ^^^^^^- help: consider using a semicolon here: `;`
+  |     |
+  |     expected `()`, found `Result<(), _>`
   |
   = note: expected unit type `()`
                   found enum `Result<(), _>`
 
 error[E0308]: mismatched types
-  --> $DIR/macros_type_mismatch.rs:10:5
-   |
-9  | async fn missing_return_type() {
-   |                                - help: a return type might be missing here: `-> _`
-10 |     return Ok(());
-   |     ^^^^^^^^^^^^^^ expected `()`, found enum `Result`
-   |
-   = note: expected unit type `()`
-                   found enum `Result<(), _>`
+ --> tests/fail/macros_type_mismatch.rs:8:1
+  |
+8 | #[tokio::main]
+  | ^^^^^^^^^^^^^^ expected `()`, found `Result<(), _>`
+9 | async fn missing_return_type() {
+  |                                - help: a return type might be missing here: `-> _`
+  |
+  = note: expected unit type `()`
+                  found enum `Result<(), _>`
+  = note: this error originates in the attribute macro `tokio::main` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0308]: mismatched types
-  --> $DIR/macros_type_mismatch.rs:23:5
+  --> tests/fail/macros_type_mismatch.rs:14:31
    |
 14 | async fn extra_semicolon() -> Result<(), ()> {
-   |                               -------------- expected `Result<(), ()>` because of return type
+   |          ---------------      ^^^^^^^^^^^^^^ expected `Result<(), ()>`, found `()`
+   |          |
+   |          implicitly returns `()` as its body has no tail or `return` expression
 ...
 23 |     Ok(());
-   |     ^^^^^^^ expected enum `Result`, found `()`
+   |           - help: remove this semicolon to return this value
    |
    = note:   expected enum `Result<(), ()>`
            found unit type `()`
-help: try adding an expression at the end of the block
-   |
-23 ~     Ok(());;
-24 +     Ok(())
-   |
 
 error[E0308]: mismatched types
-  --> $DIR/macros_type_mismatch.rs:32:5
+  --> tests/fail/macros_type_mismatch.rs:29:1
    |
+29 | #[tokio::main]
+   | ^^^^^^^^^^^^^^ expected `()`, found integer
 30 | async fn issue_4635() {
    |                       - help: try adding a return type: `-> i32`
-31 |     return 1;
-32 |     ;
-   |     ^ expected `()`, found integer
+   |
+   = note: this error originates in the attribute macro `tokio::main` (in Nightly builds, run with -Z macro-backtrace for more info)
