@@ -396,35 +396,48 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
     //
     // We don't do this for the main function as it should only be used once so
     // there will be no benefit.
-    let output_type = match &input.sig.output {
+
+    // FIXME: this is ... rather repetitive
+    let (output_type, body_cast) = match &input.sig.output {
         // For functions with no return value syn doesn't print anything,
         // but that doesn't work as `Output` for our boxed `Future`, so
         // default to `()` (the same type as the function output).
-        syn::ReturnType::Default => quote! { () },
-        syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
+        syn::ReturnType::Default => {
+            let t = quote! { () };
+            let b = quote! {
+                async {
+                    #[allow(unreachable_code)]
+                    {
+                        let _body_cast: () = #body;
+                        _body_cast;
+                    }
+                }
+            };
+            (t, b)
+        }
+        syn::ReturnType::Type(_, ret_type) => {
+            let t = quote! { #ret_type };
+            let b = quote! {
+                async {
+                    #[allow(unreachable_code)]
+                    {
+                        let _body_cast: #ret_type = #body;
+                        _body_cast
+                    }
+                }
+            };
+            (t, b)
+        }
     };
     let body = if is_test {
         quote_spanned! {last_stmt_end_span=>
-            let body = async {
-                #[allow(unreachable_code)]
-                {
-                    let _body_cast: #output_type = #body;
-                    _body_cast
-                }
-            };
+            let body = #body_cast;
             #crate_path::pin!(body);
             let body: ::std::pin::Pin<&mut dyn ::std::future::Future<Output = #output_type>> = body;
         }
     } else {
         quote_spanned! {last_stmt_end_span=>
-            let body = async
-            {
-                #[allow(unreachable_code)]
-                {
-                    let _body_cast: #output_type = #body;
-                    _body_cast
-                }
-            };
+            let body = #body_cast;
         }
     };
 
