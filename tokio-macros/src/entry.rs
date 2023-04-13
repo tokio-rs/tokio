@@ -375,9 +375,7 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
 
     let body = &input.block;
     let brace_token = input.block.brace_token;
-    let body_ident = quote_spanned! {last_stmt_end_span=>
-        body
-    };
+    let body_ident = quote! { body };
     let block_expr = quote_spanned! {Span::call_site()=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
         {
@@ -398,22 +396,32 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
     //
     // We don't do this for the main function as it should only be used once so
     // there will be no benefit.
+    let output_type = match &input.sig.output {
+        // For functions with no return value syn doesn't print anything,
+        // but that doesn't work as `Output` for our boxed `Future`, so
+        // default to `()` (the same type as the function output).
+        syn::ReturnType::Default => quote! { () },
+        syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
+    };
     let body = if is_test {
-        let output_type = match &input.sig.output {
-            // For functions with no return value syn doesn't print anything,
-            // but that doesn't work as `Output` for our boxed `Future`, so
-            // default to `()` (the same type as the function output).
-            syn::ReturnType::Default => quote! { () },
-            syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
-        };
-        quote! {
-            let body = async #body;
+        quote_spanned! {last_stmt_end_span=>
+            let body = async {
+                let body_cast: #output_type = #body;
+                body_cast
+            };
             #crate_path::pin!(body);
             let body: ::std::pin::Pin<&mut dyn ::std::future::Future<Output = #output_type>> = body;
         }
     } else {
-        quote! {
-            let body = async #body;
+        quote_spanned! {last_stmt_end_span=>
+            let body = async
+            {
+                #[allow(unreachable_code)]
+                {
+                    let body_cast: #output_type = #body;
+                    body_cast
+                }
+            };
         }
     };
 
