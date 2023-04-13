@@ -2,6 +2,7 @@
 
 #[cfg(all(
     tokio_unstable,
+    tokio_taskdump,
     target_os = "linux",
     any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
 ))]
@@ -40,6 +41,7 @@ async fn main() {
 
 #[cfg(not(all(
     tokio_unstable,
+    tokio_taskdump,
     target_os = "linux",
     any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
 )))]

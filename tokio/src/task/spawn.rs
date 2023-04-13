@@ -181,7 +181,7 @@ cfg_rt! {
         use crate::runtime::task;
         #[cfg(all(
             tokio_unstable,
-            feature = "taskdump",
+            tokio_taskdump,
             target_os = "linux",
             any(
                 target_arch = "aarch64",

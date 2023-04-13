@@ -290,7 +290,7 @@ impl Runtime {
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         #[cfg(all(
             tokio_unstable,
-            feature = "taskdump",
+            tokio_taskdump,
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
         ))]

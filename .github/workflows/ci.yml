@@ -186,10 +186,10 @@ jobs:
         run: cargo test --all-features
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
-          RUSTDOCFLAGS: --cfg tokio_unstable
+          RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_taskdump
 
   miri:
     name: miri
@@ -269,7 +269,7 @@ jobs:
         uses: taiki-e/install-action@cross
       - run: cross check --workspace --all-features --target ${{ matrix.target }}
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
   cross-test:
     name: cross-test
@@ -297,14 +297,14 @@ jobs:
       # First run with all features (including parking_lot)
       - run: cross test -p tokio --all-features --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_ipv6 ${{ matrix.rustflags }}
       # Now run without parking_lot
       - name: Remove `parking_lot` from `full` feature
         run: sed -i '0,/parking_lot/{/parking_lot/d;}' tokio/Cargo.toml
       # The `tokio_no_parking_lot` cfg is here to ensure the `sed` above does not silently break.
       - run: cross test -p tokio --features full,test-util --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot ${{ matrix.rustflags }}
 
   # See https://github.com/tokio-rs/tokio/issues/5187
   no-atomic-u64:
@@ -325,15 +325,15 @@ jobs:
           target: i686-unknown-linux-gnu
       - run: cargo test -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_atomic_u64
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64
       # https://github.com/tokio-rs/tokio/pull/5356
       # https://github.com/tokio-rs/tokio/issues/5373
       - run: cargo hack build -p tokio --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_atomic_u64 --cfg tokio_no_const_mutex_new
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64 --cfg tokio_no_const_mutex_new
       - run: cargo hack build -p tokio --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_atomic_u64
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64
 
   features:
     name: features
@@ -354,7 +354,7 @@ jobs:
       - name: check --feature-powerset --unstable
         run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
   minrust:
     name: minrust
@@ -406,7 +406,7 @@ jobs:
           cargo hack check --all-features --ignore-private
       - name: "check --all-features --unstable -Z minimal-versions"
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
           # from determining minimal versions based on dev-dependencies.
@@ -463,8 +463,8 @@ jobs:
       - name: "doc --lib --all-features"
         run: cargo doc --lib --no-deps --all-features --document-private-items
         env:
-          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
-          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable --cfg tokio_taskdump
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
   loom-compile:
     name: build loom tests
@@ -480,7 +480,7 @@ jobs:
         run: cargo test --no-run --lib --features full
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
   check-readme:
     name: Check README
@@ -587,19 +587,19 @@ jobs:
         run: cargo test -p tokio --target wasm32-wasi --features full
         env:
           CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
       - name: WASI test tokio-util full
         run: cargo test -p tokio-util --target wasm32-wasi --features full
         env:
           CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
       - name: WASI test tokio-stream
         run: cargo test -p tokio-stream --target wasm32-wasi --features time,net,io-util,sync
         env:
           CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`
