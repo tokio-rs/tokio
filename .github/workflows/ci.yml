@@ -269,7 +269,7 @@ jobs:
         uses: taiki-e/install-action@cross
       - run: cross check --workspace --all-features --target ${{ matrix.target }}
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   cross-test:
     name: cross-test
@@ -297,14 +297,14 @@ jobs:
       # First run with all features (including parking_lot)
       - run: cross test -p tokio --all-features --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_ipv6 ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 ${{ matrix.rustflags }}
       # Now run without parking_lot
       - name: Remove `parking_lot` from `full` feature
         run: sed -i '0,/parking_lot/{/parking_lot/d;}' tokio/Cargo.toml
       # The `tokio_no_parking_lot` cfg is here to ensure the `sed` above does not silently break.
       - run: cross test -p tokio --features full,test-util --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot ${{ matrix.rustflags }}
 
   # See https://github.com/tokio-rs/tokio/issues/5187
   no-atomic-u64:
