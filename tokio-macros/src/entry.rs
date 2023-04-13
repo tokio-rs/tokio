@@ -406,8 +406,11 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
     let body = if is_test {
         quote_spanned! {last_stmt_end_span=>
             let body = async {
-                let body_cast: #output_type = #body;
-                body_cast
+                #[allow(unreachable_code)]
+                {
+                    let body_cast: #output_type = #body;
+                    body_cast
+                }
             };
             #crate_path::pin!(body);
             let body: ::std::pin::Pin<&mut dyn ::std::future::Future<Output = #output_type>> = body;
