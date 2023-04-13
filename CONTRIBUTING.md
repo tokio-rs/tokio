@@ -131,8 +131,12 @@ cargo check --all-features
 cargo test --all-features
 ```
 
-Clippy must be run using the MSRV, so Tokio can avoid having to `#[allow]` new
-lints whose fixes would be incompatible with the current MSRV:
+Clippy respects the `rust-version` field in `Cargo.toml` (as of 1.64.0), so
+it is OK to use a newer version of the toolchain than the current MSRV.
+However, it's usually best to use the same toolchain version for Clippy that
+is used in CI (defined by `env.rust_clippy` in [ci.yml][ci.yml]):
+
+[ci.yml]: .github/workflows/ci.yml
 
 <!--
 When updating this, also update:
@@ -146,7 +150,7 @@ When updating this, also update:
 -->
 
 ```
-cargo +1.49.0 clippy --all --tests --all-features
+cargo +1.65.0 clippy --all --tests --all-features
 ```
 
 When building documentation normally, the markers that list the features
