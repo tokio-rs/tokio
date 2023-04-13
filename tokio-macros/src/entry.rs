@@ -408,8 +408,8 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
             let body = async {
                 #[allow(unreachable_code)]
                 {
-                    let body_cast: #output_type = #body;
-                    body_cast
+                    let _body_cast: #output_type = #body;
+                    _body_cast
                 }
             };
             #crate_path::pin!(body);
@@ -421,8 +421,8 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
             {
                 #[allow(unreachable_code)]
                 {
-                    let body_cast: #output_type = #body;
-                    body_cast
+                    let _body_cast: #output_type = #body;
+                    _body_cast
                 }
             };
         }
