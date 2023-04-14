@@ -1,4 +1,4 @@
-use std::collections::{hash_map::DefaultHasher, HashMap as Map, HashSet as Set};
+use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
@@ -12,17 +12,17 @@ pub(super) struct Tree {
     /// The roots of the trees.
     ///
     /// There should only be one root, but the code is robust to multiple roots.
-    roots: Set<Symbol>,
+    roots: HashSet<Symbol>,
 
     /// The adjacency list of symbols in the execution tree(s).
-    edges: Map<Symbol, Set<Symbol>>,
+    edges: HashMap<Symbol, HashSet<Symbol>>,
 }
 
 impl Tree {
     /// Constructs a [`Tree`] from [`Trace`]
     pub(super) fn from_trace(trace: Trace) -> Self {
-        let mut roots: Set<Symbol> = Set::default();
-        let mut edges: Map<Symbol, Set<Symbol>> = Map::default();
+        let mut roots: HashSet<Symbol> = HashSet::default();
+        let mut edges: HashMap<Symbol, HashSet<Symbol>> = HashMap::default();
 
         for trace in trace.backtraces {
             let trace = to_symboltrace(trace);
