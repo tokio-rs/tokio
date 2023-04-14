@@ -658,5 +658,6 @@ cfg_macros! {
 #[cfg(test)]
 fn is_unpin<T: Unpin>() {}
 
+/// fuzz test (fuzz_linked_list)
 #[cfg(fuzzing)]
 pub mod fuzz;
