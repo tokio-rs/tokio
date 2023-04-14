@@ -173,6 +173,7 @@ jobs:
         os:
           - windows-latest
           - ubuntu-latest
+            rustflags: --cfg tokio_taskdump
           - macos-latest
     steps:
       - uses: actions/checkout@v3
@@ -186,10 +187,10 @@ jobs:
         run: cargo test --all-features
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable ${{ matrix.rustflags }} -Dwarnings
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
-          RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_taskdump
+          RUSTDOCFLAGS: --cfg tokio_unstable ${{ matrix.rustflags }}
 
   miri:
     name: miri
@@ -278,9 +279,11 @@ jobs:
       matrix:
         include:
           - target: i686-unknown-linux-gnu
+            rustflags: --cfg tokio_taskdump
           - target: arm-unknown-linux-gnueabihf
           - target: armv7-unknown-linux-gnueabihf
           - target: aarch64-unknown-linux-gnu
+            rustflags: --cfg tokio_taskdump
 
           # Run a platform without AtomicU64 and no const Mutex::new
           - target: arm-unknown-linux-gnueabihf
@@ -501,7 +504,9 @@ jobs:
       matrix:
         os:
           - windows-latest
+            rustflags: --cfg tokio_taskdump
           - ubuntu-latest
+            rustflags: --cfg tokio_taskdump
           - macos-latest
     steps:
       - uses: actions/checkout@v3
@@ -587,19 +592,19 @@ jobs:
         run: cargo test -p tokio --target wasm32-wasi --features full
         env:
           CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
       - name: WASI test tokio-util full
         run: cargo test -p tokio-util --target wasm32-wasi --features full
         env:
           CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
       - name: WASI test tokio-stream
         run: cargo test -p tokio-stream --target wasm32-wasi --features time,net,io-util,sync
         env:
           CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`
