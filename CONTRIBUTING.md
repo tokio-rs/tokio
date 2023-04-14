@@ -131,10 +131,9 @@ cargo check --all-features
 cargo test --all-features
 ```
 
-Clippy respects the `rust-version` field in `Cargo.toml` (as of 1.64.0), so
-it is OK to use a newer version of the toolchain than the current MSRV.
-However, it's usually best to use the same toolchain version for Clippy that
-is used in CI (defined by `env.rust_clippy` in [ci.yml][ci.yml]):
+Ideally, you should use the same version of clippy as the one used in CI
+(defined by `env.rust_clippy` in [ci.yml][ci.yml]), because newer versions
+might have new lints:
 
 [ci.yml]: .github/workflows/ci.yml
 
