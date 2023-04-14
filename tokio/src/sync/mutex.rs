@@ -4,6 +4,7 @@ use crate::sync::batch_semaphore as semaphore;
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
 
+use std::borrow::{Borrow, BorrowMut};
 use std::cell::UnsafeCell;
 use std::error::Error;
 use std::marker::PhantomData;
@@ -947,6 +948,18 @@ impl<T: ?Sized> Drop for MutexGuard<'_, T> {
                 locked = false,
             );
         });
+    }
+}
+
+impl<T: ?Sized> Borrow<T> for MutexGuard<'_, T> {
+    fn borrow(&self) -> &T {
+        self
+    }
+}
+
+impl<T: ?Sized> BorrowMut<T> for MutexGuard<'_, T> {
+    fn borrow_mut(&mut self) -> &mut T {
+        self
     }
 }
 
