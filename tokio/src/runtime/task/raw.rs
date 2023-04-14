@@ -6,7 +6,7 @@ use std::ptr::NonNull;
 use std::task::{Poll, Waker};
 
 /// Raw task handle
-pub(crate) struct RawTask {
+pub(in crate::runtime) struct RawTask {
     ptr: NonNull<Header>,
 }
 
