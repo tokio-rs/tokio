@@ -62,7 +62,7 @@ jobs:
     steps:
       - run: exit 0
 
-  # Basic actions that must pass before we kick of more expensive tests.
+  # Basic actions that must pass before we kick off more expensive tests.
   basics:
     name: basic checks
     runs-on: ubuntu-latest
