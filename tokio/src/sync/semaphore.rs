@@ -678,8 +678,8 @@ impl OwnedSemaphorePermit {
     }
 
     /// Returns the [`Semaphore`] from which this permit was acquired.
-    pub fn semaphore(&self) -> Arc<Semaphore> {
-        self.sem.clone()
+    pub fn semaphore(&self) -> &Arc<Semaphore> {
+        &self.sem
     }
 }
 
