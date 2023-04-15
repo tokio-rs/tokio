@@ -369,7 +369,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     };
 
     let body_ident = quote! { body };
-    let block_expr = quote_spanned! {last_stmt_end_span=>
+    let last_block = quote_spanned! {last_stmt_end_span=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
         {
             return #rt
@@ -410,7 +410,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         }
     };
 
-    input.into_tokens(header, body, block_expr)
+    input.into_tokens(header, body, last_block)
 }
 
 fn token_stream_with_error(mut tokens: TokenStream, error: syn::Error) -> TokenStream {
@@ -495,7 +495,7 @@ impl ItemFn {
         self,
         header: proc_macro2::TokenStream,
         body: proc_macro2::TokenStream,
-        block_expr: proc_macro2::TokenStream,
+        last_block: proc_macro2::TokenStream,
     ) -> TokenStream {
         let mut tokens = proc_macro2::TokenStream::new();
         header.to_tokens(&mut tokens);
@@ -518,7 +518,7 @@ impl ItemFn {
 
         self.brace_token.surround(&mut tokens, |tokens| {
             body.to_tokens(tokens);
-            block_expr.to_tokens(tokens);
+            last_block.to_tokens(tokens);
         });
 
         tokens
