@@ -53,7 +53,6 @@
 /// }
 /// ```
 #[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 macro_rules! join {
     (@ {
         // One `_` for each branch in the `join!` macro. This is not used once
