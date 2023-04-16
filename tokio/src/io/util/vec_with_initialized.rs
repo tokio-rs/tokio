@@ -28,6 +28,7 @@ pub(crate) struct VecWithInitialized<V> {
     // The number of initialized bytes in the vector.
     // Always between `vec.len()` and `vec.capacity()`.
     num_initialized: usize,
+    starting_capacity: usize,
 }
 
 impl VecWithInitialized<Vec<u8>> {
@@ -47,6 +48,7 @@ where
         // to its length are initialized.
         Self {
             num_initialized: vec.as_mut().len(),
+            starting_capacity: vec.as_ref().capacity(),
             vec,
         }
     }
@@ -110,6 +112,15 @@ where
             self.num_initialized = parts.initialized;
             vec.set_len(parts.len);
         }
+    }
+
+    // Returns a boolean telling the caller to try reading into a small local buffer first if true.
+    // Doing so would avoid overallocating when vec is filled to capacity and we reached EOF.
+    pub(crate) fn try_small_read_first(&self, num_bytes: usize) -> bool {
+        let vec = self.vec.as_ref();
+        vec.capacity() - vec.len() < num_bytes
+            && self.starting_capacity == vec.capacity()
+            && self.starting_capacity >= num_bytes
     }
 }
 
