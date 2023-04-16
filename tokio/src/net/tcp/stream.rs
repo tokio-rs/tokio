@@ -8,7 +8,6 @@ use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 
-use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
@@ -165,9 +164,16 @@ impl TcpStream {
     /// Creates new `TcpStream` from a `std::net::TcpStream`.
     ///
     /// This function is intended to be used to wrap a TCP stream from the
-    /// standard library in the Tokio equivalent. The conversion assumes nothing
-    /// about the underlying stream; it is left up to the user to set it in
-    /// non-blocking mode.
+    /// standard library in the Tokio equivalent.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the stream is in
+    /// non-blocking mode. Otherwise all I/O operations on the stream
+    /// will block the thread, which will cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::net::TcpStream::set_nonblocking
     ///
     /// # Examples
     ///
@@ -376,6 +382,12 @@ impl TcpStream {
     /// This function is usually paired with `try_read()` or `try_write()`. It
     /// can be used to concurrently read / write to the same socket on a single
     /// task without splitting the socket.
+    ///
+    /// The function may complete without the socket being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
+    /// [`Ready`] set, so you should always check the returned value and possibly
+    /// wait again if the requested states are not set.
     ///
     /// # Cancel safety
     ///
@@ -964,7 +976,7 @@ impl TcpStream {
     /// Tries to read or write from the socket using a user-provided IO operation.
     ///
     /// If the socket is ready, the provided closure is called. The closure
-    /// should attempt to perform IO operation from the socket by manually
+    /// should attempt to perform IO operation on the socket by manually
     /// calling the appropriate syscall. If the operation fails because the
     /// socket is not actually ready, then the closure should return a
     /// `WouldBlock` error and the readiness flag is cleared. The return value
@@ -983,6 +995,11 @@ impl TcpStream {
     /// defined on the Tokio `TcpStream` type, as this will mess with the
     /// readiness flag and can cause the socket to behave incorrectly.
     ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
+    ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
     /// [`readable()`]: TcpStream::readable()
@@ -996,6 +1013,42 @@ impl TcpStream {
         self.io
             .registration()
             .try_io(interest, || self.io.try_io(f))
+    }
+
+    /// Reads or writes from the socket using a user-provided IO operation.
+    ///
+    /// The readiness of the socket is awaited and when the socket is ready,
+    /// the provided closure is called. The closure should attempt to perform
+    /// IO operation on the socket by manually calling the appropriate syscall.
+    /// If the operation fails because the socket is not actually ready,
+    /// then the closure should return a `WouldBlock` error. In such case the
+    /// readiness flag is cleared and the socket readiness is awaited again.
+    /// This loop is repeated until the closure returns an `Ok` or an error
+    /// other than `WouldBlock`.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `TcpStream` type, as this will mess with the
+    /// readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
+    pub async fn async_io<R>(
+        &self,
+        interest: Interest,
+        mut f: impl FnMut() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.io
+            .registration()
+            .async_io(interest, || self.io.try_io(&mut f))
+            .await
     }
 
     /// Receives data on the socket from the remote address to which it is
@@ -1324,16 +1377,30 @@ mod sys {
             self.io.as_raw_fd()
         }
     }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for TcpStream {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
+    }
 }
 
-#[cfg(windows)]
-mod sys {
-    use super::TcpStream;
-    use std::os::windows::prelude::*;
+cfg_windows! {
+    use crate::os::windows::io::{AsRawSocket, RawSocket};
+    #[cfg(not(tokio_no_as_fd))]
+    use crate::os::windows::io::{AsSocket, BorrowedSocket};
 
     impl AsRawSocket for TcpStream {
         fn as_raw_socket(&self) -> RawSocket {
             self.io.as_raw_socket()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsSocket for TcpStream {
+        fn as_socket(&self) -> BorrowedSocket<'_> {
+            unsafe { BorrowedSocket::borrow_raw(self.as_raw_socket()) }
         }
     }
 }
@@ -1346,6 +1413,13 @@ mod sys {
     impl AsRawFd for TcpStream {
         fn as_raw_fd(&self) -> RawFd {
             self.io.as_raw_fd()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for TcpStream {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
         }
     }
 }

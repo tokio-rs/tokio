@@ -131,6 +131,13 @@
 /// correctly even if it is restarted while waiting at an `.await`, then it is
 /// cancellation safe.
 ///
+/// Cancellation safety can be defined in the following way: If you have a
+/// future that has not yet completed, then it must be a no-op to drop that
+/// future and recreate it. This definition is motivated by the situation where
+/// a `select!` is used in a loop. Without this guarantee, you would lose your
+/// progress when another branch completes and you restart the `select!` by
+/// going around the loop.
+///
 /// Be aware that cancelling something that is not cancellation safe is not
 /// necessarily wrong. For example, if you are cancelling a task because the
 /// application is shutting down, then you probably don't care that partially
@@ -442,6 +449,7 @@ macro_rules! select {
         use $crate::macros::support::Pin;
         use $crate::macros::support::Poll::{Ready, Pending};
 
+        #[doc(hidden)]
         const BRANCHES: u32 = $crate::count!( $($count)* );
 
         let mut disabled: __tokio_select_util::Mask = Default::default();
@@ -460,7 +468,17 @@ macro_rules! select {
         let mut output = {
             // Safety: Nothing must be moved out of `futures`. This is to
             // satisfy the requirement of `Pin::new_unchecked` called below.
+            //
+            // We can't use the `pin!` macro for this because `futures` is a
+            // tuple and the standard library provides no way to pin-project to
+            // the fields of a tuple.
             let mut futures = ( $( $fut , )+ );
+
+            // This assignment makes sure that the `poll_fn` closure only has a
+            // reference to the futures, instead of taking ownership of them.
+            // This mitigates the issue described in
+            // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
+            let mut futures = &mut futures;
 
             $crate::macros::support::poll_fn(|cx| {
                 // Track if any branch returns pending. If no branch completes
@@ -497,7 +515,7 @@ macro_rules! select {
 
                                 // Extract the future for this branch from the
                                 // tuple
-                                let ( $($skip,)* fut, .. ) = &mut futures;
+                                let ( $($skip,)* fut, .. ) = &mut *futures;
 
                                 // Safety: future is stored on the stack above
                                 // and never moved.

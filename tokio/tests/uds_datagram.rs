@@ -29,9 +29,7 @@ async fn echo() -> io::Result<()> {
     let server_socket = UnixDatagram::bind(server_path.clone())?;
 
     tokio::spawn(async move {
-        if let Err(e) = echo_server(server_socket).await {
-            eprintln!("Error in echo server: {}", e);
-        }
+        let _ = echo_server(server_socket).await;
     });
 
     {
@@ -55,9 +53,7 @@ async fn echo_from() -> io::Result<()> {
     let server_socket = UnixDatagram::bind(server_path.clone())?;
 
     tokio::spawn(async move {
-        if let Err(e) = echo_server(server_socket).await {
-            eprintln!("Error in echo server: {}", e);
-        }
+        let _ = echo_server(server_socket).await;
     });
 
     {
@@ -181,7 +177,7 @@ async fn send_recv_poll() -> std::io::Result<()> {
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
-    let _len = poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
+    poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
 
     assert_eq!(read.filled(), msg);
     Ok(())
@@ -281,6 +277,28 @@ async fn try_recv_buf_from() -> std::io::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn recv_buf_from() -> std::io::Result<()> {
+    let tmp = tempfile::tempdir()?;
+
+    // Bind each socket to a filesystem path
+    let tx_path = tmp.path().join("tx");
+    let tx = UnixDatagram::bind(&tx_path)?;
+    let rx_path = tmp.path().join("rx");
+    let rx = UnixDatagram::bind(&rx_path)?;
+
+    let bytes = b"hello world";
+    tx.send_to(bytes, &rx_path).await?;
+
+    let mut buf = Vec::with_capacity(24);
+    let (size, addr) = rx.recv_buf_from(&mut buf).await?;
+
+    let dgram = &buf[..size];
+    assert_eq!(dgram, bytes);
+    assert_eq!(addr.as_pathname().unwrap(), &tx_path);
+    Ok(())
+}
+
 // Even though we use sync non-blocking io we still need a reactor.
 #[tokio::test]
 async fn try_recv_buf_never_block() -> io::Result<()> {
@@ -326,6 +344,24 @@ async fn try_recv_buf_never_block() -> io::Result<()> {
         _ => unreachable!("unexpected error {:?}", err),
     }
 
+    Ok(())
+}
+
+#[tokio::test]
+async fn recv_buf() -> std::io::Result<()> {
+    // Create the pair of sockets
+    let (sock1, sock2) = UnixDatagram::pair()?;
+
+    // Since the sockets are paired, the paired send/recv
+    // functions can be used
+    let bytes = b"hello world";
+    sock1.send(bytes).await?;
+
+    let mut buff = Vec::with_capacity(24);
+    let size = sock2.recv_buf(&mut buff).await?;
+
+    let dgram = &buff[..size];
+    assert_eq!(dgram, bytes);
     Ok(())
 }
 

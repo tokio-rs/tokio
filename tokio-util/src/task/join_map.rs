@@ -363,10 +363,7 @@ where
     fn insert(&mut self, key: K, abort: AbortHandle) {
         let hash = self.hash(&key);
         let id = abort.id();
-        let map_key = Key {
-            id: id.clone(),
-            key,
-        };
+        let map_key = Key { id, key };
 
         // Insert the new key into the map of tasks by keys.
         let entry = self

@@ -1,7 +1,6 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
-use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -179,13 +178,20 @@ impl UdpSocket {
     /// Creates new `UdpSocket` from a previously bound `std::net::UdpSocket`.
     ///
     /// This function is intended to be used to wrap a UDP socket from the
-    /// standard library in the Tokio equivalent. The conversion assumes nothing
-    /// about the underlying socket; it is left up to the user to set it in
-    /// non-blocking mode.
+    /// standard library in the Tokio equivalent.
     ///
     /// This can be used in conjunction with socket2's `Socket` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the socket is in
+    /// non-blocking mode. Otherwise all I/O operations on the socket
+    /// will block the thread, which will cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::net::UdpSocket::set_nonblocking
     ///
     /// # Panics
     ///
@@ -357,7 +363,9 @@ impl UdpSocket {
     ///
     /// The function may complete without the socket being ready. This is a
     /// false-positive and attempting an operation will return with
-    /// `io::ErrorKind::WouldBlock`.
+    /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
+    /// [`Ready`] set, so you should always check the returned value and possibly
+    /// wait again if the requested states are not set.
     ///
     /// # Cancel safety
     ///
@@ -740,7 +748,7 @@ impl UdpSocket {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv_from` is used as the event in a
+    /// This method is cancel safe. If `recv` is used as the event in a
     /// [`tokio::select!`](crate::select) statement and some other branch
     /// completes first, it is guaranteed that no messages were received on this
     /// socket.
@@ -817,7 +825,7 @@ impl UdpSocket {
     /// address to which it is connected. On success, returns the number of
     /// bytes read.
     ///
-    /// The function must be called with valid byte array buf of sufficient size
+    /// This method must be called with valid byte array buf of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
     ///
@@ -873,9 +881,11 @@ impl UdpSocket {
         /// Tries to receive data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
-        /// The function must be called with valid byte array buf of sufficient size
+        /// This method must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
+        ///
+        /// This method can be used even if `buf` is uninitialized.
         ///
         /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
         /// returned. This function is usually paired with `readable()`.
@@ -923,10 +933,10 @@ impl UdpSocket {
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
+                let n = (*self.io).recv(dst)?;
+
                 // Safety: We trust `UdpSocket::recv` to have filled up `n` bytes in the
                 // buffer.
-                let n = (&*self.io).recv(dst)?;
-
                 unsafe {
                     buf.advance_mut(n);
                 }
@@ -935,15 +945,74 @@ impl UdpSocket {
             })
         }
 
-        /// Tries to receive a single datagram message on the socket. On success,
-        /// returns the number of bytes read and the origin.
+        /// Receives a single datagram message on the socket from the remote address
+        /// to which it is connected, advancing the buffer's internal cursor,
+        /// returning how many bytes were read.
         ///
-        /// The function must be called with valid byte array buf of sufficient size
+        /// This method must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
+        /// This method can be used even if `buf` is uninitialized.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::UdpSocket;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     // Connect to a peer
+        ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
+        ///     socket.connect("127.0.0.1:8081").await?;
+        ///
+        ///     let mut buf = Vec::with_capacity(512);
+        ///     let len = socket.recv_buf(&mut buf).await?;
+        ///
+        ///     println!("received {} bytes {:?}", len, &buf[..len]);
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub async fn recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().async_io(Interest::READABLE, || {
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                let n = (*self.io).recv(dst)?;
+
+                // Safety: We trust `UdpSocket::recv` to have filled up `n` bytes in the
+                // buffer.
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok(n)
+            }).await
+        }
+
+        /// Tries to receive a single datagram message on the socket. On success,
+        /// returns the number of bytes read and the origin.
+        ///
+        /// This method must be called with valid byte array buf of sufficient size
+        /// to hold the message bytes. If a message is too long to fit in the
+        /// supplied buffer, excess bytes may be discarded.
+        ///
+        /// This method can be used even if `buf` is uninitialized.
+        ///
         /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
         /// returned. This function is usually paired with `readable()`.
+        ///
+        /// # Notes
+        /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+        /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+        /// Because UDP is stateless and does not validate the origin of a packet,
+        /// the attacker does not need to be able to intercept traffic in order to interfere.
+        /// It is important to be aware of this when designing your application-level protocol.
+        ///
+        /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
         ///
         /// # Examples
         ///
@@ -987,16 +1056,72 @@ impl UdpSocket {
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
+                let (n, addr) = (*self.io).recv_from(dst)?;
+
                 // Safety: We trust `UdpSocket::recv_from` to have filled up `n` bytes in the
                 // buffer.
-                let (n, addr) = (&*self.io).recv_from(dst)?;
-
                 unsafe {
                     buf.advance_mut(n);
                 }
 
                 Ok((n, addr))
             })
+        }
+
+        /// Receives a single datagram message on the socket, advancing the
+        /// buffer's internal cursor, returning how many bytes were read and the origin.
+        ///
+        /// This method must be called with valid byte array buf of sufficient size
+        /// to hold the message bytes. If a message is too long to fit in the
+        /// supplied buffer, excess bytes may be discarded.
+        ///
+        /// This method can be used even if `buf` is uninitialized.
+        ///
+        /// # Notes
+        /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+        /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+        /// Because UDP is stateless and does not validate the origin of a packet,
+        /// the attacker does not need to be able to intercept traffic in order to interfere.
+        /// It is important to be aware of this when designing your application-level protocol.
+        ///
+        /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::UdpSocket;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     // Connect to a peer
+        ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
+        ///     socket.connect("127.0.0.1:8081").await?;
+        ///
+        ///     let mut buf = Vec::with_capacity(512);
+        ///     let (len, addr) = socket.recv_buf_from(&mut buf).await?;
+        ///
+        ///     println!("received {:?} bytes from {:?}", len, addr);
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub async fn recv_buf_from<B: BufMut>(&self, buf: &mut B) -> io::Result<(usize, SocketAddr)> {
+            self.io.registration().async_io(Interest::READABLE, || {
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                let (n, addr) = (*self.io).recv_from(dst)?;
+
+                // Safety: We trust `UdpSocket::recv_from` to have filled up `n` bytes in the
+                // buffer.
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok((n,addr))
+            }).await
         }
     }
 
@@ -1168,6 +1293,15 @@ impl UdpSocket {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// # Notes
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
@@ -1192,6 +1326,15 @@ impl UdpSocket {
     /// # Errors
     ///
     /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// # Notes
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub fn poll_recv_from(
         &self,
         cx: &mut Context<'_>,
@@ -1217,12 +1360,22 @@ impl UdpSocket {
     /// Tries to receive a single datagram message on the socket. On success,
     /// returns the number of bytes read and the origin.
     ///
-    /// The function must be called with valid byte array buf of sufficient size
+    /// This method must be called with valid byte array buf of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
     ///
     /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
     /// returned. This function is usually paired with `readable()`.
+    ///
+    /// # Notes
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     ///
     /// # Examples
     ///
@@ -1271,7 +1424,7 @@ impl UdpSocket {
     /// Tries to read or write from the socket using a user-provided IO operation.
     ///
     /// If the socket is ready, the provided closure is called. The closure
-    /// should attempt to perform IO operation from the socket by manually
+    /// should attempt to perform IO operation on the socket by manually
     /// calling the appropriate syscall. If the operation fails because the
     /// socket is not actually ready, then the closure should return a
     /// `WouldBlock` error and the readiness flag is cleared. The return value
@@ -1290,6 +1443,11 @@ impl UdpSocket {
     /// defined on the Tokio `UdpSocket` type, as this will mess with the
     /// readiness flag and can cause the socket to behave incorrectly.
     ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
+    ///
     /// Usually, [`readable()`], [`writable()`] or [`ready()`] is used with this function.
     ///
     /// [`readable()`]: UdpSocket::readable()
@@ -1305,6 +1463,42 @@ impl UdpSocket {
             .try_io(interest, || self.io.try_io(f))
     }
 
+    /// Reads or writes from the socket using a user-provided IO operation.
+    ///
+    /// The readiness of the socket is awaited and when the socket is ready,
+    /// the provided closure is called. The closure should attempt to perform
+    /// IO operation on the socket by manually calling the appropriate syscall.
+    /// If the operation fails because the socket is not actually ready,
+    /// then the closure should return a `WouldBlock` error. In such case the
+    /// readiness flag is cleared and the socket readiness is awaited again.
+    /// This loop is repeated until the closure returns an `Ok` or an error
+    /// other than `WouldBlock`.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `UdpSocket` type, as this will mess with the
+    /// readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
+    pub async fn async_io<R>(
+        &self,
+        interest: Interest,
+        mut f: impl FnMut() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.io
+            .registration()
+            .async_io(interest, || self.io.try_io(&mut f))
+            .await
+    }
+
     /// Receives data from the socket, without removing it from the input queue.
     /// On success, returns the number of bytes read and the address from whence
     /// the data came.
@@ -1316,6 +1510,17 @@ impl UdpSocket {
     /// WSAEMSGSIZE(10040). The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
+    ///
+    /// MacOS will return an error if you pass a zero-sized buffer.
+    ///
+    /// If you're merely interested in learning the sender of the data at the head of the queue,
+    /// try [`peek_sender`].
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
     ///
     /// # Examples
     ///
@@ -1335,6 +1540,9 @@ impl UdpSocket {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// [`peek_sender`]: method@Self::peek_sender
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub async fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
@@ -1343,7 +1551,7 @@ impl UdpSocket {
     }
 
     /// Receives data from the socket, without removing it from the input queue.
-    /// On success, returns the number of bytes read.
+    /// On success, returns the sending address of the datagram.
     ///
     /// # Notes
     ///
@@ -1357,6 +1565,17 @@ impl UdpSocket {
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///
+    /// MacOS will return an error if you pass a zero-sized buffer.
+    ///
+    /// If you're merely interested in learning the sender of the data at the head of the queue,
+    /// try [`poll_peek_sender`].
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
     /// # Return value
     ///
     /// The function returns:
@@ -1368,6 +1587,9 @@ impl UdpSocket {
     /// # Errors
     ///
     /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`poll_peek_sender`]: method@Self::poll_peek_sender
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub fn poll_peek_from(
         &self,
         cx: &mut Context<'_>,
@@ -1388,6 +1610,117 @@ impl UdpSocket {
         }
         buf.advance(n);
         Poll::Ready(Ok(addr))
+    }
+
+    /// Tries to receive data on the socket without removing it from the input queue.
+    /// On success, returns the number of bytes read and the sending address of the
+    /// datagram.
+    ///
+    /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
+    /// returned. This function is usually paired with `readable()`.
+    ///
+    /// # Notes
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and peek returns the error
+    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
+    ///
+    /// MacOS will return an error if you pass a zero-sized buffer.
+    ///
+    /// If you're merely interested in learning the sender of the data at the head of the queue,
+    /// try [`try_peek_sender`].
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [`try_peek_sender`]: method@Self::try_peek_sender
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+    pub fn try_peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || self.io.peek_from(buf))
+    }
+
+    /// Retrieve the sender of the data at the head of the input queue, waiting if empty.
+    ///
+    /// This is equivalent to calling [`peek_from`] with a zero-sized buffer,
+    /// but suppresses the `WSAEMSGSIZE` error on Windows and the "invalid argument" error on macOS.
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [`peek_from`]: method@Self::peek_from
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+    pub async fn peek_sender(&self) -> io::Result<SocketAddr> {
+        self.io
+            .registration()
+            .async_io(Interest::READABLE, || self.peek_sender_inner())
+            .await
+    }
+
+    /// Retrieve the sender of the data at the head of the input queue,
+    /// scheduling a wakeup if empty.
+    ///
+    /// This is equivalent to calling [`poll_peek_from`] with a zero-sized buffer,
+    /// but suppresses the `WSAEMSGSIZE` error on Windows and the "invalid argument" error on macOS.
+    ///
+    /// # Notes
+    ///
+    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup.
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [`poll_peek_from`]: method@Self::poll_peek_from
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+    pub fn poll_peek_sender(&self, cx: &mut Context<'_>) -> Poll<io::Result<SocketAddr>> {
+        self.io
+            .registration()
+            .poll_read_io(cx, || self.peek_sender_inner())
+    }
+
+    /// Try to retrieve the sender of the data at the head of the input queue.
+    ///
+    /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
+    /// returned. This function is usually paired with `readable()`.
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+    pub fn try_peek_sender(&self) -> io::Result<SocketAddr> {
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || self.peek_sender_inner())
+    }
+
+    #[inline]
+    fn peek_sender_inner(&self) -> io::Result<SocketAddr> {
+        self.io.try_io(|| {
+            self.as_socket()
+                .peek_sender()?
+                // May be `None` if the platform doesn't populate the sender for some reason.
+                // In testing, that only occurred on macOS if you pass a zero-sized buffer,
+                // but the implementation of `Socket::peek_sender()` covers that.
+                .as_socket()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "sender not available"))
+        })
     }
 
     /// Gets the value of the `SO_BROADCAST` option for this socket.
@@ -1544,8 +1877,8 @@ impl UdpSocket {
 
     /// Sets the value for the `IP_TOS` option on this socket.
     ///
-    /// This value sets the time-to-live field that is used in every packet sent
-    /// from this socket.
+    /// This value sets the type-of-service field that is used in every packet
+    /// sent from this socket.
     ///
     /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
     /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
@@ -1677,7 +2010,7 @@ impl fmt::Debug for UdpSocket {
     }
 }
 
-#[cfg(all(unix))]
+#[cfg(unix)]
 mod sys {
     use super::UdpSocket;
     use std::os::unix::prelude::*;
@@ -1687,16 +2020,30 @@ mod sys {
             self.io.as_raw_fd()
         }
     }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for UdpSocket {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
+    }
 }
 
-#[cfg(windows)]
-mod sys {
-    use super::UdpSocket;
-    use std::os::windows::prelude::*;
+cfg_windows! {
+    use crate::os::windows::io::{AsRawSocket, RawSocket};
+    #[cfg(not(tokio_no_as_fd))]
+    use crate::os::windows::io::{AsSocket, BorrowedSocket};
 
     impl AsRawSocket for UdpSocket {
         fn as_raw_socket(&self) -> RawSocket {
             self.io.as_raw_socket()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsSocket for UdpSocket {
+        fn as_socket(&self) -> BorrowedSocket<'_> {
+            unsafe { BorrowedSocket::borrow_raw(self.as_raw_socket()) }
         }
     }
 }

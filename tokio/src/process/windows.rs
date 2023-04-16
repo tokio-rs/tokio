@@ -28,16 +28,17 @@ use std::os::windows::prelude::{AsRawHandle, IntoRawHandle, RawHandle};
 use std::pin::Pin;
 use std::process::Stdio;
 use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
-use std::ptr;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use winapi::shared::minwindef::{DWORD, FALSE};
-use winapi::um::handleapi::{DuplicateHandle, INVALID_HANDLE_VALUE};
-use winapi::um::processthreadsapi::GetCurrentProcess;
-use winapi::um::threadpoollegacyapiset::UnregisterWaitEx;
-use winapi::um::winbase::{RegisterWaitForSingleObject, INFINITE};
-use winapi::um::winnt::{
-    BOOLEAN, DUPLICATE_SAME_ACCESS, HANDLE, PVOID, WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE,
+
+use windows_sys::{
+    Win32::Foundation::{
+        DuplicateHandle, BOOLEAN, DUPLICATE_SAME_ACCESS, HANDLE, INVALID_HANDLE_VALUE,
+    },
+    Win32::System::Threading::{
+        GetCurrentProcess, RegisterWaitForSingleObject, UnregisterWaitEx, INFINITE,
+        WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE,
+    },
 };
 
 #[must_use = "futures do nothing unless polled"]
@@ -119,11 +120,11 @@ impl Future for Child {
             }
             let (tx, rx) = oneshot::channel();
             let ptr = Box::into_raw(Box::new(Some(tx)));
-            let mut wait_object = ptr::null_mut();
+            let mut wait_object = 0;
             let rc = unsafe {
                 RegisterWaitForSingleObject(
                     &mut wait_object,
-                    inner.child.as_raw_handle(),
+                    inner.child.as_raw_handle() as _,
                     Some(callback),
                     ptr as *mut _,
                     INFINITE,
@@ -162,7 +163,7 @@ impl Drop for Waiting {
     }
 }
 
-unsafe extern "system" fn callback(ptr: PVOID, _timer_fired: BOOLEAN) {
+unsafe extern "system" fn callback(ptr: *mut std::ffi::c_void, _timer_fired: BOOLEAN) {
     let complete = &mut *(ptr as *mut Option<oneshot::Sender<()>>);
     let _ = complete.take().unwrap().send(());
 }
@@ -257,11 +258,11 @@ fn duplicate_handle<T: AsRawHandle>(io: &T) -> io::Result<StdFile> {
 
         let status = DuplicateHandle(
             cur_proc,
-            io.as_raw_handle(),
+            io.as_raw_handle() as _,
             cur_proc,
             &mut dup_handle,
-            0 as DWORD,
-            FALSE,
+            0,
+            0,
             DUPLICATE_SAME_ACCESS,
         );
 
@@ -269,6 +270,6 @@ fn duplicate_handle<T: AsRawHandle>(io: &T) -> io::Result<StdFile> {
             return Err(io::Error::last_os_error());
         }
 
-        Ok(StdFile::from_raw_handle(dup_handle))
+        Ok(StdFile::from_raw_handle(dup_handle as _))
     }
 }

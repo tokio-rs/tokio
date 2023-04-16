@@ -27,6 +27,51 @@ impl CopyBuffer {
         }
     }
 
+    fn poll_fill_buf<R>(
+        &mut self,
+        cx: &mut Context<'_>,
+        reader: Pin<&mut R>,
+    ) -> Poll<io::Result<()>>
+    where
+        R: AsyncRead + ?Sized,
+    {
+        let me = &mut *self;
+        let mut buf = ReadBuf::new(&mut me.buf);
+        buf.set_filled(me.cap);
+
+        let res = reader.poll_read(cx, &mut buf);
+        if let Poll::Ready(Ok(_)) = res {
+            let filled_len = buf.filled().len();
+            me.read_done = me.cap == filled_len;
+            me.cap = filled_len;
+        }
+        res
+    }
+
+    fn poll_write_buf<R, W>(
+        &mut self,
+        cx: &mut Context<'_>,
+        mut reader: Pin<&mut R>,
+        mut writer: Pin<&mut W>,
+    ) -> Poll<io::Result<usize>>
+    where
+        R: AsyncRead + ?Sized,
+        W: AsyncWrite + ?Sized,
+    {
+        let me = &mut *self;
+        match writer.as_mut().poll_write(cx, &me.buf[me.pos..me.cap]) {
+            Poll::Pending => {
+                // Top up the buffer towards full if we can read a bit more
+                // data - this should improve the chances of a large write
+                if !me.read_done && me.cap < me.buf.len() {
+                    ready!(me.poll_fill_buf(cx, reader.as_mut()))?;
+                }
+                Poll::Pending
+            }
+            res => res,
+        }
+    }
+
     pub(super) fn poll_copy<R, W>(
         &mut self,
         cx: &mut Context<'_>,
@@ -41,10 +86,10 @@ impl CopyBuffer {
             // If our buffer is empty, then we need to read some data to
             // continue.
             if self.pos == self.cap && !self.read_done {
-                let me = &mut *self;
-                let mut buf = ReadBuf::new(&mut me.buf);
+                self.pos = 0;
+                self.cap = 0;
 
-                match reader.as_mut().poll_read(cx, &mut buf) {
+                match self.poll_fill_buf(cx, reader.as_mut()) {
                     Poll::Ready(Ok(_)) => (),
                     Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
                     Poll::Pending => {
@@ -58,20 +103,11 @@ impl CopyBuffer {
                         return Poll::Pending;
                     }
                 }
-
-                let n = buf.filled().len();
-                if n == 0 {
-                    self.read_done = true;
-                } else {
-                    self.pos = 0;
-                    self.cap = n;
-                }
             }
 
             // If our buffer has some data, let's write it out!
             while self.pos < self.cap {
-                let me = &mut *self;
-                let i = ready!(writer.as_mut().poll_write(cx, &me.buf[me.pos..me.cap]))?;
+                let i = ready!(self.poll_write_buf(cx, reader.as_mut(), writer.as_mut()))?;
                 if i == 0 {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::WriteZero,
@@ -117,14 +153,22 @@ cfg_io_util! {
     ///
     /// This function returns a future that will continuously read data from
     /// `reader` and then write it into `writer` in a streaming fashion until
-    /// `reader` returns EOF.
+    /// `reader` returns EOF or fails.
     ///
     /// On success, the total number of bytes that were copied from `reader` to
     /// `writer` is returned.
     ///
     /// This is an asynchronous version of [`std::io::copy`][std].
     ///
+    /// A heap-allocated copy buffer with 8 KB is created to take data from the
+    /// reader to the writer, check [`copy_buf`] if you want an alternative for
+    /// [`AsyncBufRead`]. You can use `copy_buf` with [`BufReader`] to change the
+    /// buffer capacity.
+    ///
     /// [std]: std::io::copy
+    /// [`copy_buf`]: crate::io::copy_buf
+    /// [`AsyncBufRead`]: crate::io::AsyncBufRead
+    /// [`BufReader`]: crate::io::BufReader
     ///
     /// # Errors
     ///

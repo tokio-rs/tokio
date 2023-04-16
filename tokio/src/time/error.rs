@@ -41,7 +41,10 @@ impl From<Kind> for Error {
 }
 
 /// Errors returned by `Timeout`.
-#[derive(Debug, PartialEq)]
+///
+/// This error is returned when a timeout expires before the function was able
+/// to finish.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Elapsed(());
 
 #[derive(Debug)]

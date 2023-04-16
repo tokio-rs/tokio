@@ -82,16 +82,12 @@
 //! ```
 //!
 //! [`interval`]: crate::time::interval()
+//! [`sleep`]: sleep()
 
 mod clock;
 pub(crate) use self::clock::Clock;
 #[cfg(feature = "test-util")]
 pub use clock::{advance, pause, resume};
-
-pub(crate) mod driver;
-
-#[doc(inline)]
-pub use driver::sleep::{sleep, sleep_until, Sleep};
 
 pub mod error;
 
@@ -101,13 +97,12 @@ pub use self::instant::Instant;
 mod interval;
 pub use interval::{interval, interval_at, Interval, MissedTickBehavior};
 
+mod sleep;
+pub use sleep::{sleep, sleep_until, Sleep};
+
 mod timeout;
 #[doc(inline)]
 pub use timeout::{timeout, timeout_at, Timeout};
-
-#[cfg(test)]
-#[cfg(not(loom))]
-mod tests;
 
 // Re-export for convenience
 #[doc(no_inline)]

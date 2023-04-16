@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops::Deref;
 
-/// `AtomicU16` providing an additional `load_unsync` function.
+/// `AtomicU16` providing an additional `unsync_load` function.
 pub(crate) struct AtomicU16 {
     inner: UnsafeCell<std::sync::atomic::AtomicU16>,
 }
@@ -23,7 +23,7 @@ impl AtomicU16 {
     /// All mutations must have happened before the unsynchronized load.
     /// Additionally, there must be no concurrent mutations.
     pub(crate) unsafe fn unsync_load(&self) -> u16 {
-        *(*self.inner.get()).get_mut()
+        core::ptr::read(self.inner.get() as *const u16)
     }
 }
 

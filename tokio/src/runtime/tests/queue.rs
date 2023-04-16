@@ -1,5 +1,5 @@
+use crate::runtime::scheduler::multi_thread::queue;
 use crate::runtime::task::{self, Inject, Schedule, Task};
-use crate::runtime::thread_pool::queue;
 use crate::runtime::MetricsBatch;
 
 use std::thread;
@@ -111,7 +111,7 @@ const fn normal_or_miri(normal: usize, miri: usize) -> usize {
 
 #[test]
 fn stress1() {
-    const NUM_ITER: usize = 1;
+    const NUM_ITER: usize = 5;
     const NUM_STEAL: usize = normal_or_miri(1_000, 10);
     const NUM_LOCAL: usize = normal_or_miri(1_000, 10);
     const NUM_PUSH: usize = normal_or_miri(500, 10);

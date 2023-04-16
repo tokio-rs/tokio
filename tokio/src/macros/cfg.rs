@@ -13,6 +13,18 @@ macro_rules! feature {
     }
 }
 
+/// Enables Windows-specific code.
+/// Use this macro instead of `cfg(windows)` to generate docs properly.
+macro_rules! cfg_windows {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(all(doc, docsrs), windows))]
+            #[cfg_attr(docsrs, doc(cfg(windows)))]
+            $item
+        )*
+    }
+}
+
 /// Enables enter::block_on.
 macro_rules! cfg_block_on {
     ($($item:item)*) => {
@@ -297,6 +309,13 @@ macro_rules! cfg_signal_internal {
     }
 }
 
+macro_rules! cfg_signal_internal_and_unix {
+    ($($item:item)*) => {
+        #[cfg(unix)]
+        cfg_signal_internal! { $($item)* }
+    }
+}
+
 macro_rules! cfg_not_signal_internal {
     ($($item:item)*) => {
         $(
@@ -406,16 +425,6 @@ macro_rules! cfg_unstable {
     };
 }
 
-macro_rules! cfg_not_unstable {
-    ($($item:item)*) => {
-        $(
-            #[cfg(not(tokio_unstable))]
-            #[cfg_attr(docsrs, doc(cfg(not(tokio_unstable))))]
-            $item
-        )*
-    };
-}
-
 macro_rules! cfg_not_trace {
     ($($item:item)*) => {
         $(
@@ -464,13 +473,14 @@ macro_rules! cfg_not_coop {
 macro_rules! cfg_has_atomic_u64 {
     ($($item:item)*) => {
         $(
-            #[cfg(not(any(
-                    target_arch = "arm",
-                    target_arch = "mips",
-                    target_arch = "powerpc",
-                    target_arch = "riscv32",
-                    tokio_wasm
-                    )))]
+            #[cfg_attr(
+                not(tokio_no_target_has_atomic),
+                cfg(all(target_has_atomic = "64", not(tokio_no_atomic_u64))
+            ))]
+            #[cfg_attr(
+                tokio_no_target_has_atomic,
+                cfg(not(tokio_no_atomic_u64))
+            )]
             $item
         )*
     }
@@ -479,13 +489,44 @@ macro_rules! cfg_has_atomic_u64 {
 macro_rules! cfg_not_has_atomic_u64 {
     ($($item:item)*) => {
         $(
-            #[cfg(any(
-                    target_arch = "arm",
-                    target_arch = "mips",
-                    target_arch = "powerpc",
-                    target_arch = "riscv32",
-                    tokio_wasm
-                    ))]
+            #[cfg_attr(
+                not(tokio_no_target_has_atomic),
+                cfg(any(not(target_has_atomic = "64"), tokio_no_atomic_u64)
+            ))]
+            #[cfg_attr(
+                tokio_no_target_has_atomic,
+                cfg(tokio_no_atomic_u64)
+            )]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_has_const_mutex_new {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                not(all(loom, test)),
+                any(
+                    feature = "parking_lot",
+                    not(tokio_no_const_mutex_new)
+                )
+            ))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_has_const_mutex_new {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(
+                not(all(loom, test)),
+                any(
+                    feature = "parking_lot",
+                    not(tokio_no_const_mutex_new)
+                )
+            )))]
             $item
         )*
     }

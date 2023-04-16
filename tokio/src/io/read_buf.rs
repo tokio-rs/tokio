@@ -270,6 +270,33 @@ impl<'a> ReadBuf<'a> {
     }
 }
 
+#[cfg(feature = "io-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+unsafe impl<'a> bytes::BufMut for ReadBuf<'a> {
+    fn remaining_mut(&self) -> usize {
+        self.remaining()
+    }
+
+    // SAFETY: The caller guarantees that at least `cnt` unfilled bytes have been initialized.
+    unsafe fn advance_mut(&mut self, cnt: usize) {
+        self.assume_init(cnt);
+        self.advance(cnt);
+    }
+
+    fn chunk_mut(&mut self) -> &mut bytes::buf::UninitSlice {
+        // SAFETY: No region of `unfilled` will be deinitialized because it is
+        // exposed as an `UninitSlice`, whose API guarantees that the memory is
+        // never deinitialized.
+        let unfilled = unsafe { self.unfilled_mut() };
+        let len = unfilled.len();
+        let ptr = unfilled.as_mut_ptr() as *mut u8;
+
+        // SAFETY: The pointer is valid for `len` bytes because it comes from a
+        // slice of that length.
+        unsafe { bytes::buf::UninitSlice::from_raw_parts_mut(ptr, len) }
+    }
+}
+
 impl fmt::Debug for ReadBuf<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReadBuf")

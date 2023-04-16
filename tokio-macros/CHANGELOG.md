@@ -1,3 +1,36 @@
+# 2.0.0 (March 24th, 2023)
+
+This major release updates the dependency on the syn crate to 2.0.0, and
+increases the MSRV to 1.56.
+
+As part of this release, we are adopting a policy of depending on a specific minor
+release of tokio-macros. This prevents Tokio from being able to pull in many different
+versions of tokio-macros.
+
+- macros: update `syn` ([#5572])
+- macros: accept path as crate rename ([#5557])
+
+[#5572]: https://github.com/tokio-rs/tokio/pull/5572
+[#5557]: https://github.com/tokio-rs/tokio/pull/5557
+
+# 1.8.2 (November 30th, 2022)
+
+- fix a regression introduced in 1.8.1 ([#5244])
+
+[#5244]: https://github.com/tokio-rs/tokio/pull/5244
+
+# 1.8.1 (November 29th, 2022)
+
+(yanked)
+
+- macros: Pin Futures in `#[tokio::test]` to stack ([#5205])
+- macros: Reduce usage of last statement spans in proc-macros ([#5092])
+- macros: Improve the documentation for `#[tokio::test]` ([#4761])
+
+[#5205]: https://github.com/tokio-rs/tokio/pull/5205
+[#5092]: https://github.com/tokio-rs/tokio/pull/5092
+[#4761]: https://github.com/tokio-rs/tokio/pull/4761
+
 # 1.8.0 (June 4th, 2022)
 
 - macros: always emit return statement ([#4636])

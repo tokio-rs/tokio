@@ -64,34 +64,28 @@ error: The `worker_threads` option requires the `multi_thread` runtime flavor. U
 35 | #[tokio::test(flavor = "current_thread", worker_threads = 4)]
    |                                                           ^
 
-error: Failed to parse value of `crate` as ident.
+error: Failed to parse value of `crate` as path.
   --> $DIR/macros_invalid_input.rs:38:23
    |
 38 | #[tokio::test(crate = 456)]
    |                       ^^^
 
-error: Failed to parse value of `crate` as ident: "456"
+error: Failed to parse value of `crate` as path: "456"
   --> $DIR/macros_invalid_input.rs:41:23
    |
 41 | #[tokio::test(crate = "456")]
    |                       ^^^^^
 
-error: Failed to parse value of `crate` as ident: "abc::edf"
-  --> $DIR/macros_invalid_input.rs:44:23
-   |
-44 | #[tokio::test(crate = "abc::edf")]
-   |                       ^^^^^^^^^^
-
 error: second test attribute is supplied
-  --> $DIR/macros_invalid_input.rs:48:1
+  --> $DIR/macros_invalid_input.rs:45:1
    |
-48 | #[test]
+45 | #[test]
    | ^^^^^^^
 
 error: duplicated attribute
-  --> $DIR/macros_invalid_input.rs:48:1
+  --> $DIR/macros_invalid_input.rs:45:1
    |
-48 | #[test]
+45 | #[test]
    | ^^^^^^^
    |
 note: the lint level is defined here

@@ -36,7 +36,7 @@ pub async fn consume_budget() {
         if status.is_ready() {
             return status;
         }
-        status = crate::coop::poll_proceed(cx).map(|restore| {
+        status = crate::runtime::coop::poll_proceed(cx).map(|restore| {
             restore.made_progress();
         });
         status

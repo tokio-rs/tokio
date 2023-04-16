@@ -37,7 +37,7 @@ where
         // currently goes through Task::poll(), and so is subject to budgeting. That isn't really
         // what we want; a blocking task may itself want to run tasks (it might be a Worker!), so
         // we want it to start without any budgeting.
-        crate::coop::stop();
+        crate::runtime::coop::stop();
 
         Poll::Ready(func())
     }

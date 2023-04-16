@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support directory operations
+#![cfg(all(feature = "full", not(tokio_wasi)))] // WASI does not support all fs operations
 
 use tokio::fs;
 use tokio_test::{assert_err, assert_ok};
@@ -46,6 +46,27 @@ async fn build_dir() {
 }
 
 #[tokio::test]
+#[cfg(unix)]
+async fn build_dir_mode_read_only() {
+    let base_dir = tempdir().unwrap();
+    let new_dir = base_dir.path().join("abc");
+
+    assert_ok!(
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o444)
+            .create(&new_dir)
+            .await
+    );
+
+    assert!(fs::metadata(new_dir)
+        .await
+        .expect("metadata result")
+        .permissions()
+        .readonly());
+}
+
+#[tokio::test]
 async fn remove() {
     let base_dir = tempdir().unwrap();
     let new_dir = base_dir.path().join("foo");
@@ -84,4 +105,22 @@ async fn read_inherent() {
         *files,
         vec!["aa".to_string(), "bb".to_string(), "cc".to_string()]
     );
+}
+
+#[tokio::test]
+async fn read_dir_entry_info() {
+    let temp_dir = tempdir().unwrap();
+
+    let file_path = temp_dir.path().join("a.txt");
+
+    fs::write(&file_path, b"Hello File!").await.unwrap();
+
+    let mut dir = fs::read_dir(temp_dir.path()).await.unwrap();
+
+    let first_entry = dir.next_entry().await.unwrap().unwrap();
+
+    assert_eq!(first_entry.path(), file_path);
+    assert_eq!(first_entry.file_name(), "a.txt");
+    assert!(first_entry.metadata().await.unwrap().is_file());
+    assert!(first_entry.file_type().await.unwrap().is_file());
 }

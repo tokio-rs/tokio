@@ -6,19 +6,17 @@
 #![cfg(unix)]
 #![cfg_attr(docsrs, doc(cfg(all(unix, feature = "signal"))))]
 
+use crate::runtime::scheduler;
+use crate::runtime::signal::Handle;
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::signal::RxFuture;
 use crate::sync::watch;
 
 use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
-use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
-
-pub(crate) mod driver;
-use self::driver::Handle;
 
 pub(crate) type OsStorage = Vec<SignalInfo>;
 
@@ -52,7 +50,7 @@ impl Storage for OsStorage {
 #[derive(Debug)]
 pub(crate) struct OsExtraData {
     sender: UnixStream,
-    receiver: UnixStream,
+    pub(crate) receiver: UnixStream,
 }
 
 impl Init for OsExtraData {
@@ -84,7 +82,7 @@ impl SignalKind {
     // unlikely to change to other types, but technically libc can change this
     // in the future minor version.
     // See https://github.com/tokio-rs/tokio/issues/3767 for more.
-    pub fn from_raw(signum: std::os::raw::c_int) -> Self {
+    pub const fn from_raw(signum: std::os::raw::c_int) -> Self {
         Self(signum as libc::c_int)
     }
 
@@ -95,7 +93,7 @@ impl SignalKind {
     /// let kind = SignalKind::interrupt();
     /// assert_eq!(kind.as_raw_value(), libc::SIGINT);
     /// ```
-    pub fn as_raw_value(&self) -> std::os::raw::c_int {
+    pub const fn as_raw_value(&self) -> std::os::raw::c_int {
         self.0
     }
 
@@ -103,7 +101,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when a real-time timer has expired.
     /// By default, the process is terminated by this signal.
-    pub fn alarm() -> Self {
+    pub const fn alarm() -> Self {
         Self(libc::SIGALRM)
     }
 
@@ -111,7 +109,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when the status of a child process
     /// has changed. By default, this signal is ignored.
-    pub fn child() -> Self {
+    pub const fn child() -> Self {
         Self(libc::SIGCHLD)
     }
 
@@ -119,7 +117,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when the terminal is disconnected.
     /// By default, the process is terminated by this signal.
-    pub fn hangup() -> Self {
+    pub const fn hangup() -> Self {
         Self(libc::SIGHUP)
     }
 
@@ -134,7 +132,7 @@ impl SignalKind {
         target_os = "netbsd",
         target_os = "openbsd"
     ))]
-    pub fn info() -> Self {
+    pub const fn info() -> Self {
         Self(libc::SIGINFO)
     }
 
@@ -142,7 +140,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent to interrupt a program.
     /// By default, the process is terminated by this signal.
-    pub fn interrupt() -> Self {
+    pub const fn interrupt() -> Self {
         Self(libc::SIGINT)
     }
 
@@ -150,7 +148,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when I/O operations are possible
     /// on some file descriptor. By default, this signal is ignored.
-    pub fn io() -> Self {
+    pub const fn io() -> Self {
         Self(libc::SIGIO)
     }
 
@@ -159,7 +157,7 @@ impl SignalKind {
     /// On Unix systems this signal is sent when the process attempts to write
     /// to a pipe which has no reader. By default, the process is terminated by
     /// this signal.
-    pub fn pipe() -> Self {
+    pub const fn pipe() -> Self {
         Self(libc::SIGPIPE)
     }
 
@@ -168,7 +166,7 @@ impl SignalKind {
     /// On Unix systems this signal is sent to issue a shutdown of the
     /// process, after which the OS will dump the process core.
     /// By default, the process is terminated by this signal.
-    pub fn quit() -> Self {
+    pub const fn quit() -> Self {
         Self(libc::SIGQUIT)
     }
 
@@ -176,7 +174,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent to issue a shutdown of the
     /// process. By default, the process is terminated by this signal.
-    pub fn terminate() -> Self {
+    pub const fn terminate() -> Self {
         Self(libc::SIGTERM)
     }
 
@@ -184,7 +182,7 @@ impl SignalKind {
     ///
     /// On Unix systems this is a user defined signal.
     /// By default, the process is terminated by this signal.
-    pub fn user_defined1() -> Self {
+    pub const fn user_defined1() -> Self {
         Self(libc::SIGUSR1)
     }
 
@@ -192,7 +190,7 @@ impl SignalKind {
     ///
     /// On Unix systems this is a user defined signal.
     /// By default, the process is terminated by this signal.
-    pub fn user_defined2() -> Self {
+    pub const fn user_defined2() -> Self {
         Self(libc::SIGUSR2)
     }
 
@@ -200,7 +198,7 @@ impl SignalKind {
     ///
     /// On Unix systems this signal is sent when the terminal window is resized.
     /// By default, this signal is ignored.
-    pub fn window_change() -> Self {
+    pub const fn window_change() -> Self {
         Self(libc::SIGWINCH)
     }
 }
@@ -241,7 +239,7 @@ impl Default for SignalInfo {
 /// 2. Wake up the driver by writing a byte to a pipe
 ///
 /// Those two operations should both be async-signal safe.
-fn action(globals: Pin<&'static Globals>, signal: libc::c_int) {
+fn action(globals: &'static Globals, signal: libc::c_int) {
     globals.record_event(signal as EventId);
 
     // Send a wakeup, ignore any errors (anything reasonably possible is
@@ -294,7 +292,11 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     }
 }
 
-/// A stream of events for receiving a particular type of OS signal.
+/// An listener for receiving a particular type of OS signal.
+///
+/// The listener can be turned into a `Stream` using [`SignalStream`].
+///
+/// [`SignalStream`]: https://docs.rs/tokio-stream/latest/tokio_stream/wrappers/struct.SignalStream.html
 ///
 /// In general signal handling on Unix is a pretty tricky topic, and this
 /// structure is no exception! There are some important limitations to keep in
@@ -309,7 +311,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
 ///   Once `poll` has been called, however, a further signal is guaranteed to
 ///   be yielded as an item.
 ///
-///   Put another way, any element pulled off the returned stream corresponds to
+///   Put another way, any element pulled off the returned listener corresponds to
 ///   *at least one* signal, but possibly more.
 ///
 /// * Signal handling in general is relatively inefficient. Although some
@@ -347,11 +349,11 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     // An infinite stream of hangup signals.
-///     let mut stream = signal(SignalKind::hangup())?;
+///     let mut sig = signal(SignalKind::hangup())?;
 ///
 ///     // Print whenever a HUP signal is received
 ///     loop {
-///         stream.recv().await;
+///         sig.recv().await;
 ///         println!("got signal HUP");
 ///     }
 /// }
@@ -362,7 +364,7 @@ pub struct Signal {
     inner: RxFuture,
 }
 
-/// Creates a new stream which will receive notifications when the current
+/// Creates a new listener which will receive notifications when the current
 /// process receives the specified signal `kind`.
 ///
 /// This function will create a new stream which binds to the default reactor.
@@ -391,7 +393,8 @@ pub struct Signal {
 /// feature flag is not enabled.
 #[track_caller]
 pub fn signal(kind: SignalKind) -> io::Result<Signal> {
-    let rx = signal_with_handle(kind, &Handle::current())?;
+    let handle = scheduler::Handle::current();
+    let rx = signal_with_handle(kind, handle.driver().signal())?;
 
     Ok(Signal {
         inner: RxFuture::new(rx),

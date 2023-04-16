@@ -5,10 +5,10 @@ name = "tokio"
 # - Update doc url
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v1.0.x" git tag.
-version = "1.20.1"
-edition = "2018"
-rust-version = "1.49"
+# - Create "v1.x.y" git tag.
+version = "1.27.0"
+edition = "2021"
+rust-version = "1.56"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
@@ -42,7 +42,7 @@ full = [
 ]
 
 fs = []
-io-util = ["memchr", "bytes"]
+io-util = ["bytes"]
 # stdin, stdout, stderr
 io-std = []
 macros = ["tokio-macros"]
@@ -51,46 +51,38 @@ net = [
   "mio/os-poll",
   "mio/os-ext",
   "mio/net",
-  "winapi/fileapi",
-  "winapi/handleapi",
-  "winapi/namedpipeapi",
-  "winapi/winbase",
-  "winapi/winnt",
-  "winapi/minwindef",
-  "winapi/accctrl",
-  "winapi/aclapi"
+  "socket2",
+  "windows-sys/Win32_Foundation",
+  "windows-sys/Win32_Security",
+  "windows-sys/Win32_Storage_FileSystem",
+  "windows-sys/Win32_System_Pipes",
+  "windows-sys/Win32_System_SystemServices",
 ]
 process = [
   "bytes",
-  "once_cell",
   "libc",
   "mio/os-poll",
   "mio/os-ext",
   "mio/net",
   "signal-hook-registry",
-  "winapi/handleapi",
-  "winapi/minwindef",
-  "winapi/processthreadsapi",
-  "winapi/threadpoollegacyapiset",
-  "winapi/winbase",
-  "winapi/winnt",
+  "windows-sys/Win32_Foundation",
+  "windows-sys/Win32_System_Threading",
+  "windows-sys/Win32_System_WindowsProgramming",
 ]
 # Includes basic task execution capabilities
-rt = ["once_cell"]
+rt = []
 rt-multi-thread = [
   "num_cpus",
   "rt",
 ]
 signal = [
-  "once_cell",
   "libc",
   "mio/os-poll",
   "mio/net",
   "mio/os-ext",
   "signal-hook-registry",
-  "winapi/consoleapi",
-  "winapi/wincon",
-  "winapi/minwindef",
+  "windows-sys/Win32_Foundation",
+  "windows-sys/Win32_System_Console",
 ]
 sync = []
 test-util = ["rt", "sync", "time"]
@@ -105,20 +97,18 @@ stats = []
 autocfg = "1.1"
 
 [dependencies]
-tokio-macros = { version = "1.7.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "~2.0.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.0"
 
 # Everything else is optional...
 bytes = { version = "1.0.0", optional = true }
-once_cell = { version = "1.5.2", optional = true }
-memchr = { version = "2.2", optional = true }
 mio = { version = "0.8.4", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.12.0", optional = true }
 
 [target.'cfg(not(any(target_arch = "wasm32", target_arch = "wasm64")))'.dependencies]
-socket2 = { version = "0.4.4", features = [ "all" ] }
+socket2 = { version = "0.4.9", optional = true, features = [ "all" ] }
 
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
@@ -131,13 +121,18 @@ signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.42" }
-nix = { version = "0.24", default-features = false, features = ["fs", "socket"] }
+nix = { version = "0.26", default-features = false, features = ["fs", "socket"] }
 
-[target.'cfg(windows)'.dependencies.winapi]
-version = "0.3.8"
-default-features = false
-features = ["std"]
+[target.'cfg(windows)'.dependencies.windows-sys]
+version = "0.48"
 optional = true
+
+[target.'cfg(docsrs)'.dependencies.windows-sys]
+version = "0.48"
+features = [
+    "Win32_Foundation",
+    "Win32_Security_Authorization",
+]
 
 [target.'cfg(windows)'.dev-dependencies.ntapi]
 version = "0.3.6"
@@ -147,12 +142,11 @@ tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
 mockall = "0.11.1"
-tempfile = "3.1.0"
 async-stream = "0.3"
 
 [target.'cfg(not(any(target_arch = "wasm32", target_arch = "wasm64")))'.dev-dependencies]
-proptest = "1"
-socket2 = "0.4"
+socket2 = "0.4.9"
+tempfile = "3.1.0"
 
 [target.'cfg(not(all(any(target_arch = "wasm32", target_arch = "wasm64"), target_os = "unknown")))'.dev-dependencies]
 rand = "0.8.0"
@@ -161,7 +155,7 @@ rand = "0.8.0"
 wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]
-mio-aio = { version = "0.6.0", features = ["tokio"] }
+mio-aio = { version = "0.7.0", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.5.2", features = ["futures", "checkpoint"] }

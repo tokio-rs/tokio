@@ -4,7 +4,7 @@
 //! A [`Sender`] is used to broadcast values to **all** connected [`Receiver`]
 //! values. [`Sender`] handles are clone-able, allowing concurrent send and
 //! receive actions. [`Sender`] and [`Receiver`] are both `Send` and `Sync` as
-//! long as `T` is also `Send` or `Sync` respectively.
+//! long as `T` is `Send`.
 //!
 //! When a value is sent, **all** [`Receiver`] handles are notified and will
 //! receive the value. The value is stored once inside the channel and cloned on
@@ -17,6 +17,9 @@
 //! New [`Receiver`] handles are created by calling [`Sender::subscribe`]. The
 //! returned [`Receiver`] will receive values sent **after** the call to
 //! `subscribe`.
+//!
+//! This channel is also suitable for the single-producer multi-consumer
+//! use-case, where a single sender broadcasts values to many receivers.
 //!
 //! ## Lagging
 //!
@@ -50,6 +53,10 @@
 //! sent. At this point, the channel is "closed". Once a receiver has received
 //! all values retained by the channel, the next call to [`recv`] will return
 //! with [`RecvError::Closed`].
+//!
+//! When a [`Receiver`] handle is dropped, any messages not read by the receiver
+//! will be marked as read. If this receiver was the only one not to have read
+//! that message, the message will be dropped at this point.
 //!
 //! [`Sender`]: crate::sync::broadcast::Sender
 //! [`Sender::subscribe`]: crate::sync::broadcast::Sender::subscribe
@@ -111,8 +118,9 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
+use crate::loom::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
 use crate::util::linked_list::{self, LinkedList};
+use crate::util::WakeList;
 
 use std::fmt;
 use std::future::Future;
@@ -230,7 +238,7 @@ pub mod error {
     ///
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
     /// [`Receiver`]: crate::sync::broadcast::Receiver
-    #[derive(Debug, PartialEq, Clone)]
+    #[derive(Debug, PartialEq, Eq, Clone)]
     pub enum RecvError {
         /// There are no more active senders implying no further messages will ever
         /// be sent.
@@ -258,7 +266,7 @@ pub mod error {
     ///
     /// [`try_recv`]: crate::sync::broadcast::Receiver::try_recv
     /// [`Receiver`]: crate::sync::broadcast::Receiver
-    #[derive(Debug, PartialEq, Clone)]
+    #[derive(Debug, PartialEq, Eq, Clone)]
     pub enum TryRecvError {
         /// The channel is currently empty. There are still active
         /// [`Sender`] handles, so data may yet become available.
@@ -562,12 +570,10 @@ impl<T> Sender<T> {
         // Release the slot lock before notifying the receivers.
         drop(slot);
 
-        tail.notify_rx();
-
-        // Release the mutex. This must happen after the slot lock is released,
-        // otherwise the writer lock bit could be cleared while another thread
-        // is in the critical section.
-        drop(tail);
+        // Notify and release the mutex. This must happen after the slot lock is
+        // released, otherwise the writer lock bit could be cleared while another
+        // thread is in the critical section.
+        self.shared.notify_rx(tail);
 
         Ok(rem)
     }
@@ -598,6 +604,97 @@ impl<T> Sender<T> {
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
         new_receiver(shared)
+    }
+
+    /// Returns the number of queued values.
+    ///
+    /// A value is queued until it has either been seen by all receivers that were alive at the time
+    /// it was sent, or has been evicted from the queue by subsequent sends that exceeded the
+    /// queue's capacity.
+    ///
+    /// # Note
+    ///
+    /// In contrast to [`Receiver::len`], this method only reports queued values and not values that
+    /// have been evicted from the queue before being seen by all receivers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx1) = broadcast::channel(16);
+    ///     let mut rx2 = tx.subscribe();
+    ///
+    ///     tx.send(10).unwrap();
+    ///     tx.send(20).unwrap();
+    ///     tx.send(30).unwrap();
+    ///
+    ///     assert_eq!(tx.len(), 3);
+    ///
+    ///     rx1.recv().await.unwrap();
+    ///
+    ///     // The len is still 3 since rx2 hasn't seen the first value yet.
+    ///     assert_eq!(tx.len(), 3);
+    ///
+    ///     rx2.recv().await.unwrap();
+    ///
+    ///     assert_eq!(tx.len(), 2);
+    /// }
+    /// ```
+    pub fn len(&self) -> usize {
+        let tail = self.shared.tail.lock();
+
+        let base_idx = (tail.pos & self.shared.mask as u64) as usize;
+        let mut low = 0;
+        let mut high = self.shared.buffer.len();
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let idx = base_idx.wrapping_add(mid) & self.shared.mask;
+            if self.shared.buffer[idx].read().unwrap().rem.load(SeqCst) == 0 {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+
+        self.shared.buffer.len() - low
+    }
+
+    /// Returns true if there are no queued values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx1) = broadcast::channel(16);
+    ///     let mut rx2 = tx.subscribe();
+    ///
+    ///     assert!(tx.is_empty());
+    ///
+    ///     tx.send(10).unwrap();
+    ///
+    ///     assert!(!tx.is_empty());
+    ///
+    ///     rx1.recv().await.unwrap();
+    ///
+    ///     // The queue is still not empty since rx2 hasn't seen the value.
+    ///     assert!(!tx.is_empty());
+    ///
+    ///     rx2.recv().await.unwrap();
+    ///
+    ///     assert!(tx.is_empty());
+    /// }
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        let tail = self.shared.tail.lock();
+
+        let idx = (tail.pos.wrapping_sub(1) & self.shared.mask as u64) as usize;
+        self.shared.buffer[idx].read().unwrap().rem.load(SeqCst) == 0
     }
 
     /// Returns the number of active receivers
@@ -641,11 +738,34 @@ impl<T> Sender<T> {
         tail.rx_cnt
     }
 
+    /// Returns `true` if senders belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, _rx) = broadcast::channel::<()>(16);
+    ///     let tx2 = tx.clone();
+    ///
+    ///     assert!(tx.same_channel(&tx2));
+    ///
+    ///     let (tx3, _rx3) = broadcast::channel::<()>(16);
+    ///
+    ///     assert!(!tx3.same_channel(&tx2));
+    /// }
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
+    }
+
     fn close_channel(&self) {
         let mut tail = self.shared.tail.lock();
         tail.closed = true;
 
-        tail.notify_rx();
+        self.shared.notify_rx(tail);
     }
 }
 
@@ -666,18 +786,47 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     Receiver { shared, next }
 }
 
-impl Tail {
-    fn notify_rx(&mut self) {
-        while let Some(mut waiter) = self.waiters.pop_back() {
-            // Safety: `waiters` lock is still held.
-            let waiter = unsafe { waiter.as_mut() };
+impl<T> Shared<T> {
+    fn notify_rx<'a, 'b: 'a>(&'b self, mut tail: MutexGuard<'a, Tail>) {
+        let mut wakers = WakeList::new();
+        'outer: loop {
+            while wakers.can_push() {
+                match tail.waiters.pop_back() {
+                    Some(mut waiter) => {
+                        // Safety: `tail` lock is still held.
+                        let waiter = unsafe { waiter.as_mut() };
 
-            assert!(waiter.queued);
-            waiter.queued = false;
+                        assert!(waiter.queued);
+                        waiter.queued = false;
 
-            let waker = waiter.waker.take().unwrap();
-            waker.wake();
+                        if let Some(waker) = waiter.waker.take() {
+                            wakers.push(waker);
+                        }
+                    }
+                    None => {
+                        break 'outer;
+                    }
+                }
+            }
+
+            // Release the lock before waking.
+            drop(tail);
+
+            // Before we acquire the lock again all sorts of things can happen:
+            // some waiters may remove themselves from the list and new waiters
+            // may be added. This is fine since at worst we will unnecessarily
+            // wake up waiters which will then queue themselves again.
+
+            wakers.wake_all();
+
+            // Acquire the lock again.
+            tail = self.tail.lock();
         }
+
+        // Release the lock before waking.
+        drop(tail);
+
+        wakers.wake_all();
     }
 }
 
@@ -728,7 +877,7 @@ impl<T> Receiver<T> {
     ///     assert_eq!(rx1.len(), 2);
     ///     assert_eq!(rx1.recv().await.unwrap(), 10);
     ///     assert_eq!(rx1.len(), 1);
-    ///     assert_eq!(rx1.recv().await.unwrap(), 20);     
+    ///     assert_eq!(rx1.recv().await.unwrap(), 20);
     ///     assert_eq!(rx1.len(), 0);
     /// }
     /// ```
@@ -758,12 +907,35 @@ impl<T> Receiver<T> {
     ///
     ///     assert!(!rx1.is_empty());
     ///     assert_eq!(rx1.recv().await.unwrap(), 10);
-    ///     assert_eq!(rx1.recv().await.unwrap(), 20);     
+    ///     assert_eq!(rx1.recv().await.unwrap(), 20);
     ///     assert!(rx1.is_empty());
     /// }
     /// ```
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Returns `true` if receivers belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = broadcast::channel::<()>(16);
+    ///     let rx2 = tx.subscribe();
+    ///
+    ///     assert!(rx.same_channel(&rx2));
+    ///
+    ///     let (_tx3, rx3) = broadcast::channel::<()>(16);
+    ///
+    ///     assert!(!rx3.same_channel(&rx2));
+    /// }
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
     }
 
     /// Locks the next value if there is one.
@@ -785,6 +957,8 @@ impl<T> Receiver<T> {
             // while `send2` acquired the `tail` lock and attempts to acquire
             // the slot lock.
             drop(slot);
+
+            let mut old_waker = None;
 
             let mut tail = self.shared.tail.lock();
 
@@ -818,7 +992,10 @@ impl<T> Receiver<T> {
                                 match (*ptr).waker {
                                     Some(ref w) if w.will_wake(waker) => {}
                                     _ => {
-                                        (*ptr).waker = Some(waker.clone());
+                                        old_waker = std::mem::replace(
+                                            &mut (*ptr).waker,
+                                            Some(waker.clone()),
+                                        );
                                     }
                                 }
 
@@ -829,6 +1006,11 @@ impl<T> Receiver<T> {
                             });
                         }
                     }
+
+                    // Drop the old waker after releasing the locks.
+                    drop(slot);
+                    drop(tail);
+                    drop(old_waker);
 
                     return Err(TryRecvError::Empty);
                 }

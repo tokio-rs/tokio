@@ -21,6 +21,9 @@
 //! when additional capacity is available. In other words, the channel provides
 //! backpressure.
 //!
+//! This channel is also suitable for the single-producer single-consumer
+//! use-case. (Unless you only need to send one message, in which case you
+//! should use the [oneshot] channel.)
 //!
 //! # Disconnection
 //!
@@ -30,7 +33,8 @@
 //!
 //! If the [`Receiver`] handle is dropped, then messages can no longer
 //! be read out of the channel. In this case, all further attempts to send will
-//! result in an error.
+//! result in an error. Additionally, all unread messages will be drained from the
+//! channel and dropped.
 //!
 //! # Clean Shutdown
 //!
@@ -62,7 +66,7 @@
 //! in mind, but they can also be generalized to other kinds of channels. In
 //! general, any channel method that isn't marked async can be called anywhere,
 //! including outside of the runtime. For example, sending a message on a
-//! oneshot channel from outside the runtime is perfectly fine.
+//! [oneshot] channel from outside the runtime is perfectly fine.
 //!
 //! # Multiple runtimes
 //!
@@ -82,6 +86,7 @@
 //! [blocking-recv]: crate::sync::mpsc::Receiver::blocking_recv()
 //! [`UnboundedSender`]: crate::sync::mpsc::UnboundedSender
 //! [`UnboundedReceiver`]: crate::sync::mpsc::UnboundedReceiver
+//! [oneshot]: crate::sync::oneshot
 //! [`Handle::block_on`]: crate::runtime::Handle::block_on()
 //! [std-unbounded]: std::sync::mpsc::channel
 //! [crossbeam-unbounded]: https://docs.rs/crossbeam/*/crossbeam/channel/fn.unbounded.html
@@ -97,7 +102,9 @@ mod chan;
 pub(super) mod list;
 
 mod unbounded;
-pub use self::unbounded::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+pub use self::unbounded::{
+    unbounded_channel, UnboundedReceiver, UnboundedSender, WeakUnboundedSender,
+};
 
 pub mod error;
 

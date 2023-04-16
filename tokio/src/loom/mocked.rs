@@ -25,6 +25,13 @@ pub(crate) mod sync {
         }
     }
     pub(crate) use loom::sync::*;
+
+    pub(crate) mod atomic {
+        pub(crate) use loom::sync::atomic::*;
+
+        // TODO: implement a loom version
+        pub(crate) type StaticAtomicU64 = std::sync::atomic::AtomicU64;
+    }
 }
 
 pub(crate) mod rand {
@@ -37,4 +44,9 @@ pub(crate) mod sys {
     pub(crate) fn num_cpus() -> usize {
         2
     }
+}
+
+pub(crate) mod thread {
+    pub use loom::lazy_static::AccessError;
+    pub use loom::thread::*;
 }

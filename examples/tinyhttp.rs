@@ -18,7 +18,7 @@ use futures::SinkExt;
 use http::{header::HeaderValue, Request, Response, StatusCode};
 #[macro_use]
 extern crate serde_derive;
-use std::{env, error::Error, fmt, io};
+use std::{convert::TryFrom, env, error::Error, fmt, io};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{Decoder, Encoder, Framed};
@@ -180,8 +180,11 @@ impl Decoder for Http {
                 headers[i] = Some((k, v));
             }
 
+            let method = http::Method::try_from(r.method.unwrap())
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
             (
-                toslice(r.method.unwrap().as_bytes()),
+                method,
                 toslice(r.path.unwrap().as_bytes()),
                 r.version.unwrap(),
                 amt,
@@ -195,7 +198,7 @@ impl Decoder for Http {
         }
         let data = src.split_to(amt).freeze();
         let mut ret = Request::builder();
-        ret = ret.method(&data[method.0..method.1]);
+        ret = ret.method(method);
         let s = data.slice(path.0..path.1);
         let s = unsafe { String::from_utf8_unchecked(Vec::from(s.as_ref())) };
         ret = ret.uri(s);

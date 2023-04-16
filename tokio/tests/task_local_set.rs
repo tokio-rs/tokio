@@ -22,7 +22,7 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
 #[tokio::test(flavor = "current_thread")]
-async fn local_basic_scheduler() {
+async fn local_current_thread_scheduler() {
     LocalSet::new()
         .run_until(async {
             task::spawn_local(async {}).await.unwrap();
@@ -284,14 +284,12 @@ fn join_local_future_elsewhere() {
     local.block_on(&rt, async move {
         let (tx, rx) = oneshot::channel();
         let join = task::spawn_local(async move {
-            println!("hello world running...");
             assert!(
                 ON_RT_THREAD.with(|cell| cell.get()),
                 "local task must run on local thread, no matter where it is awaited"
             );
             rx.await.unwrap();
 
-            println!("hello world task done");
             "hello world"
         });
         let join2 = task::spawn(async move {
@@ -301,13 +299,31 @@ fn join_local_future_elsewhere() {
             );
 
             tx.send(()).expect("task shouldn't have ended yet");
-            println!("waking up hello world...");
 
             join.await.expect("task should complete successfully");
-
-            println!("hello world task joined");
         });
         join2.await.unwrap()
+    });
+}
+
+// Tests for <https://github.com/tokio-rs/tokio/issues/4973>
+#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
+#[tokio::test(flavor = "multi_thread")]
+async fn localset_in_thread_local() {
+    thread_local! {
+        static LOCAL_SET: LocalSet = LocalSet::new();
+    }
+
+    // holds runtime thread until end of main fn.
+    let (_tx, rx) = oneshot::channel::<()>();
+    let handle = tokio::runtime::Handle::current();
+
+    std::thread::spawn(move || {
+        LOCAL_SET.with(|local_set| {
+            handle.block_on(local_set.run_until(async move {
+                let _ = rx.await;
+            }))
+        });
     });
 }
 
@@ -374,9 +390,7 @@ fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
         ),
         // Did the test thread panic? We'll find out for sure when we `join`
         // with it.
-        Err(RecvTimeoutError::Disconnected) => {
-            println!("done_rx dropped, did the test thread panic?");
-        }
+        Err(RecvTimeoutError::Disconnected) => {}
         // Test completed successfully!
         Ok(()) => {}
     }
@@ -486,12 +500,15 @@ async fn local_tasks_are_polled_after_tick_inner() {
                     tx.send(()).unwrap();
                 }
 
-                time::sleep(Duration::from_millis(20)).await;
-                let rx1 = RX1.load(SeqCst);
-                let rx2 = RX2.load(SeqCst);
-                println!("EXPECT = {}; RX1 = {}; RX2 = {}", EXPECTED, rx1, rx2);
-                assert_eq!(EXPECTED, rx1);
-                assert_eq!(EXPECTED, rx2);
+                loop {
+                    time::sleep(Duration::from_millis(20)).await;
+                    let rx1 = RX1.load(SeqCst);
+                    let rx2 = RX2.load(SeqCst);
+
+                    if rx1 == EXPECTED && rx2 == EXPECTED {
+                        break;
+                    }
+                }
             });
 
             while let Some(oneshot) = rx.recv().await {
@@ -553,6 +570,48 @@ async fn spawn_wakes_localset() {
     }
 }
 
+#[test]
+fn store_local_set_in_thread_local_with_runtime() {
+    use tokio::runtime::Runtime;
+
+    thread_local! {
+        static CURRENT: RtAndLocalSet = RtAndLocalSet::new();
+    }
+
+    struct RtAndLocalSet {
+        rt: Runtime,
+        local: LocalSet,
+    }
+
+    impl RtAndLocalSet {
+        fn new() -> RtAndLocalSet {
+            RtAndLocalSet {
+                rt: tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap(),
+                local: LocalSet::new(),
+            }
+        }
+
+        async fn inner_method(&self) {
+            self.local
+                .run_until(async move {
+                    tokio::task::spawn_local(async {});
+                })
+                .await
+        }
+
+        fn method(&self) {
+            self.rt.block_on(self.inner_method());
+        }
+    }
+
+    CURRENT.with(|f| {
+        f.method();
+    });
+}
+
 #[cfg(tokio_unstable)]
 mod unstable {
     use tokio::runtime::UnhandledPanic;
@@ -573,6 +632,56 @@ mod unstable {
                 futures::future::pending::<()>().await;
             })
             .await;
+    }
+
+    // This test compares that, when the task driving `run_until` has already
+    // consumed budget, the `run_until` future has less budget than a "spawned"
+    // task.
+    //
+    // "Budget" is a fuzzy metric as the Tokio runtime is able to change values
+    // internally. This is why the test uses indirection to test this.
+    #[tokio::test]
+    async fn run_until_does_not_get_own_budget() {
+        // Consume some budget
+        tokio::task::consume_budget().await;
+
+        LocalSet::new()
+            .run_until(async {
+                let spawned = tokio::spawn(async {
+                    let mut spawned_n = 0;
+
+                    {
+                        let mut spawned = tokio_test::task::spawn(async {
+                            loop {
+                                spawned_n += 1;
+                                tokio::task::consume_budget().await;
+                            }
+                        });
+                        // Poll once
+                        assert!(!spawned.poll().is_ready());
+                    }
+
+                    spawned_n
+                });
+
+                let mut run_until_n = 0;
+                {
+                    let mut run_until = tokio_test::task::spawn(async {
+                        loop {
+                            run_until_n += 1;
+                            tokio::task::consume_budget().await;
+                        }
+                    });
+                    // Poll once
+                    assert!(!run_until.poll().is_ready());
+                }
+
+                let spawned_n = spawned.await.unwrap();
+                assert_ne!(spawned_n, 0);
+                assert_ne!(run_until_n, 0);
+                assert!(spawned_n > run_until_n);
+            })
+            .await
     }
 }
 

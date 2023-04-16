@@ -415,6 +415,32 @@ fn coop_and_block_in_place() {
     });
 }
 
+#[test]
+fn yield_after_block_in_place() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        tokio::spawn(async move {
+            // Block in place then enter a new runtime
+            tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .build()
+                    .unwrap();
+
+                rt.block_on(async {});
+            });
+
+            // Yield, then complete
+            tokio::task::yield_now().await;
+        })
+        .await
+        .unwrap()
+    });
+}
+
 // Testing this does not panic
 #[test]
 fn max_blocking_threads() {
@@ -480,9 +506,7 @@ fn wake_during_shutdown() {
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
             let me = Pin::into_inner(self);
             let mut lock = me.shared.lock().unwrap();
-            println!("poll {}", me.put_waker);
             if me.put_waker {
-                println!("putting");
                 lock.waker = Some(cx.waker().clone());
             }
             Poll::Pending
@@ -491,13 +515,11 @@ fn wake_during_shutdown() {
 
     impl Drop for MyFuture {
         fn drop(&mut self) {
-            println!("drop {} start", self.put_waker);
             let mut lock = self.shared.lock().unwrap();
             if !self.put_waker {
                 lock.waker.take().unwrap().wake();
             }
             drop(lock);
-            println!("drop {} stop", self.put_waker);
         }
     }
 

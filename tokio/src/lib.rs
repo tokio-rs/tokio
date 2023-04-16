@@ -1,7 +1,9 @@
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
-    clippy::needless_doctest_main
+    clippy::module_inception,
+    clippy::needless_doctest_main,
+    clippy::declare_interior_mutable_const
 )]
 #![warn(
     missing_debug_implementations,
@@ -153,7 +155,7 @@
 //! provide the functionality you need.
 //!
 //! Using the runtime requires the "rt" or "rt-multi-thread" feature flags, to
-//! enable the basic [single-threaded scheduler][rt] and the [thread-pool
+//! enable the current-thread [single-threaded scheduler][rt] and the [multi-thread
 //! scheduler][rt-multi-thread], respectively. See the [`runtime` module
 //! documentation][rt-features] for details. In addition, the "macros" feature
 //! flag enables the `#[tokio::main]` and `#[tokio::test]` attributes.
@@ -172,12 +174,15 @@
 //! swapping the currently running task on each thread. However, this kind of
 //! swapping can only happen at `.await` points, so code that spends a long time
 //! without reaching an `.await` will prevent other tasks from running. To
-//! combat this, Tokio provides two kinds of threads: Core threads and blocking
-//! threads. The core threads are where all asynchronous code runs, and Tokio
-//! will by default spawn one for each CPU core. The blocking threads are
-//! spawned on demand, can be used to run blocking code that would otherwise
-//! block other tasks from running and are kept alive when not used for a certain
-//! amount of time which can be configured with [`thread_keep_alive`].
+//! combat this, Tokio provides two kinds of threads: Core threads and blocking threads.
+//!
+//! The core threads are where all asynchronous code runs, and Tokio will by default
+//! spawn one for each CPU core. You can use the environment variable `TOKIO_WORKER_THREADS`
+//! to override the default value.
+//!
+//! The blocking threads are spawned on demand, can be used to run blocking code
+//! that would otherwise block other tasks from running and are kept alive when
+//! not used for a certain amount of time which can be configured with [`thread_keep_alive`].
 //! Since it is not possible for Tokio to swap out blocking tasks, like it
 //! can do with asynchronous code, the upper limit on the number of blocking
 //! threads is very large. These limits can be configured on the [`Builder`].
@@ -310,7 +315,7 @@
 //! need.
 //!
 //! - `full`: Enables all features listed below except `test-util` and `tracing`.
-//! - `rt`: Enables `tokio::spawn`, the basic (current thread) scheduler,
+//! - `rt`: Enables `tokio::spawn`, the current-thread scheduler,
 //!         and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
@@ -326,19 +331,14 @@
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
+//! - `parking_lot`: As a potential optimization, use the _parking_lot_ crate's
+//!                  synchronization primitives internally. Also, this
+//!                  dependency is necessary to construct some of our primitives
+//!                  in a const context. MSRV may increase according to the
+//!                  _parking_lot_ release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
-//!
-//! ### Internal features
-//!
-//! These features do not expose any new API, but influence internal
-//! implementation aspects of Tokio, and can pull in additional
-//! dependencies.
-//!
-//! - `parking_lot`: As a potential optimization, use the _parking_lot_ crate's
-//! synchronization primitives internally. MSRV may increase according to the
-//! _parking_lot_ release in use.
 //!
 //! ### Unstable features
 //!
@@ -349,7 +349,11 @@
 //! Likewise, some parts of the API are only available with the same flag:
 //!
 //! - [`task::Builder`]
-//!  
+//! - Some methods on [`task::JoinSet`]
+//! - [`runtime::RuntimeMetrics`]
+//! - [`runtime::Builder::unhandled_panic`]
+//! - [`task::Id`]
+//!
 //! This flag enables **unstable** features. The public API of these features
 //! may break in 1.x releases. To enable these features, the `--cfg
 //! tokio_unstable` argument must be passed to `rustc` when compiling. This
@@ -379,6 +383,65 @@
 //!
 //! [unstable features]: https://internals.rust-lang.org/t/feature-request-unstable-opt-in-non-transitive-crate-features/16193#why-not-a-crate-feature-2
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
+//!
+//! ## Supported platforms
+//!
+//! Tokio currently guarantees support for the following platforms:
+//!
+//!  * Linux
+//!  * Windows
+//!  * Android (API level 21)
+//!  * macOS
+//!  * iOS
+//!  * FreeBSD
+//!
+//! Tokio will continue to support these platforms in the future. However,
+//! future releases may change requirements such as the minimum required libc
+//! version on Linux, the API level on Android, or the supported FreeBSD
+//! release.
+//!
+//! Beyond the above platforms, Tokio is intended to work on all platforms
+//! supported by the mio crate. You can find a longer list [in mio's
+//! documentation][mio-supported]. However, these additional platforms may
+//! become unsupported in the future.
+//!
+//! Note that Wine is considered to be a different platform from Windows. See
+//! mio's documentation for more information on Wine support.
+//!
+//! [mio-supported]: https://crates.io/crates/mio#platforms
+//!
+//! ### WASM support
+//!
+//! Tokio has some limited support for the WASM platform. Without the
+//! `tokio_unstable` flag, the following features are supported:
+//!
+//!  * `sync`
+//!  * `macros`
+//!  * `io-util`
+//!  * `rt`
+//!  * `time`
+//!
+//! Enabling any other feature (including `full`) will cause a compilation
+//! failure.
+//!
+//! The `time` module will only work on WASM platforms that have support for
+//! timers (e.g. wasm32-wasi). The timing functions will panic if used on a WASM
+//! platform that does not support timers.
+//!
+//! Note also that if the runtime becomes indefinitely idle, it will panic
+//! immediately instead of blocking forever. On platforms that don't support
+//! time, this means that the runtime can never be idle in any way.
+//!
+//! ### Unstable WASM support
+//!
+//! Tokio also has unstable support for some additional WASM features. This
+//! requires the use of the `tokio_unstable` flag.
+//!
+//! Using this flag enables the use of `tokio::net` on the wasm32-wasi target.
+//! However, not all methods are available on the networking types as WASI
+//! currently does not support the creation of new sockets from within WASM.
+//! Because of this, sockets must currently be created via the `FromRawFd`
+//! trait.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.
@@ -422,7 +485,7 @@ compile_error!("Tokio's build script has incorrectly detected wasm.");
         feature = "signal"
     )
 ))]
-compile_error!("Only features sync,macros,io-util,rt are supported on wasm.");
+compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
 // Includes re-exports used by macros.
 //
@@ -442,7 +505,6 @@ pub mod io;
 pub mod net;
 
 mod loom;
-mod park;
 
 cfg_process! {
     pub mod process;
@@ -460,12 +522,8 @@ cfg_rt! {
     pub mod runtime;
 }
 cfg_not_rt! {
-    cfg_io_driver_impl! {
-        pub(crate) mod runtime;
-    }
+    pub(crate) mod runtime;
 }
-
-pub(crate) mod coop;
 
 cfg_signal! {
     pub mod signal;
@@ -549,14 +607,6 @@ pub(crate) use self::doc::os;
 #[allow(unused)]
 pub(crate) use std::os;
 
-#[cfg(docsrs)]
-#[allow(unused)]
-pub(crate) use self::doc::winapi;
-
-#[cfg(all(not(docsrs), windows, feature = "net"))]
-#[allow(unused)]
-pub(crate) use winapi;
-
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**
     /// intended to be used as part of the public API and is permitted to
@@ -607,3 +657,7 @@ cfg_macros! {
 #[cfg(feature = "io-util")]
 #[cfg(test)]
 fn is_unpin<T: Unpin>() {}
+
+/// fuzz test (fuzz_linked_list)
+#[cfg(fuzzing)]
+pub mod fuzz;

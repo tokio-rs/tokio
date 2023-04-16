@@ -1,3 +1,27 @@
+# 0.1.12 (January 20, 2023)
+
+- time: remove `Unpin` bound on `Throttle` methods ([#5105])
+- time: document that `throttle` operates on ms granularity ([#5101])
+- sync: add `WatchStream::from_changes` ([#5432])
+
+[#5105]: https://github.com/tokio-rs/tokio/pull/5105
+[#5101]: https://github.com/tokio-rs/tokio/pull/5101
+[#5432]: https://github.com/tokio-rs/tokio/pull/5432
+
+# 0.1.11 (October 11, 2022)
+
+- time: allow `StreamExt::chunks_timeout` outside of a runtime ([#5036])
+
+[#5036]: https://github.com/tokio-rs/tokio/pull/5036
+
+# 0.1.10 (Sept 18, 2022)
+
+- time: add `StreamExt::chunks_timeout` ([#4695])
+- stream: add track_caller to public APIs ([#4786])
+
+[#4695]: https://github.com/tokio-rs/tokio/pull/4695
+[#4786]: https://github.com/tokio-rs/tokio/pull/4786
+
 # 0.1.9 (June 4, 2022)
 
 - deps: upgrade `tokio-util` dependency to `0.7.x` ([#3762])

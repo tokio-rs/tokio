@@ -1,5 +1,6 @@
 use crate::io::interest::Interest;
-use crate::runtime::io::{Handle, Registration};
+use crate::runtime::io::Registration;
+use crate::runtime::scheduler;
 
 use mio::event::Source;
 use std::fmt;
@@ -103,13 +104,14 @@ impl<E: Source> PollEvented<E> {
     #[track_caller]
     #[cfg_attr(feature = "signal", allow(unused))]
     pub(crate) fn new_with_interest(io: E, interest: Interest) -> io::Result<Self> {
-        Self::new_with_interest_and_handle(io, interest, Handle::current())
+        Self::new_with_interest_and_handle(io, interest, scheduler::Handle::current())
     }
 
+    #[track_caller]
     pub(crate) fn new_with_interest_and_handle(
         mut io: E,
         interest: Interest,
-        handle: Handle,
+        handle: scheduler::Handle,
     ) -> io::Result<Self> {
         let registration = Registration::new_with_interest_and_handle(&mut io, interest, handle)?;
         Ok(Self {
@@ -119,11 +121,7 @@ impl<E: Source> PollEvented<E> {
     }
 
     /// Returns a reference to the registration.
-    #[cfg(any(
-        feature = "net",
-        all(unix, feature = "process"),
-        all(unix, feature = "signal"),
-    ))]
+    #[cfg(any(feature = "net"))]
     pub(crate) fn registration(&self) -> &Registration {
         &self.registration
     }
@@ -188,10 +186,29 @@ feature! {
             &'a E: io::Write + 'a,
         {
             use std::io::Write;
-            self.registration.poll_write_io(cx, || self.io.as_ref().unwrap().write(buf))
+
+            loop {
+                let evt = ready!(self.registration.poll_write_ready(cx))?;
+
+                match self.io.as_ref().unwrap().write(buf) {
+                    Ok(n) => {
+                        // if we write only part of our buffer, this is sufficient on unix to show
+                        // that the socket buffer is full
+                        if n > 0 && (!cfg!(windows) && n < buf.len()) {
+                            self.registration.clear_readiness(evt);
+                        }
+
+                        return Poll::Ready(Ok(n));
+                    },
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        self.registration.clear_readiness(evt);
+                    }
+                    Err(e) => return Poll::Ready(Err(e)),
+                }
+            }
         }
 
-        #[cfg(feature = "net")]
+        #[cfg(any(feature = "net", feature = "process"))]
         pub(crate) fn poll_write_vectored<'a>(
             &'a self,
             cx: &mut Context<'_>,

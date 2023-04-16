@@ -9,10 +9,10 @@
 //! # Usage
 //!
 //! [`channel`] returns a [`Sender`] / [`Receiver`] pair. These are the producer
-//! and sender halves of the channel. The channel is created with an initial
+//! and consumer halves of the channel. The channel is created with an initial
 //! value. The **latest** value stored in the channel is accessed with
 //! [`Receiver::borrow()`]. Awaiting [`Receiver::changed()`] waits for a new
-//! value to sent by the [`Sender`] half.
+//! value to be sent by the [`Sender`] half.
 //!
 //! # Examples
 //!
@@ -39,6 +39,9 @@
 //! when all [`Receiver`] handles have been dropped. This indicates that there
 //! is no further interest in the values being produced and work can be stopped.
 //!
+//! The value in the channel will not be dropped until the sender and all receivers
+//! have been dropped.
+//!
 //! # Thread safety
 //!
 //! Both [`Sender`] and [`Receiver`] are thread safe. They can be moved to other
@@ -58,6 +61,7 @@ use crate::sync::notify::Notify;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::Relaxed;
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
+use std::fmt;
 use std::mem;
 use std::ops;
 use std::panic;
@@ -90,10 +94,11 @@ pub struct Sender<T> {
 /// Returns a reference to the inner value.
 ///
 /// Outstanding borrows hold a read lock on the inner value. This means that
-/// long lived borrows could cause the produce half to block. It is recommended
-/// to keep the borrow as short lived as possible. Additionally, if you are
+/// long-lived borrows could cause the producer half to block. It is recommended
+/// to keep the borrow as short-lived as possible. Additionally, if you are
 /// running in an environment that allows `!Send` futures, you must ensure that
-/// the returned `Ref` type is never held alive across an `.await` point.
+/// the returned `Ref` type is never held alive across an `.await` point,
+/// otherwise, it can lead to a deadlock.
 ///
 /// The priority policy of the lock is dependent on the underlying lock
 /// implementation, and this type does not guarantee that any particular policy
@@ -165,7 +170,6 @@ impl<'a, T> Ref<'a, T> {
     }
 }
 
-#[derive(Debug)]
 struct Shared<T> {
     /// The most recent value.
     value: RwLock<T>,
@@ -180,10 +184,22 @@ struct Shared<T> {
     ref_count_rx: AtomicUsize,
 
     /// Notifies waiting receivers that the value changed.
-    notify_rx: Notify,
+    notify_rx: big_notify::BigNotify,
 
     /// Notifies any task listening for `Receiver` dropped events.
     notify_tx: Notify,
+}
+
+impl<T: fmt::Debug> fmt::Debug for Shared<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let state = self.state.load();
+        f.debug_struct("Shared")
+            .field("value", &self.value)
+            .field("version", &state.version())
+            .field("is_closed", &state.is_closed())
+            .field("ref_count_rx", &self.ref_count_rx)
+            .finish()
+    }
 }
 
 pub mod error {
@@ -218,6 +234,62 @@ pub mod error {
     }
 
     impl std::error::Error for RecvError {}
+}
+
+mod big_notify {
+    use super::*;
+    use crate::sync::notify::Notified;
+
+    // To avoid contention on the lock inside the `Notify`, we store multiple
+    // copies of it. Then, we use either circular access or randomness to spread
+    // out threads over different `Notify` objects.
+    //
+    // Some simple benchmarks show that randomness performs slightly better than
+    // circular access (probably due to contention on `next`), so we prefer to
+    // use randomness when Tokio is compiled with a random number generator.
+    //
+    // When the random number generator is not available, we fall back to
+    // circular access.
+
+    pub(super) struct BigNotify {
+        #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
+        next: AtomicUsize,
+        inner: [Notify; 8],
+    }
+
+    impl BigNotify {
+        pub(super) fn new() -> Self {
+            Self {
+                #[cfg(not(all(
+                    not(loom),
+                    feature = "sync",
+                    any(feature = "rt", feature = "macros")
+                )))]
+                next: AtomicUsize::new(0),
+                inner: Default::default(),
+            }
+        }
+
+        pub(super) fn notify_waiters(&self) {
+            for notify in &self.inner {
+                notify.notify_waiters();
+            }
+        }
+
+        /// This function implements the case where randomness is not available.
+        #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
+        pub(super) fn notified(&self) -> Notified<'_> {
+            let i = self.next.fetch_add(1, Relaxed) % 8;
+            self.inner[i].notified()
+        }
+
+        /// This function implements the case where randomness is available.
+        #[cfg(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros")))]
+        pub(super) fn notified(&self) -> Notified<'_> {
+            let i = crate::runtime::context::thread_rng_n(8) as usize;
+            self.inner[i].notified()
+        }
+    }
 }
 
 use self::state::{AtomicState, Version};
@@ -319,7 +391,7 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
         value: RwLock::new(init),
         state: AtomicState::new(),
         ref_count_rx: AtomicUsize::new(1),
-        notify_rx: Notify::new(),
+        notify_rx: big_notify::BigNotify::new(),
         notify_tx: Notify::new(),
     });
 
@@ -350,11 +422,12 @@ impl<T> Receiver<T> {
     /// [`changed`] may return immediately even if you have already seen the
     /// value with a call to `borrow`.
     ///
-    /// Outstanding borrows hold a read lock. This means that long lived borrows
-    /// could cause the send half to block. It is recommended to keep the borrow
-    /// as short lived as possible. Additionally, if you are running in an
-    /// environment that allows `!Send` futures, you must ensure that the
-    /// returned `Ref` type is never held alive across an `.await` point.
+    /// Outstanding borrows hold a read lock on the inner value. This means that
+    /// long-lived borrows could cause the producer half to block. It is recommended
+    /// to keep the borrow as short-lived as possible. Additionally, if you are
+    /// running in an environment that allows `!Send` futures, you must ensure that
+    /// the returned `Ref` type is never held alive across an `.await` point,
+    /// otherwise, it can lead to a deadlock.
     ///
     /// The priority policy of the lock is dependent on the underlying lock
     /// implementation, and this type does not guarantee that any particular policy
@@ -401,11 +474,12 @@ impl<T> Receiver<T> {
     /// will not return immediately until the [`Sender`] has modified the shared
     /// value again.
     ///
-    /// Outstanding borrows hold a read lock. This means that long lived borrows
-    /// could cause the send half to block. It is recommended to keep the borrow
-    /// as short lived as possible. Additionally, if you are running in an
-    /// environment that allows `!Send` futures, you must ensure that the
-    /// returned `Ref` type is never held alive across an `.await` point.
+    /// Outstanding borrows hold a read lock on the inner value. This means that
+    /// long-lived borrows could cause the producer half to block. It is recommended
+    /// to keep the borrow as short-lived as possible. Additionally, if you are
+    /// running in an environment that allows `!Send` futures, you must ensure that
+    /// the returned `Ref` type is never held alive across an `.await` point,
+    /// otherwise, it can lead to a deadlock.
     ///
     /// The priority policy of the lock is dependent on the underlying lock
     /// implementation, and this type does not guarantee that any particular policy
@@ -604,8 +678,22 @@ impl<T> Drop for Receiver<T> {
 impl<T> Sender<T> {
     /// Sends a new value via the channel, notifying all receivers.
     ///
-    /// This method fails if the channel has been closed, which happens when
-    /// every receiver has been dropped.
+    /// This method fails if the channel is closed, which is the case when
+    /// every receiver has been dropped. It is possible to reopen the channel
+    /// using the [`subscribe`] method. However, when `send` fails, the value
+    /// isn't made available for future receivers (but returned with the
+    /// [`SendError`]).
+    ///
+    /// To always make a new value available for future receivers, even if no
+    /// receiver currently exists, one of the other send methods
+    /// ([`send_if_modified`], [`send_modify`], or [`send_replace`]) can be
+    /// used instead.
+    ///
+    /// [`subscribe`]: Sender::subscribe
+    /// [`SendError`]: error::SendError
+    /// [`send_if_modified`]: Sender::send_if_modified
+    /// [`send_modify`]: Sender::send_modify
+    /// [`send_replace`]: Sender::send_replace
     pub fn send(&self, value: T) -> Result<(), error::SendError<T>> {
         // This is pretty much only useful as a hint anyway, so synchronization isn't critical.
         if 0 == self.receiver_count() {
@@ -619,7 +707,7 @@ impl<T> Sender<T> {
     /// Modifies the watched value **unconditionally** in-place,
     /// notifying all receivers.
     ///
-    /// This can useful for modifying the watched value, without
+    /// This can be useful for modifying the watched value, without
     /// having to allocate a new instance. Additionally, this
     /// method permits sending values even when there are no receivers.
     ///
@@ -659,7 +747,7 @@ impl<T> Sender<T> {
     /// Modifies the watched value **conditionally** in-place,
     /// notifying all receivers only if modified.
     ///
-    /// This can useful for modifying the watched value, without
+    /// This can be useful for modifying the watched value, without
     /// having to allocate a new instance. Additionally, this
     /// method permits sending values even when there are no receivers.
     ///
@@ -780,9 +868,12 @@ impl<T> Sender<T> {
 
     /// Returns a reference to the most recently sent value
     ///
-    /// Outstanding borrows hold a read lock. This means that long lived borrows
-    /// could cause the send half to block. It is recommended to keep the borrow
-    /// as short lived as possible.
+    /// Outstanding borrows hold a read lock on the inner value. This means that
+    /// long-lived borrows could cause the producer half to block. It is recommended
+    /// to keep the borrow as short-lived as possible. Additionally, if you are
+    /// running in an environment that allows `!Send` futures, you must ensure that
+    /// the returned `Ref` type is never held alive across an `.await` point,
+    /// otherwise, it can lead to a deadlock.
     ///
     /// # Examples
     ///

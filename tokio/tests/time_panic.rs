@@ -15,7 +15,7 @@ use support::panic::test_panic;
 #[test]
 fn pause_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
-        let rt = basic();
+        let rt = current_thread();
 
         rt.block_on(async {
             time::pause();
@@ -32,7 +32,7 @@ fn pause_panic_caller() -> Result<(), Box<dyn Error>> {
 #[test]
 fn resume_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
-        let rt = basic();
+        let rt = current_thread();
 
         rt.block_on(async {
             time::resume();
@@ -85,7 +85,7 @@ fn timeout_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn basic() -> Runtime {
+fn current_thread() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

@@ -1,5 +1,5 @@
-use crate::runtime::blocking::NoopSchedule;
 use crate::runtime::task::{self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::tests::NoopSchedule;
 use crate::util::TryLock;
 
 use std::collections::VecDeque;

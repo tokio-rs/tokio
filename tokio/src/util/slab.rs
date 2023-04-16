@@ -560,7 +560,7 @@ impl<T> Slots<T> {
         assert!(slot >= base, "unexpected pointer");
 
         let idx = (slot - base) / width;
-        assert!(idx < self.slots.len() as usize);
+        assert!(idx < self.slots.len());
 
         idx
     }
