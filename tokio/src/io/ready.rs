@@ -230,6 +230,7 @@ cfg_io_readiness! {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             if interest.is_priority() {
                 ready |= Ready::PRIORITY;
+                ready |= Ready::READ_CLOSED;
             }
 
             ready

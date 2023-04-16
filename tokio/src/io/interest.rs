@@ -129,7 +129,7 @@ impl Interest {
             Interest::READABLE => Ready::READABLE | Ready::READ_CLOSED,
             Interest::WRITABLE => Ready::WRITABLE | Ready::WRITE_CLOSED,
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            Interest::PRIORITY => Ready::PRIORITY,
+            Interest::PRIORITY => Ready::PRIORITY | Ready::READ_CLOSED,
             _ => Ready::EMPTY,
         }
     }
