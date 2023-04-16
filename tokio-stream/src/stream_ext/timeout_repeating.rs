@@ -1,8 +1,7 @@
 use crate::stream_ext::Fuse;
 use crate::{Elapsed, Stream};
-use tokio::time::{Instant, Sleep};
+use tokio::time::{self, Interval, MissedTickBehavior};
 
-use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use pin_project_lite::pin_project;
@@ -16,20 +15,20 @@ pin_project! {
         #[pin]
         stream: Fuse<S>,
         #[pin]
-        deadline: Sleep,
-        duration: Duration,
+        interval: Interval,
     }
 }
 
 impl<S: Stream> TimeoutRepeating<S> {
     pub(super) fn new(stream: S, duration: Duration) -> Self {
-        let next = Instant::now() + duration;
-        let deadline = tokio::time::sleep_until(next);
+        let mut interval = time::interval(duration);
+        // Use Delay behavior so timeouts are always emitted at least
+        // `duration` apart.
+        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
         TimeoutRepeating {
             stream: Fuse::new(stream),
-            deadline,
-            duration,
+            interval,
         }
     }
 }
@@ -43,17 +42,14 @@ impl<S: Stream> Stream for TimeoutRepeating<S> {
         match me.stream.poll_next(cx) {
             Poll::Ready(v) => {
                 if v.is_some() {
-                    let next = Instant::now() + *me.duration;
-                    me.deadline.reset(next);
+                    me.interval.reset();
                 }
                 return Poll::Ready(v.map(Ok));
             }
             Poll::Pending => {}
         };
 
-        ready!(me.deadline.as_mut().poll(cx));
-        let next = Instant::now() + *me.duration;
-        me.deadline.reset(next);
+        ready!(me.interval.poll_tick(cx));
         Poll::Ready(Some(Err(Elapsed::new())))
     }
 
