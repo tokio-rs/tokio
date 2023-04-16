@@ -44,6 +44,10 @@ impl Interest {
     /// Writable interest includes write-closed events.
     pub const WRITABLE: Interest = Interest(mio::Interest::WRITABLE);
 
+    /// Returns a `Interest` set representing priority completion interests.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub const PRIORITY: Interest = Interest(mio::Interest::PRIORITY);
+
     /// Returns true if the value includes readable interest.
     ///
     /// # Examples

@@ -509,6 +509,32 @@ impl<T: AsRawFd> AsyncFd<T> {
         self.readiness_mut(Interest::WRITABLE).await
     }
 
+    /// Waits for the file descriptor to become priority ready, returning a
+    /// [`AsyncFdReadyGuard`] that must be dropped to resume priority-readiness
+    /// polling.
+    ///
+    /// This method takes `&self`, so it is possible to call this method
+    /// concurrently with other methods on this struct. This method only
+    /// provides shared access to the inner IO resource when handling the
+    /// [`AsyncFdReadyGuard`].
+    #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub async fn priority<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
+        self.readiness(Interest::PRIORITY).await
+    }
+
+    /// Waits for the file descriptor to become priority ready, returning a
+    /// [`AsyncFdReadyMutGuard`] that must be dropped to resume priority-readiness
+    /// polling.
+    ///
+    /// This method takes `&mut self`, so it is possible to access the inner IO
+    /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub async fn priority_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
+        self.readiness_mut(Interest::PRIORITY).await
+    }
+
     /// Reads or writes from the file descriptor using a user-provided IO operation.
     ///
     /// The `async_io` method is a convenience utility that waits for the file
