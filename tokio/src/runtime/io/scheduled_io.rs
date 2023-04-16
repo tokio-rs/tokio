@@ -46,6 +46,9 @@ struct Waiters {
 
     /// Waker used for AsyncWrite.
     writer: Option<Waker>,
+
+    /// Waker used for Priority
+    priority: Option<Waker>,
 }
 
 cfg_io_readiness! {
@@ -234,6 +237,14 @@ impl ScheduledIo {
         // check for AsyncWrite slot
         if ready.is_writable() {
             if let Some(waker) = waiters.writer.take() {
+                wakers.push(waker);
+            }
+        }
+
+        // check for AsyncWrite slot
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if ready.is_priority_ready() {
+            if let Some(waker) = waiters.priority.take() {
                 wakers.push(waker);
             }
         }

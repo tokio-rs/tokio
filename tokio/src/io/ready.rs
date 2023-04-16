@@ -176,7 +176,7 @@ impl Ready {
     /// ```
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
-    pub fn is_priority(self) -> bool {
+    pub fn is_priority_ready(self) -> bool {
         self.contains(Ready::PRIORITY)
     }
 
@@ -289,7 +289,7 @@ impl fmt::Debug for Ready {
                 .field("is_writable", &self.is_writable())
                 .field("is_read_closed", &self.is_read_closed())
                 .field("is_write_closed", &self.is_write_closed())
-                .field("is_priority", &self.is_priority())
+                .field("is_priority_ready", &self.is_priority_ready())
                 .finish()
         }
 
