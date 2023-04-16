@@ -9,15 +9,6 @@ use pin_project_lite::pin_project;
 use std::fmt;
 use std::time::Duration;
 
-/// Behavior of timeouts.
-#[derive(Debug)]
-pub(super) enum TimeoutMode {
-    /// A timeout will only fire once.
-    Once,
-    /// A timeout will fire repeatedly.
-    Repeating,
-}
-
 pin_project! {
     /// Stream returned by the [`timeout`](super::StreamExt::timeout) method.
     #[must_use = "streams do nothing unless polled"]
@@ -29,16 +20,15 @@ pin_project! {
         deadline: Sleep,
         duration: Duration,
         poll_deadline: bool,
-        timeout_mode: TimeoutMode,
     }
 }
 
-/// Error returned by `Timeout`.
+/// Error returned by `Timeout` and `TimeoutRepeating`.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Elapsed(());
 
 impl<S: Stream> Timeout<S> {
-    pub(super) fn new(stream: S, duration: Duration, timeout_mode: TimeoutMode) -> Self {
+    pub(super) fn new(stream: S, duration: Duration) -> Self {
         let next = Instant::now() + duration;
         let deadline = tokio::time::sleep_until(next);
 
@@ -47,7 +37,6 @@ impl<S: Stream> Timeout<S> {
             deadline,
             duration,
             poll_deadline: true,
-            timeout_mode,
         }
     }
 }
@@ -56,7 +45,7 @@ impl<S: Stream> Stream for Timeout<S> {
     type Item = Result<S::Item, Elapsed>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut me = self.project();
+        let me = self.project();
 
         match me.stream.poll_next(cx) {
             Poll::Ready(v) => {
@@ -70,46 +59,28 @@ impl<S: Stream> Stream for Timeout<S> {
             Poll::Pending => {}
         };
 
-        match me.timeout_mode {
-            TimeoutMode::Once => {
-                if *me.poll_deadline {
-                    ready!(me.deadline.poll(cx));
-                    *me.poll_deadline = false;
-                    return Poll::Ready(Some(Err(Elapsed::new())));
-                }
-
-                Poll::Pending
-            }
-            TimeoutMode::Repeating => {
-                ready!(me.deadline.as_mut().poll(cx));
-                let next = Instant::now() + *me.duration;
-                me.deadline.reset(next);
-                Poll::Ready(Some(Err(Elapsed::new())))
-            }
+        if *me.poll_deadline {
+            ready!(me.deadline.poll(cx));
+            *me.poll_deadline = false;
+            return Poll::Ready(Some(Err(Elapsed::new())));
         }
+
+        Poll::Pending
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (lower, upper) = self.stream.size_hint();
 
-        match self.timeout_mode {
-            TimeoutMode::Once => {
-                // The timeout stream may insert an error before and after each message
-                // from the underlying stream, but no more than one error between each
-                // message. Hence the upper bound is computed as 2x+1.
+        // The timeout stream may insert an error before and after each message
+        // from the underlying stream, but no more than one error between each
+        // message. Hence the upper bound is computed as 2x+1.
 
-                // Using a helper function to enable use of question mark operator.
-                fn twice_plus_one(value: Option<usize>) -> Option<usize> {
-                    value?.checked_mul(2)?.checked_add(1)
-                }
-
-                (lower, twice_plus_one(upper))
-            }
-            TimeoutMode::Repeating => {
-                // The timeout stream may insert an error an infinite number of times.
-                (lower, None)
-            }
+        // Using a helper function to enable use of question mark operator.
+        fn twice_plus_one(value: Option<usize>) -> Option<usize> {
+            value?.checked_mul(2)?.checked_add(1)
         }
+
+        (lower, twice_plus_one(upper))
     }
 }
 

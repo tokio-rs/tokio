@@ -57,7 +57,9 @@ use try_next::TryNext;
 
 cfg_time! {
     pub(crate) mod timeout;
-    use timeout::{Timeout, TimeoutMode};
+    pub(crate) mod timeout_repeating;
+    use timeout::Timeout;
+    use timeout_repeating::TimeoutRepeating;
     use tokio::time::Duration;
     mod throttle;
     use throttle::{throttle, Throttle};
@@ -990,7 +992,7 @@ pub trait StreamExt: Stream {
     where
         Self: Sized,
     {
-        Timeout::new(self, duration, TimeoutMode::Once)
+        Timeout::new(self, duration)
     }
 
     /// Applies a per-item timeout to the passed stream.
@@ -1066,11 +1068,11 @@ pub trait StreamExt: Stream {
     /// ```
     #[cfg(all(feature = "time"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
-    fn timeout_repeating(self, duration: Duration) -> Timeout<Self>
+    fn timeout_repeating(self, duration: Duration) -> TimeoutRepeating<Self>
     where
         Self: Sized,
     {
-        Timeout::new(self, duration, TimeoutMode::Repeating)
+        TimeoutRepeating::new(self, duration)
     }
 
     /// Slows down a stream by enforcing a delay between items.
