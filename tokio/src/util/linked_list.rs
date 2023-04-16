@@ -174,6 +174,21 @@ impl<L: Link> LinkedList<L, L::Target> {
         true
     }
 
+    // Counts the elements of the LinkedList
+    pub(crate) fn count(&self) -> usize {
+        let mut count = 0;
+        let mut current = self.head;
+
+        while let Some(node) = current {
+            unsafe {
+                count += 1;
+                current = L::pointers(node).as_ref().get_next()
+            }
+        }
+
+        count
+    }
+
     /// Removes the specified node from the list
     ///
     /// # Safety

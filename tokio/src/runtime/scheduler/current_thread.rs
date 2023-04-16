@@ -430,6 +430,10 @@ cfg_metrics! {
         pub(crate) fn blocking_queue_depth(&self) -> usize {
             self.blocking_spawner.queue_depth()
         }
+
+        pub(crate) fn active_tasks_count(&self) -> usize {
+            self.shared.owned.active_tasks_count()
+        }
     }
 }
 

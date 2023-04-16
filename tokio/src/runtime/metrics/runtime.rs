@@ -68,6 +68,25 @@ impl RuntimeMetrics {
         self.handle.inner.num_blocking_threads()
     }
 
+    /// Returns the number of active tasks in the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///    let metrics = Handle::current().metrics();
+    ///
+    ///     let n = metrics.active_tasks_count();
+    ///     println!("Runtime has {} active tasks", n);
+    /// }
+    /// ```
+    pub fn active_tasks_count(&self) -> usize {
+        self.handle.inner.active_tasks_count()
+    }
+
     /// Returns the number of idle threads, which have spawned by the runtime
     /// for `spawn_blocking` calls.
     ///

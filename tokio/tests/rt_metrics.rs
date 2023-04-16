@@ -82,6 +82,23 @@ fn blocking_queue_depth() {
 }
 
 #[test]
+fn active_tasks_count() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+    assert_eq!(0, metrics.active_tasks_count());
+    rt.spawn(async move {
+        assert_eq!(1, metrics.active_tasks_count());
+    });
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+    assert_eq!(0, metrics.active_tasks_count());
+    rt.spawn(async move {
+        assert_eq!(1, metrics.active_tasks_count());
+    });
+}
+
+#[test]
 fn remote_schedule_count() {
     use std::thread;
 

@@ -153,6 +153,10 @@ impl<S: 'static> OwnedTasks<S> {
         }
     }
 
+    pub(crate) fn active_tasks_count(&self) -> usize {
+        self.inner.lock().list.count()
+    }
+
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
         let task_id = task.header().get_owner_id();
         if task_id == 0 {
