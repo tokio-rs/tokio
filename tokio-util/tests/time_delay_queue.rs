@@ -823,6 +823,44 @@ async fn remove_after_compact_poll() {
     assert!(panic.is_err());
 }
 
+#[tokio::test(start_paused = true)]
+async fn peek() {
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    let key = queue.insert_at("foo", now + ms(5));
+    let key2 = queue.insert_at("bar", now);
+    let key3 = queue.insert_at("baz", now + ms(10));
+
+    assert_eq!(queue.peek(), Some(key2));
+
+    sleep(ms(6)).await;
+
+    assert_eq!(queue.peek(), Some(key2));
+
+    let entry = assert_ready_some!(poll!(queue));
+    assert_eq!(entry.get_ref(), &"bar");
+
+    assert_eq!(queue.peek(), Some(key));
+
+    let entry = assert_ready_some!(poll!(queue));
+    assert_eq!(entry.get_ref(), &"foo");
+
+    assert_eq!(queue.peek(), Some(key3));
+
+    assert_pending!(poll!(queue));
+
+    sleep(ms(5)).await;
+
+    assert_eq!(queue.peek(), Some(key3));
+
+    let entry = assert_ready_some!(poll!(queue));
+    assert_eq!(entry.get_ref(), &"baz");
+
+    assert!(queue.peek().is_none());
+}
+
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
