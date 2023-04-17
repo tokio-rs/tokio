@@ -679,7 +679,19 @@ impl<T> Receiver<T> {
                 return Ok(());
             }
 
-            self.changed().await?;
+            match self.changed().await {
+                Ok(()) => {}
+                Err(e) => {
+                    // some error occurred but we still need to call the closure
+                    // to guarantee that it has been called on the last value.
+                    // and we error only if its false.
+                    if f(&self.borrow_and_update()) {
+                        return Ok(());
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
         }
     }
 
