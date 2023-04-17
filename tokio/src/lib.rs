@@ -495,12 +495,12 @@ compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
     tokio_taskdump,
     not(all(
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
     ))
 ))]
 compile_error!(
     "The `tokio_taskdump` feature is only currently supported on \
-linux, on `aarch64`, `i686` and `x86_64`."
+linux, on `aarch64`, `x86` and `x86_64`."
 );
 
 // Includes re-exports used by macros.

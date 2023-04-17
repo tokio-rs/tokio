@@ -382,7 +382,7 @@ impl Handle {
         tokio_unstable,
         tokio_taskdump,
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
     ))]
     pub(crate) fn dump(&self) -> crate::runtime::Dump {
         use crate::runtime::dump;

@@ -275,7 +275,7 @@ impl State {
         tokio_unstable,
         tokio_taskdump,
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
     ))]
     pub(super) fn transition_to_notified_for_tracing(&self) {
         self.fetch_update_action(|mut snapshot| {

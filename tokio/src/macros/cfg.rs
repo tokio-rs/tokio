@@ -382,7 +382,7 @@ macro_rules! cfg_taskdump {
                 target_os = "linux",
                 any(
                     target_arch = "aarch64",
-                    target_arch = "i686",
+                    target_arch = "x86",
                     target_arch = "x86_64"
                 )
             ))]
@@ -392,7 +392,7 @@ macro_rules! cfg_taskdump {
                 target_os = "linux",
                 any(
                     target_arch = "aarch64",
-                    target_arch = "i686",
+                    target_arch = "x86",
                     target_arch = "x86_64"
                 )
             ))))]

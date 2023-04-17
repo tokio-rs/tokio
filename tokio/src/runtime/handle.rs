@@ -256,7 +256,7 @@ impl Handle {
             tokio_unstable,
             tokio_taskdump,
             target_os = "linux",
-            any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+            any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
         ))]
         let future = super::task::trace::Trace::root(future);
 
@@ -286,7 +286,7 @@ impl Handle {
             tokio_unstable,
             tokio_taskdump,
             target_os = "linux",
-            any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+            any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
         ))]
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
