@@ -60,7 +60,7 @@ cfg_time! {
     pub(crate) mod timeout_repeating;
     use timeout::Timeout;
     use timeout_repeating::TimeoutRepeating;
-    use tokio::time::Duration;
+    use tokio::time::{Duration, Interval};
     mod throttle;
     use throttle::{throttle, Throttle};
     mod chunks_timeout;
@@ -997,15 +997,16 @@ pub trait StreamExt: Stream {
 
     /// Applies a per-item timeout to the passed stream.
     ///
-    /// `timeout_repeating()` takes a `Duration` that represents the maximum amount of
-    /// time each element of the stream has to complete before timing out.
+    /// `timeout_repeating()` takes an [`Interval`](tokio::time::Interval) that
+    /// controls the time each element of the stream has to complete before
+    /// timing out.
     ///
     /// If the wrapped stream yields a value before the deadline is reached, the
     /// value is returned. Otherwise, an error is returned. The caller may decide
     /// to continue consuming the stream and will eventually get the next source
     /// stream value once it becomes available. Unlike `timeout()`, if no value
     /// becomes available before the deadline is reached, additional errors are
-    /// returned at the specified interval.  See [`timeout`](StreamExt::timeout)
+    /// returned at the specified interval. See [`timeout`](StreamExt::timeout)
     /// for an alternative where the timeouts do not repeat.
     ///
     /// # Notes
@@ -1027,7 +1028,7 @@ pub trait StreamExt: Stream {
     /// use std::time::Duration;
     /// # let int_stream = stream::iter(1..=3);
     ///
-    /// let int_stream = int_stream.timeout_repeating(Duration::from_secs(1));
+    /// let int_stream = int_stream.timeout_repeating(tokio::time::interval(Duration::from_secs(1)));
     /// tokio::pin!(int_stream);
     ///
     /// // When no items time out, we get the 3 elements in succession:
@@ -1055,7 +1056,7 @@ pub trait StreamExt: Stream {
     /// // Timeout errors will be continuously produced at the specified
     /// // interval until the wrapped stream yields a value.
     /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(23)));
-    /// let timeout_stream = interval_stream.timeout_repeating(Duration::from_millis(9));
+    /// let timeout_stream = interval_stream.timeout_repeating(tokio::time::interval(Duration::from_millis(9)));
     /// tokio::pin!(timeout_stream);
     ///
     /// // Multiple timeouts will be received between values in the source stream.
@@ -1068,11 +1069,11 @@ pub trait StreamExt: Stream {
     /// ```
     #[cfg(all(feature = "time"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
-    fn timeout_repeating(self, duration: Duration) -> TimeoutRepeating<Self>
+    fn timeout_repeating(self, interval: Interval) -> TimeoutRepeating<Self>
     where
         Self: Sized,
     {
-        TimeoutRepeating::new(self, duration)
+        TimeoutRepeating::new(self, interval)
     }
 
     /// Slows down a stream by enforcing a delay between items.

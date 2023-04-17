@@ -1,11 +1,10 @@
 use crate::stream_ext::Fuse;
 use crate::{Elapsed, Stream};
-use tokio::time::{self, Interval, MissedTickBehavior};
+use tokio::time::Interval;
 
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use pin_project_lite::pin_project;
-use std::time::Duration;
 
 pin_project! {
     /// Stream returned by the [`timeout_repeating`](super::StreamExt::timeout_repeating) method.
@@ -20,12 +19,7 @@ pin_project! {
 }
 
 impl<S: Stream> TimeoutRepeating<S> {
-    pub(super) fn new(stream: S, duration: Duration) -> Self {
-        let mut interval = time::interval(duration);
-        // Use Delay behavior so timeouts are always emitted at least
-        // `duration` apart.
-        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
-
+    pub(super) fn new(stream: S, interval: Interval) -> Self {
         TimeoutRepeating {
             stream: Fuse::new(stream),
             interval,
