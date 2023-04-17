@@ -96,5 +96,8 @@ pub use pending::{pending, Pending};
 mod stream_map;
 pub use stream_map::StreamMap;
 
+mod stream_close;
+pub use stream_close::StreamNotifyClose;
+
 #[doc(no_inline)]
 pub use futures_core::Stream;

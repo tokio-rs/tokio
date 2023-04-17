@@ -587,3 +587,57 @@ fn sender_len_random() {
         assert_eq!(tx.len(), expected_len);
     }
 }
+
+#[test]
+fn send_in_waker_drop() {
+    use futures::task::ArcWake;
+    use std::future::Future;
+    use std::task::Context;
+
+    struct SendOnDrop(broadcast::Sender<()>);
+
+    impl Drop for SendOnDrop {
+        fn drop(&mut self) {
+            let _ = self.0.send(());
+        }
+    }
+
+    impl ArcWake for SendOnDrop {
+        fn wake_by_ref(_arc_self: &Arc<Self>) {}
+    }
+
+    // Test if there is no deadlock when replacing the old waker.
+
+    let (tx, mut rx) = broadcast::channel(16);
+
+    let mut fut = Box::pin(async {
+        let _ = rx.recv().await;
+    });
+
+    // Store our special waker in the receiving future.
+    let waker = futures::task::waker(Arc::new(SendOnDrop(tx)));
+    let mut cx = Context::from_waker(&waker);
+    assert!(fut.as_mut().poll(&mut cx).is_pending());
+    drop(waker);
+
+    // Second poll shouldn't deadlock.
+    let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+    let _ = fut.as_mut().poll(&mut cx);
+
+    // Test if there is no deadlock when calling waker.wake().
+
+    let (tx, mut rx) = broadcast::channel(16);
+
+    let mut fut = Box::pin(async {
+        let _ = rx.recv().await;
+    });
+
+    // Store our special waker in the receiving future.
+    let waker = futures::task::waker(Arc::new(SendOnDrop(tx.clone())));
+    let mut cx = Context::from_waker(&waker);
+    assert!(fut.as_mut().poll(&mut cx).is_pending());
+    drop(waker);
+
+    // Shouldn't deadlock.
+    let _ = tx.send(());
+}
