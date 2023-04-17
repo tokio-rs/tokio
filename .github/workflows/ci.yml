@@ -186,11 +186,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os:
-          - windows-latest
-          - ubuntu-latest
+        include:
+          - os: windows-latest
+          - os: ubuntu-latest
             rustflags: --cfg tokio_taskdump
-          - macos-latest
+          - os: macos-latest
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
@@ -530,9 +530,7 @@ jobs:
       matrix:
         os:
           - windows-latest
-            rustflags: --cfg tokio_taskdump
           - ubuntu-latest
-            rustflags: --cfg tokio_taskdump
           - macos-latest
     steps:
       - uses: actions/checkout@v3
