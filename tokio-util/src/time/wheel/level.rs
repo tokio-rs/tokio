@@ -183,7 +183,7 @@ impl<T: Stack> Level<T> {
         if self.occupied == 0 {
             return None;
         }
-        
+
         // Get the slot for now using Maths
         let now_slot = (now / slot_range(self.level)) as usize;
         let occupied = self.occupied.rotate_right(now_slot as u32);
