@@ -42,10 +42,18 @@ use std::task::{Context, Poll};
 /// to be merged, it may be advisable to use tasks sending values on a shared
 /// [`mpsc`] channel.
 ///
+/// # Notes
+///
+/// `StreamMap` removes finished streams automatically, without alerting the user.
+/// In some scenarios, the caller would want to know on closed streams.
+/// To do this, use [`StreamNotifyClose`] as a wrapper to your stream.
+/// It will return None when the stream is closed.
+///
 /// [`StreamExt::merge`]: crate::StreamExt::merge
 /// [`mpsc`]: https://docs.rs/tokio/1.0/tokio/sync/mpsc/index.html
 /// [`pin!`]: https://docs.rs/tokio/1.0/tokio/macro.pin.html
 /// [`Box::pin`]: std::boxed::Box::pin
+/// [`StreamNotifyClose`]: crate::StreamNotifyClose
 ///
 /// # Examples
 ///
@@ -170,6 +178,28 @@ use std::task::{Context, Poll};
 ///     }
 /// }
 /// ```
+///
+/// Using `StreamNotifyClose` to handle closed streams with `StreamMap`.
+///
+/// ```
+/// use tokio_stream::{StreamExt, StreamMap, StreamNotifyClose};
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut map = StreamMap::new();
+///     let stream = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
+///     let stream2 = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
+///     map.insert(0, stream);
+///     map.insert(1, stream2);
+///     while let Some((key, val)) = map.next().await {
+///         match val {
+///             Some(val) => println!("got {val:?} from stream {key:?}"),
+///             None => println!("stream {key:?} closed"),
+///         }
+///     }
+/// }
+/// ```
+
 #[derive(Debug)]
 pub struct StreamMap<K, V> {
     /// Streams stored in the map

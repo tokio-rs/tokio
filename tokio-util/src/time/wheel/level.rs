@@ -206,6 +206,10 @@ impl<T: Stack> Level<T> {
 
         ret
     }
+
+    pub(crate) fn peek_entry_slot(&self, slot: usize) -> Option<T::Owned> {
+        self.slot[slot].peek()
+    }
 }
 
 impl<T> fmt::Debug for Level<T> {
