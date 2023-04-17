@@ -4,7 +4,7 @@
     tokio_unstable,
     tokio_taskdump,
     target_os = "linux",
-    any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+    any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
 ))]
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -43,7 +43,7 @@ async fn main() {
     tokio_unstable,
     tokio_taskdump,
     target_os = "linux",
-    any(target_arch = "aarch64", target_arch = "i686", target_arch = "x86_64")
+    any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
 )))]
 fn main() {
     println!("task dumps are not available")

@@ -493,6 +493,7 @@ compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
 #[cfg(all(
     tokio_unstable,
     tokio_taskdump,
+    feature = "rt",
     not(all(
         target_os = "linux",
         any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")

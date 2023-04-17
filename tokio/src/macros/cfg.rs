@@ -379,6 +379,7 @@ macro_rules! cfg_taskdump {
             #[cfg(all(
                 tokio_unstable,
                 tokio_taskdump,
+                feature = "rt",
                 target_os = "linux",
                 any(
                     target_arch = "aarch64",
@@ -389,6 +390,7 @@ macro_rules! cfg_taskdump {
             #[cfg_attr(docsrs, doc(cfg(all(
                 tokio_unstable,
                 tokio_taskdump,
+                feature = "rt",
                 target_os = "linux",
                 any(
                     target_arch = "aarch64",

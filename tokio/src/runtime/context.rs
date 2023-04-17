@@ -12,10 +12,10 @@ cfg_rt! {
     use std::cell::RefCell;
     use std::marker::PhantomData;
     use std::time::Duration;
-}
 
-cfg_taskdump! {
-    use crate::runtime::task::trace;
+    cfg_taskdump! {
+        use crate::runtime::task::trace;
+    }
 }
 
 struct Context {
@@ -53,6 +53,7 @@ struct Context {
     #[cfg(all(
         tokio_unstable,
         tokio_taskdump,
+        feature = "rt",
         target_os = "linux",
         any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
     ))]
@@ -91,6 +92,7 @@ tokio_thread_local! {
             #[cfg(all(
                 tokio_unstable,
                 tokio_taskdump,
+                feature = "rt",
                 target_os = "linux",
                 any(
                     target_arch = "aarch64",
@@ -402,13 +404,13 @@ cfg_rt! {
             matches!(self, EnterRuntime::Entered { .. })
         }
     }
-}
 
-cfg_taskdump! {
-    /// SAFETY: Callers of this function must ensure that trace frames always
-    /// form a valid linked list.
-    pub(crate) unsafe fn with_trace<R>(f: impl FnOnce(&trace::Context) -> R) -> R {
-        CONTEXT.with(|c| f(&c.trace))
+    cfg_taskdump! {
+        /// SAFETY: Callers of this function must ensure that trace frames always
+        /// form a valid linked list.
+        pub(crate) unsafe fn with_trace<R>(f: impl FnOnce(&trace::Context) -> R) -> R {
+            CONTEXT.with(|c| f(&c.trace))
+        }
     }
 }
 

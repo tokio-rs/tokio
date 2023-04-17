@@ -182,6 +182,7 @@ cfg_rt! {
         #[cfg(all(
             tokio_unstable,
             tokio_taskdump,
+            feature = "rt",
             target_os = "linux",
             any(
                 target_arch = "aarch64",
