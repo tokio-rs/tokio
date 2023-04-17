@@ -2,10 +2,10 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use futures::StreamExt;
 use tokio::time::{self, sleep, sleep_until, Duration, Instant};
 use tokio_test::{assert_pending, assert_ready, task};
 use tokio_util::time::DelayQueue;
-use futures::StreamExt;
 
 macro_rules! poll {
     ($queue:ident) => {
@@ -787,7 +787,6 @@ async fn compact_change_deadline() {
     assert!(entry.is_none());
 }
 
-
 #[tokio::test(start_paused = true)]
 async fn item_expiry_greater_than_wheel() {
     // This function tests that a delay queue that has existed for at least 2^36 milliseconds won't panic when a new item is inserted.
@@ -799,7 +798,7 @@ async fn item_expiry_greater_than_wheel() {
     }
     // This should not panic
     let no_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-    queue.insert(1, Duration::from_millis(1));
+        queue.insert(1, Duration::from_millis(1));
     }));
     assert!(no_panic.is_ok());
 }
