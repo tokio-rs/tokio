@@ -1,3 +1,8 @@
+
+# [Unreleased]
+### Fixed
+- fix panic after ~2 years and 2 months in DelayQueue. ([#5536])
+
 # 0.7.7 (February 12, 2023)
 
 This release reverts the removal of the `Encoder` bound on the `FramedParts`
