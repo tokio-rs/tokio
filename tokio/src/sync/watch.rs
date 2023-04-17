@@ -610,12 +610,38 @@ impl<T> Receiver<T> {
         }
     }
 
-    /// Takes a closure and waits until the provided closure returns true.
+    /// Waits for a value that satisifes the provided condition.
     ///
-    /// This function is similar to [`Receiver::changed()`], but it takes a closure that is
-    /// called with a reference to the new value. If the closure returns `true`,
-    /// then the function returns immediately. Otherwise, it waits for a new
-    /// value and calls the closure again.
+    /// This method will call the provided closure whenever something is sent on
+    /// the channel. Once the closure returns `true`, this method will return a
+    /// reference to the value that was passed to the closure.
+    ///
+    /// Before `wait_for` starts waiting for changes, it will call the closure
+    /// on the current value. If the closure returns `true` when given the
+    /// current value, then `wait_for` will immediately return a reference to
+    /// the current value. This is the case even if the current value is already
+    /// considered seen.
+    ///
+    /// The watch channel only keeps track of the most recent value, so if
+    /// several messages are sent faster than `wait_for` is able to call the
+    /// closure, then it may skip some updates. Whenever the closure is called,
+    /// it will be called with the most recent value.
+    ///
+    /// When this function returns, the value that was passed to the closure
+    /// when it returned `true` will be considered seen.
+    ///
+    /// If the channel is closed, then `wait_for` will return a `RecvError`.
+    /// Once this happens, no more messages can ever be sent on the channel.
+    /// When an error is returned, it is guaranteed that the closure has been
+    /// called on the last value, and that it returned `false` for that value.
+    /// (If the closure returned `true`, then the last value would have been
+    /// returned instead of the error.)
+    ///
+    /// Like the `borrow` method, the returned borrow holds a read lock on the
+    /// inner value. This means that long-lived borrows could cause the producer
+    /// half to block. It is recommended to keep the borrow as short-lived as
+    /// possible. See the documentation of `borrow` for more information on
+    /// this.
     ///
     /// [`Receiver::changed()`]: crate::sync::watch::Receiver::changed
     ///
