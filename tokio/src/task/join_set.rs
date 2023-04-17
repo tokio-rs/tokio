@@ -247,6 +247,21 @@ impl<T: 'static> JoinSet<T> {
         self.insert(crate::runtime::spawn_blocking(f))
     }
 
+    /// Spawn the blocking code on the blocking threadpool of the
+    /// provided runtime and store it in this `JoinSet`, returning an
+    /// [`AbortHandle`] that can be used to remotely cancel the task.
+    ///
+    /// [`AbortHandle`]: crate::task::AbortHandle
+    #[track_caller]
+    pub fn spawn_blocking_on<F>(&mut self, f: F, handle: &Handle) -> AbortHandle
+    where
+        F: FnOnce() -> T,
+        F: Send + 'static,
+        T: Send,
+    {
+        self.insert(handle.spawn_blocking(f))
+    }
+
     fn insert(&mut self, jh: JoinHandle<T>) -> AbortHandle {
         let abort = jh.abort_handle();
         let mut entry = self.inner.insert_idle(jh);
