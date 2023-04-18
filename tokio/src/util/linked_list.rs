@@ -11,6 +11,7 @@ use core::fmt;
 use core::marker::{PhantomData, PhantomPinned};
 use core::mem::ManuallyDrop;
 use core::ptr::{self, NonNull};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// An intrusive linked list.
 ///
@@ -25,6 +26,9 @@ pub(crate) struct LinkedList<L, T> {
 
     /// Node type marker.
     _marker: PhantomData<*const L>,
+
+    /// Tracks the length of the linked list
+    _count: AtomicUsize,
 }
 
 unsafe impl<L: Link> Send for LinkedList<L, L::Target> where L::Target: Send {}
@@ -117,6 +121,7 @@ impl<L, T> LinkedList<L, T> {
             head: None,
             tail: None,
             _marker: PhantomData,
+            _count: AtomicUsize::new(0),
         }
     }
 }
@@ -142,6 +147,7 @@ impl<L: Link> LinkedList<L, L::Target> {
                 self.tail = Some(ptr);
             }
         }
+        self._count.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Removes the last element from a list and returns it, or None if it is
@@ -160,6 +166,8 @@ impl<L: Link> LinkedList<L, L::Target> {
             L::pointers(last).as_mut().set_prev(None);
             L::pointers(last).as_mut().set_next(None);
 
+            self._count.fetch_sub(1, Ordering::Relaxed);
+
             Some(L::from_raw(last))
         }
     }
@@ -174,19 +182,9 @@ impl<L: Link> LinkedList<L, L::Target> {
         true
     }
 
-    // Counts the elements of the LinkedList
+    // Returns the number of elements contained in the LinkedList
     pub(crate) fn count(&self) -> usize {
-        let mut count = 0;
-        let mut current = self.head;
-
-        while let Some(node) = current {
-            unsafe {
-                count += 1;
-                current = L::pointers(node).as_ref().get_next()
-            }
-        }
-
-        count
+        self._count.load(Ordering::Relaxed)
     }
 
     /// Removes the specified node from the list
@@ -229,6 +227,8 @@ impl<L: Link> LinkedList<L, L::Target> {
 
         L::pointers(node).as_mut().set_next(None);
         L::pointers(node).as_mut().set_prev(None);
+
+        self._count.fetch_sub(1, Ordering::Relaxed);
 
         Some(L::from_raw(node))
     }
@@ -732,6 +732,26 @@ pub(crate) mod tests {
 
             assert!(list.remove(ptr(&c)).is_none());
         }
+    }
+
+    #[test]
+    fn count() {
+        let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
+        assert_eq!(0, list.count());
+
+        let a = entry(5);
+        let b = entry(7);
+        list.push_front(a.as_ref());
+        list.push_front(b.as_ref());
+        assert_eq!(2, list.count());
+
+        list.pop_back();
+        assert_eq!(1, list.count());
+
+        unsafe {
+            list.remove(ptr(&b));
+        }
+        assert_eq!(0, list.count());
     }
 
     /// This is a fuzz test. You run it by entering `cargo fuzz run fuzz_linked_list` in CLI in `/tokio/` module.
