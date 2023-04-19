@@ -223,9 +223,9 @@ pub(in crate::runtime) fn trace_current_thread(
     local: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
     injection: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
 ) -> Vec<Trace> {
-    // drain the local and injection queues
-    let _ = local.drain(..);
-    let _ = injection.drain(..);
+    // clear the local and injection queues
+    local.clear();
+    injection.clear();
 
     // notify each task
     let mut tasks = vec![];
