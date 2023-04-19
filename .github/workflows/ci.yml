@@ -189,7 +189,6 @@ jobs:
         include:
           - os: windows-latest
           - os: ubuntu-latest
-            rustflags: --cfg tokio_taskdump
           - os: macos-latest
     steps:
       - uses: actions/checkout@v3
@@ -203,10 +202,35 @@ jobs:
         run: cargo test --all-features
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg tokio_unstable ${{ matrix.rustflags }} -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
-          RUSTDOCFLAGS: --cfg tokio_unstable ${{ matrix.rustflags }}
+          RUSTDOCFLAGS: --cfg tokio_unstable
+    
+  test-unstable-taskdump:
+    name: test tokio full --unstable --taskdump
+    needs: basics
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      # Run `tokio` with "unstable" and "taskdump" cfg flags.
+      - name: test tokio full --cfg unstable --cfg taskdump
+        run: cargo test --all-features
+        working-directory: tokio
+        env:
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          # in order to run doctests for unstable features, we must also pass
+          # the unstable cfg to RustDoc
+          RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_taskdump
 
   miri:
     name: miri
