@@ -449,7 +449,6 @@ macro_rules! select {
         use $crate::macros::support::Pin;
         use $crate::macros::support::Poll::{Ready, Pending};
 
-        #[doc(hidden)]
         const BRANCHES: u32 = $crate::count!( $($count)* );
 
         let mut disabled: __tokio_select_util::Mask = Default::default();
