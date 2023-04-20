@@ -772,7 +772,7 @@ rt_test! {
                                 // sleep forever so that the `fail_test` branch
                                 // of the `select!` below triggers.
                                 let _ = fail_test.send(());
-                                let () = futures::future::pending().await;
+                                futures::future::pending::<()>().await;
                                 break;
                             }
                         }
