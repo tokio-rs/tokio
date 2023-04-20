@@ -295,8 +295,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The `worker_threads` option configures the number of worker threads, and
-/// defaults to the number of cpus on the system. This is the default
-/// flavor.
+/// defaults to the number of cpus on the system.
 ///
 /// Note: The multi-threaded runtime requires the `rt-multi-thread` feature
 /// flag.
