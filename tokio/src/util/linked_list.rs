@@ -26,9 +26,6 @@ pub(crate) struct LinkedList<L, T> {
 
     /// Node type marker.
     _marker: PhantomData<*const L>,
-
-    /// Tracks the length of the linked list
-    _count: AtomicUsize,
 }
 
 unsafe impl<L: Link> Send for LinkedList<L, L::Target> where L::Target: Send {}
@@ -121,7 +118,6 @@ impl<L, T> LinkedList<L, T> {
             head: None,
             tail: None,
             _marker: PhantomData,
-            _count: AtomicUsize::new(0),
         }
     }
 }
@@ -147,7 +143,6 @@ impl<L: Link> LinkedList<L, L::Target> {
                 self.tail = Some(ptr);
             }
         }
-        self._count.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Removes the last element from a list and returns it, or None if it is
@@ -166,8 +161,6 @@ impl<L: Link> LinkedList<L, L::Target> {
             L::pointers(last).as_mut().set_prev(None);
             L::pointers(last).as_mut().set_next(None);
 
-            self._count.fetch_sub(1, Ordering::Relaxed);
-
             Some(L::from_raw(last))
         }
     }
@@ -180,11 +173,6 @@ impl<L: Link> LinkedList<L, L::Target> {
 
         assert!(self.tail.is_none());
         true
-    }
-
-    // Returns the number of elements contained in the LinkedList
-    pub(crate) fn count(&self) -> usize {
-        self._count.load(Ordering::Relaxed)
     }
 
     /// Removes the specified node from the list
@@ -228,8 +216,6 @@ impl<L: Link> LinkedList<L, L::Target> {
         L::pointers(node).as_mut().set_next(None);
         L::pointers(node).as_mut().set_prev(None);
 
-        self._count.fetch_sub(1, Ordering::Relaxed);
-
         Some(L::from_raw(node))
     }
 }
@@ -240,6 +226,53 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
             .field("head", &self.head)
             .field("tail", &self.tail)
             .finish()
+    }
+}
+
+// ===== impl CountedLinkedList ====
+
+// Delegates operations to the base LinkedList implementation, and adds a counter to the elements
+// in the list.
+pub(crate) struct CountedLinkedList<L: Link, T> {
+    _list: LinkedList<L, T>,
+    _count: AtomicUsize,
+}
+
+impl<L: Link> CountedLinkedList<L, L::Target> {
+    pub(crate) const fn new() -> CountedLinkedList<L, L::Target> {
+        CountedLinkedList {
+            _list: LinkedList::new(),
+            _count: AtomicUsize::new(0),
+        }
+    }
+
+    pub(crate) fn push_front(&mut self, val: L::Handle) {
+        self._list.push_front(val);
+        self._count.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
+        let val = self._list.pop_back();
+        if val.is_some() {
+            self._count.fetch_sub(1, Ordering::Relaxed);
+        }
+        val
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self._list.is_empty()
+    }
+
+    pub(crate) unsafe fn remove(&mut self, node: NonNull<L::Target>) -> Option<L::Handle> {
+        let val = self._list.remove(node);
+        if val.is_some() {
+            self._count.fetch_sub(1, Ordering::Relaxed);
+        }
+        val
+    }
+
+    pub(crate) fn count(&self) -> usize {
+        self._count.load(Ordering::Relaxed)
     }
 }
 
@@ -736,7 +769,7 @@ pub(crate) mod tests {
 
     #[test]
     fn count() {
-        let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
+        let mut list = CountedLinkedList::<&Entry, <&Entry as Link>::Target>::new();
         assert_eq!(0, list.count());
 
         let a = entry(5);
