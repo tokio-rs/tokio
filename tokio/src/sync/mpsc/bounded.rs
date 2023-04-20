@@ -1,5 +1,5 @@
 use crate::loom::sync::Arc;
-use crate::sync::batch_semaphore::{self as semaphore, TryAcquireError};
+use crate::sync::batch_semaphore::{self as semaphore, Acquire, TryAcquireError};
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{SendError, TryRecvError, TrySendError};
 
@@ -8,8 +8,11 @@ cfg_time! {
     use crate::time::Duration;
 }
 
-use std::fmt;
+use pin_project_lite::pin_project;
+use std::future::Future;
+use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{fmt, mem};
 
 /// Sends values to the associated `Receiver`.
 ///
@@ -81,7 +84,7 @@ pub struct Permit<'a, T> {
 /// [`Sender::reserve_owned()`]: Sender::reserve_owned
 /// [`Sender::try_reserve_owned()`]: Sender::try_reserve_owned
 pub struct OwnedPermit<T> {
-    chan: Option<chan::Tx<T, Semaphore>>,
+    tx: Option<Sender<T>>,
 }
 
 /// Receives values from the associated `Sender`.
@@ -161,6 +164,31 @@ pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
 pub(crate) struct Semaphore {
     pub(crate) semaphore: semaphore::Semaphore,
     pub(crate) bound: usize,
+}
+
+pin_project! {
+    struct ReserveInner<'a> {
+        #[pin]
+        acquire: Acquire<'a>,
+    }
+}
+
+pin_project! {
+    /// Future returned from [`Sender::reserve()`].
+    pub struct Reserve<'a, T> {
+        #[pin]
+        inner: Option<ReserveInner<'a>>,
+        tx: &'a Sender<T>,
+    }
+}
+
+pin_project! {
+    /// Future returned from [`Sender::reserve_owned()`].
+    pub struct ReserveOwned<T> {
+        #[pin]
+        inner: Option<ReserveInner<'static>>,
+        tx: Option<Sender<T>>,
+    }
 }
 
 impl<T> Receiver<T> {
@@ -768,9 +796,11 @@ impl<T> Sender<T> {
     ///     assert_eq!(rx.recv().await.unwrap(), 456);
     /// }
     /// ```
-    pub async fn reserve(&self) -> Result<Permit<'_, T>, SendError<()>> {
-        self.reserve_inner().await?;
-        Ok(Permit { chan: &self.chan })
+    pub fn reserve(&self) -> Reserve<'_, T> {
+        Reserve {
+            inner: None,
+            tx: self,
+        }
     }
 
     /// Waits for channel capacity, moving the `Sender` and returning an owned
@@ -853,17 +883,16 @@ impl<T> Sender<T> {
     /// [`OwnedPermit`]: OwnedPermit
     /// [`send`]: OwnedPermit::send
     /// [`Arc::clone`]: std::sync::Arc::clone
-    pub async fn reserve_owned(self) -> Result<OwnedPermit<T>, SendError<()>> {
-        self.reserve_inner().await?;
-        Ok(OwnedPermit {
-            chan: Some(self.chan),
-        })
+    pub fn reserve_owned(self) -> ReserveOwned<T> {
+        ReserveOwned {
+            inner: None,
+            tx: Some(self),
+        }
     }
 
-    async fn reserve_inner(&self) -> Result<(), SendError<()>> {
-        match self.chan.semaphore().semaphore.acquire(1).await {
-            Ok(_) => Ok(()),
-            Err(_) => Err(SendError(())),
+    fn reserve_inner(&self) -> ReserveInner<'_> {
+        ReserveInner {
+            acquire: self.chan.semaphore().semaphore.acquire(1),
         }
     }
 
@@ -982,9 +1011,7 @@ impl<T> Sender<T> {
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(self)),
         }
 
-        Ok(OwnedPermit {
-            chan: Some(self.chan),
-        })
+        Ok(OwnedPermit { tx: Some(self) })
     }
 
     /// Returns `true` if senders belong to the same channel.
@@ -1099,6 +1126,99 @@ impl<T> fmt::Debug for Sender<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Sender")
             .field("chan", &self.chan)
+            .finish()
+    }
+}
+
+impl Future for ReserveInner<'_> {
+    type Output = Result<(), SendError<()>>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.project().acquire.poll(cx).map(|res| match res {
+            Ok(_) => Ok(()),
+            Err(_) => Err(SendError(())),
+        })
+    }
+}
+
+fn option_insert_pinned<T>(mut opt: Pin<&mut Option<T>>, value: T) -> Pin<&mut T> {
+    opt.as_mut().set(Some(value));
+    opt.as_pin_mut().unwrap()
+}
+
+impl<'a, T> Future for Reserve<'a, T> {
+    type Output = Result<Permit<'a, T>, SendError<()>>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut me = self.project();
+        let inner = match me.inner.as_mut().as_pin_mut() {
+            Some(inner) => inner,
+            None => option_insert_pinned(me.inner, me.tx.reserve_inner()),
+        };
+        inner.poll(cx).map_ok(|()| Permit { chan: &me.tx.chan })
+    }
+}
+
+impl<T> fmt::Debug for Reserve<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Reserve").field("tx", &self.tx).finish()
+    }
+}
+
+impl<T> ReserveOwned<T> {
+    /// Aborts the reservation, returning the [`Sender`].
+    ///
+    /// After this method is called, this future is invalid in the same way as if it had been
+    /// polled to completion.
+    pub fn abort(self: Pin<&mut Self>) -> Sender<T> {
+        let mut me = self.project();
+        me.inner.set(None);
+        me.tx
+            .take()
+            .expect("ReserveOwned::abort called after completion")
+    }
+
+    /// Gets a reference to the [`Sender`] for the channel this future is reserving a permit in.
+    pub fn sender(&self) -> &Sender<T> {
+        self.tx
+            .as_ref()
+            .expect("ReserveOwned::sender called after completion")
+    }
+}
+
+impl<T> Future for ReserveOwned<T> {
+    type Output = Result<OwnedPermit<T>, SendError<()>>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut me = self.project();
+        let inner = match me.inner.as_mut().as_pin_mut() {
+            Some(inner) => inner,
+            None => {
+                let tx = me
+                    .tx
+                    .as_mut()
+                    .expect("ReserveOwned polled after completion");
+                let inner = tx.reserve_inner();
+                // SAFETY: ReserveInner holds a reference to tx.chan.inner.*.semaphore, which is behind an Arc and
+                //         thus has a stable address. Furthermore, inner comes before tx in the field drop order,
+                //         and the fields are private, so it will only ever be observed while tx is alive
+                let inner =
+                    unsafe { mem::transmute::<ReserveInner<'_>, ReserveInner<'static>>(inner) };
+                option_insert_pinned(me.inner.as_mut(), inner)
+            }
+        };
+        let res = ready!(inner.poll(cx));
+        me.inner.set(None);
+        let tx = me.tx.take().unwrap();
+        res?;
+        Poll::Ready(Ok(OwnedPermit { tx: Some(tx) }))
+    }
+}
+
+impl<T> fmt::Debug for ReserveOwned<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ReserveOwned")
+            .field("tx", &self.tx)
             .finish()
     }
 }
@@ -1234,12 +1354,12 @@ impl<T> OwnedPermit<T> {
     /// }
     /// ```
     pub fn send(mut self, value: T) -> Sender<T> {
-        let chan = self.chan.take().unwrap_or_else(|| {
+        let tx = self.tx.take().unwrap_or_else(|| {
             unreachable!("OwnedPermit channel is only taken when the permit is moved")
         });
-        chan.send(value);
+        tx.chan.send(value);
 
-        Sender { chan }
+        tx
     }
 
     /// Releases the reserved capacity *without* sending a message, returning the
@@ -1275,13 +1395,20 @@ impl<T> OwnedPermit<T> {
     pub fn release(mut self) -> Sender<T> {
         use chan::Semaphore;
 
-        let chan = self.chan.take().unwrap_or_else(|| {
+        let tx = self.tx.take().unwrap_or_else(|| {
             unreachable!("OwnedPermit channel is only taken when the permit is moved")
         });
 
         // Add the permit back to the semaphore
-        chan.semaphore().add_permit();
-        Sender { chan }
+        tx.chan.semaphore().add_permit();
+        tx
+    }
+
+    /// Gets a reference to the [`Sender`] this permit has ownership over.
+    pub fn sender(&self) -> &Sender<T> {
+        self.tx.as_ref().unwrap_or_else(|| {
+            unreachable!("OwnedPermit channel is only taken when the permit is moved")
+        })
     }
 }
 
@@ -1290,7 +1417,7 @@ impl<T> Drop for OwnedPermit<T> {
         use chan::Semaphore;
 
         // Are we still holding onto the sender?
-        if let Some(chan) = self.chan.take() {
+        if let Some(Sender { chan }) = self.tx.take() {
             let semaphore = chan.semaphore();
 
             // Add the permit back to the semaphore
@@ -1311,7 +1438,7 @@ impl<T> Drop for OwnedPermit<T> {
 impl<T> fmt::Debug for OwnedPermit<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("OwnedPermit")
-            .field("chan", &self.chan)
+            .field("tx", &self.tx)
             .finish()
     }
 }
