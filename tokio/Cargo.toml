@@ -134,9 +134,6 @@ features = [
     "Win32_Security_Authorization",
 ]
 
-[target.'cfg(windows)'.dev-dependencies.ntapi]
-version = "0.3.6"
-
 [dev-dependencies]
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }

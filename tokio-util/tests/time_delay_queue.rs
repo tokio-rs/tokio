@@ -2,6 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use futures::StreamExt;
 use tokio::time::{self, sleep, sleep_until, Duration, Instant};
 use tokio_test::{assert_pending, assert_ready, task};
 use tokio_util::time::DelayQueue;
@@ -784,6 +785,22 @@ async fn compact_change_deadline() {
 
     let entry = assert_ready!(poll!(queue));
     assert!(entry.is_none());
+}
+
+#[tokio::test(start_paused = true)]
+async fn item_expiry_greater_than_wheel() {
+    // This function tests that a delay queue that has existed for at least 2^36 milliseconds won't panic when a new item is inserted.
+    let mut queue = DelayQueue::new();
+    for _ in 0..2 {
+        tokio::time::advance(Duration::from_millis(1 << 35)).await;
+        queue.insert(0, Duration::from_millis(0));
+        queue.next().await;
+    }
+    // This should not panic
+    let no_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        queue.insert(1, Duration::from_millis(1));
+    }));
+    assert!(no_panic.is_ok());
 }
 
 #[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
