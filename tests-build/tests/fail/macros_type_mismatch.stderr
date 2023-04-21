@@ -1,33 +1,33 @@
 error[E0308]: mismatched types
- --> $DIR/macros_type_mismatch.rs:5:5
+ --> tests/fail/macros_type_mismatch.rs:5:5
   |
 4 | async fn missing_semicolon_or_return_type() {
   |                                             - help: a return type might be missing here: `-> _`
 5 |     Ok(())
-  |     ^^^^^^ expected `()`, found enum `Result`
+  |     ^^^^^^ expected `()`, found `Result<(), _>`
   |
   = note: expected unit type `()`
                   found enum `Result<(), _>`
 
 error[E0308]: mismatched types
-  --> $DIR/macros_type_mismatch.rs:10:5
+  --> tests/fail/macros_type_mismatch.rs:10:5
    |
 9  | async fn missing_return_type() {
    |                                - help: a return type might be missing here: `-> _`
 10 |     return Ok(());
-   |     ^^^^^^^^^^^^^^ expected `()`, found enum `Result`
+   |     ^^^^^^^^^^^^^^ expected `()`, found `Result<(), _>`
    |
    = note: expected unit type `()`
                    found enum `Result<(), _>`
 
 error[E0308]: mismatched types
-  --> $DIR/macros_type_mismatch.rs:23:5
+  --> tests/fail/macros_type_mismatch.rs:23:5
    |
 14 | async fn extra_semicolon() -> Result<(), ()> {
    |                               -------------- expected `Result<(), ()>` because of return type
 ...
 23 |     Ok(());
-   |     ^^^^^^^ expected enum `Result`, found `()`
+   |     ^^^^^^^ expected `Result<(), ()>`, found `()`
    |
    = note:   expected enum `Result<(), ()>`
            found unit type `()`
@@ -38,7 +38,7 @@ help: try adding an expression at the end of the block
    |
 
 error[E0308]: mismatched types
-  --> $DIR/macros_type_mismatch.rs:32:5
+  --> tests/fail/macros_type_mismatch.rs:32:5
    |
 30 | async fn issue_4635() {
    |                       - help: try adding a return type: `-> i32`
