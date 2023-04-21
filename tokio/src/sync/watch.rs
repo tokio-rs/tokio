@@ -673,7 +673,7 @@ impl<T> Receiver<T> {
     pub async fn wait_for<'a>(
         &'a mut self,
         mut f: impl FnMut(&T) -> bool,
-    ) -> Result<Ref<'a, T>, error::RecvError> {
+    ) -> Result<Ref<'_, T>, error::RecvError> {
         loop {
             if f(&self.borrow_and_update()) {
                 return Ok(self.borrow());
@@ -685,7 +685,6 @@ impl<T> Receiver<T> {
                     // some error occurred but we still need to call the closure
                     // to guarantee that it has been called on the last value.
                     // and we error only if its false.
-                    // we should not call the closure twice on the same value.
                     if f(&self.borrow_and_update()) {
                         return Ok(self.borrow());
                     } else {
