@@ -676,7 +676,7 @@ impl<T> Receiver<T> {
     ) -> Result<Ref<'a, T>, error::RecvError> {
         loop {
             if f(&self.borrow_and_update()) {
-                return Ok(());
+                return Ok(self.borrow());
             }
 
             match self.changed().await {
@@ -685,8 +685,9 @@ impl<T> Receiver<T> {
                     // some error occurred but we still need to call the closure
                     // to guarantee that it has been called on the last value.
                     // and we error only if its false.
+                    // we should not call the closure twice on the same value.
                     if f(&self.borrow_and_update()) {
-                        return Ok(());
+                        return Ok(self.borrow());
                     } else {
                         return Err(e);
                     }

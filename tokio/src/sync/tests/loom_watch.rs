@@ -55,7 +55,7 @@ fn wait_for_test() {
             tx2.send(true).unwrap();
         });
 
-        block_on(rx.wait_for(|x| *x)).unwrap();
+        assert_eq!(*block_on(rx.wait_for(|x| *x)).unwrap(), true);
 
         th1.join().unwrap();
         th2.join().unwrap();
