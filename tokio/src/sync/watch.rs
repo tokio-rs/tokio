@@ -682,15 +682,14 @@ impl<T> Receiver<T> {
             match self.changed().await {
                 Ok(_) => {}
                 Err(e) => {
+                    let updated_val = self.borrow_and_update();
                     // check if the version has changed since the last time we
                     // called the closure.
-                    if self.shared.state.load().version() == self.version {
-                        return Err(e);
+                    if updated_val.has_changed && f(&updated_val) {
+                        return Ok(updated_val);
                     }
-                    // the version has changed, so we need to call the closure
-                    if f(&self.borrow_and_update()) {
-                        return Ok(self.borrow());
-                    }
+                    // if the version hasn't changed, then the channel has been
+                    // closed. We return the error.
                     return Err(e);
                 }
             }
