@@ -680,16 +680,18 @@ impl<T> Receiver<T> {
             }
 
             match self.changed().await {
-                Ok(()) => {}
+                Ok(_) => {}
                 Err(e) => {
-                    // some error occurred but we still need to call the closure
-                    // to guarantee that it has been called on the last value.
-                    // and we error only if its false.
-                    if f(&self.borrow_and_update()) {
-                        return Ok(self.borrow());
-                    } else {
+                    // check if the version has changed since the last time we
+                    // called the closure.
+                    if self.shared.state.load().version() == self.version {
                         return Err(e);
                     }
+                    // the version has changed, so we need to call the closure
+                    if f(&self.borrow_and_update()) {
+                        return Ok(self.borrow());
+                    }
+                    return Err(e);
                 }
             }
         }
