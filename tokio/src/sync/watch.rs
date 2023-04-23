@@ -730,7 +730,10 @@ fn maybe_changed<T>(
     None
 }
 
-async fn changed_impl<T>(shared: &Shared<T>, version: &mut Version) -> Result<(), error::RecvError> {
+async fn changed_impl<T>(
+    shared: &Shared<T>,
+    version: &mut Version,
+) -> Result<(), error::RecvError> {
     loop {
         // In order to avoid a race condition, we first request a notification,
         // **then** check the current value's version. If a new version exists,
