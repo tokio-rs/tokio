@@ -671,10 +671,8 @@ impl<T> Receiver<T> {
                 let has_changed = self.version != new_version;
                 self.version = new_version;
 
-                if !closed || has_changed {
-                    if f(&inner) {
-                        return Ok(Ref { inner, has_changed });
-                    }
+                if (!closed || has_changed) && f(&inner) {
+                    return Ok(Ref { inner, has_changed });
                 }
             }
 
