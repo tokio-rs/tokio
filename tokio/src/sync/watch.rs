@@ -595,19 +595,7 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
-        loop {
-            // In order to avoid a race condition, we first request a notification,
-            // **then** check the current value's version. If a new version exists,
-            // the notification request is dropped.
-            let notified = self.shared.notify_rx.notified();
-
-            if let Some(ret) = maybe_changed(&self.shared, &mut self.version) {
-                return ret;
-            }
-
-            notified.await;
-            // loop around again in case the wake-up was spurious
-        }
+        changed_impl(&self.shared, &mut self.version).await
     }
 
     /// Waits for a value that satisifes the provided condition.
@@ -656,13 +644,13 @@ impl<T> Receiver<T> {
     ///     let (tx, _rx) = watch::channel("hello");
     ///
     ///     tx.send("goodbye").unwrap();
-    ///     
+    ///
     ///     // here we subscribe to a second receiver
     ///     // now in case of using `changed` we would have
     ///     // to first check the current value and then wait
     ///     // for changes or else `changed` would hang.
     ///     let mut rx2 = tx.subscribe();
-    ///     
+    ///
     ///     // in place of changed we have use `wait_for`
     ///     // which would automatically check the current value
     ///     // and wait for changes until the closure returns true.
@@ -674,25 +662,28 @@ impl<T> Receiver<T> {
         &mut self,
         mut f: impl FnMut(&T) -> bool,
     ) -> Result<Ref<'_, T>, error::RecvError> {
+        let mut closed = false;
         loop {
-            if f(&self.borrow_and_update()) {
-                return Ok(self.borrow());
-            }
+            {
+                let inner = self.shared.value.read().unwrap();
 
-            match self.changed().await {
-                Ok(_) => {}
-                Err(e) => {
-                    let updated_val = self.borrow_and_update();
-                    // check if the version has changed since the last time we
-                    // called the closure.
-                    if updated_val.has_changed && f(&updated_val) {
-                        return Ok(updated_val);
+                let new_version = self.shared.state.load().version();
+                let has_changed = self.version != new_version;
+                self.version = new_version;
+
+                if !closed || has_changed {
+                    if f(&inner) {
+                        return Ok(Ref { inner, has_changed });
                     }
-                    // if the version hasn't changed, then the channel has been
-                    // closed. We return the error.
-                    return Err(e);
                 }
             }
+
+            if closed {
+                return Err(error::RecvError(()));
+            }
+
+            // Wait for the value to change.
+            closed = changed_impl(&self.shared, &mut self.version).await.is_err();
         }
     }
 
@@ -739,6 +730,22 @@ fn maybe_changed<T>(
     }
 
     None
+}
+
+async fn changed_impl<T>(shared: &Shared<T>, version: &mut Version) -> Result<(), error::RecvError> {
+    loop {
+        // In order to avoid a race condition, we first request a notification,
+        // **then** check the current value's version. If a new version exists,
+        // the notification request is dropped.
+        let notified = shared.notify_rx.notified();
+
+        if let Some(ret) = maybe_changed(shared, version) {
+            return ret;
+        }
+
+        notified.await;
+        // loop around again in case the wake-up was spurious
+    }
 }
 
 impl<T> Clone for Receiver<T> {
