@@ -61,3 +61,29 @@ fn wait_for_test() {
         th2.join().unwrap();
     });
 }
+
+#[test]
+fn wait_for_returns_correct_value() {
+    loom::model(move || {
+        let (tx, mut rx) = watch::channel(0);
+
+        let jh = thread::spawn(move || {
+            tx.send(1).unwrap();
+            tx.send(2).unwrap();
+            tx.send(3).unwrap();
+        });
+
+        // Stop at the first value we are called at.
+        let mut stopped_at = usize::MAX;
+        let returned = *block_on(rx.wait_for(|x| {
+            stopped_at = *x;
+            true
+        })).unwrap();
+
+        // Check that it returned the same value as the one we returned
+        // `true` for.
+        assert_eq!(stopped_at, returned);
+
+        jh.join().unwrap();
+    });
+}
