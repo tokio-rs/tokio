@@ -943,9 +943,9 @@ pub trait StreamExt: Stream {
     /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
     ///
     /// ```
-    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// # #[tokio::main]
     /// # async fn main() {
-    /// use tokio_stream::{self as stream, StreamExt, wrappers::IntervalStream};
+    /// use tokio_stream::{self as stream, StreamExt};
     /// use std::time::Duration;
     /// # let int_stream = stream::iter(1..=3);
     ///
@@ -973,9 +973,17 @@ pub trait StreamExt: Stream {
     ///
     /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));
     /// assert_eq!(int_stream.try_next().await, Ok(None));
+    /// # }
+    /// ```
     ///
-    /// // Once a timeout error is received, no further events will be received
-    /// // unless the wrapped stream yields a value (timeouts do not repeat).
+    /// Once a timeout error is received, no further events will be received
+    /// unless the wrapped stream yields a value (timeouts do not repeat).
+    ///
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// # async fn main() {
+    /// use tokio_stream::{StreamExt, wrappers::IntervalStream};
+    /// use std::time::Duration;
     /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(100)));
     /// let timeout_stream = interval_stream.timeout(Duration::from_millis(10));
     /// tokio::pin!(timeout_stream);
@@ -1022,9 +1030,9 @@ pub trait StreamExt: Stream {
     /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
     ///
     /// ```
-    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// # #[tokio::main]
     /// # async fn main() {
-    /// use tokio_stream::{self as stream, StreamExt, wrappers::IntervalStream};
+    /// use tokio_stream::{self as stream, StreamExt};
     /// use std::time::Duration;
     /// # let int_stream = stream::iter(1..=3);
     ///
@@ -1052,9 +1060,17 @@ pub trait StreamExt: Stream {
     ///
     /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));
     /// assert_eq!(int_stream.try_next().await, Ok(None));
+    /// # }
+    /// ```
     ///
-    /// // Timeout errors will be continuously produced at the specified
-    /// // interval until the wrapped stream yields a value.
+    /// Timeout errors will be continuously produced at the specified interval
+    /// until the wrapped stream yields a value.
+    ///
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// # async fn main() {
+    /// use tokio_stream::{StreamExt, wrappers::IntervalStream};
+    /// use std::time::Duration;
     /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(23)));
     /// let timeout_stream = interval_stream.timeout_repeating(tokio::time::interval(Duration::from_millis(9)));
     /// tokio::pin!(timeout_stream);
