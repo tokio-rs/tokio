@@ -78,7 +78,8 @@ fn wait_for_returns_correct_value() {
         let returned = *block_on(rx.wait_for(|x| {
             stopped_at = *x;
             true
-        })).unwrap();
+        }))
+        .unwrap();
 
         // Check that it returned the same value as the one we returned
         // `true` for.
