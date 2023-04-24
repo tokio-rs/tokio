@@ -241,38 +241,38 @@ pub(crate) struct CountedLinkedList<L: Link, T> {
 impl<L: Link> CountedLinkedList<L, L::Target> {
     pub(crate) const fn new() -> CountedLinkedList<L, L::Target> {
         CountedLinkedList {
-            _list: LinkedList::new(),
-            _count: AtomicUsize::new(0),
+            list: LinkedList::new(),
+            count: AtomicUsize::new(0),
         }
     }
 
     pub(crate) fn push_front(&mut self, val: L::Handle) {
-        self._list.push_front(val);
-        self._count.fetch_add(1, Ordering::Relaxed);
+        self.list.push_front(val);
+        self.count.fetch_add(1, Ordering::Relaxed);
     }
 
     pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
-        let val = self._list.pop_back();
+        let val = self.list.pop_back();
         if val.is_some() {
-            self._count.fetch_sub(1, Ordering::Relaxed);
+            self.count.fetch_sub(1, Ordering::Relaxed);
         }
         val
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self._list.is_empty()
+        self.list.is_empty()
     }
 
     pub(crate) unsafe fn remove(&mut self, node: NonNull<L::Target>) -> Option<L::Handle> {
-        let val = self._list.remove(node);
+        let val = self.list.remove(node);
         if val.is_some() {
-            self._count.fetch_sub(1, Ordering::Relaxed);
+            self.count.fetch_sub(1, Ordering::Relaxed);
         }
         val
     }
 
     pub(crate) fn count(&self) -> usize {
-        self._count.load(Ordering::Relaxed)
+        self.count.load(Ordering::Relaxed)
     }
 }
 
