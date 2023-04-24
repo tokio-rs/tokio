@@ -239,7 +239,7 @@ pub(crate) struct CountedLinkedList<L: Link, T> {
 }
 
 impl<L: Link> CountedLinkedList<L, L::Target> {
-    pub(crate) const fn new() -> CountedLinkedList<L, L::Target> {
+    pub(crate) fn new() -> CountedLinkedList<L, L::Target> {
         CountedLinkedList {
             list: LinkedList::new(),
             count: AtomicUsize::new(0),
