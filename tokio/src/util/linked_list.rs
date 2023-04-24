@@ -507,6 +507,7 @@ pub(crate) mod tests {
         }
     }
 
+    #[cfg(test)]
     macro_rules! assert_clean {
         ($e:ident) => {{
             assert!($e.pointers.get_next().is_none());
@@ -514,6 +515,7 @@ pub(crate) mod tests {
         }};
     }
 
+    #[cfg(test)]
     macro_rules! assert_ptr_eq {
         ($a:expr, $b:expr) => {{
             // Deal with mapping a Pin<&mut T> -> Option<NonNull<T>>
@@ -717,6 +719,7 @@ pub(crate) mod tests {
         }
     }
 
+    /// This is a fuzz test. You run it by entering `cargo fuzz run fuzz_linked_list` in CLI in `/tokio/` module.
     #[cfg(fuzzing)]
     pub fn fuzz_linked_list(ops: &[u8]) {
         enum Op {

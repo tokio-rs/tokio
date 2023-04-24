@@ -807,6 +807,8 @@ impl UnixDatagram {
     cfg_io_util! {
         /// Tries to receive data from the socket without waiting.
         ///
+        /// This method can be used even if `buf` is uninitialized.
+        ///
         /// # Examples
         ///
         /// ```no_run
@@ -866,8 +868,63 @@ impl UnixDatagram {
             Ok((n, SocketAddr(addr)))
         }
 
+        /// Receives from the socket, advances the
+        /// buffer's internal cursor and returns how many bytes were read and the origin.
+        ///
+        /// This method can be used even if `buf` is uninitialized.
+        ///
+        /// # Examples
+        /// ```
+        /// # use std::error::Error;
+        /// # #[tokio::main]
+        /// # async fn main() -> Result<(), Box<dyn Error>> {
+        /// use tokio::net::UnixDatagram;
+        /// use tempfile::tempdir;
+        ///
+        /// // We use a temporary directory so that the socket
+        /// // files left by the bound sockets will get cleaned up.
+        /// let tmp = tempdir()?;
+        ///
+        /// // Bind each socket to a filesystem path
+        /// let tx_path = tmp.path().join("tx");
+        /// let tx = UnixDatagram::bind(&tx_path)?;
+        /// let rx_path = tmp.path().join("rx");
+        /// let rx = UnixDatagram::bind(&rx_path)?;
+        ///
+        /// let bytes = b"hello world";
+        /// tx.send_to(bytes, &rx_path).await?;
+        ///
+        /// let mut buf = Vec::with_capacity(24);
+        /// let (size, addr) = rx.recv_buf_from(&mut buf).await?;
+        ///
+        /// let dgram = &buf[..size];
+        /// assert_eq!(dgram, bytes);
+        /// assert_eq!(addr.as_pathname().unwrap(), &tx_path);
+        ///
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub async fn recv_buf_from<B: BufMut>(&self, buf: &mut B) -> io::Result<(usize, SocketAddr)> {
+            self.io.registration().async_io(Interest::READABLE, || {
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `UnixDatagram::recv_from` to have filled up `n` bytes in the
+                // buffer.
+                let (n, addr) = (*self.io).recv_from(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+                Ok((n,SocketAddr(addr)))
+            }).await
+        }
+
         /// Tries to read data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
+        ///
+        /// This method can be used even if `buf` is uninitialized.
         ///
         /// # Examples
         ///
@@ -925,6 +982,52 @@ impl UnixDatagram {
 
                 Ok(n)
             })
+        }
+
+        /// Receives data from the socket from the address to which it is connected,
+        /// advancing the buffer's internal cursor, returning how many bytes were read.
+        ///
+        /// This method can be used even if `buf` is uninitialized.
+        ///
+        /// # Examples
+        /// ```
+        /// # use std::error::Error;
+        /// # #[tokio::main]
+        /// # async fn main() -> Result<(), Box<dyn Error>> {
+        /// use tokio::net::UnixDatagram;
+        ///
+        /// // Create the pair of sockets
+        /// let (sock1, sock2) = UnixDatagram::pair()?;
+        ///
+        /// // Since the sockets are paired, the paired send/recv
+        /// // functions can be used
+        /// let bytes = b"hello world";
+        /// sock1.send(bytes).await?;
+        ///
+        /// let mut buff = Vec::with_capacity(24);
+        /// let size = sock2.recv_buf(&mut buff).await?;
+        ///
+        /// let dgram = &buff[..size];
+        /// assert_eq!(dgram, bytes);
+        ///
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub async fn recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().async_io(Interest::READABLE, || {
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `UnixDatagram::recv_from` to have filled up `n` bytes in the
+                // buffer.
+                let n = (*self.io).recv(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+                Ok(n)
+            }).await
         }
     }
 

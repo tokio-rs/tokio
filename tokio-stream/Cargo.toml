@@ -18,6 +18,16 @@ categories = ["asynchronous"]
 
 [features]
 default = ["time"]
+
+full = [
+    "time",
+    "net",
+    "io-util",
+    "fs",
+    "sync",
+    "signal"
+]
+
 time = ["tokio/time"]
 net = ["tokio/net"]
 io-util = ["tokio/io-util"]

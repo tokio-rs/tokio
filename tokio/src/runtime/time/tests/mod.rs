@@ -164,7 +164,7 @@ fn reset_future() {
                 .as_mut()
                 .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
 
-            entry.as_mut().reset(start + Duration::from_secs(2));
+            entry.as_mut().reset(start + Duration::from_secs(2), true);
 
             // shouldn't complete before 2s
             block_on(futures::future::poll_fn(|cx| {

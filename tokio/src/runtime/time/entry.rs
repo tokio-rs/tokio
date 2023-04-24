@@ -527,9 +527,9 @@ impl TimerEntry {
         unsafe { self.driver().clear_entry(NonNull::from(self.inner())) };
     }
 
-    pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant) {
+    pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant, reregister: bool) {
         unsafe { self.as_mut().get_unchecked_mut() }.deadline = new_time;
-        unsafe { self.as_mut().get_unchecked_mut() }.registered = true;
+        unsafe { self.as_mut().get_unchecked_mut() }.registered = reregister;
 
         let tick = self.driver().time_source().deadline_to_tick(new_time);
 
@@ -537,9 +537,11 @@ impl TimerEntry {
             return;
         }
 
-        unsafe {
-            self.driver()
-                .reregister(&self.driver.driver().io, tick, self.inner().into());
+        if reregister {
+            unsafe {
+                self.driver()
+                    .reregister(&self.driver.driver().io, tick, self.inner().into());
+            }
         }
     }
 
@@ -553,7 +555,7 @@ impl TimerEntry {
 
         if !self.registered {
             let deadline = self.deadline;
-            self.as_mut().reset(deadline);
+            self.as_mut().reset(deadline, true);
         }
 
         let this = unsafe { self.get_unchecked_mut() };

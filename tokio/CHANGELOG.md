@@ -1,3 +1,52 @@
+# 1.27.0 (March 27th, 2023)
+
+This release bumps the MSRV of Tokio to 1.56. ([#5559])
+
+### Added
+
+- io: add `async_io` helper method to sockets ([#5512])
+- io: add implementations of `AsFd`/`AsHandle`/`AsSocket` ([#5514], [#5540])
+- net: add `UdpSocket::peek_sender()` ([#5520])
+- sync: add `RwLockWriteGuard::{downgrade_map, try_downgrade_map}` ([#5527])
+- task: add `JoinHandle::abort_handle` ([#5543])
+
+### Changed
+
+- io: use `memchr` from `libc` ([#5558])
+- macros: accept path as crate rename in `#[tokio::main]` ([#5557])
+- macros: update to syn 2.0.0 ([#5572])
+- time: don't register for a wakeup when `Interval` returns `Ready` ([#5553])
+
+### Fixed
+
+- fs: fuse std iterator in `ReadDir` ([#5555])
+- tracing: fix `spawn_blocking` location fields ([#5573])
+- time: clean up redundant check in `Wheel::poll()` ([#5574])
+
+### Documented
+
+- macros: define cancellation safety ([#5525])
+- io: add details to docs of `tokio::io::copy[_buf]` ([#5575])
+- io: refer to `ReaderStream` and `StreamReader` in module docs ([#5576])
+
+[#5512]: https://github.com/tokio-rs/tokio/pull/5512
+[#5514]: https://github.com/tokio-rs/tokio/pull/5514
+[#5520]: https://github.com/tokio-rs/tokio/pull/5520
+[#5525]: https://github.com/tokio-rs/tokio/pull/5525
+[#5527]: https://github.com/tokio-rs/tokio/pull/5527
+[#5540]: https://github.com/tokio-rs/tokio/pull/5540
+[#5543]: https://github.com/tokio-rs/tokio/pull/5543
+[#5553]: https://github.com/tokio-rs/tokio/pull/5553
+[#5555]: https://github.com/tokio-rs/tokio/pull/5555
+[#5557]: https://github.com/tokio-rs/tokio/pull/5557
+[#5558]: https://github.com/tokio-rs/tokio/pull/5558
+[#5559]: https://github.com/tokio-rs/tokio/pull/5559
+[#5572]: https://github.com/tokio-rs/tokio/pull/5572
+[#5573]: https://github.com/tokio-rs/tokio/pull/5573
+[#5574]: https://github.com/tokio-rs/tokio/pull/5574
+[#5575]: https://github.com/tokio-rs/tokio/pull/5575
+[#5576]: https://github.com/tokio-rs/tokio/pull/5576
+
 # 1.26.0 (March 1st, 2023)
 
 ### Fixed

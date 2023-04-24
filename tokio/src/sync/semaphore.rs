@@ -125,7 +125,7 @@ fn bounds() {
 }
 
 impl Semaphore {
-    /// The maximum number of permits which a semaphore can hold. It is `usize::MAX >>> 3`.
+    /// The maximum number of permits which a semaphore can hold. It is `usize::MAX >> 3`.
     ///
     /// Exceeding this limit typically results in a panic.
     pub const MAX_PERMITS: usize = super::batch_semaphore::Semaphore::MAX_PERMITS;
@@ -675,6 +675,11 @@ impl OwnedSemaphorePermit {
         );
         self.permits += other.permits;
         other.permits = 0;
+    }
+
+    /// Returns the [`Semaphore`] from which this permit was acquired.
+    pub fn semaphore(&self) -> &Arc<Semaphore> {
+        &self.sem
     }
 }
 

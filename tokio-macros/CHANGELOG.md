@@ -1,3 +1,18 @@
+# 2.0.0 (March 24th, 2023)
+
+This major release updates the dependency on the syn crate to 2.0.0, and
+increases the MSRV to 1.56.
+
+As part of this release, we are adopting a policy of depending on a specific minor
+release of tokio-macros. This prevents Tokio from being able to pull in many different
+versions of tokio-macros.
+
+- macros: update `syn` ([#5572])
+- macros: accept path as crate rename ([#5557])
+
+[#5572]: https://github.com/tokio-rs/tokio/pull/5572
+[#5557]: https://github.com/tokio-rs/tokio/pull/5557
+
 # 1.8.2 (November 30th, 2022)
 
 - fix a regression introduced in 1.8.1 ([#5244])
