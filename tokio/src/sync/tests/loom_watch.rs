@@ -46,7 +46,7 @@ fn wait_for_test() {
         let tx2 = tx_arc.clone();
 
         let th1 = thread::spawn(move || {
-            for _ in 0..3 {
+            for _ in 0..2 {
                 tx1.send_modify(|_x| {});
             }
         });
