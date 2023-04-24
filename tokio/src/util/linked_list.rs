@@ -234,8 +234,8 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
 // Delegates operations to the base LinkedList implementation, and adds a counter to the elements
 // in the list.
 pub(crate) struct CountedLinkedList<L: Link, T> {
-    _list: LinkedList<L, T>,
-    _count: AtomicUsize,
+    list: LinkedList<L, T>,
+    count: AtomicUsize,
 }
 
 impl<L: Link> CountedLinkedList<L, L::Target> {
