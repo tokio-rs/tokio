@@ -8,7 +8,7 @@
 - sync: add `OwnedSemaphorePermit::semaphore` ([#5618])
 - sync: add `same_channel` to broadcast channel ([#5607])
 - sync: add `watch::Receiver::wait_for` ([#5611])
-- task: add `JoinSet::spawn_blocking` ([#5612])
+- task: add `JoinSet::spawn_blocking` and `spawn_blocking_on` ([#5612])
 
 ### Changed
 
