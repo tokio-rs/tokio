@@ -97,7 +97,7 @@ stats = []
 autocfg = "1.1"
 
 [dependencies]
-tokio-macros = { version = "~2.0.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "~2.1.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.0"
 
