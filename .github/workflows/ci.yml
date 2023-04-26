@@ -404,6 +404,11 @@ jobs:
       - name: check --feature-powerset --unstable
         run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
         env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+      # Try with unstable and taskdump feature flags
+      - name: check --feature-powerset --unstable --taskdump
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
+        env:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
   minrust:
