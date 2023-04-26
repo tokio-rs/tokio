@@ -1,3 +1,10 @@
+# 0.1.14 (April 26th, 2023)
+
+This bugfix release bumps the minimum version of Tokio to 1.15, which is
+necessary for `timeout_repeating` to compile. ([#5657])
+
+[#5657]: https://github.com/tokio-rs/tokio/pull/5657
+
 # 0.1.13 (April 25th, 2023)
 
 This release bumps the MSRV of tokio-stream to 1.56.
