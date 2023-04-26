@@ -11,7 +11,6 @@ use core::fmt;
 use core::marker::{PhantomData, PhantomPinned};
 use core::mem::ManuallyDrop;
 use core::ptr::{self, NonNull};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// An intrusive linked list.
 ///
@@ -235,26 +234,26 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
 // in the list.
 pub(crate) struct CountedLinkedList<L: Link, T> {
     list: LinkedList<L, T>,
-    count: AtomicUsize,
+    count: usize,
 }
 
 impl<L: Link> CountedLinkedList<L, L::Target> {
     pub(crate) fn new() -> CountedLinkedList<L, L::Target> {
         CountedLinkedList {
             list: LinkedList::new(),
-            count: AtomicUsize::new(0),
+            count: 0,
         }
     }
 
     pub(crate) fn push_front(&mut self, val: L::Handle) {
         self.list.push_front(val);
-        self.count.fetch_add(1, Ordering::Relaxed);
+        self.count += 1;
     }
 
     pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
         let val = self.list.pop_back();
         if val.is_some() {
-            self.count.fetch_sub(1, Ordering::Relaxed);
+            self.count -= 1;
         }
         val
     }
@@ -266,13 +265,13 @@ impl<L: Link> CountedLinkedList<L, L::Target> {
     pub(crate) unsafe fn remove(&mut self, node: NonNull<L::Target>) -> Option<L::Handle> {
         let val = self.list.remove(node);
         if val.is_some() {
-            self.count.fetch_sub(1, Ordering::Relaxed);
+            self.count -= 1;
         }
         val
     }
 
     pub(crate) fn count(&self) -> usize {
-        self.count.load(Ordering::Relaxed)
+        self.count
     }
 }
 
