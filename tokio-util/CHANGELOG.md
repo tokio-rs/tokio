@@ -1,3 +1,30 @@
+# 0.7.8 (April 25th, 2023)
+
+This release bumps the MSRV of tokio-util to 1.56.
+
+### Added
+
+- time: add `DelayQueue::peek` ([#5569])
+
+### Changed
+
+This release contains one performance improvement:
+
+- sync: try to lock the parent first in `CancellationToken` ([#5561])
+
+### Fixed
+
+- time: fix panic in `DelayQueue` ([#5630])
+
+### Documented
+
+- sync: improve `CancellationToken` doc on child tokens ([#5632])
+
+[#5561]: https://github.com/tokio-rs/tokio/pull/5561
+[#5569]: https://github.com/tokio-rs/tokio/pull/5569
+[#5630]: https://github.com/tokio-rs/tokio/pull/5630
+[#5632]: https://github.com/tokio-rs/tokio/pull/5632
+
 # 0.7.7 (February 12, 2023)
 
 This release reverts the removal of the `Encoder` bound on the `FramedParts`

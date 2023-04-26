@@ -1,3 +1,22 @@
+# 0.1.14 (April 26th, 2023)
+
+This bugfix release bumps the minimum version of Tokio to 1.15, which is
+necessary for `timeout_repeating` to compile. ([#5657])
+
+[#5657]: https://github.com/tokio-rs/tokio/pull/5657
+
+# 0.1.13 (April 25th, 2023)
+
+This release bumps the MSRV of tokio-stream to 1.56.
+
+- stream: add "full" feature flag ([#5639])
+- stream: add `StreamExt::timeout_repeating` ([#5577])
+- stream: add `StreamNotifyClose` ([#4851])
+
+[#4851]: https://github.com/tokio-rs/tokio/pull/4851
+[#5577]: https://github.com/tokio-rs/tokio/pull/5577
+[#5639]: https://github.com/tokio-rs/tokio/pull/5639
+
 # 0.1.12 (January 20, 2023)
 
 - time: remove `Unpin` bound on `Throttle` methods ([#5105])

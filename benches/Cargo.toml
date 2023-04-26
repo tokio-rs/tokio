@@ -45,6 +45,10 @@ name = "rt_multi_threaded"
 path = "rt_multi_threaded.rs"
 harness = false
 
+[[bench]]
+name = "sync_notify"
+path = "sync_notify.rs"
+harness = false
 
 [[bench]]
 name = "sync_rwlock"

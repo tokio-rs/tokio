@@ -23,7 +23,7 @@ pin_project! {
     }
 }
 
-/// Error returned by `Timeout`.
+/// Error returned by `Timeout` and `TimeoutRepeating`.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Elapsed(());
 
