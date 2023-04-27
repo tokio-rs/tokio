@@ -179,6 +179,18 @@ cfg_rt! {
         T::Output: Send + 'static,
     {
         use crate::runtime::task;
+        #[cfg(all(
+            tokio_unstable,
+            tokio_taskdump,
+            feature = "rt",
+            target_os = "linux",
+            any(
+                target_arch = "aarch64",
+                target_arch = "x86",
+                target_arch = "x86_64"
+            )
+        ))]
+        let future = task::trace::Trace::root(future);
         let id = task::Id::next();
         let task = crate::util::trace::task(future, "task", name, id.as_u64());
         let handle = Handle::current();

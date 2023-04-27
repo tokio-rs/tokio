@@ -115,6 +115,11 @@ socket2 = { version = "0.4.9", optional = true, features = [ "all" ] }
 [target.'cfg(tokio_unstable)'.dependencies]
 tracing = { version = "0.1.25", default-features = false, features = ["std"], optional = true } # Not in full
 
+# Currently unstable. The API exposed by these features may be broken at any time.
+# Requires `--cfg tokio_unstable` to enable.
+[target.'cfg(tokio_taskdump)'.dependencies]
+backtrace = { version = "0.3.58" }
+
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.42", optional = true }
 signal-hook-registry = { version = "1.1.1", optional = true }

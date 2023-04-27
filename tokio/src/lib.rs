@@ -487,6 +487,21 @@ compile_error!("Tokio's build script has incorrectly detected wasm.");
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
+#[cfg(all(not(tokio_unstable), tokio_taskdump))]
+compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
+
+#[cfg(all(
+    tokio_taskdump,
+    not(all(
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    ))
+))]
+compile_error!(
+    "The `tokio_taskdump` feature is only currently supported on \
+linux, on `aarch64`, `x86` and `x86_64`."
+);
+
 // Includes re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any

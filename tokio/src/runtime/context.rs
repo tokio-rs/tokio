@@ -12,6 +12,10 @@ cfg_rt! {
     use std::cell::RefCell;
     use std::marker::PhantomData;
     use std::time::Duration;
+
+    cfg_taskdump! {
+        use crate::runtime::task::trace;
+    }
 }
 
 struct Context {
@@ -45,6 +49,15 @@ struct Context {
     /// Tracks the amount of "work" a task may still do before yielding back to
     /// the sheduler
     budget: Cell<coop::Budget>,
+
+    #[cfg(all(
+        tokio_unstable,
+        tokio_taskdump,
+        feature = "rt",
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    ))]
+    trace: trace::Context,
 }
 
 tokio_thread_local! {
@@ -75,6 +88,19 @@ tokio_thread_local! {
             rng: FastRand::new(RngSeed::new()),
 
             budget: Cell::new(coop::Budget::unconstrained()),
+
+            #[cfg(all(
+                tokio_unstable,
+                tokio_taskdump,
+                feature = "rt",
+                target_os = "linux",
+                any(
+                    target_arch = "aarch64",
+                    target_arch = "x86",
+                    target_arch = "x86_64"
+                )
+            ))]
+            trace: trace::Context::new(),
         }
     }
 }
@@ -376,6 +402,14 @@ cfg_rt! {
     impl EnterRuntime {
         pub(crate) fn is_entered(self) -> bool {
             matches!(self, EnterRuntime::Entered { .. })
+        }
+    }
+
+    cfg_taskdump! {
+        /// SAFETY: Callers of this function must ensure that trace frames always
+        /// form a valid linked list.
+        pub(crate) unsafe fn with_trace<R>(f: impl FnOnce(&trace::Context) -> R) -> R {
+            CONTEXT.with(|c| f(&c.trace))
         }
     }
 }
