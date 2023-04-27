@@ -10,7 +10,7 @@ use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::Mutex;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
-use crate::util::linked_list::{Link, LinkedList};
+use crate::util::linked_list::{CountedLinkedList, Link, LinkedList};
 
 use std::marker::PhantomData;
 
@@ -54,8 +54,12 @@ cfg_not_has_atomic_u64! {
 }
 
 pub(crate) struct OwnedTasks<S: 'static> {
-    inner: Mutex<OwnedTasksInner<S>>,
+    inner: Mutex<CountedOwnedTasksInner<S>>,
     id: u64,
+}
+struct CountedOwnedTasksInner<S: 'static> {
+    list: CountedLinkedList<Task<S>, <Task<S> as Link>::Target>,
+    closed: bool,
 }
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
@@ -70,8 +74,8 @@ struct OwnedTasksInner<S: 'static> {
 impl<S: 'static> OwnedTasks<S> {
     pub(crate) fn new() -> Self {
         Self {
-            inner: Mutex::new(OwnedTasksInner {
-                list: LinkedList::new(),
+            inner: Mutex::new(CountedOwnedTasksInner {
+                list: CountedLinkedList::new(),
                 closed: false,
             }),
             id: get_next_id(),
@@ -151,6 +155,10 @@ impl<S: 'static> OwnedTasks<S> {
 
             task.shutdown();
         }
+    }
+
+    pub(crate) fn active_tasks_count(&self) -> usize {
+        self.inner.lock().list.count()
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
