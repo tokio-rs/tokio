@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.27.0"
+version = "1.28.0"
 edition = "2021"
 rust-version = "1.56"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -97,7 +97,7 @@ stats = []
 autocfg = "1.1"
 
 [dependencies]
-tokio-macros = { version = "~2.0.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "~2.1.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.0"
 
@@ -133,9 +133,6 @@ features = [
     "Win32_Foundation",
     "Win32_Security_Authorization",
 ]
-
-[target.'cfg(windows)'.dev-dependencies.ntapi]
-version = "0.3.6"
 
 [dev-dependencies]
 tokio-test = { version = "0.4.0", path = "../tokio-test" }

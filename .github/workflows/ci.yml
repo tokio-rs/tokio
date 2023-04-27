@@ -254,17 +254,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@master
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
-          toolchain: ${{ env.rust_stable }}
-      - name: Install cargo-semver-checks
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-semver-checks
-      - name: Check semver compatibility
-        run: |
-          cargo semver-checks check-release --release-type minor
+          rust-toolchain: ${{ env.rust_stable }}
+          release-type: minor
 
   cross-check:
     name: cross-check

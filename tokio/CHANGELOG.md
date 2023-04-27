@@ -1,3 +1,50 @@
+# 1.28.0 (April 25th, 2023)
+
+### Added
+
+- io: add `AsyncFd::async_io` ([#5542])
+- io: impl BufMut for ReadBuf ([#5590])
+- net: add `recv_buf` for `UdpSocket` and `UnixDatagram` ([#5583])
+- sync: add `OwnedSemaphorePermit::semaphore` ([#5618])
+- sync: add `same_channel` to broadcast channel ([#5607])
+- sync: add `watch::Receiver::wait_for` ([#5611])
+- task: add `JoinSet::spawn_blocking` and `JoinSet::spawn_blocking_on` ([#5612])
+
+### Changed
+
+- deps: update windows-sys to 0.48 ([#5591])
+- io: make `read_to_end` not grow unnecessarily ([#5610])
+- macros: make entrypoints more efficient ([#5621])
+- sync: improve Debug impl for `RwLock` ([#5647])
+- sync: reduce contention in `Notify` ([#5503])
+
+### Fixed
+
+- net: support `get_peer_cred` on AIX ([#5065])
+- sync: avoid deadlocks in `broadcast` with custom wakers ([#5578])
+
+### Documented
+
+- sync: fix typo in `Semaphore::MAX_PERMITS` ([#5645])
+- sync: fix typo in `tokio::sync::watch::Sender` docs ([#5587])
+
+[#5065]: https://github.com/tokio-rs/tokio/pull/5065
+[#5503]: https://github.com/tokio-rs/tokio/pull/5503
+[#5542]: https://github.com/tokio-rs/tokio/pull/5542
+[#5578]: https://github.com/tokio-rs/tokio/pull/5578
+[#5583]: https://github.com/tokio-rs/tokio/pull/5583
+[#5587]: https://github.com/tokio-rs/tokio/pull/5587
+[#5590]: https://github.com/tokio-rs/tokio/pull/5590
+[#5591]: https://github.com/tokio-rs/tokio/pull/5591
+[#5607]: https://github.com/tokio-rs/tokio/pull/5607
+[#5610]: https://github.com/tokio-rs/tokio/pull/5610
+[#5611]: https://github.com/tokio-rs/tokio/pull/5611
+[#5612]: https://github.com/tokio-rs/tokio/pull/5612
+[#5618]: https://github.com/tokio-rs/tokio/pull/5618
+[#5621]: https://github.com/tokio-rs/tokio/pull/5621
+[#5645]: https://github.com/tokio-rs/tokio/pull/5645
+[#5647]: https://github.com/tokio-rs/tokio/pull/5647
+
 # 1.27.0 (March 27th, 2023)
 
 This release bumps the MSRV of Tokio to 1.56. ([#5559])

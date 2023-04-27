@@ -5,6 +5,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
 use tokio_test::assert_ok;
+use tokio_test::io::Builder;
 
 #[tokio::test]
 async fn read_to_end() {
@@ -75,4 +76,49 @@ async fn read_to_end_uninit() {
 
     test.read_to_end(&mut buf).await.unwrap();
     assert_eq!(buf.len(), 33);
+}
+
+#[tokio::test]
+async fn read_to_end_doesnt_grow_with_capacity() {
+    let arr: Vec<u8> = (0..100).collect();
+
+    // We only test from 32 since we allocate at least 32 bytes each time
+    for len in 32..100 {
+        let bytes = &arr[..len];
+        for split in 0..len {
+            for cap in 0..101 {
+                let mut mock = if split == 0 {
+                    Builder::new().read(bytes).build()
+                } else {
+                    Builder::new()
+                        .read(&bytes[..split])
+                        .read(&bytes[split..])
+                        .build()
+                };
+                let mut buf = Vec::with_capacity(cap);
+                AsyncReadExt::read_to_end(&mut mock, &mut buf)
+                    .await
+                    .unwrap();
+                // It has the right data.
+                assert_eq!(buf.as_slice(), bytes);
+                // Unless cap was smaller than length, then we did not reallocate.
+                if cap >= len {
+                    assert_eq!(buf.capacity(), cap);
+                }
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn read_to_end_grows_capacity_if_unfit() {
+    let bytes = b"the_vector_startingcap_will_be_smaller";
+    let mut mock = Builder::new().read(bytes).build();
+    let initial_capacity = bytes.len() - 4;
+    let mut buf = Vec::with_capacity(initial_capacity);
+    AsyncReadExt::read_to_end(&mut mock, &mut buf)
+        .await
+        .unwrap();
+    // *4 since it doubles when it doesn't fit and again when reaching EOF
+    assert_eq!(buf.capacity(), initial_capacity * 4);
 }

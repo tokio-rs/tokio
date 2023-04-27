@@ -125,7 +125,7 @@ fn bounds() {
 }
 
 impl Semaphore {
-    /// The maximum number of permits which a semaphore can hold. It is `usize::MAX >>> 3`.
+    /// The maximum number of permits which a semaphore can hold. It is `usize::MAX >> 3`.
     ///
     /// Exceeding this limit typically results in a panic.
     pub const MAX_PERMITS: usize = super::batch_semaphore::Semaphore::MAX_PERMITS;
