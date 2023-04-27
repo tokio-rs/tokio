@@ -342,6 +342,15 @@ cfg_io_readiness! {
 }
 
 cfg_taskdump! {
+    impl<T: Link> CountedLinkedList<T, T::Target> {
+        pub(crate) fn for_each<F>(&mut self, f: F)
+        where
+            F: FnMut(&T::Handle),
+        {
+            self.list.for_each(f)
+        }
+    }
+
     impl<T: Link> LinkedList<T, T::Target> {
         pub(crate) fn for_each<F>(&mut self, mut f: F)
         where
