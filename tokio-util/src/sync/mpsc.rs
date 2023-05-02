@@ -41,10 +41,10 @@ enum State<T> {
 ///
 /// [`mpsc::Sender`]: tokio::sync::mpsc::Sender
 #[derive(Debug)]
-pub struct PollSender<'a, T> {
+pub struct PollSender<T> {
     sender: Option<Sender<T>>,
     state: State<T>,
-    acquire: ReusableBoxFuture<'a, Result<OwnedPermit<T>, PollSendError<T>>>,
+    acquire: PollSenderFuture<T>,
 }
 
 // Creates a future for acquiring a permit from the underlying channel.  This is used to ensure
@@ -64,13 +64,39 @@ async fn make_acquire_future<T>(
     }
 }
 
-impl<'a, T: Send + 'a> PollSender<'a, T> {
+#[derive(Debug)]
+// TODO: This should be replace with a type_alias_impl_trait to eliminate `'static` and all the transmutes 
+struct PollSenderFuture<T>(ReusableBoxFuture<'static, Result<OwnedPermit<T>, PollSendError<T>>>);
+
+impl<T> From<ReusableBoxFuture<'static, Result<OwnedPermit<T>, PollSendError<T>>>> for PollSenderFuture<T> {
+    fn from(v: ReusableBoxFuture<'static, Result<OwnedPermit<T>, PollSendError<T>>>) -> Self {
+        Self(v)
+    }
+}
+
+impl<T: Send> From<Option<Sender<T>>> for PollSenderFuture<T> {
+    fn from(data: Option<Sender<T>>) -> Self {
+        let v = ReusableBoxFuture::<'_, Result<OwnedPermit<T>, PollSendError<T>>>::new(make_acquire_future(data));
+        // This is safe because we're just transmuting the `'static` bound on the Box<dyn> to get around storage issue
+        unsafe { mem::transmute(v) }
+    }
+}
+
+impl<T: Send> PollSenderFuture<T> {
+    fn get<'a>(&mut self) -> &mut ReusableBoxFuture<'a, Result<OwnedPermit<T>, PollSendError<T>>>
+    where T: 'a {
+        // This is safe because we're just untransmuting the `'static` bound on the Box<dyn> to get around storage issue
+        unsafe { mem::transmute(&mut self.0) }
+    }
+}
+
+impl<T: Send> PollSender<T> {
     /// Creates a new `PollSender`.
     pub fn new(sender: Sender<T>) -> Self {
         Self {
             sender: Some(sender.clone()),
             state: State::Idle(sender),
-            acquire: ReusableBoxFuture::new(make_acquire_future(None)),
+            acquire: None.into(),
         }
     }
 
@@ -97,10 +123,10 @@ impl<'a, T: Send + 'a> PollSender<'a, T> {
                 State::Idle(sender) => {
                     // Start trying to acquire a permit to reserve a slot for our send, and
                     // immediately loop back around to poll it the first time.
-                    self.acquire.set(make_acquire_future(Some(sender)));
+                    self.acquire.get().set(make_acquire_future(Some(sender)));
                     (None, State::Acquiring)
                 }
-                State::Acquiring => match self.acquire.poll(cx) {
+                State::Acquiring => match self.acquire.get().poll(cx) {
                     // Channel has capacity.
                     Poll::Ready(Ok(permit)) => {
                         (Some(Poll::Ready(Ok(()))), State::ReadyToSend(permit))
@@ -194,7 +220,7 @@ impl<'a, T: Send + 'a> PollSender<'a, T> {
         match self.state {
             State::Idle(_) => self.state = State::Closed,
             State::Acquiring => {
-                self.acquire.set(make_acquire_future(None));
+                self.acquire.get().set(make_acquire_future(None));
                 self.state = State::Closed;
             }
             _ => {}
@@ -215,7 +241,7 @@ impl<'a, T: Send + 'a> PollSender<'a, T> {
             // We're currently trying to reserve a slot to send into.
             State::Acquiring => {
                 // Replacing the future drops the in-flight one.
-                self.acquire.set(make_acquire_future(None));
+                self.acquire.get().set(make_acquire_future(None));
 
                 // If we haven't closed yet, we have to clone our stored sender since we have no way
                 // to get it back from the acquire future we just dropped.
@@ -242,11 +268,11 @@ impl<'a, T: Send + 'a> PollSender<'a, T> {
     }
 }
 
-impl<'a, T> Clone for PollSender<'a, T> {
+impl<T> Clone for PollSender<T> {
     /// Clones this `PollSender`.
     ///
     /// The resulting `PollSender` will have an initial state identical to calling `PollSender::new`.
-    fn clone(&self) -> PollSender<'a, T> {
+    fn clone(&self) -> PollSender<T> {
         let (sender, state) = match self.sender.clone() {
             Some(sender) => (Some(sender.clone()), State::Idle(sender)),
             None => (None, State::Closed),
@@ -257,12 +283,12 @@ impl<'a, T> Clone for PollSender<'a, T> {
             state,
             // We don't use `make_acquire_future` here because our relaxed bounds on `T` are not
             // compatible with the transitive bounds required by `Sender<T>`.
-            acquire: ReusableBoxFuture::new(async { unreachable!() }),
+            acquire: ReusableBoxFuture::new(async { unreachable!() }).into(),
         }
     }
 }
 
-impl<'a, T: Send + 'a> Sink<T> for PollSender<'a, T> {
+impl<T: Send + 'static> Sink<T> for PollSender<T> {
     type Error = PollSendError<T>;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
