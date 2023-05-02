@@ -65,10 +65,12 @@ async fn make_acquire_future<T>(
 }
 
 #[derive(Debug)]
-// TODO: This should be replace with a type_alias_impl_trait to eliminate `'static` and all the transmutes 
+// TODO: This should be replace with a type_alias_impl_trait to eliminate `'static` and all the transmutes
 struct PollSenderFuture<T>(ReusableBoxFuture<'static, Result<OwnedPermit<T>, PollSendError<T>>>);
 
-impl<T> From<ReusableBoxFuture<'static, Result<OwnedPermit<T>, PollSendError<T>>>> for PollSenderFuture<T> {
+impl<T> From<ReusableBoxFuture<'static, Result<OwnedPermit<T>, PollSendError<T>>>>
+    for PollSenderFuture<T>
+{
     fn from(v: ReusableBoxFuture<'static, Result<OwnedPermit<T>, PollSendError<T>>>) -> Self {
         Self(v)
     }
@@ -76,7 +78,9 @@ impl<T> From<ReusableBoxFuture<'static, Result<OwnedPermit<T>, PollSendError<T>>
 
 impl<T: Send> From<Option<Sender<T>>> for PollSenderFuture<T> {
     fn from(data: Option<Sender<T>>) -> Self {
-        let v = ReusableBoxFuture::<'_, Result<OwnedPermit<T>, PollSendError<T>>>::new(make_acquire_future(data));
+        let v = ReusableBoxFuture::<'_, Result<OwnedPermit<T>, PollSendError<T>>>::new(
+            make_acquire_future(data),
+        );
         // This is safe because we're just transmuting the `'static` bound on the Box<dyn> to get around storage issue
         unsafe { mem::transmute(v) }
     }
@@ -84,7 +88,9 @@ impl<T: Send> From<Option<Sender<T>>> for PollSenderFuture<T> {
 
 impl<T: Send> PollSenderFuture<T> {
     fn get<'a>(&mut self) -> &mut ReusableBoxFuture<'a, Result<OwnedPermit<T>, PollSendError<T>>>
-    where T: 'a {
+    where
+        T: 'a,
+    {
         // This is safe because we're just untransmuting the `'static` bound on the Box<dyn> to get around storage issue
         unsafe { mem::transmute(&mut self.0) }
     }

@@ -27,7 +27,6 @@ async fn simple() {
     send.send_item(42).unwrap();
 }
 
-
 #[tokio::test]
 async fn simple_ref() {
     let v = [1, 2, 3i32];
@@ -52,7 +51,6 @@ async fn simple_ref() {
 
     send.send_item(&42).unwrap();
 }
-
 
 #[tokio::test]
 async fn repeated_poll_reserve() {
