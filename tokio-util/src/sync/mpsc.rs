@@ -64,7 +64,7 @@ async fn make_acquire_future<T>(
     }
 }
 
-impl<'a, T: Send+'a> PollSender<'a, T> {
+impl<'a, T: Send + 'a> PollSender<'a, T> {
     /// Creates a new `PollSender`.
     pub fn new(sender: Sender<T>) -> Self {
         Self {
