@@ -41,10 +41,10 @@ enum State<T> {
 ///
 /// [`mpsc::Sender`]: tokio::sync::mpsc::Sender
 #[derive(Debug)]
-pub struct PollSender<T> {
+pub struct PollSender<'a, T> {
     sender: Option<Sender<T>>,
     state: State<T>,
-    acquire: ReusableBoxFuture<'static, Result<OwnedPermit<T>, PollSendError<T>>>,
+    acquire: ReusableBoxFuture<'a, Result<OwnedPermit<T>, PollSendError<T>>>,
 }
 
 // Creates a future for acquiring a permit from the underlying channel.  This is used to ensure
@@ -64,7 +64,7 @@ async fn make_acquire_future<T>(
     }
 }
 
-impl<T: Send + 'static> PollSender<T> {
+impl<'a, T: Send+'a> PollSender<'a, T> {
     /// Creates a new `PollSender`.
     pub fn new(sender: Sender<T>) -> Self {
         Self {
@@ -242,11 +242,11 @@ impl<T: Send + 'static> PollSender<T> {
     }
 }
 
-impl<T> Clone for PollSender<T> {
+impl<'a, T> Clone for PollSender<'a, T> {
     /// Clones this `PollSender`.
     ///
     /// The resulting `PollSender` will have an initial state identical to calling `PollSender::new`.
-    fn clone(&self) -> PollSender<T> {
+    fn clone(&self) -> PollSender<'a, T> {
         let (sender, state) = match self.sender.clone() {
             Some(sender) => (Some(sender.clone()), State::Idle(sender)),
             None => (None, State::Closed),
@@ -262,7 +262,7 @@ impl<T> Clone for PollSender<T> {
     }
 }
 
-impl<T: Send + 'static> Sink<T> for PollSender<T> {
+impl<'a, T: Send + 'a> Sink<T> for PollSender<'a, T> {
     type Error = PollSendError<T>;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
