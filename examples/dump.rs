@@ -6,7 +6,7 @@
     target_os = "linux",
     any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
 ))]
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 async fn main() {
     use std::hint::black_box;
 
@@ -22,21 +22,29 @@ async fn main() {
 
     #[inline(never)]
     async fn c() {
-        black_box(tokio::task::yield_now()).await
+        loop {
+            tokio::task::yield_now().await;
+        }
     }
 
-    tokio::spawn(a());
-    tokio::spawn(b());
-    tokio::spawn(c());
+    async fn dump() {
+        let handle = tokio::runtime::Handle::current();
+        let dump = handle.dump().await;
 
-    let handle = tokio::runtime::Handle::current();
-    let dump = handle.dump();
-
-    for (i, task) in dump.tasks().iter().enumerate() {
-        let trace = task.trace();
-        println!("task {i} trace:");
-        println!("{trace}");
+        for (i, task) in dump.tasks().iter().enumerate() {
+            let trace = task.trace();
+            println!("task {i} trace:");
+            println!("{trace}\n");
+        }
     }
+
+    tokio::select!(
+        biased;
+        _ = tokio::spawn(a()) => {},
+        _ = tokio::spawn(b()) => {},
+        _ = tokio::spawn(c()) => {},
+        _ = dump() => {},
+    );
 }
 
 #[cfg(not(all(

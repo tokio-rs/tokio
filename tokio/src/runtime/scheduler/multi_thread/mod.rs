@@ -23,6 +23,10 @@ pub(crate) mod queue;
 mod worker;
 pub(crate) use worker::{Context, Launch, Shared};
 
+cfg_taskdump! {
+    pub(crate) use worker::Synced;
+}
+
 pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
