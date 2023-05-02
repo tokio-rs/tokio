@@ -122,7 +122,7 @@ cfg_time! {
         /// dropped.
         Closed(T),
     }
-    
+
     impl<T> fmt::Debug for SendTimeoutError<T> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match *self {
@@ -144,6 +144,6 @@ cfg_time! {
             )
         }
     }
-    
+
     impl<T> Error for SendTimeoutError<T> {}
 }
