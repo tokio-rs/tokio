@@ -514,7 +514,7 @@ impl Inner {
 
                 shared = self.shared.lock();
                 if shared.shutdown {
-                    break
+                    break;
                 }
             }
 
