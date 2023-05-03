@@ -29,7 +29,7 @@ async fn simple() {
 
 #[tokio::test]
 async fn simple_ref() {
-    let v = [1, 2, 3i32];
+    let v = vec![1, 2, 3i32];
 
     let (send, mut recv) = channel(3);
     let mut send = PollSender::new(send);
@@ -46,9 +46,7 @@ async fn simple_ref() {
     assert_eq!(*recv.recv().await.unwrap(), 1);
     assert!(reserve.is_woken());
     assert_ready_ok!(reserve.poll());
-
     drop(recv);
-
     send.send_item(&42).unwrap();
 }
 
