@@ -5,8 +5,8 @@ name = "tokio-test"
 # - Update CHANGELOG.md.
 # - Create "tokio-test-0.4.x" git tag.
 version = "0.4.2"
-edition = "2018"
-rust-version = "1.49"
+edition = "2021"
+rust-version = "1.56"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -19,7 +19,7 @@ categories = ["asynchronous", "testing"]
 [dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["rt", "sync", "time", "test-util"] }
 tokio-stream = { version = "0.1.1", path = "../tokio-stream" }
-async-stream = "0.3"
+async-stream = "0.3.3"
 
 bytes = "1.0.0"
 futures-core = "0.3.0"

@@ -12,6 +12,10 @@
 //! Since the `send` method is not async, it can be used anywhere. This includes
 //! sending between two runtimes, and using it from non-async code.
 //!
+//! If the [`Receiver`] is closed before receiving a message which has already
+//! been sent, the message will remain in the channel until the receiver is
+//! dropped, at which point the message will be dropped immediately.
+//!
 //! # Examples
 //!
 //! ```
@@ -1056,6 +1060,7 @@ impl<T> Receiver<T> {
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(alias = "recv_blocking"))]
     pub fn blocking_recv(self) -> Result<T, RecvError> {
         crate::future::block_on(self)
     }

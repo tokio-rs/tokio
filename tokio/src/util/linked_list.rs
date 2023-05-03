@@ -178,8 +178,12 @@ impl<L: Link> LinkedList<L, L::Target> {
     ///
     /// # Safety
     ///
-    /// The caller **must** ensure that `node` is currently contained by
-    /// `self` or not contained by any other list.
+    /// The caller **must** ensure that exactly one of the following is true:
+    /// - `node` is currently contained by `self`,
+    /// - `node` is not contained by any list,
+    /// - `node` is currently contained by some other `GuardedLinkedList` **and**
+    ///   the caller has an exclusive access to that list. This condition is
+    ///   used by the linked list in `sync::Notify`.
     pub(crate) unsafe fn remove(&mut self, node: NonNull<L::Target>) -> Option<L::Handle> {
         if let Some(prev) = L::pointers(node).as_ref().get_prev() {
             debug_assert_eq!(L::pointers(prev).as_ref().get_next(), Some(node));
@@ -221,6 +225,53 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
             .field("head", &self.head)
             .field("tail", &self.tail)
             .finish()
+    }
+}
+
+// ===== impl CountedLinkedList ====
+
+// Delegates operations to the base LinkedList implementation, and adds a counter to the elements
+// in the list.
+pub(crate) struct CountedLinkedList<L: Link, T> {
+    list: LinkedList<L, T>,
+    count: usize,
+}
+
+impl<L: Link> CountedLinkedList<L, L::Target> {
+    pub(crate) fn new() -> CountedLinkedList<L, L::Target> {
+        CountedLinkedList {
+            list: LinkedList::new(),
+            count: 0,
+        }
+    }
+
+    pub(crate) fn push_front(&mut self, val: L::Handle) {
+        self.list.push_front(val);
+        self.count += 1;
+    }
+
+    pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
+        let val = self.list.pop_back();
+        if val.is_some() {
+            self.count -= 1;
+        }
+        val
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.list.is_empty()
+    }
+
+    pub(crate) unsafe fn remove(&mut self, node: NonNull<L::Target>) -> Option<L::Handle> {
+        let val = self.list.remove(node);
+        if val.is_some() {
+            self.count -= 1;
+        }
+        val
+    }
+
+    pub(crate) fn count(&self) -> usize {
+        self.count
     }
 }
 
@@ -290,6 +341,126 @@ cfg_io_readiness! {
     }
 }
 
+cfg_taskdump! {
+    impl<T: Link> CountedLinkedList<T, T::Target> {
+        pub(crate) fn for_each<F>(&mut self, f: F)
+        where
+            F: FnMut(&T::Handle),
+        {
+            self.list.for_each(f)
+        }
+    }
+
+    impl<T: Link> LinkedList<T, T::Target> {
+        pub(crate) fn for_each<F>(&mut self, mut f: F)
+        where
+            F: FnMut(&T::Handle),
+        {
+            use std::mem::ManuallyDrop;
+
+            let mut next = self.head;
+
+            while let Some(curr) = next {
+                unsafe {
+                    let handle = ManuallyDrop::new(T::from_raw(curr));
+                    f(&handle);
+                    next = T::pointers(curr).as_ref().get_next();
+                }
+            }
+        }
+    }
+}
+
+// ===== impl GuardedLinkedList =====
+
+feature! {
+    #![any(
+        feature = "process",
+        feature = "sync",
+        feature = "rt",
+        feature = "signal",
+    )]
+
+    /// An intrusive linked list, but instead of keeping pointers to the head
+    /// and tail nodes, it uses a special guard node linked with those nodes.
+    /// It means that the list is circular and every pointer of a node from
+    /// the list is not `None`, including pointers from the guard node.
+    ///
+    /// If a list is empty, then both pointers of the guard node are pointing
+    /// at the guard node itself.
+    pub(crate) struct GuardedLinkedList<L, T> {
+        /// Pointer to the guard node.
+        guard: NonNull<T>,
+
+        /// Node type marker.
+        _marker: PhantomData<*const L>,
+    }
+
+    impl<U, L: Link<Handle = NonNull<U>>> LinkedList<L, L::Target> {
+        /// Turns a linked list into the guarded version by linking the guard node
+        /// with the head and tail nodes. Like with other nodes, you should guarantee
+        /// that the guard node is pinned in memory.
+        pub(crate) fn into_guarded(self, guard_handle: L::Handle) -> GuardedLinkedList<L, L::Target> {
+            // `guard_handle` is a NonNull pointer, we don't have to care about dropping it.
+            let guard = L::as_raw(&guard_handle);
+
+            unsafe {
+                if let Some(head) = self.head {
+                    debug_assert!(L::pointers(head).as_ref().get_prev().is_none());
+                    L::pointers(head).as_mut().set_prev(Some(guard));
+                    L::pointers(guard).as_mut().set_next(Some(head));
+
+                    // The list is not empty, so the tail cannot be `None`.
+                    let tail = self.tail.unwrap();
+                    debug_assert!(L::pointers(tail).as_ref().get_next().is_none());
+                    L::pointers(tail).as_mut().set_next(Some(guard));
+                    L::pointers(guard).as_mut().set_prev(Some(tail));
+                } else {
+                    // The list is empty.
+                    L::pointers(guard).as_mut().set_prev(Some(guard));
+                    L::pointers(guard).as_mut().set_next(Some(guard));
+                }
+            }
+
+            GuardedLinkedList { guard, _marker: PhantomData }
+        }
+    }
+
+    impl<L: Link> GuardedLinkedList<L, L::Target> {
+        fn tail(&self) -> Option<NonNull<L::Target>> {
+            let tail_ptr = unsafe {
+                L::pointers(self.guard).as_ref().get_prev().unwrap()
+            };
+
+            // Compare the tail pointer with the address of the guard node itself.
+            // If the guard points at itself, then there are no other nodes and
+            // the list is considered empty.
+            if tail_ptr != self.guard {
+                Some(tail_ptr)
+            } else {
+                None
+            }
+        }
+
+        /// Removes the last element from a list and returns it, or None if it is
+        /// empty.
+        pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
+            unsafe {
+                let last = self.tail()?;
+                let before_last = L::pointers(last).as_ref().get_prev().unwrap();
+
+                L::pointers(self.guard).as_mut().set_prev(Some(before_last));
+                L::pointers(before_last).as_mut().set_next(Some(self.guard));
+
+                L::pointers(last).as_mut().set_prev(None);
+                L::pointers(last).as_mut().set_next(None);
+
+                Some(L::from_raw(last))
+            }
+        }
+    }
+}
+
 // ===== impl Pointers =====
 
 impl<T> Pointers<T> {
@@ -352,9 +523,9 @@ impl<T> fmt::Debug for Pointers<T> {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, fuzzing))]
 #[cfg(not(loom))]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     use std::pin::Pin;
@@ -413,6 +584,7 @@ mod tests {
         }
     }
 
+    #[cfg(test)]
     macro_rules! assert_clean {
         ($e:ident) => {{
             assert!($e.pointers.get_next().is_none());
@@ -420,6 +592,7 @@ mod tests {
         }};
     }
 
+    #[cfg(test)]
     macro_rules! assert_ptr_eq {
         ($a:expr, $b:expr) => {{
             // Deal with mapping a Pin<&mut T> -> Option<NonNull<T>>
@@ -623,31 +796,42 @@ mod tests {
         }
     }
 
-    #[cfg(not(tokio_wasm))]
-    proptest::proptest! {
-        #[test]
-        fn fuzz_linked_list(ops: Vec<usize>) {
-            run_fuzz(ops);
+    #[test]
+    fn count() {
+        let mut list = CountedLinkedList::<&Entry, <&Entry as Link>::Target>::new();
+        assert_eq!(0, list.count());
+
+        let a = entry(5);
+        let b = entry(7);
+        list.push_front(a.as_ref());
+        list.push_front(b.as_ref());
+        assert_eq!(2, list.count());
+
+        list.pop_back();
+        assert_eq!(1, list.count());
+
+        unsafe {
+            list.remove(ptr(&b));
         }
+        assert_eq!(0, list.count());
     }
 
-    #[cfg(not(tokio_wasm))]
-    fn run_fuzz(ops: Vec<usize>) {
-        use std::collections::VecDeque;
-
-        #[derive(Debug)]
+    /// This is a fuzz test. You run it by entering `cargo fuzz run fuzz_linked_list` in CLI in `/tokio/` module.
+    #[cfg(fuzzing)]
+    pub fn fuzz_linked_list(ops: &[u8]) {
         enum Op {
             Push,
             Pop,
             Remove(usize),
         }
+        use std::collections::VecDeque;
 
         let ops = ops
             .iter()
-            .map(|i| match i % 3 {
+            .map(|i| match i % 3u8 {
                 0 => Op::Push,
                 1 => Op::Pop,
-                2 => Op::Remove(i / 3),
+                2 => Op::Remove((i / 3u8) as usize),
                 _ => unreachable!(),
             })
             .collect::<Vec<_>>();

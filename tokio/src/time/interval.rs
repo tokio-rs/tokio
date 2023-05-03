@@ -2,10 +2,10 @@ use crate::future::poll_fn;
 use crate::time::{sleep_until, Duration, Instant, Sleep};
 use crate::util::trace;
 
+use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{convert::TryInto, future::Future};
 
 /// Creates new [`Interval`] that yields with interval of `period`. The first
 /// tick completes immediately. The default [`MissedTickBehavior`] is
@@ -482,7 +482,10 @@ impl Interval {
             timeout + self.period
         };
 
-        self.delay.as_mut().reset(next);
+        // When we arrive here, the internal delay returned `Poll::Ready`.
+        // Reset the delay but do not register it. It should be registered with
+        // the next call to [`poll_tick`].
+        self.delay.as_mut().reset_without_reregister(next);
 
         // Return the time when we were scheduled to tick
         Poll::Ready(timeout)

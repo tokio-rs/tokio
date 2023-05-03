@@ -292,7 +292,11 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     }
 }
 
-/// A stream of events for receiving a particular type of OS signal.
+/// An listener for receiving a particular type of OS signal.
+///
+/// The listener can be turned into a `Stream` using [`SignalStream`].
+///
+/// [`SignalStream`]: https://docs.rs/tokio-stream/latest/tokio_stream/wrappers/struct.SignalStream.html
 ///
 /// In general signal handling on Unix is a pretty tricky topic, and this
 /// structure is no exception! There are some important limitations to keep in
@@ -307,7 +311,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
 ///   Once `poll` has been called, however, a further signal is guaranteed to
 ///   be yielded as an item.
 ///
-///   Put another way, any element pulled off the returned stream corresponds to
+///   Put another way, any element pulled off the returned listener corresponds to
 ///   *at least one* signal, but possibly more.
 ///
 /// * Signal handling in general is relatively inefficient. Although some
@@ -345,11 +349,11 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     // An infinite stream of hangup signals.
-///     let mut stream = signal(SignalKind::hangup())?;
+///     let mut sig = signal(SignalKind::hangup())?;
 ///
 ///     // Print whenever a HUP signal is received
 ///     loop {
-///         stream.recv().await;
+///         sig.recv().await;
 ///         println!("got signal HUP");
 ///     }
 /// }
@@ -360,7 +364,7 @@ pub struct Signal {
     inner: RxFuture,
 }
 
-/// Creates a new stream which will receive notifications when the current
+/// Creates a new listener which will receive notifications when the current
 /// process receives the specified signal `kind`.
 ///
 /// This function will create a new stream which binds to the default reactor.

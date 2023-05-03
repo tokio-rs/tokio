@@ -21,7 +21,7 @@ env:
   # - tokio-util/Cargo.toml
   # - tokio-test/Cargo.toml
   # - tokio-stream/Cargo.toml
-  rust_min: 1.49.0
+  rust_min: 1.56.0
 
 defaults:
   run:
@@ -31,7 +31,7 @@ permissions:
   contents: read
 
 jobs:
-  # Depends on all action sthat are required for a "successful" CI run.
+  # Depends on all actions that are required for a "successful" CI run.
   tests-pass:
     name: all systems go
     runs-on: ubuntu-latest
@@ -42,6 +42,7 @@ jobs:
       - test-unstable
       - miri
       - asan
+      - semver
       - cross-check
       - cross-test
       - no-atomic-u64
@@ -61,7 +62,20 @@ jobs:
     steps:
       - run: exit 0
 
+  # Basic actions that must pass before we kick off more expensive tests.
+  basics:
+    name: basic checks
+    runs-on: ubuntu-latest
+    needs:
+      - clippy
+      - fmt
+      - docs
+      - minrust
+    steps:
+      - run: exit 0
+
   test:
+    needs: basics
     name: test tokio full
     runs-on: ${{ matrix.os }}
     strategy:
@@ -118,6 +132,7 @@ jobs:
     # This relies on the potentially affected Tokio type being listed in
     # `tokio/tokio/tests/async_send_sync.rs`.
     name: compile tests with parking lot send guards
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -134,6 +149,7 @@ jobs:
 
   valgrind:
     name: valgrind
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -166,13 +182,14 @@ jobs:
 
   test-unstable:
     name: test tokio full --unstable
+    needs: basics
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os:
-          - windows-latest
-          - ubuntu-latest
-          - macos-latest
+        include:
+          - os: windows-latest
+          - os: ubuntu-latest
+          - os: macos-latest
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
@@ -189,9 +206,35 @@ jobs:
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
           RUSTDOCFLAGS: --cfg tokio_unstable
+    
+  test-unstable-taskdump:
+    name: test tokio full --unstable --taskdump
+    needs: basics
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      # Run `tokio` with "unstable" and "taskdump" cfg flags.
+      - name: test tokio full --cfg unstable --cfg taskdump
+        run: cargo test --all-features
+        working-directory: tokio
+        env:
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          # in order to run doctests for unstable features, we must also pass
+          # the unstable cfg to RustDoc
+          RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_taskdump
 
   miri:
     name: miri
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -208,10 +251,10 @@ jobs:
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
-          PROPTEST_CASES: 10
 
   asan:
     name: asan
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -230,8 +273,21 @@ jobs:
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
           TRYBUILD: overwrite
 
+  semver:
+    name: semver
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          rust-toolchain: ${{ env.rust_stable }}
+          release-type: minor
+
   cross-check:
     name: cross-check
+    needs: basics
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -256,14 +312,17 @@ jobs:
 
   cross-test:
     name: cross-test
+    needs: basics
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - target: i686-unknown-linux-gnu
+            rustflags: --cfg tokio_taskdump
           - target: arm-unknown-linux-gnueabihf
           - target: armv7-unknown-linux-gnueabihf
           - target: aarch64-unknown-linux-gnu
+            rustflags: --cfg tokio_taskdump
 
           # Run a platform without AtomicU64 and no const Mutex::new
           - target: arm-unknown-linux-gnueabihf
@@ -292,6 +351,7 @@ jobs:
   # See https://github.com/tokio-rs/tokio/issues/5187
   no-atomic-u64:
     name: Test i686-unknown-linux-gnu without AtomicU64
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -300,16 +360,27 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
           components: rust-src
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       # Install linker and libraries for i686-unknown-linux-gnu
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: i686-unknown-linux-gnu
       - run: cargo test -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_atomic_u64
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64
+      # https://github.com/tokio-rs/tokio/pull/5356
+      # https://github.com/tokio-rs/tokio/issues/5373
+      - run: cargo hack build -p tokio --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
+        env:
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64 --cfg tokio_no_const_mutex_new
+      - run: cargo hack build -p tokio --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
+        env:
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64
 
   features:
     name: features
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -328,6 +399,11 @@ jobs:
         run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+      # Try with unstable and taskdump feature flags
+      - name: check --feature-powerset --unstable --taskdump
+        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
+        env:
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
   minrust:
     name: minrust
@@ -359,6 +435,7 @@ jobs:
 
   minimal-versions:
     name: minimal-versions
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -379,7 +456,7 @@ jobs:
           cargo hack check --all-features --ignore-private
       - name: "check --all-features --unstable -Z minimal-versions"
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
           # from determining minimal versions based on dev-dependencies.
@@ -436,11 +513,12 @@ jobs:
       - name: "doc --lib --all-features"
         run: cargo doc --lib --no-deps --all-features --document-private-items
         env:
-          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
-          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable --cfg tokio_taskdump
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
   loom-compile:
     name: build loom tests
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -469,6 +547,7 @@ jobs:
 
   test-hyper:
     name: Test hyper
+    needs: basics
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -502,6 +581,7 @@ jobs:
 
   x86_64-fortanix-unknown-sgx:
     name: build tokio for x86_64-fortanix-unknown-sgx
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -518,6 +598,7 @@ jobs:
 
   wasm32-unknown-unknown:
     name: test tokio for wasm32-unknown-unknown
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -534,6 +615,7 @@ jobs:
 
   wasm32-wasi:
     name: wasm32-wasi
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -581,6 +663,7 @@ jobs:
 
   check-external-types:
     name: check-external-types
+    needs: basics
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

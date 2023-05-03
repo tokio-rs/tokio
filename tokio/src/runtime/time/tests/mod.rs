@@ -62,12 +62,13 @@ fn single_timer() {
 
         thread::yield_now();
 
-        let handle = handle.inner.driver().time();
+        let time = handle.inner.driver().time();
+        let clock = handle.inner.driver().clock();
 
         // This may or may not return Some (depending on how it races with the
         // thread). If it does return None, however, the timer should complete
         // synchronously.
-        handle.process_at_time(handle.time_source().now() + 2_000_000_000);
+        time.process_at_time(time.time_source().now(clock) + 2_000_000_000);
 
         jh.join().unwrap();
     })
@@ -97,10 +98,11 @@ fn drop_timer() {
 
         thread::yield_now();
 
-        let handle = handle.inner.driver().time();
+        let time = handle.inner.driver().time();
+        let clock = handle.inner.driver().clock();
 
         // advance 2s in the future.
-        handle.process_at_time(handle.time_source().now() + 2_000_000_000);
+        time.process_at_time(time.time_source().now(clock) + 2_000_000_000);
 
         jh.join().unwrap();
     })
@@ -132,10 +134,11 @@ fn change_waker() {
 
         thread::yield_now();
 
-        let handle = handle.inner.driver().time();
+        let time = handle.inner.driver().time();
+        let clock = handle.inner.driver().clock();
 
         // advance 2s
-        handle.process_at_time(handle.time_source().now() + 2_000_000_000);
+        time.process_at_time(time.time_source().now(clock) + 2_000_000_000);
 
         jh.join().unwrap();
     })
@@ -161,7 +164,7 @@ fn reset_future() {
                 .as_mut()
                 .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
 
-            entry.as_mut().reset(start + Duration::from_secs(2));
+            entry.as_mut().reset(start + Duration::from_secs(2), true);
 
             // shouldn't complete before 2s
             block_on(futures::future::poll_fn(|cx| {

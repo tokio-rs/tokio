@@ -39,6 +39,8 @@ use std::fmt;
 use std::fs::File;
 use std::future::Future;
 use std::io;
+#[cfg(not(tokio_no_as_fd))]
+use std::os::unix::io::{AsFd, BorrowedFd};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::pin::Pin;
 use std::process::{Child as StdChild, ExitStatus, Stdio};
@@ -194,6 +196,13 @@ impl AsRawFd for Pipe {
     }
 }
 
+#[cfg(not(tokio_no_as_fd))]
+impl AsFd for Pipe {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+    }
+}
+
 pub(crate) fn convert_to_stdio(io: ChildStdio) -> io::Result<Stdio> {
     let mut fd = io.inner.into_inner()?.fd;
 
@@ -243,6 +252,13 @@ impl fmt::Debug for ChildStdio {
 impl AsRawFd for ChildStdio {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
+    }
+}
+
+#[cfg(not(tokio_no_as_fd))]
+impl AsFd for ChildStdio {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
     }
 }
 

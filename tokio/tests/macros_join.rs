@@ -153,3 +153,9 @@ async fn a_different_future_is_polled_first_every_time_poll_fn_is_polled() {
         *poll_order.lock().unwrap()
     );
 }
+
+#[tokio::test]
+#[allow(clippy::unit_cmp)]
+async fn empty_join() {
+    assert_eq!(tokio::join!(), ());
+}

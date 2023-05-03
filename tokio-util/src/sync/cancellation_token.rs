@@ -55,6 +55,9 @@ pub struct CancellationToken {
     inner: Arc<tree_node::TreeNode>,
 }
 
+impl std::panic::UnwindSafe for CancellationToken {}
+impl std::panic::RefUnwindSafe for CancellationToken {}
+
 pin_project! {
     /// A Future that is resolved once the corresponding [`CancellationToken`]
     /// is cancelled.
@@ -94,6 +97,8 @@ impl core::fmt::Debug for CancellationToken {
 }
 
 impl Clone for CancellationToken {
+    /// Creates a clone of the `CancellationToken` which will get cancelled
+    /// whenever the current token gets cancelled, and vice versa.
     fn clone(&self) -> Self {
         tree_node::increase_handle_refcount(&self.inner);
         CancellationToken {
@@ -123,7 +128,8 @@ impl CancellationToken {
     }
 
     /// Creates a `CancellationToken` which will get cancelled whenever the
-    /// current token gets cancelled.
+    /// current token gets cancelled. Unlike a cloned `CancellationToken`,
+    /// cancelling a child token does not cancel the parent token.
     ///
     /// If the current token is already cancelled, the child token will get
     /// returned in cancelled state.

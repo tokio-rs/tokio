@@ -6,7 +6,7 @@ use std::ptr::NonNull;
 use std::task::{Poll, Waker};
 
 /// Raw task handle
-pub(super) struct RawTask {
+pub(in crate::runtime) struct RawTask {
     ptr: NonNull<Header>,
 }
 
@@ -195,7 +195,7 @@ impl RawTask {
     }
 
     /// Safety: mutual exclusion is required to call this function.
-    pub(super) fn poll(self) {
+    pub(crate) fn poll(self) {
         let vtable = self.header().vtable;
         unsafe { (vtable.poll)(self.ptr) }
     }

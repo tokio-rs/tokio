@@ -19,7 +19,7 @@ impl<T> OnceCell<T> {
         }
     }
 
-    /// Get the value inside this cell, intiailizing it using the provided
+    /// Get the value inside this cell, initializing it using the provided
     /// function if necessary.
     ///
     /// If the `init` closure panics, then the `OnceCell` is poisoned and all

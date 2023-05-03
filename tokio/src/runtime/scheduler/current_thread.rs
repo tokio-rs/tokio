@@ -377,6 +377,51 @@ impl Handle {
         handle
     }
 
+    /// Capture a snapshot of this runtime's state.
+    #[cfg(all(
+        tokio_unstable,
+        tokio_taskdump,
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    ))]
+    pub(crate) fn dump(&self) -> crate::runtime::Dump {
+        use crate::runtime::dump;
+        use task::trace::trace_current_thread;
+
+        let mut traces = vec![];
+
+        // todo: how to make this work outside of a runtime context?
+        CURRENT.with(|maybe_context| {
+            // drain the local queue
+            let context = if let Some(context) = maybe_context {
+                context
+            } else {
+                return;
+            };
+            let mut maybe_core = context.core.borrow_mut();
+            let core = if let Some(core) = maybe_core.as_mut() {
+                core
+            } else {
+                return;
+            };
+            let local = &mut core.tasks;
+
+            let mut injection = self.shared.queue.lock();
+            let injection = if let Some(injection) = injection.as_mut() {
+                injection
+            } else {
+                return;
+            };
+
+            traces = trace_current_thread(&self.shared.owned, local, injection)
+                .into_iter()
+                .map(dump::Task::new)
+                .collect();
+        });
+
+        dump::Dump::new(traces)
+    }
+
     fn pop(&self) -> Option<task::Notified<Arc<Handle>>> {
         match self.shared.queue.lock().as_mut() {
             Some(queue) => queue.pop_front(),
@@ -429,6 +474,10 @@ cfg_metrics! {
 
         pub(crate) fn blocking_queue_depth(&self) -> usize {
             self.blocking_spawner.queue_depth()
+        }
+
+        pub(crate) fn active_tasks_count(&self) -> usize {
+            self.shared.owned.active_tasks_count()
         }
     }
 }

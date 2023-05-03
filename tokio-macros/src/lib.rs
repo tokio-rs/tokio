@@ -39,6 +39,13 @@ use proc_macro::TokenStream;
 /// function is called often, it is preferable to create the runtime using the
 /// runtime builder so the runtime can be reused across calls.
 ///
+/// # Non-worker async function
+///
+/// Note that the async function marked with this macro does not run as a
+/// worker. The expectation is that other tasks are spawned by the function here.
+/// Awaiting on other futures from the function provided here will not
+/// perform as fast as those spawned as workers.
+///
 /// # Multi-threaded runtime
 ///
 /// To use the multi-threaded runtime, the macro can be configured using
@@ -197,7 +204,7 @@ use proc_macro::TokenStream;
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    entry::main(args, item, true)
+    entry::main(args.into(), item.into(), true).into()
 }
 
 /// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
@@ -262,7 +269,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
-    entry::main(args, item, false)
+    entry::main(args.into(), item.into(), false).into()
 }
 
 /// Marks async function to be executed by runtime, suitable to test environment.
@@ -288,8 +295,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The `worker_threads` option configures the number of worker threads, and
-/// defaults to the number of cpus on the system. This is the default
-/// flavor.
+/// defaults to the number of cpus on the system.
 ///
 /// Note: The multi-threaded runtime requires the `rt-multi-thread` feature
 /// flag.
@@ -420,7 +426,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
-    entry::test(args, item, true)
+    entry::test(args.into(), item.into(), true).into()
 }
 
 /// Marks async function to be executed by runtime, suitable to test environment
@@ -435,7 +441,7 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn test_rt(args: TokenStream, item: TokenStream) -> TokenStream {
-    entry::test(args, item, false)
+    entry::test(args.into(), item.into(), false).into()
 }
 
 /// Always fails with the error message below.

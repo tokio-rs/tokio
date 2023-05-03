@@ -34,14 +34,14 @@ cfg_rt! {
     /// async fn main() {
     ///     // `Rc` does not implement `Send`, and thus may not be sent between
     ///     // threads safely.
-    ///     let unsend_data = Rc::new("my unsend data...");
+    ///     let nonsend_data = Rc::new("my nonsend data...");
     ///
-    ///     let unsend_data = unsend_data.clone();
-    ///     // Because the `async` block here moves `unsend_data`, the future is `!Send`.
+    ///     let nonsend_data = nonsend_data.clone();
+    ///     // Because the `async` block here moves `nonsend_data`, the future is `!Send`.
     ///     // Since `tokio::spawn` requires the spawned future to implement `Send`, this
     ///     // will not compile.
     ///     tokio::spawn(async move {
-    ///         println!("{}", unsend_data);
+    ///         println!("{}", nonsend_data);
     ///         // ...
     ///     }).await.unwrap();
     /// }
@@ -60,18 +60,18 @@ cfg_rt! {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let unsend_data = Rc::new("my unsend data...");
+    ///     let nonsend_data = Rc::new("my nonsend data...");
     ///
     ///     // Construct a local task set that can run `!Send` futures.
     ///     let local = task::LocalSet::new();
     ///
     ///     // Run the local task set.
     ///     local.run_until(async move {
-    ///         let unsend_data = unsend_data.clone();
+    ///         let nonsend_data = nonsend_data.clone();
     ///         // `spawn_local` ensures that the future is spawned on the local
     ///         // task set.
     ///         task::spawn_local(async move {
-    ///             println!("{}", unsend_data);
+    ///             println!("{}", nonsend_data);
     ///             // ...
     ///         }).await.unwrap();
     ///     }).await;
@@ -94,18 +94,18 @@ cfg_rt! {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let unsend_data = Rc::new("world");
+    ///     let nonsend_data = Rc::new("world");
     ///     let local = task::LocalSet::new();
     ///
-    ///     let unsend_data2 = unsend_data.clone();
+    ///     let nonsend_data2 = nonsend_data.clone();
     ///     local.spawn_local(async move {
     ///         // ...
-    ///         println!("hello {}", unsend_data2)
+    ///         println!("hello {}", nonsend_data2)
     ///     });
     ///
     ///     local.spawn_local(async move {
     ///         time::sleep(time::Duration::from_millis(100)).await;
-    ///         println!("goodbye {}", unsend_data)
+    ///         println!("goodbye {}", nonsend_data)
     ///     });
     ///
     ///     // ...
@@ -289,9 +289,9 @@ cfg_rt! {
     ///
     /// The spawned future will run on the same thread that called `spawn_local`.
     ///
-    /// You do not have to `.await` the returned `JoinHandle` to make the
-    /// provided future start execution. It will start running in the background
-    /// immediately when `spawn_local` is called.
+    /// The provided future will start running in the background immediately
+    /// when `spawn_local` is called, even if you don't await the returned
+    /// `JoinHandle`.
     ///
     /// # Panics
     ///
@@ -309,15 +309,15 @@ cfg_rt! {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let unsend_data = Rc::new("my unsend data...");
+    ///     let nonsend_data = Rc::new("my nonsend data...");
     ///
     ///     let local = task::LocalSet::new();
     ///
     ///     // Run the local task set.
     ///     local.run_until(async move {
-    ///         let unsend_data = unsend_data.clone();
+    ///         let nonsend_data = nonsend_data.clone();
     ///         task::spawn_local(async move {
-    ///             println!("{}", unsend_data);
+    ///             println!("{}", nonsend_data);
     ///             // ...
     ///         }).await.unwrap();
     ///     }).await;
@@ -417,10 +417,9 @@ impl LocalSet {
     /// This task is guaranteed to be run on the current thread.
     ///
     /// Unlike the free function [`spawn_local`], this method may be used to
-    /// spawn local tasks when the `LocalSet` is _not_ running. You do not have
-    /// to `.await` the returned `JoinHandle` to make the provided future start
-    /// execution. It will start running immediately whenever the `LocalSet` is
-    /// next started.
+    /// spawn local tasks when the `LocalSet` is _not_ running. The provided
+    /// future will start running once the `LocalSet` is next started, even if
+    /// you don't await the returned `JoinHandle`.
     ///
     /// # Examples
     ///

@@ -88,7 +88,7 @@ pub(super) enum TransitionToNotifiedByVal {
 }
 
 #[must_use]
-pub(super) enum TransitionToNotifiedByRef {
+pub(crate) enum TransitionToNotifiedByRef {
     DoNothing,
     Submit,
 }
@@ -268,6 +268,22 @@ impl State {
                 (TransitionToNotifiedByRef::Submit, Some(snapshot))
             }
         })
+    }
+
+    /// Transitions the state to `NOTIFIED`, unconditionally increasing the ref count.
+    #[cfg(all(
+        tokio_unstable,
+        tokio_taskdump,
+        feature = "rt",
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    ))]
+    pub(super) fn transition_to_notified_for_tracing(&self) {
+        self.fetch_update_action(|mut snapshot| {
+            snapshot.set_notified();
+            snapshot.ref_inc();
+            ((), Some(snapshot))
+        });
     }
 
     /// Sets the cancelled bit and transitions the state to `NOTIFIED` if idle.

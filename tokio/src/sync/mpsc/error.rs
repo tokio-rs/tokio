@@ -4,8 +4,14 @@ use std::error::Error;
 use std::fmt;
 
 /// Error returned by the `Sender`.
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct SendError<T>(pub T);
+
+impl<T> fmt::Debug for SendError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SendError").finish_non_exhaustive()
+    }
+}
 
 impl<T> fmt::Display for SendError<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -13,13 +19,13 @@ impl<T> fmt::Display for SendError<T> {
     }
 }
 
-impl<T: fmt::Debug> std::error::Error for SendError<T> {}
+impl<T> std::error::Error for SendError<T> {}
 
 // ===== TrySendError =====
 
 /// This enumeration is the list of the possible error outcomes for the
 /// [try_send](super::Sender::try_send) method.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum TrySendError<T> {
     /// The data could not be sent on the channel because the channel is
     /// currently full and sending would require blocking.
@@ -30,7 +36,14 @@ pub enum TrySendError<T> {
     Closed(T),
 }
 
-impl<T: fmt::Debug> Error for TrySendError<T> {}
+impl<T> fmt::Debug for TrySendError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            TrySendError::Full(..) => "Full(..)".fmt(f),
+            TrySendError::Closed(..) => "Closed(..)".fmt(f),
+        }
+    }
+}
 
 impl<T> fmt::Display for TrySendError<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -44,6 +57,8 @@ impl<T> fmt::Display for TrySendError<T> {
         )
     }
 }
+
+impl<T> Error for TrySendError<T> {}
 
 impl<T> From<SendError<T>> for TrySendError<T> {
     fn from(src: SendError<T>) -> TrySendError<T> {
@@ -96,7 +111,7 @@ impl Error for RecvError {}
 cfg_time! {
     // ===== SendTimeoutError =====
 
-    #[derive(Debug, Eq, PartialEq)]
+    #[derive(PartialEq, Eq, Clone, Copy)]
     /// Error returned by [`Sender::send_timeout`](super::Sender::send_timeout)].
     pub enum SendTimeoutError<T> {
         /// The data could not be sent on the channel because the channel is
@@ -108,7 +123,14 @@ cfg_time! {
         Closed(T),
     }
 
-    impl<T: fmt::Debug> Error for SendTimeoutError<T> {}
+    impl<T> fmt::Debug for SendTimeoutError<T> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match *self {
+                SendTimeoutError::Timeout(..) => "Timeout(..)".fmt(f),
+                SendTimeoutError::Closed(..) => "Closed(..)".fmt(f),
+            }
+        }
+    }
 
     impl<T> fmt::Display for SendTimeoutError<T> {
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -122,4 +144,6 @@ cfg_time! {
             )
         }
     }
+
+    impl<T> Error for SendTimeoutError<T> {}
 }

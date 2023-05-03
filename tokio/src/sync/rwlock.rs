@@ -5,7 +5,6 @@ use crate::util::trace;
 use std::cell::UnsafeCell;
 use std::marker;
 use std::marker::PhantomData;
-use std::mem::ManuallyDrop;
 use std::sync::Arc;
 
 pub(crate) mod owned_read_guard;
@@ -86,7 +85,6 @@ const MAX_READS: u32 = 10;
 /// [`RwLockWriteGuard`]: struct@RwLockWriteGuard
 /// [`Send`]: trait@std::marker::Send
 /// [_write-preferring_]: https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock#Priority_policies
-#[derive(Debug)]
 pub struct RwLock<T: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
@@ -423,23 +421,33 @@ impl<T: ?Sized> RwLock<T> {
     /// }
     /// ```
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
+        let acquire_fut = async {
+            self.s.acquire(1).await.unwrap_or_else(|_| {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            });
+
+            RwLockReadGuard {
+                s: &self.s,
+                data: self.c.get(),
+                marker: PhantomData,
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                resource_span: self.resource_span.clone(),
+            }
+        };
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let inner = trace::async_op(
-            || self.s.acquire(1),
+        let acquire_fut = trace::async_op(
+            move || acquire_fut,
             self.resource_span.clone(),
             "RwLock::read",
             "poll",
             false,
         );
 
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = self.s.acquire(1);
-
-        inner.await.unwrap_or_else(|_| {
-            // The semaphore was closed. but, we never explicitly close it, and we have a
-            // handle to it through the Arc, which means that this can never happen.
-            unreachable!()
-        });
+        #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
+        let guard = acquire_fut.await;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         self.resource_span.in_scope(|| {
@@ -450,13 +458,7 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        RwLockReadGuard {
-            s: &self.s,
-            data: self.c.get(),
-            marker: marker::PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: self.resource_span.clone(),
-        }
+        guard
     }
 
     /// Blockingly locks this `RwLock` with shared read access.
@@ -565,25 +567,38 @@ impl<T: ?Sized> RwLock<T> {
     /// ```
     pub async fn read_owned(self: Arc<Self>) -> OwnedRwLockReadGuard<T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let inner = trace::async_op(
-            || self.s.acquire(1),
-            self.resource_span.clone(),
+        let resource_span = self.resource_span.clone();
+
+        let acquire_fut = async {
+            self.s.acquire(1).await.unwrap_or_else(|_| {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            });
+
+            OwnedRwLockReadGuard {
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                resource_span: self.resource_span.clone(),
+                data: self.c.get(),
+                lock: self,
+                _p: PhantomData,
+            }
+        };
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let acquire_fut = trace::async_op(
+            move || acquire_fut,
+            resource_span,
             "RwLock::read_owned",
             "poll",
             false,
         );
 
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = self.s.acquire(1);
-
-        inner.await.unwrap_or_else(|_| {
-            // The semaphore was closed. but, we never explicitly close it, and we have a
-            // handle to it through the Arc, which means that this can never happen.
-            unreachable!()
-        });
+        #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
+        let guard = acquire_fut.await;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
+        guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             current_readers = 1,
@@ -591,16 +606,7 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = self.resource_span.clone();
-
-        OwnedRwLockReadGuard {
-            data: self.c.get(),
-            lock: ManuallyDrop::new(self),
-            _p: PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
-        }
+        guard
     }
 
     /// Attempts to acquire this `RwLock` with shared read access.
@@ -642,6 +648,14 @@ impl<T: ?Sized> RwLock<T> {
             Err(TryAcquireError::Closed) => unreachable!(),
         }
 
+        let guard = RwLockReadGuard {
+            s: &self.s,
+            data: self.c.get(),
+            marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: self.resource_span.clone(),
+        };
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         self.resource_span.in_scope(|| {
             tracing::trace!(
@@ -651,13 +665,7 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        Ok(RwLockReadGuard {
-            s: &self.s,
-            data: self.c.get(),
-            marker: marker::PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: self.resource_span.clone(),
-        })
+        Ok(guard)
     }
 
     /// Attempts to acquire this `RwLock` with shared read access.
@@ -705,8 +713,16 @@ impl<T: ?Sized> RwLock<T> {
             Err(TryAcquireError::Closed) => unreachable!(),
         }
 
+        let guard = OwnedRwLockReadGuard {
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: self.resource_span.clone(),
+            data: self.c.get(),
+            lock: self,
+            _p: PhantomData,
+        };
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
+        guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             current_readers = 1,
@@ -714,16 +730,7 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = self.resource_span.clone();
-
-        Ok(OwnedRwLockReadGuard {
-            data: self.c.get(),
-            lock: ManuallyDrop::new(self),
-            _p: PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
-        })
+        Ok(guard)
     }
 
     /// Locks this `RwLock` with exclusive write access, causing the current
@@ -755,23 +762,34 @@ impl<T: ?Sized> RwLock<T> {
     ///}
     /// ```
     pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
+        let acquire_fut = async {
+            self.s.acquire(self.mr).await.unwrap_or_else(|_| {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            });
+
+            RwLockWriteGuard {
+                permits_acquired: self.mr,
+                s: &self.s,
+                data: self.c.get(),
+                marker: marker::PhantomData,
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                resource_span: self.resource_span.clone(),
+            }
+        };
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let inner = trace::async_op(
-            || self.s.acquire(self.mr),
+        let acquire_fut = trace::async_op(
+            move || acquire_fut,
             self.resource_span.clone(),
             "RwLock::write",
             "poll",
             false,
         );
 
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = self.s.acquire(self.mr);
-
-        inner.await.unwrap_or_else(|_| {
-            // The semaphore was closed. but, we never explicitly close it, and we have a
-            // handle to it through the Arc, which means that this can never happen.
-            unreachable!()
-        });
+        #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
+        let guard = acquire_fut.await;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         self.resource_span.in_scope(|| {
@@ -782,14 +800,7 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        RwLockWriteGuard {
-            permits_acquired: self.mr,
-            s: &self.s,
-            data: self.c.get(),
-            marker: marker::PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: self.resource_span.clone(),
-        }
+        guard
     }
 
     /// Blockingly locks this `RwLock` with exclusive write access.
@@ -884,25 +895,39 @@ impl<T: ?Sized> RwLock<T> {
     /// ```
     pub async fn write_owned(self: Arc<Self>) -> OwnedRwLockWriteGuard<T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let inner = trace::async_op(
-            || self.s.acquire(self.mr),
-            self.resource_span.clone(),
+        let resource_span = self.resource_span.clone();
+
+        let acquire_fut = async {
+            self.s.acquire(self.mr).await.unwrap_or_else(|_| {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            });
+
+            OwnedRwLockWriteGuard {
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                resource_span: self.resource_span.clone(),
+                permits_acquired: self.mr,
+                data: self.c.get(),
+                lock: self,
+                _p: PhantomData,
+            }
+        };
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let acquire_fut = trace::async_op(
+            move || acquire_fut,
+            resource_span,
             "RwLock::write_owned",
             "poll",
             false,
         );
 
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = self.s.acquire(self.mr);
-
-        inner.await.unwrap_or_else(|_| {
-            // The semaphore was closed. but, we never explicitly close it, and we have a
-            // handle to it through the Arc, which means that this can never happen.
-            unreachable!()
-        });
+        #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
+        let guard = acquire_fut.await;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
+        guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             write_locked = true,
@@ -910,17 +935,7 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = self.resource_span.clone();
-
-        OwnedRwLockWriteGuard {
-            permits_acquired: self.mr,
-            data: self.c.get(),
-            lock: ManuallyDrop::new(self),
-            _p: PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
-        }
+        guard
     }
 
     /// Attempts to acquire this `RwLock` with exclusive write access.
@@ -953,6 +968,15 @@ impl<T: ?Sized> RwLock<T> {
             Err(TryAcquireError::Closed) => unreachable!(),
         }
 
+        let guard = RwLockWriteGuard {
+            permits_acquired: self.mr,
+            s: &self.s,
+            data: self.c.get(),
+            marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: self.resource_span.clone(),
+        };
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         self.resource_span.in_scope(|| {
             tracing::trace!(
@@ -962,14 +986,7 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        Ok(RwLockWriteGuard {
-            permits_acquired: self.mr,
-            s: &self.s,
-            data: self.c.get(),
-            marker: marker::PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: self.resource_span.clone(),
-        })
+        Ok(guard)
     }
 
     /// Attempts to acquire this `RwLock` with exclusive write access.
@@ -1009,8 +1026,17 @@ impl<T: ?Sized> RwLock<T> {
             Err(TryAcquireError::Closed) => unreachable!(),
         }
 
+        let guard = OwnedRwLockWriteGuard {
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: self.resource_span.clone(),
+            permits_acquired: self.mr,
+            data: self.c.get(),
+            lock: self,
+            _p: PhantomData,
+        };
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
+        guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
             write_locked = true,
@@ -1018,17 +1044,7 @@ impl<T: ?Sized> RwLock<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = self.resource_span.clone();
-
-        Ok(OwnedRwLockWriteGuard {
-            permits_acquired: self.mr,
-            data: self.c.get(),
-            lock: ManuallyDrop::new(self),
-            _p: PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
-        })
+        Ok(guard)
     }
 
     /// Returns a mutable reference to the underlying data.
@@ -1076,5 +1092,19 @@ where
 {
     fn default() -> Self {
         Self::new(T::default())
+    }
+}
+
+impl<T: ?Sized> std::fmt::Debug for RwLock<T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("RwLock");
+        match self.try_read() {
+            Ok(inner) => d.field("data", &&*inner),
+            Err(_) => d.field("data", &format_args!("<locked>")),
+        };
+        d.finish()
     }
 }

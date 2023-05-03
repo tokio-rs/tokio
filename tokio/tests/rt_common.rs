@@ -695,12 +695,34 @@ rt_test! {
     /// Tests that yielded tasks are not scheduled until **after** resource
     /// drivers are polled.
     ///
-    /// Note: we may have to delete this test as it is not necessarily reliable.
     /// The OS does not guarantee when I/O events are delivered, so there may be
-    /// more yields than anticipated.
+    /// more yields than anticipated. This makes the test slightly flaky. To
+    /// help avoid flakiness, we run the test 10 times and only fail it after
+    /// 10 failures in a row.
+    ///
+    /// Note that if the test fails by panicking rather than by returning false,
+    /// then we fail it immediately. That kind of failure should not happen
+    /// spuriously.
     #[test]
     #[cfg(not(target_os="wasi"))]
     fn yield_defers_until_park() {
+        for _ in 0..10 {
+            if yield_defers_until_park_inner() {
+                // test passed
+                return;
+            }
+
+            // Wait a bit and run the test again.
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+
+        panic!("yield_defers_until_park is failing consistently");
+    }
+
+    /// Implementation of `yield_defers_until_park` test. Returns `true` if the
+    /// test passed.
+    #[cfg(not(target_os="wasi"))]
+    fn yield_defers_until_park_inner() -> bool {
         use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
         use std::sync::Barrier;
 
@@ -727,14 +749,16 @@ rt_test! {
 
             barrier.wait();
 
-            tokio::spawn(async move {
+            let (fail_test, fail_test_recv) = oneshot::channel::<()>();
+
+            let jh = tokio::spawn(async move {
                 // Create a TCP litener
                 let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
                 let addr = listener.local_addr().unwrap();
 
                 tokio::join!(
                     async {
-                        // Done blocking intentionally
+                        // Done in a blocking manner intentionally.
                         let _socket = std::net::TcpStream::connect(addr).unwrap();
 
                         // Yield until connected
@@ -744,7 +768,12 @@ rt_test! {
                             cnt += 1;
 
                             if cnt >= 10 {
-                                panic!("yielded too many times; TODO: delete this test?");
+                                // yielded too many times; report failure and
+                                // sleep forever so that the `fail_test` branch
+                                // of the `select!` below triggers.
+                                let _ = fail_test.send(());
+                                futures::future::pending::<()>().await;
+                                break;
                             }
                         }
                     },
@@ -753,8 +782,20 @@ rt_test! {
                         flag.store(true, SeqCst);
                     }
                 );
-            }).await.unwrap();
-        });
+            });
+
+            // Wait until the spawned task completes or fails. If no message is
+            // sent on `fail_test`, then the test succeeds. Otherwise, it fails.
+            let success = fail_test_recv.await.is_err();
+
+            if success {
+                // Check for panics in spawned task.
+                jh.abort();
+                jh.await.unwrap();
+            }
+
+            success
+        })
     }
 
     #[cfg(not(target_os="wasi"))] // Wasi does not support threads

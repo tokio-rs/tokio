@@ -13,7 +13,7 @@ use std::task::Poll;
 
 use futures::future::FutureExt;
 
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockWriteGuard};
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
@@ -278,4 +278,54 @@ fn try_read_try_write() {
     }
 
     assert_eq!(*lock.try_read().unwrap(), 1515);
+}
+
+#[maybe_tokio_test]
+async fn downgrade_map() {
+    let lock = RwLock::new(0);
+    let write_guard = lock.write().await;
+    let mut read_t = spawn(lock.read());
+
+    // We can't create a read when a write exists
+    assert_pending!(read_t.poll());
+
+    // During the call to `f`, `read_t` doesn't have access yet.
+    let read_guard1 = RwLockWriteGuard::downgrade_map(write_guard, |v| {
+        assert_pending!(read_t.poll());
+        v
+    });
+
+    // After the downgrade, `read_t` got the lock
+    let read_guard2 = assert_ready!(read_t.poll());
+
+    // Ensure they're equal, as we return the original value
+    assert_eq!(&*read_guard1 as *const _, &*read_guard2 as *const _);
+}
+
+#[maybe_tokio_test]
+async fn try_downgrade_map() {
+    let lock = RwLock::new(0);
+    let write_guard = lock.write().await;
+    let mut read_t = spawn(lock.read());
+
+    // We can't create a read when a write exists
+    assert_pending!(read_t.poll());
+
+    // During the call to `f`, `read_t` doesn't have access yet.
+    let write_guard = RwLockWriteGuard::try_downgrade_map(write_guard, |_| {
+        assert_pending!(read_t.poll());
+        None::<&()>
+    })
+    .expect_err("downgrade didn't fail");
+
+    // After `f` returns `None`, `read_t` doesn't have access
+    assert_pending!(read_t.poll());
+
+    // After `f` returns `Some`, `read_t` does have access
+    let read_guard1 = RwLockWriteGuard::try_downgrade_map(write_guard, |v| Some(v))
+        .expect("downgrade didn't succeed");
+    let read_guard2 = assert_ready!(read_t.poll());
+
+    // Ensure they're equal, as we return the original value
+    assert_eq!(&*read_guard1 as *const _, &*read_guard2 as *const _);
 }

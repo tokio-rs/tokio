@@ -125,7 +125,7 @@ impl Driver {
     /// thread and `time_source` to get the current time and convert to ticks.
     ///
     /// Specifying the source of time is useful when testing.
-    pub(crate) fn new(park: IoStack, clock: Clock) -> (Driver, Handle) {
+    pub(crate) fn new(park: IoStack, clock: &Clock) -> (Driver, Handle) {
         let time_source = TimeSource::new(clock);
 
         let handle = Handle {
@@ -186,7 +186,7 @@ impl Driver {
 
         match next_wake {
             Some(when) => {
-                let now = handle.time_source.now();
+                let now = handle.time_source.now(rt_handle.clock());
                 // Note that we effectively round up to 1ms here - this avoids
                 // very short-duration microsecond-resolution sleeps that the OS
                 // might treat as zero-length.
@@ -214,13 +214,13 @@ impl Driver {
         }
 
         // Process pending timers after waking up
-        handle.process();
+        handle.process(rt_handle.clock());
     }
 
     cfg_test_util! {
         fn park_thread_timeout(&mut self, rt_handle: &driver::Handle, duration: Duration) {
             let handle = rt_handle.time();
-            let clock = &handle.time_source.clock;
+            let clock = rt_handle.clock();
 
             if clock.can_auto_advance() {
                 self.park.park_timeout(rt_handle, Duration::from_secs(0));
@@ -231,7 +231,9 @@ impl Driver {
                 // advance the clock.
                 if !handle.did_wake() {
                     // Simulate advancing time
-                    clock.advance(duration);
+                    if let Err(msg) = clock.advance(duration) {
+                        panic!("{}", msg);
+                    }
                 }
             } else {
                 self.park.park_timeout(rt_handle, duration);
@@ -248,8 +250,8 @@ impl Driver {
 
 impl Handle {
     /// Runs timer related logic, and returns the next wakeup time
-    pub(self) fn process(&self) {
-        let now = self.time_source().now();
+    pub(self) fn process(&self, clock: &Clock) {
+        let now = self.time_source().now(clock);
 
         self.process_at_time(now)
     }

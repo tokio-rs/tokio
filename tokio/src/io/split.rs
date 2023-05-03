@@ -75,7 +75,10 @@ impl<T> ReadHalf<T> {
     /// This can be checked ahead of time by comparing the stream ID
     /// of the two halves.
     #[track_caller]
-    pub fn unsplit(self, wr: WriteHalf<T>) -> T {
+    pub fn unsplit(self, wr: WriteHalf<T>) -> T
+    where
+        T: Unpin,
+    {
         if self.is_pair_of(&wr) {
             drop(wr);
 

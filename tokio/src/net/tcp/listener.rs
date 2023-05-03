@@ -5,7 +5,6 @@ cfg_not_wasi! {
     use crate::net::{to_socket_addrs, ToSocketAddrs};
 }
 
-use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{self, SocketAddr};
@@ -195,14 +194,21 @@ impl TcpListener {
     /// Creates new `TcpListener` from a `std::net::TcpListener`.
     ///
     /// This function is intended to be used to wrap a TCP listener from the
-    /// standard library in the Tokio equivalent. The conversion assumes nothing
-    /// about the underlying listener; it is left up to the user to set it in
-    /// non-blocking mode.
+    /// standard library in the Tokio equivalent.
     ///
     /// This API is typically paired with the `socket2` crate and the `Socket`
     /// type to build up and customize a listener before it's shipped off to the
     /// backing event loop. This allows configuration of options like
     /// `SO_REUSEPORT`, binding to multiple addresses, etc.
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the listener is in
+    /// non-blocking mode. Otherwise all I/O operations on the listener
+    /// will block the thread, which will cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::net::TcpListener::set_nonblocking
     ///
     /// # Examples
     ///
@@ -400,6 +406,13 @@ mod sys {
             self.io.as_raw_fd()
         }
     }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsFd for TcpListener {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
+    }
 }
 
 cfg_unstable! {
@@ -413,17 +426,31 @@ cfg_unstable! {
                 self.io.as_raw_fd()
             }
         }
+
+        #[cfg(not(tokio_no_as_fd))]
+        impl AsFd for TcpListener {
+            fn as_fd(&self) -> BorrowedFd<'_> {
+                unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+            }
+        }
     }
 }
 
-#[cfg(windows)]
-mod sys {
-    use super::TcpListener;
-    use std::os::windows::prelude::*;
+cfg_windows! {
+    use crate::os::windows::io::{AsRawSocket, RawSocket};
+    #[cfg(not(tokio_no_as_fd))]
+    use crate::os::windows::io::{AsSocket, BorrowedSocket};
 
     impl AsRawSocket for TcpListener {
         fn as_raw_socket(&self) -> RawSocket {
             self.io.as_raw_socket()
+        }
+    }
+
+    #[cfg(not(tokio_no_as_fd))]
+    impl AsSocket for TcpListener {
+        fn as_socket(&self) -> BorrowedSocket<'_> {
+            unsafe { BorrowedSocket::borrow_raw(self.as_raw_socket()) }
         }
     }
 }

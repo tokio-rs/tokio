@@ -10,7 +10,7 @@ use std::path::Path;
 ///
 /// This is an async version of [`std::os::windows::fs::symlink_dir`][std]
 ///
-/// [std]: std::os::windows::fs::symlink_dir
+/// [std]: https://doc.rust-lang.org/std/os/windows/fs/fn.symlink_dir.html
 pub async fn symlink_dir(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
     let src = src.as_ref().to_owned();
     let dst = dst.as_ref().to_owned();

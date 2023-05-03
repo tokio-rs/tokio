@@ -183,3 +183,8 @@ async fn a_different_future_is_polled_first_every_time_poll_fn_is_polled() {
         *poll_order.lock().unwrap()
     );
 }
+
+#[tokio::test]
+async fn empty_try_join() {
+    assert_eq!(tokio::try_join!() as Result<_, ()>, Ok(()));
+}

@@ -102,6 +102,9 @@ pub use self::write::write;
 mod copy;
 pub use self::copy::copy;
 
+mod try_exists;
+pub use self::try_exists::try_exists;
+
 #[cfg(test)]
 mod mocks;
 
@@ -112,9 +115,7 @@ feature! {
     pub use self::symlink::symlink;
 }
 
-feature! {
-    #![windows]
-
+cfg_windows! {
     mod symlink_dir;
     pub use self::symlink_dir::symlink_dir;
 

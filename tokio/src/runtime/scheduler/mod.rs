@@ -135,6 +135,14 @@ cfg_rt! {
                 }
             }
 
+            pub(crate) fn active_tasks_count(&self) -> usize {
+                match self {
+                    Handle::CurrentThread(handle) => handle.active_tasks_count(),
+                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    Handle::MultiThread(handle) => handle.active_tasks_count(),
+                }
+            }
+
             pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
                 match self {
                     Handle::CurrentThread(handle) => handle.scheduler_metrics(),

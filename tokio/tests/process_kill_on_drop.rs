@@ -12,7 +12,7 @@ use tokio_test::assert_ok;
 #[tokio::test]
 async fn kill_on_drop() {
     let mut cmd = Command::new("bash");
-    cmd.args(&[
+    cmd.args([
         "-c",
         "
        # Fork another child that won't get killed
