@@ -685,3 +685,19 @@ jobs:
           cargo install cargo-check-external-types --locked --version 0.1.6
           cargo check-external-types --all-features --config external-types.toml
         working-directory: tokio
+
+  check-fuzzing:
+    name: check-fuzzing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.rust_nightly }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+      - name: Check tokio/
+        run: cargo fuzz check --all-features
+        working-directory: tokio
