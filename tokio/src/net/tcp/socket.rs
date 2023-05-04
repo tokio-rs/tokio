@@ -404,7 +404,7 @@ impl TcpSocket {
         self.inner.linger()
     }
 
-    /// Sets the value of the TCP_NODELAY option on this socket.
+    /// Sets the value of the `TCP_NODELAY` option on this socket.
     ///
     /// If set, this option disables the Nagle algorithm. This means that segments are always
     /// sent as soon as possible, even if there is only a small amount of data. When not set,
