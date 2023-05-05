@@ -209,7 +209,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
 /// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
-/// [Builder](../tokio/runtime/struct.builder.html) directly.
+/// [Builder](../tokio/runtime/struct.Builder.html) directly.
 ///
 /// ## Function arguments:
 ///
