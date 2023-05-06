@@ -404,6 +404,51 @@ impl TcpSocket {
         self.inner.linger()
     }
 
+    /// Sets the value of the `TCP_NODELAY` option on this socket.
+    ///
+    /// If set, this option disables the Nagle algorithm. This means that segments are always
+    /// sent as soon as possible, even if there is only a small amount of data. When not set,
+    /// data is buffered until there is a sufficient amount to send out, thereby avoiding
+    /// the frequent sending of small packets.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let socket = TcpSocket::new_v4()?;
+    ///
+    /// println!("{:?}", socket.nodelay()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
+        self.inner.set_nodelay(nodelay)
+    }
+
+    /// Gets the value of the `TCP_NODELAY` option on this socket.
+    ///
+    /// For more information about this option, see [`set_nodelay`].
+    ///
+    /// [`set_nodelay`]: TcpSocket::set_nodelay
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = TcpSocket::new_v4()?;
+    ///
+    /// stream.set_nodelay(true)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn nodelay(&self) -> io::Result<bool> {
+        self.inner.nodelay()
+    }
+
     /// Gets the value of the `IP_TOS` option for this socket.
     ///
     /// For more information about this option, see [`set_tos`].
