@@ -42,7 +42,7 @@ struct Frame {
 /// An tree execution trace.
 ///
 /// Traces are captured with [`Trace::capture`], rooted with [`Trace::root`]
-/// and leaved with [`Trace::leaf`].
+/// and leaved with [`trace_leaf`].
 #[derive(Clone, Debug)]
 pub(crate) struct Trace {
     // The linear backtraces that comprise this trace. These linear traces can
@@ -93,7 +93,7 @@ impl Context {
 
 impl Trace {
     /// Invokes `f`, returning both its result and the collection of backtraces
-    /// captured at each sub-invocation of [`Trace::leaf`].
+    /// captured at each sub-invocation of [`trace_leaf`].
     #[inline(never)]
     pub(crate) fn capture<F, R>(f: F) -> (R, Trace)
     where
