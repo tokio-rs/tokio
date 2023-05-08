@@ -46,7 +46,7 @@ pub async fn yield_now() {
         type Output = ();
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-            crate::runtime::task::trace_leaf();
+            ready!(crate::runtime::task::trace_leaf(cx));
 
             if self.yielded {
                 return Poll::Ready(());
@@ -55,7 +55,7 @@ pub async fn yield_now() {
             self.yielded = true;
 
             let defer = context::with_defer(|rt| {
-                rt.defer(cx.waker().clone());
+                rt.defer(cx.waker());
             });
 
             if defer.is_none() {

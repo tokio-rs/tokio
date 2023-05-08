@@ -128,9 +128,9 @@ impl Trace {
 // backtrace, below which frames should not be included in the backtrace (since they reflect the
 // internal implementation details of this crate).
 #[inline(never)]
-pub(crate) fn trace_leaf() {
+pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
     // Safety: We don't manipulate the current context's active frame.
-    unsafe {
+    let did_trace = unsafe {
         Context::with_current(|context_cell| {
             if let Some(mut collector) = context_cell.collector.take() {
                 let mut frames = vec![];
@@ -158,8 +158,24 @@ pub(crate) fn trace_leaf() {
                 }
                 collector.backtraces.push(frames);
                 context_cell.collector.set(Some(collector));
+                true
+            } else {
+                false
             }
+        })
+    };
+
+    if did_trace {
+        // Use the same logic that `yield_now` uses to send out wakeups after
+        // the task yields.
+        let defer = crate::runtime::context::with_defer(|rt| {
+            rt.defer(cx.waker());
         });
+        debug_assert!(defer.is_some());
+
+        Poll::Pending
+    } else {
+        Poll::Ready(())
     }
 }
 

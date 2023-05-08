@@ -498,7 +498,7 @@ impl AsyncRead for File {
         cx: &mut Context<'_>,
         dst: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        crate::runtime::task::trace_leaf();
+        ready!(crate::runtime::task::trace_leaf(cx));
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
@@ -595,7 +595,7 @@ impl AsyncSeek for File {
     }
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        crate::runtime::task::trace_leaf();
+        ready!(crate::runtime::task::trace_leaf(cx));
         let inner = self.inner.get_mut();
 
         loop {
@@ -631,7 +631,7 @@ impl AsyncWrite for File {
         cx: &mut Context<'_>,
         src: &[u8],
     ) -> Poll<io::Result<usize>> {
-        crate::runtime::task::trace_leaf();
+        ready!(crate::runtime::task::trace_leaf(cx));
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
@@ -698,13 +698,13 @@ impl AsyncWrite for File {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        crate::runtime::task::trace_leaf();
+        ready!(crate::runtime::task::trace_leaf(cx));
         let inner = self.inner.get_mut();
         inner.poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        crate::runtime::task::trace_leaf();
+        ready!(crate::runtime::task::trace_leaf(cx));
         self.poll_flush(cx)
     }
 }
@@ -783,7 +783,7 @@ impl Inner {
     }
 
     fn poll_complete_inflight(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        crate::runtime::task::trace_leaf();
+        ready!(crate::runtime::task::trace_leaf(cx));
         match self.poll_flush(cx) {
             Poll::Ready(Err(e)) => {
                 self.last_write_err = Some(e.kind());
