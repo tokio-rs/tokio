@@ -94,7 +94,12 @@ impl<T: Send> PollSenderFuture<T> {
 
     /// Replace the inner future.
     fn set(&mut self, sender: Option<Sender<T>>) {
-        // This is safe because `make_acquire_future(sender)` is bounded by the lifetime of `T`, which inner is already bound by
+        // SAFETY: The `make_acquire_future(sender)` future must not exist after the type `T`
+        // becomes invalid, and this casts away the type-level lifetime check for that. However, the
+        // inner future is never moved out of this `PollSenderFuture<T>`, so the future will not
+        // live longer than the `PollSenderFuture<T>` lives. A `PollSenderFuture<T>` is guaranteed
+        // to not exist after the type `T` becomes invalid, because it is annotated with a `T`, so
+        // this is ok.
         let inner: &mut InnerFuture<'_, T> =
             unsafe { &mut *(&mut self.0 as *mut InnerFuture<'static, T>).cast() };
         inner.set(make_acquire_future(sender));
