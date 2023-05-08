@@ -275,6 +275,7 @@ fn wake_deferred_tasks() {
     context::with_defer(|deferred| deferred.wake());
 }
 
+#[cfg(tokio_taskdump)]
 fn wake_deferred_tasks_and_free() {
     let wakers = context::with_defer(|deferred| deferred.take_deferred());
     if let Some(wakers) = wakers {
