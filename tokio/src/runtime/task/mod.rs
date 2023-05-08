@@ -215,7 +215,7 @@ cfg_taskdump! {
 
 cfg_not_taskdump! {
     #[inline(always)]
-    pub(crate) fn trace_leaf(cx: &mut std::task::Context<'_>) -> std::task::Poll<()> {
+    pub(crate) fn trace_leaf(_: &mut std::task::Context<'_>) -> std::task::Poll<()> {
         std::task::Poll::Ready(())
     }
 }
