@@ -313,6 +313,7 @@ impl<T> Future for JoinHandle<T> {
     type Output = super::Result<T>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        crate::runtime::task::trace_leaf();
         let mut ret = Poll::Pending;
 
         // Keep track of task budget

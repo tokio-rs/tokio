@@ -387,7 +387,15 @@ macro_rules! cfg_taskdump {
                     target_arch = "x86_64"
                 )
             ))]
-            #[cfg_attr(docsrs, doc(cfg(all(
+            $item
+        )*
+    };
+}
+
+macro_rules! cfg_not_taskdump {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(
                 tokio_unstable,
                 tokio_taskdump,
                 feature = "rt",
@@ -397,7 +405,7 @@ macro_rules! cfg_taskdump {
                     target_arch = "x86",
                     target_arch = "x86_64"
                 )
-            ))))]
+            )))]
             $item
         )*
     };
