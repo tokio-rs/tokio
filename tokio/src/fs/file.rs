@@ -788,7 +788,7 @@ impl Inner {
             Poll::Ready(Err(e)) => {
                 self.last_write_err = Some(e.kind());
                 Poll::Ready(())
-            },
+            }
             Poll::Ready(Ok(())) => Poll::Ready(()),
             Poll::Pending => Poll::Pending,
         }

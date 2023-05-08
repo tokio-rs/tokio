@@ -140,8 +140,7 @@ pub(crate) fn trace_leaf() {
                     let active_frame = active_frame.as_ref();
 
                     backtrace::trace(|frame| {
-                        let below_root =
-                            !ptr::eq(frame.symbol_address(), active_frame.inner_addr);
+                        let below_root = !ptr::eq(frame.symbol_address(), active_frame.inner_addr);
 
                         // only capture frames above `Trace::leaf` and below
                         // `Trace::root`.
