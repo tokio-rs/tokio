@@ -42,7 +42,7 @@ struct Frame {
 /// An tree execution trace.
 ///
 /// Traces are captured with [`Trace::capture`], rooted with [`Trace::root`]
-/// and leaved with [`Trace::leaf`].
+/// and leaved with [`trace_leaf`].
 #[derive(Clone, Debug)]
 pub(crate) struct Trace {
     // The linear backtraces that comprise this trace. These linear traces can
@@ -93,7 +93,7 @@ impl Context {
 
 impl Trace {
     /// Invokes `f`, returning both its result and the collection of backtraces
-    /// captured at each sub-invocation of [`Trace::leaf`].
+    /// captured at each sub-invocation of [`trace_leaf`].
     #[inline(never)]
     pub(crate) fn capture<F, R>(f: F) -> (R, Trace)
     where
@@ -116,51 +116,66 @@ impl Trace {
     pub(crate) fn root<F>(future: F) -> Root<F> {
         Root { future }
     }
+}
 
-    /// If this is a sub-invocation of [`Trace::capture`], capture a backtrace.
-    ///
-    /// The captured backtrace will be returned by [`Trace::capture`].
-    ///
-    /// Invoking this function does nothing when it is not a sub-invocation
-    /// [`Trace::capture`].
-    // This function is marked `#[inline(never)]` to ensure that it gets a distinct `Frame` in the
-    // backtrace, below which frames should not be included in the backtrace (since they reflect the
-    // internal implementation details of this crate).
-    #[inline(never)]
-    pub(crate) fn leaf() {
-        // Safety: We don't manipulate the current context's active frame.
-        unsafe {
-            Context::with_current(|context_cell| {
-                if let Some(mut collector) = context_cell.collector.take() {
-                    let mut frames = vec![];
-                    let mut above_leaf = false;
+/// If this is a sub-invocation of [`Trace::capture`], capture a backtrace.
+///
+/// The captured backtrace will be returned by [`Trace::capture`].
+///
+/// Invoking this function does nothing when it is not a sub-invocation
+/// [`Trace::capture`].
+// This function is marked `#[inline(never)]` to ensure that it gets a distinct `Frame` in the
+// backtrace, below which frames should not be included in the backtrace (since they reflect the
+// internal implementation details of this crate).
+#[inline(never)]
+pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
+    // Safety: We don't manipulate the current context's active frame.
+    let did_trace = unsafe {
+        Context::with_current(|context_cell| {
+            if let Some(mut collector) = context_cell.collector.take() {
+                let mut frames = vec![];
+                let mut above_leaf = false;
 
-                    if let Some(active_frame) = context_cell.active_frame.get() {
-                        let active_frame = active_frame.as_ref();
+                if let Some(active_frame) = context_cell.active_frame.get() {
+                    let active_frame = active_frame.as_ref();
 
-                        backtrace::trace(|frame| {
-                            let below_root =
-                                !ptr::eq(frame.symbol_address(), active_frame.inner_addr);
+                    backtrace::trace(|frame| {
+                        let below_root = !ptr::eq(frame.symbol_address(), active_frame.inner_addr);
 
-                            // only capture frames above `Trace::leaf` and below
-                            // `Trace::root`.
-                            if above_leaf && below_root {
-                                frames.push(frame.to_owned().into());
-                            }
+                        // only capture frames above `Trace::leaf` and below
+                        // `Trace::root`.
+                        if above_leaf && below_root {
+                            frames.push(frame.to_owned().into());
+                        }
 
-                            if ptr::eq(frame.symbol_address(), Self::leaf as *const _) {
-                                above_leaf = true;
-                            }
+                        if ptr::eq(frame.symbol_address(), trace_leaf as *const _) {
+                            above_leaf = true;
+                        }
 
-                            // only continue unwinding if we're below `Trace::root`
-                            below_root
-                        });
-                    }
-                    collector.backtraces.push(frames);
-                    context_cell.collector.set(Some(collector));
+                        // only continue unwinding if we're below `Trace::root`
+                        below_root
+                    });
                 }
-            });
-        }
+                collector.backtraces.push(frames);
+                context_cell.collector.set(Some(collector));
+                true
+            } else {
+                false
+            }
+        })
+    };
+
+    if did_trace {
+        // Use the same logic that `yield_now` uses to send out wakeups after
+        // the task yields.
+        let defer = crate::runtime::context::with_defer(|rt| {
+            rt.defer(cx.waker());
+        });
+        debug_assert!(defer.is_some());
+
+        Poll::Pending
+    } else {
+        Poll::Ready(())
     }
 }
 

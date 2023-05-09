@@ -275,6 +275,16 @@ fn wake_deferred_tasks() {
     context::with_defer(|deferred| deferred.wake());
 }
 
+#[cfg(tokio_taskdump)]
+fn wake_deferred_tasks_and_free() {
+    let wakers = context::with_defer(|deferred| deferred.take_deferred());
+    if let Some(wakers) = wakers {
+        for waker in wakers {
+            waker.wake();
+        }
+    }
+}
+
 // ===== impl Context =====
 
 impl Context {
@@ -418,6 +428,11 @@ impl Handle {
                 .map(dump::Task::new)
                 .collect();
         });
+
+        // Taking a taskdump could wakes every task, but we probably don't want
+        // the `yield_now` vector to be that large under normal circumstances.
+        // Therefore, we free its allocation.
+        wake_deferred_tasks_and_free();
 
         dump::Dump::new(traces)
     }

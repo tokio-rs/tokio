@@ -11,8 +11,14 @@ impl Defer {
         }
     }
 
-    pub(crate) fn defer(&mut self, waker: Waker) {
-        self.deferred.push(waker);
+    pub(crate) fn defer(&mut self, waker: &Waker) {
+        // If the same task adds itself a bunch of times, then only add it once.
+        if let Some(last) = self.deferred.last() {
+            if last.will_wake(waker) {
+                return;
+            }
+        }
+        self.deferred.push(waker.clone());
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -23,5 +29,10 @@ impl Defer {
         for waker in self.deferred.drain(..) {
             waker.wake();
         }
+    }
+
+    #[cfg(tokio_taskdump)]
+    pub(crate) fn take_deferred(&mut self) -> Vec<Waker> {
+        std::mem::take(&mut self.deferred)
     }
 }
