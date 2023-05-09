@@ -567,6 +567,19 @@ cfg_time! {
     pub mod time;
 }
 
+mod trace {
+    cfg_taskdump! {
+        pub(crate) use crate::runtime::task::trace::trace_leaf;
+    }
+
+    cfg_not_taskdump! {
+        #[inline(always)]
+        pub(crate) fn trace_leaf(_: &mut std::task::Context<'_>) -> std::task::Poll<()> {
+            std::task::Poll::Ready(())
+        }
+    }
+}
+
 mod util;
 
 /// Due to the `Stream` trait's inclusion in `std` landing later than Tokio's 1.0

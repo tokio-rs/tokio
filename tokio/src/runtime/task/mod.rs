@@ -209,15 +209,6 @@ mod waker;
 
 cfg_taskdump! {
     pub(crate) mod trace;
-
-    pub(crate) use self::trace::trace_leaf;
-}
-
-cfg_not_taskdump! {
-    #[inline(always)]
-    pub(crate) fn trace_leaf(_: &mut std::task::Context<'_>) -> std::task::Poll<()> {
-        std::task::Poll::Ready(())
-    }
 }
 
 use crate::future::Future;

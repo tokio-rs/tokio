@@ -46,7 +46,7 @@ pub async fn yield_now() {
         type Output = ();
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-            ready!(crate::runtime::task::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf(cx));
 
             if self.yielded {
                 return Poll::Ready(());
