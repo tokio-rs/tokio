@@ -28,6 +28,29 @@ async fn simple() {
 }
 
 #[tokio::test]
+async fn simple_ref() {
+    let v = vec![1, 2, 3i32];
+
+    let (send, mut recv) = channel(3);
+    let mut send = PollSender::new(send);
+
+    for vi in v.iter() {
+        let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+        assert_ready_ok!(reserve.poll());
+        send.send_item(vi).unwrap();
+    }
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_pending!(reserve.poll());
+
+    assert_eq!(*recv.recv().await.unwrap(), 1);
+    assert!(reserve.is_woken());
+    assert_ready_ok!(reserve.poll());
+    drop(recv);
+    send.send_item(&42).unwrap();
+}
+
+#[tokio::test]
 async fn repeated_poll_reserve() {
     let (send, mut recv) = channel::<i32>(1);
     let mut send = PollSender::new(send);
