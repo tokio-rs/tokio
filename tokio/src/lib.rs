@@ -574,6 +574,7 @@ mod trace {
 
     cfg_not_taskdump! {
         #[inline(always)]
+        #[allow(dead_code)]
         pub(crate) fn trace_leaf(_: &mut std::task::Context<'_>) -> std::task::Poll<()> {
             std::task::Poll::Ready(())
         }
