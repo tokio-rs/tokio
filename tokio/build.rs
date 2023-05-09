@@ -19,13 +19,14 @@ const CONST_MUTEX_NEW_PROBE: &str = r#"
 
 const AS_FD_PROBE: &str = r#"
 {
-    #![allow(unused_imports)]
-
+    #[allow(unused_imports)]
     #[cfg(unix)]
     use std::os::unix::prelude::AsFd as _;
+    #[allow(unused_imports)]
     #[cfg(windows)]
     use std::os::windows::prelude::AsSocket as _;
-    #[cfg(target = "wasm32-wasi")]
+    #[allow(unused_imports)]
+    #[cfg(target_os = "wasi")]
     use std::os::wasi::prelude::AsFd as _;
 }
 "#;
