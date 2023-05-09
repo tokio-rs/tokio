@@ -19,7 +19,9 @@ mod stream_reader;
 
 cfg_io_util! {
     mod sync_bridge;
+    mod sync_read_to_async_read;
     pub use self::sync_bridge::SyncIoBridge;
+    pub use self::sync_read_to_async_read::SyncReadIntoAsyncRead;
 }
 
 pub use self::copy_to_bytes::CopyToBytes;
