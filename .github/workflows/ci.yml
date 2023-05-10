@@ -698,6 +698,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
-      - name: Check tokio/
+      - name: Check /tokio/
         run: cargo fuzz check --all-features
         working-directory: tokio
+      - name: Check /tokio-stream/
+        run: cargo fuzz check --all-features
+        working-directory: tokio-stream
