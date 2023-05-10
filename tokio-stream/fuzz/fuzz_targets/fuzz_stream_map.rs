@@ -3,17 +3,8 @@
 use libfuzzer_sys::fuzz_target;
 use std::pin::Pin;
 
-use tokio_stream::{self as stream, pending, Stream, StreamExt, StreamMap};
-use tokio_test::{assert_ok, assert_pending, assert_ready, task};
-
-macro_rules! assert_ready_some {
-    ($($t:tt)*) => {
-        match assert_ready!($($t)*) {
-            Some(v) => v,
-            None => panic!("expected `Some`, got `None`"),
-        }
-    };
-}
+use tokio_stream::{self as stream, Stream, StreamMap};
+use tokio_test::{assert_pending, assert_ready, task};
 
 macro_rules! assert_ready_none {
     ($($t:tt)*) => {
