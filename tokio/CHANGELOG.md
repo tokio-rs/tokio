@@ -1,3 +1,10 @@
+# 1.28.1 (May 10th, 2023)
+
+This release fixes a mistake in the build script that makes `AsFd`
+implementations unavailable on Rust 1.63. ([#5677])
+
+[#5677]: https://github.com/tokio-rs/tokio/pull/5677
+
 # 1.28.0 (April 25th, 2023)
 
 ### Added
