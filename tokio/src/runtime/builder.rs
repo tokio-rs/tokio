@@ -97,6 +97,9 @@ pub struct Builder {
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
+
+    #[cfg(tokio_unstable)]
+    pub(super) metrics_poll_time_histogram: Option<crate::runtime::HistogramBuilder>,
 }
 
 cfg_unstable! {
@@ -267,6 +270,9 @@ impl Builder {
 
             #[cfg(tokio_unstable)]
             unhandled_panic: UnhandledPanic::Ignore,
+
+            #[cfg(tokio_unstable)]
+            metrics_poll_time_histogram: None,
 
             disable_lifo_slot: false,
         }
@@ -875,6 +881,39 @@ impl Builder {
             self.seed_generator = RngSeedGenerator::new(seed);
             self
         }
+
+        pub fn metrics_poll_time_histogram(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
+            self.metrics_poll_time_histogram.get_or_insert_with(Default::default).scale = histogram_scale;
+            // self.metrics
+            self
+        }
+
+        pub fn metrics_poll_time_histogram_resolution(&mut self, resolution: Duration) -> &mut Self {
+            // Sanity check the argument and also make the cast below safe.
+            assert!(resolution <= Duration::from_secs(1));
+
+            let resolution = resolution.as_nanos() as u64;
+            self.metrics_poll_time_histogram.get_or_insert_with(Default::default).resolution = resolution;
+            self
+        }
+
+        pub fn metrics_poll_time_histogram_buckets(&mut self, buckets: usize) -> &mut Self {
+            self.metrics_poll_time_histogram.get_or_insert_with(Default::default).num_buckets = buckets;
+            self
+        }
+
+        fn poll_time_histogram_builder(&self) -> Option<crate::runtime::HistogramBuilder> {
+            let mut builder = self.metrics_poll_time_histogram.clone();
+
+            // Do some sanity checks
+            if let Some(builder) = &mut builder {
+                if matches!(builder.scale, crate::runtime::HistogramScale::Log) {
+                    builder.resolution = builder.resolution.next_power_of_two();
+                }
+            }
+
+            builder
+        }
     }
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
@@ -909,6 +948,8 @@ impl Builder {
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
                 seed_generator: seed_generator_1,
+                #[cfg(tokio_unstable)]
+                metrics_poll_time_histogram: self.poll_time_histogram_builder(),
             },
         );
 
@@ -1050,6 +1091,8 @@ cfg_rt_multi_thread! {
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
                     seed_generator: seed_generator_1,
+                    #[cfg(tokio_unstable)]
+                    metrics_poll_time_histogram: self.poll_time_histogram_builder(),
                 },
             );
 

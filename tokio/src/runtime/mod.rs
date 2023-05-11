@@ -249,9 +249,9 @@ cfg_rt! {
 
     cfg_metrics! {
         mod metrics;
-        pub use metrics::RuntimeMetrics;
+        pub use metrics::{RuntimeMetrics, HistogramScale};
 
-        pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
+        pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics, HistogramBuilder};
 
         cfg_net! {
         pub(crate) use metrics::IoDriverMetrics;

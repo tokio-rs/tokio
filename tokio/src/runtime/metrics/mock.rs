@@ -16,7 +16,7 @@ impl SchedulerMetrics {
 }
 
 impl WorkerMetrics {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(_: &crate::runtime::Config) -> Self {
         Self {}
     }
 
@@ -24,15 +24,21 @@ impl WorkerMetrics {
 }
 
 impl MetricsBatch {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(_: &WorkerMetrics) -> Self {
+        Self {}
+    }
+
+    #[cfg(test)]
+    pub(crate) fn noop() -> Self {
         Self {}
     }
 
     pub(crate) fn submit(&mut self, _to: &WorkerMetrics) {}
     pub(crate) fn about_to_park(&mut self) {}
     pub(crate) fn returned_from_park(&mut self) {}
-    pub(crate) fn incr_poll_count(&mut self) {}
     pub(crate) fn inc_local_schedule_count(&mut self) {}
+    pub(crate) fn start_poll(&mut self) {}
+    pub(crate) fn end_poll(&mut self) {}
 }
 
 cfg_rt_multi_thread! {

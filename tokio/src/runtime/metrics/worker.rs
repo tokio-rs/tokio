@@ -1,5 +1,7 @@
 use crate::loom::sync::atomic::Ordering::Relaxed;
 use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
+use crate::runtime::metrics::Histogram;
+use crate::runtime::Config;
 
 /// Retrieve runtime worker metrics.
 ///
@@ -38,10 +40,19 @@ pub(crate) struct WorkerMetrics {
     /// Number of tasks currently in the local queue. Used only by the
     /// current-thread scheduler.
     pub(crate) queue_depth: AtomicUsize,
+
+    /// If `Some`, tracsk the poll times in `ns`
+    pub(super) poll_times: Option<PollTimer>,
+}
+
+#[derive(Debug)]
+pub(super) struct PollTimer {
+    pub(super) poll_times: Histogram,
+    pub(super) poll_counts: Histogram,
 }
 
 impl WorkerMetrics {
-    pub(crate) fn new() -> WorkerMetrics {
+    pub(crate) fn new(config: &Config) -> WorkerMetrics {
         WorkerMetrics {
             park_count: AtomicU64::new(0),
             noop_count: AtomicU64::new(0),
@@ -52,6 +63,13 @@ impl WorkerMetrics {
             busy_duration_total: AtomicU64::new(0),
             local_schedule_count: AtomicU64::new(0),
             queue_depth: AtomicUsize::new(0),
+            poll_times: config
+                .metrics_poll_time_histogram
+                .as_ref()
+                .map(|histogram_builder| PollTimer {
+                    poll_times: histogram_builder.build(),
+                    poll_counts: histogram_builder.build(),
+                }),
         }
     }
 

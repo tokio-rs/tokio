@@ -31,4 +31,8 @@ pub(crate) struct Config {
     #[cfg(tokio_unstable)]
     /// How to respond to unhandled task panics.
     pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
+
+    #[cfg(tokio_unstable)]
+    /// How to build poll time histograms
+    pub(crate) metrics_poll_time_histogram: Option<crate::runtime::HistogramBuilder>,
 }
