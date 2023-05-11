@@ -1,4 +1,3 @@
-use bytes::buf::Take;
 use bytes::Buf;
 use core::task::Poll::Ready;
 use futures_core::{ready, Future};
@@ -16,7 +15,7 @@ use tokio::task::JoinHandle;
 #[derive(Debug)]
 enum State<Buf: bytes::Buf + bytes::BufMut> {
     Idle(Option<Buf>),
-    Busy(JoinHandle<(io::Result<usize>, Take<Buf>)>),
+    Busy(JoinHandle<(io::Result<usize>, Buf)>),
 }
 
 use State::{Busy, Idle};
@@ -47,7 +46,6 @@ impl<R: Read + Send, Buf: bytes::Buf + bytes::BufMut> SyncReadIntoAsyncRead<R, B
     }
 }
 
-pub(crate) const MAX_BUF: usize = 2 * 1024 * 1024;
 /// Repeats operations that are interrupted.
 macro_rules! uninterruptibly {
     ($e:expr) => {{
@@ -80,37 +78,66 @@ impl<
                     let mut buf = buf_cell.take().unwrap_or_default();
 
                     if buf.has_remaining() {
-                        buf.copy_to_slice(dst.initialized_mut());
+                        // Here, we will split the `buf` into `[..dst.remaining()... ; rest ]`
+                        // The `rest` is stuffed into the `buf_cell` for further poll_read.
+                        // The other is completely consumed into the unfilled destination.
+                        // `rest` can be empty.
+                        let mut adjusted_src = buf.copy_to_bytes(
+                            std::cmp::min(buf.remaining(), dst.remaining())
+                        );
+                        let copied_size = adjusted_src.remaining();
+                        adjusted_src.copy_to_slice(dst.initialize_unfilled_to(copied_size));
+                        dst.set_filled(copied_size);
                         *buf_cell = Some(buf);
                         return Ready(Ok(()));
                     }
 
-                    let target_length = std::cmp::min(dst.remaining(), MAX_BUF);
-                    let mut new_buf = vec![0; target_length];
-
                     let reader = me.reader.clone();
                     *state = Busy(me.rt.spawn_blocking(move || {
-                        let result = uninterruptibly!(reader.blocking_lock().read(&mut new_buf));
-
-                        buf.put_slice(&new_buf);
+                        let result = uninterruptibly!(reader.blocking_lock().read(
+                                // SAFETY: `reader.read` will *ONLY* write initialized bytes
+                                // and never *READ* uninitialized bytes
+                                // inside this buffer.
+                                //
+                                // Furthermore, casting the slice as `*mut [u8]`
+                                // is safe because it has the same layout.
+                                //
+                                // Finally, the pointer obtained is valid and owned
+                                // by `buf` only as we have a valid mutable reference
+                                // to it, it is valid for write.
+                                //
+                                // Here, we copy an nightly API: https://doc.rust-lang.org/stable/src/core/mem/maybe_uninit.rs.html#994-998
+                                unsafe {
+                                        &mut *(buf
+                                                .chunk_mut()
+                                                .as_uninit_slice_mut()
+                                                as *mut [std::mem::MaybeUninit<u8>]
+                                                as *mut [u8]
+                                            )
+                                }
+                        ));
 
                         if let Ok(n) = result {
-                            (result, buf.take(n))
-                        } else {
-                            (result, buf.take(0))
+                            // SAFETY: given we initialize `n` bytes, we can move `n` bytes
+                            // forward.
+                            unsafe { buf.advance_mut(n); }
                         }
+
+                        (result, buf)
                     }));
                 }
                 Busy(ref mut rx) => {
                     let (result, mut buf) = ready!(Pin::new(rx).poll(cx))?;
 
                     match result {
-                        Ok(_) => {
-                            let remaining = buf.remaining();
-                            let mut adjusted_dst = dst.take(remaining);
-                            buf.copy_to_slice(adjusted_dst.initialize_unfilled());
-                            dst.advance(remaining);
-                            *state = Idle(None);
+                        Ok(n) => {
+                            if n > 0 {
+                                let remaining = std::cmp::min(n, dst.remaining());
+                                let mut adjusted_src = buf.copy_to_bytes(remaining);
+                                adjusted_src.copy_to_slice(dst.initialize_unfilled_to(remaining));
+                                dst.advance(remaining);
+                            }
+                            *state = Idle(Some(buf));
                             return Ready(Ok(()));
                         }
                         Err(e) => {
