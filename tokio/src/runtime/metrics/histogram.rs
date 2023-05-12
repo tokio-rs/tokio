@@ -226,11 +226,12 @@ mod test {
 
     #[test]
     fn log_scale_resolution_2() {
-        let h = Histogram::builder()
-            .log_scale()
-            .buckets(10)
-            .resolution(2)
-            .build();
+        let h = HistogramBuilder {
+            scale: HistogramScale::Log,
+            resolution: 2,
+            num_buckets: 10,
+        }
+        .build();
 
         assert_eq!(h.bucket_range(0), 0..2);
         assert_eq!(h.bucket_range(1), 2..4);
@@ -312,11 +313,12 @@ mod test {
 
     #[test]
     fn linear_scale_resolution_1() {
-        let h = Histogram::builder()
-            .linear_scale()
-            .buckets(10)
-            .resolution(1)
-            .build();
+        let h = HistogramBuilder {
+            scale: HistogramScale::Linear,
+            resolution: 1,
+            num_buckets: 10,
+        }
+        .build();
 
         assert_eq!(h.bucket_range(0), 0..1);
         assert_eq!(h.bucket_range(1), 1..2);
@@ -372,11 +374,12 @@ mod test {
 
     #[test]
     fn linear_scale_resolution_100() {
-        let h = Histogram::builder()
-            .linear_scale()
-            .buckets(10)
-            .resolution(100)
-            .build();
+        let h = HistogramBuilder {
+            scale: HistogramScale::Linear,
+            resolution: 100,
+            num_buckets: 10,
+        }
+        .build();
 
         assert_eq!(h.bucket_range(0), 0..100);
         assert_eq!(h.bucket_range(1), 100..200);
@@ -450,11 +453,12 @@ mod test {
 
     #[test]
     fn inc_by_more_than_one() {
-        let h = Histogram::builder()
-            .linear_scale()
-            .buckets(10)
-            .resolution(100)
-            .build();
+        let h = HistogramBuilder {
+            scale: HistogramScale::Linear,
+            resolution: 100,
+            num_buckets: 10,
+        }
+        .build();
 
         let mut b = HistogramBatch::from_histogram(&h);
 

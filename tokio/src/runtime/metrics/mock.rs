@@ -16,7 +16,7 @@ impl SchedulerMetrics {
 }
 
 impl WorkerMetrics {
-    pub(crate) fn new(_: &crate::runtime::Config) -> Self {
+    pub(crate) fn from_config(_: &crate::runtime::Config) -> Self {
         Self {}
     }
 

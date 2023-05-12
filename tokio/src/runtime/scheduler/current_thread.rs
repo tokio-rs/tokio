@@ -109,7 +109,7 @@ impl CurrentThread {
         seed_generator: RngSeedGenerator,
         config: Config,
     ) -> (CurrentThread, Arc<Handle>) {
-        let worker_metrics = WorkerMetrics::new(&config);
+        let worker_metrics = WorkerMetrics::from_config(&config);
 
         let handle = Arc::new(Handle {
             shared: Shared {

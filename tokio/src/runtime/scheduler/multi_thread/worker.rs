@@ -203,7 +203,7 @@ pub(super) fn create(
 
         let park = park.clone();
         let unpark = park.unpark();
-        let metrics = WorkerMetrics::new(&config);
+        let metrics = WorkerMetrics::from_config(&config);
 
         cores.push(Box::new(Core {
             tick: 0,

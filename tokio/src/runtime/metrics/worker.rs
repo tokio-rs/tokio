@@ -46,7 +46,16 @@ pub(crate) struct WorkerMetrics {
 }
 
 impl WorkerMetrics {
-    pub(crate) fn new(config: &Config) -> WorkerMetrics {
+    pub(crate) fn from_config(config: &Config) -> WorkerMetrics {
+        let mut worker_metrics = WorkerMetrics::new();
+        worker_metrics.poll_count_histogram = config
+            .metrics_poll_count_histogram
+            .as_ref()
+            .map(|histogram_builder| histogram_builder.build());
+        worker_metrics
+    }
+
+    pub(crate) fn new() -> WorkerMetrics {
         WorkerMetrics {
             park_count: AtomicU64::new(0),
             noop_count: AtomicU64::new(0),
@@ -57,10 +66,7 @@ impl WorkerMetrics {
             busy_duration_total: AtomicU64::new(0),
             local_schedule_count: AtomicU64::new(0),
             queue_depth: AtomicUsize::new(0),
-            poll_count_histogram: config
-                .metrics_poll_count_histogram
-                .as_ref()
-                .map(|histogram_builder| histogram_builder.build()),
+            poll_count_histogram: None,
         }
     }
 
