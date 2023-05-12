@@ -19,7 +19,9 @@ impl SchedulerMetrics {
 }
 
 impl WorkerMetrics {
-    pub(crate) fn from_config(_: &crate::runtime::Config) -> Self {
+    pub(crate) fn from_config(config: &crate::runtime::Config) -> Self {
+        // Prevent the dead-code warning from being triggered
+        let _ = &config.metrics_poll_count_histogram;
         Self {}
     }
 
