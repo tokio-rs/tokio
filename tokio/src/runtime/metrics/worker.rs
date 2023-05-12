@@ -41,14 +41,8 @@ pub(crate) struct WorkerMetrics {
     /// current-thread scheduler.
     pub(crate) queue_depth: AtomicUsize,
 
-    /// If `Some`, tracsk the poll times in `ns`
-    pub(super) poll_times: Option<PollTimer>,
-}
-
-#[derive(Debug)]
-pub(super) struct PollTimer {
-    pub(super) poll_times: Histogram,
-    pub(super) poll_counts: Histogram,
+    /// If `Some`, tracks the the number of polls by duration range.
+    pub(super) poll_count_histogram: Option<Histogram>,
 }
 
 impl WorkerMetrics {
@@ -63,13 +57,10 @@ impl WorkerMetrics {
             busy_duration_total: AtomicU64::new(0),
             local_schedule_count: AtomicU64::new(0),
             queue_depth: AtomicUsize::new(0),
-            poll_times: config
-                .metrics_poll_time_histogram
+            poll_count_histogram: config
+                .metrics_poll_count_histogram
                 .as_ref()
-                .map(|histogram_builder| PollTimer {
-                    poll_times: histogram_builder.build(),
-                    poll_counts: histogram_builder.build(),
-                }),
+                .map(|histogram_builder| histogram_builder.build()),
         }
     }
 

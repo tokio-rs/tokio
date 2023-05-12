@@ -579,28 +579,32 @@ impl RuntimeMetrics {
         self.handle.inner.worker_local_queue_depth(worker)
     }
 
-    pub fn is_poll_time_histogram_enabled(&self) -> bool {
-        self.handle.inner.worker_metrics(0).poll_times.is_some()
-    }
-
-    pub fn num_poll_time_buckets(&self) -> usize {
+    pub fn poll_count_histogram_enabled(&self) -> bool {
         self.handle
             .inner
             .worker_metrics(0)
-            .poll_times
+            .poll_count_histogram
+            .is_some()
+    }
+
+    pub fn poll_count_histogram_num_buckets(&self) -> usize {
+        self.handle
+            .inner
+            .worker_metrics(0)
+            .poll_count_histogram
             .as_ref()
-            .map(|poll_times| poll_times.poll_times.num_buckets())
+            .map(|histogram| histogram.num_buckets())
             .unwrap_or_default()
     }
 
-    pub fn poll_time_bucket_range(&self, bucket: usize) -> Range<Duration> {
+    pub fn poll_count_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
         self.handle
             .inner
             .worker_metrics(0)
-            .poll_times
+            .poll_count_histogram
             .as_ref()
-            .map(|poll_times| {
-                let range = poll_times.poll_times.bucket_range(bucket);
+            .map(|histogram| {
+                let range = histogram.bucket_range(bucket);
                 std::ops::Range {
                     start: Duration::from_nanos(range.start),
                     end: Duration::from_nanos(range.end),
@@ -609,25 +613,13 @@ impl RuntimeMetrics {
             .unwrap_or_default()
     }
 
-    pub fn worker_bucket_poll_total_duration(&self, worker: usize, bucket: usize) -> Duration {
-        let nanos = self
-            .handle
-            .inner
-            .worker_metrics(worker)
-            .poll_times
-            .as_ref()
-            .map(|poll_times| poll_times.poll_times.get(bucket))
-            .unwrap_or_default();
-        Duration::from_nanos(nanos)
-    }
-
-    pub fn worker_bucket_poll_count(&self, worker: usize, bucket: usize) -> u64 {
+    pub fn poll_count_histogram_bucket_count(&self, worker: usize, bucket: usize) -> u64 {
         self.handle
             .inner
             .worker_metrics(worker)
-            .poll_times
+            .poll_count_histogram
             .as_ref()
-            .map(|poll_times| poll_times.poll_counts.get(bucket))
+            .map(|histogram| histogram.get(bucket))
             .unwrap_or_default()
     }
 

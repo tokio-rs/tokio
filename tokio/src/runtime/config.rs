@@ -34,5 +34,5 @@ pub(crate) struct Config {
 
     #[cfg(tokio_unstable)]
     /// How to build poll time histograms
-    pub(crate) metrics_poll_time_histogram: Option<crate::runtime::HistogramBuilder>,
+    pub(crate) metrics_poll_count_histogram: Option<crate::runtime::HistogramBuilder>,
 }

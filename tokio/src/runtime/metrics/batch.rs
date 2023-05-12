@@ -41,9 +41,6 @@ pub(crate) struct MetricsBatch {
 }
 
 struct PollTimer {
-    /// Histogram of mean time spent polling within each band.
-    poll_times: HistogramBatch,
-
     /// Histogram of poll counts within each band.
     poll_counts: HistogramBatch,
 
@@ -67,11 +64,10 @@ impl MetricsBatch {
             busy_duration_total: 0,
             last_resume_time: now,
             poll_timer: worker_metrics
-                .poll_times
+                .poll_count_histogram
                 .as_ref()
-                .map(|worker_poll_times| PollTimer {
-                    poll_times: HistogramBatch::from_histogram(&worker_poll_times.poll_times),
-                    poll_counts: HistogramBatch::from_histogram(&worker_poll_times.poll_counts),
+                .map(|worker_poll_counts| PollTimer {
+                    poll_counts: HistogramBatch::from_histogram(worker_poll_counts),
                     poll_started_at: now,
                 }),
         }
@@ -96,9 +92,8 @@ impl MetricsBatch {
         worker.overflow_count.store(self.overflow_count, Relaxed);
 
         if let Some(poll_timer) = &self.poll_timer {
-            let dst = worker.poll_times.as_ref().unwrap();
-            poll_timer.poll_times.submit(&dst.poll_times);
-            poll_timer.poll_counts.submit(&dst.poll_counts);
+            let dst = worker.poll_count_histogram.as_ref().unwrap();
+            poll_timer.poll_counts.submit(dst);
         }
     }
 
@@ -127,7 +122,6 @@ impl MetricsBatch {
     pub(crate) fn end_poll(&mut self) {
         if let Some(poll_timer) = &mut self.poll_timer {
             let elapsed = duration_as_u64(poll_timer.poll_started_at.elapsed());
-            poll_timer.poll_times.measure(elapsed, elapsed);
             poll_timer.poll_counts.measure(elapsed, 1);
         }
     }
