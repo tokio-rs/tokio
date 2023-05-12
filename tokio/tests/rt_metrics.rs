@@ -228,6 +228,11 @@ fn worker_poll_count() {
     drop(rt);
     assert_eq!(N, metrics.worker_poll_count(0));
 
+    // Does not populate the histogram
+    for i in 0..10 {
+        assert_eq!(0, metrics.poll_count_histogram_bucket_count(0, i));
+    }
+
     let rt = threaded();
     let metrics = rt.metrics();
     rt.block_on(async {
@@ -242,6 +247,13 @@ fn worker_poll_count() {
         .sum();
 
     assert_eq!(N, n);
+
+    // Does not populate the histogram
+    for n in (0..metrics.num_workers()) {
+        for i in 0..10 {
+            assert_eq!(0, metrics.poll_count_histogram_bucket_count(n, i));
+        }
+    }
 }
 
 #[test]
