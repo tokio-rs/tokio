@@ -36,7 +36,7 @@ pub(crate) struct MetricsBatch {
     /// Instant at which work last resumed (continued after park).
     last_resume_time: Instant,
 
-    /// If `Some`, tracks poll times in `ns`
+    /// If `Some`, tracks poll times in nanoseconds
     poll_timer: Option<PollTimer>,
 }
 
