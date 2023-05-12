@@ -479,6 +479,7 @@ impl Context {
                     None => return Ok(core),
                 };
 
+                coop::consume_one();
                 if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
                     core.metrics.incr_poll_count();
