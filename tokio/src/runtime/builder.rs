@@ -95,11 +95,10 @@ pub struct Builder {
     /// Specify a random number generator seed to provide deterministic results
     pub(super) seed_generator: RngSeedGenerator,
 
-    #[cfg(tokio_unstable)]
-    pub(super) unhandled_panic: UnhandledPanic,
+    pub(super) metrics_poll_count_histogram: Option<crate::runtime::HistogramBuilder>,
 
     #[cfg(tokio_unstable)]
-    pub(super) metrics_poll_count_histogram: Option<crate::runtime::HistogramBuilder>,
+    pub(super) unhandled_panic: UnhandledPanic,
 }
 
 cfg_unstable! {
@@ -271,7 +270,6 @@ impl Builder {
             #[cfg(tokio_unstable)]
             unhandled_panic: UnhandledPanic::Ignore,
 
-            #[cfg(tokio_unstable)]
             metrics_poll_count_histogram: None,
 
             disable_lifo_slot: false,
@@ -881,7 +879,9 @@ impl Builder {
             self.seed_generator = RngSeedGenerator::new(seed);
             self
         }
+    }
 
+    cfg_metrics! {
         pub fn metrics_poll_count_histogram(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
             self.metrics_poll_count_histogram.get_or_insert_with(Default::default).scale = histogram_scale;
             // self.metrics
@@ -889,6 +889,7 @@ impl Builder {
         }
 
         pub fn metrics_poll_count_histogram_resolution(&mut self, resolution: Duration) -> &mut Self {
+            assert!(resolution > Duration::from_secs(0));
             // Sanity check the argument and also make the cast below safe.
             assert!(resolution <= Duration::from_secs(1));
 
@@ -900,19 +901,6 @@ impl Builder {
         pub fn metrics_poll_count_histogram_buckets(&mut self, buckets: usize) -> &mut Self {
             self.metrics_poll_count_histogram.get_or_insert_with(Default::default).num_buckets = buckets;
             self
-        }
-
-        fn poll_count_histogram_builder(&self) -> Option<crate::runtime::HistogramBuilder> {
-            let mut builder = self.metrics_poll_count_histogram.clone();
-
-            // Do some sanity checks
-            if let Some(builder) = &mut builder {
-                if matches!(builder.scale, crate::runtime::HistogramScale::Log) {
-                    builder.resolution = builder.resolution.next_power_of_two();
-                }
-            }
-
-            builder
         }
     }
 
@@ -948,8 +936,7 @@ impl Builder {
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
                 seed_generator: seed_generator_1,
-                #[cfg(tokio_unstable)]
-                metrics_poll_count_histogram: self.poll_count_histogram_builder(),
+                metrics_poll_count_histogram: self.metrics_poll_count_histogram.clone(),
             },
         );
 
@@ -1091,8 +1078,7 @@ cfg_rt_multi_thread! {
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
                     seed_generator: seed_generator_1,
-                    #[cfg(tokio_unstable)]
-                    metrics_poll_count_histogram: self.poll_count_histogram_builder(),
+                    metrics_poll_count_histogram: self.metrics_poll_count_histogram.clone(),
                 },
             );
 

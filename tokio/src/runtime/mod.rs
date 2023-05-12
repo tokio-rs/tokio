@@ -260,7 +260,7 @@ cfg_rt! {
 
     cfg_not_metrics! {
         pub(crate) mod metrics;
-        pub(crate) use metrics::{SchedulerMetrics, WorkerMetrics, MetricsBatch};
+        pub(crate) use metrics::{SchedulerMetrics, WorkerMetrics, MetricsBatch, HistogramBuilder};
     }
 
     /// After thread starts / before thread stops

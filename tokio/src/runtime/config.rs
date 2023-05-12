@@ -28,11 +28,10 @@ pub(crate) struct Config {
     /// deterministic way.
     pub(crate) seed_generator: RngSeedGenerator,
 
+    /// How to build poll time histograms
+    pub(crate) metrics_poll_count_histogram: Option<crate::runtime::HistogramBuilder>,
+
     #[cfg(tokio_unstable)]
     /// How to respond to unhandled task panics.
     pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
-
-    #[cfg(tokio_unstable)]
-    /// How to build poll time histograms
-    pub(crate) metrics_poll_count_histogram: Option<crate::runtime::HistogramBuilder>,
 }

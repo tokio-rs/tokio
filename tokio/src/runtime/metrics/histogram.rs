@@ -139,10 +139,12 @@ impl HistogramBuilder {
     }
 
     pub(crate) fn build(&self) -> Histogram {
-        assert!(self.resolution > 0);
+        let mut resolution = self.resolution;
+
+        assert!(resolution > 0);
 
         if matches!(self.scale, HistogramScale::Log) {
-            assert!(self.resolution.is_power_of_two());
+            resolution = resolution.next_power_of_two();
         }
 
         Histogram {
@@ -150,7 +152,7 @@ impl HistogramBuilder {
                 .map(|_| AtomicU64::new(0))
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
-            resolution: self.resolution,
+            resolution,
             scale: self.scale,
         }
     }

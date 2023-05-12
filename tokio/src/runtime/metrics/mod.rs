@@ -36,5 +36,5 @@ cfg_metrics! {
 cfg_not_metrics! {
     mod mock;
 
-    pub(crate) use mock::{SchedulerMetrics, WorkerMetrics, MetricsBatch};
+    pub(crate) use mock::{SchedulerMetrics, WorkerMetrics, MetricsBatch, HistogramBuilder};
 }
