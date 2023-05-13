@@ -579,6 +579,7 @@ impl RuntimeMetrics {
         self.handle.inner.worker_local_queue_depth(worker)
     }
 
+    /// TODO
     pub fn poll_count_histogram_enabled(&self) -> bool {
         self.handle
             .inner
@@ -587,6 +588,7 @@ impl RuntimeMetrics {
             .is_some()
     }
 
+    /// TODO
     pub fn poll_count_histogram_num_buckets(&self) -> usize {
         self.handle
             .inner
@@ -597,6 +599,7 @@ impl RuntimeMetrics {
             .unwrap_or_default()
     }
 
+    /// TODO
     pub fn poll_count_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
         self.handle
             .inner
@@ -613,6 +616,7 @@ impl RuntimeMetrics {
             .unwrap_or_default()
     }
 
+    /// TODO
     pub fn poll_count_histogram_bucket_count(&self, worker: usize, bucket: usize) -> u64 {
         self.handle
             .inner

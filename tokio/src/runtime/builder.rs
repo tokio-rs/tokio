@@ -882,12 +882,14 @@ impl Builder {
     }
 
     cfg_metrics! {
+        /// TODO
         pub fn metrics_poll_count_histogram(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
             self.metrics_poll_count_histogram.get_or_insert_with(Default::default).scale = histogram_scale;
             // self.metrics
             self
         }
 
+        /// TODO
         pub fn metrics_poll_count_histogram_resolution(&mut self, resolution: Duration) -> &mut Self {
             assert!(resolution > Duration::from_secs(0));
             // Sanity check the argument and also make the cast below safe.
@@ -898,6 +900,7 @@ impl Builder {
             self
         }
 
+        /// TODO
         pub fn metrics_poll_count_histogram_buckets(&mut self, buckets: usize) -> &mut Self {
             self.metrics_poll_count_histogram.get_or_insert_with(Default::default).num_buckets = buckets;
             self
