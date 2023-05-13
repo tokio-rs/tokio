@@ -434,6 +434,10 @@
 //!   holds a number of permits, which tasks may request in order to enter a
 //!   critical section. Semaphores are useful for implementing limiting or
 //!   bounding of any kind.
+//!
+//! * [`OnceCell`](OnceCell) A value that can be initialized only once.
+//!  
+//! * [`Lazy`](Lazy) A value that is lazily initialized on first access.
 
 cfg_sync! {
     /// Named future types.
@@ -476,6 +480,9 @@ cfg_sync! {
 
     mod once_cell;
     pub use self::once_cell::{OnceCell, SetError};
+
+    mod lazy;
+    pub use self::lazy::Lazy;
 
     pub mod watch;
 }

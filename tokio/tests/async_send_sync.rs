@@ -331,6 +331,15 @@ mod windows_signal {
 assert_value!(tokio::sync::AcquireError: Send & Sync & Unpin);
 assert_value!(tokio::sync::Barrier: Send & Sync & Unpin);
 assert_value!(tokio::sync::BarrierWaitResult: Send & Sync & Unpin);
+assert_value!(tokio::sync::Lazy<NN,NN>: !Send & !Sync & Unpin);
+assert_value!(tokio::sync::Lazy<NN,YN>: !Send & !Sync & Unpin);
+assert_value!(tokio::sync::Lazy<NN,YY>: !Send & !Sync & Unpin);
+assert_value!(tokio::sync::Lazy<YN,NN>: !Send & !Sync & Unpin);
+assert_value!(tokio::sync::Lazy<YN,YN>: Send & !Sync & Unpin);
+assert_value!(tokio::sync::Lazy<YN,YY>: Send & !Sync & Unpin);
+assert_value!(tokio::sync::Lazy<YY,NN>: !Send & !Sync & Unpin);
+assert_value!(tokio::sync::Lazy<YY,YN>: Send & Sync & Unpin);
+assert_value!(tokio::sync::Lazy<YY,YY>: Send & Sync & Unpin);
 assert_value!(tokio::sync::MappedMutexGuard<'_, NN>: !Send & !Sync & Unpin);
 assert_value!(tokio::sync::MappedMutexGuard<'_, YN>: Send & !Sync & Unpin);
 assert_value!(tokio::sync::MappedMutexGuard<'_, YY>: Send & Sync & Unpin);
