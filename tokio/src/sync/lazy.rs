@@ -1,10 +1,12 @@
 use super::Semaphore;
 use crate::loom::cell::UnsafeCell;
+use std::fmt;
 use std::future::Future;
+use std::mem::ManuallyDrop;
 use std::ops::Drop;
+use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::{fmt, mem::ManuallyDrop};
 
 /// The inner data of a `Lazy`.
 /// Is `function` when not yet initialized,
@@ -325,3 +327,6 @@ unsafe impl<T: Send, F: Send> Send for Lazy<T, F> {}
 // We never create a `&F` from a `&Lazy<T, F>` so it is fine
 // to not require a `Sync` bound on `F`
 unsafe impl<T: Sync, F: Send> Sync for Lazy<T, F> {}
+
+impl<T: UnwindSafe, F: UnwindSafe> UnwindSafe for Lazy<T, F> {}
+impl<T: UnwindSafe + RefUnwindSafe, F: UnwindSafe> RefUnwindSafe for Lazy<T, F> {}
