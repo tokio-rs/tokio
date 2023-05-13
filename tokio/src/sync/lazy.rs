@@ -127,7 +127,10 @@ impl<T, F> Lazy<T, F> {
     ///
     /// The `Lazy` must be initialized.
     unsafe fn get_unchecked_mut(&mut self) -> Option<&mut T> {
-        unsafe { self.value.with_mut(|v| (&mut *v).value.as_mut()) }
+        #[allow(clippy::needless_borrow)]
+        unsafe {
+            self.value.with_mut(|v| (&mut *v).value.as_mut())
+        }
     }
 
     /// Gets a reference to the result of this lazy value if it was initialized,
