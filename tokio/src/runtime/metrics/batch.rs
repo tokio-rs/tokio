@@ -73,23 +73,6 @@ impl MetricsBatch {
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn noop() -> MetricsBatch {
-        MetricsBatch {
-            park_count: 0,
-            noop_count: 0,
-            steal_count: 0,
-            steal_operations: 0,
-            poll_count: 0,
-            poll_count_on_last_park: 0,
-            local_schedule_count: 0,
-            overflow_count: 0,
-            busy_duration_total: 0,
-            last_resume_time: Instant::now(),
-            poll_timer: None,
-        }
-    }
-
     pub(crate) fn submit(&mut self, worker: &WorkerMetrics) {
         worker.park_count.store(self.park_count, Relaxed);
         worker.noop_count.store(self.noop_count, Relaxed);
