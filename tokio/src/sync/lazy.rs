@@ -325,8 +325,10 @@ impl<T: fmt::Debug, F> fmt::Debug for Lazy<T, F> {
 unsafe impl<T: Send, F: Send> Send for Lazy<T, F> {}
 
 // We never create a `&F` from a `&Lazy<T, F>` so it is fine
-// to not require a `Sync` bound on `F`
-unsafe impl<T: Sync, F: Send> Sync for Lazy<T, F> {}
+// to not require a `Sync` bound on `F`.
+// Need `T: Send + Sync` for `Sync` as the thread that intitializes
+// the cell could be different from the one that destroys it.
+unsafe impl<T: Send + Sync, F: Send> Sync for Lazy<T, F> {}
 
 impl<T: UnwindSafe, F: UnwindSafe> UnwindSafe for Lazy<T, F> {}
 impl<T: UnwindSafe + RefUnwindSafe, F: UnwindSafe> RefUnwindSafe for Lazy<T, F> {}
