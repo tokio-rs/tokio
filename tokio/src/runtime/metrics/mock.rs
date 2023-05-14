@@ -19,10 +19,14 @@ impl SchedulerMetrics {
 }
 
 impl WorkerMetrics {
+    pub(crate) fn new() -> Self {
+        Self {}
+    }
+
     pub(crate) fn from_config(config: &crate::runtime::Config) -> Self {
         // Prevent the dead-code warning from being triggered
         let _ = &config.metrics_poll_count_histogram;
-        Self {}
+        Self::new()
     }
 
     pub(crate) fn set_queue_depth(&self, _len: usize) {}
@@ -30,11 +34,6 @@ impl WorkerMetrics {
 
 impl MetricsBatch {
     pub(crate) fn new(_: &WorkerMetrics) -> Self {
-        Self {}
-    }
-
-    #[cfg(test)]
-    pub(crate) fn noop() -> Self {
         Self {}
     }
 
