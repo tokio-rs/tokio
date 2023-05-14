@@ -478,7 +478,7 @@ unsafe impl<T: Send, Fut: Send, F: Send> Send for Lazy<T, Fut, F> {}
 
 // We never create a `&F` from a `&Lazy<T, F>` so it is fine
 // to not require a `Sync` bound on `F`.
-// Need `T: Send + Sync` for `Sync` as the thread that intitializes
+// Need `T: Send + Sync` for `Sync` as the thread that initializes
 // the cell could be different from the one that destroys it.
 unsafe impl<T: Send + Sync, Fut: Send, F: Send> Sync for Lazy<T, Fut, F> {}
 
