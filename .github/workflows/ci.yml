@@ -59,6 +59,7 @@ jobs:
       - wasm32-unknown-unknown
       - wasm32-wasi
       - check-external-types
+      - check-fuzzing
     steps:
       - run: exit 0
 
@@ -688,6 +689,7 @@ jobs:
 
   check-fuzzing:
     name: check-fuzzing
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
