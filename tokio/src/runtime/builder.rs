@@ -1,5 +1,5 @@
 use crate::runtime::handle::Handle;
-use crate::runtime::{blocking, driver, Callback, Runtime};
+use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use std::fmt;
@@ -95,7 +95,11 @@ pub struct Builder {
     /// Specify a random number generator seed to provide deterministic results
     pub(super) seed_generator: RngSeedGenerator,
 
-    pub(super) metrics_poll_count_histogram: Option<crate::runtime::HistogramBuilder>,
+    /// When true, enables task poll count histogram instrumentation.
+    pub(super) metrics_poll_count_histogram_enable: bool,
+
+    /// Configures the task poll count histogram
+    pub(super) metrics_poll_count_histogram: HistogramBuilder,
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
@@ -270,7 +274,9 @@ impl Builder {
             #[cfg(tokio_unstable)]
             unhandled_panic: UnhandledPanic::Ignore,
 
-            metrics_poll_count_histogram: None,
+            metrics_poll_count_histogram_enable: false,
+
+            metrics_poll_count_histogram: Default::default(),
 
             disable_lifo_slot: false,
         }
@@ -883,9 +889,14 @@ impl Builder {
 
     cfg_metrics! {
         /// TODO
+        pub fn enable_metrics_poll_count_histogram(&mut self) -> &mut Self {
+            self.metrics_poll_count_histogram_enable = true;
+            self
+        }
+
+        /// TODO
         pub fn metrics_poll_count_histogram(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
-            self.metrics_poll_count_histogram.get_or_insert_with(Default::default).scale = histogram_scale;
-            // self.metrics
+            self.metrics_poll_count_histogram.scale = histogram_scale;
             self
         }
 
@@ -896,13 +907,13 @@ impl Builder {
             assert!(resolution <= Duration::from_secs(1));
 
             let resolution = resolution.as_nanos() as u64;
-            self.metrics_poll_count_histogram.get_or_insert_with(Default::default).resolution = resolution;
+            self.metrics_poll_count_histogram.resolution = resolution;
             self
         }
 
         /// TODO
         pub fn metrics_poll_count_histogram_buckets(&mut self, buckets: usize) -> &mut Self {
-            self.metrics_poll_count_histogram.get_or_insert_with(Default::default).num_buckets = buckets;
+            self.metrics_poll_count_histogram.num_buckets = buckets;
             self
         }
     }
@@ -939,7 +950,7 @@ impl Builder {
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
                 seed_generator: seed_generator_1,
-                metrics_poll_count_histogram: self.metrics_poll_count_histogram.clone(),
+                metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
             },
         );
 
@@ -952,6 +963,14 @@ impl Builder {
             handle,
             blocking_pool,
         ))
+    }
+
+    fn metrics_poll_count_histogram_builder(&self) -> Option<HistogramBuilder> {
+        if self.metrics_poll_count_histogram_enable {
+            Some(self.metrics_poll_count_histogram.clone())
+        } else {
+            None
+        }
     }
 }
 
@@ -1081,7 +1100,7 @@ cfg_rt_multi_thread! {
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
                     seed_generator: seed_generator_1,
-                    metrics_poll_count_histogram: self.metrics_poll_count_histogram.clone(),
+                    metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },
             );
 

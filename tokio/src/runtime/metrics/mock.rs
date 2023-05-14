@@ -6,7 +6,7 @@ pub(crate) struct WorkerMetrics {}
 
 pub(crate) struct MetricsBatch {}
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub(crate) struct HistogramBuilder {}
 
 impl SchedulerMetrics {

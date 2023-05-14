@@ -265,6 +265,7 @@ fn worker_poll_count_histogram() {
     let rts = [
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
+            .enable_metrics_poll_count_histogram()
             .metrics_poll_count_histogram(tokio::runtime::HistogramScale::Linear)
             .metrics_poll_count_histogram_buckets(3)
             .metrics_poll_count_histogram_resolution(Duration::from_millis(50))
@@ -273,6 +274,7 @@ fn worker_poll_count_histogram() {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
+            .enable_metrics_poll_count_histogram()
             .metrics_poll_count_histogram(tokio::runtime::HistogramScale::Linear)
             .metrics_poll_count_histogram_buckets(3)
             .metrics_poll_count_histogram_resolution(Duration::from_millis(50))
@@ -309,6 +311,7 @@ fn worker_poll_count_histogram_range() {
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
+        .enable_metrics_poll_count_histogram()
         .metrics_poll_count_histogram(tokio::runtime::HistogramScale::Linear)
         .metrics_poll_count_histogram_buckets(3)
         .metrics_poll_count_histogram_resolution(us(50))
@@ -325,6 +328,7 @@ fn worker_poll_count_histogram_range() {
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
+        .enable_metrics_poll_count_histogram()
         .metrics_poll_count_histogram(tokio::runtime::HistogramScale::Log)
         .metrics_poll_count_histogram_buckets(3)
         .metrics_poll_count_histogram_resolution(us(50))
@@ -338,6 +342,32 @@ fn worker_poll_count_histogram_range() {
     assert_eq!(metrics.poll_count_histogram_bucket_range(0), us(0)..a);
     assert_eq!(metrics.poll_count_histogram_bucket_range(1), a..b);
     assert_eq!(metrics.poll_count_histogram_bucket_range(2), b..max);
+}
+
+#[test]
+fn worker_poll_count_histogram_disabled_without_explicit_enable() {
+    let rts = [
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .metrics_poll_count_histogram(tokio::runtime::HistogramScale::Linear)
+            .metrics_poll_count_histogram_buckets(3)
+            .metrics_poll_count_histogram_resolution(Duration::from_millis(50))
+            .build()
+            .unwrap(),
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .metrics_poll_count_histogram(tokio::runtime::HistogramScale::Linear)
+            .metrics_poll_count_histogram_buckets(3)
+            .metrics_poll_count_histogram_resolution(Duration::from_millis(50))
+            .build()
+            .unwrap(),
+    ];
+
+    for rt in rts {
+        let metrics = rt.metrics();
+        assert!(!metrics.poll_count_histogram_enabled());
+    }
 }
 
 #[test]
