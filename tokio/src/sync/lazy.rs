@@ -1,5 +1,5 @@
 use super::Semaphore;
-use crate::loom::cell::UnsafeCell;
+use crate::{loom::cell::UnsafeCell, sync::SemaphorePermit};
 use std::fmt;
 use std::future::Future;
 use std::mem::ManuallyDrop;
@@ -8,13 +8,18 @@ use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+enum LazyUninitData<Fut, F> {
+    Function(ManuallyDrop<F>),
+    Future(ManuallyDrop<Fut>),
+}
+
 /// The inner data of a `Lazy`.
 /// Is `function` when not yet initialized,
 /// `value` with `Some` when initialized,
 /// and `value` with `None` when poisoned.
-union LazyData<T, F> {
-    value: ManuallyDrop<Option<T>>,
-    function: ManuallyDrop<F>,
+union LazyData<T, F, Fut> {
+    init: ManuallyDrop<Option<T>>,
+    uninit: ManuallyDrop<LazyUninitData<F, Fut>>,
 }
 
 /// A value that is initialized on the first access.
@@ -41,22 +46,22 @@ union LazyData<T, F> {
 ///     assert_eq!(result, 2);
 /// }
 /// ```
-pub struct Lazy<T, F = fn() -> Pin<Box<dyn Future<Output = T> + Send>>> {
+pub struct Lazy<T, Fut = Pin<Box<dyn Future<Output = T> + Send>>, F = fn() -> Fut> {
     value_set: AtomicBool,
-    value: UnsafeCell<LazyData<T, F>>,
+    value: UnsafeCell<LazyData<T, Fut, F>>,
     semaphore: Semaphore,
 }
 
-impl<T, F> Lazy<T, F> {
+impl<T, Fut, F> Lazy<T, Fut, F> {
     /// Creates a new empty `Lazy` instance with the given initializing
     /// async function.
     #[must_use]
     #[inline]
-    pub fn new(init: F) -> Lazy<T, F> {
-        Lazy {
+    pub fn new(init: F) -> Self {
+        Self {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(LazyData {
-                function: ManuallyDrop::new(init),
+                uninit: ManuallyDrop::new(LazyUninitData::Function(ManuallyDrop::new(init))),
             }),
             semaphore: Semaphore::new(1),
         }
@@ -91,25 +96,38 @@ impl<T, F> Lazy<T, F> {
     #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
     #[must_use]
     #[inline]
-    pub const fn const_new(init: F) -> Lazy<T, F> {
-        Lazy {
+    pub const fn const_new(init: F) -> Self {
+        Self {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(LazyData {
-                function: ManuallyDrop::new(init),
+                uninit: ManuallyDrop::new(LazyUninitData::Function(ManuallyDrop::new(init))),
             }),
             semaphore: Semaphore::const_new(1),
         }
     }
 
     /// Returns `true` if this `Lazy` has been initialized, and `false` otherwise.
+    #[must_use]
+    #[inline]
     fn initialized(&self) -> bool {
         self.value_set.load(Ordering::Acquire)
     }
 
     /// Returns `true` if this `Lazy` has been initialized, and `false` otherwise.
     /// Because it takes a mutable reference, it doesn't require an atomic operation.
+    #[must_use]
+    #[inline]
     fn initialized_mut(&mut self) -> bool {
         *self.value_set.get_mut()
+    }
+
+    /// Returns `true` if this `Lazy` has been initialized, and `false` otherwise.
+    /// Because it takes a mutable reference, it doesn't require an atomic operation.
+    #[must_use]
+    #[inline]
+    fn initialized_pin_mut(self: Pin<&mut Self>) -> bool {
+        // SAFETY: this doens't move out of any pinned
+        unsafe { *self.get_unchecked_mut().value_set.get_mut() }
     }
 
     /// Returns a reference to the value,
@@ -118,8 +136,10 @@ impl<T, F> Lazy<T, F> {
     /// # Safety
     ///
     /// The `Lazy` must be initialized.
+    #[must_use]
+    #[inline]
     unsafe fn get_unchecked(&self) -> Option<&T> {
-        unsafe { self.value.with(|v| (*v).value.as_ref()) }
+        unsafe { self.value.with(|v| (*v).init.as_ref()) }
     }
 
     /// Returns a mutable reference to the value,
@@ -128,10 +148,43 @@ impl<T, F> Lazy<T, F> {
     /// # Safety
     ///
     /// The `Lazy` must be initialized.
+    #[must_use]
+    #[inline]
     unsafe fn get_unchecked_mut(&mut self) -> Option<&mut T> {
         #[allow(clippy::needless_borrow)]
         unsafe {
-            self.value.with_mut(|v| (&mut *v).value.as_mut())
+            self.value.with_mut(|v| (&mut *v).init.as_mut())
+        }
+    }
+
+    /// Returns a pinned reference to the value,
+    /// or `None` if it has been poisoned.
+    ///
+    /// # Safety
+    ///
+    /// The `Lazy` must be initialized.
+    #[must_use]
+    #[inline]
+    unsafe fn get_unchecked_pin(self: Pin<&Self>) -> Option<Pin<&T>> {
+        unsafe {
+            self.value
+                .with(|v| (*v).init.as_ref().map(|r| Pin::new_unchecked(r)))
+        }
+    }
+
+    /// Returns a pinned mutable reference to the value,
+    /// or `None` if it has been poisoned.
+    ///
+    /// # Safety
+    ///
+    /// The `Lazy` must be initialized.
+    #[must_use]
+    #[inline]
+    unsafe fn get_unchecked_pin_mut(self: Pin<&mut Self>) -> Option<Pin<&mut T>> {
+        #[allow(clippy::needless_borrow)]
+        unsafe {
+            self.value
+                .with_mut(|v| (&mut *v).init.as_mut().map(|r| Pin::new_unchecked(r)))
         }
     }
 
@@ -161,105 +214,38 @@ impl<T, F> Lazy<T, F> {
         }
     }
 
-    /// Consumes this Lazy returning the stored value.
-    /// Returns Ok(value) if Lazy is initialized and Err(f) otherwise.
-    ///
-    /// # Panics
-    ///
-    /// If this `Lazy` is poisoned because the initialization function panicked,
-    /// calls to this function will panic.
-
-    pub fn into_value(self) -> Result<T, F> {
-        // Prevent double-drop
-        let mut me = ManuallyDrop::new(self);
-
-        if me.initialized_mut() {
-            // SAFETY: we just checked that the `Lazy` is initialized.
-            let maybe_val = unsafe { me.value.with_mut(|v| ManuallyDrop::take(&mut (*v).value)) };
-            Ok(maybe_val.unwrap_or_else(|| panic!("Lazy instance has previously been poisoned")))
+    /// Gets a pinned reference to the result of this lazy value if it was initialized,
+    /// otherwise returns `None`.
+    #[must_use]
+    #[inline]
+    pub fn get_pin(self: Pin<&Self>) -> Option<Pin<&T>> {
+        if self.initialized() {
+            // SAFETY: we just checked that the `Lazy` is initialized
+            unsafe { self.get_unchecked_pin() }
         } else {
-            // SAFETY: we just checked that the `Lazy` is uninitialized.
-            // We own the `Lazy`, so there are no outstading references
-            // and it is not in the process of initialization.
-            Err(unsafe {
-                me.value
-                    .with_mut(|v| ManuallyDrop::take(&mut (*v).function))
-            })
+            None
+        }
+    }
+
+    /// Gets a pinned mutable reference to the result of this lazy value if it was initialized,
+    /// otherwise returns `None`.
+    #[must_use]
+    #[inline]
+    pub fn get_pin_mut(mut self: Pin<&mut Self>) -> Option<Pin<&mut T>> {
+        if self.as_mut().initialized_pin_mut() {
+            // SAFETY: we just checked that the `Lazy` is initialized
+            unsafe { self.get_unchecked_pin_mut() }
+        } else {
+            None
         }
     }
 }
 
-impl<T, F, Fut> Lazy<T, F>
+impl<T, Fut, F> Lazy<T, Fut, F>
 where
+    Fut: Future<Output = T> + Unpin,
     F: FnOnce() -> Fut,
-    Fut: Future<Output = T>,
 {
-    /// Initializes the `Lazy`, if it has not yet been.
-    /// Once this has returned, `LazyData` is guaranteed to be in the `value` state.
-    #[cold]
-    async fn initialize(&self) {
-        // Here we try to acquire the semaphore permit. Holding the permit
-        // will allow us to set the value of the Lazy, and prevents
-        // other tasks from initializing the Lazy while we are holding
-        // it.
-        match self.semaphore.acquire().await {
-            Ok(permit) => {
-                debug_assert!(!self.initialized());
-
-                // No matter what happens, nobody will ever get another try
-                // at initializing the Lazy.
-                permit.forget();
-
-                // SAFETY: This lazy is uninitialized, so it still stores the initializing function.
-                let f = unsafe {
-                    self.value
-                        .with_mut(|v| ManuallyDrop::take(&mut (*v).function))
-                };
-
-                // If the function panics, we have to set the `Lazy` to poisoned.
-                // So all the initialization work happens on the `Drop` of this struct.
-                struct InitializeOnDrop<'a, T, F> {
-                    lazy: &'a Lazy<T, F>,
-                    value: ManuallyDrop<Option<T>>,
-                }
-
-                impl<'a, T, F> Drop for InitializeOnDrop<'a, T, F> {
-                    fn drop(&mut self) {
-                        // Write the new value to the `Lazy`.
-                        // SAFETY: we hold the only semaphore permit.
-                        // We are inside `drop`, so nobody will access our fields after us.
-                        unsafe {
-                            self.lazy.value.with_mut(|v| {
-                                (*v).value = ManuallyDrop::new(ManuallyDrop::take(&mut self.value))
-                            });
-                        }
-                        // FIXME this can be unsychronized when we have a mutable borrow of the `Lazy`
-                        self.lazy.value_set.store(true, Ordering::Release);
-                        self.lazy.semaphore.close();
-                    }
-                }
-
-                // Arm the initialize-on-drop-mechanism.
-                let mut initialize_on_drop = InitializeOnDrop {
-                    lazy: self,
-                    value: ManuallyDrop::new(None),
-                };
-
-                // Run the initializing function to get the new value.
-                // If this panics, `initialize_on_drop` is dropped with
-                // `value = None` and poisions the `Lazy`.
-                // Otherwise, it is dropped with the new value and initializes
-                // the `Lazy` with it.
-                initialize_on_drop.value = ManuallyDrop::new(Some(f().await));
-
-                drop(initialize_on_drop)
-            }
-            Err(_) => {
-                debug_assert!(self.initialized());
-            }
-        }
-    }
-
     /// Forces the evaluation of this lazy value and returns a reference to the result.
     ///
     /// # Panics
@@ -269,7 +255,11 @@ where
     #[inline]
     pub async fn force(&self) -> &T {
         if !self.initialized() {
-            self.initialize().await;
+            // SAFETY: the cell is not initialized, so it stores `F` or `Fut`.
+            // And `F` is `Unpin`. So making a pinned reference is safe.
+            unsafe {
+                Pin::new_unchecked(self).initialize().await;
+            }
         }
         // SAFETY: we just initialized the `Lazy`
         (unsafe { self.get_unchecked() })
@@ -285,7 +275,11 @@ where
     #[inline]
     pub async fn force_mut(&mut self) -> &mut T {
         if !self.initialized_mut() {
-            self.initialize().await;
+            // SAFETY: the cell is not initialized, so it stores `F` or `Fut`.
+            // And `F` is `Unpin`. So making a pinned reference is safe.
+            unsafe {
+                Pin::new_unchecked(&*self).initialize().await;
+            }
         }
         // SAFETY: we just initialized the `Lazy`
         (unsafe { self.get_unchecked_mut() })
@@ -293,26 +287,184 @@ where
     }
 }
 
-impl<T, F> Drop for Lazy<T, F> {
+impl<T, Fut, F> Lazy<T, Fut, F>
+where
+    Fut: Future<Output = T>,
+    F: FnOnce() -> Fut,
+{
+    /// Initializes the `Lazy`, if it has not yet been.
+    /// Once this has returned, `LazyData` is guaranteed to be in the `value` state.
+    #[cold]
+    async fn initialize(self: Pin<&Self>) {
+        // Here we try to acquire the semaphore permit. Holding the permit
+        // will allow us to set the value of the Lazy, and prevents
+        // other tasks from initializing the Lazy while we are holding
+        // it.
+        match self.semaphore.acquire().await {
+            Ok(permit) => {
+                debug_assert!(!self.initialized());
+
+                enum InitializationState<T> {
+                    // The `Lazy` stores the initializing future.
+                    Initializing,
+                    // The `Lazy` has been fully initialized,
+                    // or poisoned if this contains `None`.
+                    Initialized(ManuallyDrop<Option<T>>),
+                }
+
+                // If the function panics, we have to set the `Lazy` to poisoned.
+                // So all the initialization work happens on the `Drop` of this struct.
+                struct InitializeOnDrop<'a, 'permit, T, Fut, F> {
+                    lazy: Pin<&'a Lazy<T, Fut, F>>,
+                    value: InitializationState<T>,
+                    permit: ManuallyDrop<SemaphorePermit<'permit>>,
+                }
+
+                impl<'a, 'permit, T, Fut, F> Drop for InitializeOnDrop<'a, 'permit, T, Fut, F> {
+                    fn drop(&mut self) {
+                        match self.value {
+                            InitializationState::Initializing => {
+                                // Dropped while initializing -
+                                // release the permit, give next caller a chance.
+                                // At this point, the `Lazy` stores the initializing future.
+                                // SAFETY: we are in `drop`, so nobody will access our fields after us.
+                                unsafe {
+                                    drop(ManuallyDrop::take(&mut self.permit));
+                                }
+                            }
+                            InitializationState::Initialized(ref mut value) => {
+                                // Write the initialized value to the `Lazy`.
+                                // SAFETY: we are in `drop`, so nobody will access our fields after us.
+                                unsafe {
+                                    self.lazy.value.with_mut(|v| {
+                                        (*v).init = ManuallyDrop::new(ManuallyDrop::take(value))
+                                    });
+                                }
+
+                                // FIXME this could be made unsychronized when we have a mutable borrow of the `Lazy`
+                                self.lazy.value_set.store(true, Ordering::Release);
+                                self.lazy.semaphore.close();
+                            }
+                        }
+                    }
+                }
+
+                // SAFETY: This lazy is uninitialized, so it still stores either the initializing function
+                // or the initializing future.
+                let uninit_data = unsafe { self.value.with_mut(|v| &mut (*v).uninit) };
+
+                // Arm the initialize-on-drop-mechanism.
+                // We start as `poisoned` because if the initialization function panics,
+                // we want the `Lazy` to be poisoned.
+                let mut initialize_on_drop = InitializeOnDrop {
+                    lazy: self,
+                    value: InitializationState::Initialized(ManuallyDrop::new(None)),
+                    permit: ManuallyDrop::new(permit),
+                };
+
+                let fut: &mut Fut = match &mut **uninit_data {
+                    LazyUninitData::Function(f) => {
+                        // SAFETY: The `f` will never be accessed later
+                        let f = unsafe { ManuallyDrop::take(f) };
+
+                        // Run the initializing function.
+                        let fut = f();
+
+                        **uninit_data = LazyUninitData::Future(ManuallyDrop::new(fut));
+
+                        match &mut **uninit_data {
+                            // Someone else already ran the intializing function.
+                            // Get a pointer to the future that this `Lazy` is currently storing.
+                            LazyUninitData::Future(fut) => &mut *fut,
+                            _ => unreachable!("We just set this to LazyUninitData::Future"),
+                        }
+                    }
+                    LazyUninitData::Future(fut) => &mut *fut,
+                };
+
+                // SAFETY: `Lazy` futures are structurally pinned.
+                let fut: Pin<&mut Fut> = unsafe { Pin::new_unchecked(fut) };
+
+                // If we reach this point, the initializing function has run successfully,
+                // and the initializing future is stored in the struct.
+                // Now we disarm the poison mechanism before polling the future.
+                initialize_on_drop.value = InitializationState::Initializing;
+
+                // `await` the initializing future.
+                // If this panics or we are cancelled,
+                // the semaphore permit will be released and the next
+                // caller to `initialize` will keep polling where we left off.
+                let result = fut.await;
+
+                // Set the cell to initialized.
+                initialize_on_drop.value =
+                    InitializationState::Initialized(ManuallyDrop::new(Some(result)));
+
+                drop(initialize_on_drop);
+            }
+            Err(_) => {
+                debug_assert!(self.initialized());
+            }
+        }
+    }
+
+    /// Forces the evaluation of this lazy value and returns a reference to the result.
+    ///
+    /// # Panics
+    ///
+    /// If the initialization function panics, the `Lazy` is poisoned
+    /// and all subsequent calls to this function will panic.
+    #[inline]
+    pub async fn force_pin(self: Pin<&Self>) -> Pin<&T> {
+        if !self.initialized() {
+            self.initialize().await;
+        }
+        // SAFETY: we just initialized the `Lazy`
+        (unsafe { self.get_unchecked_pin() })
+            .unwrap_or_else(|| panic!("Lazy instance has previously been poisoned"))
+    }
+
+    /// Forces the evaluation of this lazy value and returns a mutable reference to the result.
+    ///
+    /// # Panics
+    ///
+    /// If the initialization function panics, the `Lazy` is poisoned
+    /// and all subsequent calls to this function will panic.
+    #[inline]
+    pub async fn force_pin_mut(mut self: Pin<&mut Self>) -> Pin<&mut T> {
+        if !self.as_mut().initialized_pin_mut() {
+            // SAFETY: the cell is not initialized, so it stores `F` or `Fut`.
+            // And `F` is `Unpin`. So making a pinned reference is safe.
+            self.as_ref().initialize().await;
+        }
+        // SAFETY: we just initialized the `Lazy`
+        (unsafe { self.get_unchecked_pin_mut() })
+            .unwrap_or_else(|| panic!("Lazy instance has previously been poisoned"))
+    }
+}
+
+impl<T, Fut, F> Drop for Lazy<T, Fut, F> {
     #[inline]
     fn drop(&mut self) {
         if self.initialized_mut() {
             // SAFETY: we just checked for the `Lazy` being initialized.
             // We are inside `drop`, so nobody will access our fields after us.
-            unsafe { self.value.with_mut(|v| ManuallyDrop::drop(&mut (*v).value)) };
+            unsafe { self.value.with_mut(|v| ManuallyDrop::drop(&mut (*v).init)) };
         } else {
             // SAFETY: we just check for the `Lazy` being uninitialized.
             // We hold an `&mut` to this `Lazy`, so nobody else is in the process of initializing it.
             // We are inside `drop`, so nobody will access our fields after us.
             unsafe {
-                self.value
-                    .with_mut(|v| ManuallyDrop::drop(&mut (*v).function))
+                self.value.with_mut(|v| match &mut *(*v).uninit {
+                    LazyUninitData::Function(f) => ManuallyDrop::drop(f),
+                    LazyUninitData::Future(fut) => ManuallyDrop::drop(fut),
+                })
             };
         }
     }
 }
 
-impl<T: fmt::Debug, F> fmt::Debug for Lazy<T, F> {
+impl<T: fmt::Debug, Fut, F> fmt::Debug for Lazy<T, Fut, F> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.get() {
@@ -322,13 +474,19 @@ impl<T: fmt::Debug, F> fmt::Debug for Lazy<T, F> {
     }
 }
 
-unsafe impl<T: Send, F: Send> Send for Lazy<T, F> {}
+unsafe impl<T: Send, F: Send, Fut: Send> Send for Lazy<T, F, Fut> {}
 
 // We never create a `&F` from a `&Lazy<T, F>` so it is fine
 // to not require a `Sync` bound on `F`.
 // Need `T: Send + Sync` for `Sync` as the thread that intitializes
 // the cell could be different from the one that destroys it.
-unsafe impl<T: Send + Sync, F: Send> Sync for Lazy<T, F> {}
+unsafe impl<T: Send + Sync, F: Send, Fut: Send> Sync for Lazy<T, F, Fut> {}
 
-impl<T: UnwindSafe, F: UnwindSafe> UnwindSafe for Lazy<T, F> {}
-impl<T: UnwindSafe + RefUnwindSafe, F: UnwindSafe> RefUnwindSafe for Lazy<T, F> {}
+impl<T: UnwindSafe, F: UnwindSafe, Fut: UnwindSafe> UnwindSafe for Lazy<T, F, Fut> {}
+impl<T: UnwindSafe + RefUnwindSafe, F: UnwindSafe, Fut: UnwindSafe> RefUnwindSafe
+    for Lazy<T, F, Fut>
+{
+}
+
+// F is not structurally pinned
+impl<T: Unpin, F, Fut: Unpin> Unpin for Lazy<T, F, Fut> {}

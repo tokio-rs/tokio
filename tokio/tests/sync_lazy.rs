@@ -36,66 +36,6 @@ fn drop_lazy() {
 }
 
 #[test]
-fn drop_into_value() {
-    let rt = runtime::Builder::new_current_thread().build().unwrap();
-
-    static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
-
-    rt.block_on(async {
-        struct Foo {}
-
-        let fooer = Foo {};
-
-        impl Drop for Foo {
-            fn drop(&mut self) {
-                NUM_DROPS.fetch_add(1, Ordering::Release);
-            }
-        }
-
-        let lazy = Lazy::new(|| Box::pin(async { fooer }));
-        lazy.force().await;
-
-        let fooer = lazy
-            .into_value()
-            .unwrap_or_else(|_| panic!("lazy should be initialized"));
-        let count = NUM_DROPS.load(Ordering::Acquire);
-        assert!(count == 0);
-        drop(fooer);
-        let count = NUM_DROPS.load(Ordering::Acquire);
-        assert!(count == 1);
-    });
-}
-
-#[test]
-fn drop_into_value_err() {
-    let rt = runtime::Builder::new_current_thread().build().unwrap();
-
-    static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
-
-    rt.block_on(async {
-        #[derive(Debug)]
-        struct Foo {}
-
-        impl Drop for Foo {
-            fn drop(&mut self) {
-                NUM_DROPS.fetch_add(1, Ordering::Release);
-            }
-        }
-
-        let fooer = Foo {};
-
-        let lazy: Lazy<Foo, _> = Lazy::new(|| fooer);
-
-        let get_a_fooer = lazy.into_value().unwrap_err();
-        let count = NUM_DROPS.load(Ordering::Acquire);
-        assert!(count == 0);
-        drop(get_a_fooer);
-        let count = NUM_DROPS.load(Ordering::Acquire);
-        assert!(count == 1);
-    });
-}
-
-#[test]
 fn force() {
     let rt = runtime::Builder::new_current_thread()
         .enable_time()
