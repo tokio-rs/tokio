@@ -2,9 +2,8 @@
 #![cfg(all(feature = "full", feature = "parking_lot"))]
 
 use core::panic;
-use futures::poll;
+use futures::{pin_mut, poll};
 use std::ops::Drop;
-use std::pin::pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::runtime;
 use tokio::sync::Lazy;
@@ -77,7 +76,8 @@ fn force_cancel() {
 
     rt.block_on(async {
         let handle1 = rt.spawn(async {
-            let fut = pin!(LAZY.force());
+            let fut = LAZY.force();
+            pin_mut!(fut);
             let _ = poll!(fut);
         });
         let handle2 = rt.spawn(async {
