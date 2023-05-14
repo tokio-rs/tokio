@@ -2,7 +2,9 @@
 #![cfg(all(feature = "full", feature = "parking_lot"))]
 
 use core::panic;
+use futures::poll;
 use std::ops::Drop;
+use std::pin::pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::runtime;
 use tokio::sync::Lazy;
@@ -59,6 +61,36 @@ fn force() {
         let result2 = handle2.await.unwrap();
 
         assert_eq!(result1, 5);
+        assert_eq!(result2, 5);
+    });
+}
+
+#[test]
+fn force_cancel() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .unwrap();
+
+    static LAZY: Lazy<u32> = Lazy::const_new(|| Box::pin(async { 5 }));
+
+    rt.block_on(async {
+        let handle1 = rt.spawn(async {
+            let fut = pin!(LAZY.force());
+            let _ = poll!(fut);
+        });
+        let handle2 = rt.spawn(async {
+            time::sleep(Duration::from_millis(1)).await;
+            *LAZY.force().await
+        });
+
+        time::advance(Duration::from_millis(1)).await;
+        time::resume();
+
+        handle1.await.unwrap();
+        let result2 = handle2.await.unwrap();
+
         assert_eq!(result2, 5);
     });
 }
