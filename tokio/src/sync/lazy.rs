@@ -474,19 +474,19 @@ impl<T: fmt::Debug, Fut, F> fmt::Debug for Lazy<T, Fut, F> {
     }
 }
 
-unsafe impl<T: Send, F: Send, Fut: Send> Send for Lazy<T, F, Fut> {}
+unsafe impl<T: Send, Fut: Send, F: Send> Send for Lazy<T, Fut, F> {}
 
 // We never create a `&F` from a `&Lazy<T, F>` so it is fine
 // to not require a `Sync` bound on `F`.
 // Need `T: Send + Sync` for `Sync` as the thread that intitializes
 // the cell could be different from the one that destroys it.
-unsafe impl<T: Send + Sync, F: Send, Fut: Send> Sync for Lazy<T, F, Fut> {}
+unsafe impl<T: Send + Sync, Fut: Send, F: Send> Sync for Lazy<T, Fut, F> {}
 
-impl<T: UnwindSafe, F: UnwindSafe, Fut: UnwindSafe> UnwindSafe for Lazy<T, F, Fut> {}
-impl<T: UnwindSafe + RefUnwindSafe, F: UnwindSafe, Fut: UnwindSafe> RefUnwindSafe
+impl<T: UnwindSafe, Fut: UnwindSafe, F: UnwindSafe> UnwindSafe for Lazy<T, Fut, F> {}
+impl<T: UnwindSafe + RefUnwindSafe, Fut: UnwindSafe, F: UnwindSafe> RefUnwindSafe
     for Lazy<T, F, Fut>
 {
 }
 
 // F is not structurally pinned
-impl<T: Unpin, F, Fut: Unpin> Unpin for Lazy<T, F, Fut> {}
+impl<T: Unpin, Fut: Unpin, F> Unpin for Lazy<T, Fut, F> {}
