@@ -132,8 +132,9 @@ impl HistogramBatch {
 impl HistogramBuilder {
     pub(crate) fn new() -> HistogramBuilder {
         HistogramBuilder {
-            scale: HistogramScale::Log,
-            resolution: 50,
+            scale: HistogramScale::Linear,
+            // Resolution is in nanoseconds.
+            resolution: 100_000,
             num_buckets: 10,
         }
     }

@@ -888,19 +888,94 @@ impl Builder {
     }
 
     cfg_metrics! {
-        /// TODO
+        /// Enables tracking the distribution of task poll times.
+        ///
+        /// Task poll times are not instrumented by default as doing so requires
+        /// calling [`Instant::now()]` twice per task poll, which could add
+        /// measurable overhead. Use the [`Handle::metrics()`] to access the
+        /// metrics data.
+        ///
+        /// The histogram uses fixed bucket sizes. In other words, the histogram
+        /// buckets are not dynamic based on input values. Use the
+        /// `metrics_poll_count_histogram_` builder methods to configure the
+        /// histogram details.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_count_histogram()
+        ///     .build()
+        ///     .unwrap();
+        /// # // Test default values here
+        /// # fn us(n: u64) -> std::time::Duration { std::time::Duration::from_micros(n) }
+        /// # let m = rt.handle().metrics();
+        /// # assert_eq!(m.poll_count_histogram_num_buckets(), 10);
+        /// # assert_eq!(m.poll_count_histogram_bucket_range(0), us(0)..us(100));
+        /// # assert_eq!(m.poll_count_histogram_bucket_range(1), us(100)..us(200));
+        /// ```
+        ///
+        /// [`Handle::metrics()`]: crate::runtime::Handle::metrics
         pub fn enable_metrics_poll_count_histogram(&mut self) -> &mut Self {
             self.metrics_poll_count_histogram_enable = true;
             self
         }
 
-        /// TODO
-        pub fn metrics_poll_count_histogram(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
+        /// Sets the histogram scale for tracking the distribution of task poll
+        /// times.
+        ///
+        /// Tracking the distribution of task poll times can be done using a
+        /// linear or log scale. When using linear scale, each histogram bucket
+        /// will represent the same range of poll times. When using log scale,
+        /// each histogram bucket will cover a range twice as big as the
+        /// previous bucket.
+        ///
+        /// **Default:** linear scale.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::{self, HistogramScale};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_count_histogram()
+        ///     .metrics_poll_count_histogram_scale(HistogramScale::Log)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn metrics_poll_count_histogram_scale(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
             self.metrics_poll_count_histogram.scale = histogram_scale;
             self
         }
 
-        /// TODO
+        /// Sets the histogram resolution for tracking the distribution of task
+        /// poll times.
+        ///
+        /// The resolution is the histogram's first bucket's range. When using a
+        /// linear histogram scale, each bucket will cover the same range. When
+        /// using a log scale, each bucket will cover a range twice as big as
+        /// the previous bucket. In the log case, the resolution represents the
+        /// smallest bucket range.
+        ///
+        /// Note that, when using log scale, the resolution is rounded up to the
+        /// nearest power of 2 in nanoseconds.
+        ///
+        /// **Default:** 100 microseconds.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        /// use std::time::Duration;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_count_histogram()
+        ///     .metrics_poll_count_histogram_resolution(Duration::from_micros(100))
+        ///     .build()
+        ///     .unwrap();
+        /// ```
         pub fn metrics_poll_count_histogram_resolution(&mut self, resolution: Duration) -> &mut Self {
             assert!(resolution > Duration::from_secs(0));
             // Sanity check the argument and also make the cast below safe.
@@ -911,7 +986,22 @@ impl Builder {
             self
         }
 
-        /// TODO
+        /// Sets the number of buckets for the histogram tracking the
+        /// distribution of task poll times.
+        ///
+        /// **Default:** 10
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_count_histogram()
+        ///     .metrics_poll_count_histogram_buckets(15)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
         pub fn metrics_poll_count_histogram_buckets(&mut self, buckets: usize) -> &mut Self {
             self.metrics_poll_count_histogram.num_buckets = buckets;
             self

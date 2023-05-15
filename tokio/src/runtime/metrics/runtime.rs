@@ -579,7 +579,34 @@ impl RuntimeMetrics {
         self.handle.inner.worker_local_queue_depth(worker)
     }
 
-    /// TODO
+    /// Returns `true` if the runtime is tracking the distribution of task poll
+    /// times.
+    ///
+    /// Task poll times are not instrumented by default as doing so requires
+    /// calling [`Instant::now()`] twice per task poll. The feature is enabled
+    /// by calling [`enable_metrics_poll_count_histogram()`] when building the
+    /// runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::{self, Handle};
+    ///
+    /// fn main() {
+    ///     runtime::Builder::new_current_thread()
+    ///         .enable_metrics_poll_count_histogram()
+    ///         .build()
+    ///         .unwrap()
+    ///         .block_on(async {
+    ///             let metrics = Handle::current().metrics();
+    ///             let enabled = metrics.poll_count_histogram_enabled();
+    ///
+    ///             println!("Tracking task poll time distribution: {:?}", enabled);
+    ///         });
+    /// }
+    /// ```
+    ///
+    /// [`enable_metrics_poll_count_histogram()`]: crate::runtime::Builder::enable_metrics_poll_count_histogram
     pub fn poll_count_histogram_enabled(&self) -> bool {
         self.handle
             .inner
@@ -588,7 +615,33 @@ impl RuntimeMetrics {
             .is_some()
     }
 
-    /// TODO
+    /// Returns the number of histogram buckets tracking the distribution of
+    /// task poll times.
+    ///
+    /// This value is configured by calling
+    /// [`metrics_poll_count_histogram_buckets()`] when building the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::{self, Handle};
+    ///
+    /// fn main() {
+    ///     runtime::Builder::new_current_thread()
+    ///         .enable_metrics_poll_count_histogram()
+    ///         .build()
+    ///         .unwrap()
+    ///         .block_on(async {
+    ///             let metrics = Handle::current().metrics();
+    ///             let buckets = metrics.poll_count_histogram_num_buckets();
+    ///
+    ///             println!("Histogram buckets: {:?}", buckets);
+    ///         });
+    /// }
+    /// ```
+    ///
+    /// [`metrics_poll_count_histogram_buckets()`]:
+    ///     crate::runtime::Builder::metrics_poll_count_histogram_buckets
     pub fn poll_count_histogram_num_buckets(&self) -> usize {
         self.handle
             .inner
@@ -599,7 +652,35 @@ impl RuntimeMetrics {
             .unwrap_or_default()
     }
 
-    /// TODO
+    /// Returns the range of task poll times tracked by the given bucket.
+    ///
+    /// This value is configured by calling
+    /// [`metrics_poll_count_histogram_resolution()`] when building the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::{self, Handle};
+    ///
+    /// fn main() {
+    ///     runtime::Builder::new_current_thread()
+    ///         .enable_metrics_poll_count_histogram()
+    ///         .build()
+    ///         .unwrap()
+    ///         .block_on(async {
+    ///             let metrics = Handle::current().metrics();
+    ///             let buckets = metrics.poll_count_histogram_num_buckets();
+    ///
+    ///             for i in 0..buckets {
+    ///                 let range = metrics.poll_count_histogram_bucket_range(i);
+    ///                 println!("Histogram bucket {} range: {:?}", i, range);
+    ///             }
+    ///         });
+    /// }
+    /// ```
+    ///
+    /// [`metrics_poll_count_histogram_resolution()`]:
+    ///     crate::runtime::Builder::metrics_poll_count_histogram_resolution
     pub fn poll_count_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
         self.handle
             .inner
@@ -616,7 +697,58 @@ impl RuntimeMetrics {
             .unwrap_or_default()
     }
 
-    /// TODO
+    /// Returns the number of times the given worker polled tasks with a poll
+    /// duration within the given bucket's range.
+    ///
+    /// Each worker maintains its own histogram and the counts for each bucket
+    /// starts at zero when the runtime is created. Each time the worker polls a
+    /// task, it tracks the duration the task poll time took and increments the
+    /// associated bucket by 1.
+    ///
+    /// Each bucket is a monotonically increasing counter. It is never
+    /// decremented or reset to zero.
+    ///
+    /// # Arguments
+    ///
+    /// `worker` is the index of the worker being queried. The given value must
+    /// be between 0 and `num_workers()`. The index uniquely identifies a single
+    /// worker and will continue to identify the worker throughout the lifetime
+    /// of the runtime instance.
+    ///
+    /// `bucket` is the index of the bucket being queried. The bucket is scoped
+    /// to the worker. The range represented by the bucket can be queried by
+    /// calling [`poll_count_histogram_bucket_range()`]. Each worker maintains
+    /// identical bucket ranges.
+    ///
+    /// # Panics
+    ///
+    /// The method panics when `worker` represents an invalid worker, i.e. is
+    /// greater than or equal to `num_workers()` or if `bucket` represents an
+    /// invalid bucket.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::{self, Handle};
+    ///
+    /// fn main() {
+    ///     runtime::Builder::new_current_thread()
+    ///         .enable_metrics_poll_count_histogram()
+    ///         .build()
+    ///         .unwrap()
+    ///         .block_on(async {
+    ///             let metrics = Handle::current().metrics();
+    ///             let buckets = metrics.poll_count_histogram_num_buckets();
+    ///
+    ///             for worker in 0..metrics.num_workers() {
+    ///                 for i in 0..buckets {
+    ///                     let count = metrics.poll_count_histogram_bucket_count(worker, i);
+    ///                     println!("Poll count {}", count);
+    ///                 }
+    ///             }
+    ///         });
+    /// }
+    /// ```
     pub fn poll_count_histogram_bucket_count(&self, worker: usize, bucket: usize) -> u64 {
         self.handle
             .inner
