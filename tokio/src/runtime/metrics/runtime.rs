@@ -607,6 +607,7 @@ impl RuntimeMetrics {
     /// ```
     ///
     /// [`enable_metrics_poll_count_histogram()`]: crate::runtime::Builder::enable_metrics_poll_count_histogram
+    /// [`Instant::now()`]: std::time::Instant::now
     pub fn poll_count_histogram_enabled(&self) -> bool {
         self.handle
             .inner
@@ -749,6 +750,8 @@ impl RuntimeMetrics {
     ///         });
     /// }
     /// ```
+    ///
+    /// [`poll_count_histogram_bucket_range()`]: crate::runtime::RuntimeMetrics::poll_count_histogram_bucket_range
     pub fn poll_count_histogram_bucket_count(&self, worker: usize, bucket: usize) -> u64 {
         self.handle
             .inner
