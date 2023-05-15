@@ -73,7 +73,7 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// [`PollSemaphore`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSemaphore.html
+/// [`PollSemaphore`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSemaphore.html
 /// [`Semaphore::acquire_owned`]: crate::sync::Semaphore::acquire_owned
 #[derive(Debug)]
 pub struct Semaphore {

@@ -146,7 +146,7 @@ cfg_rt! {
     /// [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code
     /// [rayon]: https://docs.rs/rayon
     /// [`mpsc channel`]: crate::sync::mpsc
-    /// [`SyncIoBridge`]: https://docs.rs/tokio-util/0.6/tokio_util/io/struct.SyncIoBridge.html
+    /// [`SyncIoBridge`]: https://docs.rs/tokio-util/latest/tokio_util/io/struct.SyncIoBridge.html
     /// [hyper]: https://docs.rs/hyper
     /// [`thread::spawn`]: fn@std::thread::spawn
     /// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
