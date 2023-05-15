@@ -479,6 +479,12 @@ impl Context {
                     None => return Ok(core),
                 };
 
+                // Polling a task doesn't necessarily consume any budget, if it
+                // doesn't use any Tokio leaf futures. To prevent such tasks
+                // from using the lifo slot in an infinite loop, we consume an
+                // extra unit of budget between each iteration of the loop.
+                coop::consume_one();
+
                 if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
                     core.metrics.incr_poll_count();

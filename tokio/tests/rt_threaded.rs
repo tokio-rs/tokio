@@ -30,7 +30,8 @@ fn single_thread() {
     let _ = runtime::Builder::new_multi_thread()
         .enable_all()
         .worker_threads(1)
-        .build();
+        .build()
+        .unwrap();
 }
 
 #[test]
@@ -158,6 +159,32 @@ fn many_multishot_futures() {
             });
         }
     }
+}
+
+#[test]
+fn lifo_slot_budget() {
+    async fn my_fn() {
+        spawn_another();
+    }
+
+    fn spawn_another() {
+        tokio::spawn(my_fn());
+    }
+
+    let rt = runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    let (send, recv) = oneshot::channel();
+
+    rt.spawn(async move {
+        tokio::spawn(my_fn());
+        let _ = send.send(());
+    });
+
+    let _ = rt.block_on(recv);
 }
 
 #[test]
