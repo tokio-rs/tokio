@@ -421,7 +421,7 @@ impl<T: 'static> Wake for ListEntry<T> {
             // We move ourself to the notified list.
             let me = unsafe {
                 // Safety: We just checked that we are in this particular list.
-                lock.idle.remove(NonNull::from(&**me)).unwrap()
+                lock.idle.remove(ListEntry::as_raw(me)).unwrap()
             };
             lock.notified.push_front(me);
 
