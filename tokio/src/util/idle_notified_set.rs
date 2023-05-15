@@ -461,7 +461,7 @@ unsafe impl<T> linked_list::Link for ListEntry<T> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod tests {
     use crate::runtime::Builder;
     use crate::task::JoinSet;
