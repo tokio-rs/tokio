@@ -5,15 +5,19 @@ use crate::runtime::MetricsBatch;
 
 use loom::thread;
 
+fn metrics_batch() -> MetricsBatch {
+    MetricsBatch::new(&crate::runtime::WorkerMetrics::new())
+}
+
 #[test]
 fn basic() {
     loom::model(|| {
         let (steal, mut local) = queue::local();
         let inject = Inject::new();
-        let mut metrics = MetricsBatch::new();
+        let mut metrics = metrics_batch();
 
         let th = thread::spawn(move || {
-            let mut metrics = MetricsBatch::new();
+            let mut metrics = metrics_batch();
             let (_, mut local) = queue::local();
             let mut n = 0;
 
@@ -66,10 +70,10 @@ fn steal_overflow() {
     loom::model(|| {
         let (steal, mut local) = queue::local();
         let inject = Inject::new();
-        let mut metrics = MetricsBatch::new();
+        let mut metrics = metrics_batch();
 
         let th = thread::spawn(move || {
-            let mut metrics = MetricsBatch::new();
+            let mut metrics = metrics_batch();
             let (_, mut local) = queue::local();
             let mut n = 0;
 
@@ -118,7 +122,7 @@ fn multi_stealer() {
     const NUM_TASKS: usize = 5;
 
     fn steal_tasks(steal: queue::Steal<NoopSchedule>) -> usize {
-        let mut metrics = MetricsBatch::new();
+        let mut metrics = metrics_batch();
         let (_, mut local) = queue::local();
 
         if steal.steal_into(&mut local, &mut metrics).is_none() {
@@ -137,7 +141,7 @@ fn multi_stealer() {
     loom::model(|| {
         let (steal, mut local) = queue::local();
         let inject = Inject::new();
-        let mut metrics = MetricsBatch::new();
+        let mut metrics = metrics_batch();
 
         // Push work
         for _ in 0..NUM_TASKS {
@@ -172,7 +176,7 @@ fn multi_stealer() {
 #[test]
 fn chained_steal() {
     loom::model(|| {
-        let mut metrics = MetricsBatch::new();
+        let mut metrics = metrics_batch();
         let (s1, mut l1) = queue::local();
         let (s2, mut l2) = queue::local();
         let inject = Inject::new();
@@ -188,7 +192,7 @@ fn chained_steal() {
 
         // Spawn a task to steal from **our** queue
         let th = thread::spawn(move || {
-            let mut metrics = MetricsBatch::new();
+            let mut metrics = metrics_batch();
             let (_, mut local) = queue::local();
             s1.steal_into(&mut local, &mut metrics);
 

@@ -109,6 +109,8 @@ impl CurrentThread {
         seed_generator: RngSeedGenerator,
         config: Config,
     ) -> (CurrentThread, Arc<Handle>) {
+        let worker_metrics = WorkerMetrics::from_config(&config);
+
         let handle = Arc::new(Handle {
             shared: Shared {
                 queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
@@ -116,7 +118,7 @@ impl CurrentThread {
                 woken: AtomicBool::new(false),
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
-                worker_metrics: WorkerMetrics::new(),
+                worker_metrics,
             },
             driver: driver_handle,
             blocking_spawner,
@@ -127,7 +129,7 @@ impl CurrentThread {
             tasks: VecDeque::with_capacity(INITIAL_CAPACITY),
             tick: 0,
             driver: Some(driver),
-            metrics: MetricsBatch::new(),
+            metrics: MetricsBatch::new(&handle.shared.worker_metrics),
             unhandled_panic: false,
         })));
 
@@ -291,8 +293,10 @@ impl Context {
     /// Execute the closure with the given scheduler core stored in the
     /// thread-local context.
     fn run_task<R>(&self, mut core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
-        core.metrics.incr_poll_count();
-        self.enter(core, || crate::runtime::coop::budget(f))
+        core.metrics.start_poll();
+        let mut ret = self.enter(core, || crate::runtime::coop::budget(f));
+        ret.0.metrics.end_poll();
+        ret
     }
 
     /// Blocks the current thread until an event is received by the driver,

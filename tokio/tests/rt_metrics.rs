@@ -228,6 +228,12 @@ fn worker_poll_count() {
     drop(rt);
     assert_eq!(N, metrics.worker_poll_count(0));
 
+    // Does not populate the histogram
+    assert!(!metrics.poll_count_histogram_enabled());
+    for i in 0..10 {
+        assert_eq!(0, metrics.poll_count_histogram_bucket_count(0, i));
+    }
+
     let rt = threaded();
     let metrics = rt.metrics();
     rt.block_on(async {
@@ -242,6 +248,126 @@ fn worker_poll_count() {
         .sum();
 
     assert_eq!(N, n);
+
+    // Does not populate the histogram
+    assert!(!metrics.poll_count_histogram_enabled());
+    for n in 0..metrics.num_workers() {
+        for i in 0..10 {
+            assert_eq!(0, metrics.poll_count_histogram_bucket_count(n, i));
+        }
+    }
+}
+
+#[test]
+fn worker_poll_count_histogram() {
+    const N: u64 = 5;
+
+    let rts = [
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .enable_metrics_poll_count_histogram()
+            .metrics_poll_count_histogram_scale(tokio::runtime::HistogramScale::Linear)
+            .metrics_poll_count_histogram_buckets(3)
+            .metrics_poll_count_histogram_resolution(Duration::from_millis(50))
+            .build()
+            .unwrap(),
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .enable_metrics_poll_count_histogram()
+            .metrics_poll_count_histogram_scale(tokio::runtime::HistogramScale::Linear)
+            .metrics_poll_count_histogram_buckets(3)
+            .metrics_poll_count_histogram_resolution(Duration::from_millis(50))
+            .build()
+            .unwrap(),
+    ];
+
+    for rt in rts {
+        let metrics = rt.metrics();
+        rt.block_on(async {
+            for _ in 0..N {
+                tokio::spawn(async {}).await.unwrap();
+            }
+        });
+        drop(rt);
+
+        let num_workers = metrics.num_workers();
+        let num_buckets = metrics.poll_count_histogram_num_buckets();
+
+        assert!(metrics.poll_count_histogram_enabled());
+        assert_eq!(num_buckets, 3);
+
+        let n = (0..num_workers)
+            .flat_map(|i| (0..num_buckets).map(move |j| (i, j)))
+            .map(|(worker, bucket)| metrics.poll_count_histogram_bucket_count(worker, bucket))
+            .sum();
+        assert_eq!(N, n);
+    }
+}
+
+#[test]
+fn worker_poll_count_histogram_range() {
+    let max = Duration::from_nanos(u64::MAX);
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .enable_metrics_poll_count_histogram()
+        .metrics_poll_count_histogram_scale(tokio::runtime::HistogramScale::Linear)
+        .metrics_poll_count_histogram_buckets(3)
+        .metrics_poll_count_histogram_resolution(us(50))
+        .build()
+        .unwrap();
+    let metrics = rt.metrics();
+
+    assert_eq!(metrics.poll_count_histogram_bucket_range(0), us(0)..us(50));
+    assert_eq!(
+        metrics.poll_count_histogram_bucket_range(1),
+        us(50)..us(100)
+    );
+    assert_eq!(metrics.poll_count_histogram_bucket_range(2), us(100)..max);
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .enable_metrics_poll_count_histogram()
+        .metrics_poll_count_histogram_scale(tokio::runtime::HistogramScale::Log)
+        .metrics_poll_count_histogram_buckets(3)
+        .metrics_poll_count_histogram_resolution(us(50))
+        .build()
+        .unwrap();
+    let metrics = rt.metrics();
+
+    let a = Duration::from_nanos(50000_u64.next_power_of_two());
+    let b = a * 2;
+
+    assert_eq!(metrics.poll_count_histogram_bucket_range(0), us(0)..a);
+    assert_eq!(metrics.poll_count_histogram_bucket_range(1), a..b);
+    assert_eq!(metrics.poll_count_histogram_bucket_range(2), b..max);
+}
+
+#[test]
+fn worker_poll_count_histogram_disabled_without_explicit_enable() {
+    let rts = [
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .metrics_poll_count_histogram_scale(tokio::runtime::HistogramScale::Linear)
+            .metrics_poll_count_histogram_buckets(3)
+            .metrics_poll_count_histogram_resolution(Duration::from_millis(50))
+            .build()
+            .unwrap(),
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .metrics_poll_count_histogram_scale(tokio::runtime::HistogramScale::Linear)
+            .metrics_poll_count_histogram_buckets(3)
+            .metrics_poll_count_histogram_resolution(Duration::from_millis(50))
+            .build()
+            .unwrap(),
+    ];
+
+    for rt in rts {
+        let metrics = rt.metrics();
+        assert!(!metrics.poll_count_histogram_enabled());
+    }
 }
 
 #[test]
@@ -571,4 +697,8 @@ fn threaded() -> Runtime {
         .enable_all()
         .build()
         .unwrap()
+}
+
+fn us(n: u64) -> Duration {
+    Duration::from_micros(n)
 }

@@ -203,6 +203,7 @@ pub(super) fn create(
 
         let park = park.clone();
         let unpark = park.unpark();
+        let metrics = WorkerMetrics::from_config(&config);
 
         cores.push(Box::new(Core {
             tick: 0,
@@ -211,12 +212,12 @@ pub(super) fn create(
             is_searching: false,
             is_shutdown: false,
             park: Some(park),
-            metrics: MetricsBatch::new(),
+            metrics: MetricsBatch::new(&metrics),
             rand: FastRand::new(config.seed_generator.next_seed()),
         }));
 
         remotes.push(Remote { steal, unpark });
-        worker_metrics.push(WorkerMetrics::new());
+        worker_metrics.push(metrics);
     }
 
     let handle = Arc::new(Handle {
@@ -456,7 +457,7 @@ impl Context {
         core.transition_from_searching(&self.worker);
 
         // Make the core available to the runtime context
-        core.metrics.incr_poll_count();
+        core.metrics.start_poll();
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
@@ -473,6 +474,13 @@ impl Context {
                     None => return Err(()),
                 };
 
+                // If task poll times is enabled, measure the poll time. Note
+                // that, if the `core` is stolen, this means `block_in_place`
+                // was called, turning the poll into a "blocking op". In this
+                // case, we don't want to measure the poll time as it doesn't
+                // really count as an async poll anymore.
+                core.metrics.end_poll();
+
                 // Check for a task in the LIFO slot
                 let task = match core.lifo_slot.take() {
                     Some(task) => task,
@@ -487,7 +495,7 @@ impl Context {
 
                 if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
-                    core.metrics.incr_poll_count();
+                    core.metrics.start_poll();
                     *self.core.borrow_mut() = Some(core);
                     let task = self.worker.handle.shared.owned.assert_owner(task);
                     task.run();

@@ -12,6 +12,11 @@ cfg_metrics! {
     mod batch;
     pub(crate) use batch::MetricsBatch;
 
+    mod histogram;
+    pub(crate) use histogram::{Histogram, HistogramBatch, HistogramBuilder};
+    #[allow(unreachable_pub)] // rust-lang/rust#57411
+    pub use histogram::HistogramScale;
+
     mod runtime;
     #[allow(unreachable_pub)] // rust-lang/rust#57411
     pub use runtime::RuntimeMetrics;
@@ -31,5 +36,5 @@ cfg_metrics! {
 cfg_not_metrics! {
     mod mock;
 
-    pub(crate) use mock::{SchedulerMetrics, WorkerMetrics, MetricsBatch};
+    pub(crate) use mock::{SchedulerMetrics, WorkerMetrics, MetricsBatch, HistogramBuilder};
 }

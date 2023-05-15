@@ -1,5 +1,5 @@
 use crate::runtime::handle::Handle;
-use crate::runtime::{blocking, driver, Callback, Runtime};
+use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use std::fmt;
@@ -94,6 +94,12 @@ pub struct Builder {
 
     /// Specify a random number generator seed to provide deterministic results
     pub(super) seed_generator: RngSeedGenerator,
+
+    /// When true, enables task poll count histogram instrumentation.
+    pub(super) metrics_poll_count_histogram_enable: bool,
+
+    /// Configures the task poll count histogram
+    pub(super) metrics_poll_count_histogram: HistogramBuilder,
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
@@ -267,6 +273,10 @@ impl Builder {
 
             #[cfg(tokio_unstable)]
             unhandled_panic: UnhandledPanic::Ignore,
+
+            metrics_poll_count_histogram_enable: false,
+
+            metrics_poll_count_histogram: Default::default(),
 
             disable_lifo_slot: false,
         }
@@ -877,6 +887,133 @@ impl Builder {
         }
     }
 
+    cfg_metrics! {
+        /// Enables tracking the distribution of task poll times.
+        ///
+        /// Task poll times are not instrumented by default as doing so requires
+        /// calling [`Instant::now()`] twice per task poll, which could add
+        /// measurable overhead. Use the [`Handle::metrics()`] to access the
+        /// metrics data.
+        ///
+        /// The histogram uses fixed bucket sizes. In other words, the histogram
+        /// buckets are not dynamic based on input values. Use the
+        /// `metrics_poll_count_histogram_` builder methods to configure the
+        /// histogram details.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_count_histogram()
+        ///     .build()
+        ///     .unwrap();
+        /// # // Test default values here
+        /// # fn us(n: u64) -> std::time::Duration { std::time::Duration::from_micros(n) }
+        /// # let m = rt.handle().metrics();
+        /// # assert_eq!(m.poll_count_histogram_num_buckets(), 10);
+        /// # assert_eq!(m.poll_count_histogram_bucket_range(0), us(0)..us(100));
+        /// # assert_eq!(m.poll_count_histogram_bucket_range(1), us(100)..us(200));
+        /// ```
+        ///
+        /// [`Handle::metrics()`]: crate::runtime::Handle::metrics
+        /// [`Instant::now()`]: std::time::Instant::now
+        pub fn enable_metrics_poll_count_histogram(&mut self) -> &mut Self {
+            self.metrics_poll_count_histogram_enable = true;
+            self
+        }
+
+        /// Sets the histogram scale for tracking the distribution of task poll
+        /// times.
+        ///
+        /// Tracking the distribution of task poll times can be done using a
+        /// linear or log scale. When using linear scale, each histogram bucket
+        /// will represent the same range of poll times. When using log scale,
+        /// each histogram bucket will cover a range twice as big as the
+        /// previous bucket.
+        ///
+        /// **Default:** linear scale.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::{self, HistogramScale};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_count_histogram()
+        ///     .metrics_poll_count_histogram_scale(HistogramScale::Log)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn metrics_poll_count_histogram_scale(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
+            self.metrics_poll_count_histogram.scale = histogram_scale;
+            self
+        }
+
+        /// Sets the histogram resolution for tracking the distribution of task
+        /// poll times.
+        ///
+        /// The resolution is the histogram's first bucket's range. When using a
+        /// linear histogram scale, each bucket will cover the same range. When
+        /// using a log scale, each bucket will cover a range twice as big as
+        /// the previous bucket. In the log case, the resolution represents the
+        /// smallest bucket range.
+        ///
+        /// Note that, when using log scale, the resolution is rounded up to the
+        /// nearest power of 2 in nanoseconds.
+        ///
+        /// **Default:** 100 microseconds.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        /// use std::time::Duration;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_count_histogram()
+        ///     .metrics_poll_count_histogram_resolution(Duration::from_micros(100))
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn metrics_poll_count_histogram_resolution(&mut self, resolution: Duration) -> &mut Self {
+            assert!(resolution > Duration::from_secs(0));
+            // Sanity check the argument and also make the cast below safe.
+            assert!(resolution <= Duration::from_secs(1));
+
+            let resolution = resolution.as_nanos() as u64;
+            self.metrics_poll_count_histogram.resolution = resolution;
+            self
+        }
+
+        /// Sets the number of buckets for the histogram tracking the
+        /// distribution of task poll times.
+        ///
+        /// The last bucket tracks all greater values that fall out of other
+        /// ranges. So, configuring the histogram using a linear scale,
+        /// resolution of 50ms, and 10 buckets, the 10th bucket will track task
+        /// polls that take more than 450ms to complete.
+        ///
+        /// **Default:** 10
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_count_histogram()
+        ///     .metrics_poll_count_histogram_buckets(15)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn metrics_poll_count_histogram_buckets(&mut self, buckets: usize) -> &mut Self {
+            self.metrics_poll_count_histogram.num_buckets = buckets;
+            self
+        }
+    }
+
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::scheduler::{self, CurrentThread};
         use crate::runtime::{runtime::Scheduler, Config};
@@ -909,6 +1046,7 @@ impl Builder {
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
                 seed_generator: seed_generator_1,
+                metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
             },
         );
 
@@ -921,6 +1059,14 @@ impl Builder {
             handle,
             blocking_pool,
         ))
+    }
+
+    fn metrics_poll_count_histogram_builder(&self) -> Option<HistogramBuilder> {
+        if self.metrics_poll_count_histogram_enable {
+            Some(self.metrics_poll_count_histogram.clone())
+        } else {
+            None
+        }
     }
 }
 
@@ -1050,6 +1196,7 @@ cfg_rt_multi_thread! {
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
                     seed_generator: seed_generator_1,
+                    metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },
             );
 

@@ -21,11 +21,16 @@ macro_rules! assert_metrics {
     }};
 }
 
+fn metrics_batch() -> MetricsBatch {
+    use crate::runtime::WorkerMetrics;
+    MetricsBatch::new(&WorkerMetrics::new())
+}
+
 #[test]
 fn fits_256() {
     let (_, mut local) = queue::local();
     let inject = Inject::new();
-    let mut metrics = MetricsBatch::new();
+    let mut metrics = metrics_batch();
 
     for _ in 0..256 {
         let (task, _) = super::unowned(async {});
@@ -45,7 +50,7 @@ fn fits_256() {
 fn overflow() {
     let (_, mut local) = queue::local();
     let inject = Inject::new();
-    let mut metrics = MetricsBatch::new();
+    let mut metrics = metrics_batch();
 
     for _ in 0..257 {
         let (task, _) = super::unowned(async {});
@@ -71,7 +76,7 @@ fn overflow() {
 
 #[test]
 fn steal_batch() {
-    let mut metrics = MetricsBatch::new();
+    let mut metrics = metrics_batch();
 
     let (steal1, mut local1) = queue::local();
     let (_, mut local2) = queue::local();
@@ -117,14 +122,14 @@ fn stress1() {
     const NUM_PUSH: usize = normal_or_miri(500, 10);
     const NUM_POP: usize = normal_or_miri(250, 10);
 
-    let mut metrics = MetricsBatch::new();
+    let mut metrics = metrics_batch();
 
     for _ in 0..NUM_ITER {
         let (steal, mut local) = queue::local();
         let inject = Inject::new();
 
         let th = thread::spawn(move || {
-            let mut metrics = MetricsBatch::new();
+            let mut metrics = metrics_batch();
             let (_, mut local) = queue::local();
             let mut n = 0;
 
@@ -180,14 +185,14 @@ fn stress2() {
     const NUM_TASKS: usize = normal_or_miri(1_000_000, 50);
     const NUM_STEAL: usize = normal_or_miri(1_000, 10);
 
-    let mut metrics = MetricsBatch::new();
+    let mut metrics = metrics_batch();
 
     for _ in 0..NUM_ITER {
         let (steal, mut local) = queue::local();
         let inject = Inject::new();
 
         let th = thread::spawn(move || {
-            let mut stats = MetricsBatch::new();
+            let mut stats = metrics_batch();
             let (_, mut local) = queue::local();
             let mut n = 0;
 
