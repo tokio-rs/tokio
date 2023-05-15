@@ -891,7 +891,7 @@ impl Builder {
         /// Enables tracking the distribution of task poll times.
         ///
         /// Task poll times are not instrumented by default as doing so requires
-        /// calling [`Instant::now()]` twice per task poll, which could add
+        /// calling [`Instant::now()`] twice per task poll, which could add
         /// measurable overhead. Use the [`Handle::metrics()`] to access the
         /// metrics data.
         ///
@@ -918,6 +918,7 @@ impl Builder {
         /// ```
         ///
         /// [`Handle::metrics()`]: crate::runtime::Handle::metrics
+        /// [`Instant::now()`]: std::time::Instant::now
         pub fn enable_metrics_poll_count_histogram(&mut self) -> &mut Self {
             self.metrics_poll_count_histogram_enable = true;
             self
@@ -988,6 +989,11 @@ impl Builder {
 
         /// Sets the number of buckets for the histogram tracking the
         /// distribution of task poll times.
+        ///
+        /// The last bucket tracks all greater values that fall out of other
+        /// ranges. So, configuring the histogram using a linear scale,
+        /// resolution of 50ms, and 10 buckets, the 10th bucket will track task
+        /// polls that take more than 450ms to complete.
         ///
         /// **Default:** 10
         ///

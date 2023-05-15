@@ -658,6 +658,11 @@ impl RuntimeMetrics {
     /// This value is configured by calling
     /// [`metrics_poll_count_histogram_resolution()`] when building the runtime.
     ///
+    /// # Panics
+    ///
+    /// The method panics if `bucket` represents an invalid bucket index, i.e.
+    /// is greater than or equal to `poll_count_histogram_num_buckets()`.
+    ///
     /// # Examples
     ///
     /// ```
@@ -682,6 +687,7 @@ impl RuntimeMetrics {
     ///
     /// [`metrics_poll_count_histogram_resolution()`]:
     ///     crate::runtime::Builder::metrics_poll_count_histogram_resolution
+    #[track_caller]
     pub fn poll_count_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
         self.handle
             .inner
@@ -752,6 +758,7 @@ impl RuntimeMetrics {
     /// ```
     ///
     /// [`poll_count_histogram_bucket_range()`]: crate::runtime::RuntimeMetrics::poll_count_histogram_bucket_range
+    #[track_caller]
     pub fn poll_count_histogram_bucket_count(&self, worker: usize, bucket: usize) -> u64 {
         self.handle
             .inner
