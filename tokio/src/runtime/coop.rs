@@ -120,7 +120,7 @@ cfg_rt_multi_thread! {
         let _ = context::budget(|cell| cell.set(budget));
     }
 
-    /// Consume one budget.
+    /// Consume one unit of progress from the current task's budget.
     pub(crate) fn consume_one() {
         let _ = context::budget(|cell| {
             let mut budget = cell.get();
