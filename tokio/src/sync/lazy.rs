@@ -362,28 +362,38 @@ where
                     permit: ManuallyDrop::new(permit),
                 };
 
-                let fut: &mut Fut = match &mut **uninit_data {
-                    LazyUninitData::Function(f) => {
-                        // SAFETY: The `f` will never be accessed later
-                        let f = unsafe { ManuallyDrop::take(f) };
+                // We need to hold a raw pointer across an `await`, without impacting auto traits.
+                // Hence this ugliness.
+                struct Wrapper<Fut>(*mut Fut);
+                unsafe impl<Fut> Send for Wrapper<Fut> {}
+                unsafe impl<Fut> Sync for Wrapper<Fut> {}
 
-                        // Run the initializing function.
-                        let fut = f();
+                let fut_ptr: Wrapper<Fut> = {
+                    let mut_ptr: *mut ManuallyDrop<Fut> = match &mut **uninit_data {
+                        LazyUninitData::Function(f) => {
+                            // SAFETY: The `f` will never be accessed later
+                            let f = unsafe { ManuallyDrop::take(f) };
 
-                        **uninit_data = LazyUninitData::Future(ManuallyDrop::new(fut));
+                            // Run the initializing function.
+                            let fut = f();
 
-                        match &mut **uninit_data {
-                            // Someone else already ran the intializing function.
-                            // Get a pointer to the future that this `Lazy` is currently storing.
-                            LazyUninitData::Future(fut) => &mut *fut,
-                            _ => unreachable!("We just set this to LazyUninitData::Future"),
+                            **uninit_data = LazyUninitData::Future(ManuallyDrop::new(fut));
+
+                            match &mut **uninit_data {
+                                // Someone else already ran the intializing function.
+                                // Get a pointer to the future that this `Lazy` is currently storing.
+                                LazyUninitData::Future(fut) => fut,
+                                _ => unreachable!("We just set this to LazyUninitData::Future"),
+                            }
                         }
-                    }
-                    LazyUninitData::Future(fut) => &mut *fut,
+                        LazyUninitData::Future(fut) => fut,
+                    };
+
+                    Wrapper(mut_ptr.cast())
                 };
 
                 // SAFETY: `Lazy` futures are structurally pinned.
-                let fut: Pin<&mut Fut> = unsafe { Pin::new_unchecked(fut) };
+                let fut: Pin<&mut Fut> = unsafe { Pin::new_unchecked(&mut *fut_ptr.0) };
 
                 // If we reach this point, the initializing function has run successfully,
                 // and the initializing future is stored in the struct.
@@ -399,6 +409,10 @@ where
                 // Set the cell to initialized.
                 initialize_on_drop.value =
                     InitializationState::Initialized(ManuallyDrop::new(Some(result)));
+
+                // Drop the future now that we are done polling it.
+                // SAFETY: there are no accesses to the future after this.
+                unsafe { core::ptr::drop_in_place(fut_ptr.0) }
 
                 drop(initialize_on_drop);
             }
@@ -488,5 +502,5 @@ impl<T: UnwindSafe + RefUnwindSafe, Fut: UnwindSafe, F: UnwindSafe> RefUnwindSaf
 {
 }
 
-// F is not structurally pinned
+// F is not structurally pinned.
 impl<T: Unpin, Fut: Unpin, F> Unpin for Lazy<T, Fut, F> {}
