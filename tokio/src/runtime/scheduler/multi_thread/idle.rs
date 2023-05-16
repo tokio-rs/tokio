@@ -1,18 +1,25 @@
 //! Coordinates idling workers
 
-use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::Mutex;
 
-use std::fmt;
-use std::sync::atomic::Ordering::{self, SeqCst};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 
 pub(super) struct Idle {
-    /// Tracks both the number of searching workers and the number of unparked
-    /// workers.
-    ///
-    /// Used as a fast-path to avoid acquiring the lock when needed.
-    state: AtomicUsize,
+    /// Number of searching workers
+    num_searching: AtomicUsize,
 
+    /// Number of sleeping workers
+    num_sleeping: AtomicUsize,
+
+    /// Used to catch false-negatives when notifying workers.
+    needs_searching: AtomicBool,
+
+    // /// Tracks both the number of searching workers and the number of unparked
+    // /// workers.
+    // ///
+    // /// Used as a fast-path to avoid acquiring the lock when needed.
+    // state: AtomicUsize,
     /// Sleeping workers
     sleepers: Mutex<Vec<usize>>,
 
@@ -20,19 +27,15 @@ pub(super) struct Idle {
     num_workers: usize,
 }
 
-const UNPARK_SHIFT: usize = 16;
-const UNPARK_MASK: usize = !SEARCH_MASK;
-const SEARCH_MASK: usize = (1 << UNPARK_SHIFT) - 1;
-
 #[derive(Copy, Clone)]
 struct State(usize);
 
 impl Idle {
     pub(super) fn new(num_workers: usize) -> Idle {
-        let init = State::new(num_workers);
-
         Idle {
-            state: AtomicUsize::new(init.into()),
+            num_searching: AtomicUsize::new(0),
+            num_sleeping: AtomicUsize::new(0),
+            needs_searching: AtomicBool::new(false),
             sleepers: Mutex::new(Vec::with_capacity(num_workers)),
             num_workers,
         }
@@ -40,65 +43,112 @@ impl Idle {
 
     /// If there are no workers actively searching, returns the index of a
     /// worker currently sleeping.
-    pub(super) fn worker_to_notify(&self) -> Option<usize> {
-        // If at least one worker is spinning, work being notified will
-        // eventually be found. A searching thread will find **some** work and
-        // notify another worker, eventually leading to our work being found.
+    pub(super) fn worker_to_notify_local(&self) -> Option<usize> {
+        // Because this is only called from a worker thread, we can be more
+        // relaxed here. If we get false-negatives, the caller will eventually
+        // process the work.
         //
-        // For this to happen, this load must happen before the thread
-        // transitioning `num_searching` to zero. Acquire / Release does not
-        // provide sufficient guarantees, so this load is done with `SeqCst` and
-        // will pair with the `fetch_sub(1)` when transitioning out of
-        // searching.
-        if !self.notify_should_wakeup() {
+        // Before attempting the CAS (which is expensive), do a load which is cheap.
+        if self.num_searching.load(Acquire) != 0 {
             return None;
         }
 
-        // Acquire the lock
-        let mut sleepers = self.sleepers.lock();
-
-        // Check again, now that the lock is acquired
-        if !self.notify_should_wakeup() {
+        if self
+            .num_searching
+            .compare_exchange(0, 1, Acquire, Acquire)
+            .is_err()
+        {
             return None;
         }
 
-        // A worker should be woken up, atomically increment the number of
-        // searching workers as well as the number of unparked workers.
-        State::unpark_one(&self.state, 1);
+        // We will notify a worker.
+        let mut sleepers = self.sleepers.lock();
 
-        // Get the worker to unpark
-        let ret = sleepers.pop();
-        debug_assert!(ret.is_some());
+        if let Some(ret) = sleepers.pop() {
+            self.num_sleeping
+                .store(self.num_sleeping.load(Acquire) - 1, Release);
+            return Some(ret);
+        }
 
-        ret
+        self.num_searching.fetch_sub(1, Release);
+        None
     }
 
-    /// Returns `true` if the worker needs to do a final check for submitted
-    /// work.
-    pub(super) fn transition_worker_to_parked(&self, worker: usize, is_searching: bool) -> bool {
+    pub(super) fn worker_to_notify_remote(&self) -> Option<usize> {
+        // Because this function is called from *outside* the runtime, we need
+        // to be more aggressive with our synchronization. We need to create a
+        // barrier between pushing a task into the queue (done right before
+        // calling this method) and ensuring there is at least one spinning
+        // thread. A load is not sufficient, we must also write to create the
+        // release relationship.
+        if self.num_searching.fetch_add(0, AcqRel) != 0 {
+            return None;
+        }
+
+        // We just created the release ordering and also noticed there are no
+        // searchers. Try incrementing the number of searches.
+        if self
+            .num_searching
+            .compare_exchange(0, 1, AcqRel, Acquire)
+            .is_err()
+        {
+            // A worker started searching, because of the ordering set by
+            // `fetch_add` we don't need to do anything else
+            return None;
+        }
+
+        // We will notify a worker.
+        let mut sleepers = self.sleepers.lock();
+
+        if let Some(ret) = sleepers.pop() {
+            self.num_sleeping
+                .store(self.num_sleeping.load(Acquire) - 1, Release);
+            return Some(ret);
+        }
+
+        self.num_searching.fetch_sub(1, Release);
+
+        // We failed to find a worker to wake, we need to make sure we don't lose this wake.
+        self.needs_searching.store(true, Release);
+        None
+    }
+
+    /// Returns `false` if the worker must transition back to searching
+    pub(super) fn transition_worker_to_parked(&self, worker: usize) -> bool {
         // Acquire the lock
         let mut sleepers = self.sleepers.lock();
 
-        // Decrement the number of unparked threads
-        let ret = State::dec_num_unparked(&self.state, is_searching);
-
-        // Track the sleeping worker
-        sleepers.push(worker);
-
-        ret
-    }
-
-    pub(super) fn transition_worker_to_searching(&self) -> bool {
-        let state = State::load(&self.state, SeqCst);
-        if 2 * state.num_searching() >= self.num_workers {
+        if self.needs_searching.load(Acquire) {
             return false;
         }
 
-        // It is possible for this routine to allow more than 50% of the workers
-        // to search. That is OK. Limiting searchers is only an optimization to
-        // prevent too much contention.
-        State::inc_num_searching(&self.state, SeqCst);
+        // Track the sleeping worker
+        sleepers.push(worker);
+        self.num_sleeping
+            .store(self.num_sleeping.load(Acquire) + 1, Release);
+
         true
+    }
+
+    /// Returns `true` if the worker has become searching
+    pub(super) fn try_transition_worker_to_searching(&self) -> bool {
+        let num_searching = self.num_searching.load(Acquire);
+        let num_sleeping = self.num_sleeping.load(Acquire);
+
+        if 2 * num_searching >= self.num_workers - num_sleeping {
+            return false;
+        }
+
+        self.transition_worker_to_searching();
+        true
+    }
+
+    pub(super) fn transition_worker_to_searching(&self) {
+        // Because we are about to become a searching worker, we can
+        // optimistically clear the need searching flag.
+        self.needs_searching.store(false, Release);
+
+        self.num_searching.fetch_add(1, AcqRel);
     }
 
     /// A lightweight transition from searching -> running.
@@ -106,7 +156,9 @@ impl Idle {
     /// Returns `true` if this is the final searching worker. The caller
     /// **must** notify a new worker.
     pub(super) fn transition_worker_from_searching(&self) -> bool {
-        State::dec_num_searching(&self.state)
+        let prev = self.num_searching.fetch_sub(1, AcqRel);
+        debug_assert!(prev > 0);
+        prev == 1
     }
 
     /// Unpark a specific worker. This happens if tasks are submitted from
@@ -118,10 +170,9 @@ impl Idle {
 
         for index in 0..sleepers.len() {
             if sleepers[index] == worker_id {
+                self.num_sleeping
+                    .store(self.num_sleeping.load(Acquire) - 1, Release);
                 sleepers.swap_remove(index);
-
-                // Update the state accordingly while the lock is held.
-                State::unpark_one(&self.state, 0);
 
                 return true;
             }
@@ -135,92 +186,4 @@ impl Idle {
         let sleepers = self.sleepers.lock();
         sleepers.contains(&worker_id)
     }
-
-    fn notify_should_wakeup(&self) -> bool {
-        let state = State(self.state.fetch_add(0, SeqCst));
-        state.num_searching() == 0 && state.num_unparked() < self.num_workers
-    }
-}
-
-impl State {
-    fn new(num_workers: usize) -> State {
-        // All workers start in the unparked state
-        let ret = State(num_workers << UNPARK_SHIFT);
-        debug_assert_eq!(num_workers, ret.num_unparked());
-        debug_assert_eq!(0, ret.num_searching());
-        ret
-    }
-
-    fn load(cell: &AtomicUsize, ordering: Ordering) -> State {
-        State(cell.load(ordering))
-    }
-
-    fn unpark_one(cell: &AtomicUsize, num_searching: usize) {
-        cell.fetch_add(num_searching | (1 << UNPARK_SHIFT), SeqCst);
-    }
-
-    fn inc_num_searching(cell: &AtomicUsize, ordering: Ordering) {
-        cell.fetch_add(1, ordering);
-    }
-
-    /// Returns `true` if this is the final searching worker
-    fn dec_num_searching(cell: &AtomicUsize) -> bool {
-        let state = State(cell.fetch_sub(1, SeqCst));
-        state.num_searching() == 1
-    }
-
-    /// Track a sleeping worker
-    ///
-    /// Returns `true` if this is the final searching worker.
-    fn dec_num_unparked(cell: &AtomicUsize, is_searching: bool) -> bool {
-        let mut dec = 1 << UNPARK_SHIFT;
-
-        if is_searching {
-            dec += 1;
-        }
-
-        let prev = State(cell.fetch_sub(dec, SeqCst));
-        is_searching && prev.num_searching() == 1
-    }
-
-    /// Number of workers currently searching
-    fn num_searching(self) -> usize {
-        self.0 & SEARCH_MASK
-    }
-
-    /// Number of workers currently unparked
-    fn num_unparked(self) -> usize {
-        (self.0 & UNPARK_MASK) >> UNPARK_SHIFT
-    }
-}
-
-impl From<usize> for State {
-    fn from(src: usize) -> State {
-        State(src)
-    }
-}
-
-impl From<State> for usize {
-    fn from(src: State) -> usize {
-        src.0
-    }
-}
-
-impl fmt::Debug for State {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("worker::State")
-            .field("num_unparked", &self.num_unparked())
-            .field("num_searching", &self.num_searching())
-            .finish()
-    }
-}
-
-#[test]
-fn test_state() {
-    assert_eq!(0, UNPARK_MASK & SEARCH_MASK);
-    assert_eq!(0, !(UNPARK_MASK | SEARCH_MASK));
-
-    let state = State::new(10);
-    assert_eq!(10, state.num_unparked());
-    assert_eq!(0, state.num_searching());
 }

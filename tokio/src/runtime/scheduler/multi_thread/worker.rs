@@ -437,18 +437,21 @@ impl Context {
                 continue;
             }
 
-            // There is no more **local** work to process, try to steal work
-            // from other workers.
-            if let Some(task) = core.steal_work(&self.worker) {
-                core = self.run_task(task, core)?;
-            } else {
-                // Wait for work
-                core = if did_defer_tasks() {
-                    self.park_timeout(core, Some(Duration::from_millis(0)))
-                } else {
-                    self.park(core)
-                };
+            if core.transition_to_searching(&self.worker) {
+                // There is no more **local** work to process, try to steal work
+                // from other workers.
+                if let Some(task) = core.steal_work(&self.worker) {
+                    core = self.run_task(task, core)?;
+                    continue;
+                }
             }
+
+            // Wait for work
+            core = if did_defer_tasks() {
+                self.park_timeout(core, Some(Duration::from_millis(0)))
+            } else {
+                self.park(core)
+            };
         }
 
         core.pre_shutdown(&self.worker);
@@ -544,23 +547,29 @@ impl Context {
     /// Also, we rely on the workstealing algorithm to spread the tasks amongst workers
     /// after all the IOs get dispatched
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
+        // First, try to transition to the parked state. If this doesn't
+        // succeed, then we abort the parking process. This transition can fail
+        // if we detect that there *may* have been a lost wakeup. See the
+        // transition fn in `idle.rs` for more details.
+        if !core.transition_to_parked(&self.worker) {
+            return core;
+        }
+
         if let Some(f) = &self.worker.handle.shared.config.before_park {
             f();
         }
 
-        if core.transition_to_parked(&self.worker) {
-            while !core.is_shutdown {
-                core.metrics.about_to_park();
-                core = self.park_timeout(core, None);
-                core.metrics.returned_from_park();
-
-                // Run regularly scheduled maintenance
-                core.maintenance(&self.worker);
-
-                if core.transition_from_parked(&self.worker) {
-                    break;
-                }
+        while !core.is_shutdown {
+            if core.transition_from_parked_if_notified(&self.worker) {
+                break;
             }
+
+            core.metrics.about_to_park();
+            core = self.park_timeout(core, None);
+            core.metrics.returned_from_park();
+
+            // Run regularly scheduled maintenance
+            core.maintenance(&self.worker);
         }
 
         if let Some(f) = &self.worker.handle.shared.config.after_unpark {
@@ -594,7 +603,8 @@ impl Context {
         // If there are tasks available to steal, but this worker is not
         // looking for tasks to steal, notify another worker.
         if !core.is_searching && core.run_queue.is_stealable() {
-            self.worker.handle.notify_parked();
+            // TODO: is this correct?
+            self.worker.handle.notify_parked_local();
         }
 
         core
@@ -633,10 +643,6 @@ impl Core {
     /// workers will be trying to steal at the same time.
     fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
         const ATTEMPTS: usize = 4;
-
-        if !self.transition_to_searching(worker) {
-            return None;
-        }
 
         // Number of remotes
         let num = worker.handle.shared.remotes.len();
@@ -682,55 +688,72 @@ impl Core {
 
     fn transition_to_searching(&mut self, worker: &Worker) -> bool {
         if !self.is_searching {
-            self.is_searching = worker.handle.shared.idle.transition_worker_to_searching();
+            self.is_searching = worker
+                .handle
+                .shared
+                .idle
+                .try_transition_worker_to_searching();
         }
 
         self.is_searching
     }
 
+    /// Called right before running a task. In this case, if this is the last
+    /// searching worker, we need to wake up another worker as there might be
+    /// other queued tasks.
     fn transition_from_searching(&mut self, worker: &Worker) {
         if !self.is_searching {
             return;
         }
 
         self.is_searching = false;
-        worker.handle.transition_worker_from_searching();
+
+        if worker.handle.shared.idle.transition_worker_from_searching() {
+            // We are the final searching worker, so notify a new one
+            worker.handle.notify_parked_local();
+        }
     }
 
     /// Prepares the worker state for parking.
     ///
     /// Returns true if the transition happened, false if there is work to do first.
     fn transition_to_parked(&mut self, worker: &Worker) -> bool {
-        // Workers should not park if they have work to do
-        if worker.lifo_slot().is_some() || self.run_queue.has_tasks() {
-            return false;
+        if self.is_searching {
+            self.is_searching = false;
+
+            if worker.handle.shared.idle.transition_worker_from_searching() {
+                if worker.handle.work_to_steal() {
+                    // Transition *back* to searching
+                    self.is_searching = true;
+                    worker.handle.shared.idle.transition_worker_to_searching();
+
+                    return false;
+                }
+            }
         }
 
-        // When the final worker transitions **out** of searching to parked, it
-        // must check all the queues one last time in case work materialized
-        // between the last work scan and transitioning out of searching.
-        let is_last_searcher = worker
+        // When the final worker transitions **out** of searching to parked, the
+        // transition might fail. In this case, it becomes a searching worker.
+        let res = worker
             .handle
             .shared
             .idle
-            .transition_worker_to_parked(worker.index, self.is_searching);
+            .transition_worker_to_parked(worker.index);
 
-        // The worker is no longer searching. Setting this is the local cache
-        // only.
-        self.is_searching = false;
-
-        if is_last_searcher {
-            worker.handle.notify_if_work_pending();
+        if res {
+            true
+        } else {
+            self.is_searching = true;
+            worker.handle.shared.idle.transition_worker_to_searching();
+            false
         }
-
-        true
     }
 
     /// Returns `true` if the transition happened.
-    fn transition_from_parked(&mut self, worker: &Worker) -> bool {
+    fn transition_from_parked_if_notified(&mut self, worker: &Worker) -> bool {
         // If a task is in the lifo slot, then we must unpark regardless of
         // being notified
-        if worker.lifo_slot().is_some() {
+        if worker.lifo_slot().is_some() || self.run_queue.has_tasks() {
             // When a worker wakes, it should only transition to the "searching"
             // state when the wake originates from another worker *or* a new task
             // is pushed. We do *not* want the worker to transition to "searching"
@@ -829,7 +852,8 @@ impl Handle {
             // Otherwise, use the inject queue.
             self.shared.inject.push(task);
             self.shared.scheduler_metrics.inc_remote_schedule_count();
-            self.notify_parked();
+
+            self.notify_parked_remote();
         })
     }
 
@@ -857,7 +881,7 @@ impl Handle {
         // scheduling is from a resource driver. As notifications often come in
         // batches, the notification is delayed until the park is complete.
         if core.park.is_some() {
-            self.notify_parked();
+            self.notify_parked_local();
         }
     }
 
@@ -867,8 +891,19 @@ impl Handle {
         }
     }
 
-    fn notify_parked(&self) {
-        if let Some(index) = self.shared.idle.worker_to_notify() {
+    /// A weaker notification. It is possible for there to be false-negatives (a
+    /// worker should be woken, but isn't). This is very rare and considered OK
+    /// as it is called from a worker thread which will, eventually, process the
+    /// work.
+    fn notify_parked_local(&self) {
+        if let Some(index) = self.shared.idle.worker_to_notify_local() {
+            self.shared.remotes[index].unpark.unpark(&self.driver);
+        }
+    }
+
+    /// A stronger notify that ensures a worker will always wake up if needed.
+    fn notify_parked_remote(&self) {
+        if let Some(index) = self.shared.idle.worker_to_notify_remote() {
             self.shared.remotes[index].unpark.unpark(&self.driver);
         }
     }
@@ -879,25 +914,14 @@ impl Handle {
         }
     }
 
-    fn notify_if_work_pending(&self) {
+    fn work_to_steal(&self) -> bool {
         for remote in &self.shared.remotes[..] {
             if !remote.steal.is_empty() {
-                self.notify_parked();
-                return;
+                return true;
             }
         }
 
-        if !self.shared.inject.is_empty() {
-            self.notify_parked();
-        }
-    }
-
-    fn transition_worker_from_searching(&self) {
-        if self.shared.idle.transition_worker_from_searching() {
-            // We are the final searching worker. Because work was found, we
-            // need to notify another worker.
-            self.notify_parked();
-        }
+        !self.shared.inject.is_empty()
     }
 
     /// Signals that a worker has observed the shutdown signal and has replaced
