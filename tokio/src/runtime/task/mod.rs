@@ -183,6 +183,9 @@ mod id;
 pub use id::{id, try_id, Id};
 
 cfg_rt_multi_thread! {
+    mod atomic_cell;
+    pub(super) use atomic_cell::AtomicCell;
+
     mod inject;
     pub(super) use self::inject::Inject;
 }

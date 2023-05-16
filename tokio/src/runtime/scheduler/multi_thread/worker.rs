@@ -84,15 +84,11 @@ pub(super) struct Worker {
 
 /// Core data
 struct Core {
+    /// Index holding this worker's remote state
+    index: usize,
+
     /// Used to schedule bookkeeping tasks every so often.
     tick: u32,
-
-    /// When a task is scheduled from a worker, it is stored in this slot. The
-    /// worker will check this slot for a task **before** checking the run
-    /// queue. This effectively results in the **last** scheduled task to be run
-    /// next (LIFO). This is an optimization for message passing patterns and
-    /// helps to reduce latency.
-    lifo_slot: Option<Notified>,
 
     /// The worker-local run queue.
     run_queue: queue::Local<Arc<Handle>>,
@@ -152,6 +148,13 @@ pub(super) struct Shared {
 
 /// Used to communicate with a worker from other threads.
 struct Remote {
+    /// When a task is scheduled from a worker, it is stored in this slot. The
+    /// worker will check this slot for a task **before** checking the run
+    /// queue. This effectively results in the **last** scheduled task to be run
+    /// next (LIFO). This is an optimization for message passing patterns and
+    /// helps to reduce latency.
+    lifo_slot: Lifo,
+
     /// Steals tasks from this worker.
     steal: queue::Steal<Arc<Handle>>,
 
@@ -182,6 +185,8 @@ type Task = task::Task<Arc<Handle>>;
 /// A notified task handle
 type Notified = task::Notified<Arc<Handle>>;
 
+type Lifo = task::AtomicCell<Arc<Handle>>;
+
 // Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
 
@@ -198,7 +203,7 @@ pub(super) fn create(
     let mut worker_metrics = Vec::with_capacity(size);
 
     // Create the local queues
-    for _ in 0..size {
+    for i in 0..size {
         let (steal, run_queue) = queue::local();
 
         let park = park.clone();
@@ -206,8 +211,8 @@ pub(super) fn create(
         let metrics = WorkerMetrics::from_config(&config);
 
         cores.push(Box::new(Core {
+            index: i,
             tick: 0,
-            lifo_slot: None,
             run_queue,
             is_searching: false,
             is_shutdown: false,
@@ -216,7 +221,11 @@ pub(super) fn create(
             rand: FastRand::new(config.seed_generator.next_seed()),
         }));
 
-        remotes.push(Remote { steal, unpark });
+        remotes.push(Remote {
+            lifo_slot: task::AtomicCell::new(),
+            steal,
+            unpark,
+        });
         worker_metrics.push(metrics);
     }
 
@@ -482,7 +491,7 @@ impl Context {
                 core.metrics.end_poll();
 
                 // Check for a task in the LIFO slot
-                let task = match core.lifo_slot.take() {
+                let task = match self.worker.lifo_slot().take_local() {
                     Some(task) => task,
                     None => return Ok(core),
                 };
@@ -601,14 +610,20 @@ impl Core {
     /// Return the next notified task available to this worker.
     fn next_task(&mut self, worker: &Worker) -> Option<Notified> {
         if self.tick % worker.handle.shared.config.global_queue_interval == 0 {
-            worker.inject().pop().or_else(|| self.next_local_task())
+            worker
+                .inject()
+                .pop()
+                .or_else(|| self.next_local_task(&worker.handle))
         } else {
-            self.next_local_task().or_else(|| worker.inject().pop())
+            self.next_local_task(&worker.handle)
+                .or_else(|| worker.inject().pop())
         }
     }
 
-    fn next_local_task(&mut self) -> Option<Notified> {
-        self.lifo_slot.take().or_else(|| self.run_queue.pop())
+    fn next_local_task(&mut self, handle: &Handle) -> Option<Notified> {
+        self.lifo_slot(handle)
+            .take_local()
+            .or_else(|| self.run_queue.pop())
     }
 
     /// Function responsible for stealing tasks from another worker
@@ -617,28 +632,47 @@ impl Core {
     /// a new worker will actually try to steal. The idea is to make sure not all
     /// workers will be trying to steal at the same time.
     fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
+        const ATTEMPTS: usize = 4;
+
         if !self.transition_to_searching(worker) {
             return None;
         }
 
+        // Number of remotes
         let num = worker.handle.shared.remotes.len();
-        // Start from a random worker
-        let start = self.rand.fastrand_n(num as u32) as usize;
 
-        for i in 0..num {
-            let i = (start + i) % num;
+        // Run this a few times
+        for i in 0..ATTEMPTS {
+            // Only try stealing the LIFO slot
+            let steal_lifo = i == ATTEMPTS - 1;
 
-            // Don't steal from ourself! We know we don't have work.
-            if i == worker.index {
-                continue;
-            }
+            // Start from a random worker
+            let start = self.rand.fastrand_n(num as u32) as usize;
 
-            let target = &worker.handle.shared.remotes[i];
-            if let Some(task) = target
-                .steal
-                .steal_into(&mut self.run_queue, &mut self.metrics)
-            {
-                return Some(task);
+            for i in 0..num {
+                let i = (start + i) % num;
+
+                // Don't steal from ourself! We know we don't have work.
+                if i == worker.index {
+                    continue;
+                }
+
+                let target = &worker.handle.shared.remotes[i];
+                if let Some(task) = target
+                    .steal
+                    .steal_into(&mut self.run_queue, &mut self.metrics)
+                {
+                    return Some(task);
+                }
+
+                if steal_lifo {
+                    // Try stealing from the LIFO slot
+                    if let Some(task) = target.lifo_slot.take_remote() {
+                        self.metrics.incr_steal_count(1);
+                        self.metrics.incr_steal_operations();
+                        return Some(task);
+                    }
+                }
             }
         }
 
@@ -668,7 +702,7 @@ impl Core {
     /// Returns true if the transition happened, false if there is work to do first.
     fn transition_to_parked(&mut self, worker: &Worker) -> bool {
         // Workers should not park if they have work to do
-        if self.lifo_slot.is_some() || self.run_queue.has_tasks() {
+        if worker.lifo_slot().is_some() || self.run_queue.has_tasks() {
             return false;
         }
 
@@ -696,7 +730,7 @@ impl Core {
     fn transition_from_parked(&mut self, worker: &Worker) -> bool {
         // If a task is in the lifo slot, then we must unpark regardless of
         // being notified
-        if self.lifo_slot.is_some() {
+        if worker.lifo_slot().is_some() {
             // When a worker wakes, it should only transition to the "searching"
             // state when the wake originates from another worker *or* a new task
             // is pushed. We do *not* want the worker to transition to "searching"
@@ -741,9 +775,13 @@ impl Core {
         let mut park = self.park.take().expect("park missing");
 
         // Drain the queue
-        while self.next_local_task().is_some() {}
+        while self.next_local_task(handle).is_some() {}
 
         park.shutdown(&handle.driver);
+    }
+
+    fn lifo_slot<'a>(&self, handle: &'a Handle) -> &'a Lifo {
+        &handle.shared.remotes[self.index].lifo_slot
     }
 }
 
@@ -751,6 +789,11 @@ impl Worker {
     /// Returns a reference to the scheduler's injection queue.
     fn inject(&self) -> &Inject<Arc<Handle>> {
         &self.handle.shared.inject
+    }
+
+    /// Returns a reference to the worker's lifo slot
+    fn lifo_slot(&self) -> &Lifo {
+        &self.handle.shared.remotes[self.index].lifo_slot
     }
 }
 
@@ -797,29 +840,23 @@ impl Handle {
         // task must always be pushed to the back of the queue, enabling other
         // tasks to be executed. If **not** a yield, then there is more
         // flexibility and the task may go to the front of the queue.
-        let should_notify = if is_yield || self.shared.config.disable_lifo_slot {
+        if is_yield || self.shared.config.disable_lifo_slot {
             core.run_queue
                 .push_back(task, &self.shared.inject, &mut core.metrics);
-            true
         } else {
             // Push to the LIFO slot
-            let prev = core.lifo_slot.take();
-            let ret = prev.is_some();
+            let prev = core.lifo_slot(&self).swap_local(task);
 
             if let Some(prev) = prev {
                 core.run_queue
                     .push_back(prev, &self.shared.inject, &mut core.metrics);
             }
-
-            core.lifo_slot = Some(task);
-
-            ret
         };
 
         // Only notify if not currently parked. If `park` is `None`, then the
         // scheduling is from a resource driver. As notifications often come in
         // batches, the notification is delayed until the park is complete.
-        if should_notify && core.park.is_some() {
+        if core.park.is_some() {
             self.notify_parked();
         }
     }
