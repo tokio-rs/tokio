@@ -93,6 +93,8 @@ struct Core {
     /// The worker-local run queue.
     run_queue: queue::Local<Arc<Handle>>,
 
+    lifo: Lifo,
+
     /// True if the worker is currently searching for more work. Searching
     /// involves attempting to steal from other workers.
     is_searching: bool,
@@ -112,6 +114,9 @@ struct Core {
     /// Fast random number generator.
     rand: FastRand,
 }
+
+unsafe impl Send for Core {}
+unsafe impl Sync for Core {}
 
 /// State shared across all workers
 pub(super) struct Shared {
@@ -210,10 +215,17 @@ pub(super) fn create(
         let unpark = park.unpark();
         let metrics = WorkerMetrics::from_config(&config);
 
+        remotes.push(Remote {
+            lifo_slot: task::AtomicCell::new(),
+            steal,
+            unpark,
+        });
+
         cores.push(Box::new(Core {
             index: i,
             tick: 0,
             run_queue,
+            lifo: task::AtomicCell::new(),
             is_searching: false,
             is_shutdown: false,
             park: Some(park),
@@ -221,11 +233,6 @@ pub(super) fn create(
             rand: FastRand::new(config.seed_generator.next_seed()),
         }));
 
-        remotes.push(Remote {
-            lifo_slot: task::AtomicCell::new(),
-            steal,
-            unpark,
-        });
         worker_metrics.push(metrics);
     }
 
@@ -756,8 +763,9 @@ impl Core {
         park.shutdown(&handle.driver);
     }
 
-    fn lifo_slot<'a>(&self, handle: &'a Handle) -> &'a Lifo {
-        &handle.shared.remotes[self.index].lifo_slot
+    fn lifo_slot<'a>(&'a self, handle: &'a Handle) -> &'a Lifo {
+        // &handle.shared.remotes[self.index].lifo_slot
+        &self.lifo
     }
 }
 
