@@ -75,6 +75,8 @@ impl<S> AtomicCell<S> {
             return None;
         }
 
+        std::thread::sleep(std::time::Duration::from_micros(3));
+
         // Try to take it once
         if self
             .task

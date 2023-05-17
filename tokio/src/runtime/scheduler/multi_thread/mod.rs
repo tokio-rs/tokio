@@ -1,4 +1,5 @@
 //! Multi-threaded runtime
+mod counters;
 
 mod handle;
 pub(crate) use handle::Handle;

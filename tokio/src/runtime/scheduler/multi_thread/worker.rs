@@ -144,6 +144,9 @@ pub(super) struct Shared {
     pub(super) scheduler_metrics: SchedulerMetrics,
 
     pub(super) worker_metrics: Box<[WorkerMetrics]>,
+
+    /// Internal-only performance counters
+    _counters: super::counters::Counters,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -239,6 +242,7 @@ pub(super) fn create(
             config,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
+            _counters: super::counters::Counters,
         },
         driver: driver_handle,
         blocking_spawner,
@@ -621,12 +625,11 @@ impl Core {
     fn next_task(&mut self, worker: &Worker) -> Option<Notified> {
         if self.tick % worker.handle.shared.config.global_queue_interval == 0 {
             worker
-                .inject()
-                .pop()
+                .next_injected_task()
                 .or_else(|| self.next_local_task(&worker.handle))
         } else {
             self.next_local_task(&worker.handle)
-                .or_else(|| worker.inject().pop())
+                .or_else(|| worker.next_injected_task())
         }
     }
 
@@ -650,6 +653,8 @@ impl Core {
 
         // Number of remotes
         let num = worker.handle.shared.remotes.len();
+
+        let mut backoff = 1;
 
         // Run this a few times
         for i in 0..ATTEMPTS {
@@ -675,19 +680,26 @@ impl Core {
                     return Some(task);
                 }
 
-                if steal_lifo {
-                    // Try stealing from the LIFO slot
-                    if let Some(task) = target.lifo_slot.take_remote() {
-                        self.metrics.incr_steal_count(1);
-                        self.metrics.incr_steal_operations();
-                        return Some(task);
-                    }
-                }
+                // if steal_lifo {
+                //     // Try stealing from the LIFO slot
+                //     if let Some(task) = target.lifo_slot.take_remote() {
+                //         self.metrics.incr_steal_count(1);
+                //         self.metrics.incr_steal_operations();
+                //         return Some(task);
+                //     }
+                // }
             }
+
+            // Fallback on checking the global queue
+            if let Some(task) = worker.handle.shared.inject.pop() {
+                return Some(task);
+            }
+
+            std::thread::sleep(std::time::Duration::from_micros(backoff));
+            backoff *= 2;
         }
 
-        // Fallback on checking the global queue
-        worker.handle.shared.inject.pop()
+        None
     }
 
     fn transition_to_searching(&mut self, worker: &Worker) -> bool {
@@ -813,6 +825,10 @@ impl Core {
 }
 
 impl Worker {
+    fn next_injected_task(&self) -> Option<Notified> {
+        self.inject().pop()
+    }
+
     /// Returns a reference to the scheduler's injection queue.
     fn inject(&self) -> &Inject<Arc<Handle>> {
         &self.handle.shared.inject
@@ -900,7 +916,10 @@ impl Handle {
     /// as it is called from a worker thread which will, eventually, process the
     /// work.
     fn notify_parked_local(&self) {
+        super::counters::inc_num_inc_notify_local();
+
         if let Some(index) = self.shared.idle.worker_to_notify_local() {
+            super::counters::inc_num_unparks_local();
             self.shared.remotes[index].unpark.unpark(&self.driver);
         }
     }

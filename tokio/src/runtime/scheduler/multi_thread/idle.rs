@@ -108,6 +108,8 @@ impl Idle {
 
         self.num_searching.fetch_sub(1, Release);
 
+        super::counters::inc_num_need_searchers();
+
         // We failed to find a worker to wake, we need to make sure we don't lose this wake.
         self.needs_searching.store(true, Release);
         None
