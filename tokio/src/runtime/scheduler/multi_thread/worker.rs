@@ -646,7 +646,7 @@ impl Core {
     /// workers will be trying to steal at the same time.
     fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
         #[cfg(not(loom))]
-        const ATTEMPTS: usize = 4;
+        const ATTEMPTS: usize = 2;
 
         #[cfg(loom)]
         const ATTEMPTS: usize = 1;
@@ -690,24 +690,24 @@ impl Core {
                 // }
             }
 
+            std::thread::sleep(std::time::Duration::from_micros(backoff));
+            backoff *= 2;
+
             // Fallback on checking the global queue
             if let Some(task) = worker.handle.shared.inject.pop() {
                 return Some(task);
             }
-
-            std::thread::sleep(std::time::Duration::from_micros(backoff));
-            backoff *= 2;
         }
 
         None
     }
 
     fn transition_to_searching(&mut self, worker: &Worker) -> bool {
-        if did_defer_tasks() {
-            return false;
-        }
-
         if !self.is_searching {
+            if did_defer_tasks() {
+                return false;
+            }
+
             self.is_searching = worker
                 .handle
                 .shared
