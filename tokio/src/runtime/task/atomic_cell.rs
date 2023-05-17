@@ -5,25 +5,33 @@ use crate::runtime::task::{Header, Notified};
 use std::marker::PhantomData;
 use std::ptr::{self, NonNull};
 
-pub(crate) struct AtomicCell<S> {
-    task: AtomicPtr<Header>,
+pub(crate) struct AtomicCell<S: 'static> {
+    // task: AtomicPtr<Header>,
+    task: std::cell::UnsafeCell<Option<Notified<S>>>,
     _p: PhantomData<S>,
 }
+
+unsafe impl<S: 'static> Send for AtomicCell<S> {}
+unsafe impl<S: 'static> Sync for AtomicCell<S> {}
 
 impl<S> AtomicCell<S> {
     pub(crate) fn new() -> AtomicCell<S> {
         AtomicCell {
-            task: AtomicPtr::default(),
+            // task: AtomicPtr::default(),
+            task: Default::default(),
             _p: PhantomData,
         }
     }
 
     /// Should be called from a local context
     pub(crate) fn is_some(&self) -> bool {
-        !self.task.load(Acquire).is_null()
+        // !self.task.load(Acquire).is_null()
+        unsafe { (*self.task.get()).is_some() }
     }
 
     pub(crate) fn take_local(&self) -> Option<Notified<S>> {
+        unsafe { (*self.task.get()).take() }
+        /*
         let ptr = self.task.load(Acquire);
 
         if ptr.is_null() {
@@ -39,9 +47,12 @@ impl<S> AtomicCell<S> {
         }
 
         NonNull::new(ptr).map(|ptr| unsafe { Notified::from_raw(ptr) })
+        */
     }
 
     pub(crate) fn swap_local(&self, task: Notified<S>) -> Option<Notified<S>> {
+        std::mem::replace(unsafe { &mut (*self.task.get()) }, Some(task))
+        /*
         let next = task.into_raw().as_ptr();
         let prev = self.task.load(Acquire);
 
@@ -66,8 +77,10 @@ impl<S> AtomicCell<S> {
         // this is the only thread that could set the cell to !null.
         self.task.store(next, Release);
         None
+        */
     }
 
+    /*
     pub(crate) fn take_remote(&self) -> Option<Notified<S>> {
         let task = self.task.load(Acquire);
 
@@ -87,4 +100,5 @@ impl<S> AtomicCell<S> {
 
         return None;
     }
+    */
 }

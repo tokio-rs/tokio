@@ -626,53 +626,29 @@ impl Core {
             .or_else(|| self.run_queue.pop())
     }
 
-    /// Function responsible for stealing tasks from another worker
-    ///
-    /// Note: Only if less than half the workers are searching for tasks to steal
-    /// a new worker will actually try to steal. The idea is to make sure not all
-    /// workers will be trying to steal at the same time.
     fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
-        const ATTEMPTS: usize = 4;
-
         if !self.transition_to_searching(worker) {
             return None;
         }
 
-        // Number of remotes
         let num = worker.handle.shared.remotes.len();
+        // Start from a random worker
+        let start = self.rand.fastrand_n(num as u32) as usize;
 
-        // Run this a few times
-        for i in 0..ATTEMPTS {
-            // Only try stealing the LIFO slot
-            let steal_lifo = i == ATTEMPTS - 1;
+        for i in 0..num {
+            let i = (start + i) % num;
 
-            // Start from a random worker
-            let start = self.rand.fastrand_n(num as u32) as usize;
+            // Don't steal from ourself! We know we don't have work.
+            if i == worker.index {
+                continue;
+            }
 
-            for i in 0..num {
-                let i = (start + i) % num;
-
-                // Don't steal from ourself! We know we don't have work.
-                if i == worker.index {
-                    continue;
-                }
-
-                let target = &worker.handle.shared.remotes[i];
-                if let Some(task) = target
-                    .steal
-                    .steal_into(&mut self.run_queue, &mut self.metrics)
-                {
-                    return Some(task);
-                }
-
-                if steal_lifo {
-                    // Try stealing from the LIFO slot
-                    if let Some(task) = target.lifo_slot.take_remote() {
-                        self.metrics.incr_steal_count(1);
-                        self.metrics.incr_steal_operations();
-                        return Some(task);
-                    }
-                }
+            let target = &worker.handle.shared.remotes[i];
+            if let Some(task) = target
+                .steal
+                .steal_into(&mut self.run_queue, &mut self.metrics)
+            {
+                return Some(task);
             }
         }
 
