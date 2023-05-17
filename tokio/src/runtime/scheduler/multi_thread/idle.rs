@@ -15,11 +15,6 @@ pub(super) struct Idle {
     /// Used to catch false-negatives when notifying workers.
     needs_searching: AtomicBool,
 
-    // /// Tracks both the number of searching workers and the number of unparked
-    // /// workers.
-    // ///
-    // /// Used as a fast-path to avoid acquiring the lock when needed.
-    // state: AtomicUsize,
     /// Sleeping workers
     sleepers: Mutex<Vec<usize>>,
 

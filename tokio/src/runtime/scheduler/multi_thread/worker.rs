@@ -703,6 +703,10 @@ impl Core {
     }
 
     fn transition_to_searching(&mut self, worker: &Worker) -> bool {
+        if did_defer_tasks() {
+            return false;
+        }
+
         if !self.is_searching {
             self.is_searching = worker
                 .handle
