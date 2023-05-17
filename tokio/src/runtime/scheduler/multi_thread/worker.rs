@@ -642,7 +642,11 @@ impl Core {
     /// a new worker will actually try to steal. The idea is to make sure not all
     /// workers will be trying to steal at the same time.
     fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
+        #[cfg(not(loom))]
         const ATTEMPTS: usize = 4;
+
+        #[cfg(loom)]
+        const ATTEMPTS: usize = 1;
 
         // Number of remotes
         let num = worker.handle.shared.remotes.len();
