@@ -54,7 +54,7 @@ impl<S> AtomicCell<S> {
 
         if self
             .task
-            .compare_exchange(prev, next, Release, Acquire)
+            .compare_exchange(prev, next, AcqRel, Acquire)
             .is_ok()
         {
             // Safety: we already checked !null above
@@ -85,6 +85,6 @@ impl<S> AtomicCell<S> {
             return Some(unsafe { Notified::from_raw(NonNull::new_unchecked(task)) });
         }
 
-        return None;
+        None
     }
 }

@@ -721,14 +721,14 @@ impl Core {
         if self.is_searching {
             self.is_searching = false;
 
-            if worker.handle.shared.idle.transition_worker_from_searching() {
-                if worker.handle.work_to_steal() {
-                    // Transition *back* to searching
-                    self.is_searching = true;
-                    worker.handle.shared.idle.transition_worker_to_searching();
+            if worker.handle.shared.idle.transition_worker_from_searching()
+                && worker.handle.work_to_steal()
+            {
+                // Transition *back* to searching
+                self.is_searching = true;
+                worker.handle.shared.idle.transition_worker_to_searching();
 
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -869,7 +869,7 @@ impl Handle {
                 .push_back(task, &self.shared.inject, &mut core.metrics);
         } else {
             // Push to the LIFO slot
-            let prev = core.lifo_slot(&self).swap_local(task);
+            let prev = core.lifo_slot(self).swap_local(task);
 
             if let Some(prev) = prev {
                 core.run_queue
