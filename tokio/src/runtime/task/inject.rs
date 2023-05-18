@@ -170,34 +170,43 @@ impl<T: 'static> Inject<T> {
     }
 
     pub(crate) fn pop(&self) -> Option<task::Notified<T>> {
+        self.pop_n(1, |_| {})
+    }
+
+    pub(crate) fn pop_n<F>(&self, n: usize, mut f: F) -> Option<task::Notified<T>>
+    where
+        F: FnMut(task::Notified<T>),
+    {
+        use std::cmp;
+
         // Fast path, if len == 0, then there are no values
         if self.is_empty() {
             return None;
         }
 
+        // Lock the queue
         let mut p = self.pointers.lock();
 
-        // It is possible to hit null here if another thread popped the last
-        // task between us checking `len` and acquiring the lock.
-        let task = p.head?;
+        let n = cmp::min(n, unsafe { self.len.unsync_load() });
 
-        p.head = get_next(task);
-
-        if p.head.is_none() {
-            p.tail = None;
+        if n == 0 {
+            return None;
         }
-
-        set_next(task, None);
 
         // Decrement the count.
         //
         // safety: All updates to the len atomic are guarded by the mutex. As
         // such, a non-atomic load followed by a store is safe.
         self.len
-            .store(unsafe { self.len.unsync_load() } - 1, Release);
+            .store(unsafe { self.len.unsync_load() } - n, Release);
 
-        // safety: a `Notified` is pushed into the queue and now it is popped!
-        Some(unsafe { task::Notified::from_raw(task) })
+        let ret = p.pop().unwrap();
+
+        for _ in 1..n {
+            f(p.pop().unwrap());
+        }
+
+        Some(ret)
     }
 }
 
@@ -206,6 +215,23 @@ impl<T: 'static> Drop for Inject<T> {
         if !std::thread::panicking() {
             assert!(self.pop().is_none(), "queue not empty");
         }
+    }
+}
+
+impl Pointers {
+    fn pop<T: 'static>(&mut self) -> Option<task::Notified<T>> {
+        let task = self.head?;
+
+        self.head = get_next(task);
+
+        if self.head.is_none() {
+            self.tail = None;
+        }
+
+        set_next(task, None);
+
+        // safety: a `Notified` is pushed into the queue and now it is popped!
+        Some(unsafe { task::Notified::from_raw(task) })
     }
 }
 

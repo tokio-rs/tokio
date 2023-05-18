@@ -34,7 +34,7 @@ fn fits_256() {
 
     for _ in 0..256 {
         let (task, _) = super::unowned(async {});
-        local.push_back(task, &inject, &mut metrics);
+        local.push_back_or_overflow(task, &inject, &mut metrics);
     }
 
     cfg_metrics! {
@@ -54,7 +54,7 @@ fn overflow() {
 
     for _ in 0..257 {
         let (task, _) = super::unowned(async {});
-        local.push_back(task, &inject, &mut metrics);
+        local.push_back_or_overflow(task, &inject, &mut metrics);
     }
 
     cfg_metrics! {
@@ -84,7 +84,7 @@ fn steal_batch() {
 
     for _ in 0..4 {
         let (task, _) = super::unowned(async {});
-        local1.push_back(task, &inject, &mut metrics);
+        local1.push_back_or_overflow(task, &inject, &mut metrics);
     }
 
     assert!(steal1.steal_into(&mut local2, &mut metrics).is_some());
@@ -157,7 +157,7 @@ fn stress1() {
         for _ in 0..NUM_LOCAL {
             for _ in 0..NUM_PUSH {
                 let (task, _) = super::unowned(async {});
-                local.push_back(task, &inject, &mut metrics);
+                local.push_back_or_overflow(task, &inject, &mut metrics);
             }
 
             for _ in 0..NUM_POP {
@@ -215,7 +215,7 @@ fn stress2() {
 
         for i in 0..NUM_TASKS {
             let (task, _) = super::unowned(async {});
-            local.push_back(task, &inject, &mut metrics);
+            local.push_back_or_overflow(task, &inject, &mut metrics);
 
             if i % 128 == 0 && local.pop().is_some() {
                 num_pop += 1;

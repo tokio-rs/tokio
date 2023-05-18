@@ -110,6 +110,15 @@ impl<T> Local<T> {
         !self.inner.is_empty()
     }
 
+    /// How many tasks can be pushed into the queue
+    pub(crate) fn capacity(&self) -> usize {
+        self.inner.capacity()
+    }
+
+    pub(crate) fn max_capacity(&self) -> usize {
+        LOCAL_QUEUE_CAPACITY
+    }
+
     /// Returns false if there are any entries in the queue
     ///
     /// Separate to is_stealable so that refactors of is_stealable to "protect"
@@ -118,8 +127,44 @@ impl<T> Local<T> {
         !self.inner.is_empty()
     }
 
+    pub(crate) fn push_back(&mut self, task: task::Notified<T>) -> Result<(), task::Notified<T>> {
+        let tail = loop {
+            let head = self.inner.head.load(Acquire);
+            let (steal, _) = unpack(head);
+
+            // safety: this is the **only** thread that updates this cell.
+            let tail = unsafe { self.inner.tail.unsync_load() };
+
+            if tail.wrapping_sub(steal) < LOCAL_QUEUE_CAPACITY as UnsignedShort {
+                // There is capacity for the task
+                break tail;
+            } else {
+                return Err(task);
+            }
+        };
+
+        // Map the position to a slot index.
+        let idx = tail as usize & MASK;
+
+        self.inner.buffer[idx].with_mut(|ptr| {
+            // Write the task to the slot
+            //
+            // Safety: There is only one producer and the above `if`
+            // condition ensures we don't touch a cell if there is a
+            // value, thus no consumer.
+            unsafe {
+                ptr::write((*ptr).as_mut_ptr(), task);
+            }
+        });
+
+        // Make the task available. Synchronizes with a load in
+        // `steal_into2`.
+        self.inner.tail.store(tail.wrapping_add(1), Release);
+        Ok(())
+    }
+
     /// Pushes a task to the back of the local queue, skipping the LIFO slot.
-    pub(crate) fn push_back(
+    pub(crate) fn push_back_or_overflow(
         &mut self,
         mut task: task::Notified<T>,
         inject: &Inject<T>,
@@ -501,6 +546,13 @@ impl<T> Drop for Local<T> {
 }
 
 impl<T> Inner<T> {
+    fn capacity(&self) -> usize {
+        let (steal, _) = unpack(self.head.load(Acquire));
+        let tail = self.tail.load(Acquire);
+
+        LOCAL_QUEUE_CAPACITY - (tail.wrapping_sub(steal) as usize)
+    }
+
     fn len(&self) -> UnsignedShort {
         let (_, head) = unpack(self.head.load(Acquire));
         let tail = self.tail.load(Acquire);

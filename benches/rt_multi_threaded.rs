@@ -10,9 +10,10 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{mpsc, Arc};
 
-fn spawn_many(b: &mut Bencher) {
-    const NUM_SPAWN: usize = 10_000;
+const NUM_WORKERS: usize = 4;
+const NUM_SPAWN: usize = 10_000;
 
+fn spawn_many_local(b: &mut Bencher) {
     let rt = rt();
 
     let (tx, rx) = mpsc::sync_channel(1000);
@@ -34,6 +35,52 @@ fn spawn_many(b: &mut Bencher) {
             }
 
             let _ = rx.recv().unwrap();
+        });
+    });
+}
+
+fn spawn_many_remote_idle(b: &mut Bencher) {
+    let rt = rt();
+
+    let mut handles = Vec::with_capacity(NUM_SPAWN);
+
+    b.iter(|| {
+        for _ in 0..NUM_SPAWN {
+            handles.push(rt.spawn(async {}));
+        }
+
+        rt.block_on(async {
+            for handle in handles.drain(..) {
+                handle.await.unwrap();
+            }
+        });
+    });
+}
+
+fn spawn_many_remote_busy(b: &mut Bencher) {
+    let rt = rt();
+    let rt_handle = rt.handle();
+    let mut handles = Vec::with_capacity(NUM_SPAWN);
+
+    // Spawn some tasks to keep the runtimes busy
+    for _ in 0..(2 * NUM_WORKERS) {
+        rt.spawn(async {
+            loop {
+                tokio::task::yield_now().await;
+                std::thread::sleep(std::time::Duration::from_micros(10));
+            }
+        });
+    }
+
+    b.iter(|| {
+        for _ in 0..NUM_SPAWN {
+            handles.push(rt_handle.spawn(async {}));
+        }
+
+        rt.block_on(async {
+            for handle in handles.drain(..) {
+                handle.await.unwrap();
+            }
         });
     });
 }
@@ -140,12 +187,20 @@ fn chained_spawn(b: &mut Bencher) {
 
 fn rt() -> Runtime {
     runtime::Builder::new_multi_thread()
-        .worker_threads(4)
+        .worker_threads(NUM_WORKERS)
         .enable_all()
         .build()
         .unwrap()
 }
 
-benchmark_group!(scheduler, spawn_many, ping_pong, yield_many, chained_spawn,);
+benchmark_group!(
+    scheduler,
+    spawn_many_local,
+    spawn_many_remote_idle,
+    spawn_many_remote_busy,
+    ping_pong,
+    yield_many,
+    chained_spawn,
+);
 
 benchmark_main!(scheduler);
