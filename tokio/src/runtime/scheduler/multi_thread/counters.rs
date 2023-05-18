@@ -1,4 +1,4 @@
-#[cfg(tokio_mt_counters)]
+#[cfg(tokio_internal_mt_counters)]
 mod imp {
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering::Relaxed;
@@ -38,7 +38,7 @@ mod imp {
     }
 }
 
-#[cfg(not(tokio_mt_counters))]
+#[cfg(not(tokio_internal_mt_counters))]
 mod imp {
     pub(crate) fn inc_num_need_searchers() {}
     pub(crate) fn inc_num_inc_notify_local() {}
