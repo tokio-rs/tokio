@@ -59,7 +59,7 @@
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::context;
-use crate::runtime::scheduler::multi_thread::{queue, Handle, Idle, Parker, Unparker};
+use crate::runtime::scheduler::multi_thread::{queue, Counters, Handle, Idle, Parker, Unparker};
 use crate::runtime::task::{Inject, OwnedTasks};
 use crate::runtime::{
     blocking, coop, driver, scheduler, task, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics,
@@ -148,6 +148,12 @@ pub(super) struct Shared {
     pub(super) scheduler_metrics: SchedulerMetrics,
 
     pub(super) worker_metrics: Box<[WorkerMetrics]>,
+
+    /// Only held to trigger some code on drop. This is used to get internal
+    /// runtime metrics that can be useful when doing performance
+    /// investigations. This does nothing (empty struct, no drop impl) unless
+    /// the `tokio_internal_mt_counters` cfg flag is set.
+    _counters: Counters,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -230,6 +236,7 @@ pub(super) fn create(
             config,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
+            _counters: Counters,
         },
         driver: driver_handle,
         blocking_spawner,
@@ -512,6 +519,8 @@ impl Context {
 
     fn maintenance(&self, mut core: Box<Core>) -> Box<Core> {
         if core.tick % self.worker.handle.shared.config.event_interval == 0 {
+            super::counters::inc_num_maintenance();
+
             // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
             // to run without actually putting the thread to sleep.
             core = self.park_timeout(core, Some(Duration::from_millis(0)));
@@ -585,7 +594,7 @@ impl Context {
         // If there are tasks available to steal, but this worker is not
         // looking for tasks to steal, notify another worker.
         if !core.is_searching && core.run_queue.is_stealable() {
-            self.worker.handle.notify_parked();
+            self.worker.handle.notify_parked_local();
         }
 
         core
@@ -786,7 +795,7 @@ impl Handle {
             // Otherwise, use the inject queue.
             self.shared.inject.push(task);
             self.shared.scheduler_metrics.inc_remote_schedule_count();
-            self.notify_parked();
+            self.notify_parked_remote();
         })
     }
 
@@ -820,7 +829,7 @@ impl Handle {
         // scheduling is from a resource driver. As notifications often come in
         // batches, the notification is delayed until the park is complete.
         if should_notify && core.park.is_some() {
-            self.notify_parked();
+            self.notify_parked_local();
         }
     }
 
@@ -830,7 +839,16 @@ impl Handle {
         }
     }
 
-    fn notify_parked(&self) {
+    fn notify_parked_local(&self) {
+        super::counters::inc_num_inc_notify_local();
+
+        if let Some(index) = self.shared.idle.worker_to_notify() {
+            super::counters::inc_num_unparks_local();
+            self.shared.remotes[index].unpark.unpark(&self.driver);
+        }
+    }
+
+    fn notify_parked_remote(&self) {
         if let Some(index) = self.shared.idle.worker_to_notify() {
             self.shared.remotes[index].unpark.unpark(&self.driver);
         }
@@ -845,13 +863,13 @@ impl Handle {
     fn notify_if_work_pending(&self) {
         for remote in &self.shared.remotes[..] {
             if !remote.steal.is_empty() {
-                self.notify_parked();
+                self.notify_parked_local();
                 return;
             }
         }
 
         if !self.shared.inject.is_empty() {
-            self.notify_parked();
+            self.notify_parked_local();
         }
     }
 
@@ -859,7 +877,7 @@ impl Handle {
         if self.shared.idle.transition_worker_from_searching() {
             // We are the final searching worker. Because work was found, we
             // need to notify another worker.
-            self.notify_parked();
+            self.notify_parked_local();
         }
     }
 
