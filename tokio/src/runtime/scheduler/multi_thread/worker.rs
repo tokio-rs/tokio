@@ -528,6 +528,7 @@ impl Context {
 
     fn maintenance(&self, mut core: Box<Core>) -> Box<Core> {
         if core.tick % self.worker.handle.shared.config.event_interval == 0 {
+            super::counters::inc_num_maintenance();
             // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
             // to run without actually putting the thread to sleep.
             core = self.park_timeout(core, Some(Duration::from_millis(0)));
@@ -986,8 +987,10 @@ fn did_defer_tasks() -> bool {
     context::with_defer(|deferred| !deferred.is_empty()).unwrap()
 }
 
+/// Returns the number of deferred tasks that were woken
 fn wake_deferred_tasks() {
-    context::with_defer(|deferred| deferred.wake());
+    let n = context::with_defer(|deferred| deferred.wake()).unwrap_or(0);
+    super::counters::inc_num_defers(n);
 }
 
 cfg_metrics! {

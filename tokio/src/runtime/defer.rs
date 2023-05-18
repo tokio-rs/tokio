@@ -25,10 +25,14 @@ impl Defer {
         self.deferred.is_empty()
     }
 
-    pub(crate) fn wake(&mut self) {
+    pub(crate) fn wake(&mut self) -> usize {
+        let ret = self.deferred.len();
+
         for waker in self.deferred.drain(..) {
             waker.wake();
         }
+
+        ret
     }
 
     #[cfg(tokio_taskdump)]
