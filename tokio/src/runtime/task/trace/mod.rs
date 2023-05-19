@@ -1,5 +1,6 @@
 use crate::loom::sync::Arc;
 use crate::runtime::scheduler::current_thread;
+use crate::runtime::task::Inject;
 use backtrace::BacktraceFrame;
 use std::cell::Cell;
 use std::collections::VecDeque;
@@ -236,11 +237,14 @@ impl<T: Future> Future for Root<T> {
 pub(in crate::runtime) fn trace_current_thread(
     owned: &OwnedTasks<Arc<current_thread::Handle>>,
     local: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
-    injection: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
+    injection: &Inject<Arc<current_thread::Handle>>,
 ) -> Vec<Trace> {
     // clear the local and injection queues
     local.clear();
-    injection.clear();
+
+    while let Some(task) = injection.pop() {
+        drop(task);
+    }
 
     // notify each task
     let mut tasks = vec![];

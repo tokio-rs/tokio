@@ -437,14 +437,11 @@ impl Handle {
             };
             let local = &mut core.tasks;
 
-            let mut injection = self.shared.queue.lock();
-            let injection = if let Some(injection) = injection.as_mut() {
-                injection
-            } else {
+            if self.shared.inject.is_closed() {
                 return;
-            };
+            }
 
-            traces = trace_current_thread(&self.shared.owned, local, injection)
+            traces = trace_current_thread(&self.shared.owned, local, &self.shared.inject)
                 .into_iter()
                 .map(dump::Task::new)
                 .collect();
