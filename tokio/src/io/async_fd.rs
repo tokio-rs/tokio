@@ -201,18 +201,13 @@ pub struct AsyncFdReadyMutGuard<'a, T: AsRawFd> {
     event: Option<ReadyEvent>,
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-const ALL_INTEREST: Interest = Interest::READABLE.add(Interest::WRITABLE);
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-const ALL_INTEREST: Interest = Interest::READABLE
-    .add(Interest::WRITABLE)
-    .add(Interest::PRIORITY);
-
 impl<T: AsRawFd> AsyncFd<T> {
     /// Creates an AsyncFd backed by (and taking ownership of) an object
     /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
     /// time of creation.
+    ///
+    /// Only configures the [`Interest::READABLE`] and [`Interest::WRITABLE`] interests. For more
+    /// control, use [`AsyncFd::with_interest`].
     ///
     /// This method must be called in the context of a tokio runtime.
     ///
@@ -226,11 +221,12 @@ impl<T: AsRawFd> AsyncFd<T> {
     where
         T: AsRawFd,
     {
-        Self::with_interest(inner, ALL_INTEREST)
+        Self::with_interest(inner, Interest::READABLE | Interest::WRITABLE)
     }
 
-    /// Creates new instance as `new` with additional ability to customize interest,
-    /// allowing to specify whether file descriptor will be polled for read, write or both.
+    /// Creates an AsyncFd backed by (and taking ownership of) an object
+    /// implementing [`AsRawFd`], with a specific [`Interest`]. The backing
+    /// file descriptor is cached at the time of creation.
     ///
     /// # Panics
     ///
