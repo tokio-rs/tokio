@@ -404,7 +404,7 @@ impl Command {
     ///
     /// This is useful for passing arguments to `cmd.exe /c`, which doesn't follow
     /// `CommandLineToArgvW` escaping rules.
-    /// 
+    ///
     /// **Note**: This is an [unstable API][unstable] but will be stabilised once
     /// tokio's MSRV is sufficiently new. See [the documentation on
     /// unstable features][unstable] for details about using unstable features.
@@ -1111,7 +1111,7 @@ impl Child {
             }
         }
     }
-    
+
     /// Attempts to force the child to exit, but does not wait for the request
     /// to take effect.
     ///
