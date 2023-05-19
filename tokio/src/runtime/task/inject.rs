@@ -52,6 +52,12 @@ impl<T: 'static> Inject<T> {
         self.len() == 0
     }
 
+    // Kind of annoying to have to include the cfg here
+    #[cfg(any(tokio_taskdump, all(feature = "rt-multi-thread", not(tokio_wasi))))]
+    pub(crate) fn is_closed(&self) -> bool {
+        self.pointers.lock().is_closed
+    }
+
     /// Closes the injection queue, returns `true` if the queue is open when the
     /// transition is made.
     pub(crate) fn close(&self) -> bool {
@@ -134,10 +140,6 @@ impl<T: 'static> Inject<T> {
 
 cfg_rt_multi_thread! {
     impl<T: 'static> Inject<T> {
-        pub(crate) fn is_closed(&self) -> bool {
-            self.pointers.lock().is_closed
-        }
-
         /// Pushes several values into the queue.
         #[inline]
         pub(crate) fn push_batch<I>(&self, mut iter: I)
