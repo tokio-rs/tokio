@@ -170,9 +170,9 @@ impl Ready {
     /// ```
     /// use tokio::io::Ready;
     ///
-    /// assert!(!Ready::EMPTY.is_priority());
-    /// assert!(!Ready::WRITABLE.is_priority());
-    /// assert!(Ready::PRIORITY.is_priority());
+    /// assert!(!Ready::EMPTY.is_priority_ready());
+    /// assert!(!Ready::WRITABLE.is_priority_ready());
+    /// assert!(Ready::PRIORITY.is_priority_ready());
     /// ```
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
