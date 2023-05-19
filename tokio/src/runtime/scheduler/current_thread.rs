@@ -66,7 +66,7 @@ struct Core {
 
 /// Scheduler state shared between threads.
 struct Shared {
-    /// Remote run queue. None if the `Runtime` has been dropped.
+    /// Remote run queue
     inject: Inject<Arc<Handle>>,
 
     /// Collection of all active tasks spawned onto this executor.
