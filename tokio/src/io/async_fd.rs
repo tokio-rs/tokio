@@ -1,4 +1,4 @@
-use crate::io::Interest;
+use crate::io::{Interest, Ready};
 use crate::runtime::io::{ReadyEvent, Registration};
 use crate::runtime::scheduler;
 
@@ -442,7 +442,82 @@ impl<T: AsRawFd> AsyncFd<T> {
         .into()
     }
 
-    async fn readiness(&self, interest: Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
+    /// Waits for any of the requested ready states, returning a
+    /// [`AsyncFdReadyGuard`] that must be dropped to resume
+    /// polling for the requested ready states.
+    ///
+    /// The function may complete without the file descriptor being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
+    /// [`Ready`] set, so you should always check the returned value and possibly
+    /// wait again if the requested states are not set.
+    ///
+    /// This method takes `&self`, so it is possible to call this method
+    /// concurrently with other methods on this struct. This method only
+    /// provides shared access to the inner IO resource when handling the
+    /// [`AsyncFdReadyGuard`].
+    ///
+    /// # Examples
+    ///
+    /// Concurrently read and write to a [`std::net::TcpStream`] on the same task without
+    /// splitting.
+    ///
+    /// ```no_run
+    /// use std::error::Error;
+    /// use std::io;
+    /// use std::io::{Read, Write};
+    /// use std::net::TcpStream;
+    /// use tokio::io::unix::AsyncFd;
+    /// use tokio::io::Interest;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let stream = TcpStream::connect("127.0.0.1:8080")?;
+    ///     stream.set_nonblocking(true)?;
+    ///     let stream = AsyncFd::new(stream)?;
+    ///
+    ///     loop {
+    ///         let mut guard = stream
+    ///             .ready(Interest::READABLE | Interest::WRITABLE)
+    ///             .await?;
+    ///
+    ///         if guard.ready().is_readable() {
+    ///             let mut data = vec![0; 1024];
+    ///             // Try to read data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.get_ref().read(&mut data) {
+    ///                 Ok(n) => {
+    ///                     println!("read {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     guard.clear_ready();
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///
+    ///         if guard.ready().is_writable() {
+    ///             // Try to write data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.get_ref().write(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("write {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     guard.clear_ready();
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    pub async fn ready(&self, interest: Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
         let event = self.registration.readiness(interest).await?;
 
         Ok(AsyncFdReadyGuard {
@@ -451,7 +526,13 @@ impl<T: AsRawFd> AsyncFd<T> {
         })
     }
 
-    async fn readiness_mut(
+    /// Waits for any of the requested ready states, returning a
+    /// [`AsyncFdReadyMutGuard`] that must be dropped to resume
+    /// polling for the requested ready states.
+    ///
+    /// This method takes `&mut self`, so it is possible to access the inner IO
+    /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    pub async fn ready_mut(
         &mut self,
         interest: Interest,
     ) -> io::Result<AsyncFdReadyMutGuard<'_, T>> {
@@ -473,7 +554,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// [`AsyncFdReadyGuard`].
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn readable<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
-        self.readiness(Interest::READABLE).await
+        self.ready(Interest::READABLE).await
     }
 
     /// Waits for the file descriptor to become readable, returning a
@@ -484,7 +565,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn readable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
-        self.readiness_mut(Interest::READABLE).await
+        self.ready_mut(Interest::READABLE).await
     }
 
     /// Waits for the file descriptor to become writable, returning a
@@ -497,7 +578,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// [`AsyncFdReadyGuard`].
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn writable<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
-        self.readiness(Interest::WRITABLE).await
+        self.ready(Interest::WRITABLE).await
     }
 
     /// Waits for the file descriptor to become writable, returning a
@@ -508,35 +589,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn writable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
-        self.readiness_mut(Interest::WRITABLE).await
-    }
-
-    /// Waits for the file descriptor to become priority ready, returning a
-    /// [`AsyncFdReadyGuard`] that must be dropped to resume priority-readiness
-    /// polling.
-    ///
-    /// This method takes `&self`, so it is possible to call this method
-    /// concurrently with other methods on this struct. This method only
-    /// provides shared access to the inner IO resource when handling the
-    /// [`AsyncFdReadyGuard`].
-    #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
-    pub async fn priority_ready<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
-        self.readiness(Interest::PRIORITY).await
-    }
-
-    /// Waits for the file descriptor to become priority ready, returning a
-    /// [`AsyncFdReadyMutGuard`] that must be dropped to resume priority-readiness
-    /// polling.
-    ///
-    /// This method takes `&mut self`, so it is possible to access the inner IO
-    /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
-    #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
-    pub async fn priority_ready_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
-        self.readiness_mut(Interest::PRIORITY).await
+        self.ready_mut(Interest::WRITABLE).await
     }
 
     /// Reads or writes from the file descriptor using a user-provided IO operation.
@@ -696,6 +749,20 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
         // no-op
     }
 
+    /// Get the [`Ready`] value associated with this guard.
+    ///
+    /// This method will return the empty readiness state if
+    /// [`AsyncFdReadyGuard::clear_ready`] has been called on
+    /// the guard.
+    ///
+    /// [`Ready`]: crate::io::Ready
+    pub fn ready(&self) -> Ready {
+        match &self.event {
+            Some(event) => event.ready,
+            None => Ready::EMPTY,
+        }
+    }
+
     /// Performs the provided IO operation.
     ///
     /// If `f` returns a [`WouldBlock`] error, the readiness state associated
@@ -804,6 +871,20 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// constraint on the [`AsyncFdReadyGuard`] type.
     pub fn retain_ready(&mut self) {
         // no-op
+    }
+
+    /// Get the [`Ready`] value associated with this guard.
+    ///
+    /// This method will return the empty readiness state if
+    /// [`AsyncFdReadyGuard::clear_ready`] has been called on
+    /// the guard.
+    ///
+    /// [`Ready`]: super::Ready
+    pub fn ready(&self) -> Ready {
+        match &self.event {
+            Some(event) => event.ready,
+            None => Ready::EMPTY,
+        }
     }
 
     /// Performs the provided IO operation.

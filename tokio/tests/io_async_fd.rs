@@ -620,7 +620,7 @@ async fn priority_event_on_oob_data() {
     // Sending out of band data should trigger priority event.
     send_oob_data(&stream, b"hello").unwrap();
 
-    let _ = client.priority_ready().await.unwrap();
+    let _ = client.ready(Interest::PRIORITY).await.unwrap();
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
