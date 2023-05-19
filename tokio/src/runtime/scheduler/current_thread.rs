@@ -217,6 +217,9 @@ impl CurrentThread {
                 drop(task);
             }
 
+            // Close the injection queue
+            handle.shared.inject.close();
+
             // Drain remote queue
             while let Some(task) = handle.shared.inject.pop() {
                 drop(task);
