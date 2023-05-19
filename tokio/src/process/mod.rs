@@ -1101,9 +1101,7 @@ impl Child {
         }
     }
 
-    #[cfg(windows)]
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(all(windows, tokio_unstable))))]
+    cfg_windows! {
         /// Extracts the raw handle of the process associated with this child while
         /// it is still running. Returns `None` if the child has exited.
         pub fn raw_handle(&self) -> Option<RawHandle> {
@@ -1112,8 +1110,8 @@ impl Child {
                 FusedChild::Done(_) => None,
             }
         }
-
-
+    }
+    
     /// Attempts to force the child to exit, but does not wait for the request
     /// to take effect.
     ///
