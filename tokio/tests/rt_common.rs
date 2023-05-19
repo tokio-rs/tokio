@@ -1319,6 +1319,7 @@ rt_test! {
     }
 
     #[test]
+    #[cfg(not(target_os="wasi"))]
     fn shutdown_concurrent_spawn() {
         const NUM_TASKS: usize = 10_000;
         for _ in 0..5 {
