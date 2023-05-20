@@ -301,6 +301,8 @@ impl<T> OnceCell<T> {
         F: FnOnce() -> Fut,
         Fut: Future<Output = T>,
     {
+        crate::trace::async_trace_leaf().await;
+
         if self.initialized() {
             // SAFETY: The OnceCell has been fully initialized.
             unsafe { self.get_unchecked() }
@@ -349,6 +351,8 @@ impl<T> OnceCell<T> {
         F: FnOnce() -> Fut,
         Fut: Future<Output = Result<T, E>>,
     {
+        crate::trace::async_trace_leaf().await;
+
         if self.initialized() {
             // SAFETY: The OnceCell has been fully initialized.
             unsafe { Ok(self.get_unchecked()) }

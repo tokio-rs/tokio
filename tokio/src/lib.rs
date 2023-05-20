@@ -579,6 +579,24 @@ mod trace {
             std::task::Poll::Ready(())
         }
     }
+
+    pub(crate) fn async_trace_leaf() -> impl Future<Output = ()> {
+        use std::pin::Pin;
+        use std::task::{Context, Poll};
+
+        struct Trace;
+
+        impl Future for Trace {
+            type Output = ();
+
+            #[inline(always)]
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+                trace_leaf()
+            }
+        }
+
+        Trace
+    }
 }
 
 mod util;

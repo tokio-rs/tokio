@@ -629,6 +629,8 @@ impl<T: ?Sized> Mutex<T> {
     }
 
     async fn acquire(&self) {
+        crate::trace::async_trace_leaf().await;
+
         self.s.acquire(1).await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and
             // we own it exclusively, which means that this can never happen.

@@ -885,6 +885,7 @@ impl Notified<'_> {
 
         let (notify, state, notify_waiters_calls, waiter) = self.project();
 
+        'outer_loop:
         loop {
             match *state {
                 Init => {
@@ -901,7 +902,7 @@ impl Notified<'_> {
                     if res.is_ok() {
                         // Acquired the notification
                         *state = Done;
-                        return Poll::Ready(());
+                        continue 'outer_loop;
                     }
 
                     // Clone the waker before locking, a waker clone can be
@@ -919,7 +920,7 @@ impl Notified<'_> {
                     // was created, then we are done
                     if get_num_notify_waiters_calls(curr) != *notify_waiters_calls {
                         *state = Done;
-                        return Poll::Ready(());
+                        continue 'outer_loop;
                     }
 
                     // Transition the state to WAITING.
@@ -955,7 +956,7 @@ impl Notified<'_> {
                                     Ok(_) => {
                                         // Acquired the notification
                                         *state = Done;
-                                        return Poll::Ready(());
+                                        continue 'outer_loop;
                                     }
                                     Err(actual) => {
                                         assert_eq!(get_state(actual), EMPTY);
@@ -990,6 +991,8 @@ impl Notified<'_> {
                     return Poll::Pending;
                 }
                 Waiting => {
+                    ready!(crate::trace::trace_leaf(cx));
+
                     if waiter.notification.load(Acquire).is_some() {
                         // Safety: waiter is already unlinked and will not be shared again,
                         // so we have an exclusive access to `waker`.
@@ -1078,7 +1081,7 @@ impl Notified<'_> {
                     drop(old_waker);
                 }
                 Done => {
-                    return Poll::Ready(());
+                    return crate::trace::trace_leaf(cx);
                 }
             }
         }
