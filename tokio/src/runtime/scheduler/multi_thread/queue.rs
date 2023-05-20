@@ -128,38 +128,21 @@ impl<T> Local<T> {
     }
 
     pub(crate) fn push_back(&mut self, task: task::Notified<T>) -> Result<(), task::Notified<T>> {
-        let tail = loop {
-            let head = self.inner.head.load(Acquire);
-            let (steal, _) = unpack(head);
+        let head = self.inner.head.load(Acquire);
+        let (steal, _) = unpack(head);
 
-            // safety: this is the **only** thread that updates this cell.
-            let tail = unsafe { self.inner.tail.unsync_load() };
+        // safety: this is the **only** thread that updates this cell.
+        let tail = unsafe { self.inner.tail.unsync_load() };
 
-            if tail.wrapping_sub(steal) < LOCAL_QUEUE_CAPACITY as UnsignedShort {
-                // There is capacity for the task
-                break tail;
-            } else {
-                return Err(task);
-            }
-        };
+        if tail.wrapping_sub(steal) < LOCAL_QUEUE_CAPACITY as UnsignedShort {
+            // Yes, this if condition is structured a bit weird (first block
+            // does nothing, second returns an error). It is this way to match
+            // `push_back_or_overflow`.
+        } else {
+            return Err(task);
+        }
 
-        // Map the position to a slot index.
-        let idx = tail as usize & MASK;
-
-        self.inner.buffer[idx].with_mut(|ptr| {
-            // Write the task to the slot
-            //
-            // Safety: There is only one producer and the above `if`
-            // condition ensures we don't touch a cell if there is a
-            // value, thus no consumer.
-            unsafe {
-                ptr::write((*ptr).as_mut_ptr(), task);
-            }
-        });
-
-        // Make the task available. Synchronizes with a load in
-        // `steal_into2`.
-        self.inner.tail.store(tail.wrapping_add(1), Release);
+        self.push_back_finish(task, tail);
         Ok(())
     }
 
@@ -198,6 +181,11 @@ impl<T> Local<T> {
             }
         };
 
+        self.push_back_finish(task, tail);
+    }
+
+    // Second half of `push_back`
+    fn push_back_finish(&self, task: task::Notified<T>, tail: UnsignedShort) {
         // Map the position to a slot index.
         let idx = tail as usize & MASK;
 
