@@ -1089,7 +1089,7 @@ impl Notified<'_> {
                         let mut ctx = Context::from_waker(waker);
                         ready!(crate::trace::trace_leaf(&mut ctx));
                     }
-                    return Poll::Pending;
+                    return Poll::Ready(());
                 }
             }
         }
