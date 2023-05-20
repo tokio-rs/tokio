@@ -584,6 +584,7 @@ mod trace {
         }
     }
 
+    #[cfg_attr(not(feature = "sync"), allow(dead_code))]
     pub(crate) fn async_trace_leaf() -> impl Future<Output = ()> {
         struct Trace;
 
