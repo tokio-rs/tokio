@@ -80,7 +80,7 @@ impl<'a> Builder<'a> {
     ///
     /// This method panics if called outside of a Tokio runtime.
     ///
-    /// See [`task::spawn`](crate::task::spawn) for
+    /// See [`task::spawn`](crate::task::spawn()) for
     /// more details.
     #[track_caller]
     pub fn spawn<Fut>(self, future: Fut) -> io::Result<JoinHandle<Fut::Output>>

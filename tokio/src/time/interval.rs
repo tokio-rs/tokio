@@ -387,7 +387,7 @@ impl Default for MissedTickBehavior {
 /// An `Interval` can be turned into a `Stream` with [`IntervalStream`].
 ///
 /// [`IntervalStream`]: https://docs.rs/tokio-stream/latest/tokio_stream/wrappers/struct.IntervalStream.html
-/// [`sleep`]: crate::time::sleep
+/// [`sleep`]: crate::time::sleep()
 #[derive(Debug)]
 pub struct Interval {
     /// Future that completes the next time the `Interval` yields a value.
