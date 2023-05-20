@@ -885,8 +885,7 @@ impl Notified<'_> {
 
         let (notify, state, notify_waiters_calls, waiter) = self.project();
 
-        'outer_loop:
-        loop {
+        'outer_loop: loop {
             match *state {
                 Init => {
                     let curr = notify.state.load(SeqCst);
@@ -991,7 +990,11 @@ impl Notified<'_> {
                     return Poll::Pending;
                 }
                 Waiting => {
-                    ready!(crate::trace::trace_leaf(cx));
+                    #[cfg(tokio_taskdump)]
+                    if let Some(waker) = waker {
+                        let mut ctx = Context::from_waker(waker);
+                        ready!(crate::trace::trace_leaf(&mut ctx));
+                    }
 
                     if waiter.notification.load(Acquire).is_some() {
                         // Safety: waiter is already unlinked and will not be shared again,
@@ -1081,7 +1084,12 @@ impl Notified<'_> {
                     drop(old_waker);
                 }
                 Done => {
-                    return crate::trace::trace_leaf(cx);
+                    #[cfg(tokio_taskdump)]
+                    if let Some(waker) = waker {
+                        let mut ctx = Context::from_waker(waker);
+                        ready!(crate::trace::trace_leaf(&mut ctx));
+                    }
+                    return Poll::Pending;
                 }
             }
         }

@@ -568,6 +568,10 @@ cfg_time! {
 }
 
 mod trace {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+
     cfg_taskdump! {
         pub(crate) use crate::runtime::task::trace::trace_leaf;
     }
@@ -581,9 +585,6 @@ mod trace {
     }
 
     pub(crate) fn async_trace_leaf() -> impl Future<Output = ()> {
-        use std::pin::Pin;
-        use std::task::{Context, Poll};
-
         struct Trace;
 
         impl Future for Trace {
@@ -591,7 +592,7 @@ mod trace {
 
             #[inline(always)]
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-                trace_leaf()
+                trace_leaf(cx)
             }
         }
 
