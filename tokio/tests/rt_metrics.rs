@@ -514,6 +514,13 @@ fn injection_queue_depth() {
     rt.spawn(async move { rx1.recv().unwrap() });
     rt.spawn(async move { rx2.recv().unwrap() });
 
+    // Spawn some more to make sure there are items
+    for _ in 0..10 {
+        rt.spawn(async {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+         });
+    }
+
     thread::spawn(move || {
         handle.spawn(async {});
     })
@@ -522,7 +529,7 @@ fn injection_queue_depth() {
 
     let n = metrics.injection_queue_depth();
     assert!(1 <= n, "{}", n);
-    assert!(3 >= n, "{}", n);
+    assert!(15 >= n, "{}", n);
 
     tx1.send(()).unwrap();
     tx2.send(()).unwrap();
