@@ -518,7 +518,7 @@ fn injection_queue_depth() {
     for _ in 0..10 {
         rt.spawn(async {
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-         });
+        });
     }
 
     thread::spawn(move || {
