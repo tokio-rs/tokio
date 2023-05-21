@@ -1,8 +1,8 @@
 use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
-use crate::loom::sync::{Arc, Mutex};
+use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
-use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::task::{self, Inject, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::{blocking, context, scheduler, Config};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
@@ -66,8 +66,8 @@ struct Core {
 
 /// Scheduler state shared between threads.
 struct Shared {
-    /// Remote run queue. None if the `Runtime` has been dropped.
-    queue: Mutex<Option<VecDeque<Notified>>>,
+    /// Remote run queue
+    inject: Inject<Arc<Handle>>,
 
     /// Collection of all active tasks spawned onto this executor.
     owned: OwnedTasks<Arc<Handle>>,
@@ -115,7 +115,7 @@ impl CurrentThread {
 
         let handle = Arc::new(Handle {
             shared: Shared {
-                queue: Mutex::new(Some(VecDeque::with_capacity(INITIAL_CAPACITY))),
+                inject: Inject::new(),
                 owned: OwnedTasks::new(),
                 woken: AtomicBool::new(false),
                 config,
@@ -217,15 +217,12 @@ impl CurrentThread {
                 drop(task);
             }
 
-            // Drain remote queue and set it to None
-            let remote_queue = handle.shared.queue.lock().take();
+            // Close the injection queue
+            handle.shared.inject.close();
 
-            // Using `Option::take` to replace the shared queue with `None`.
-            // We already shut down every task, so we just need to drop the task.
-            if let Some(remote_queue) = remote_queue {
-                for task in remote_queue {
-                    drop(task);
-                }
+            // Drain remote queue
+            while let Some(task) = handle.shared.inject.pop() {
+                drop(task);
             }
 
             assert!(handle.shared.owned.is_empty());
@@ -259,9 +256,12 @@ impl Core {
 
     fn next_task(&mut self, handle: &Handle) -> Option<Notified> {
         if self.tick % handle.shared.config.global_queue_interval == 0 {
-            handle.pop().or_else(|| self.next_local_task(handle))
+            handle
+                .next_remote_task()
+                .or_else(|| self.next_local_task(handle))
         } else {
-            self.next_local_task(handle).or_else(|| handle.pop())
+            self.next_local_task(handle)
+                .or_else(|| handle.next_remote_task())
         }
     }
 
@@ -440,14 +440,11 @@ impl Handle {
             };
             let local = &mut core.tasks;
 
-            let mut injection = self.shared.queue.lock();
-            let injection = if let Some(injection) = injection.as_mut() {
-                injection
-            } else {
+            if self.shared.inject.is_closed() {
                 return;
-            };
+            }
 
-            traces = trace_current_thread(&self.shared.owned, local, injection)
+            traces = trace_current_thread(&self.shared.owned, local, &self.shared.inject)
                 .into_iter()
                 .map(dump::Task::new)
                 .collect();
@@ -461,11 +458,8 @@ impl Handle {
         dump::Dump::new(traces)
     }
 
-    fn pop(&self) -> Option<Notified> {
-        match self.shared.queue.lock().as_mut() {
-            Some(queue) => queue.pop_front(),
-            None => None,
-        }
+    fn next_remote_task(&self) -> Option<Notified> {
+        self.shared.inject.pop()
     }
 
     fn waker_ref(me: &Arc<Self>) -> WakerRef<'_> {
@@ -488,14 +482,7 @@ cfg_metrics! {
         }
 
         pub(crate) fn injection_queue_depth(&self) -> usize {
-            // TODO: avoid having to lock. The multi-threaded injection queue
-            // could probably be used here.
-            self.shared
-                .queue
-                .lock()
-                .as_ref()
-                .map(|queue| queue.len())
-                .unwrap_or(0)
+            self.shared.inject.len()
         }
 
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
@@ -549,14 +536,9 @@ impl Schedule for Arc<Handle> {
                 // Track that a task was scheduled from **outside** of the runtime.
                 self.shared.scheduler_metrics.inc_remote_schedule_count();
 
-                // If the queue is None, then the runtime has shut down. We
-                // don't need to do anything with the notification in that case.
-                let mut guard = self.shared.queue.lock();
-                if let Some(queue) = guard.as_mut() {
-                    queue.push_back(task);
-                    drop(guard);
-                    self.driver.unpark();
-                }
+                // Schedule the task
+                self.shared.inject.push(task);
+                self.driver.unpark();
             }
         });
     }
