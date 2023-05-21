@@ -510,14 +510,17 @@ fn injection_queue_depth() {
     // First we need to block the runtime workers
     let (tx1, rx1) = std::sync::mpsc::channel();
     let (tx2, rx2) = std::sync::mpsc::channel();
+    let (tx3, rx3) = std::sync::mpsc::channel();
+    let rx3 = Arc::new(Mutex::new(rx3));
 
     rt.spawn(async move { rx1.recv().unwrap() });
     rt.spawn(async move { rx2.recv().unwrap() });
 
     // Spawn some more to make sure there are items
     for _ in 0..10 {
-        rt.spawn(async {
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let rx = rx3.clone();
+        rt.spawn(async move {
+            rx.lock().unwrap().recv().unwrap();
         });
     }
 
@@ -530,6 +533,10 @@ fn injection_queue_depth() {
     let n = metrics.injection_queue_depth();
     assert!(1 <= n, "{}", n);
     assert!(15 >= n, "{}", n);
+
+    for _ in 0..10 {
+        tx3.send(()).unwrap();
+    }
 
     tx1.send(()).unwrap();
     tx2.send(()).unwrap();
