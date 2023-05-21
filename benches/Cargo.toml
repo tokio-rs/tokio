@@ -41,6 +41,11 @@ path = "sync_watch.rs"
 harness = false
 
 [[bench]]
+name = "rt_current_thread"
+path = "rt_current_thread.rs"
+harness = false
+
+[[bench]]
 name = "rt_multi_threaded"
 path = "rt_multi_threaded.rs"
 harness = false

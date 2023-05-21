@@ -278,15 +278,11 @@ impl<T: Future, S: Schedule> Core<T, S> {
     }
 }
 
-cfg_rt_multi_thread! {
-    impl Header {
-        pub(super) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
-            self.queue_next.with_mut(|ptr| *ptr = next);
-        }
-    }
-}
-
 impl Header {
+    pub(super) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
+        self.queue_next.with_mut(|ptr| *ptr = next);
+    }
+
     // safety: The caller must guarantee exclusive access to this field, and
     // must ensure that the id is either 0 or the id of the OwnedTasks
     // containing this task.
