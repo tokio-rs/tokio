@@ -22,9 +22,9 @@ fn push_batch_and_pop() {
 
     inject.push_batch((0..10).map(|_| super::unowned(async {}).0));
 
-    assert_eq!(5, inject.pop_n(5).collect::<Vec<_>>().len());
-    assert_eq!(5, inject.pop_n(5).collect::<Vec<_>>().len());
-    assert_eq!(0, inject.pop_n(5).collect::<Vec<_>>().len());
+    assert_eq!(5, inject.pop_n(5).count());
+    assert_eq!(5, inject.pop_n(5).count());
+    assert_eq!(0, inject.pop_n(5).count());
 }
 
 #[test]
