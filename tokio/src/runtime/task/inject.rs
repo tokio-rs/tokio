@@ -261,7 +261,7 @@ impl<'a, T: 'static> ExactSizeIterator for Pop<'a, T> {
 
 impl<'a, T: 'static> Drop for Pop<'a, T> {
     fn drop(&mut self) {
-        while let Some(_) = self.next() {}
+        for _ in self.by_ref() {}
     }
 }
 
