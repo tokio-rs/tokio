@@ -131,14 +131,14 @@ impl<T: 'static> Inject<T> {
         // Lock the queue
         let p = self.pointers.lock();
 
-        let n = cmp::min(n, unsafe { self.len.unsync_load() });
-
-        // Decrement the count.
-        //
         // safety: All updates to the len atomic are guarded by the mutex. As
         // such, a non-atomic load followed by a store is safe.
-        self.len
-            .store(unsafe { self.len.unsync_load() } - n, Release);
+        let len = unsafe { self.len.unsync_load() };
+
+        let n = cmp::min(n, len);
+
+        // Decrement the count.
+        self.len.store(len - n, Release);
 
         Pop {
             len: n,

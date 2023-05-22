@@ -111,8 +111,8 @@ impl<T> Local<T> {
     }
 
     /// How many tasks can be pushed into the queue
-    pub(crate) fn capacity(&self) -> usize {
-        self.inner.capacity()
+    pub(crate) fn remaining_slots(&self) -> usize {
+        self.inner.remaining_slots()
     }
 
     pub(crate) fn max_capacity(&self) -> usize {
@@ -569,7 +569,7 @@ impl<T> Drop for Local<T> {
 }
 
 impl<T> Inner<T> {
-    fn capacity(&self) -> usize {
+    fn remaining_slots(&self) -> usize {
         let (steal, _) = unpack(self.head.load(Acquire));
         let tail = self.tail.load(Acquire);
 

@@ -68,7 +68,6 @@ use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
-use std::cmp;
 use std::time::Duration;
 
 /// A scheduler worker
@@ -622,17 +621,22 @@ impl Core {
                 return maybe_task;
             }
 
-            let cap = self.run_queue.capacity();
+            // Other threads can only **remove** tasks from the current worker's
+            // `run_queue`. So, we can be confident that by the time we call
+            // `run_queue.push_back` below, there will be *at least* `cap`
+            // available slots in the queue.
+            let cap = usize::min(
+                self.run_queue.remaining_slots(),
+                self.run_queue.max_capacity() / 2,
+            );
 
             // The worker is currently idle, pull a batch of work from the
             // injection queue. We don't want to pull *all* the work so other
             // workers can also get some.
-            let n = cmp::min(
+            let n = usize::min(
                 worker.inject().len() / worker.handle.shared.remotes.len() + 1,
                 cap,
             );
-
-            let n = cmp::min(n, self.run_queue.max_capacity() / 2);
 
             let mut tasks = worker.inject().pop_n(n);
 
