@@ -127,23 +127,48 @@ impl<T> Local<T> {
         !self.inner.is_empty()
     }
 
-    pub(crate) fn push_back(&mut self, task: task::Notified<T>) -> Result<(), task::Notified<T>> {
+    /// Panics if there are more tasks than available capacity
+    pub(crate) fn push_back(&mut self, tasks: impl ExactSizeIterator<Item = task::Notified<T>>) {
+        let len = tasks.len();
+        assert!(len <= LOCAL_QUEUE_CAPACITY);
+
+        if len == 0 {
+            // Nothing to do
+            return;
+        }
+
         let head = self.inner.head.load(Acquire);
         let (steal, _) = unpack(head);
 
         // safety: this is the **only** thread that updates this cell.
-        let tail = unsafe { self.inner.tail.unsync_load() };
+        let mut tail = unsafe { self.inner.tail.unsync_load() };
 
-        if tail.wrapping_sub(steal) < LOCAL_QUEUE_CAPACITY as UnsignedShort {
+        if tail.wrapping_sub(steal) <= (LOCAL_QUEUE_CAPACITY - len) as UnsignedShort {
             // Yes, this if condition is structured a bit weird (first block
             // does nothing, second returns an error). It is this way to match
             // `push_back_or_overflow`.
         } else {
-            return Err(task);
+            panic!()
         }
 
-        self.push_back_finish(task, tail);
-        Ok(())
+        for task in tasks {
+            let idx = tail as usize & MASK;
+
+            self.inner.buffer[idx].with_mut(|ptr| {
+                // Write the task to the slot
+                //
+                // Safety: There is only one producer and the above `if`
+                // condition ensures we don't touch a cell if there is a
+                // value, thus no consumer.
+                unsafe {
+                    ptr::write((*ptr).as_mut_ptr(), task);
+                }
+            });
+
+            tail = tail.wrapping_add(1);
+        }
+
+        self.inner.tail.store(tail, Release);
     }
 
     /// Pushes a task to the back of the local queue, skipping the LIFO slot.

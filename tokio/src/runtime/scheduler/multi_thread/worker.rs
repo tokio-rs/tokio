@@ -634,11 +634,15 @@ impl Core {
 
             let n = cmp::min(n, self.run_queue.max_capacity() / 2);
 
-            worker.inject().pop_n(n, |task| {
-                if self.run_queue.push_back(task).is_err() {
-                    panic!("[internal Tokio bug] pushing to local queue failed.");
-                }
-            })
+            let mut tasks = worker.inject().pop_n(n);
+
+            // Pop the first task to return immedietly
+            let ret = tasks.next();
+
+            // Push the rest of the on the run queue
+            self.run_queue.push_back(tasks);
+
+            ret
         }
     }
 

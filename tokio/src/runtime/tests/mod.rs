@@ -63,6 +63,7 @@ cfg_loom! {
 }
 
 cfg_not_loom! {
+    mod inject;
     mod queue;
 
     #[cfg(not(miri))]

@@ -1,7 +1,7 @@
 //! Inject queue used to send wakeups to a work-stealing scheduler
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::Mutex;
+use crate::loom::sync::{Mutex, MutexGuard};
 use crate::runtime::task;
 
 use std::marker::PhantomData;
@@ -30,6 +30,12 @@ struct Pointers {
 
     /// Linked-list tail.
     tail: Option<NonNull<task::Header>>,
+}
+
+pub(crate) struct Pop<'a, T: 'static> {
+    len: usize,
+    pointers: Option<MutexGuard<'a, Pointers>>,
+    _p: PhantomData<T>,
 }
 
 unsafe impl<T> Send for Inject<T> {}
@@ -107,28 +113,25 @@ impl<T: 'static> Inject<T> {
     }
 
     pub(crate) fn pop(&self) -> Option<task::Notified<T>> {
-        self.pop_n(1, |_| {})
+        self.pop_n(1).next()
     }
 
-    pub(crate) fn pop_n<F>(&self, n: usize, mut f: F) -> Option<task::Notified<T>>
-    where
-        F: FnMut(task::Notified<T>),
-    {
+    pub(crate) fn pop_n(&self, n: usize) -> Pop<'_, T> {
         use std::cmp;
 
         // Fast path, if len == 0, then there are no values
         if self.is_empty() {
-            return None;
+            return Pop {
+                len: 0,
+                pointers: None,
+                _p: PhantomData,
+            };
         }
 
         // Lock the queue
-        let mut p = self.pointers.lock();
+        let p = self.pointers.lock();
 
         let n = cmp::min(n, unsafe { self.len.unsync_load() });
-
-        if n == 0 {
-            return None;
-        }
 
         // Decrement the count.
         //
@@ -137,13 +140,11 @@ impl<T: 'static> Inject<T> {
         self.len
             .store(unsafe { self.len.unsync_load() } - n, Release);
 
-        let ret = p.pop().unwrap();
-
-        for _ in 1..n {
-            f(p.pop().unwrap());
+        Pop {
+            len: n,
+            pointers: Some(p),
+            _p: PhantomData,
         }
-
-        Some(ret)
     }
 }
 
@@ -221,6 +222,46 @@ impl<T: 'static> Drop for Inject<T> {
         if !std::thread::panicking() {
             assert!(self.pop().is_none(), "queue not empty");
         }
+    }
+}
+
+impl<'a, T: 'static> Iterator for Pop<'a, T> {
+    type Item = task::Notified<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.len == 0 {
+            return None;
+        }
+
+        // `pointers` is always `Some` when `len() > 0`
+        let pointers = self.pointers.as_mut().unwrap();
+        let ret = pointers.pop();
+
+        debug_assert!(ret.is_some());
+
+        self.len -= 1;
+
+        if self.len == 0 {
+            self.pointers = None;
+        }
+
+        ret
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+}
+
+impl<'a, T: 'static> ExactSizeIterator for Pop<'a, T> {
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl<'a, T: 'static> Drop for Pop<'a, T> {
+    fn drop(&mut self) {
+        while let Some(_) = self.next() {}
     }
 }
 

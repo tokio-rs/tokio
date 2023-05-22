@@ -27,7 +27,7 @@ fn metrics_batch() -> MetricsBatch {
 }
 
 #[test]
-fn fits_256() {
+fn fits_256_one_at_a_time() {
     let (_, mut local) = queue::local();
     let inject = Inject::new();
     let mut metrics = metrics_batch();
@@ -44,6 +44,44 @@ fn fits_256() {
     assert!(inject.pop().is_none());
 
     while local.pop().is_some() {}
+}
+
+#[test]
+fn fits_256_all_at_once() {
+    let (_, mut local) = queue::local();
+
+    let mut tasks = (0..256)
+        .map(|_| super::unowned(async {}).0)
+        .collect::<Vec<_>>();
+    local.push_back(tasks.drain(..));
+
+    let mut i = 0;
+    while local.pop().is_some() {
+        i += 1;
+    }
+
+    assert_eq!(i, 256);
+}
+
+#[test]
+fn fits_256_all_in_chunks() {
+    let (_, mut local) = queue::local();
+
+    let mut tasks = (0..256)
+        .map(|_| super::unowned(async {}).0)
+        .collect::<Vec<_>>();
+
+    local.push_back(tasks.drain(..10));
+    local.push_back(tasks.drain(..100));
+    local.push_back(tasks.drain(..46));
+    local.push_back(tasks.drain(..100));
+
+    let mut i = 0;
+    while local.pop().is_some() {
+        i += 1;
+    }
+
+    assert_eq!(i, 256);
 }
 
 #[test]
