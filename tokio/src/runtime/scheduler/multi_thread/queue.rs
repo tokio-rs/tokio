@@ -127,7 +127,12 @@ impl<T> Local<T> {
         !self.inner.is_empty()
     }
 
-    /// Panics if there are more tasks than available capacity
+    /// Pushes a batch of tasks to the back of the queue. All tasks must fit in
+    /// the local queue.
+    ///
+    /// # Panics
+    ///
+    /// The method panics if there is not enough capacity to fit in the queue.
     pub(crate) fn push_back(&mut self, tasks: impl ExactSizeIterator<Item = task::Notified<T>>) {
         let len = tasks.len();
         assert!(len <= LOCAL_QUEUE_CAPACITY);
@@ -171,7 +176,12 @@ impl<T> Local<T> {
         self.inner.tail.store(tail, Release);
     }
 
-    /// Pushes a task to the back of the local queue, skipping the LIFO slot.
+    /// Pushes a task to the back of the local queue, if there is not enough
+    /// capacity in the queue, this triggers the overflow operation.
+    ///
+    /// When the queue overflows, half of the curent contents of the queue is
+    /// moved to the given Injection queue. This frees up capacity for more
+    /// tasks to be pushed into the local queue.
     pub(crate) fn push_back_or_overflow(
         &mut self,
         mut task: task::Notified<T>,
