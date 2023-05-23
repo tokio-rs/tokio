@@ -85,8 +85,7 @@ impl Context {
     where
         F: FnOnce(&Cell<Option<NonNull<Frame>>>) -> R,
     {
-        Self::try_with_current(|context| f(&context.active_frame))
-            .expect(FAIL_NO_THREAD_LOCAL)
+        Self::try_with_current(|context| f(&context.active_frame)).expect(FAIL_NO_THREAD_LOCAL)
     }
 
     fn with_current_collector<F, R>(f: F) -> R
@@ -96,8 +95,7 @@ impl Context {
         // SAFETY: This call can only access the collector field, so it cannot
         // break the trace frame linked list.
         unsafe {
-            Self::try_with_current(|context| f(&context.collector))
-                .expect(FAIL_NO_THREAD_LOCAL)
+            Self::try_with_current(|context| f(&context.collector)).expect(FAIL_NO_THREAD_LOCAL)
         }
     }
 }
@@ -173,7 +171,8 @@ pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
             } else {
                 false
             }
-        }).unwrap_or(false)
+        })
+        .unwrap_or(false)
     };
 
     if did_trace {
