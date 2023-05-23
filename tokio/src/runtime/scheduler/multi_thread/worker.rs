@@ -90,8 +90,8 @@ struct Core {
     /// When a task is scheduled from a worker, it is stored in this slot. The
     /// worker will check this slot for a task **before** checking the run
     /// queue. This effectively results in the **last** scheduled task to be run
-    /// next (LIFO). This is an optimization for message passing patterns and
-    /// helps to reduce latency.
+    /// next (LIFO). This is an optimization for improving locality which
+    /// benefits message passing patterns and helps to reduce latency.
     lifo_slot: Option<Notified>,
 
     /// The worker-local run queue.
@@ -190,6 +190,8 @@ type Notified = task::Notified<Arc<Handle>>;
 
 // Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
+
+const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 
 pub(super) fn create(
     size: usize,
@@ -470,6 +472,7 @@ impl Context {
         // Run the task
         coop::budget(|| {
             task.run();
+            let mut lifo_polls = 0;
 
             // As long as there is budget remaining and a task exists in the
             // `lifo_slot`, then keep running.
@@ -493,6 +496,28 @@ impl Context {
                     Some(task) => task,
                     None => return Ok(core),
                 };
+
+                // In ping-ping style workloads where task A notifies task B,
+                // which notifies task A again, continuously prioritizing the
+                // LIFO slot can cause starvation as these two tasks will
+                // repeatedly schedule the other. Budget is consumed below,
+                // however, at the time of this comment, the scheduler allocates
+                // 128 units of budget for each chunk of work. This is quite
+                // high in situation where tasks do not perform many async
+                // operations, yet have meaningful poll times (even 5-10
+                // microsecond poll times can have outsized impact on the
+                // scheduler). To mitigate this, we limit the number of times
+                // the LIFO slot is prioritized.
+                if lifo_polls >= MAX_LIFO_POLLS_PER_TICK {
+                    core.run_queue.push_back_or_overflow(
+                        task,
+                        self.worker.inject(),
+                        &mut core.metrics,
+                    );
+                    return Ok(core);
+                }
+
+                lifo_polls += 1;
 
                 // Polling a task doesn't necessarily consume any budget, if it
                 // doesn't use any Tokio leaf futures. To prevent such tasks
