@@ -438,6 +438,8 @@ impl Context {
         self.reset_lifo_enabled(&mut core);
 
         while !core.is_shutdown {
+            self.assert_lifo_enabled_is_correct(&core);
+
             // Increment the tick
             core.tick();
 
@@ -561,6 +563,10 @@ impl Context {
         core.lifo_enabled = !self.worker.handle.shared.config.disable_lifo_slot;
     }
 
+    fn assert_lifo_enabled_is_correct(&self, core: &Core) {
+        debug_assert_eq!(core.lifo_enabled, !self.worker.handle.shared.config.disable_lifo_slot);
+    }
+
     fn maintenance(&self, mut core: Box<Core>) -> Box<Core> {
         if core.tick % self.worker.handle.shared.config.event_interval == 0 {
             super::counters::inc_num_maintenance();
@@ -614,6 +620,8 @@ impl Context {
     }
 
     fn park_timeout(&self, mut core: Box<Core>, duration: Option<Duration>) -> Box<Core> {
+        self.assert_lifo_enabled_is_correct(&core);
+
         // Take the parker out of core
         let mut park = core.park.take().expect("park missing");
 
