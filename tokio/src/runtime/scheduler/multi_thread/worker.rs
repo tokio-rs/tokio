@@ -564,7 +564,10 @@ impl Context {
     }
 
     fn assert_lifo_enabled_is_correct(&self, core: &Core) {
-        debug_assert_eq!(core.lifo_enabled, !self.worker.handle.shared.config.disable_lifo_slot);
+        debug_assert_eq!(
+            core.lifo_enabled,
+            !self.worker.handle.shared.config.disable_lifo_slot
+        );
     }
 
     fn maintenance(&self, mut core: Box<Core>) -> Box<Core> {
