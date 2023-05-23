@@ -94,6 +94,10 @@ struct Core {
     /// benefits message passing patterns and helps to reduce latency.
     lifo_slot: Option<Notified>,
 
+    /// When `true`, locally scheduled tasks go to the LIFO slot. When `false`,
+    /// they go to the back of the `run_queue`.
+    lifo_enabled: bool,
+
     /// The worker-local run queue.
     run_queue: queue::Local<Arc<Handle>>,
 
@@ -191,6 +195,10 @@ type Notified = task::Notified<Arc<Handle>>;
 // Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
 
+/// Value picked out of thin-air. Running the LIFO slot a handful of times
+/// seemms sufficient to benefit from locality. More than 3 times probably is
+/// overweighing. The value can be tuned in the future with data that shows
+/// improvements.
 const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 
 pub(super) fn create(
@@ -216,6 +224,7 @@ pub(super) fn create(
         cores.push(Box::new(Core {
             tick: 0,
             lifo_slot: None,
+            lifo_enabled: !config.disable_lifo_slot,
             run_queue,
             is_searching: false,
             is_shutdown: false,
@@ -494,32 +503,13 @@ impl Context {
                 // Check for a task in the LIFO slot
                 let task = match core.lifo_slot.take() {
                     Some(task) => task,
-                    None => return Ok(core),
+                    None => {
+                        self.reset_lifo_enabled(&mut core);
+                        return Ok(core);
+                    }
                 };
 
-                // In ping-ping style workloads where task A notifies task B,
-                // which notifies task A again, continuously prioritizing the
-                // LIFO slot can cause starvation as these two tasks will
-                // repeatedly schedule the other. To mitigate this, we limit the
-                // number of times the LIFO slot is prioritized.
-                if lifo_polls >= MAX_LIFO_POLLS_PER_TICK {
-                    core.run_queue.push_back_or_overflow(
-                        task,
-                        self.worker.inject(),
-                        &mut core.metrics,
-                    );
-                    return Ok(core);
-                }
-
-                lifo_polls += 1;
-
-                if coop::has_budget_remaining() {
-                    // Run the LIFO task, then loop
-                    core.metrics.start_poll();
-                    *self.core.borrow_mut() = Some(core);
-                    let task = self.worker.handle.shared.owned.assert_owner(task);
-                    task.run();
-                } else {
+                if !coop::has_budget_remaining() {
                     // Not enough budget left to run the LIFO task, push it to
                     // the back of the queue and return.
                     core.run_queue.push_back_or_overflow(
@@ -527,10 +517,37 @@ impl Context {
                         self.worker.inject(),
                         &mut core.metrics,
                     );
+                    // If we hit this point, the LIFO slot should be enabled.
+                    // There is no need to reset it.
+                    debug_assert!(core.lifo_enabled);
                     return Ok(core);
                 }
+
+                // Track that we are about to run a task from the LIFO slot.
+                lifo_polls += 1;
+
+                // Disable the LIFO slot if we reach our limit
+                //
+                // In ping-ping style workloads where task A notifies task B,
+                // which notifies task A again, continuously prioritizing the
+                // LIFO slot can cause starvation as these two tasks will
+                // repeatedly schedule the other. To mitigate this, we limit the
+                // number of times the LIFO slot is prioritized.
+                if lifo_polls >= MAX_LIFO_POLLS_PER_TICK {
+                    core.lifo_enabled = false;
+                }
+
+                // Run the LIFO task, then loop
+                core.metrics.start_poll();
+                *self.core.borrow_mut() = Some(core);
+                let task = self.worker.handle.shared.owned.assert_owner(task);
+                task.run();
             }
         })
+    }
+
+    fn reset_lifo_enabled(&self, core: &mut Core) {
+        core.lifo_enabled = !self.worker.handle.shared.config.disable_lifo_slot;
     }
 
     fn maintenance(&self, mut core: Box<Core>) -> Box<Core> {
@@ -853,7 +870,7 @@ impl Handle {
         // task must always be pushed to the back of the queue, enabling other
         // tasks to be executed. If **not** a yield, then there is more
         // flexibility and the task may go to the front of the queue.
-        let should_notify = if is_yield || self.shared.config.disable_lifo_slot {
+        let should_notify = if is_yield || !core.lifo_enabled {
             core.run_queue
                 .push_back_or_overflow(task, &self.shared.inject, &mut core.metrics);
             true
