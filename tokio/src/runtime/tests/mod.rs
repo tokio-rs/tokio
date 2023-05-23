@@ -62,10 +62,8 @@ cfg_loom! {
     mod loom_yield;
 
     // Make sure debug assertions are enabled
-    #[test]
-    fn ensure_debug_assertions_are_enabled() {
-        assert!(cfg!(debug_assertions));
-    }
+    #[cfg(not(debug_assertions))]
+    compiler_error!("these tests require debug assertions to be enabled");
 }
 
 cfg_not_loom! {
