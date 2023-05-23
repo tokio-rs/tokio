@@ -500,14 +500,8 @@ impl Context {
                 // In ping-ping style workloads where task A notifies task B,
                 // which notifies task A again, continuously prioritizing the
                 // LIFO slot can cause starvation as these two tasks will
-                // repeatedly schedule the other. Budget is consumed below,
-                // however, at the time of this comment, the scheduler allocates
-                // 128 units of budget for each chunk of work. This is quite
-                // high in situation where tasks do not perform many async
-                // operations, yet have meaningful poll times (even 5-10
-                // microsecond poll times can have outsized impact on the
-                // scheduler). To mitigate this, we limit the number of times
-                // the LIFO slot is prioritized.
+                // repeatedly schedule the other. To mitigate this, we limit the
+                // number of times the LIFO slot is prioritized.
                 if lifo_polls >= MAX_LIFO_POLLS_PER_TICK {
                     core.run_queue.push_back_or_overflow(
                         task,
@@ -518,12 +512,6 @@ impl Context {
                 }
 
                 lifo_polls += 1;
-
-                // Polling a task doesn't necessarily consume any budget, if it
-                // doesn't use any Tokio leaf futures. To prevent such tasks
-                // from using the lifo slot in an infinite loop, we consume an
-                // extra unit of budget between each iteration of the loop.
-                coop::consume_one();
 
                 if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
