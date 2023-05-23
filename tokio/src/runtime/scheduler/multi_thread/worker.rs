@@ -433,6 +433,10 @@ fn run(worker: Arc<Worker>) {
 
 impl Context {
     fn run(&self, mut core: Box<Core>) -> RunResult {
+        // Reset `lifo_enabled` here in case the core was previously stolen from
+        // a task that had the LIFO slot disabled.
+        self.reset_lifo_enabled(&mut core);
+
         while !core.is_shutdown {
             // Increment the tick
             core.tick();
@@ -490,7 +494,12 @@ impl Context {
                 // by another worker.
                 let mut core = match self.core.borrow_mut().take() {
                     Some(core) => core,
-                    None => return Err(()),
+                    None => {
+                        // In this case, we cannot call `reset_lifo_enabled()`
+                        // because the core was stolen. The stealer will handle
+                        // that at the top of `Context::run`
+                        return Err(());
+                    }
                 };
 
                 // If task poll times is enabled, measure the poll time. Note
