@@ -8,7 +8,7 @@ on:
 name: Loom
 
 env:
-  RUSTFLAGS: -Dwarnings
+  RUSTFLAGS: -Dwarnings -C debug-assertions
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
   rust_stable: stable

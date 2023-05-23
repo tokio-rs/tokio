@@ -60,6 +60,12 @@ cfg_loom! {
     mod loom_shutdown_join;
     mod loom_join_set;
     mod loom_yield;
+
+    // Make sure debug assertions are enabled
+    #[test]
+    fn ensure_debug_assertions_are_enabled() {
+        assert!(cfg!(debug_assertions));
+    }
 }
 
 cfg_not_loom! {
