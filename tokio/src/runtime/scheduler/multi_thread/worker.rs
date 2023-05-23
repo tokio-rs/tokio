@@ -480,6 +480,8 @@ impl Context {
         // another idle worker to try to steal work.
         core.transition_from_searching(&self.worker);
 
+        self.assert_lifo_enabled_is_correct(&core);
+
         // Make the core available to the runtime context
         core.metrics.start_poll();
         *self.core.borrow_mut() = Some(core);
