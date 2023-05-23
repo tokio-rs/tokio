@@ -1317,4 +1317,39 @@ rt_test! {
             }
         });
     }
+
+    #[test]
+    #[cfg(not(target_os="wasi"))]
+    fn shutdown_concurrent_spawn() {
+        const NUM_TASKS: usize = 10_000;
+        for _ in 0..5 {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let rt = rt();
+
+            let mut txs = vec![];
+
+            for _ in 0..NUM_TASKS {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                txs.push(tx);
+                rt.spawn(async move {
+                    rx.await.unwrap();
+                });
+            }
+
+            // Prime the tasks
+            rt.block_on(async { tokio::task::yield_now().await });
+
+            let th = std::thread::spawn(move || {
+                tx.send(()).unwrap();
+                for tx in txs.drain(..) {
+                    let _ = tx.send(());
+                }
+            });
+
+            rx.recv().unwrap();
+            drop(rt);
+
+            th.join().unwrap();
+        }
+    }
 }

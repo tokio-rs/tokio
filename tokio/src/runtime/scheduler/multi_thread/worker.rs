@@ -509,8 +509,11 @@ impl Context {
                 } else {
                     // Not enough budget left to run the LIFO task, push it to
                     // the back of the queue and return.
-                    core.run_queue
-                        .push_back(task, self.worker.inject(), &mut core.metrics);
+                    core.run_queue.push_back_or_overflow(
+                        task,
+                        self.worker.inject(),
+                        &mut core.metrics,
+                    );
                     return Ok(core);
                 }
             }
@@ -612,7 +615,38 @@ impl Core {
         if self.tick % worker.handle.shared.config.global_queue_interval == 0 {
             worker.inject().pop().or_else(|| self.next_local_task())
         } else {
-            self.next_local_task().or_else(|| worker.inject().pop())
+            let maybe_task = self.next_local_task();
+
+            if maybe_task.is_some() {
+                return maybe_task;
+            }
+
+            // Other threads can only **remove** tasks from the current worker's
+            // `run_queue`. So, we can be confident that by the time we call
+            // `run_queue.push_back` below, there will be *at least* `cap`
+            // available slots in the queue.
+            let cap = usize::min(
+                self.run_queue.remaining_slots(),
+                self.run_queue.max_capacity() / 2,
+            );
+
+            // The worker is currently idle, pull a batch of work from the
+            // injection queue. We don't want to pull *all* the work so other
+            // workers can also get some.
+            let n = usize::min(
+                worker.inject().len() / worker.handle.shared.remotes.len() + 1,
+                cap,
+            );
+
+            let mut tasks = worker.inject().pop_n(n);
+
+            // Pop the first task to return immedietly
+            let ret = tasks.next();
+
+            // Push the rest of the on the run queue
+            self.run_queue.push_back(tasks);
+
+            ret
         }
     }
 
@@ -808,7 +842,7 @@ impl Handle {
         // flexibility and the task may go to the front of the queue.
         let should_notify = if is_yield || self.shared.config.disable_lifo_slot {
             core.run_queue
-                .push_back(task, &self.shared.inject, &mut core.metrics);
+                .push_back_or_overflow(task, &self.shared.inject, &mut core.metrics);
             true
         } else {
             // Push to the LIFO slot
@@ -817,7 +851,7 @@ impl Handle {
 
             if let Some(prev) = prev {
                 core.run_queue
-                    .push_back(prev, &self.shared.inject, &mut core.metrics);
+                    .push_back_or_overflow(prev, &self.shared.inject, &mut core.metrics);
             }
 
             core.lifo_slot = Some(task);

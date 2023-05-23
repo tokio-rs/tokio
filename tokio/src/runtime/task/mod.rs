@@ -182,10 +182,8 @@ mod id;
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 pub use id::{id, try_id, Id};
 
-cfg_rt_multi_thread! {
-    mod inject;
-    pub(super) use self::inject::Inject;
-}
+mod inject;
+pub(super) use self::inject::Inject;
 
 #[cfg(feature = "rt")]
 mod abort;
@@ -370,25 +368,23 @@ impl<S: 'static> Notified<S> {
     }
 }
 
-cfg_rt_multi_thread! {
-    impl<S: 'static> Notified<S> {
-        unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
-            Notified(Task::from_raw(ptr))
-        }
+impl<S: 'static> Notified<S> {
+    unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
+        Notified(Task::from_raw(ptr))
     }
+}
 
-    impl<S: 'static> Task<S> {
-        fn into_raw(self) -> NonNull<Header> {
-            let ret = self.raw.header_ptr();
-            mem::forget(self);
-            ret
-        }
+impl<S: 'static> Task<S> {
+    fn into_raw(self) -> NonNull<Header> {
+        let ret = self.raw.header_ptr();
+        mem::forget(self);
+        ret
     }
+}
 
-    impl<S: 'static> Notified<S> {
-        fn into_raw(self) -> NonNull<Header> {
-            self.0.into_raw()
-        }
+impl<S: 'static> Notified<S> {
+    fn into_raw(self) -> NonNull<Header> {
+        self.0.into_raw()
     }
 }
 
