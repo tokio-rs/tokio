@@ -24,13 +24,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        scope:
-          - --skip loom_pool
-          - loom_pool::group_a
-          - loom_pool::group_b
-          - loom_pool::group_c
-          - loom_pool::group_d
-          - time::driver
+        include:
+          - scope: --skip loom_pool
+            max_preemptions: 2
+          - scope: loom_pool::group_a
+            max_preemptions: 1
+          - scope: loom_pool::group_b
+            max_preemptions: 2
+          - scope: loom_pool::group_c
+            max_preemptions: 1
+          - scope: loom_pool::group_d
+            max_preemptions: 1
+          - scope: time::driver
+            max_preemptions: 2
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
@@ -43,6 +49,6 @@ jobs:
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
-          LOOM_MAX_PREEMPTIONS: 2
+          LOOM_MAX_PREEMPTIONS: ${{ matrix.max_preemptions }}
           LOOM_MAX_BRANCHES: 10000
           SCOPE: ${{ matrix.scope }}

@@ -27,14 +27,14 @@ fn metrics_batch() -> MetricsBatch {
 }
 
 #[test]
-fn fits_256() {
+fn fits_256_one_at_a_time() {
     let (_, mut local) = queue::local();
     let inject = Inject::new();
     let mut metrics = metrics_batch();
 
     for _ in 0..256 {
         let (task, _) = super::unowned(async {});
-        local.push_back(task, &inject, &mut metrics);
+        local.push_back_or_overflow(task, &inject, &mut metrics);
     }
 
     cfg_metrics! {
@@ -47,6 +47,44 @@ fn fits_256() {
 }
 
 #[test]
+fn fits_256_all_at_once() {
+    let (_, mut local) = queue::local();
+
+    let mut tasks = (0..256)
+        .map(|_| super::unowned(async {}).0)
+        .collect::<Vec<_>>();
+    local.push_back(tasks.drain(..));
+
+    let mut i = 0;
+    while local.pop().is_some() {
+        i += 1;
+    }
+
+    assert_eq!(i, 256);
+}
+
+#[test]
+fn fits_256_all_in_chunks() {
+    let (_, mut local) = queue::local();
+
+    let mut tasks = (0..256)
+        .map(|_| super::unowned(async {}).0)
+        .collect::<Vec<_>>();
+
+    local.push_back(tasks.drain(..10));
+    local.push_back(tasks.drain(..100));
+    local.push_back(tasks.drain(..46));
+    local.push_back(tasks.drain(..100));
+
+    let mut i = 0;
+    while local.pop().is_some() {
+        i += 1;
+    }
+
+    assert_eq!(i, 256);
+}
+
+#[test]
 fn overflow() {
     let (_, mut local) = queue::local();
     let inject = Inject::new();
@@ -54,7 +92,7 @@ fn overflow() {
 
     for _ in 0..257 {
         let (task, _) = super::unowned(async {});
-        local.push_back(task, &inject, &mut metrics);
+        local.push_back_or_overflow(task, &inject, &mut metrics);
     }
 
     cfg_metrics! {
@@ -84,7 +122,7 @@ fn steal_batch() {
 
     for _ in 0..4 {
         let (task, _) = super::unowned(async {});
-        local1.push_back(task, &inject, &mut metrics);
+        local1.push_back_or_overflow(task, &inject, &mut metrics);
     }
 
     assert!(steal1.steal_into(&mut local2, &mut metrics).is_some());
@@ -157,7 +195,7 @@ fn stress1() {
         for _ in 0..NUM_LOCAL {
             for _ in 0..NUM_PUSH {
                 let (task, _) = super::unowned(async {});
-                local.push_back(task, &inject, &mut metrics);
+                local.push_back_or_overflow(task, &inject, &mut metrics);
             }
 
             for _ in 0..NUM_POP {
@@ -215,7 +253,7 @@ fn stress2() {
 
         for i in 0..NUM_TASKS {
             let (task, _) = super::unowned(async {});
-            local.push_back(task, &inject, &mut metrics);
+            local.push_back_or_overflow(task, &inject, &mut metrics);
 
             if i % 128 == 0 && local.pop().is_some() {
                 num_pop += 1;
