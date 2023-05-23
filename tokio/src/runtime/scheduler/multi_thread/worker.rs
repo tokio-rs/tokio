@@ -525,6 +525,7 @@ impl Context {
 
                 // Track that we are about to run a task from the LIFO slot.
                 lifo_polls += 1;
+                super::counters::inc_lifo_schedules();
 
                 // Disable the LIFO slot if we reach our limit
                 //
@@ -535,6 +536,7 @@ impl Context {
                 // number of times the LIFO slot is prioritized.
                 if lifo_polls >= MAX_LIFO_POLLS_PER_TICK {
                     core.lifo_enabled = false;
+                    super::counters::inc_lifo_capped();
                 }
 
                 // Run the LIFO task, then loop
