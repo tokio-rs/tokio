@@ -784,13 +784,17 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// block. For example when a read blocks when using a combined interest,
     /// only clear `Ready::READABLE`.
     pub fn clear_ready_exact(&mut self, ready: Ready) {
-        if let Some(event) = &mut self.event {
+        if let Some(mut event) = self.event.take() {
             self.async_fd
                 .registration
                 .clear_readiness(event.with_ready(ready));
 
             // the event is no longer ready for the readiness that was just cleared
             event.ready = event.ready - ready;
+
+            if !event.ready.is_empty() {
+                self.event = Some(event);
+            }
         }
     }
 
@@ -933,13 +937,17 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// block. For example when a read blocks when using a combined interest,
     /// only clear `Ready::READABLE`.
     pub fn clear_ready_exact(&mut self, ready: Ready) {
-        if let Some(event) = &mut self.event {
+        if let Some(mut event) = self.event.take() {
             self.async_fd
                 .registration
                 .clear_readiness(event.with_ready(ready));
 
             // the event is no longer ready for the readiness that was just cleared
             event.ready = event.ready - ready;
+
+            if !event.ready.is_empty() {
+                self.event = Some(event);
+            }
         }
     }
 
