@@ -59,10 +59,12 @@
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::context;
-use crate::runtime::scheduler::multi_thread::{queue, Counters, Handle, Idle, Parker, Unparker};
+use crate::runtime::scheduler::multi_thread::{
+    queue, Counters, Handle, Idle, Parker, Stats, Unparker,
+};
 use crate::runtime::task::{Inject, OwnedTasks};
 use crate::runtime::{
-    blocking, coop, driver, scheduler, task, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics,
+    blocking, coop, driver, scheduler, task, Config, SchedulerMetrics, WorkerMetrics,
 };
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
@@ -114,8 +116,11 @@ struct Core {
     /// borrow checker happy.
     park: Option<Parker>,
 
-    /// Batching metrics so they can be submitted to RuntimeMetrics.
-    metrics: MetricsBatch,
+    /// Per-worker runtime stats
+    stats: Stats,
+
+    /// How often to check the global queue
+    global_queue_interval: u32,
 
     /// Fast random number generator.
     rand: FastRand,
@@ -220,6 +225,7 @@ pub(super) fn create(
         let park = park.clone();
         let unpark = park.unpark();
         let metrics = WorkerMetrics::from_config(&config);
+        let stats = Stats::new(&metrics);
 
         cores.push(Box::new(Core {
             tick: 0,
@@ -229,7 +235,8 @@ pub(super) fn create(
             is_searching: false,
             is_shutdown: false,
             park: Some(park),
-            metrics: MetricsBatch::new(&metrics),
+            global_queue_interval: stats.tuned_global_queue_interval(&config),
+            stats,
             rand: FastRand::new(config.seed_generator.next_seed()),
         }));
 
@@ -437,6 +444,10 @@ impl Context {
         // a task that had the LIFO slot disabled.
         self.reset_lifo_enabled(&mut core);
 
+        // Start as "processing" tasks as polling tasks from the local queue
+        // will be one of the first things we do.
+        core.stats.start_processing_scheduled_tasks();
+
         while !core.is_shutdown {
             self.assert_lifo_enabled_is_correct(&core);
 
@@ -452,9 +463,14 @@ impl Context {
                 continue;
             }
 
+            // We consumed all work in the queues and will start searching for work.
+            core.stats.end_processing_scheduled_tasks();
+
             // There is no more **local** work to process, try to steal work
             // from other workers.
             if let Some(task) = core.steal_work(&self.worker) {
+                // Found work, switch back to processing
+                core.stats.start_processing_scheduled_tasks();
                 core = self.run_task(task, core)?;
             } else {
                 // Wait for work
@@ -483,7 +499,7 @@ impl Context {
         self.assert_lifo_enabled_is_correct(&core);
 
         // Make the core available to the runtime context
-        core.metrics.start_poll();
+        core.stats.start_poll();
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
@@ -506,29 +522,25 @@ impl Context {
                     }
                 };
 
-                // If task poll times is enabled, measure the poll time. Note
-                // that, if the `core` is stolen, this means `block_in_place`
-                // was called, turning the poll into a "blocking op". In this
-                // case, we don't want to measure the poll time as it doesn't
-                // really count as an async poll anymore.
-                core.metrics.end_poll();
-
                 // Check for a task in the LIFO slot
                 let task = match core.lifo_slot.take() {
                     Some(task) => task,
                     None => {
                         self.reset_lifo_enabled(&mut core);
+                        core.stats.end_poll();
                         return Ok(core);
                     }
                 };
 
                 if !coop::has_budget_remaining() {
+                    core.stats.end_poll();
+
                     // Not enough budget left to run the LIFO task, push it to
                     // the back of the queue and return.
                     core.run_queue.push_back_or_overflow(
                         task,
                         self.worker.inject(),
-                        &mut core.metrics,
+                        &mut core.stats,
                     );
                     // If we hit this point, the LIFO slot should be enabled.
                     // There is no need to reset it.
@@ -553,7 +565,6 @@ impl Context {
                 }
 
                 // Run the LIFO task, then loop
-                core.metrics.start_poll();
                 *self.core.borrow_mut() = Some(core);
                 let task = self.worker.handle.shared.owned.assert_owner(task);
                 task.run();
@@ -576,12 +587,16 @@ impl Context {
         if core.tick % self.worker.handle.shared.config.event_interval == 0 {
             super::counters::inc_num_maintenance();
 
+            core.stats.end_processing_scheduled_tasks();
+
             // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
             // to run without actually putting the thread to sleep.
             core = self.park_timeout(core, Some(Duration::from_millis(0)));
 
             // Run regularly scheduled maintenance
             core.maintenance(&self.worker);
+
+            core.stats.start_processing_scheduled_tasks();
         }
 
         core
@@ -605,9 +620,8 @@ impl Context {
 
         if core.transition_to_parked(&self.worker) {
             while !core.is_shutdown {
-                core.metrics.about_to_park();
+                core.stats.about_to_park();
                 core = self.park_timeout(core, None);
-                core.metrics.returned_from_park();
 
                 // Run regularly scheduled maintenance
                 core.maintenance(&self.worker);
@@ -666,7 +680,10 @@ impl Core {
 
     /// Return the next notified task available to this worker.
     fn next_task(&mut self, worker: &Worker) -> Option<Notified> {
-        if self.tick % worker.handle.shared.config.global_queue_interval == 0 {
+        if self.tick % self.global_queue_interval == 0 {
+            // Update the global queue interval, if needed
+            self.tune_global_queue_interval(worker);
+
             worker.inject().pop().or_else(|| self.next_local_task())
         } else {
             let maybe_task = self.next_local_task();
@@ -733,7 +750,7 @@ impl Core {
             let target = &worker.handle.shared.remotes[i];
             if let Some(task) = target
                 .steal
-                .steal_into(&mut self.run_queue, &mut self.metrics)
+                .steal_into(&mut self.run_queue, &mut self.stats)
             {
                 return Some(task);
             }
@@ -813,7 +830,7 @@ impl Core {
 
     /// Runs maintenance work such as checking the pool's state.
     fn maintenance(&mut self, worker: &Worker) {
-        self.metrics
+        self.stats
             .submit(&worker.handle.shared.worker_metrics[worker.index]);
 
         if !self.is_shutdown {
@@ -828,7 +845,7 @@ impl Core {
         // Signal to all tasks to shut down.
         worker.handle.shared.owned.close_and_shutdown_all();
 
-        self.metrics
+        self.stats
             .submit(&worker.handle.shared.worker_metrics[worker.index]);
     }
 
@@ -841,6 +858,17 @@ impl Core {
         while self.next_local_task().is_some() {}
 
         park.shutdown(&handle.driver);
+    }
+
+    fn tune_global_queue_interval(&mut self, worker: &Worker) {
+        let next = self
+            .stats
+            .tuned_global_queue_interval(&worker.handle.shared.config);
+
+        // Smooth out jitter
+        if self.global_queue_interval.abs_diff(next) > 2 {
+            self.global_queue_interval = next;
+        }
     }
 }
 
@@ -888,7 +916,7 @@ impl Handle {
     }
 
     fn schedule_local(&self, core: &mut Core, task: Notified, is_yield: bool) {
-        core.metrics.inc_local_schedule_count();
+        core.stats.inc_local_schedule_count();
 
         // Spawning from the worker thread. If scheduling a "yield" then the
         // task must always be pushed to the back of the queue, enabling other
@@ -896,7 +924,7 @@ impl Handle {
         // flexibility and the task may go to the front of the queue.
         let should_notify = if is_yield || !core.lifo_enabled {
             core.run_queue
-                .push_back_or_overflow(task, &self.shared.inject, &mut core.metrics);
+                .push_back_or_overflow(task, &self.shared.inject, &mut core.stats);
             true
         } else {
             // Push to the LIFO slot
@@ -905,7 +933,7 @@ impl Handle {
 
             if let Some(prev) = prev {
                 core.run_queue
-                    .push_back_or_overflow(prev, &self.shared.inject, &mut core.metrics);
+                    .push_back_or_overflow(prev, &self.shared.inject, &mut core.stats);
             }
 
             core.lifo_slot = Some(task);
