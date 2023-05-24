@@ -641,7 +641,7 @@ fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
 }
 
 #[tokio::test]
-async fn clear_ready_exact_clears_ready() {
+async fn clear_ready_matching_clears_ready() {
     use tokio::io::{Interest, Ready};
 
     let (a, mut b) = socketpair();
@@ -656,15 +656,15 @@ async fn clear_ready_exact_clears_ready() {
 
     assert_eq!(guard.ready(), Ready::READABLE | Ready::WRITABLE);
 
-    guard.clear_ready_exact(Ready::READABLE);
+    guard.clear_ready_matching(Ready::READABLE);
     assert_eq!(guard.ready(), Ready::WRITABLE);
 
-    guard.clear_ready_exact(Ready::WRITABLE);
+    guard.clear_ready_matching(Ready::WRITABLE);
     assert_eq!(guard.ready(), Ready::EMPTY);
 }
 
 #[tokio::test]
-async fn clear_ready_exact_clears_ready_mut() {
+async fn clear_ready_matching_clears_ready_mut() {
     use tokio::io::{Interest, Ready};
 
     let (a, mut b) = socketpair();
@@ -679,9 +679,9 @@ async fn clear_ready_exact_clears_ready_mut() {
 
     assert_eq!(guard.ready(), Ready::READABLE | Ready::WRITABLE);
 
-    guard.clear_ready_exact(Ready::READABLE);
+    guard.clear_ready_matching(Ready::READABLE);
     assert_eq!(guard.ready(), Ready::WRITABLE);
 
-    guard.clear_ready_exact(Ready::WRITABLE);
+    guard.clear_ready_matching(Ready::WRITABLE);
     assert_eq!(guard.ready(), Ready::EMPTY);
 }

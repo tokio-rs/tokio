@@ -456,8 +456,8 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// When a combined interest is used, it is important to clear only the readiness
     /// that is actually observed to block. For instance when the combined
     /// interest `Interest::READABLE | Interest::WRITABLE` is used, and a read blocks, only
-    /// read readiness should be cleared using the [`AsyncFdReadyGuard::clear_ready_exact`] method:
-    /// `guard.clear_ready_exact(Ready::READABLE)`.
+    /// read readiness should be cleared using the [`AsyncFdReadyGuard::clear_ready_matching`] method:
+    /// `guard.clear_ready_matching(Ready::READABLE)`.
     /// Also clearing the write readiness in this case would be incorrect. The [`AsyncFdReadyGuard::clear_ready`]
     /// method clears all readiness flags.
     ///
@@ -501,7 +501,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                     // a read has blocked, but a write might still succeed.
     ///                     // clear only the read readiness.
-    ///                     guard.clear_ready_exact(Ready::READABLE);
+    ///                     guard.clear_ready_matching(Ready::READABLE);
     ///                     continue;
     ///                 }
     ///                 Err(e) => {
@@ -520,7 +520,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
     ///                     // a write has blocked, but a read might still succeed.
     ///                     // clear only the write readiness.
-    ///                     guard.clear_ready_exact(Ready::WRITABLE);
+    ///                     guard.clear_ready_matching(Ready::WRITABLE);
     ///                     continue;
     ///                 }
     ///                 Err(e) => {
@@ -554,8 +554,8 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// When a combined interest is used, it is important to clear only the readiness
     /// that is actually observed to block. For instance when the combined
     /// interest `Interest::READABLE | Interest::WRITABLE` is used, and a read blocks, only
-    /// read readiness should be cleared using the [`AsyncFdReadyMutGuard::clear_ready_exact`] method:
-    /// `guard.clear_ready_exact(Ready::READABLE)`.
+    /// read readiness should be cleared using the [`AsyncFdReadyMutGuard::clear_ready_matching`] method:
+    /// `guard.clear_ready_matching(Ready::READABLE)`.
     /// Also clearing the write readiness in this case would be incorrect.
     /// The [`AsyncFdReadyMutGuard::clear_ready`] method clears all readiness flags.
     ///
@@ -783,7 +783,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// when a read is observed to block. Only clear the specific readiness that is observed to
     /// block. For example when a read blocks when using a combined interest,
     /// only clear `Ready::READABLE`.
-    pub fn clear_ready_exact(&mut self, ready: Ready) {
+    pub fn clear_ready_matching(&mut self, ready: Ready) {
         if let Some(mut event) = self.event.take() {
             self.async_fd
                 .registration
@@ -936,7 +936,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// when a read is observed to block. Only clear the specific readiness that is observed to
     /// block. For example when a read blocks when using a combined interest,
     /// only clear `Ready::READABLE`.
-    pub fn clear_ready_exact(&mut self, ready: Ready) {
+    pub fn clear_ready_matching(&mut self, ready: Ready) {
         if let Some(mut event) = self.event.take() {
             self.async_fd
                 .registration
