@@ -282,25 +282,16 @@ impl ops::Sub<Ready> for Ready {
 
 impl fmt::Debug for Ready {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        {
-            fmt.debug_struct("Ready")
-                .field("is_readable", &self.is_readable())
-                .field("is_writable", &self.is_writable())
-                .field("is_read_closed", &self.is_read_closed())
-                .field("is_write_closed", &self.is_write_closed())
-                .field("is_priority", &self.is_priority())
-                .finish()
-        }
+        let mut fmt = fmt.debug_struct("Ready");
 
-        #[cfg(not(any(target_os = "linux", target_os = "android")))]
-        {
-            fmt.debug_struct("Ready")
-                .field("is_readable", &self.is_readable())
-                .field("is_writable", &self.is_writable())
-                .field("is_read_closed", &self.is_read_closed())
-                .field("is_write_closed", &self.is_write_closed())
-                .finish()
-        }
+        fmt.field("is_readable", &self.is_readable())
+            .field("is_writable", &self.is_writable())
+            .field("is_read_closed", &self.is_read_closed())
+            .field("is_write_closed", &self.is_write_closed());
+
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        fmt.field("is_priority", &self.is_priority());
+
+        fmt.finish()
     }
 }
