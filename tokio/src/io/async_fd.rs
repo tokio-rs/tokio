@@ -452,6 +452,15 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// [`Ready`] set, so you should always check the returned value and possibly
     /// wait again if the requested states are not set.
     ///
+    /// When an IO operation does return `io::ErrorKind::WouldBlock`, the readiness must be cleared.
+    /// When a combined interest is used, it is important to clear only the readiness
+    /// that is actually observed to block. For instance when the combined
+    /// interest `Interest::READABLE | Interest::WRITABLE` is used, and a read blocks, only
+    /// read readiness should be cleared using the [`AsyncFdReadyGuard::clear_ready_exact`] method:
+    /// `guard.clear_ready_exact(Ready::READABLE)`.
+    /// Also clearing the write readiness in this case would be incorrect. The [`AsyncFdReadyGuard::clear_ready`]
+    /// method clears all readiness flags.
+    ///
     /// This method takes `&self`, so it is possible to call this method
     /// concurrently with other methods on this struct. This method only
     /// provides shared access to the inner IO resource when handling the
@@ -521,6 +530,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///         }
     ///     }
     /// }
+    /// ```
     pub async fn ready(&self, interest: Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
         let event = self.registration.readiness(interest).await?;
 
@@ -533,6 +543,21 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// Waits for any of the requested ready states, returning a
     /// [`AsyncFdReadyMutGuard`] that must be dropped to resume
     /// polling for the requested ready states.
+    ///
+    /// The function may complete without the file descriptor being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
+    /// [`Ready`] set, so you should always check the returned value and possibly
+    /// wait again if the requested states are not set.
+    ///
+    /// When an IO operation does return `io::ErrorKind::WouldBlock`, the readiness must be cleared.
+    /// When a combined interest is used, it is important to clear only the readiness
+    /// that is actually observed to block. For instance when the combined
+    /// interest `Interest::READABLE | Interest::WRITABLE` is used, and a read blocks, only
+    /// read readiness should be cleared using the [`AsyncFdReadyMutGuard::clear_ready_exact`] method:
+    /// `guard.clear_ready_exact(Ready::READABLE)`.
+    /// Also clearing the write readiness in this case would be incorrect.
+    /// The [`AsyncFdReadyMutGuard::clear_ready`] method clears all readiness flags.
     ///
     /// This method takes `&mut self`, so it is possible to access the inner IO
     /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
