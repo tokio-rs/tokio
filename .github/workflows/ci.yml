@@ -345,11 +345,13 @@ jobs:
       matrix:
         include:
           - target: i686-unknown-linux-gnu
-            rustflags: --cfg tokio_taskdump
+            rustflags: --cfg tokio_cross --cfg tokio_taskdump
           - target: arm-unknown-linux-gnueabihf
+            rustflags: --cfg tokio_cross
           - target: armv7-unknown-linux-gnueabihf
+            rustflags: --cfg tokio_cross
           - target: aarch64-unknown-linux-gnu
-            rustflags: --cfg tokio_taskdump
+            rustflags: --cfg tokio_cross --cfg tokio_taskdump
 
           # Run a platform without AtomicU64 and no const Mutex::new
           - target: arm-unknown-linux-gnueabihf

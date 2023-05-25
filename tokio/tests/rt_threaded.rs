@@ -590,6 +590,7 @@ async fn test_block_in_place4() {
 }
 
 #[test]
+#[cfg(not(tokio_cross))]
 fn test_tuning() {
     let rt = runtime::Builder::new_multi_thread()
         .worker_threads(1)
@@ -618,14 +619,20 @@ fn test_tuning() {
     }
 
     // Now, hammer the injection queue until the interval drops.
+    let mut i = 0;
     while interval.load(Relaxed) > 8 {
+        i += 1;
         let counter = counter.clone();
         let interval = interval.clone();
 
-        rt.spawn(async move {
-            let prev = counter.swap(0, Relaxed);
-            interval.store(prev, Relaxed);
-        });
+        if i <= 5_000 {
+            rt.spawn(async move {
+                let prev = counter.swap(0, Relaxed);
+                interval.store(prev, Relaxed);
+            });
+        }
+
+        std::thread::yield_now();
     }
 
     flag.store(false, Relaxed);
@@ -650,14 +657,20 @@ fn test_tuning() {
     }
 
     // Now, hammer the injection queue until the interval reaches the expected range.
+    let mut i = 0;
     while interval.load(Relaxed) > 1_000 || interval.load(Relaxed) <= 32 {
+        i += 1;
         let counter = counter.clone();
         let interval = interval.clone();
 
-        rt.spawn(async move {
-            let prev = counter.swap(0, Relaxed);
-            interval.store(prev, Relaxed);
-        });
+        if i <= 5_000 {
+            rt.spawn(async move {
+                let prev = counter.swap(0, Relaxed);
+                interval.store(prev, Relaxed);
+            });
+        }
+
+        std::thread::yield_now();
     }
 
     flag.store(false, Relaxed);
