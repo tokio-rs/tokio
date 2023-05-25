@@ -866,7 +866,9 @@ impl Core {
             .tuned_global_queue_interval(&worker.handle.shared.config);
 
         // Smooth out jitter
-        if self.global_queue_interval.abs_diff(next) > 2 {
+        //
+        // `u32::abs_diff` is not available on Tokio's MSRV.
+        if abs_diff(self.global_queue_interval, next) > 2 {
             self.global_queue_interval = next;
         }
     }
@@ -1045,5 +1047,13 @@ cfg_metrics! {
         pub(super) fn worker_local_queue_depth(&self, worker: usize) -> usize {
             self.remotes[worker].steal.len()
         }
+    }
+}
+
+fn abs_diff(a: u32, b: u32) -> u32 {
+    if a > b {
+        a - b
+    } else {
+        b - a
     }
 }
