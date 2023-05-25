@@ -623,18 +623,19 @@ fn test_tuning() {
     // Now, hammer the injection queue until the interval drops.
     let mut i = 0;
     while interval.load(Relaxed) > 8 {
-        i += 1;
         let counter = counter.clone();
         let interval = interval.clone();
 
         if i <= 5_000 {
+            i += 1;
             rt.spawn(async move {
                 let prev = counter.swap(0, Relaxed);
                 interval.store(prev, Relaxed);
             });
+            std::thread::yield_now();
+        } else {
+            std::thread::sleep(Duration::from_micros(500));
         }
-
-        std::thread::yield_now();
     }
 
     flag.store(false, Relaxed);
@@ -643,7 +644,7 @@ fn test_tuning() {
     drop(interval);
 
     while w.strong_count() > 0 {
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_micros(500));
     }
 
     // Now, run it again with a faster task
@@ -661,18 +662,20 @@ fn test_tuning() {
     // Now, hammer the injection queue until the interval reaches the expected range.
     let mut i = 0;
     while interval.load(Relaxed) > 1_000 || interval.load(Relaxed) <= 32 {
-        i += 1;
         let counter = counter.clone();
         let interval = interval.clone();
 
         if i <= 5_000 {
+            i += 1;
             rt.spawn(async move {
                 let prev = counter.swap(0, Relaxed);
                 interval.store(prev, Relaxed);
             });
-        }
 
-        std::thread::yield_now();
+            std::thread::yield_now();
+        } else {
+            std::thread::sleep(Duration::from_micros(500));
+        }
     }
 
     flag.store(false, Relaxed);
