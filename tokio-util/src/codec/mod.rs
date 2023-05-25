@@ -288,3 +288,5 @@ pub use self::lines_codec::{LinesCodec, LinesCodecError};
 
 mod any_delimiter_codec;
 pub use self::any_delimiter_codec::{AnyDelimiterCodec, AnyDelimiterCodecError};
+
+pub use bytes::BytesMut;
