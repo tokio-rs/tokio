@@ -11,10 +11,9 @@ use futures::future::poll_fn;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::{AtomicUsize};
 use std::sync::{mpsc, Arc, Mutex};
 use std::task::{Context, Poll, Waker};
-use std::time::Duration;
 
 macro_rules! cfg_metrics {
     ($($t:tt)*) => {
@@ -592,6 +591,9 @@ async fn test_block_in_place4() {
 #[test]
 #[cfg(not(tokio_cross))]
 fn test_tuning() {
+    use std::sync::atomic::AtomicBool;
+    use std::time::Duration;
+
     let rt = runtime::Builder::new_multi_thread()
         .worker_threads(1)
         .build()
