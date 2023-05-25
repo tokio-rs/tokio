@@ -362,7 +362,7 @@ impl<T: 'static> JoinSet<T> {
     /// This can happen if the [coop budget] is reached.
     ///
     /// [coop budget]: crate::task#cooperative-scheduling
-    fn poll_join_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<T, JoinError>>> {
+    pub fn poll_join_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<T, JoinError>>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
         let mut entry = match self.inner.pop_notified(cx.waker()) {
@@ -419,7 +419,8 @@ impl<T: 'static> JoinSet<T> {
     /// [coop budget]: crate::task#cooperative-scheduling
     /// [task ID]: crate::task::Id
     #[cfg(tokio_unstable)]
-    fn poll_join_next_with_id(
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn poll_join_next_with_id(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<(Id, T), JoinError>>> {
