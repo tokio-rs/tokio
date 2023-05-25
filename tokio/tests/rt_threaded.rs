@@ -10,10 +10,11 @@ use tokio_test::{assert_err, assert_ok};
 use futures::future::poll_fn;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{mpsc, Arc, Mutex};
 use std::task::{Context, Poll, Waker};
+use std::time::Duration;
 
 macro_rules! cfg_metrics {
     ($($t:tt)*) => {
@@ -586,6 +587,80 @@ async fn test_block_in_place3() {
 #[test]
 async fn test_block_in_place4() {
     tokio::task::block_in_place(|| {});
+}
+
+#[test]
+fn test_tuning() {
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    fn iter(flag: Arc<AtomicBool>, counter: Arc<AtomicUsize>, stall: bool) {
+        if flag.load(Relaxed) {
+            if stall {
+                std::thread::sleep(Duration::from_micros(5));
+            }
+
+            counter.fetch_add(1, Relaxed);
+            tokio::spawn(async move { iter(flag, counter, stall) });
+        }
+    }
+
+    let flag = Arc::new(AtomicBool::new(true));
+    let counter = Arc::new(AtomicUsize::new(61));
+    let interval = Arc::new(AtomicUsize::new(61));
+
+    {
+        let flag = flag.clone();
+        let counter = counter.clone();
+        rt.spawn(async move { iter(flag, counter, true) });
+    }
+
+    // Now, hammer the injection queue until the interval drops.
+    while interval.load(Relaxed) > 8 {
+        let counter = counter.clone();
+        let interval = interval.clone();
+
+        rt.spawn(async move {
+            let prev = counter.swap(0, Relaxed);
+            interval.store(prev, Relaxed);
+        });
+    }
+
+    flag.store(false, Relaxed);
+
+    let w = Arc::downgrade(&interval);
+    drop(interval);
+
+    while w.strong_count() > 0 {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+
+    // Now, run it again with a faster task
+    let flag = Arc::new(AtomicBool::new(true));
+    // Set it high, we know it shouldn't ever really be this high
+    let counter = Arc::new(AtomicUsize::new(10_000));
+    let interval = Arc::new(AtomicUsize::new(10_000));
+
+    {
+        let flag = flag.clone();
+        let counter = counter.clone();
+        rt.spawn(async move { iter(flag, counter, false) });
+    }
+
+    // Now, hammer the injection queue until the interval reaches the expected range.
+    while interval.load(Relaxed) > 1_000 || interval.load(Relaxed) <= 32 {
+        let counter = counter.clone();
+        let interval = interval.clone();
+
+        rt.spawn(async move {
+            let prev = counter.swap(0, Relaxed);
+            interval.store(prev, Relaxed);
+        });
+    }
+
+    flag.store(false, Relaxed);
 }
 
 fn rt() -> runtime::Runtime {
