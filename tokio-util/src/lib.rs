@@ -55,6 +55,11 @@ pub mod sync;
 
 pub mod either;
 
+/// A partial reexport of the bytes crate.
+pub mod bytes {
+    pub use bytes::{ Bytes, BytesMut, Buf, BufMut };
+}
+
 #[cfg(any(feature = "io", feature = "codec"))]
 mod util {
     use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
