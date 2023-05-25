@@ -200,7 +200,7 @@ cfg_coop! {
         cfg_metrics! {
             #[inline(always)]
             fn inc_budget_forced_yield_count() {
-                if let Ok(handle) = context::try_current() {
+                if let Ok(handle) = context::with_current() {
                     handle.scheduler_metrics().inc_budget_forced_yield_count();
                 }
             }
