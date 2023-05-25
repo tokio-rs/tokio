@@ -49,7 +49,7 @@ impl Stats {
             batch: MetricsBatch::new(worker_metrics),
             processing_scheduled_tasks_started_at: Instant::now(),
             tasks_polled_in_batch: 0,
-            task_poll_time_ewma: task_poll_time_ewma,
+            task_poll_time_ewma,
         }
     }
 
