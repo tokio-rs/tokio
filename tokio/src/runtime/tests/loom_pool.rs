@@ -323,8 +323,7 @@ mod group_d {
             // Spawn a task
             let c2 = c1.clone();
             pool.spawn(track(async move {
-                gated().await;
-                gated().await;
+                multi_gated().await;
 
                 if 1 == c1.fetch_add(1, Relaxed) {
                     done_tx1.assert_send(());
@@ -333,8 +332,7 @@ mod group_d {
 
             // Spawn a second task
             pool.spawn(track(async move {
-                gated().await;
-                gated().await;
+                multi_gated().await;
 
                 if 1 == c2.fetch_add(1, Relaxed) {
                     done_tx2.assert_send(());
@@ -393,6 +391,19 @@ fn gated2(thread: bool) -> impl Future<Output = &'static str> {
             Poll::Pending
         }
     })
+}
+
+async fn multi_gated() {
+    let (tx1, rx1) = oneshot::channel();
+    let (tx2, rx2) = oneshot::channel();
+
+    spawn(track(async move {
+        tx1.send(());
+        tx2.send(());
+    }));
+
+    rx1.await;
+    rx2.await;
 }
 
 fn track<T: Future>(f: T) -> Track<T> {
