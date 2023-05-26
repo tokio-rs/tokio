@@ -23,9 +23,11 @@ cfg_trace! {
     mod trace;
 }
 
-#[macro_use]
-#[cfg(feature = "rt")]
-pub(crate) mod scoped_tls;
+cfg_rt_multi_thread! {
+    #[macro_use]
+    #[cfg(feature = "rt")]
+    pub(crate) mod scoped_tls;
+}
 
 cfg_macros! {
     #[macro_use]

@@ -1,6 +1,3 @@
-mod scoped;
-use scoped::Scoped;
-
 use crate::loom::thread::AccessError;
 use crate::runtime::coop;
 
@@ -10,6 +7,9 @@ use std::cell::Cell;
 use crate::util::rand::{FastRand, RngSeed};
 
 cfg_rt! {
+    mod scoped;
+    use scoped::Scoped;
+
     use crate::runtime::{scheduler, task::Id, Defer};
 
     use std::cell::RefCell;
@@ -31,6 +31,7 @@ struct Context {
     handle: RefCell<Option<scheduler::Handle>>,
 
     /// Handle to the scheduler's internal "context"
+    #[cfg(feature = "rt")]
     scheduler: Scoped<scheduler::Context>,
 
     #[cfg(feature = "rt")]

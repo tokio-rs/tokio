@@ -25,6 +25,7 @@ pub(crate) enum Handle {
     Disabled,
 }
 
+#[cfg(feature = "rt")]
 pub(super) enum Context {
     CurrentThread(current_thread::Context),
 }

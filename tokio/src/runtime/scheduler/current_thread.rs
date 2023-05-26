@@ -102,9 +102,6 @@ type Notified = task::Notified<Arc<Handle>>;
 /// Initial queue capacity.
 const INITIAL_CAPACITY: usize = 64;
 
-// Tracks the current CurrentThread.
-// scoped_thread_local!(static CURRENT: Context);
-
 impl CurrentThread {
     pub(crate) fn new(
         driver: Driver,
