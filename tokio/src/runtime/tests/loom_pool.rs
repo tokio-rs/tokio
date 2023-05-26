@@ -352,10 +352,6 @@ fn mk_pool(num_threads: usize) -> Runtime {
         .unwrap()
 }
 
-fn gated() -> impl Future<Output = &'static str> {
-    gated2(false)
-}
-
 fn gated2(thread: bool) -> impl Future<Output = &'static str> {
     use loom::thread;
     use std::sync::Arc;
@@ -394,16 +390,35 @@ fn gated2(thread: bool) -> impl Future<Output = &'static str> {
 }
 
 async fn multi_gated() {
-    let (tx1, rx1) = oneshot::channel();
-    let (tx2, rx2) = oneshot::channel();
+    struct Gate {
+        waker: loom::future::AtomicWaker,
+        count: AtomicUsize,
+    }
 
-    spawn(track(async move {
-        tx1.send(());
-        tx2.send(());
-    }));
+    let gate = Arc::new(Gate {
+        waker: loom::future::AtomicWaker::new(),
+        count: AtomicUsize::new(0),
+    });
 
-    rx1.await;
-    rx2.await;
+    {
+        let gate = gate.clone();
+        spawn(track(async move {
+            for i in 1..3 {
+                gate.count.store(i, SeqCst);
+                gate.waker.wake();
+            }
+        }));
+    }
+
+    poll_fn(move |cx| {
+        if gate.count.load(SeqCst) < 2 {
+            gate.waker.register_by_ref(cx.waker());
+            Poll::Pending
+        } else {
+            Poll::Ready(())
+        }
+    })
+    .await;
 }
 
 fn track<T: Future>(f: T) -> Track<T> {
