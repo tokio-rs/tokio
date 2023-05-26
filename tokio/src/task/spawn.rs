@@ -1,4 +1,3 @@
-use crate::runtime::Handle;
 use crate::task::JoinHandle;
 
 use std::future::Future;
@@ -178,7 +177,8 @@ cfg_rt! {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        use crate::runtime::task;
+        use crate::runtime::{context, task};
+
         #[cfg(all(
             tokio_unstable,
             tokio_taskdump,
@@ -193,7 +193,10 @@ cfg_rt! {
         let future = task::trace::Trace::root(future);
         let id = task::Id::next();
         let task = crate::util::trace::task(future, "task", name, id.as_u64());
-        let handle = Handle::current();
-        handle.inner.spawn(task, id)
+
+        match context::with_current(|handle| handle.spawn(task, id)) {
+            Ok(join_handle) => join_handle,
+            Err(e) => panic!("{}", e),
+        }
     }
 }

@@ -109,7 +109,9 @@ impl Handle {
     ///
     /// Contrary to `current`, this never panics
     pub fn try_current() -> Result<Self, TryCurrentError> {
-        context::try_current().map(|inner| Handle { inner })
+        context::with_current(|inner| Handle {
+            inner: inner.clone(),
+        })
     }
 
     /// Spawns a future onto the Tokio runtime.

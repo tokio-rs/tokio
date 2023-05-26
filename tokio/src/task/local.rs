@@ -299,7 +299,7 @@ cfg_rt! {
     ///
     /// Note that if [`tokio::spawn`] is used from within a `LocalSet`, the
     /// resulting new task will _not_ be inside the `LocalSet`, so you must use
-    /// use `spawn_local` if you want to stay within the `LocalSet`.
+    /// `spawn_local` if you want to stay within the `LocalSet`.
     ///
     /// # Examples
     ///
