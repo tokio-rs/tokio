@@ -1,3 +1,6 @@
+mod scoped;
+use scoped::Scoped;
+
 use crate::loom::thread::AccessError;
 use crate::runtime::coop;
 
@@ -26,6 +29,9 @@ struct Context {
     /// Handle to the runtime scheduler running on the current thread.
     #[cfg(feature = "rt")]
     handle: RefCell<Option<scheduler::Handle>>,
+
+    /// Handle to the scheduler's internal "context"
+    scheduler: Scoped<scheduler::Context>,
 
     #[cfg(feature = "rt")]
     current_task_id: Cell<Option<Id>>,
@@ -70,6 +76,11 @@ tokio_thread_local! {
             /// accessing drivers, etc...
             #[cfg(feature = "rt")]
             handle: RefCell::new(None),
+
+            /// Tracks the current scheduler internal context
+            #[cfg(feature = "rt")]
+            scheduler: Scoped::new(),
+
             #[cfg(feature = "rt")]
             current_task_id: Cell::new(None),
 
@@ -285,6 +296,14 @@ cfg_rt! {
             let mut defer = c.defer.borrow_mut();
             defer.as_mut().map(f)
         })
+    }
+
+    pub(super) fn set_scheduler<R>(v: &scheduler::Context, f: impl FnOnce() -> R) -> R {
+        CONTEXT.with(|c| c.scheduler.set(v, f))
+    }
+
+    pub(super) fn with_scheduler<R>(f: impl FnOnce(Option<&scheduler::Context>) -> R) -> R {
+        CONTEXT.with(|c| c.scheduler.with(f))
     }
 
     impl Context {
