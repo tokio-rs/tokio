@@ -52,7 +52,7 @@ cfg_rt! {
     impl Handle {
         #[track_caller]
         pub(crate) fn current() -> Handle {
-            match context::try_current() {
+            match context::with_current(Clone::clone) {
                 Ok(handle) => handle,
                 Err(e) => panic!("{}", e),
             }
