@@ -446,10 +446,10 @@ impl Handle {
         let mut traces = vec![];
 
         // todo: how to make this work outside of a runtime context?
-        CURRENT.with(|maybe_context| {
+        context::with_scheduler(|maybe_context| {
             // drain the local queue
             let context = if let Some(context) = maybe_context {
-                context
+                context.expect_current_thread()
             } else {
                 return;
             };
@@ -575,11 +575,14 @@ impl Schedule for Arc<Handle> {
                     // Do nothing
                 }
                 UnhandledPanic::ShutdownRuntime => {
+                    use scheduler::Context::CurrentThread;
+
                     // This hook is only called from within the runtime, so
-                    // `CURRENT` should match with `&self`, i.e. there is no
-                    // opportunity for a nested scheduler to be called.
-                    CURRENT.with(|maybe_cx| match maybe_cx {
-                        Some(cx) if Arc::ptr_eq(self, &cx.handle) => {
+                    // `context::with_scheduler` should match with `&self`, i.e.
+                    // there is no opportunity for a nested scheduler to be
+                    // called.
+                    context::with_scheduler(|maybe_cx| match maybe_cx {
+                        Some(CurrentThread(cx)) if Arc::ptr_eq(self, &cx.handle) => {
                             let mut core = cx.core.borrow_mut();
 
                             // If `None`, the runtime is shutting down, so there is no need to signal shutdown
