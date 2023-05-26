@@ -35,6 +35,7 @@ fn single_thread() {
 }
 
 #[test]
+#[cfg(not(tokio_cross))]
 fn many_oneshot_futures() {
     // used for notifying the main thread
     const NUM: usize = 1_000;

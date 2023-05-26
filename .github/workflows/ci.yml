@@ -355,7 +355,7 @@ jobs:
 
           # Run a platform without AtomicU64 and no const Mutex::new
           - target: arm-unknown-linux-gnueabihf
-            rustflags: --cfg tokio_no_const_mutex_new
+            rustflags: --cfg tokio_cross --cfg tokio_no_const_mutex_new
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust stable
