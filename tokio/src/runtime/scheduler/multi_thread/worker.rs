@@ -1007,8 +1007,14 @@ fn wake_deferred_tasks() {
     context::with_defer(|deferred| deferred.wake());
 }
 
+#[track_caller]
 fn with_current<R>(f: impl FnOnce(Option<&Context>) -> R) -> R {
-    context::with_scheduler(|ctx| f(ctx.map(|c| c.expect_multi_thread())))
+    use scheduler::Context::MultiThread;
+
+    context::with_scheduler(|ctx| match ctx {
+        Some(MultiThread(ctx)) => f(Some(ctx)),
+        _ => f(None),
+    })
 }
 
 cfg_metrics! {

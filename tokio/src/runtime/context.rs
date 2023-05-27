@@ -303,6 +303,7 @@ cfg_rt! {
         CONTEXT.with(|c| c.scheduler.set(v, f))
     }
 
+    #[track_caller]
     pub(super) fn with_scheduler<R>(f: impl FnOnce(Option<&scheduler::Context>) -> R) -> R {
         CONTEXT.with(|c| c.scheduler.with(f))
     }

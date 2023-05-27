@@ -194,6 +194,7 @@ cfg_rt! {
     }
 
     impl Context {
+        #[track_caller]
         pub(crate) fn expect_current_thread(&self) -> &current_thread::Context {
             match self {
                 Context::CurrentThread(context) => context,
@@ -203,6 +204,7 @@ cfg_rt! {
         }
 
         cfg_rt_multi_thread! {
+            #[track_caller]
             pub(crate) fn expect_multi_thread(&self) -> &multi_thread::Context {
                 match self {
                     Context::MultiThread(context) => context,
