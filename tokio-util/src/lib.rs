@@ -55,10 +55,7 @@ pub mod sync;
 
 pub mod either;
 
-/// A partial reexport of the bytes crate.
-pub mod bytes {
-    pub use bytes::{Buf, BufMut, Bytes, BytesMut};
-}
+pub use bytes;
 
 #[cfg(any(feature = "io", feature = "codec"))]
 mod util {
