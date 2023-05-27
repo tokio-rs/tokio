@@ -28,13 +28,13 @@ jobs:
           - scope: --skip loom_pool
             max_preemptions: 2
           - scope: loom_pool::group_a
-            max_preemptions: 1
+            max_preemptions: 2
           - scope: loom_pool::group_b
             max_preemptions: 2
           - scope: loom_pool::group_c
-            max_preemptions: 1
+            max_preemptions: 2
           - scope: loom_pool::group_d
-            max_preemptions: 1
+            max_preemptions: 2
           - scope: time::driver
             max_preemptions: 2
     steps:
