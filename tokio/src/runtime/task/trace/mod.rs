@@ -61,7 +61,7 @@ pin_project_lite::pin_project! {
 }
 
 const FAIL_NO_THREAD_LOCAL: &str = "The Tokio thread-local has been destroyed \
-                                    as part of shutting down the curren \
+                                    as part of shutting down the current \
                                     thread, so collecting a taskdump is not \
                                     possible.";
 
