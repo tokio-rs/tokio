@@ -1,11 +1,9 @@
 use std::cell::Cell;
-use std::marker::PhantomData;
 use std::ptr;
 
 /// Scoped thread-local storage
 pub(super) struct Scoped<T> {
-    pub(super) inner: Cell<*const ()>,
-    pub(crate) _p: PhantomData<T>,
+    pub(super) inner: Cell<*const T>,
 }
 
 unsafe impl<T> Sync for Scoped<T> {}
@@ -14,7 +12,6 @@ impl<T> Scoped<T> {
     pub(super) fn new() -> Scoped<T> {
         Scoped {
             inner: Cell::new(ptr::null()),
-            _p: PhantomData,
         }
     }
 
@@ -23,19 +20,19 @@ impl<T> Scoped<T> {
     where
         F: FnOnce() -> R,
     {
-        struct Reset<'a> {
-            cell: &'a Cell<*const ()>,
-            prev: *const (),
+        struct Reset<'a, T> {
+            cell: &'a Cell<*const T>,
+            prev: *const T,
         }
 
-        impl Drop for Reset<'_> {
+        impl<T> Drop for Reset<'_, T> {
             fn drop(&mut self) {
                 self.cell.set(self.prev);
             }
         }
 
         let prev = self.inner.get();
-        self.inner.set(t as *const _ as *const ());
+        self.inner.set(t as *const _);
 
         let _reset = Reset {
             cell: &self.inner,
