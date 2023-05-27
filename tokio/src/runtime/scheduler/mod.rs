@@ -25,6 +25,14 @@ pub(crate) enum Handle {
     Disabled,
 }
 
+#[cfg(feature = "rt")]
+pub(super) enum Context {
+    CurrentThread(current_thread::Context),
+
+    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+    MultiThread(multi_thread::Context),
+}
+
 impl Handle {
     #[cfg_attr(not(feature = "full"), allow(dead_code))]
     pub(crate) fn driver(&self) -> &driver::Handle {
@@ -180,6 +188,27 @@ cfg_rt! {
                     Handle::CurrentThread(handle) => handle.blocking_queue_depth(),
                     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                     Handle::MultiThread(handle) => handle.blocking_queue_depth(),
+                }
+            }
+        }
+    }
+
+    impl Context {
+        #[track_caller]
+        pub(crate) fn expect_current_thread(&self) -> &current_thread::Context {
+            match self {
+                Context::CurrentThread(context) => context,
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                _ => panic!("expected `CurrentThread::Context`")
+            }
+        }
+
+        cfg_rt_multi_thread! {
+            #[track_caller]
+            pub(crate) fn expect_multi_thread(&self) -> &multi_thread::Context {
+                match self {
+                    Context::MultiThread(context) => context,
+                    _ => panic!("expected `MultiThread::Context`")
                 }
             }
         }

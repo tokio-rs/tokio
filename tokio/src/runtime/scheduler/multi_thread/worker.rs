@@ -175,7 +175,7 @@ struct Remote {
 }
 
 /// Thread-local context
-struct Context {
+pub(crate) struct Context {
     /// Worker
     worker: Arc<Worker>,
 
@@ -196,9 +196,6 @@ type Task = task::Task<Arc<Handle>>;
 
 /// A notified task handle
 type Notified = task::Notified<Arc<Handle>>;
-
-// Tracks thread-local state
-scoped_thread_local!(static CURRENT: Context);
 
 /// Value picked out of thin-air. Running the LIFO slot a handful of times
 /// seemms sufficient to benefit from locality. More than 3 times probably is
@@ -284,7 +281,7 @@ where
 
     impl Drop for Reset {
         fn drop(&mut self) {
-            CURRENT.with(|maybe_cx| {
+            with_current(|maybe_cx| {
                 if let Some(cx) = maybe_cx {
                     let core = cx.worker.core.take();
                     let mut cx_core = cx.core.borrow_mut();
@@ -301,7 +298,7 @@ where
 
     let mut had_entered = false;
 
-    let setup_result = CURRENT.with(|maybe_cx| {
+    let setup_result = with_current(|maybe_cx| {
         match (
             crate::runtime::context::current_enter_context(),
             maybe_cx.is_some(),
@@ -421,12 +418,14 @@ fn run(worker: Arc<Worker>) {
     let _enter = crate::runtime::context::enter_runtime(&handle, true);
 
     // Set the worker context.
-    let cx = Context {
+    let cx = scheduler::Context::MultiThread(Context {
         worker,
         core: RefCell::new(None),
-    };
+    });
 
-    CURRENT.set(&cx, || {
+    context::set_scheduler(&cx, || {
+        let cx = cx.expect_multi_thread();
+
         // This should always be an error. It only returns a `Result` to support
         // using `?` to short circuit.
         assert!(cx.run(core).is_err());
@@ -898,7 +897,7 @@ impl task::Schedule for Arc<Handle> {
 
 impl Handle {
     pub(super) fn schedule_task(&self, task: Notified, is_yield: bool) {
-        CURRENT.with(|maybe_cx| {
+        with_current(|maybe_cx| {
             if let Some(cx) = maybe_cx {
                 // Make sure the task is part of the **current** scheduler.
                 if self.ptr_eq(&cx.worker.handle) {
@@ -1036,6 +1035,16 @@ fn did_defer_tasks() -> bool {
 
 fn wake_deferred_tasks() {
     context::with_defer(|deferred| deferred.wake());
+}
+
+#[track_caller]
+fn with_current<R>(f: impl FnOnce(Option<&Context>) -> R) -> R {
+    use scheduler::Context::MultiThread;
+
+    context::with_scheduler(|ctx| match ctx {
+        Some(MultiThread(ctx)) => f(Some(ctx)),
+        _ => f(None),
+    })
 }
 
 cfg_metrics! {

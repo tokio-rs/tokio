@@ -1,3 +1,13 @@
+# 1.28.2 (May 28, 2023)
+
+Forward ports 1.18.6 changes.
+
+### Fixed
+
+- deps: disable default features for mio ([#5728])
+
+[#5728]: https://github.com/tokio-rs/tokio/pull/5728
+
 # 1.28.1 (May 10th, 2023)
 
 This release fixes a mistake in the build script that makes `AsFd`
@@ -183,6 +193,16 @@ This release bumps the MSRV of Tokio to 1.56. ([#5559])
 [#5511]: https://github.com/tokio-rs/tokio/pull/5511
 [#5513]: https://github.com/tokio-rs/tokio/pull/5513
 [#5517]: https://github.com/tokio-rs/tokio/pull/5517
+
+# 1.25.1 (May 28, 2023)
+
+Forward ports 1.18.6 changes.
+
+### Fixed
+
+- deps: disable default features for mio ([#5728])
+
+[#5728]: https://github.com/tokio-rs/tokio/pull/5728
 
 # 1.25.0 (January 28, 2023)
 
@@ -520,6 +540,16 @@ wasm32-wasi target is given unstable support for the `net` feature.
 [#4956]: https://github.com/tokio-rs/tokio/pull/4956
 [#4959]: https://github.com/tokio-rs/tokio/pull/4959
 
+# 1.20.5 (May 28, 2023)
+
+Forward ports 1.18.6 changes.
+
+### Fixed
+
+- deps: disable default features for mio ([#5728])
+
+[#5728]: https://github.com/tokio-rs/tokio/pull/5728
+
 # 1.20.4 (January 17, 2023)
 
 Forward ports 1.18.5 changes.
@@ -665,6 +695,14 @@ This release fixes a bug in `Notified::enable`. ([#4747])
 [#4726]: https://github.com/tokio-rs/tokio/pull/4726
 [#4729]: https://github.com/tokio-rs/tokio/pull/4729
 [#4739]: https://github.com/tokio-rs/tokio/pull/4739
+
+# 1.18.6 (May 28, 2023)
+
+### Fixed
+
+- deps: disable default features for mio ([#5728])
+
+[#5728]: https://github.com/tokio-rs/tokio/pull/5728
 
 # 1.18.5 (January 17, 2023)
 

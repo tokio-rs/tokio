@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.28.1"
+version = "1.28.2"
 edition = "2021"
 rust-version = "1.56"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -103,7 +103,7 @@ pin-project-lite = "0.2.0"
 
 # Everything else is optional...
 bytes = { version = "1.0.0", optional = true }
-mio = { version = "0.8.4", optional = true }
+mio = { version = "0.8.4", optional = true, default-features = false }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.12.0", optional = true }
 
