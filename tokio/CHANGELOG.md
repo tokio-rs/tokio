@@ -1,3 +1,11 @@
+# 1.18.6 (May 28, 2023)
+
+### Fixed
+
+- deps: disable default features for mio ([#5728])
+
+[#5728]: https://github.com/tokio-rs/tokio/pull/5728
+
 # 1.18.5 (January 17, 2023)
 
 ### Fixed
