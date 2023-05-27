@@ -257,6 +257,10 @@ async fn reset_twice() {
 #[tokio::test]
 async fn repeatedly_reset_entry_inserted_as_expired() {
     time::pause();
+
+    // Instants before the start of the test seem to break in wasm.
+    time::sleep(ms(1000)).await;
+
     let mut queue = task::spawn(DelayQueue::new());
     let now = Instant::now();
 
@@ -556,6 +560,10 @@ async fn reset_later_after_slot_starts() {
 #[tokio::test]
 async fn reset_inserted_expired() {
     time::pause();
+
+    // Instants before the start of the test seem to break in wasm.
+    time::sleep(ms(1000)).await;
+
     let mut queue = task::spawn(DelayQueue::new());
     let now = Instant::now();
 
