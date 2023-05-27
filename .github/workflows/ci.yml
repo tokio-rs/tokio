@@ -71,7 +71,7 @@ jobs:
         run: rustup update stable
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        run: cargo install cargo-hack --version 0.5.26
 
       # Run `tokio` with `full` features. This excludes testing utilities which
       # can alter the runtime behavior of Tokio.
@@ -274,7 +274,7 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        run: cargo install cargo-hack --version 0.5.26
       - name: check --each-feature
         run: cargo hack check --all --each-feature -Z avoid-dev-deps
       # Try with unstable feature flags
@@ -310,7 +310,7 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack
+        run: cargo install cargo-hack --version 0.5.26
       - name: "check --all-features -Z minimal-versions"
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
