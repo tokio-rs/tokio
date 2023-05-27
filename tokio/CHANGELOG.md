@@ -1,3 +1,13 @@
+# 1.25.1 (May 28, 2023)
+
+Forward ports 1.18.6 changes.
+
+### Fixed
+
+- deps: disable default features for mio ([#5728])
+
+[#5728]: https://github.com/tokio-rs/tokio/pull/5728
+
 # 1.25.0 (January 28, 2023)
 
 ### Fixed
