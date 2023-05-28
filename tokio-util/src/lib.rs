@@ -55,6 +55,8 @@ pub mod sync;
 
 pub mod either;
 
+pub use bytes;
+
 #[cfg(any(feature = "io", feature = "codec"))]
 mod util {
     use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
