@@ -57,22 +57,16 @@ impl<T> super::Owner<T> for Local<T> {
         metrics: &mut MetricsBatch,
     ) {
         if let Err(t) = self.inner.enqueue(task) {
-            inject.push(t);
-            // note: the current implementation is slow
-            // if self.inner.has_stealers() {
-            //     inject.push(t);
-            // } else {
-            //     // push overflow of old queue
-            //     if let Some(block_iter) = self.inner.dequeue_block() {
-            //         // could use `and_then` to chain block dequeues a couple of times if
-            //         // successfull, if we want to steal more than one block
-            //         inject.push_batch(block_iter.chain(std::iter::once(t)))
-            //     } else {
-            //         // Give up and use inject queue.
-            //         inject.push(t)
-            //     }
-            // }
-            // Add 1 to factor in the task currently being scheduled.
+            if self.inner.next_block_has_stealers() {
+                inject.push(t);
+            } else {
+                // push overflow of old queue
+                if let Some(block_iter) = self.inner.dequeue_block() {
+                    inject.push_batch(block_iter.chain(std::iter::once(t)))
+                } else {
+                    inject.push(t)
+                }
+            }
             metrics.incr_overflow_count();
         };
     }
@@ -94,12 +88,13 @@ impl<T> super::Owner<T> for Local<T> {
         let _num_enqueued = self.inner.enqueue_batch_unchecked(tasks);
     }
 
-    fn remaining_slots_hint(&self) -> (u32, Option<u32>) {
+    fn remaining_slots_hint(&self) -> (u16, Option<u16>) {
         let min_slots = self.inner.min_remaining_slots();
+        debug_assert!(min_slots <= u16::MAX.into());
         // Note: If we do change from a linked list of blocks to an array of blocks,
         // we may be able to quickly calculate an approximate upper bound based
         // on the consumer cache _index_.
-        (min_slots as u32, None)
+        (min_slots as u16, None)
     }
 
     fn pop(&mut self) -> Option<task::Notified<T>> {
@@ -128,7 +123,7 @@ impl<T> super::Stealer<T> for Steal<T> {
     ) -> Option<task::Notified<T>> {
         // In the rare case that the `dst` queue is at the same time also full, because the
         // producer is blocked waiting on a stealer we only attempt to steal a single task
-        if dst.remaining_slots_hint().0 < ELEMENTS_PER_BLOCK as u32 {
+        if dst.remaining_slots_hint().0 < ELEMENTS_PER_BLOCK as u16 {
             dst_metrics.incr_steal_count(1);
             dst_metrics.incr_steal_operations();
             // We could evaluate stealing exactly the amount of remaining slots + 1.

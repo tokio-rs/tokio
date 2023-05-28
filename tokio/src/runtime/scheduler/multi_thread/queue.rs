@@ -30,7 +30,7 @@ pub(crate) trait Owner<T: 'static>: Send + Sync {
 
     /// Returns a tuple with the lower bound and an Option for the upper bound of remaining
     /// slots for enqueuing in the queue.
-    fn remaining_slots_hint(&self) -> (u32, Option<u32>);
+    fn remaining_slots_hint(&self) -> (u16, Option<u16>);
 
     /// Returns true if there are entries in the queue.
     fn has_tasks(&self) -> bool;

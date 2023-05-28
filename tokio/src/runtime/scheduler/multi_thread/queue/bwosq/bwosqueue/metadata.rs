@@ -42,6 +42,7 @@ impl<const NUM_ELEMENTS_PER_BLOCK: usize> Index<NUM_ELEMENTS_PER_BLOCK> {
 
     /// True if the block is empty
     #[inline(always)]
+    #[allow(dead_code)]
     pub(crate) fn is_empty(&self) -> bool {
         self.0 == 0
     }

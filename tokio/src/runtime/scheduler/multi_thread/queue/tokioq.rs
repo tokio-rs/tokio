@@ -395,7 +395,7 @@ impl<T: 'static> super::Owner<T> for Local<T> {
 
     /// Returns a tuple with the lower bound and an Option for the upper bound of remaining
     /// slots for enqueuing in the queue.
-    fn remaining_slots_hint(&self) -> (u32, Option<u32>) {
+    fn remaining_slots_hint(&self) -> (u16, Option<u16>) {
         // Safety: We own the queue and thus are the only ones that could potentially mutate
         // `inner.tail`.
         let tail = unsafe { self.inner.tail.unsync_load() };
@@ -410,8 +410,8 @@ impl<T: 'static> super::Owner<T> for Local<T> {
         // `tail` is always larger then `steal`, since the counter is monotonically increasing,
         // at least until it wraps around at `UnsignedShort::MAX`. wrapping_sub always gives the
         // correct difference.
-        let capacity = LOCAL_QUEUE_CAPACITY as UnsignedShort - (tail.wrapping_sub(steal)) as u32;
-        (capacity, Some(capacity))
+        let capacity = LOCAL_QUEUE_CAPACITY as UnsignedShort - (tail.wrapping_sub(steal));
+        (capacity as u16, Some(capacity as u16))
     }
 
     /// Pops a task from the local queue.
@@ -546,7 +546,7 @@ impl<T: 'static> super::Stealer<T> for Steal<T> {
 
 impl<T> Steal<T> {
     /// Steal half of the queues item, but not more than `max`.
-    fn steal_half_max(&self, max: u32) -> Option<StealerIterator<'_, T>> {
+    fn steal_half_max(&self, max: u16) -> Option<StealerIterator<'_, T>> {
         let mut prev_packed = self.0.head.load(Acquire);
         let mut next_packed;
 
@@ -561,7 +561,7 @@ impl<T> Steal<T> {
             // Number of available tasks to steal
             let n = src_tail.wrapping_sub(src_head_real);
             let n = n - n / 2;
-            let n = cmp::min(n, max);
+            let n = cmp::min(n, max as UnsignedShort);
 
             if n == 0 {
                 // No tasks available to steal

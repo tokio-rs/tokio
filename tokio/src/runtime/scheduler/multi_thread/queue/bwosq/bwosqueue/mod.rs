@@ -62,8 +62,6 @@ pub(crate) struct Owner<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usi
     pcache: CachePadded<*const Block<E, { ENTRIES_PER_BLOCK }>>,
     /// Consumer cache (single consumer) - points to block in self.queue.
     ccache: CachePadded<*const Block<E, { ENTRIES_PER_BLOCK }>>,
-    /// Stealer position cache - Allows the owner to quickly check if there are any stealers
-    spos: CachePadded<Arc<AtomicUsize>>,
     /// `Arc` to the actual queue to ensure the queue lives at least as long as the Owner.
     #[allow(dead_code)]
     queue: Pin<Arc<BwsQueue<E, NUM_BLOCKS, ENTRIES_PER_BLOCK>>>,
@@ -373,37 +371,15 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
         true
     }
 
-    // /// Advance consumer to the next block, unless the producer has not reached the block yet.
-    // fn try_advance_consumer_block(
-    //     &mut self,
-    //     next_block: &Block<E, ENTRIES_PER_BLOCK>,
-    //     curr_consumed: IndexAndVersion<ENTRIES_PER_BLOCK>,
-    // ) -> Result<(), ()> {
-    //     if self.can_advance_consumer_block(next_block, curr_consumed) {
-    //         *self.ccache = next_block;
-    //         Ok(())
-    //     } else {
-    //         Err(())
-    //     }
-    // }
-
-    /// Todo: Ideally we would not have this function.
-    pub(crate) fn has_stealers(&self) -> bool {
-        let curr_spos = self.spos.load(Relaxed);
-        // spos increments beyond NUM_BLOCKS to prevent ABA problems.
-        let start_block_idx = curr_spos % NUM_BLOCKS;
-        for i in 0..NUM_BLOCKS {
-            let block_idx = (start_block_idx + i) % NUM_BLOCKS;
-            let blk: &Block<E, ENTRIES_PER_BLOCK> = &self.queue.blocks[block_idx];
-            let stolen = blk.stolen.load(Relaxed);
-            let reserved = blk.reserved.load(Relaxed);
-            if reserved != stolen {
-                return true;
-            } else if !reserved.index().is_full() {
-                return false;
-            }
-        }
-        false
+    /// Check if there are any entries in the next block that are currently being stolen.
+    pub(crate) fn next_block_has_stealers(&self) -> bool {
+        // SAFETY: `pcache` always points to a valid `Block` in the queue. We never create a mutable reference
+        // to a Block, so it is safe to construct a shared reference here.
+        let blk = unsafe { &**self.pcache };
+        let reserved = blk.reserved.load(Relaxed);
+        let stolen = blk.stolen.load(Relaxed);
+        // If reserved and stolen don't match then there is still an active stealer in the block.
+        stolen != reserved
     }
 
     /// Check if there are entries that can be stolen from the queue.
@@ -448,18 +424,6 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
             free_slots += ENTRIES_PER_BLOCK;
         }
         free_slots
-    }
-
-    /// Returns `true` if enqueuing one block of entries would succeed.
-    pub(crate) fn can_enqueue_block(&self) -> bool {
-        // Note: the current implementation of this function is overly conservative but fast.
-        let current_block = unsafe { &*(**self.pcache).next() };
-        let committed = current_block.committed.load(Relaxed);
-        if committed.index().is_empty() {
-            true
-        } else {
-            self.is_next_block_writable(current_block, committed.version())
-        }
     }
 
     /// `true` if there is at least one entry that can be dequeued.
@@ -740,7 +704,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
 
     /// The estimated number of entries currently enqueued.
     #[cfg(feature = "stats")]
-    pub fn estimated_queue_entries(&self) -> usize {
+    pub(crate) fn estimated_queue_entries(&self) -> usize {
         self.queue.estimated_len()
     }
 }
@@ -851,7 +815,6 @@ pub(crate) fn new<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>() 
         Owner {
             pcache: CachePadded::new(first_block),
             ccache: CachePadded::new(first_block),
-            spos: CachePadded::new(stealer_position.clone()),
             queue: q.clone(),
         },
         Stealer {
