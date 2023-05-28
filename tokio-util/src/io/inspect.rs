@@ -52,6 +52,30 @@ impl<R: AsyncRead, F: FnMut(&[u8])> AsyncRead for InspectReader<R, F> {
     }
 }
 
+impl<R: AsyncRead + AsyncWrite, F: FnMut(&[u8])> AsyncWrite for InspectReader<R, F> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::result::Result<usize, std::io::Error>> {
+        self.project().reader.poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), std::io::Error>> {
+        self.project().reader.poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), std::io::Error>> {
+        self.project().reader.poll_shutdown(cx)
+    }
+}
+
 pin_project! {
     /// An adapter that lets you inspect the data that's being written.
     ///
@@ -130,5 +154,15 @@ impl<W: AsyncWrite, F: FnMut(&[u8])> AsyncWrite for InspectWriter<W, F> {
 
     fn is_write_vectored(&self) -> bool {
         self.writer.is_write_vectored()
+    }
+}
+
+impl<W: AsyncRead + AsyncWrite, F: FnMut(&[u8])> AsyncRead for InspectWriter<W, F> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        self.project().writer.poll_read(cx, buf)
     }
 }
