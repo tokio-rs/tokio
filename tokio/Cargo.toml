@@ -24,7 +24,7 @@ keywords = ["io", "async", "non-blocking", "futures"]
 [features]
 # Include nothing by default
 default = []
-bwos = ["bwosqueue"]
+bwos = ["rt-multi-thread"]
 # enable everything
 full = [
   "fs",
@@ -91,15 +91,13 @@ time = []
 # Technically, removing this is a breaking change even though it only ever did
 # anything with the unstable flag on. It is probably safe to get rid of it after
 # a few releases.
-stats = ["bwosqueue?/stats"]
+stats = []
 
 [build-dependencies]
 autocfg = "1.1"
 
 [dependencies]
 tokio-macros = { version = "~2.1.0", path = "../tokio-macros", optional = true }
-
-bwosqueue = { path = "../bwosqueue", features = ["stats"], optional = true }
 
 pin-project-lite = "0.2.0"
 

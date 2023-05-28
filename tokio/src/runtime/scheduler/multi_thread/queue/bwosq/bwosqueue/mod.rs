@@ -24,10 +24,6 @@
 //!   operations in this block.
 //! - This queue implementation puts the producer and consumer into a shared Owner struct,
 //!
-//! # Examples
-//!
-//!  todo
-//!
 //! [BBQ]: https://www.usenix.org/conference/atc22/presentation/wang-jiawei
 //!
 //! # Todo:
@@ -45,27 +41,23 @@ use core::{
 use std::fmt::Formatter;
 use std::mem::MaybeUninit;
 
-mod array_init;
 mod bwos_queue;
-mod cache_padded;
-mod loom;
 mod metadata;
 
-use crate::cache_padded::CachePadded;
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{
     AtomicUsize,
     Ordering::{Acquire, Relaxed, Release},
 };
 use crate::loom::sync::Arc;
+use crate::util::cache_padded::CachePadded;
 use bwos_queue::{Block, BwsQueue};
 use metadata::{Index, IndexAndVersion};
 
 /// The Owner interface to the BWoS queue
 ///
 /// The owner is both the single producer and single consumer.
-#[repr(align(128))]
-pub struct Owner<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize> {
+pub(crate) struct Owner<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize> {
     /// Producer cache (single producer）- points to block in self.queue.
     pcache: CachePadded<*const Block<E, { ENTRIES_PER_BLOCK }>>,
     /// Consumer cache (single consumer) - points to block in self.queue.
@@ -81,8 +73,7 @@ pub struct Owner<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize> {
 ///
 /// There may be multiple stealers. Stealers share the stealer position which is used to quickly look up
 /// the next block for attempted stealing.
-#[repr(align(128))]
-pub struct Stealer<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize> {
+pub(crate) struct Stealer<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize> {
     /// The actual stealer position is `self.spos % NUM_BLOCKS`. The position is incremented beyond
     /// `NUM_BLOCKS` to detect ABA problems.
     spos: CachePadded<Arc<AtomicUsize>>,
@@ -94,7 +85,7 @@ pub struct Stealer<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize> {
 /// The iterator borrows all elements up to `committed` to allows batched
 /// operations on the elements. When the iterator is dropped the entries
 /// are marked as consumed in one atomic operation.
-pub struct BlockIter<'a, E, const ENTRIES_PER_BLOCK: usize> {
+pub(crate) struct BlockIter<'a, E, const ENTRIES_PER_BLOCK: usize> {
     buffer: &'a [UnsafeCell<MaybeUninit<E>>; ENTRIES_PER_BLOCK],
     /// Index if the next to be consumed entry in the buffer.
     i: usize,
@@ -105,7 +96,7 @@ pub struct BlockIter<'a, E, const ENTRIES_PER_BLOCK: usize> {
 /// An iterator over elements of one Block of a stealer
 ///
 /// Marks the stolen entries as stolen once the iterator has been consumed.
-pub struct StealerBlockIter<'a, E, const ENTRIES_PER_BLOCK: usize> {
+pub(crate) struct StealerBlockIter<'a, E, const ENTRIES_PER_BLOCK: usize> {
     /// Stealer Block
     stealer_block: &'a Block<E, ENTRIES_PER_BLOCK>,
     /// Remember how many entries where reserved for the Drop implementation
@@ -144,7 +135,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
     ///
     /// If the queue is full, `Err(t)` is returned to the caller.
     #[inline(always)]
-    pub fn enqueue(&mut self, t: E) -> Result<(), E> {
+    pub(crate) fn enqueue(&mut self, t: E) -> Result<(), E> {
         loop {
             // SAFETY: `pcache` always points to a valid `Block` in the queue. We never create a mutable reference
             // to a Block, so it is safe to construct a shared reference here.
@@ -196,7 +187,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
     ///
     /// The caller must ensure that the queue has sufficient remaining capacity
     /// to enqueue all items in the iterator.
-    pub unsafe fn enqueue_batch_unchecked(
+    pub(crate) unsafe fn enqueue_batch_unchecked(
         &mut self,
         mut iter: Box<dyn ExactSizeIterator<Item = E> + '_>,
     ) {
@@ -281,7 +272,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
 {
     /// Try to dequeue the oldest element in the queue.
     #[inline(always)]
-    pub fn dequeue(&mut self) -> Option<E> {
+    pub(crate) fn dequeue(&mut self) -> Option<E> {
         let (blk, consumed) = self.get_consumer_block()?;
 
         // We trust that the correct index is passed to us here.
@@ -297,7 +288,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
     }
 
     /// Try to dequeue all remaining committed entries in the current block.
-    pub fn dequeue_block(&mut self) -> Option<BlockIter<'_, E, ENTRIES_PER_BLOCK>> {
+    pub(crate) fn dequeue_block(&mut self) -> Option<BlockIter<'_, E, ENTRIES_PER_BLOCK>> {
         let (blk, consumed) = self.get_consumer_block()?;
 
         let committed = blk.committed.load(Relaxed);
@@ -397,7 +388,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
     // }
 
     /// Todo: Ideally we would not have this function.
-    pub fn has_stealers(&self) -> bool {
+    pub(crate) fn has_stealers(&self) -> bool {
         let curr_spos = self.spos.load(Relaxed);
         // spos increments beyond NUM_BLOCKS to prevent ABA problems.
         let start_block_idx = curr_spos % NUM_BLOCKS;
@@ -415,20 +406,26 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
         false
     }
 
-    /// Check if there is a block available for stealing in the queue.
+    /// Check if there are entries that can be stolen from the queue.
     ///
     /// Note that stealing may still fail for a number of reasons even if this function returned true
-    /// Todo: the overhead could be reduced, if we allow this function to return false in some
-    /// cases when the queue size is low.
-    #[cfg(feature = "stats")]
-    pub fn has_stealable_block(&self) -> bool {
-        let n = self.queue.stats.curr_enqueued();
-        // SAFETY: self.ccache always points to a valid Block.
-        let committed_idx = unsafe { (**self.ccache).committed.load(Relaxed).raw_index() };
-        // SAFETY: self.ccache always points to a valid Block.
-        let consumed_idx = unsafe { (**self.ccache).consumed.load(Relaxed).raw_index() };
-        // true if there are more items enqueued in total than enqueued in the current block.
-        n > (committed_idx - consumed_idx)
+    pub(crate) fn has_stealable_entries(&self) -> bool {
+        // If the consumer is not on the same block as the producer, then there
+        // is at least the producer block that can be stolen from.
+        if self.pcache == self.ccache {
+            return false;
+        }
+
+        // SAFETY: `pcache` always points to a valid `Block` in the queue. We never create a mutable reference
+        // to a Block, so it is safe to construct a shared reference here.
+        let blk = unsafe { &**self.pcache };
+        let committed = blk.committed.load(Relaxed);
+        // Probably we could get away with Relaxed here too, since a false positive
+        // isn't that bad since users anyway have to expect concurrent stealing.
+        let reserved = blk.reserved.load(Acquire);
+        // For the current FIFO stealing policy it is sufficient to only check
+        // if all items in the producer block have been reserved yet.
+        reserved != committed
     }
 
     /// Returns the minimum amount of slots that are free and can be enqueued.
@@ -436,7 +433,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
     /// For performance reasons this implementation will only check the current and next
     /// block. This is sufficient for stealing policies which steal at most 1 block at a
     /// time.
-    pub fn min_remaining_slots(&self) -> usize {
+    pub(crate) fn min_remaining_slots(&self) -> usize {
         // SAFETY: self.pcache always points to a valid Block.
         let current_block: &Block<E, ENTRIES_PER_BLOCK> = unsafe { &*(*self.pcache) };
         // The committed field is only updated by the owner.
@@ -454,7 +451,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
     }
 
     /// Returns `true` if enqueuing one block of entries would succeed.
-    pub fn can_enqueue_block(&self) -> bool {
+    pub(crate) fn can_enqueue_block(&self) -> bool {
         // Note: the current implementation of this function is overly conservative but fast.
         let current_block = unsafe { &*(**self.pcache).next() };
         let committed = current_block.committed.load(Relaxed);
@@ -469,7 +466,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
     ///
     /// It is possible that a dequeue can still fail, since the item was stolen after we checked
     /// and before the consumer advanced to the block in question.
-    pub fn can_consume(&self) -> bool {
+    pub(crate) fn can_consume(&self) -> bool {
         // SAFETY: `ccache` always points to a valid `Block` in the queue. We never create a mutable reference
         // to a Block, so it is safe to construct a shared reference here.
         let current_blk_cache = unsafe { &**self.ccache };
@@ -571,7 +568,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
 {
     /// Try to steal a single item from the queue
     #[inline]
-    pub fn steal(&self) -> Option<E> {
+    pub(crate) fn steal(&self) -> Option<E> {
         loop {
             let (blk, curr_spos) = self.curr_block();
 
@@ -634,7 +631,7 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
     /// committed yet it will steal up to and including the last committed entry
     /// of that block.
     #[inline]
-    pub fn steal_block(&self) -> Option<StealerBlockIter<'_, E, ENTRIES_PER_BLOCK>> {
+    pub(crate) fn steal_block(&self) -> Option<StealerBlockIter<'_, E, ENTRIES_PER_BLOCK>> {
         loop {
             let (blk, curr_spos) = self.curr_block();
 
@@ -678,6 +675,43 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
             }
             self.try_advance_spos(curr_spos);
         }
+    }
+
+    /// `true` if there is at least one entry that can be stolen
+    ///
+    /// Note: Calling this function is expensive! Try to avoid it.
+    /// This is intended solely for the case where the worker owning the queue
+    /// is parked, and we need to check if there is work remaining in their queue.
+    pub(crate) fn is_empty(&self) -> bool {
+        let spos = self.spos.load(Acquire);
+        for i in 0..NUM_BLOCKS + 1 {
+            let blk = &self.queue.blocks[spos.wrapping_add(i) % NUM_BLOCKS];
+            // check if the block is fully consumed already
+            let consumed = blk.reserved.load(Acquire);
+            let consumed_idx = consumed.raw_index();
+
+            // Fastpath (Block is not fully consumed yet)
+            if consumed_idx < ENTRIES_PER_BLOCK {
+                // we know the block is not full, but we must first check if there is an entry to
+                // dequeue.
+                let committed_idx = blk.committed.load(Acquire).raw_index();
+                if consumed_idx == committed_idx {
+                    return false;
+                }
+
+                /* There is an entry to dequeue */
+                return true;
+            }
+
+            /* Advance to next block */
+
+            if !self.can_advance(blk, consumed) {
+                return false;
+            }
+        }
+        // Since there is no concurrent enqueuing and the buffer is bounded, we should reach
+        // one of the exit conditions in at most NUM_BLOCKS iterations.
+        unreachable!()
     }
 
     /// True if the stealer can advance to the next block
@@ -773,12 +807,8 @@ impl<'a, E, const ENTRIES_PER_BLOCK: usize> Drop for StealerBlockIter<'a, E, ENT
 }
 
 impl<'a, E, const ENTRIES_PER_BLOCK: usize> StealerBlockIter<'a, E, ENTRIES_PER_BLOCK> {
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.block_reserved - self.i
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 }
 
@@ -803,7 +833,7 @@ impl<'a, E, const ENTRIES_PER_BLOCK: usize> core::fmt::Debug
 /// The Owner throughput will improve with a larger `ENTRIES_PER_BLOCK` value.
 /// Thieves however will prefer a higher `NUM_BLOCKS` count since it makes it easier to
 /// steal a whole block.
-pub fn new<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>() -> (
+pub(crate) fn new<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>() -> (
     Owner<E, { NUM_BLOCKS }, { ENTRIES_PER_BLOCK }>,
     Stealer<E, { NUM_BLOCKS }, { ENTRIES_PER_BLOCK }>,
 ) {

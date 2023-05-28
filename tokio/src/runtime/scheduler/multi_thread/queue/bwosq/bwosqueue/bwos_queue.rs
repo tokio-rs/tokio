@@ -1,13 +1,13 @@
 use super::metadata::AtomicIndexAndVersion;
-use crate::array_init::array_init;
-use crate::cache_padded::CachePadded;
 use crate::loom::{cell::UnsafeCell, sync::Arc};
+use crate::util::array_init;
+use crate::util::cache_padded::CachePadded;
 use core::{marker::PhantomPinned, mem::MaybeUninit, pin::Pin, ptr::null};
 
 #[cfg(feature = "stats")]
 mod bwsstats {
-    use crate::cache_padded::CachePadded;
     use crate::loom::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+    use crate::util::cache_padded::CachePadded;
 
     pub(crate) struct BwsStats {
         owner_counter: CachePadded<AtomicUsize>,

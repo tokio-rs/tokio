@@ -72,10 +72,10 @@ pub(crate) trait Owner<T: 'static>: Send + Sync {
 }
 
 pub(crate) trait Stealer<T>: Send + Sync {
-    // Todo: `is_empty()` is hard to implement for BWoS, since
-    // the stealer doesn't really have access to this kind of information,
-    // at least not in an inexpensive way, that doesn't interfere with the
-    // owner. Check if the upper layers really need this function!
+    /// Returns true if the queue is empty
+    ///
+    /// This function _must_ be accurate and is intended to be used
+    /// only in non-performance critical settings.
     fn is_empty(&self) -> bool;
 
     /// Steals half the tasks from self and place them into `dst`.
@@ -87,6 +87,7 @@ pub(crate) trait Stealer<T>: Send + Sync {
 
     cfg_metrics! {
         /// Number of tasks in the queue.
+        #[cfg(feature = "stats")]
         fn len(&self) -> usize;
     }
 }

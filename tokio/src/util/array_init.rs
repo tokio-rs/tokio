@@ -1,4 +1,5 @@
-/// Simplified version of https://github.com/Manishearth/array-init for our usecase.
+/// Simplified version of https://github.com/Manishearth/array-init for an infallible
+/// initializer
 use std::mem::MaybeUninit;
 
 #[inline]

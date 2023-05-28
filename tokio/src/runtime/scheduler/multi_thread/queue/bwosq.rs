@@ -3,7 +3,8 @@ use std::convert::TryInto;
 use crate::runtime::scheduler::multi_thread::queue::Owner as OwnerTrait;
 use crate::runtime::task::{self, Inject, Notified};
 use crate::runtime::MetricsBatch;
-use bwosqueue::{Owner, Stealer};
+
+mod bwosqueue;
 
 // todo: Discuss using const generics or runtime values. Benchmark performance difference.
 const NUM_BLOCKS: usize = 8;
@@ -11,11 +12,13 @@ const ELEMENTS_PER_BLOCK: usize = 32;
 
 /// Producer handle. May only be used from a single thread.
 pub(crate) struct Local<T: 'static> {
-    inner: Owner<task::Notified<T>, NUM_BLOCKS, ELEMENTS_PER_BLOCK>,
+    inner: bwosqueue::Owner<task::Notified<T>, NUM_BLOCKS, ELEMENTS_PER_BLOCK>,
 }
 
 /// Consumer handle. May be used from many threads.
-pub(crate) struct Steal<T: 'static>(Stealer<task::Notified<T>, NUM_BLOCKS, ELEMENTS_PER_BLOCK>);
+pub(crate) struct Steal<T: 'static>(
+    bwosqueue::Stealer<task::Notified<T>, NUM_BLOCKS, ELEMENTS_PER_BLOCK>,
+);
 
 /// Create a new local run-queue
 pub(crate) fn local<T: 'static>() -> (
@@ -34,7 +37,7 @@ pub(crate) fn local<T: 'static>() -> (
 impl<T> super::Owner<T> for Local<T> {
     /// Returns true if the queue has entries that can be stolen.
     fn is_stealable(&self) -> bool {
-        self.inner.has_stealable_block()
+        self.inner.has_stealable_entries()
     }
 
     fn max_capacity(&self) -> usize {
@@ -114,7 +117,7 @@ impl<T> Drop for Local<T> {
 
 impl<T> super::Stealer<T> for Steal<T> {
     fn is_empty(&self) -> bool {
-        self.0.estimated_queue_entries() == 0
+        self.0.is_empty()
     }
 
     /// Steals one block from self and place them into `dst`.
