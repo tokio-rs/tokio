@@ -6,8 +6,9 @@ use core::{marker::PhantomPinned, mem::MaybeUninit, pin::Pin, ptr::null};
 
 #[cfg(feature = "stats")]
 mod bwsstats {
-    use crate::loom::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+    // The statistics don't influence correctness, so don't model them with loom.
     use crate::util::cache_padded::CachePadded;
+    use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
     pub(crate) struct BwsStats {
         owner_counter: CachePadded<AtomicUsize>,
