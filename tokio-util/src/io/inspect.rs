@@ -52,7 +52,7 @@ impl<R: AsyncRead, F: FnMut(&[u8])> AsyncRead for InspectReader<R, F> {
     }
 }
 
-impl<R: AsyncRead + AsyncWrite, F: FnMut(&[u8])> AsyncWrite for InspectReader<R, F> {
+impl<R: AsyncWrite, F> AsyncWrite for InspectReader<R, F> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -157,7 +157,7 @@ impl<W: AsyncWrite, F: FnMut(&[u8])> AsyncWrite for InspectWriter<W, F> {
     }
 }
 
-impl<W: AsyncRead + AsyncWrite, F: FnMut(&[u8])> AsyncRead for InspectWriter<W, F> {
+impl<W: AsyncRead, F> AsyncRead for InspectWriter<W, F> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
