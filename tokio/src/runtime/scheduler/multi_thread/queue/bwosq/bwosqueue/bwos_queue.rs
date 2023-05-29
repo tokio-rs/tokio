@@ -42,16 +42,12 @@ mod bwsstats {
         }
 
         /// Returns the _estimated_ number of currently enqueued items.
-        ///
-        ///
         #[inline]
         pub(crate) fn curr_enqueued(&self) -> usize {
             let owner_cnt = self.owner_counter.load(Relaxed);
             let total_stolen = self.total_stolen.load(Relaxed);
 
-            // We assume the `u64` total numbers will never overflow.
-            let num = owner_cnt.saturating_sub(total_stolen);
-            num
+            owner_cnt.saturating_sub(total_stolen)
         }
     }
 }

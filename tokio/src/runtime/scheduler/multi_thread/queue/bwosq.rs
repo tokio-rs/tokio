@@ -85,7 +85,7 @@ impl<T> super::Owner<T> for Local<T> {
         &mut self,
         tasks: Box<dyn ExactSizeIterator<Item = Notified<T>> + '_>,
     ) {
-        let _num_enqueued = self.inner.enqueue_batch_unchecked(tasks);
+        self.inner.enqueue_batch_unchecked(tasks);
     }
 
     fn remaining_slots_hint(&self) -> (u16, Option<u16>) {
