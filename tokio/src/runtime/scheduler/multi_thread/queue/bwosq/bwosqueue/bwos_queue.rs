@@ -15,7 +15,7 @@ mod bwsstats {
     }
 
     impl BwsStats {
-        pub(crate) const fn new() -> Self {
+        pub(crate) fn new() -> Self {
             Self {
                 owner_counter: CachePadded::new(AtomicUsize::new(0)),
                 total_stolen: CachePadded::new(AtomicUsize::new(0)),
