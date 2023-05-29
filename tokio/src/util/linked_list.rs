@@ -270,6 +270,7 @@ impl<L: Link> CountedLinkedList<L, L::Target> {
         val
     }
 
+    #[cfg(any(all(tokio_unstable, not(loom), feature = "stats"), test))]
     pub(crate) fn count(&self) -> usize {
         self.count
     }

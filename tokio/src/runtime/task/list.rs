@@ -157,8 +157,10 @@ impl<S: 'static> OwnedTasks<S> {
         }
     }
 
-    pub(crate) fn active_tasks_count(&self) -> usize {
-        self.inner.lock().list.count()
+    cfg_metrics! {
+        pub(crate) fn active_tasks_count(&self) -> usize {
+            self.inner.lock().list.count()
+        }
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
