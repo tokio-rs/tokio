@@ -54,15 +54,7 @@ pub async fn yield_now() {
 
             self.yielded = true;
 
-            let defer = context::with_defer(|rt| {
-                rt.defer(cx.waker());
-            });
-
-            if defer.is_none() {
-                //  Not currently in a runtime, just notify ourselves
-                //  immediately.
-                cx.waker().wake_by_ref();
-            }
+            context::defer(cx.waker());
 
             Poll::Pending
         }
