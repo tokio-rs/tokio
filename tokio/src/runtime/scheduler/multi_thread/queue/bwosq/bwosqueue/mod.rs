@@ -657,21 +657,19 @@ impl<E, const NUM_BLOCKS: usize, const ENTRIES_PER_BLOCK: usize>
 
             // Fastpath (Block is not fully consumed yet)
             if consumed_idx < ENTRIES_PER_BLOCK {
-                // we know the block is not full, but we must first check if there is an entry to
-                // dequeue.
                 let committed_idx = blk.committed.load(Acquire).raw_index();
                 if consumed_idx == committed_idx {
-                    return false;
+                    return true;
                 }
 
                 /* There is an entry to dequeue */
-                return true;
+                return false;
             }
 
             /* Advance to next block */
 
             if !self.can_advance(blk, consumed) {
-                return false;
+                return true;
             }
         }
         // Since there is no concurrent enqueuing and the buffer is bounded, we should reach
