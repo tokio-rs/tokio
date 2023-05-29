@@ -71,7 +71,7 @@ fn basic_default() {
     basic_flavor(MultiThreadFlavor::Default);
 }
 
-#[cfg(all(tokio_unstable, feature = "bwos"))]
+//#[cfg(all(tokio_unstable, feature = "bwos"))]
 #[test]
 fn basic_bwos() {
     basic_flavor(MultiThreadFlavor::Bwos);
@@ -133,7 +133,7 @@ fn steal_overflow_default() {
     steal_overflow(MultiThreadFlavor::Default)
 }
 
-#[cfg(all(tokio_unstable, feature = "bwos"))]
+//#[cfg(all(tokio_unstable, feature = "bwos"))]
 #[test]
 fn steal_overflow_bwos() {
     steal_overflow(MultiThreadFlavor::Bwos)
@@ -204,7 +204,7 @@ fn multi_stealer_default() {
     multi_stealer_flavor(MultiThreadFlavor::Default)
 }
 
-#[cfg(all(tokio_unstable, feature = "bwos"))]
+//#[cfg(all(tokio_unstable, feature = "bwos"))]
 #[test]
 fn multi_stealer_bwos() {
     multi_stealer_flavor(MultiThreadFlavor::Bwos)
@@ -253,7 +253,7 @@ fn chained_steal_default() {
     chained_steal(MultiThreadFlavor::Default)
 }
 
-#[cfg(all(tokio_unstable, feature = "bwos"))]
+//#[cfg(all(tokio_unstable, feature = "bwos"))]
 #[test]
 fn chained_steal_bwos() {
     chained_steal(MultiThreadFlavor::Bwos)

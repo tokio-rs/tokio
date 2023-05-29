@@ -190,13 +190,14 @@ pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync +
 
 cfg_rt_multi_thread!(
     #[derive(Clone, Copy)]
+    #[allow(dead_code)]
     pub(crate) enum MultiThreadFlavor {
         /// The default multithreaded tokio runqueue, based on the golang runqueue.
         Default,
         // There may be more (sub-) variants in the future influencing e.g. queue size
         // or stealing strategy
         /// A Block-based workstealing queue offering better performance
-        #[cfg(all(tokio_unstable, feature = "bwos"))]
+        //#[cfg(all(tokio_unstable, feature = "bwos"))]
         Bwos,
     }
 );
@@ -233,7 +234,7 @@ impl Builder {
         /// Configuration methods can be chained on the return value.
         pub fn new_multi_thread() -> Builder {
             // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-            Builder::new(Kind::MultiThread(MultiThreadFlavor::Default), 61, 61)
+            Builder::new(Kind::MultiThread(MultiThreadFlavor::Bwos), 61, 61)
         }
     }
 

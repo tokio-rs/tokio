@@ -73,11 +73,11 @@ cfg_rt_multi_thread! {
     pub(crate) use try_lock::TryLock;
 }
 
-cfg_rt_multi_thread_bwos! {
-    pub(crate) mod cache_padded;
-    mod array_init;
-    pub(crate) use array_init::array_init;
-}
+//cfg_rt_multi_thread_bwos! {
+mod array_init;
+pub(crate) mod cache_padded;
+pub(crate) use array_init::array_init;
+//}
 
 pub(crate) mod trace;
 

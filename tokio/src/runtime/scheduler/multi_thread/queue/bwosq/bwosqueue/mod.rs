@@ -33,6 +33,7 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(unreachable_pub)]
+#![allow(dead_code)]
 
 use core::{
     marker::{Send, Sync},

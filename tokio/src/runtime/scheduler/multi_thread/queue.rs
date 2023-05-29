@@ -1,6 +1,6 @@
-cfg_rt_multi_thread_bwos! {
-    pub(crate) mod bwosq;
-}
+//cfg_rt_multi_thread_bwos! {
+pub(crate) mod bwosq;
+//}
 
 pub(crate) mod tokioq;
 
@@ -16,7 +16,7 @@ pub(crate) fn local<T: 'static>(
 ) {
     match flavor {
         MultiThreadFlavor::Default => tokioq::local(),
-        #[cfg(all(tokio_unstable, feature = "bwos"))]
+        //#[cfg(all(tokio_unstable, feature = "bwos"))]
         MultiThreadFlavor::Bwos => bwosq::local(),
     }
 }

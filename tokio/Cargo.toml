@@ -24,7 +24,7 @@ keywords = ["io", "async", "non-blocking", "futures"]
 [features]
 # Include nothing by default
 default = []
-bwos = ["rt-multi-thread"]
+bwos = []
 # enable everything
 full = [
   "fs",
@@ -73,6 +73,7 @@ process = [
 # Includes basic task execution capabilities
 rt = []
 rt-multi-thread = [
+  "bwos",
   "num_cpus",
   "rt",
 ]
