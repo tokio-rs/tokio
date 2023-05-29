@@ -466,6 +466,9 @@ impl Handle {
                 .map(dump::Task::new)
                 .collect();
 
+            // Avoid double borrow panic
+            drop(maybe_core);
+
             // Taking a taskdump could wakes every task, but we probably don't want
             // the `yield_now` vector to be that large under normal circumstances.
             // Therefore, we free its allocation.
