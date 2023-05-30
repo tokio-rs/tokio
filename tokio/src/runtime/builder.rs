@@ -82,6 +82,12 @@ pub struct Builder {
     pub(super) keep_alive: Option<Duration>,
 
     /// How many ticks before pulling a task from the global/remote queue?
+    ///
+    /// When `None`, the value is unspecified and behavior details are left to
+    /// the scheduler. Each scheduler flavor could choose to either pick its own
+    /// default value or use some other strategy to decide when to poll from the
+    /// global queue. For example, the multi-threaded scheduler uses a
+    /// self-tuning strategy based on mean task poll times.
     pub(super) global_queue_interval: Option<u32>,
 
     /// How many ticks before yielding to the driver for timer and I/O events?

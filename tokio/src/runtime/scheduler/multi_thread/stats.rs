@@ -27,7 +27,7 @@ pub(crate) struct Stats {
     task_poll_time_ewma: f64,
 }
 
-// How to weigh each individual poll time, value is plucked from thin air.
+/// How to weigh each individual poll time, value is plucked from thin air.
 const TASK_POLL_TIME_EWMA_ALPHA: f64 = 0.1;
 
 /// Ideally, we wouldn't go above this, value is plucked from thin air.

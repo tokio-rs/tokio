@@ -497,8 +497,13 @@ impl Context {
 
         self.assert_lifo_enabled_is_correct(&core);
 
-        // Make the core available to the runtime context
+        // Measure the poll start time. Note that we may end up polling other
+        // tasks under this measurement. In this case, the tasks came from the
+        // LIFO slot and are considered part of the current task for scheduling
+        // purposes. These tasks inherent the "parent"'s limits.
         core.stats.start_poll();
+
+        // Make the core available to the runtime context
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
@@ -865,8 +870,6 @@ impl Core {
             .tuned_global_queue_interval(&worker.handle.shared.config);
 
         // Smooth out jitter
-        //
-        // `u32::abs_diff` is not available on Tokio's MSRV.
         if abs_diff(self.global_queue_interval, next) > 2 {
             self.global_queue_interval = next;
         }
@@ -1059,6 +1062,7 @@ cfg_metrics! {
     }
 }
 
+// `u32::abs_diff` is not available on Tokio's MSRV.
 fn abs_diff(a: u32, b: u32) -> u32 {
     if a > b {
         a - b

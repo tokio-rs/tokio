@@ -59,6 +59,8 @@ fn spawn_many_remote_idle(b: &mut Bencher) {
     });
 }
 
+// The runtime is busy with tasks that consume CPU time and yield. Yielding is a
+// lower notification priority than spawning / regular notification.
 fn spawn_many_remote_busy1(b: &mut Bencher) {
     let rt = rt();
     let rt_handle = rt.handle();
@@ -91,6 +93,8 @@ fn spawn_many_remote_busy1(b: &mut Bencher) {
     flag.store(false, Relaxed);
 }
 
+// The runtime is busy with tasks that consume CPU time and spawn new high-CPU
+// tasks. Spawning goes via a higher notification priority than yielding.
 fn spawn_many_remote_busy2(b: &mut Bencher) {
     const NUM_SPAWN: usize = 1_000;
 

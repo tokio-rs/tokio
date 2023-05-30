@@ -589,6 +589,11 @@ async fn test_block_in_place4() {
     tokio::task::block_in_place(|| {});
 }
 
+// Testing the tuning logic is tricky as it is inherently timing based, and more
+// of a heuristic than an exact behavior. This test checks that the interval
+// changes over time based on load factors. There are no assertions, completion
+// is sufficient. If there is a regression, this test will hang. In theory, we
+// could add limits, but that would be likely to fail on CI.
 #[test]
 #[cfg(not(tokio_cross))]
 fn test_tuning() {
