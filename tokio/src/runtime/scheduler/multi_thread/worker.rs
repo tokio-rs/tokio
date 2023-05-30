@@ -869,6 +869,8 @@ impl Core {
             .stats
             .tuned_global_queue_interval(&worker.handle.shared.config);
 
+        debug_assert!(next > 1);
+
         // Smooth out jitter
         if abs_diff(self.global_queue_interval, next) > 2 {
             self.global_queue_interval = next;

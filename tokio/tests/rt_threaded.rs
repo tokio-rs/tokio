@@ -628,7 +628,23 @@ fn test_tuning() {
 
     // Now, hammer the injection queue until the interval drops.
     let mut i = 0;
-    while interval.load(Relaxed) > 8 {
+    let mut n = 0;
+    loop {
+        let curr = interval.load(Relaxed);
+
+        if curr <= 8 {
+            n += 1;
+        } else {
+            n = 0;
+        }
+
+        // Make sure we get a few good rounds. Jitter in the tuning could result
+        // in one "good" value without being representative of reaching a good
+        // state.
+        if n == 3 {
+            break;
+        }
+
         let counter = counter.clone();
         let interval = interval.clone();
 
@@ -667,7 +683,20 @@ fn test_tuning() {
 
     // Now, hammer the injection queue until the interval reaches the expected range.
     let mut i = 0;
-    while interval.load(Relaxed) > 1_000 || interval.load(Relaxed) <= 32 {
+    let mut n = 0;
+    loop {
+        let curr = interval.load(Relaxed);
+
+        if curr <= 1_000 && curr > 32 {
+            n += 1;
+        } else {
+            n = 0;
+        }
+
+        if n == 3 {
+            break;
+        }
+
         let counter = counter.clone();
         let interval = interval.clone();
 
