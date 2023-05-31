@@ -433,8 +433,8 @@ cfg_rt! {
     cfg_taskdump! {
         /// SAFETY: Callers of this function must ensure that trace frames always
         /// form a valid linked list.
-        pub(crate) unsafe fn with_trace<R>(f: impl FnOnce(&trace::Context) -> R) -> R {
-            CONTEXT.with(|c| f(&c.trace))
+        pub(crate) unsafe fn with_trace<R>(f: impl FnOnce(&trace::Context) -> R) -> Option<R> {
+            CONTEXT.try_with(|c| f(&c.trace)).ok()
         }
     }
 }
