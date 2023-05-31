@@ -274,6 +274,8 @@ cfg_rt! {
             if let Some(scheduler) = maybe_scheduler {
                 scheduler.defer(waker);
             } else {
+                // Called from outside of the runtime, immediately wake the
+                // task.
                 waker.wake_by_ref();
             }
         });
