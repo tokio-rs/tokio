@@ -119,17 +119,6 @@ cfg_rt_multi_thread! {
     pub(crate) fn set(budget: Budget) {
         let _ = context::budget(|cell| cell.set(budget));
     }
-
-    /// Consume one unit of progress from the current task's budget.
-    pub(crate) fn consume_one() {
-        let _ = context::budget(|cell| {
-            let mut budget = cell.get();
-            if let Some(ref mut counter) = budget.0 {
-                *counter = counter.saturating_sub(1);
-            }
-            cell.set(budget);
-        });
-    }
 }
 
 cfg_rt! {
@@ -211,9 +200,9 @@ cfg_coop! {
         cfg_metrics! {
             #[inline(always)]
             fn inc_budget_forced_yield_count() {
-                if let Ok(handle) = context::try_current() {
+                let _ = context::with_current(|handle| {
                     handle.scheduler_metrics().inc_budget_forced_yield_count();
-                }
+                });
             }
         }
 

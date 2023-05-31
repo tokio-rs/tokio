@@ -86,7 +86,9 @@ struct Shared {
 }
 
 /// Thread-local context.
-struct Context {
+///
+/// pub(crate) to store in `runtime::context`.
+pub(crate) struct Context {
     /// Scheduler handle
     handle: Arc<Handle>,
 
@@ -99,9 +101,6 @@ type Notified = task::Notified<Arc<Handle>>;
 
 /// Initial queue capacity.
 const INITIAL_CAPACITY: usize = 64;
-
-// Tracks the current CurrentThread.
-scoped_thread_local!(static CURRENT: Context);
 
 impl CurrentThread {
     pub(crate) fn new(
@@ -185,10 +184,10 @@ impl CurrentThread {
         let core = self.core.take()?;
 
         Some(CoreGuard {
-            context: Context {
+            context: scheduler::Context::CurrentThread(Context {
                 handle: handle.clone(),
                 core: RefCell::new(Some(core)),
-            },
+            }),
             scheduler: self,
         })
     }
@@ -205,39 +204,58 @@ impl CurrentThread {
             None => panic!("Oh no! We never placed the Core back, this is a bug!"),
         };
 
-        core.enter(|mut core, _context| {
-            // Drain the OwnedTasks collection. This call also closes the
-            // collection, ensuring that no tasks are ever pushed after this
-            // call returns.
-            handle.shared.owned.close_and_shutdown_all();
+        // Check that the thread-local is not being destroyed
+        let tls_available = context::with_current(|_| ()).is_ok();
 
-            // Drain local queue
-            // We already shut down every task, so we just need to drop the task.
-            while let Some(task) = core.next_local_task(handle) {
-                drop(task);
-            }
+        if tls_available {
+            core.enter(|core, _context| {
+                let core = shutdown2(core, handle);
+                (core, ())
+            });
+        } else {
+            // Shutdown without setting the context. `tokio::spawn` calls will
+            // fail, but those will fail either way because the thread-local is
+            // not available anymore.
+            let context = core.context.expect_current_thread();
+            let core = context.core.borrow_mut().take().unwrap();
 
-            // Close the injection queue
-            handle.shared.inject.close();
-
-            // Drain remote queue
-            while let Some(task) = handle.shared.inject.pop() {
-                drop(task);
-            }
-
-            assert!(handle.shared.owned.is_empty());
-
-            // Submit metrics
-            core.submit_metrics(handle);
-
-            // Shutdown the resource drivers
-            if let Some(driver) = core.driver.as_mut() {
-                driver.shutdown(&handle.driver);
-            }
-
-            (core, ())
-        });
+            let core = shutdown2(core, handle);
+            *context.core.borrow_mut() = Some(core);
+        }
     }
+}
+
+fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
+    // Drain the OwnedTasks collection. This call also closes the
+    // collection, ensuring that no tasks are ever pushed after this
+    // call returns.
+    handle.shared.owned.close_and_shutdown_all();
+
+    // Drain local queue
+    // We already shut down every task, so we just need to drop the task.
+    while let Some(task) = core.next_local_task(handle) {
+        drop(task);
+    }
+
+    // Close the injection queue
+    handle.shared.inject.close();
+
+    // Drain remote queue
+    while let Some(task) = handle.shared.inject.pop() {
+        drop(task);
+    }
+
+    assert!(handle.shared.owned.is_empty());
+
+    // Submit metrics
+    core.submit_metrics(handle);
+
+    // Shutdown the resource drivers
+    if let Some(driver) = core.driver.as_mut() {
+        driver.shutdown(&handle.driver);
+    }
+
+    core
 }
 
 impl fmt::Debug for CurrentThread {
@@ -425,10 +443,10 @@ impl Handle {
         let mut traces = vec![];
 
         // todo: how to make this work outside of a runtime context?
-        CURRENT.with(|maybe_context| {
+        context::with_scheduler(|maybe_context| {
             // drain the local queue
             let context = if let Some(context) = maybe_context {
-                context
+                context.expect_current_thread()
             } else {
                 return;
             };
@@ -522,8 +540,10 @@ impl Schedule for Arc<Handle> {
     }
 
     fn schedule(&self, task: task::Notified<Self>) {
-        CURRENT.with(|maybe_cx| match maybe_cx {
-            Some(cx) if Arc::ptr_eq(self, &cx.handle) => {
+        use scheduler::Context::CurrentThread;
+
+        context::with_scheduler(|maybe_cx| match maybe_cx {
+            Some(CurrentThread(cx)) if Arc::ptr_eq(self, &cx.handle) => {
                 let mut core = cx.core.borrow_mut();
 
                 // If `None`, the runtime is shutting down, so there is no need
@@ -552,11 +572,14 @@ impl Schedule for Arc<Handle> {
                     // Do nothing
                 }
                 UnhandledPanic::ShutdownRuntime => {
+                    use scheduler::Context::CurrentThread;
+
                     // This hook is only called from within the runtime, so
-                    // `CURRENT` should match with `&self`, i.e. there is no
-                    // opportunity for a nested scheduler to be called.
-                    CURRENT.with(|maybe_cx| match maybe_cx {
-                        Some(cx) if Arc::ptr_eq(self, &cx.handle) => {
+                    // `context::with_scheduler` should match with `&self`, i.e.
+                    // there is no opportunity for a nested scheduler to be
+                    // called.
+                    context::with_scheduler(|maybe_cx| match maybe_cx {
+                        Some(CurrentThread(cx)) if Arc::ptr_eq(self, &cx.handle) => {
                             let mut core = cx.core.borrow_mut();
 
                             // If `None`, the runtime is shutting down, so there is no need to signal shutdown
@@ -590,7 +613,7 @@ impl Wake for Handle {
 /// Used to ensure we always place the `Core` value back into its slot in
 /// `CurrentThread`, even if the future panics.
 struct CoreGuard<'a> {
-    context: Context,
+    context: scheduler::Context,
     scheduler: &'a CurrentThread,
 }
 
@@ -672,13 +695,15 @@ impl CoreGuard<'_> {
     where
         F: FnOnce(Box<Core>, &Context) -> (Box<Core>, R),
     {
+        let context = self.context.expect_current_thread();
+
         // Remove `core` from `context` to pass into the closure.
-        let core = self.context.core.borrow_mut().take().expect("core missing");
+        let core = context.core.borrow_mut().take().expect("core missing");
 
         // Call the closure and place `core` back
-        let (core, ret) = CURRENT.set(&self.context, || f(core, &self.context));
+        let (core, ret) = context::set_scheduler(&self.context, || f(core, context));
 
-        *self.context.core.borrow_mut() = Some(core);
+        *context.core.borrow_mut() = Some(core);
 
         ret
     }
@@ -686,7 +711,9 @@ impl CoreGuard<'_> {
 
 impl Drop for CoreGuard<'_> {
     fn drop(&mut self) {
-        if let Some(core) = self.context.core.borrow_mut().take() {
+        let context = self.context.expect_current_thread();
+
+        if let Some(core) = context.core.borrow_mut().take() {
             // Replace old scheduler back into the state to allow
             // other threads to pick it up and drive it.
             self.scheduler.core.set(core);

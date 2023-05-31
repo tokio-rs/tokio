@@ -60,6 +60,7 @@ jobs:
       - wasm32-wasi
       - check-external-types
       - check-fuzzing
+      - check-unstable-mt-counters
     steps:
       - run: exit 0
 
@@ -232,6 +233,31 @@ jobs:
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
           RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_taskdump
+
+  check-unstable-mt-counters:
+    name: check tokio full --internal-mt-counters
+    needs: basics
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      # Run `tokio` with "unstable" and "taskdump" cfg flags.
+      - name: check tokio full --cfg unstable --cfg internal-mt-counters
+        run: cargo test --all-features
+        working-directory: tokio
+        env:
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_internal_mt_counters -Dwarnings
+          # in order to run doctests for unstable features, we must also pass
+          # the unstable cfg to RustDoc
+          RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_internal_mt_counters
 
   miri:
     name: miri
@@ -416,19 +442,6 @@ jobs:
         with:
           toolchain: ${{ env.rust_min }}
       - uses: Swatinem/rust-cache@v2
-      # First compile just the main tokio crate with minrust and newest version
-      # of all dependencies, then pin once_cell and compile the rest of the
-      # crates with the pinned once_cell version.
-      #
-      # This is necessary because tokio-util transitively depends on once_cell,
-      # which is not compatible with the current minrust after the 1.15.0
-      # release.
-      - name: "check -p tokio --all-features"
-        run: cargo check -p tokio --all-features
-        env:
-          RUSTFLAGS: "" # remove -Dwarnings
-      - name: "pin once_cell version"
-        run: cargo update -p once_cell --precise 1.14.0
       - name: "check --workspace --all-features"
         run: cargo check --workspace --all-features
         env:

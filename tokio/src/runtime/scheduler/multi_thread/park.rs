@@ -4,7 +4,6 @@
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
-use crate::loom::thread;
 use crate::runtime::driver::{self, Driver};
 use crate::util::TryLock;
 
@@ -104,18 +103,14 @@ impl Unparker {
 impl Inner {
     /// Parks the current thread for at most `dur`.
     fn park(&self, handle: &driver::Handle) {
-        for _ in 0..3 {
-            // If we were previously notified then we consume this notification and
-            // return quickly.
-            if self
-                .state
-                .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
-                .is_ok()
-            {
-                return;
-            }
-
-            thread::yield_now();
+        // If we were previously notified then we consume this notification and
+        // return quickly.
+        if self
+            .state
+            .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+            .is_ok()
+        {
+            return;
         }
 
         if let Some(mut driver) = self.shared.driver.try_lock() {
