@@ -74,6 +74,18 @@ impl<R: AsyncWrite, F> AsyncWrite for InspectReader<R, F> {
     ) -> Poll<std::result::Result<(), std::io::Error>> {
         self.project().reader.poll_shutdown(cx)
     }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+    ) -> Poll<Result<usize>> {
+        self.project().reader.poll_write_vectored(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.reader.is_write_vectored()
+    }
 }
 
 pin_project! {
