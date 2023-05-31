@@ -62,6 +62,11 @@ pin_project_lite::pin_project! {
     }
 }
 
+const FAIL_NO_THREAD_LOCAL: &str = "The Tokio thread-local has been destroyed \
+                                    as part of shutting down the current \
+                                    thread, so collecting a taskdump is not \
+                                    possible.";
+
 impl Context {
     pub(crate) const fn new() -> Self {
         Context {
@@ -72,7 +77,7 @@ impl Context {
 
     /// SAFETY: Callers of this function must ensure that trace frames always
     /// form a valid linked list.
-    unsafe fn with_current<F, R>(f: F) -> R
+    unsafe fn try_with_current<F, R>(f: F) -> Option<R>
     where
         F: FnOnce(&Self) -> R,
     {
@@ -83,14 +88,18 @@ impl Context {
     where
         F: FnOnce(&Cell<Option<NonNull<Frame>>>) -> R,
     {
-        Self::with_current(|context| f(&context.active_frame))
+        Self::try_with_current(|context| f(&context.active_frame)).expect(FAIL_NO_THREAD_LOCAL)
     }
 
     fn with_current_collector<F, R>(f: F) -> R
     where
         F: FnOnce(&Cell<Option<Trace>>) -> R,
     {
-        unsafe { Self::with_current(|context| f(&context.collector)) }
+        // SAFETY: This call can only access the collector field, so it cannot
+        // break the trace frame linked list.
+        unsafe {
+            Self::try_with_current(|context| f(&context.collector)).expect(FAIL_NO_THREAD_LOCAL)
+        }
     }
 }
 
@@ -134,7 +143,7 @@ impl Trace {
 pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
     // Safety: We don't manipulate the current context's active frame.
     let did_trace = unsafe {
-        Context::with_current(|context_cell| {
+        Context::try_with_current(|context_cell| {
             if let Some(mut collector) = context_cell.collector.take() {
                 let mut frames = vec![];
                 let mut above_leaf = false;
@@ -166,6 +175,7 @@ pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
                 false
             }
         })
+        .unwrap_or(false)
     };
 
     if did_trace {
