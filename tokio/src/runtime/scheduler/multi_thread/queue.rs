@@ -2,7 +2,8 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::Arc;
-use crate::runtime::task::{self, Inject};
+use crate::runtime::scheduler::Inject;
+use crate::runtime::task;
 use crate::runtime::MetricsBatch;
 
 use std::mem::{self, MaybeUninit};

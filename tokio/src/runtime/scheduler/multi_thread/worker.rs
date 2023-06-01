@@ -60,7 +60,8 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{queue, Counters, Handle, Idle, Parker, Unparker};
-use crate::runtime::task::{Inject, OwnedTasks};
+use crate::runtime::scheduler::Inject;
+use crate::runtime::task::OwnedTasks;
 use crate::runtime::{
     blocking, coop, driver, scheduler, task, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics,
 };

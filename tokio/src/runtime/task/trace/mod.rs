@@ -1,6 +1,5 @@
 use crate::loom::sync::Arc;
-use crate::runtime::scheduler::current_thread;
-use crate::runtime::task::Inject;
+use crate::runtime::scheduler::{current_thread, Inject};
 use backtrace::BacktraceFrame;
 use std::cell::Cell;
 use std::collections::VecDeque;

@@ -1,6 +1,9 @@
 cfg_rt! {
     pub(crate) mod current_thread;
     pub(crate) use current_thread::CurrentThread;
+
+    mod inject;
+    pub(crate) use inject::Inject;
 }
 
 cfg_rt_multi_thread! {

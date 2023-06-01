@@ -6,7 +6,7 @@ use std::ptr::NonNull;
 use std::task::{Poll, Waker};
 
 /// Raw task handle
-pub(in crate::runtime) struct RawTask {
+pub(crate) struct RawTask {
     ptr: NonNull<Header>,
 }
 
@@ -239,6 +239,27 @@ impl RawTask {
     /// Currently, this is used only when creating an `AbortHandle`.
     pub(super) fn ref_inc(self) {
         self.header().state.ref_inc();
+    }
+
+    /// Get the queue-next pointer
+    ///
+    /// This is for usage by the injection queue
+    ///
+    /// Safety: make sure only one queue uses this and access is synchronized.
+    pub(crate) unsafe fn get_queue_next(self) -> Option<RawTask> {
+        self.header()
+            .queue_next
+            .with(|ptr| *ptr)
+            .map(|p| RawTask::from_raw(p))
+    }
+
+    /// Sets the queue-next pointer
+    ///
+    /// This is for usage by the injection queue
+    ///
+    /// Safety: make sure only one queue uses this and access is synchronized.
+    pub(crate) unsafe fn set_queue_next(self, val: Option<RawTask>) {
+        self.header().set_next(val.map(|task| task.ptr));
     }
 }
 
