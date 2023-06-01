@@ -34,7 +34,7 @@ pub(crate) struct MetricsBatch {
     busy_duration_total: u64,
 
     /// Instant at which work last resumed (continued after park).
-    last_resume_time: Instant,
+    processing_scheduled_tasks_started_at: Instant,
 
     /// If `Some`, tracks poll times in nanoseconds
     poll_timer: Option<PollTimer>,
@@ -62,7 +62,7 @@ impl MetricsBatch {
             local_schedule_count: 0,
             overflow_count: 0,
             busy_duration_total: 0,
-            last_resume_time: now,
+            processing_scheduled_tasks_started_at: now,
             poll_timer: worker_metrics
                 .poll_count_histogram
                 .as_ref()
@@ -106,11 +106,20 @@ impl MetricsBatch {
         } else {
             self.poll_count_on_last_park = self.poll_count;
         }
+    }
 
-        let busy_duration = self.last_resume_time.elapsed();
+    /// Start processing a batch of tasks
+    pub(crate) fn start_processing_scheduled_tasks(&mut self) {
+        self.processing_scheduled_tasks_started_at = Instant::now();
+    }
+
+    /// Stop processing a batch of tasks
+    pub(crate) fn end_processing_scheduled_tasks(&mut self) {
+        let busy_duration = self.processing_scheduled_tasks_started_at.elapsed();
         self.busy_duration_total += duration_as_u64(busy_duration);
     }
 
+    /// Start polling an individual task
     pub(crate) fn start_poll(&mut self) {
         self.poll_count += 1;
 
@@ -119,15 +128,12 @@ impl MetricsBatch {
         }
     }
 
+    /// Stop polling an individual task
     pub(crate) fn end_poll(&mut self) {
         if let Some(poll_timer) = &mut self.poll_timer {
             let elapsed = duration_as_u64(poll_timer.poll_started_at.elapsed());
             poll_timer.poll_counts.measure(elapsed, 1);
         }
-    }
-
-    pub(crate) fn returned_from_park(&mut self) {
-        self.last_resume_time = Instant::now();
     }
 
     pub(crate) fn inc_local_schedule_count(&mut self) {

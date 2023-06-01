@@ -2,8 +2,8 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::Arc;
+use crate::runtime::scheduler::multi_thread::Stats;
 use crate::runtime::task::{self, Inject};
-use crate::runtime::MetricsBatch;
 
 use std::mem::{self, MaybeUninit};
 use std::ptr;
@@ -186,7 +186,7 @@ impl<T> Local<T> {
         &mut self,
         mut task: task::Notified<T>,
         inject: &Inject<T>,
-        metrics: &mut MetricsBatch,
+        stats: &mut Stats,
     ) {
         let tail = loop {
             let head = self.inner.head.load(Acquire);
@@ -206,7 +206,7 @@ impl<T> Local<T> {
             } else {
                 // Push the current task and half of the queue into the
                 // inject queue.
-                match self.push_overflow(task, real, tail, inject, metrics) {
+                match self.push_overflow(task, real, tail, inject, stats) {
                     Ok(_) => return,
                     // Lost the race, try again
                     Err(v) => {
@@ -253,7 +253,7 @@ impl<T> Local<T> {
         head: UnsignedShort,
         tail: UnsignedShort,
         inject: &Inject<T>,
-        metrics: &mut MetricsBatch,
+        stats: &mut Stats,
     ) -> Result<(), task::Notified<T>> {
         /// How many elements are we taking from the local queue.
         ///
@@ -338,7 +338,7 @@ impl<T> Local<T> {
         inject.push_batch(batch_iter.chain(std::iter::once(task)));
 
         // Add 1 to factor in the task currently being scheduled.
-        metrics.incr_overflow_count();
+        stats.incr_overflow_count();
 
         Ok(())
     }
@@ -394,7 +394,7 @@ impl<T> Steal<T> {
     pub(crate) fn steal_into(
         &self,
         dst: &mut Local<T>,
-        dst_metrics: &mut MetricsBatch,
+        dst_stats: &mut Stats,
     ) -> Option<task::Notified<T>> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
@@ -420,8 +420,8 @@ impl<T> Steal<T> {
             return None;
         }
 
-        dst_metrics.incr_steal_count(n as u16);
-        dst_metrics.incr_steal_operations();
+        dst_stats.incr_steal_count(n as u16);
+        dst_stats.incr_steal_operations();
 
         // We are returning a task here
         n -= 1;
