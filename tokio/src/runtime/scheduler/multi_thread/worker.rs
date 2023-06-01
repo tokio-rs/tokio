@@ -1065,11 +1065,6 @@ impl Handle {
     }
 }
 
-// fn wake_deferred_tasks() {
-//     // context::with_defer(|deferred| deferred.wake());
-//     todo!();
-// }
-
 #[track_caller]
 fn with_current<R>(f: impl FnOnce(Option<&Context>) -> R) -> R {
     use scheduler::Context::MultiThread;
