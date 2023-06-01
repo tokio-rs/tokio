@@ -1,6 +1,8 @@
 use crate::loom::sync::Arc;
-use crate::runtime::scheduler::current_thread;
+use crate::runtime::context;
+use crate::runtime::scheduler::{self, current_thread};
 use crate::runtime::task::Inject;
+
 use backtrace::BacktraceFrame;
 use std::cell::Cell;
 use std::collections::VecDeque;
@@ -179,10 +181,15 @@ pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
     if did_trace {
         // Use the same logic that `yield_now` uses to send out wakeups after
         // the task yields.
-        let defer = crate::runtime::context::with_defer(|rt| {
-            rt.defer(cx.waker());
+        context::with_scheduler(|scheduler| {
+            if let Some(scheduler) = scheduler {
+                match scheduler {
+                    scheduler::Context::CurrentThread(s) => s.defer.defer(cx.waker()),
+                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    scheduler::Context::MultiThread(s) => s.defer.defer(cx.waker()),
+                }
+            }
         });
-        debug_assert!(defer.is_some());
 
         Poll::Pending
     } else {

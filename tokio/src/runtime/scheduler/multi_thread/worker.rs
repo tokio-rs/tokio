@@ -62,6 +62,7 @@ use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{
     idle, queue, Counters, Handle, Idle, Parker, Stats, Unparker,
 };
+use crate::runtime::scheduler::Defer;
 use crate::runtime::task::{Inject, OwnedTasks};
 use crate::runtime::{
     blocking, coop, driver, scheduler, task, Config, SchedulerMetrics, WorkerMetrics,
@@ -70,6 +71,7 @@ use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
+use std::task::Waker;
 use std::time::Duration;
 
 /// A scheduler worker
@@ -189,6 +191,10 @@ pub(crate) struct Context {
 
     /// Core data
     core: RefCell<Option<Box<Core>>>,
+
+    /// Tasks to wake after resource drivers are polled. This is mostly to
+    /// handle yielded tasks.
+    pub(crate) defer: Defer,
 }
 
 /// Starts the workers
@@ -432,6 +438,7 @@ fn run(worker: Arc<Worker>) {
     let cx = scheduler::Context::MultiThread(Context {
         worker,
         core: RefCell::new(None),
+        defer: Defer::new(),
     });
 
     context::set_scheduler(&cx, || {
@@ -444,7 +451,7 @@ fn run(worker: Arc<Worker>) {
         // Check if there are any deferred tasks to notify. This can happen when
         // the worker core is lost due to `block_in_place()` being called from
         // within the task.
-        wake_deferred_tasks();
+        cx.defer.wake();
     });
 }
 
@@ -484,7 +491,7 @@ impl Context {
                 core = self.run_task(task, core)?;
             } else {
                 // Wait for work
-                core = if did_defer_tasks() {
+                core = if !self.defer.is_empty() {
                     self.park_timeout(core, Some(Duration::from_millis(0)))
                 } else {
                     self.park(core)
@@ -669,7 +676,7 @@ impl Context {
             park.park(&self.worker.handle.driver);
         }
 
-        wake_deferred_tasks();
+        self.defer.wake();
 
         // Remove `core` from context
         core = self.core.borrow_mut().take().expect("core missing");
@@ -684,6 +691,10 @@ impl Context {
         }
 
         core
+    }
+
+    pub(crate) fn defer(&self, waker: &Waker) {
+        self.defer.defer(waker);
     }
 }
 
@@ -1052,14 +1063,6 @@ impl Handle {
     fn ptr_eq(&self, other: &Handle) -> bool {
         std::ptr::eq(self, other)
     }
-}
-
-fn did_defer_tasks() -> bool {
-    context::with_defer(|deferred| !deferred.is_empty()).unwrap()
-}
-
-fn wake_deferred_tasks() {
-    context::with_defer(|deferred| deferred.wake());
 }
 
 #[track_caller]

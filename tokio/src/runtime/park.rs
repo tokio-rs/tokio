@@ -284,11 +284,6 @@ impl CachedParkThread {
                 return Ok(v);
             }
 
-            // Wake any yielded tasks before parking in order to avoid
-            // blocking.
-            #[cfg(feature = "rt")]
-            crate::runtime::context::with_defer(|defer| defer.wake());
-
             self.park();
         }
     }

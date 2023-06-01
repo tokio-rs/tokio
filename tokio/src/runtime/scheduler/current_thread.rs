@@ -2,9 +2,9 @@ use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
+use crate::runtime::scheduler::{self, Defer};
 use crate::runtime::task::{self, Inject, JoinHandle, OwnedTasks, Schedule, Task};
-use crate::runtime::{blocking, context, scheduler, Config};
-use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
+use crate::runtime::{blocking, context, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
@@ -15,6 +15,7 @@ use std::fmt;
 use std::future::Future;
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
+use std::task::Waker;
 use std::time::Duration;
 
 /// Executes tasks on the current thread
@@ -98,6 +99,9 @@ pub(crate) struct Context {
     /// Scheduler core, enabling the holder of `Context` to execute the
     /// scheduler.
     core: RefCell<Option<Box<Core>>>,
+
+    /// Deferred tasks, usually ones that called `task::yield_now()`.
+    pub(crate) defer: Defer,
 }
 
 type Notified = task::Notified<Arc<Handle>>;
@@ -201,6 +205,7 @@ impl CurrentThread {
             context: scheduler::Context::CurrentThread(Context {
                 handle: handle.clone(),
                 core: RefCell::new(Some(core)),
+                defer: Defer::new(),
             }),
             scheduler: self,
         })
@@ -320,21 +325,11 @@ impl Core {
     }
 }
 
-fn did_defer_tasks() -> bool {
-    context::with_defer(|deferred| !deferred.is_empty()).unwrap()
-}
-
-fn wake_deferred_tasks() {
-    context::with_defer(|deferred| deferred.wake());
-}
-
 #[cfg(tokio_taskdump)]
-fn wake_deferred_tasks_and_free() {
-    let wakers = context::with_defer(|deferred| deferred.take_deferred());
-    if let Some(wakers) = wakers {
-        for waker in wakers {
-            waker.wake();
-        }
+fn wake_deferred_tasks_and_free(context: &Context) {
+    let wakers = context.defer.take_deferred();
+    for waker in wakers {
+        waker.wake();
     }
 }
 
@@ -372,7 +367,7 @@ impl Context {
 
             let (c, _) = self.enter(core, || {
                 driver.park(&handle.driver);
-                wake_deferred_tasks();
+                self.defer.wake();
             });
 
             core = c;
@@ -398,7 +393,7 @@ impl Context {
 
         let (mut core, _) = self.enter(core, || {
             driver.park_timeout(&handle.driver, Duration::from_millis(0));
-            wake_deferred_tasks();
+            self.defer.wake();
         });
 
         core.driver = Some(driver);
@@ -417,6 +412,10 @@ impl Context {
         // Take the scheduler core back
         let core = self.core.borrow_mut().take().expect("core missing");
         (core, ret)
+    }
+
+    pub(crate) fn defer(&self, waker: &Waker) {
+        self.defer.defer(waker);
     }
 }
 
@@ -479,12 +478,15 @@ impl Handle {
                 .into_iter()
                 .map(dump::Task::new)
                 .collect();
-        });
 
-        // Taking a taskdump could wakes every task, but we probably don't want
-        // the `yield_now` vector to be that large under normal circumstances.
-        // Therefore, we free its allocation.
-        wake_deferred_tasks_and_free();
+            // Avoid double borrow panic
+            drop(maybe_core);
+
+            // Taking a taskdump could wakes every task, but we probably don't want
+            // the `yield_now` vector to be that large under normal circumstances.
+            // Therefore, we free its allocation.
+            wake_deferred_tasks_and_free(context);
+        });
 
         dump::Dump::new(traces)
     }
@@ -671,7 +673,7 @@ impl CoreGuard<'_> {
                         None => {
                             core.metrics.end_processing_scheduled_tasks();
 
-                            core = if did_defer_tasks() {
+                            core = if !context.defer.is_empty() {
                                 context.park_yield(core, handle)
                             } else {
                                 context.park(core, handle)
