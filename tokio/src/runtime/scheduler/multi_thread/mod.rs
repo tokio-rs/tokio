@@ -18,6 +18,7 @@ pub(crate) use park::{Parker, Unparker};
 pub(crate) mod queue;
 
 mod worker;
+use worker::Shared;
 pub(crate) use worker::{Context, Launch};
 
 pub(crate) use worker::block_in_place;

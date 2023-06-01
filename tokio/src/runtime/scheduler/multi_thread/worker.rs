@@ -60,7 +60,7 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{
-    queue, Counters, Handle, Idle, Parker, Stats, Unparker,
+    idle, queue, Counters, Handle, Idle, Parker, Stats, Unparker,
 };
 use crate::runtime::task::{Inject, OwnedTasks};
 use crate::runtime::{
@@ -143,6 +143,9 @@ pub(super) struct Shared {
     /// Collection of all active tasks spawned onto this executor.
     pub(super) owned: OwnedTasks<Arc<Handle>>,
 
+    /// Data synchronized by the scheduler mutex
+    pub(super) synced: Mutex<Synced>,
+
     /// Cores that have observed the shutdown signal
     ///
     /// The core is **not** placed back in the worker to avoid it from being
@@ -163,6 +166,11 @@ pub(super) struct Shared {
     /// investigations. This does nothing (empty struct, no drop impl) unless
     /// the `tokio_internal_mt_counters` cfg flag is set.
     _counters: Counters,
+}
+
+/// Data synchronized by the scheduler mutex
+pub(super) struct Synced {
+    pub(super) idle: idle::Synced,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -241,12 +249,15 @@ pub(super) fn create(
         worker_metrics.push(metrics);
     }
 
+    let (idle, idle_synced) = Idle::new(size);
+
     let handle = Arc::new(Handle {
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
             inject: Inject::new(),
-            idle: Idle::new(size),
+            idle,
             owned: OwnedTasks::new(),
+            synced: Mutex::new(Synced { idle: idle_synced }),
             shutdown_cores: Mutex::new(vec![]),
             config,
             scheduler_metrics: SchedulerMetrics::new(),
@@ -793,11 +804,11 @@ impl Core {
         // When the final worker transitions **out** of searching to parked, it
         // must check all the queues one last time in case work materialized
         // between the last work scan and transitioning out of searching.
-        let is_last_searcher = worker
-            .handle
-            .shared
-            .idle
-            .transition_worker_to_parked(worker.index, self.is_searching);
+        let is_last_searcher = worker.handle.shared.idle.transition_worker_to_parked(
+            &worker.handle.shared,
+            worker.index,
+            self.is_searching,
+        );
 
         // The worker is no longer searching. Setting this is the local cache
         // only.
@@ -819,11 +830,20 @@ impl Core {
             // state when the wake originates from another worker *or* a new task
             // is pushed. We do *not* want the worker to transition to "searching"
             // when it wakes when the I/O driver receives new events.
-            self.is_searching = !worker.handle.shared.idle.unpark_worker_by_id(worker.index);
+            self.is_searching = !worker
+                .handle
+                .shared
+                .idle
+                .unpark_worker_by_id(&worker.handle.shared, worker.index);
             return true;
         }
 
-        if worker.handle.shared.idle.is_parked(worker.index) {
+        if worker
+            .handle
+            .shared
+            .idle
+            .is_parked(&worker.handle.shared, worker.index)
+        {
             return false;
         }
 
@@ -964,14 +984,14 @@ impl Handle {
     fn notify_parked_local(&self) {
         super::counters::inc_num_inc_notify_local();
 
-        if let Some(index) = self.shared.idle.worker_to_notify() {
+        if let Some(index) = self.shared.idle.worker_to_notify(&self.shared) {
             super::counters::inc_num_unparks_local();
             self.shared.remotes[index].unpark.unpark(&self.driver);
         }
     }
 
     fn notify_parked_remote(&self) {
-        if let Some(index) = self.shared.idle.worker_to_notify() {
+        if let Some(index) = self.shared.idle.worker_to_notify(&self.shared) {
             self.shared.remotes[index].unpark.unpark(&self.driver);
         }
     }

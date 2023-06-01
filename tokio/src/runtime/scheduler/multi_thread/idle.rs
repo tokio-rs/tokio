@@ -1,7 +1,7 @@
 //! Coordinates idling workers
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::Mutex;
+use crate::runtime::scheduler::multi_thread::Shared;
 
 use std::fmt;
 use std::sync::atomic::Ordering::{self, SeqCst};
@@ -13,11 +13,14 @@ pub(super) struct Idle {
     /// Used as a fast-path to avoid acquiring the lock when needed.
     state: AtomicUsize,
 
-    /// Sleeping workers
-    sleepers: Mutex<Vec<usize>>,
-
     /// Total number of workers.
     num_workers: usize,
+}
+
+/// Data synchronized by the scheduler mutex
+pub(super) struct Synced {
+    /// Sleeping workers
+    sleepers: Vec<usize>,
 }
 
 const UNPARK_SHIFT: usize = 16;
@@ -28,19 +31,24 @@ const SEARCH_MASK: usize = (1 << UNPARK_SHIFT) - 1;
 struct State(usize);
 
 impl Idle {
-    pub(super) fn new(num_workers: usize) -> Idle {
+    pub(super) fn new(num_workers: usize) -> (Idle, Synced) {
         let init = State::new(num_workers);
 
-        Idle {
+        let idle = Idle {
             state: AtomicUsize::new(init.into()),
-            sleepers: Mutex::new(Vec::with_capacity(num_workers)),
             num_workers,
-        }
+        };
+
+        let synced = Synced {
+            sleepers: Vec::with_capacity(num_workers),
+        };
+
+        (idle, synced)
     }
 
     /// If there are no workers actively searching, returns the index of a
     /// worker currently sleeping.
-    pub(super) fn worker_to_notify(&self) -> Option<usize> {
+    pub(super) fn worker_to_notify(&self, shared: &Shared) -> Option<usize> {
         // If at least one worker is spinning, work being notified will
         // eventually be found. A searching thread will find **some** work and
         // notify another worker, eventually leading to our work being found.
@@ -55,7 +63,7 @@ impl Idle {
         }
 
         // Acquire the lock
-        let mut sleepers = self.sleepers.lock();
+        let mut lock = shared.synced.lock();
 
         // Check again, now that the lock is acquired
         if !self.notify_should_wakeup() {
@@ -67,7 +75,7 @@ impl Idle {
         State::unpark_one(&self.state, 1);
 
         // Get the worker to unpark
-        let ret = sleepers.pop();
+        let ret = lock.idle.sleepers.pop();
         debug_assert!(ret.is_some());
 
         ret
@@ -75,15 +83,20 @@ impl Idle {
 
     /// Returns `true` if the worker needs to do a final check for submitted
     /// work.
-    pub(super) fn transition_worker_to_parked(&self, worker: usize, is_searching: bool) -> bool {
+    pub(super) fn transition_worker_to_parked(
+        &self,
+        shared: &Shared,
+        worker: usize,
+        is_searching: bool,
+    ) -> bool {
         // Acquire the lock
-        let mut sleepers = self.sleepers.lock();
+        let mut lock = shared.synced.lock();
 
         // Decrement the number of unparked threads
         let ret = State::dec_num_unparked(&self.state, is_searching);
 
         // Track the sleeping worker
-        sleepers.push(worker);
+        lock.idle.sleepers.push(worker);
 
         ret
     }
@@ -113,8 +126,9 @@ impl Idle {
     /// within the worker's park routine.
     ///
     /// Returns `true` if the worker was parked before calling the method.
-    pub(super) fn unpark_worker_by_id(&self, worker_id: usize) -> bool {
-        let mut sleepers = self.sleepers.lock();
+    pub(super) fn unpark_worker_by_id(&self, shared: &Shared, worker_id: usize) -> bool {
+        let mut lock = shared.synced.lock();
+        let sleepers = &mut lock.idle.sleepers;
 
         for index in 0..sleepers.len() {
             if sleepers[index] == worker_id {
@@ -131,9 +145,9 @@ impl Idle {
     }
 
     /// Returns `true` if `worker_id` is contained in the sleep set.
-    pub(super) fn is_parked(&self, worker_id: usize) -> bool {
-        let sleepers = self.sleepers.lock();
-        sleepers.contains(&worker_id)
+    pub(super) fn is_parked(&self, shared: &Shared, worker_id: usize) -> bool {
+        let lock = shared.synced.lock();
+        lock.idle.sleepers.contains(&worker_id)
     }
 
     fn notify_should_wakeup(&self) -> bool {
