@@ -1,18 +1,17 @@
-use crate::runtime::scheduler::multi_thread::queue;
+use crate::runtime::scheduler::multi_thread::{queue, Stats};
 use crate::runtime::task::{self, Inject, Schedule, Task};
-use crate::runtime::MetricsBatch;
 
 use std::thread;
 use std::time::Duration;
 
 #[allow(unused)]
 macro_rules! assert_metrics {
-    ($metrics:ident, $field:ident == $v:expr) => {{
+    ($stats:ident, $field:ident == $v:expr) => {{
         use crate::runtime::WorkerMetrics;
         use std::sync::atomic::Ordering::Relaxed;
 
         let worker = WorkerMetrics::new();
-        $metrics.submit(&worker);
+        $stats.submit(&worker);
 
         let expect = $v;
         let actual = worker.$field.load(Relaxed);
@@ -21,24 +20,24 @@ macro_rules! assert_metrics {
     }};
 }
 
-fn metrics_batch() -> MetricsBatch {
+fn new_stats() -> Stats {
     use crate::runtime::WorkerMetrics;
-    MetricsBatch::new(&WorkerMetrics::new())
+    Stats::new(&WorkerMetrics::new())
 }
 
 #[test]
 fn fits_256_one_at_a_time() {
     let (_, mut local) = queue::local();
     let inject = Inject::new();
-    let mut metrics = metrics_batch();
+    let mut stats = new_stats();
 
     for _ in 0..256 {
         let (task, _) = super::unowned(async {});
-        local.push_back_or_overflow(task, &inject, &mut metrics);
+        local.push_back_or_overflow(task, &inject, &mut stats);
     }
 
     cfg_metrics! {
-        assert_metrics!(metrics, overflow_count == 0);
+        assert_metrics!(stats, overflow_count == 0);
     }
 
     assert!(inject.pop().is_none());
@@ -88,15 +87,15 @@ fn fits_256_all_in_chunks() {
 fn overflow() {
     let (_, mut local) = queue::local();
     let inject = Inject::new();
-    let mut metrics = metrics_batch();
+    let mut stats = new_stats();
 
     for _ in 0..257 {
         let (task, _) = super::unowned(async {});
-        local.push_back_or_overflow(task, &inject, &mut metrics);
+        local.push_back_or_overflow(task, &inject, &mut stats);
     }
 
     cfg_metrics! {
-        assert_metrics!(metrics, overflow_count == 1);
+        assert_metrics!(stats, overflow_count == 1);
     }
 
     let mut n = 0;
@@ -114,7 +113,7 @@ fn overflow() {
 
 #[test]
 fn steal_batch() {
-    let mut metrics = metrics_batch();
+    let mut stats = new_stats();
 
     let (steal1, mut local1) = queue::local();
     let (_, mut local2) = queue::local();
@@ -122,13 +121,13 @@ fn steal_batch() {
 
     for _ in 0..4 {
         let (task, _) = super::unowned(async {});
-        local1.push_back_or_overflow(task, &inject, &mut metrics);
+        local1.push_back_or_overflow(task, &inject, &mut stats);
     }
 
-    assert!(steal1.steal_into(&mut local2, &mut metrics).is_some());
+    assert!(steal1.steal_into(&mut local2, &mut stats).is_some());
 
     cfg_metrics! {
-        assert_metrics!(metrics, steal_count == 2);
+        assert_metrics!(stats, steal_count == 2);
     }
 
     for _ in 0..1 {
@@ -160,19 +159,19 @@ fn stress1() {
     const NUM_PUSH: usize = normal_or_miri(500, 10);
     const NUM_POP: usize = normal_or_miri(250, 10);
 
-    let mut metrics = metrics_batch();
+    let mut stats = new_stats();
 
     for _ in 0..NUM_ITER {
         let (steal, mut local) = queue::local();
         let inject = Inject::new();
 
         let th = thread::spawn(move || {
-            let mut metrics = metrics_batch();
+            let mut stats = new_stats();
             let (_, mut local) = queue::local();
             let mut n = 0;
 
             for _ in 0..NUM_STEAL {
-                if steal.steal_into(&mut local, &mut metrics).is_some() {
+                if steal.steal_into(&mut local, &mut stats).is_some() {
                     n += 1;
                 }
 
@@ -184,7 +183,7 @@ fn stress1() {
             }
 
             cfg_metrics! {
-                assert_metrics!(metrics, steal_count == n as _);
+                assert_metrics!(stats, steal_count == n as _);
             }
 
             n
@@ -195,7 +194,7 @@ fn stress1() {
         for _ in 0..NUM_LOCAL {
             for _ in 0..NUM_PUSH {
                 let (task, _) = super::unowned(async {});
-                local.push_back_or_overflow(task, &inject, &mut metrics);
+                local.push_back_or_overflow(task, &inject, &mut stats);
             }
 
             for _ in 0..NUM_POP {
@@ -223,14 +222,14 @@ fn stress2() {
     const NUM_TASKS: usize = normal_or_miri(1_000_000, 50);
     const NUM_STEAL: usize = normal_or_miri(1_000, 10);
 
-    let mut metrics = metrics_batch();
+    let mut stats = new_stats();
 
     for _ in 0..NUM_ITER {
         let (steal, mut local) = queue::local();
         let inject = Inject::new();
 
         let th = thread::spawn(move || {
-            let mut stats = metrics_batch();
+            let mut stats = new_stats();
             let (_, mut local) = queue::local();
             let mut n = 0;
 
@@ -253,7 +252,7 @@ fn stress2() {
 
         for i in 0..NUM_TASKS {
             let (task, _) = super::unowned(async {});
-            local.push_back_or_overflow(task, &inject, &mut metrics);
+            local.push_back_or_overflow(task, &inject, &mut stats);
 
             if i % 128 == 0 && local.pop().is_some() {
                 num_pop += 1;

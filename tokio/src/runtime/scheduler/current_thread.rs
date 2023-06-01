@@ -59,6 +59,9 @@ struct Core {
     /// Metrics batch
     metrics: MetricsBatch,
 
+    /// How often to check the global queue
+    global_queue_interval: u32,
+
     /// True if a task panicked without being handled and the runtime is
     /// configured to shutdown on unhandled panic.
     unhandled_panic: bool,
@@ -102,6 +105,11 @@ type Notified = task::Notified<Arc<Handle>>;
 /// Initial queue capacity.
 const INITIAL_CAPACITY: usize = 64;
 
+/// Used if none is specified. This is a temporary constant and will be removed
+/// as we unify tuning logic between the multi-thread and current-thread
+/// schedulers.
+const DEFAULT_GLOBAL_QUEUE_INTERVAL: u32 = 31;
+
 impl CurrentThread {
     pub(crate) fn new(
         driver: Driver,
@@ -111,6 +119,11 @@ impl CurrentThread {
         config: Config,
     ) -> (CurrentThread, Arc<Handle>) {
         let worker_metrics = WorkerMetrics::from_config(&config);
+
+        // Get the configured global queue interval, or use the default.
+        let global_queue_interval = config
+            .global_queue_interval
+            .unwrap_or(DEFAULT_GLOBAL_QUEUE_INTERVAL);
 
         let handle = Arc::new(Handle {
             shared: Shared {
@@ -131,6 +144,7 @@ impl CurrentThread {
             tick: 0,
             driver: Some(driver),
             metrics: MetricsBatch::new(&handle.shared.worker_metrics),
+            global_queue_interval,
             unhandled_panic: false,
         })));
 
@@ -273,7 +287,7 @@ impl Core {
     }
 
     fn next_task(&mut self, handle: &Handle) -> Option<Notified> {
-        if self.tick % handle.shared.config.global_queue_interval == 0 {
+        if self.tick % self.global_queue_interval == 0 {
             handle
                 .next_remote_task()
                 .or_else(|| self.next_local_task(handle))
@@ -362,7 +376,6 @@ impl Context {
             });
 
             core = c;
-            core.metrics.returned_from_park();
         }
 
         if let Some(f) = &handle.shared.config.after_unpark {
@@ -626,6 +639,8 @@ impl CoreGuard<'_> {
 
             pin!(future);
 
+            core.metrics.start_processing_scheduled_tasks();
+
             'outer: loop {
                 let handle = &context.handle;
 
@@ -654,11 +669,15 @@ impl CoreGuard<'_> {
                     let task = match entry {
                         Some(entry) => entry,
                         None => {
+                            core.metrics.end_processing_scheduled_tasks();
+
                             core = if did_defer_tasks() {
                                 context.park_yield(core, handle)
                             } else {
                                 context.park(core, handle)
                             };
+
+                            core.metrics.start_processing_scheduled_tasks();
 
                             // Try polling the `block_on` future next
                             continue 'outer;
@@ -674,9 +693,13 @@ impl CoreGuard<'_> {
                     core = c;
                 }
 
+                core.metrics.end_processing_scheduled_tasks();
+
                 // Yield to the driver, this drives the timer and pulls any
                 // pending I/O events.
                 core = context.park_yield(core, handle);
+
+                core.metrics.start_processing_scheduled_tasks();
             }
         });
 
