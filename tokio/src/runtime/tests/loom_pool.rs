@@ -347,6 +347,7 @@ mod group_d {
 fn mk_pool(num_threads: usize) -> Runtime {
     runtime::Builder::new_multi_thread()
         .worker_threads(num_threads)
+        // Set the intervals to avoid tuning logic
         .event_interval(2)
         .build()
         .unwrap()

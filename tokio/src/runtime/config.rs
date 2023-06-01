@@ -4,7 +4,7 @@ use crate::util::RngSeedGenerator;
 
 pub(crate) struct Config {
     /// How many ticks before pulling a task from the global/remote queue?
-    pub(crate) global_queue_interval: u32,
+    pub(crate) global_queue_interval: Option<u32>,
 
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(crate) event_interval: u32,
