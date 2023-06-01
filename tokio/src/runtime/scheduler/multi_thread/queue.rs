@@ -2,8 +2,7 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::Arc;
-use crate::runtime::scheduler::multi_thread::Stats;
-use crate::runtime::scheduler::Inject;
+use crate::runtime::scheduler::multi_thread::{Overflow, Stats};
 use crate::runtime::task;
 
 use std::mem::{self, MaybeUninit};
@@ -183,10 +182,10 @@ impl<T> Local<T> {
     /// When the queue overflows, half of the curent contents of the queue is
     /// moved to the given Injection queue. This frees up capacity for more
     /// tasks to be pushed into the local queue.
-    pub(crate) fn push_back_or_overflow(
+    pub(crate) fn push_back_or_overflow<O: Overflow<T>>(
         &mut self,
         mut task: task::Notified<T>,
-        inject: &Inject<T>,
+        overflow: &O,
         stats: &mut Stats,
     ) {
         let tail = loop {
@@ -202,12 +201,12 @@ impl<T> Local<T> {
             } else if steal != real {
                 // Concurrently stealing, this will free up capacity, so only
                 // push the task onto the inject queue
-                inject.push(task);
+                overflow.push(task);
                 return;
             } else {
                 // Push the current task and half of the queue into the
                 // inject queue.
-                match self.push_overflow(task, real, tail, inject, stats) {
+                match self.push_overflow(task, real, tail, overflow, stats) {
                     Ok(_) => return,
                     // Lost the race, try again
                     Err(v) => {
@@ -248,12 +247,12 @@ impl<T> Local<T> {
     /// workers "missed" some of the tasks during a steal, they will get
     /// another opportunity.
     #[inline(never)]
-    fn push_overflow(
+    fn push_overflow<O: Overflow<T>>(
         &mut self,
         task: task::Notified<T>,
         head: UnsignedShort,
         tail: UnsignedShort,
-        inject: &Inject<T>,
+        overflow: &O,
         stats: &mut Stats,
     ) -> Result<(), task::Notified<T>> {
         /// How many elements are we taking from the local queue.
@@ -336,7 +335,7 @@ impl<T> Local<T> {
             head: head as UnsignedLong,
             i: 0,
         };
-        inject.push_batch(batch_iter.chain(std::iter::once(task)));
+        overflow.push_batch(batch_iter.chain(std::iter::once(task)));
 
         // Add 1 to factor in the task currently being scheduled.
         stats.incr_overflow_count();

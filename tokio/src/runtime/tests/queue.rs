@@ -1,7 +1,7 @@
 use crate::runtime::scheduler::multi_thread::{queue, Stats};
-use crate::runtime::scheduler::Inject;
 use crate::runtime::task::{self, Schedule, Task};
 
+use std::cell::RefCell;
 use std::thread;
 use std::time::Duration;
 
@@ -29,7 +29,7 @@ fn new_stats() -> Stats {
 #[test]
 fn fits_256_one_at_a_time() {
     let (_, mut local) = queue::local();
-    let inject = Inject::new();
+    let inject = RefCell::new(vec![]);
     let mut stats = new_stats();
 
     for _ in 0..256 {
@@ -41,7 +41,7 @@ fn fits_256_one_at_a_time() {
         assert_metrics!(stats, overflow_count == 0);
     }
 
-    assert!(inject.pop().is_none());
+    assert!(inject.borrow_mut().pop().is_none());
 
     while local.pop().is_some() {}
 }
@@ -87,7 +87,7 @@ fn fits_256_all_in_chunks() {
 #[test]
 fn overflow() {
     let (_, mut local) = queue::local();
-    let inject = Inject::new();
+    let inject = RefCell::new(vec![]);
     let mut stats = new_stats();
 
     for _ in 0..257 {
@@ -101,9 +101,7 @@ fn overflow() {
 
     let mut n = 0;
 
-    while inject.pop().is_some() {
-        n += 1;
-    }
+    n += inject.borrow_mut().drain(..).count();
 
     while local.pop().is_some() {
         n += 1;
@@ -118,7 +116,7 @@ fn steal_batch() {
 
     let (steal1, mut local1) = queue::local();
     let (_, mut local2) = queue::local();
-    let inject = Inject::new();
+    let inject = RefCell::new(vec![]);
 
     for _ in 0..4 {
         let (task, _) = super::unowned(async {});
@@ -164,7 +162,7 @@ fn stress1() {
 
     for _ in 0..NUM_ITER {
         let (steal, mut local) = queue::local();
-        let inject = Inject::new();
+        let inject = RefCell::new(vec![]);
 
         let th = thread::spawn(move || {
             let mut stats = new_stats();
@@ -207,9 +205,7 @@ fn stress1() {
             }
         }
 
-        while inject.pop().is_some() {
-            n += 1;
-        }
+        n += inject.borrow_mut().drain(..).count();
 
         n += th.join().unwrap();
 
@@ -227,7 +223,7 @@ fn stress2() {
 
     for _ in 0..NUM_ITER {
         let (steal, mut local) = queue::local();
-        let inject = Inject::new();
+        let inject = RefCell::new(vec![]);
 
         let th = thread::spawn(move || {
             let mut stats = new_stats();
@@ -259,9 +255,7 @@ fn stress2() {
                 num_pop += 1;
             }
 
-            while inject.pop().is_some() {
-                num_pop += 1;
-            }
+            num_pop += inject.borrow_mut().drain(..).count();
         }
 
         num_pop += th.join().unwrap();
@@ -270,9 +264,7 @@ fn stress2() {
             num_pop += 1;
         }
 
-        while inject.pop().is_some() {
-            num_pop += 1;
-        }
+        num_pop += inject.borrow_mut().drain(..).count();
 
         assert_eq!(num_pop, NUM_TASKS);
     }

@@ -1,8 +1,8 @@
 use crate::runtime::scheduler::multi_thread::{queue, Stats};
-use crate::runtime::scheduler::Inject;
 use crate::runtime::tests::NoopSchedule;
 
 use loom::thread;
+use std::cell::RefCell;
 
 fn new_stats() -> Stats {
     Stats::new(&crate::runtime::WorkerMetrics::new())
@@ -12,7 +12,7 @@ fn new_stats() -> Stats {
 fn basic() {
     loom::model(|| {
         let (steal, mut local) = queue::local();
-        let inject = Inject::new();
+        let inject = RefCell::new(vec![]);
         let mut stats = new_stats();
 
         let th = thread::spawn(move || {
@@ -54,9 +54,7 @@ fn basic() {
             }
         }
 
-        while inject.pop().is_some() {
-            n += 1;
-        }
+        n += inject.borrow_mut().drain(..).count();
 
         n += th.join().unwrap();
 
@@ -68,7 +66,7 @@ fn basic() {
 fn steal_overflow() {
     loom::model(|| {
         let (steal, mut local) = queue::local();
-        let inject = Inject::new();
+        let inject = RefCell::new(vec![]);
         let mut stats = new_stats();
 
         let th = thread::spawn(move || {
@@ -108,9 +106,7 @@ fn steal_overflow() {
             n += 1;
         }
 
-        while inject.pop().is_some() {
-            n += 1;
-        }
+        n += inject.borrow_mut().drain(..).count();
 
         assert_eq!(7, n);
     });
@@ -139,7 +135,7 @@ fn multi_stealer() {
 
     loom::model(|| {
         let (steal, mut local) = queue::local();
-        let inject = Inject::new();
+        let inject = RefCell::new(vec![]);
         let mut stats = new_stats();
 
         // Push work
@@ -161,9 +157,7 @@ fn multi_stealer() {
             n += 1;
         }
 
-        while inject.pop().is_some() {
-            n += 1;
-        }
+        n += inject.borrow_mut().drain(..).count();
 
         n += th1.join().unwrap();
         n += th2.join().unwrap();
@@ -178,7 +172,7 @@ fn chained_steal() {
         let mut stats = new_stats();
         let (s1, mut l1) = queue::local();
         let (s2, mut l2) = queue::local();
-        let inject = Inject::new();
+        let inject = RefCell::new(vec![]);
 
         // Load up some tasks
         for _ in 0..4 {
@@ -207,6 +201,5 @@ fn chained_steal() {
 
         while l1.pop().is_some() {}
         while l2.pop().is_some() {}
-        while inject.pop().is_some() {}
     });
 }

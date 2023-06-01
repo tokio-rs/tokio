@@ -5,11 +5,14 @@ cfg_rt! {
     mod defer;
     use defer::Defer;
 
-    mod inject;
+    pub(crate) mod inject;
     pub(crate) use inject::Inject;
 }
 
 cfg_rt_multi_thread! {
+    mod lock;
+    use lock::Lock;
+
     pub(crate) mod multi_thread;
     pub(crate) use multi_thread::MultiThread;
 }
