@@ -62,8 +62,8 @@ use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{
     idle, queue, Counters, Handle, Idle, Parker, Stats, Unparker,
 };
-use crate::runtime::scheduler::Defer;
-use crate::runtime::task::{Inject, OwnedTasks};
+use crate::runtime::scheduler::{Defer, Inject};
+use crate::runtime::task::OwnedTasks;
 use crate::runtime::{
     blocking, coop, driver, scheduler, task, Config, SchedulerMetrics, WorkerMetrics,
 };

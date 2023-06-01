@@ -4,6 +4,9 @@ cfg_rt! {
 
     mod defer;
     use defer::Defer;
+
+    mod inject;
+    pub(crate) use inject::Inject;
 }
 
 cfg_rt_multi_thread! {

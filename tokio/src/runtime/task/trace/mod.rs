@@ -1,7 +1,6 @@
 use crate::loom::sync::Arc;
 use crate::runtime::context;
-use crate::runtime::scheduler::{self, current_thread};
-use crate::runtime::task::Inject;
+use crate::runtime::scheduler::{self, current_thread, Inject};
 
 use backtrace::BacktraceFrame;
 use std::cell::Cell;

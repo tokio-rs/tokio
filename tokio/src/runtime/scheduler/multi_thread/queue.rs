@@ -3,7 +3,8 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::Arc;
 use crate::runtime::scheduler::multi_thread::Stats;
-use crate::runtime::task::{self, Inject};
+use crate::runtime::scheduler::Inject;
+use crate::runtime::task;
 
 use std::mem::{self, MaybeUninit};
 use std::ptr;

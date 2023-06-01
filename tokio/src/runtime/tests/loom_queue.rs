@@ -1,5 +1,5 @@
 use crate::runtime::scheduler::multi_thread::{queue, Stats};
-use crate::runtime::task::Inject;
+use crate::runtime::scheduler::Inject;
 use crate::runtime::tests::NoopSchedule;
 
 use loom::thread;

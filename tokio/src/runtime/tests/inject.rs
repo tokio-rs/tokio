@@ -1,4 +1,4 @@
-use crate::runtime::task::Inject;
+use crate::runtime::scheduler::Inject;
 
 #[test]
 fn push_and_pop() {

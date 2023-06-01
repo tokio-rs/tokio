@@ -1,5 +1,6 @@
 use crate::runtime::scheduler::multi_thread::{queue, Stats};
-use crate::runtime::task::{self, Inject, Schedule, Task};
+use crate::runtime::scheduler::Inject;
+use crate::runtime::task::{self, Schedule, Task};
 
 use std::thread;
 use std::time::Duration;

@@ -5,7 +5,6 @@ use crate::loom::sync::{Mutex, MutexGuard};
 use crate::runtime::task;
 
 use std::marker::PhantomData;
-use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{Acquire, Release};
 
 /// Growable, MPMC queue used to inject new tasks into the scheduler and as an
@@ -26,10 +25,10 @@ struct Pointers {
     is_closed: bool,
 
     /// Linked-list head.
-    head: Option<NonNull<task::Header>>,
+    head: Option<task::RawTask>,
 
     /// Linked-list tail.
-    tail: Option<NonNull<task::Header>>,
+    tail: Option<task::RawTask>,
 }
 
 pub(crate) struct Pop<'a, T: 'static> {
@@ -190,8 +189,8 @@ cfg_rt_multi_thread! {
         #[inline]
         fn push_batch_inner(
             &self,
-            batch_head: NonNull<task::Header>,
-            batch_tail: NonNull<task::Header>,
+            batch_head: task::RawTask,
+            batch_tail: task::RawTask,
             num: usize,
         ) {
             debug_assert!(get_next(batch_tail).is_none());
@@ -282,12 +281,12 @@ impl Pointers {
     }
 }
 
-fn get_next(header: NonNull<task::Header>) -> Option<NonNull<task::Header>> {
-    unsafe { header.as_ref().queue_next.with(|ptr| *ptr) }
+fn get_next(task: task::RawTask) -> Option<task::RawTask> {
+    unsafe { task.get_queue_next() }
 }
 
-fn set_next(header: NonNull<task::Header>, val: Option<NonNull<task::Header>>) {
+fn set_next(task: task::RawTask, val: Option<task::RawTask>) {
     unsafe {
-        header.as_ref().set_next(val);
+        task.set_queue_next(val);
     }
 }
