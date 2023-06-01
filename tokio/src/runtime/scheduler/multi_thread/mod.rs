@@ -9,12 +9,16 @@ pub(crate) use handle::Handle;
 mod idle;
 use self::idle::Idle;
 
+mod stats;
+pub(crate) use stats::Stats;
+
 mod park;
 pub(crate) use park::{Parker, Unparker};
 
 pub(crate) mod queue;
 
 mod worker;
+use worker::Shared;
 pub(crate) use worker::{Context, Launch};
 
 pub(crate) use worker::block_in_place;

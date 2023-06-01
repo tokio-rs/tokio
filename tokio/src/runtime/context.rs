@@ -10,10 +10,11 @@ cfg_rt! {
     mod scoped;
     use scoped::Scoped;
 
-    use crate::runtime::{scheduler, task::Id, Defer};
+    use crate::runtime::{scheduler, task::Id};
 
     use std::cell::RefCell;
     use std::marker::PhantomData;
+    use std::task::Waker;
     use std::time::Duration;
 
     cfg_taskdump! {
@@ -44,11 +45,6 @@ struct Context {
     /// within a runtime.
     #[cfg(feature = "rt")]
     runtime: Cell<EnterRuntime>,
-
-    /// Yielded task wakers are stored here and notified after resource drivers
-    /// are polled.
-    #[cfg(feature = "rt")]
-    defer: RefCell<Option<Defer>>,
 
     #[cfg(any(feature = "rt", feature = "macros"))]
     rng: FastRand,
@@ -92,9 +88,6 @@ tokio_thread_local! {
             /// within a runtime.
             #[cfg(feature = "rt")]
             runtime: Cell::new(EnterRuntime::NotEntered),
-
-            #[cfg(feature = "rt")]
-            defer: RefCell::new(None),
 
             #[cfg(any(feature = "rt", feature = "macros"))]
             rng: FastRand::new(RngSeed::new()),
@@ -170,12 +163,6 @@ cfg_rt! {
 
         #[allow(dead_code)] // Only tracking the guard.
         pub(crate) handle: SetCurrentGuard,
-
-        /// If true, then this is the root runtime guard. It is possible to nest
-        /// runtime guards by using `block_in_place` between the calls. We need
-        /// to track the root guard as this is the guard responsible for freeing
-        /// the deferred task queue.
-        is_root: bool,
     }
 
     /// Guard tracking that a caller has entered a blocking region.
@@ -240,20 +227,9 @@ cfg_rt! {
                 // Set the entered flag
                 c.runtime.set(EnterRuntime::Entered { allow_block_in_place });
 
-                // Initialize queue to track yielded tasks
-                let mut defer = c.defer.borrow_mut();
-
-                let is_root = if defer.is_none() {
-                    *defer = Some(Defer::new());
-                    true
-                } else {
-                    false
-                };
-
                 Some(EnterRuntimeGuard {
                     blocking: BlockingRegionGuard::new(),
                     handle: c.set_current(handle),
-                    is_root,
                 })
             }
         })
@@ -292,11 +268,17 @@ cfg_rt! {
         DisallowBlockInPlaceGuard(reset)
     }
 
-    pub(crate) fn with_defer<R>(f: impl FnOnce(&mut Defer) -> R) -> Option<R> {
-        CONTEXT.with(|c| {
-            let mut defer = c.defer.borrow_mut();
-            defer.as_mut().map(f)
-        })
+    #[track_caller]
+    pub(crate) fn defer(waker: &Waker) {
+        with_scheduler(|maybe_scheduler| {
+            if let Some(scheduler) = maybe_scheduler {
+                scheduler.defer(waker);
+            } else {
+                // Called from outside of the runtime, immediately wake the
+                // task.
+                waker.wake_by_ref();
+            }
+        });
     }
 
     pub(super) fn set_scheduler<R>(v: &scheduler::Context, f: impl FnOnce() -> R) -> R {
@@ -342,10 +324,6 @@ cfg_rt! {
             CONTEXT.with(|c| {
                 assert!(c.runtime.get().is_entered());
                 c.runtime.set(EnterRuntime::NotEntered);
-
-                if self.is_root {
-                    *c.defer.borrow_mut() = None;
-                }
             });
         }
     }
@@ -354,6 +332,7 @@ cfg_rt! {
         fn new() -> BlockingRegionGuard {
             BlockingRegionGuard { _p: PhantomData }
         }
+
         /// Blocks the thread on the specified future, returning the value with
         /// which that future completes.
         pub(crate) fn block_on<F>(&mut self, f: F) -> Result<F::Output, AccessError>
@@ -396,10 +375,6 @@ cfg_rt! {
                 if now >= when {
                     return Err(());
                 }
-
-                // Wake any yielded tasks before parking in order to avoid
-                // blocking.
-                with_defer(|defer| defer.wake());
 
                 park.park_timeout(when - now);
             }

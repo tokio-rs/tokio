@@ -230,9 +230,6 @@ cfg_rt! {
         pub use crate::util::rand::RngSeed;
     }
 
-    mod defer;
-    pub(crate) use defer::Defer;
-
     cfg_taskdump! {
         pub mod dump;
         pub use dump::Dump;
