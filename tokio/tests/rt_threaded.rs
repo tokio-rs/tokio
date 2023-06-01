@@ -627,7 +627,6 @@ fn test_tuning() {
     }
 
     // Now, hammer the injection queue until the interval drops.
-    let mut i = 0;
     let mut n = 0;
     loop {
         let curr = interval.load(Relaxed);
@@ -645,18 +644,16 @@ fn test_tuning() {
             break;
         }
 
-        let counter = counter.clone();
-        let interval = interval.clone();
+        if Arc::strong_count(&interval) < 5_000 {
+            let counter = counter.clone();
+            let interval = interval.clone();
 
-        if i <= 5_000 {
-            i += 1;
             rt.spawn(async move {
                 let prev = counter.swap(0, Relaxed);
                 interval.store(prev, Relaxed);
             });
+
             std::thread::yield_now();
-        } else {
-            std::thread::sleep(Duration::from_micros(500));
         }
     }
 
@@ -682,7 +679,6 @@ fn test_tuning() {
     }
 
     // Now, hammer the injection queue until the interval reaches the expected range.
-    let mut i = 0;
     let mut n = 0;
     loop {
         let curr = interval.load(Relaxed);
@@ -697,20 +693,17 @@ fn test_tuning() {
             break;
         }
 
-        let counter = counter.clone();
-        let interval = interval.clone();
+        if Arc::strong_count(&interval) <= 5_000 {
+            let counter = counter.clone();
+            let interval = interval.clone();
 
-        if i <= 5_000 {
-            i += 1;
             rt.spawn(async move {
                 let prev = counter.swap(0, Relaxed);
                 interval.store(prev, Relaxed);
             });
-
-            std::thread::yield_now();
-        } else {
-            std::thread::sleep(Duration::from_micros(500));
         }
+
+        std::thread::yield_now();
     }
 
     flag.store(false, Relaxed);
