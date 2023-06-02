@@ -105,9 +105,12 @@ pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
 }
 
 impl<T> Local<T> {
-    /// Returns true if the queue has entries that can be stolen.
-    pub(crate) fn is_stealable(&self) -> bool {
-        !self.inner.is_empty()
+    /// Returns the number of entries in the queue
+    pub(crate) fn tasks_num(&self) -> (usize /* stealable */, usize /* total */) {
+        let n = self.inner.len() as usize;
+        // I'm not sure if it's really necessary to return a tuple, but based on has_tasks's comments,
+        // it seems that there may be tasks in queue that cannot be stolen?
+        (n, n)
     }
 
     /// How many tasks can be pushed into the queue
