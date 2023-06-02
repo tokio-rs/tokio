@@ -47,8 +47,8 @@ impl<T: 'static> Inject<T> {
     /// Closes the injection queue, returns `true` if the queue is open when the
     /// transition is made.
     pub(crate) fn close(&self) -> bool {
-        let synced = self.synced.lock();
-        self.shared.is_closed(&synced)
+        let mut synced = self.synced.lock();
+        self.shared.close(&mut synced)
     }
 
     /// Pushes a value into the queue.
