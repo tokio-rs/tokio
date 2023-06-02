@@ -21,13 +21,14 @@ categories = ["asynchronous"]
 default = []
 
 # Shorthand for enabling everything
-full = ["codec", "compat", "io-util", "time", "net", "rt"]
+full = ["codec", "compat", "io-util", "time", "net", "rt", "tasks"]
 
 net = ["tokio/net"]
 compat = ["futures-io",]
 codec = ["tracing"]
 time = ["tokio/time","slab"]
 io = []
+tasks = []
 io-util = ["io", "tokio/rt", "tokio/io-util"]
 rt = ["tokio/rt", "tokio/sync", "futures-util", "hashbrown"]
 
