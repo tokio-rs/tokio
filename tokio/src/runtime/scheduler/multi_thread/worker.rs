@@ -60,9 +60,9 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{
-    idle, queue, Counters, Handle, Idle, Parker, Stats, Unparker,
+    idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, Unparker,
 };
-use crate::runtime::scheduler::{Defer, Inject};
+use crate::runtime::scheduler::{inject, Defer, Lock};
 use crate::runtime::task::OwnedTasks;
 use crate::runtime::{
     blocking, coop, driver, scheduler, task, Config, SchedulerMetrics, WorkerMetrics,
@@ -129,7 +129,7 @@ struct Core {
 }
 
 /// State shared across all workers
-pub(super) struct Shared {
+pub(crate) struct Shared {
     /// Per-worker remote state. All other workers have access to this and is
     /// how they communicate between each other.
     remotes: Box<[Remote]>,
@@ -137,7 +137,7 @@ pub(super) struct Shared {
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    inject: Inject<Arc<Handle>>,
+    inject: inject::Shared<Arc<Handle>>,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -172,7 +172,11 @@ pub(super) struct Shared {
 
 /// Data synchronized by the scheduler mutex
 pub(super) struct Synced {
+    /// Synchronized state for `Idle`.
     pub(super) idle: idle::Synced,
+
+    /// Synchronized state for `Inject`.
+    inject: inject::Synced,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -256,14 +260,18 @@ pub(super) fn create(
     }
 
     let (idle, idle_synced) = Idle::new(size);
+    let (inject, inject_synced) = inject::Shared::new();
 
     let handle = Arc::new(Handle {
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
-            inject: Inject::new(),
+            inject,
             idle,
             owned: OwnedTasks::new(),
-            synced: Mutex::new(Synced { idle: idle_synced }),
+            synced: Mutex::new(Synced {
+                idle: idle_synced,
+                inject: inject_synced,
+            }),
             shutdown_cores: Mutex::new(vec![]),
             config,
             scheduler_metrics: SchedulerMetrics::new(),
@@ -561,7 +569,7 @@ impl Context {
                     // the back of the queue and return.
                     core.run_queue.push_back_or_overflow(
                         task,
-                        self.worker.inject(),
+                        &*self.worker.handle,
                         &mut core.stats,
                     );
                     // If we hit this point, the LIFO slot should be enabled.
@@ -710,12 +718,19 @@ impl Core {
             // Update the global queue interval, if needed
             self.tune_global_queue_interval(worker);
 
-            worker.inject().pop().or_else(|| self.next_local_task())
+            worker
+                .handle
+                .next_remote_task()
+                .or_else(|| self.next_local_task())
         } else {
             let maybe_task = self.next_local_task();
 
             if maybe_task.is_some() {
                 return maybe_task;
+            }
+
+            if worker.inject().is_empty() {
+                return None;
             }
 
             // Other threads can only **remove** tasks from the current worker's
@@ -735,7 +750,9 @@ impl Core {
                 cap,
             );
 
-            let mut tasks = worker.inject().pop_n(n);
+            let mut synced = worker.handle.shared.synced.lock();
+            // safety: passing in the correct `inject::Synced`.
+            let mut tasks = unsafe { worker.inject().pop_n(&mut synced.inject, n) };
 
             // Pop the first task to return immedietly
             let ret = tasks.next();
@@ -783,7 +800,7 @@ impl Core {
         }
 
         // Fallback on checking the global queue
-        worker.handle.shared.inject.pop()
+        worker.handle.next_remote_task()
     }
 
     fn transition_to_searching(&mut self, worker: &Worker) -> bool {
@@ -870,7 +887,8 @@ impl Core {
 
         if !self.is_shutdown {
             // Check if the scheduler has been shutdown
-            self.is_shutdown = worker.inject().is_closed();
+            let synced = worker.handle.shared.synced.lock();
+            self.is_shutdown = worker.inject().is_closed(&synced.inject);
         }
     }
 
@@ -911,7 +929,7 @@ impl Core {
 
 impl Worker {
     /// Returns a reference to the scheduler's injection queue.
-    fn inject(&self) -> &Inject<Arc<Handle>> {
+    fn inject(&self) -> &inject::Shared<Arc<Handle>> {
         &self.handle.shared.inject
     }
 }
@@ -946,8 +964,7 @@ impl Handle {
             }
 
             // Otherwise, use the inject queue.
-            self.shared.inject.push(task);
-            self.shared.scheduler_metrics.inc_remote_schedule_count();
+            self.push_remote_task(task);
             self.notify_parked_remote();
         })
     }
@@ -961,7 +978,7 @@ impl Handle {
         // flexibility and the task may go to the front of the queue.
         let should_notify = if is_yield || !core.lifo_enabled {
             core.run_queue
-                .push_back_or_overflow(task, &self.shared.inject, &mut core.stats);
+                .push_back_or_overflow(task, self, &mut core.stats);
             true
         } else {
             // Push to the LIFO slot
@@ -970,7 +987,7 @@ impl Handle {
 
             if let Some(prev) = prev {
                 core.run_queue
-                    .push_back_or_overflow(prev, &self.shared.inject, &mut core.stats);
+                    .push_back_or_overflow(prev, self, &mut core.stats);
             }
 
             core.lifo_slot = Some(task);
@@ -986,8 +1003,32 @@ impl Handle {
         }
     }
 
+    fn next_remote_task(&self) -> Option<Notified> {
+        if self.shared.inject.is_empty() {
+            return None;
+        }
+
+        let mut synced = self.shared.synced.lock();
+        // safety: passing in correct `idle::Synced`
+        unsafe { self.shared.inject.pop(&mut synced.inject) }
+    }
+
+    fn push_remote_task(&self, task: Notified) {
+        self.shared.scheduler_metrics.inc_remote_schedule_count();
+
+        let mut synced = self.shared.synced.lock();
+        // safety: passing in correct `idle::Synced`
+        unsafe {
+            self.shared.inject.push(&mut synced.inject, task);
+        }
+    }
+
     pub(super) fn close(&self) {
-        if self.shared.inject.close() {
+        if self
+            .shared
+            .inject
+            .close(&mut self.shared.synced.lock().inject)
+        {
             self.notify_all();
         }
     }
@@ -1055,13 +1096,48 @@ impl Handle {
         // Drain the injection queue
         //
         // We already shut down every task, so we can simply drop the tasks.
-        while let Some(task) = self.shared.inject.pop() {
+        while let Some(task) = self.next_remote_task() {
             drop(task);
         }
     }
 
     fn ptr_eq(&self, other: &Handle) -> bool {
         std::ptr::eq(self, other)
+    }
+}
+
+impl Overflow<Arc<Handle>> for Handle {
+    fn push(&self, task: task::Notified<Arc<Handle>>) {
+        self.push_remote_task(task);
+    }
+
+    fn push_batch<I>(&self, iter: I)
+    where
+        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+    {
+        unsafe {
+            self.shared.inject.push_batch(self, iter);
+        }
+    }
+}
+
+pub(crate) struct InjectGuard<'a> {
+    lock: crate::loom::sync::MutexGuard<'a, Synced>,
+}
+
+impl<'a> AsMut<inject::Synced> for InjectGuard<'a> {
+    fn as_mut(&mut self) -> &mut inject::Synced {
+        &mut self.lock.inject
+    }
+}
+
+impl<'a> Lock<inject::Synced> for &'a Handle {
+    type Handle = InjectGuard<'a>;
+
+    fn lock(self) -> Self::Handle {
+        InjectGuard {
+            lock: self.shared.synced.lock(),
+        }
     }
 }
 
