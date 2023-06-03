@@ -99,7 +99,7 @@ autocfg = "1.1"
 [dependencies]
 tokio-macros = { version = "~2.1.0", path = "../tokio-macros", optional = true }
 
-pin-project-lite = "0.2.0"
+pin-project-lite = "0.2.7"
 
 # Everything else is optional...
 bytes = { version = "1.0.0", optional = true }
