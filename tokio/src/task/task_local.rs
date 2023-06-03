@@ -152,7 +152,7 @@ impl<T: 'static> LocalKey<T> {
             local: self,
             slot: Some(value),
             future: Some(f),
-            _p: PhantomPinned,
+            _pinned: PhantomPinned,
         }
     }
 
@@ -331,7 +331,7 @@ pin_project! {
         #[pin]
         future: Option<F>,
         #[pin]
-        _p: PhantomPinned,
+        _pinned: PhantomPinned,
     }
 
     impl<T: 'static, F> PinnedDrop for TaskLocalFuture<T, F> {
