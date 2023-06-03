@@ -2,7 +2,7 @@
 
 use crate::signal::os::{OsExtraData, OsStorage};
 use crate::sync::watch;
-use crate::util::once_cell::OnceCell;
+use std::sync::OnceLock;
 
 use std::ops;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -166,9 +166,9 @@ where
     OsExtraData: 'static + Send + Sync + Init,
     OsStorage: 'static + Send + Sync + Init,
 {
-    static GLOBALS: OnceCell<Globals> = OnceCell::new();
+    static GLOBALS: OnceLock<Globals> = OnceLock::new();
 
-    GLOBALS.get(globals_init)
+    GLOBALS.get_or_init(globals_init)
 }
 
 #[cfg(all(test, not(loom)))]
