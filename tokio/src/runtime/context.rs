@@ -4,7 +4,7 @@ use crate::runtime::coop;
 use std::cell::Cell;
 
 #[cfg(any(feature = "rt", feature = "macros"))]
-use crate::util::rand::{FastRand, RngSeed};
+use crate::util::rand::FastRand;
 
 cfg_rt! {
     mod scoped;
@@ -126,6 +126,7 @@ pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, A
 
 cfg_rt! {
     use crate::runtime::{ThreadId, TryCurrentError};
+    use crate::util::rand::RngSeed;
 
     use std::fmt;
 
