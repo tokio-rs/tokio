@@ -854,11 +854,7 @@ impl Core {
         if self.is_searching {
             return false;
         }
-        let (stealable_tasks, total_tasks) = self.run_queue.tasks_num();
-        if stealable_tasks == 0 {
-            return false;
-        }
-        self.lifo_slot.is_some() as usize + (total_tasks - stealable_tasks) > 0
+        self.lifo_slot.is_some() as usize + self.run_queue.len() > 1
     }
 
     /// Prepares the worker state for parking.
