@@ -9,7 +9,7 @@ pub(super) struct Scoped<T> {
 unsafe impl<T> Sync for Scoped<T> {}
 
 impl<T> Scoped<T> {
-    pub(super) fn new() -> Scoped<T> {
+    pub(super) const fn new() -> Scoped<T> {
         Scoped {
             inner: Cell::new(ptr::null()),
         }

@@ -4,7 +4,7 @@ use crate::runtime::coop;
 use std::cell::Cell;
 
 #[cfg(any(feature = "rt", feature = "macros"))]
-use crate::util::rand::{FastRand, RngSeed};
+use crate::util::rand::FastRand;
 
 cfg_rt! {
     mod scoped;
@@ -47,7 +47,7 @@ struct Context {
     runtime: Cell<EnterRuntime>,
 
     #[cfg(any(feature = "rt", feature = "macros"))]
-    rng: FastRand,
+    rng: Cell<Option<FastRand>>,
 
     /// Tracks the amount of "work" a task may still do before yielding back to
     /// the sheduler
@@ -64,7 +64,7 @@ struct Context {
 }
 
 tokio_thread_local! {
-    static CONTEXT: Context = {
+    static CONTEXT: Context = const {
         Context {
             #[cfg(feature = "rt")]
             thread_id: Cell::new(None),
@@ -90,7 +90,7 @@ tokio_thread_local! {
             runtime: Cell::new(EnterRuntime::NotEntered),
 
             #[cfg(any(feature = "rt", feature = "macros"))]
-            rng: FastRand::new(RngSeed::new()),
+            rng: Cell::new(None),
 
             budget: Cell::new(coop::Budget::unconstrained()),
 
@@ -112,7 +112,12 @@ tokio_thread_local! {
 
 #[cfg(any(feature = "macros", all(feature = "sync", feature = "rt")))]
 pub(crate) fn thread_rng_n(n: u32) -> u32 {
-    CONTEXT.with(|ctx| ctx.rng.fastrand_n(n))
+    CONTEXT.with(|ctx| {
+        let mut rng = ctx.rng.get().unwrap_or_else(FastRand::new);
+        let ret = rng.fastrand_n(n);
+        ctx.rng.set(Some(rng));
+        ret
+    })
 }
 
 pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, AccessError> {
@@ -121,6 +126,7 @@ pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, A
 
 cfg_rt! {
     use crate::runtime::{ThreadId, TryCurrentError};
+    use crate::util::rand::RngSeed;
 
     use std::fmt;
 
@@ -295,7 +301,9 @@ cfg_rt! {
             let rng_seed = handle.seed_generator().next_seed();
 
             let old_handle = self.handle.borrow_mut().replace(handle.clone());
-            let old_seed = self.rng.replace_seed(rng_seed);
+            let mut rng = self.rng.get().unwrap_or_else(FastRand::new);
+            let old_seed = rng.replace_seed(rng_seed);
+            self.rng.set(Some(rng));
 
             SetCurrentGuard {
                 old_handle,
@@ -308,7 +316,10 @@ cfg_rt! {
         fn drop(&mut self) {
             CONTEXT.with(|ctx| {
                 *ctx.handle.borrow_mut() = self.old_handle.take();
-                ctx.rng.replace_seed(self.old_seed.clone());
+
+                let mut rng = ctx.rng.get().unwrap_or_else(FastRand::new);
+                rng.replace_seed(self.old_seed.clone());
+                ctx.rng.set(Some(rng));
             });
         }
     }

@@ -252,7 +252,7 @@ pub(super) fn create(
             park: Some(park),
             global_queue_interval: stats.tuned_global_queue_interval(&config),
             stats,
-            rand: FastRand::new(config.seed_generator.next_seed()),
+            rand: FastRand::from_seed(config.seed_generator.next_seed()),
         }));
 
         remotes.push(Remote { steal, unpark });
