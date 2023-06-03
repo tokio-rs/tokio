@@ -113,7 +113,7 @@ tokio_thread_local! {
 #[cfg(any(feature = "macros", all(feature = "sync", feature = "rt")))]
 pub(crate) fn thread_rng_n(n: u32) -> u32 {
     CONTEXT.with(|ctx| {
-        let mut rng = ctx.rng.get().unwrap_or_else(|| FastRand::new());
+        let mut rng = ctx.rng.get().unwrap_or_else(FastRand::new);
         let ret = rng.fastrand_n(n);
         ctx.rng.set(Some(rng));
         ret
@@ -300,7 +300,7 @@ cfg_rt! {
             let rng_seed = handle.seed_generator().next_seed();
 
             let old_handle = self.handle.borrow_mut().replace(handle.clone());
-            let mut rng = self.rng.get().unwrap_or_else(|| FastRand::new());
+            let mut rng = self.rng.get().unwrap_or_else(FastRand::new);
             let old_seed = rng.replace_seed(rng_seed);
             self.rng.set(Some(rng));
 
@@ -316,7 +316,7 @@ cfg_rt! {
             CONTEXT.with(|ctx| {
                 *ctx.handle.borrow_mut() = self.old_handle.take();
 
-                let mut rng = ctx.rng.get().unwrap_or_else(|| FastRand::new());
+                let mut rng = ctx.rng.get().unwrap_or_else(FastRand::new);
                 rng.replace_seed(self.old_seed.clone());
                 ctx.rng.set(Some(rng));
             });
