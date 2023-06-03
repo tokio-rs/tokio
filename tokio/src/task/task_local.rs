@@ -336,12 +336,12 @@ pin_project! {
 
     impl<T: 'static, F> PinnedDrop for TaskLocalFuture<T, F> {
         fn drop(this: Pin<&mut Self>) {
-            let mut this = this.project();
+            let this = this.project();
             if mem::needs_drop::<F>() && this.future.is_some() {
                 // Drop the future while the task-local is set, if possible. Otherwise
                 // the future is dropped normally when the `Option<F>` field drops.
                 let mut future = this.future;
-                let _ = this.local.scope_inner(&mut this.slot, || {
+                let _ = this.local.scope_inner(this.slot, || {
                     future.set(None);
                 });
             }
@@ -354,21 +354,21 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
 
     #[track_caller]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
+        let this = self.project();
         let mut future_opt = this.future;
 
-        let res =
-            this.local
-                .scope_inner(&mut this.slot, || match future_opt.as_mut().as_pin_mut() {
-                    Some(fut) => {
-                        let res = fut.poll(cx);
-                        if res.is_ready() {
-                            future_opt.set(None);
-                        }
-                        Some(res)
+        let res = this
+            .local
+            .scope_inner(this.slot, || match future_opt.as_mut().as_pin_mut() {
+                Some(fut) => {
+                    let res = fut.poll(cx);
+                    if res.is_ready() {
+                        future_opt.set(None);
                     }
-                    None => None,
-                });
+                    Some(res)
+                }
+                None => None,
+            });
 
         match res {
             Ok(Some(res)) => res,
