@@ -354,10 +354,10 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         },
     };
     if let Some(v) = config.worker_threads {
-        rt = quote! { #rt.worker_threads(#v) };
+        rt = quote_spanned! {last_stmt_start_span=> #rt.worker_threads(#v) };
     }
     if let Some(v) = config.start_paused {
-        rt = quote! { #rt.start_paused(#v) };
+        rt = quote_spanned! {last_stmt_start_span=> #rt.start_paused(#v) };
     }
 
     let header = if is_test {
