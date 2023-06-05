@@ -41,7 +41,9 @@ where
             None
         } else {
             // Set the entered flag
-            c.runtime.set(EnterRuntime::Entered { allow_block_in_place });
+            c.runtime.set(EnterRuntime::Entered {
+                allow_block_in_place,
+            });
 
             // Generate a new seed
             let rng_seed = handle.seed_generator().next_seed();

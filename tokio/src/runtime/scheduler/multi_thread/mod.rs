@@ -67,7 +67,7 @@ impl MultiThread {
     ///
     /// The future will execute on the current thread, but all spawned tasks
     /// will be executed on the thread pool.
-    pub(crate) fn block_on<F>(&self, handle: &scheduler::Handle, future: F) -> F::Output    
+    pub(crate) fn block_on<F>(&self, handle: &scheduler::Handle, future: F) -> F::Output
     where
         F: Future,
     {
