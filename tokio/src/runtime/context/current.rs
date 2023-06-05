@@ -1,13 +1,17 @@
 use super::{Context, CONTEXT};
 
 use crate::runtime::{scheduler, TryCurrentError};
+use crate::util::markers::SyncNotSend;
 use crate::util::rand::{FastRand, RngSeed};
+
+use std::marker::PhantomData;
 
 #[derive(Debug)]
 #[must_use]
 pub(crate) struct SetCurrentGuard {
     old_handle: Option<scheduler::Handle>,
     old_seed: RngSeed,
+    _p: PhantomData<SyncNotSend>,
 }
 
 /// Sets this [`Handle`] as the current active [`Handle`].
@@ -40,6 +44,7 @@ impl Context {
         SetCurrentGuard {
             old_handle,
             old_seed,
+            _p: PhantomData,
         }
     }
 }
