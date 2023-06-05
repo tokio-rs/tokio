@@ -532,7 +532,7 @@ async_assert_fn!(tokio::task::unconstrained(BoxFutureSend<()>): Send & !Sync & U
 async_assert_fn!(tokio::task::unconstrained(BoxFutureSync<()>): Send & Sync & Unpin);
 
 assert_value!(tokio::runtime::Builder: Send & Sync & Unpin);
-assert_value!(tokio::runtime::EnterGuard<'_>: Send & Sync & Unpin);
+assert_value!(tokio::runtime::EnterGuard<'_>: !Send & Sync & Unpin);
 assert_value!(tokio::runtime::Handle: Send & Sync & Unpin);
 assert_value!(tokio::runtime::Runtime: Send & Sync & Unpin);
 
