@@ -422,7 +422,7 @@ impl Drop for Runtime {
             Scheduler::CurrentThread(current_thread) => {
                 // This ensures that tasks spawned on the current-thread
                 // runtime are dropped inside the runtime's context.
-                let _guard = context::try_set_current(&self.handle.inner);
+                let _guard = context::try_set_current_guard(&self.handle.inner);
                 current_thread.shutdown(&self.handle.inner);
             }
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
