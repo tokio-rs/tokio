@@ -6,8 +6,6 @@ pub(super) struct Scoped<T> {
     pub(super) inner: Cell<*const T>,
 }
 
-unsafe impl<T: Sync> Sync for Scoped<T> {}
-
 impl<T> Scoped<T> {
     pub(super) const fn new() -> Scoped<T> {
         Scoped {
