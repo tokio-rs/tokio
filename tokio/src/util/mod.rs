@@ -79,3 +79,5 @@ pub(crate) mod error;
 
 #[cfg(feature = "io-util")]
 pub(crate) mod memchr;
+
+pub(crate) mod markers;

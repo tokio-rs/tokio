@@ -159,6 +159,9 @@ cfg_rt! {
     pub(crate) struct SetCurrentGuard {
         old_handle: Option<scheduler::Handle>,
         old_seed: RngSeed,
+        // Should not be `Send` since it must be *dropped* on the same thread as
+        // created, but there is no issue with sync access.
+        _p: PhantomData<crate::util::markers::SyncNotSend>,
     }
 
     /// Guard tracking that a caller has entered a runtime context.
@@ -308,6 +311,7 @@ cfg_rt! {
             SetCurrentGuard {
                 old_handle,
                 old_seed,
+                _p: PhantomData,
             }
         }
     }
