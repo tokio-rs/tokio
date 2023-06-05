@@ -6,8 +6,6 @@ pub(super) struct Scoped<T> {
     pub(super) inner: Cell<*const T>,
 }
 
-unsafe impl<T> Sync for Scoped<T> {}
-
 impl<T> Scoped<T> {
     pub(super) const fn new() -> Scoped<T> {
         Scoped {
@@ -52,7 +50,7 @@ impl<T> Scoped<T> {
         if val.is_null() {
             f(None)
         } else {
-            unsafe { f(Some(&*(val as *const T))) }
+            unsafe { f(Some(&*val)) }
         }
     }
 }
