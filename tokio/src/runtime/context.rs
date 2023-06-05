@@ -63,6 +63,8 @@ struct Context {
     /// Tracks the amount of "work" a task may still do before yielding back to
     /// the sheduler
     budget: Cell<coop::Budget>,
+    #[cfg(tokio_unstable)]
+    initial_budget: Cell<coop::Budget>,
 
     #[cfg(all(
         tokio_unstable,
@@ -104,6 +106,8 @@ tokio_thread_local! {
             rng: Cell::new(None),
 
             budget: Cell::new(coop::Budget::unconstrained()),
+            #[cfg(tokio_unstable)]
+            initial_budget: Cell::new(coop::Budget::initial()),
 
             #[cfg(all(
                 tokio_unstable,
@@ -133,6 +137,25 @@ pub(crate) fn thread_rng_n(n: u32) -> u32 {
 
 pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, AccessError> {
     CONTEXT.try_with(|ctx| f(&ctx.budget))
+}
+
+#[cfg(all(tokio_unstable, feature = "rt"))]
+pub(super) fn set_init_budget(val: u8) {
+    CONTEXT.with(|ctx| {
+        ctx.initial_budget.set(coop::Budget::new(val));
+    });
+}
+
+pub(super) fn get_init_budget() -> Result<coop::Budget, AccessError> {
+    #[cfg(not(tokio_unstable))]
+    {
+        Ok(coop::Budget::initial())
+    }
+
+    #[cfg(tokio_unstable)]
+    {
+        CONTEXT.try_with(|ctx| ctx.initial_budget.get())
+    }
 }
 
 cfg_rt! {

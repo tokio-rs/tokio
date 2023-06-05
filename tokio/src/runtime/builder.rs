@@ -109,6 +109,8 @@ pub struct Builder {
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
+    #[cfg(tokio_unstable)]
+    pub(super) coop_budget: u8,
 }
 
 cfg_unstable! {
@@ -285,6 +287,8 @@ impl Builder {
             metrics_poll_count_histogram: Default::default(),
 
             disable_lifo_slot: false,
+            #[cfg(tokio_unstable)]
+            coop_budget: 128,
         }
     }
 
@@ -636,6 +640,14 @@ impl Builder {
         self
     }
 
+    cfg_unstable! {
+        /// Configure cooperative budget of tasks.
+        pub fn coop_budget(&mut self, val: u8) -> &mut Self {
+            self.coop_budget = val;
+            self
+        }
+    }
+
     /// Creates the configured `Runtime`.
     ///
     /// The returned `Runtime` instance is ready to spawn tasks.
@@ -652,6 +664,8 @@ impl Builder {
     /// });
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
+        #[cfg(tokio_unstable)]
+        super::context::set_init_budget(self.coop_budget);
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]

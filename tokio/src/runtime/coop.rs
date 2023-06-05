@@ -52,8 +52,14 @@ impl Budget {
     ///
     /// Note that as more yield points are added in the ecosystem, this value
     /// will probably also have to be raised.
-    const fn initial() -> Budget {
+    pub(super) const fn initial() -> Budget {
         Budget(Some(128))
+    }
+
+    cfg_unstable! {
+        pub(super) fn new(val: u8) -> Budget {
+            Budget(Some(val))
+        }
     }
 
     /// Returns an unconstrained budget. Operations will not be limited.
@@ -70,7 +76,10 @@ impl Budget {
 /// returns, the budget is reset to the value prior to calling the function.
 #[inline(always)]
 pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
-    with_budget(Budget::initial(), f)
+    with_budget(
+        context::get_init_budget().unwrap_or_else(|_| Budget::initial()),
+        f,
+    )
 }
 
 /// Runs the given closure with an unconstrained task budget. When the function returns, the budget
