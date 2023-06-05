@@ -440,26 +440,27 @@ fn run(worker: Arc<Worker>) {
     };
 
     let handle = scheduler::Handle::MultiThread(worker.handle.clone());
-    let _enter = crate::runtime::context::enter_runtime(&handle, true);
 
-    // Set the worker context.
-    let cx = scheduler::Context::MultiThread(Context {
-        worker,
-        core: RefCell::new(None),
-        defer: Defer::new(),
-    });
+    crate::runtime::context::enter_runtime(&handle, true, |_| {
+        // Set the worker context.
+        let cx = scheduler::Context::MultiThread(Context {
+            worker,
+            core: RefCell::new(None),
+            defer: Defer::new(),
+        });
 
-    context::set_scheduler(&cx, || {
-        let cx = cx.expect_multi_thread();
+        context::set_scheduler(&cx, || {
+            let cx = cx.expect_multi_thread();
 
-        // This should always be an error. It only returns a `Result` to support
-        // using `?` to short circuit.
-        assert!(cx.run(core).is_err());
+            // This should always be an error. It only returns a `Result` to support
+            // using `?` to short circuit.
+            assert!(cx.run(core).is_err());
 
-        // Check if there are any deferred tasks to notify. This can happen when
-        // the worker core is lost due to `block_in_place()` being called from
-        // within the task.
-        cx.defer.wake();
+            // Check if there are any deferred tasks to notify. This can happen when
+            // the worker core is lost due to `block_in_place()` being called from
+            // within the task.
+            cx.defer.wake();
+        });
     });
 }
 

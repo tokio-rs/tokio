@@ -67,15 +67,13 @@ impl MultiThread {
     ///
     /// The future will execute on the current thread, but all spawned tasks
     /// will be executed on the thread pool.
-    pub(crate) fn block_on<F>(&self, handle: &scheduler::Handle, future: F) -> F::Output
+    pub(crate) fn block_on<F>(&self, handle: &scheduler::Handle, future: F) -> F::Output    
     where
         F: Future,
     {
-        let mut enter = crate::runtime::context::enter_runtime(handle, true);
-        enter
-            .blocking
-            .block_on(future)
-            .expect("failed to park thread")
+        crate::runtime::context::enter_runtime(handle, true, |blocking| {
+            blocking.block_on(future).expect("failed to park thread")
+        })
     }
 
     pub(crate) fn shutdown(&mut self, handle: &scheduler::Handle) {
