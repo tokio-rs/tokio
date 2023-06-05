@@ -628,8 +628,14 @@ fn test_tuning() {
 
     // Now, hammer the injection queue until the interval drops.
     let mut n = 0;
+    let mut i = 0;
     loop {
+        i += 1;
         let curr = interval.load(Relaxed);
+
+        if i % 10_000 == 9_999 {
+            println!("interval={curr}");
+        }
 
         if curr <= 8 {
             n += 1;
@@ -652,9 +658,9 @@ fn test_tuning() {
                 let prev = counter.swap(0, Relaxed);
                 interval.store(prev, Relaxed);
             });
-
-            std::thread::yield_now();
         }
+
+        std::thread::yield_now();
     }
 
     flag.store(false, Relaxed);
@@ -680,8 +686,14 @@ fn test_tuning() {
 
     // Now, hammer the injection queue until the interval reaches the expected range.
     let mut n = 0;
+    let mut i = 0;
     loop {
+        i += 1;
         let curr = interval.load(Relaxed);
+
+        if i % 10_000 == 9_999 {
+            println!("interval(2)={curr}");
+        }
 
         if curr <= 1_000 && curr > 32 {
             n += 1;
