@@ -65,6 +65,7 @@ fn current_thread() {
 fn multi_thread() {
     let rt = runtime::Builder::new_multi_thread()
         .enable_all()
+        .worker_threads(3)
         .build()
         .unwrap();
 

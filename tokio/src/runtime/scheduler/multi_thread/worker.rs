@@ -75,7 +75,7 @@ use std::task::Waker;
 use std::time::Duration;
 
 cfg_taskdump! {
-    use std::sync::Barrier;
+    use crate::loom::sync::Barrier;
 }
 
 /// A scheduler worker
@@ -1212,8 +1212,18 @@ impl Handle {
 
             core.is_traced = false;
 
-            // wait for other workers
-            let barrier = self.shared.trace_status.trace_start.wait();
+            if core.is_shutdown {
+                return core;
+            }
+
+            // wait for other workers, or timeout without tracing
+            let timeout = Duration::from_millis(250); // a _very_ generous timeout
+            let barrier = if let Some(barrier) = self.shared.trace_status.trace_start.wait_timeout(timeout) {
+                barrier
+            } else {
+                // don't attempt to trace
+                return core;
+            };
 
             if !barrier.is_leader() {
                 // wait for leader to finish tracing
