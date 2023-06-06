@@ -233,6 +233,7 @@ impl AsyncRead for Pipe {
             cx: &mut task::Context<'_>,
             buf: &mut ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
+            ready!(crate::trace::trace_leaf(cx));
             let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
             let ret = self.poll_read_internal(cx, buf);
@@ -249,6 +250,7 @@ impl AsyncRead for Pipe {
             cx: &mut task::Context<'_>,
             buf: &mut ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
+            ready!(crate::trace::trace_leaf(cx));
             self.poll_read_internal(cx, buf)
         }
     }
@@ -261,6 +263,7 @@ impl AsyncWrite for Pipe {
             cx: &mut task::Context<'_>,
             buf: &[u8],
         ) -> Poll<std::io::Result<usize>> {
+            ready!(crate::trace::trace_leaf(cx));
             let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
             let ret = self.poll_write_internal(cx, buf);
@@ -277,6 +280,7 @@ impl AsyncWrite for Pipe {
             cx: &mut task::Context<'_>,
             buf: &[u8],
         ) -> Poll<std::io::Result<usize>> {
+            ready!(crate::trace::trace_leaf(cx));
             self.poll_write_internal(cx, buf)
         }
     }

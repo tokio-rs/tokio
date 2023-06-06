@@ -1,9 +1,18 @@
 cfg_rt! {
     pub(crate) mod current_thread;
     pub(crate) use current_thread::CurrentThread;
+
+    mod defer;
+    use defer::Defer;
+
+    pub(crate) mod inject;
+    pub(crate) use inject::Inject;
 }
 
 cfg_rt_multi_thread! {
+    mod lock;
+    use lock::Lock;
+
     pub(crate) mod multi_thread;
     pub(crate) use multi_thread::MultiThread;
 }
@@ -23,6 +32,14 @@ pub(crate) enum Handle {
     #[cfg(not(feature = "rt"))]
     #[allow(dead_code)]
     Disabled,
+}
+
+#[cfg(feature = "rt")]
+pub(super) enum Context {
+    CurrentThread(current_thread::Context),
+
+    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+    MultiThread(multi_thread::Context),
 }
 
 impl Handle {
@@ -48,11 +65,12 @@ cfg_rt! {
     use crate::runtime::context;
     use crate::task::JoinHandle;
     use crate::util::RngSeedGenerator;
+    use std::task::Waker;
 
     impl Handle {
         #[track_caller]
         pub(crate) fn current() -> Handle {
-            match context::try_current() {
+            match context::with_current(Clone::clone) {
                 Ok(handle) => handle,
                 Err(e) => panic!("{}", e),
             }
@@ -180,6 +198,35 @@ cfg_rt! {
                     Handle::CurrentThread(handle) => handle.blocking_queue_depth(),
                     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                     Handle::MultiThread(handle) => handle.blocking_queue_depth(),
+                }
+            }
+        }
+    }
+
+    impl Context {
+        #[track_caller]
+        pub(crate) fn expect_current_thread(&self) -> &current_thread::Context {
+            match self {
+                Context::CurrentThread(context) => context,
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                _ => panic!("expected `CurrentThread::Context`")
+            }
+        }
+
+        pub(crate) fn defer(&self, waker: &Waker) {
+            match self {
+                Context::CurrentThread(context) => context.defer(waker),
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                Context::MultiThread(context) => context.defer(waker),
+            }
+        }
+
+        cfg_rt_multi_thread! {
+            #[track_caller]
+            pub(crate) fn expect_multi_thread(&self) -> &multi_thread::Context {
+                match self {
+                    Context::MultiThread(context) => context,
+                    _ => panic!("expected `MultiThread::Context`")
                 }
             }
         }

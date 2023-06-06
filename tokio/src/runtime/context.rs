@@ -4,13 +4,17 @@ use crate::runtime::coop;
 use std::cell::Cell;
 
 #[cfg(any(feature = "rt", feature = "macros"))]
-use crate::util::rand::{FastRand, RngSeed};
+use crate::util::rand::FastRand;
 
 cfg_rt! {
-    use crate::runtime::{scheduler, task::Id, Defer};
+    mod scoped;
+    use scoped::Scoped;
+
+    use crate::runtime::{scheduler, task::Id};
 
     use std::cell::RefCell;
     use std::marker::PhantomData;
+    use std::task::Waker;
     use std::time::Duration;
 
     cfg_taskdump! {
@@ -27,6 +31,10 @@ struct Context {
     #[cfg(feature = "rt")]
     handle: RefCell<Option<scheduler::Handle>>,
 
+    /// Handle to the scheduler's internal "context"
+    #[cfg(feature = "rt")]
+    scheduler: Scoped<scheduler::Context>,
+
     #[cfg(feature = "rt")]
     current_task_id: Cell<Option<Id>>,
 
@@ -38,13 +46,8 @@ struct Context {
     #[cfg(feature = "rt")]
     runtime: Cell<EnterRuntime>,
 
-    /// Yielded task wakers are stored here and notified after resource drivers
-    /// are polled.
-    #[cfg(feature = "rt")]
-    defer: RefCell<Option<Defer>>,
-
     #[cfg(any(feature = "rt", feature = "macros"))]
-    rng: FastRand,
+    rng: Cell<Option<FastRand>>,
 
     /// Tracks the amount of "work" a task may still do before yielding back to
     /// the sheduler
@@ -61,7 +64,7 @@ struct Context {
 }
 
 tokio_thread_local! {
-    static CONTEXT: Context = {
+    static CONTEXT: Context = const {
         Context {
             #[cfg(feature = "rt")]
             thread_id: Cell::new(None),
@@ -70,6 +73,11 @@ tokio_thread_local! {
             /// accessing drivers, etc...
             #[cfg(feature = "rt")]
             handle: RefCell::new(None),
+
+            /// Tracks the current scheduler internal context
+            #[cfg(feature = "rt")]
+            scheduler: Scoped::new(),
+
             #[cfg(feature = "rt")]
             current_task_id: Cell::new(None),
 
@@ -81,11 +89,8 @@ tokio_thread_local! {
             #[cfg(feature = "rt")]
             runtime: Cell::new(EnterRuntime::NotEntered),
 
-            #[cfg(feature = "rt")]
-            defer: RefCell::new(None),
-
             #[cfg(any(feature = "rt", feature = "macros"))]
-            rng: FastRand::new(RngSeed::new()),
+            rng: Cell::new(None),
 
             budget: Cell::new(coop::Budget::unconstrained()),
 
@@ -107,7 +112,12 @@ tokio_thread_local! {
 
 #[cfg(any(feature = "macros", all(feature = "sync", feature = "rt")))]
 pub(crate) fn thread_rng_n(n: u32) -> u32 {
-    CONTEXT.with(|ctx| ctx.rng.fastrand_n(n))
+    CONTEXT.with(|ctx| {
+        let mut rng = ctx.rng.get().unwrap_or_else(FastRand::new);
+        let ret = rng.fastrand_n(n);
+        ctx.rng.set(Some(rng));
+        ret
+    })
 }
 
 pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, AccessError> {
@@ -116,6 +126,7 @@ pub(super) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, A
 
 cfg_rt! {
     use crate::runtime::{ThreadId, TryCurrentError};
+    use crate::util::rand::RngSeed;
 
     use std::fmt;
 
@@ -148,6 +159,9 @@ cfg_rt! {
     pub(crate) struct SetCurrentGuard {
         old_handle: Option<scheduler::Handle>,
         old_seed: RngSeed,
+        // Should not be `Send` since it must be *dropped* on the same thread as
+        // created, but there is no issue with sync access.
+        _p: PhantomData<crate::util::markers::SyncNotSend>,
     }
 
     /// Guard tracking that a caller has entered a runtime context.
@@ -158,12 +172,6 @@ cfg_rt! {
 
         #[allow(dead_code)] // Only tracking the guard.
         pub(crate) handle: SetCurrentGuard,
-
-        /// If true, then this is the root runtime guard. It is possible to nest
-        /// runtime guards by using `block_in_place` between the calls. We need
-        /// to track the root guard as this is the guard responsible for freeing
-        /// the deferred task queue.
-        is_root: bool,
     }
 
     /// Guard tracking that a caller has entered a blocking region.
@@ -182,9 +190,13 @@ cfg_rt! {
         CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
     }
 
-    pub(crate) fn try_current() -> Result<scheduler::Handle, TryCurrentError> {
-        match CONTEXT.try_with(|ctx| ctx.handle.borrow().clone()) {
-            Ok(Some(handle)) => Ok(handle),
+    pub(crate) fn with_current<F, R>(f: F) -> Result<R, TryCurrentError>
+    where
+        F: FnOnce(&scheduler::Handle) -> R,
+    {
+
+        match CONTEXT.try_with(|ctx| ctx.handle.borrow().as_ref().map(f)) {
+            Ok(Some(ret)) => Ok(ret),
             Ok(None) => Err(TryCurrentError::new_no_context()),
             Err(_access_error) => Err(TryCurrentError::new_thread_local_destroyed()),
         }
@@ -224,20 +236,9 @@ cfg_rt! {
                 // Set the entered flag
                 c.runtime.set(EnterRuntime::Entered { allow_block_in_place });
 
-                // Initialize queue to track yielded tasks
-                let mut defer = c.defer.borrow_mut();
-
-                let is_root = if defer.is_none() {
-                    *defer = Some(Defer::new());
-                    true
-                } else {
-                    false
-                };
-
                 Some(EnterRuntimeGuard {
                     blocking: BlockingRegionGuard::new(),
                     handle: c.set_current(handle),
-                    is_root,
                 })
             }
         })
@@ -276,11 +277,26 @@ cfg_rt! {
         DisallowBlockInPlaceGuard(reset)
     }
 
-    pub(crate) fn with_defer<R>(f: impl FnOnce(&mut Defer) -> R) -> Option<R> {
-        CONTEXT.with(|c| {
-            let mut defer = c.defer.borrow_mut();
-            defer.as_mut().map(f)
-        })
+    #[track_caller]
+    pub(crate) fn defer(waker: &Waker) {
+        with_scheduler(|maybe_scheduler| {
+            if let Some(scheduler) = maybe_scheduler {
+                scheduler.defer(waker);
+            } else {
+                // Called from outside of the runtime, immediately wake the
+                // task.
+                waker.wake_by_ref();
+            }
+        });
+    }
+
+    pub(super) fn set_scheduler<R>(v: &scheduler::Context, f: impl FnOnce() -> R) -> R {
+        CONTEXT.with(|c| c.scheduler.set(v, f))
+    }
+
+    #[track_caller]
+    pub(super) fn with_scheduler<R>(f: impl FnOnce(Option<&scheduler::Context>) -> R) -> R {
+        CONTEXT.with(|c| c.scheduler.with(f))
     }
 
     impl Context {
@@ -288,11 +304,14 @@ cfg_rt! {
             let rng_seed = handle.seed_generator().next_seed();
 
             let old_handle = self.handle.borrow_mut().replace(handle.clone());
-            let old_seed = self.rng.replace_seed(rng_seed);
+            let mut rng = self.rng.get().unwrap_or_else(FastRand::new);
+            let old_seed = rng.replace_seed(rng_seed);
+            self.rng.set(Some(rng));
 
             SetCurrentGuard {
                 old_handle,
                 old_seed,
+                _p: PhantomData,
             }
         }
     }
@@ -301,7 +320,10 @@ cfg_rt! {
         fn drop(&mut self) {
             CONTEXT.with(|ctx| {
                 *ctx.handle.borrow_mut() = self.old_handle.take();
-                ctx.rng.replace_seed(self.old_seed.clone());
+
+                let mut rng = ctx.rng.get().unwrap_or_else(FastRand::new);
+                rng.replace_seed(self.old_seed.clone());
+                ctx.rng.set(Some(rng));
             });
         }
     }
@@ -317,10 +339,6 @@ cfg_rt! {
             CONTEXT.with(|c| {
                 assert!(c.runtime.get().is_entered());
                 c.runtime.set(EnterRuntime::NotEntered);
-
-                if self.is_root {
-                    *c.defer.borrow_mut() = None;
-                }
             });
         }
     }
@@ -329,6 +347,7 @@ cfg_rt! {
         fn new() -> BlockingRegionGuard {
             BlockingRegionGuard { _p: PhantomData }
         }
+
         /// Blocks the thread on the specified future, returning the value with
         /// which that future completes.
         pub(crate) fn block_on<F>(&mut self, f: F) -> Result<F::Output, AccessError>
@@ -372,10 +391,6 @@ cfg_rt! {
                     return Err(());
                 }
 
-                // Wake any yielded tasks before parking in order to avoid
-                // blocking.
-                with_defer(|defer| defer.wake());
-
                 park.park_timeout(when - now);
             }
         }
@@ -408,8 +423,8 @@ cfg_rt! {
     cfg_taskdump! {
         /// SAFETY: Callers of this function must ensure that trace frames always
         /// form a valid linked list.
-        pub(crate) unsafe fn with_trace<R>(f: impl FnOnce(&trace::Context) -> R) -> R {
-            CONTEXT.with(|c| f(&c.trace))
+        pub(crate) unsafe fn with_trace<R>(f: impl FnOnce(&trace::Context) -> R) -> Option<R> {
+            CONTEXT.try_with(|c| f(&c.trace)).ok()
         }
     }
 }

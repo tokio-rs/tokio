@@ -182,9 +182,6 @@ mod id;
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 pub use id::{id, try_id, Id};
 
-mod inject;
-pub(super) use self::inject::Inject;
-
 #[cfg(feature = "rt")]
 mod abort;
 mod join;
@@ -198,7 +195,7 @@ mod list;
 pub(crate) use self::list::{LocalOwnedTasks, OwnedTasks};
 
 mod raw;
-use self::raw::RawTask;
+pub(crate) use self::raw::RawTask;
 
 mod state;
 use self::state::State;
@@ -335,11 +332,15 @@ cfg_rt! {
 }
 
 impl<S: 'static> Task<S> {
-    unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
+    unsafe fn new(raw: RawTask) -> Task<S> {
         Task {
-            raw: RawTask::from_raw(ptr),
+            raw,
             _p: PhantomData,
         }
+    }
+
+    unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
+        Task::new(RawTask::from_raw(ptr))
     }
 
     #[cfg(all(
@@ -369,22 +370,16 @@ impl<S: 'static> Notified<S> {
 }
 
 impl<S: 'static> Notified<S> {
-    unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
-        Notified(Task::from_raw(ptr))
-    }
-}
-
-impl<S: 'static> Task<S> {
-    fn into_raw(self) -> NonNull<Header> {
-        let ret = self.raw.header_ptr();
-        mem::forget(self);
-        ret
+    pub(crate) unsafe fn from_raw(ptr: RawTask) -> Notified<S> {
+        Notified(Task::new(ptr))
     }
 }
 
 impl<S: 'static> Notified<S> {
-    fn into_raw(self) -> NonNull<Header> {
-        self.0.into_raw()
+    pub(crate) fn into_raw(self) -> RawTask {
+        let raw = self.0.raw;
+        mem::forget(self);
+        raw
     }
 }
 

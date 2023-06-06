@@ -82,7 +82,13 @@ pub struct Builder {
     pub(super) keep_alive: Option<Duration>,
 
     /// How many ticks before pulling a task from the global/remote queue?
-    pub(super) global_queue_interval: u32,
+    ///
+    /// When `None`, the value is unspecified and behavior details are left to
+    /// the scheduler. Each scheduler flavor could choose to either pick its own
+    /// default value or use some other strategy to decide when to poll from the
+    /// global queue. For example, the multi-threaded scheduler uses a
+    /// self-tuning strategy based on mean task poll times.
+    pub(super) global_queue_interval: Option<u32>,
 
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
@@ -211,7 +217,7 @@ impl Builder {
         #[cfg(not(loom))]
         const EVENT_INTERVAL: u32 = 61;
 
-        Builder::new(Kind::CurrentThread, 31, EVENT_INTERVAL)
+        Builder::new(Kind::CurrentThread, EVENT_INTERVAL)
     }
 
     cfg_not_wasi! {
@@ -222,7 +228,7 @@ impl Builder {
         #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
         pub fn new_multi_thread() -> Builder {
             // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-            Builder::new(Kind::MultiThread, 61, 61)
+            Builder::new(Kind::MultiThread, 61)
         }
     }
 
@@ -230,7 +236,7 @@ impl Builder {
     /// values.
     ///
     /// Configuration methods can be chained on the return value.
-    pub(crate) fn new(kind: Kind, global_queue_interval: u32, event_interval: u32) -> Builder {
+    pub(crate) fn new(kind: Kind, event_interval: u32) -> Builder {
         Builder {
             kind,
 
@@ -266,7 +272,7 @@ impl Builder {
 
             // Defaults for these values depend on the scheduler kind, so we get them
             // as parameters.
-            global_queue_interval,
+            global_queue_interval: None,
             event_interval,
 
             seed_generator: RngSeedGenerator::new(RngSeed::new()),
@@ -716,7 +722,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn global_queue_interval(&mut self, val: u32) -> &mut Self {
-        self.global_queue_interval = val;
+        self.global_queue_interval = Some(val);
         self
     }
 

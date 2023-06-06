@@ -39,8 +39,9 @@ impl MetricsBatch {
 
     pub(crate) fn submit(&mut self, _to: &WorkerMetrics) {}
     pub(crate) fn about_to_park(&mut self) {}
-    pub(crate) fn returned_from_park(&mut self) {}
     pub(crate) fn inc_local_schedule_count(&mut self) {}
+    pub(crate) fn start_processing_scheduled_tasks(&mut self) {}
+    pub(crate) fn end_processing_scheduled_tasks(&mut self) {}
     pub(crate) fn start_poll(&mut self) {}
     pub(crate) fn end_poll(&mut self) {}
 }

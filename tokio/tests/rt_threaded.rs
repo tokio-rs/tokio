@@ -35,6 +35,7 @@ fn single_thread() {
 }
 
 #[test]
+#[cfg(not(tokio_cross))]
 fn many_oneshot_futures() {
     // used for notifying the main thread
     const NUM: usize = 1_000;
@@ -586,6 +587,126 @@ async fn test_block_in_place3() {
 #[test]
 async fn test_block_in_place4() {
     tokio::task::block_in_place(|| {});
+}
+
+// Testing the tuning logic is tricky as it is inherently timing based, and more
+// of a heuristic than an exact behavior. This test checks that the interval
+// changes over time based on load factors. There are no assertions, completion
+// is sufficient. If there is a regression, this test will hang. In theory, we
+// could add limits, but that would be likely to fail on CI.
+#[test]
+#[cfg(not(tokio_cross))]
+fn test_tuning() {
+    use std::sync::atomic::AtomicBool;
+    use std::time::Duration;
+
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    fn iter(flag: Arc<AtomicBool>, counter: Arc<AtomicUsize>, stall: bool) {
+        if flag.load(Relaxed) {
+            if stall {
+                std::thread::sleep(Duration::from_micros(5));
+            }
+
+            counter.fetch_add(1, Relaxed);
+            tokio::spawn(async move { iter(flag, counter, stall) });
+        }
+    }
+
+    let flag = Arc::new(AtomicBool::new(true));
+    let counter = Arc::new(AtomicUsize::new(61));
+    let interval = Arc::new(AtomicUsize::new(61));
+
+    {
+        let flag = flag.clone();
+        let counter = counter.clone();
+        rt.spawn(async move { iter(flag, counter, true) });
+    }
+
+    // Now, hammer the injection queue until the interval drops.
+    let mut n = 0;
+    loop {
+        let curr = interval.load(Relaxed);
+
+        if curr <= 8 {
+            n += 1;
+        } else {
+            n = 0;
+        }
+
+        // Make sure we get a few good rounds. Jitter in the tuning could result
+        // in one "good" value without being representative of reaching a good
+        // state.
+        if n == 3 {
+            break;
+        }
+
+        if Arc::strong_count(&interval) < 5_000 {
+            let counter = counter.clone();
+            let interval = interval.clone();
+
+            rt.spawn(async move {
+                let prev = counter.swap(0, Relaxed);
+                interval.store(prev, Relaxed);
+            });
+
+            std::thread::yield_now();
+        }
+    }
+
+    flag.store(false, Relaxed);
+
+    let w = Arc::downgrade(&interval);
+    drop(interval);
+
+    while w.strong_count() > 0 {
+        std::thread::sleep(Duration::from_micros(500));
+    }
+
+    // Now, run it again with a faster task
+    let flag = Arc::new(AtomicBool::new(true));
+    // Set it high, we know it shouldn't ever really be this high
+    let counter = Arc::new(AtomicUsize::new(10_000));
+    let interval = Arc::new(AtomicUsize::new(10_000));
+
+    {
+        let flag = flag.clone();
+        let counter = counter.clone();
+        rt.spawn(async move { iter(flag, counter, false) });
+    }
+
+    // Now, hammer the injection queue until the interval reaches the expected range.
+    let mut n = 0;
+    loop {
+        let curr = interval.load(Relaxed);
+
+        if curr <= 1_000 && curr > 32 {
+            n += 1;
+        } else {
+            n = 0;
+        }
+
+        if n == 3 {
+            break;
+        }
+
+        if Arc::strong_count(&interval) <= 5_000 {
+            let counter = counter.clone();
+            let interval = interval.clone();
+
+            rt.spawn(async move {
+                let prev = counter.swap(0, Relaxed);
+                interval.store(prev, Relaxed);
+            });
+        }
+
+        std::thread::yield_now();
+    }
+
+    flag.store(false, Relaxed);
 }
 
 fn rt() -> runtime::Runtime {

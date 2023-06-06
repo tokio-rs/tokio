@@ -2,9 +2,9 @@ use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
-use crate::runtime::task::{self, Inject, JoinHandle, OwnedTasks, Schedule, Task};
-use crate::runtime::{blocking, context, scheduler, Config};
-use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
+use crate::runtime::scheduler::{self, Defer, Inject};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::{blocking, context, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
@@ -15,6 +15,7 @@ use std::fmt;
 use std::future::Future;
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
+use std::task::Waker;
 use std::time::Duration;
 
 /// Executes tasks on the current thread
@@ -59,6 +60,9 @@ struct Core {
     /// Metrics batch
     metrics: MetricsBatch,
 
+    /// How often to check the global queue
+    global_queue_interval: u32,
+
     /// True if a task panicked without being handled and the runtime is
     /// configured to shutdown on unhandled panic.
     unhandled_panic: bool,
@@ -86,13 +90,18 @@ struct Shared {
 }
 
 /// Thread-local context.
-struct Context {
+///
+/// pub(crate) to store in `runtime::context`.
+pub(crate) struct Context {
     /// Scheduler handle
     handle: Arc<Handle>,
 
     /// Scheduler core, enabling the holder of `Context` to execute the
     /// scheduler.
     core: RefCell<Option<Box<Core>>>,
+
+    /// Deferred tasks, usually ones that called `task::yield_now()`.
+    pub(crate) defer: Defer,
 }
 
 type Notified = task::Notified<Arc<Handle>>;
@@ -100,8 +109,10 @@ type Notified = task::Notified<Arc<Handle>>;
 /// Initial queue capacity.
 const INITIAL_CAPACITY: usize = 64;
 
-// Tracks the current CurrentThread.
-scoped_thread_local!(static CURRENT: Context);
+/// Used if none is specified. This is a temporary constant and will be removed
+/// as we unify tuning logic between the multi-thread and current-thread
+/// schedulers.
+const DEFAULT_GLOBAL_QUEUE_INTERVAL: u32 = 31;
 
 impl CurrentThread {
     pub(crate) fn new(
@@ -112,6 +123,11 @@ impl CurrentThread {
         config: Config,
     ) -> (CurrentThread, Arc<Handle>) {
         let worker_metrics = WorkerMetrics::from_config(&config);
+
+        // Get the configured global queue interval, or use the default.
+        let global_queue_interval = config
+            .global_queue_interval
+            .unwrap_or(DEFAULT_GLOBAL_QUEUE_INTERVAL);
 
         let handle = Arc::new(Handle {
             shared: Shared {
@@ -132,6 +148,7 @@ impl CurrentThread {
             tick: 0,
             driver: Some(driver),
             metrics: MetricsBatch::new(&handle.shared.worker_metrics),
+            global_queue_interval,
             unhandled_panic: false,
         })));
 
@@ -185,10 +202,11 @@ impl CurrentThread {
         let core = self.core.take()?;
 
         Some(CoreGuard {
-            context: Context {
+            context: scheduler::Context::CurrentThread(Context {
                 handle: handle.clone(),
                 core: RefCell::new(Some(core)),
-            },
+                defer: Defer::new(),
+            }),
             scheduler: self,
         })
     }
@@ -205,39 +223,58 @@ impl CurrentThread {
             None => panic!("Oh no! We never placed the Core back, this is a bug!"),
         };
 
-        core.enter(|mut core, _context| {
-            // Drain the OwnedTasks collection. This call also closes the
-            // collection, ensuring that no tasks are ever pushed after this
-            // call returns.
-            handle.shared.owned.close_and_shutdown_all();
+        // Check that the thread-local is not being destroyed
+        let tls_available = context::with_current(|_| ()).is_ok();
 
-            // Drain local queue
-            // We already shut down every task, so we just need to drop the task.
-            while let Some(task) = core.next_local_task(handle) {
-                drop(task);
-            }
+        if tls_available {
+            core.enter(|core, _context| {
+                let core = shutdown2(core, handle);
+                (core, ())
+            });
+        } else {
+            // Shutdown without setting the context. `tokio::spawn` calls will
+            // fail, but those will fail either way because the thread-local is
+            // not available anymore.
+            let context = core.context.expect_current_thread();
+            let core = context.core.borrow_mut().take().unwrap();
 
-            // Close the injection queue
-            handle.shared.inject.close();
-
-            // Drain remote queue
-            while let Some(task) = handle.shared.inject.pop() {
-                drop(task);
-            }
-
-            assert!(handle.shared.owned.is_empty());
-
-            // Submit metrics
-            core.submit_metrics(handle);
-
-            // Shutdown the resource drivers
-            if let Some(driver) = core.driver.as_mut() {
-                driver.shutdown(&handle.driver);
-            }
-
-            (core, ())
-        });
+            let core = shutdown2(core, handle);
+            *context.core.borrow_mut() = Some(core);
+        }
     }
+}
+
+fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
+    // Drain the OwnedTasks collection. This call also closes the
+    // collection, ensuring that no tasks are ever pushed after this
+    // call returns.
+    handle.shared.owned.close_and_shutdown_all();
+
+    // Drain local queue
+    // We already shut down every task, so we just need to drop the task.
+    while let Some(task) = core.next_local_task(handle) {
+        drop(task);
+    }
+
+    // Close the injection queue
+    handle.shared.inject.close();
+
+    // Drain remote queue
+    while let Some(task) = handle.shared.inject.pop() {
+        drop(task);
+    }
+
+    assert!(handle.shared.owned.is_empty());
+
+    // Submit metrics
+    core.submit_metrics(handle);
+
+    // Shutdown the resource drivers
+    if let Some(driver) = core.driver.as_mut() {
+        driver.shutdown(&handle.driver);
+    }
+
+    core
 }
 
 impl fmt::Debug for CurrentThread {
@@ -255,7 +292,7 @@ impl Core {
     }
 
     fn next_task(&mut self, handle: &Handle) -> Option<Notified> {
-        if self.tick % handle.shared.config.global_queue_interval == 0 {
+        if self.tick % self.global_queue_interval == 0 {
             handle
                 .next_remote_task()
                 .or_else(|| self.next_local_task(handle))
@@ -288,21 +325,11 @@ impl Core {
     }
 }
 
-fn did_defer_tasks() -> bool {
-    context::with_defer(|deferred| !deferred.is_empty()).unwrap()
-}
-
-fn wake_deferred_tasks() {
-    context::with_defer(|deferred| deferred.wake());
-}
-
 #[cfg(tokio_taskdump)]
-fn wake_deferred_tasks_and_free() {
-    let wakers = context::with_defer(|deferred| deferred.take_deferred());
-    if let Some(wakers) = wakers {
-        for waker in wakers {
-            waker.wake();
-        }
+fn wake_deferred_tasks_and_free(context: &Context) {
+    let wakers = context.defer.take_deferred();
+    for waker in wakers {
+        waker.wake();
     }
 }
 
@@ -340,11 +367,10 @@ impl Context {
 
             let (c, _) = self.enter(core, || {
                 driver.park(&handle.driver);
-                wake_deferred_tasks();
+                self.defer.wake();
             });
 
             core = c;
-            core.metrics.returned_from_park();
         }
 
         if let Some(f) = &handle.shared.config.after_unpark {
@@ -367,7 +393,7 @@ impl Context {
 
         let (mut core, _) = self.enter(core, || {
             driver.park_timeout(&handle.driver, Duration::from_millis(0));
-            wake_deferred_tasks();
+            self.defer.wake();
         });
 
         core.driver = Some(driver);
@@ -386,6 +412,10 @@ impl Context {
         // Take the scheduler core back
         let core = self.core.borrow_mut().take().expect("core missing");
         (core, ret)
+    }
+
+    pub(crate) fn defer(&self, waker: &Waker) {
+        self.defer.defer(waker);
     }
 }
 
@@ -425,10 +455,10 @@ impl Handle {
         let mut traces = vec![];
 
         // todo: how to make this work outside of a runtime context?
-        CURRENT.with(|maybe_context| {
+        context::with_scheduler(|maybe_context| {
             // drain the local queue
             let context = if let Some(context) = maybe_context {
-                context
+                context.expect_current_thread()
             } else {
                 return;
             };
@@ -448,12 +478,15 @@ impl Handle {
                 .into_iter()
                 .map(dump::Task::new)
                 .collect();
-        });
 
-        // Taking a taskdump could wakes every task, but we probably don't want
-        // the `yield_now` vector to be that large under normal circumstances.
-        // Therefore, we free its allocation.
-        wake_deferred_tasks_and_free();
+            // Avoid double borrow panic
+            drop(maybe_core);
+
+            // Taking a taskdump could wakes every task, but we probably don't want
+            // the `yield_now` vector to be that large under normal circumstances.
+            // Therefore, we free its allocation.
+            wake_deferred_tasks_and_free(context);
+        });
 
         dump::Dump::new(traces)
     }
@@ -522,8 +555,10 @@ impl Schedule for Arc<Handle> {
     }
 
     fn schedule(&self, task: task::Notified<Self>) {
-        CURRENT.with(|maybe_cx| match maybe_cx {
-            Some(cx) if Arc::ptr_eq(self, &cx.handle) => {
+        use scheduler::Context::CurrentThread;
+
+        context::with_scheduler(|maybe_cx| match maybe_cx {
+            Some(CurrentThread(cx)) if Arc::ptr_eq(self, &cx.handle) => {
                 let mut core = cx.core.borrow_mut();
 
                 // If `None`, the runtime is shutting down, so there is no need
@@ -552,11 +587,14 @@ impl Schedule for Arc<Handle> {
                     // Do nothing
                 }
                 UnhandledPanic::ShutdownRuntime => {
+                    use scheduler::Context::CurrentThread;
+
                     // This hook is only called from within the runtime, so
-                    // `CURRENT` should match with `&self`, i.e. there is no
-                    // opportunity for a nested scheduler to be called.
-                    CURRENT.with(|maybe_cx| match maybe_cx {
-                        Some(cx) if Arc::ptr_eq(self, &cx.handle) => {
+                    // `context::with_scheduler` should match with `&self`, i.e.
+                    // there is no opportunity for a nested scheduler to be
+                    // called.
+                    context::with_scheduler(|maybe_cx| match maybe_cx {
+                        Some(CurrentThread(cx)) if Arc::ptr_eq(self, &cx.handle) => {
                             let mut core = cx.core.borrow_mut();
 
                             // If `None`, the runtime is shutting down, so there is no need to signal shutdown
@@ -590,7 +628,7 @@ impl Wake for Handle {
 /// Used to ensure we always place the `Core` value back into its slot in
 /// `CurrentThread`, even if the future panics.
 struct CoreGuard<'a> {
-    context: Context,
+    context: scheduler::Context,
     scheduler: &'a CurrentThread,
 }
 
@@ -602,6 +640,8 @@ impl CoreGuard<'_> {
             let mut cx = std::task::Context::from_waker(&waker);
 
             pin!(future);
+
+            core.metrics.start_processing_scheduled_tasks();
 
             'outer: loop {
                 let handle = &context.handle;
@@ -631,11 +671,15 @@ impl CoreGuard<'_> {
                     let task = match entry {
                         Some(entry) => entry,
                         None => {
-                            core = if did_defer_tasks() {
+                            core.metrics.end_processing_scheduled_tasks();
+
+                            core = if !context.defer.is_empty() {
                                 context.park_yield(core, handle)
                             } else {
                                 context.park(core, handle)
                             };
+
+                            core.metrics.start_processing_scheduled_tasks();
 
                             // Try polling the `block_on` future next
                             continue 'outer;
@@ -651,9 +695,13 @@ impl CoreGuard<'_> {
                     core = c;
                 }
 
+                core.metrics.end_processing_scheduled_tasks();
+
                 // Yield to the driver, this drives the timer and pulls any
                 // pending I/O events.
                 core = context.park_yield(core, handle);
+
+                core.metrics.start_processing_scheduled_tasks();
             }
         });
 
@@ -672,13 +720,15 @@ impl CoreGuard<'_> {
     where
         F: FnOnce(Box<Core>, &Context) -> (Box<Core>, R),
     {
+        let context = self.context.expect_current_thread();
+
         // Remove `core` from `context` to pass into the closure.
-        let core = self.context.core.borrow_mut().take().expect("core missing");
+        let core = context.core.borrow_mut().take().expect("core missing");
 
         // Call the closure and place `core` back
-        let (core, ret) = CURRENT.set(&self.context, || f(core, &self.context));
+        let (core, ret) = context::set_scheduler(&self.context, || f(core, context));
 
-        *self.context.core.borrow_mut() = Some(core);
+        *context.core.borrow_mut() = Some(core);
 
         ret
     }
@@ -686,7 +736,9 @@ impl CoreGuard<'_> {
 
 impl Drop for CoreGuard<'_> {
     fn drop(&mut self) {
-        if let Some(core) = self.context.core.borrow_mut().take() {
+        let context = self.context.expect_current_thread();
+
+        if let Some(core) = context.core.borrow_mut().take() {
             // Replace old scheduler back into the state to allow
             // other threads to pick it up and drive it.
             self.scheduler.core.set(core);

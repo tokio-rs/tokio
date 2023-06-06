@@ -294,7 +294,7 @@ jobs:
           toolchain: ${{ env.rust_nightly }}
       - uses: Swatinem/rust-cache@v2
       - name: asan
-        run: cargo test --workspace --all-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1
+        run: cargo test --workspace --all-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
         env:
           RUSTFLAGS: -Z sanitizer=address
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
@@ -366,14 +366,14 @@ jobs:
       # First run with all features (including parking_lot)
       - run: cross test -p tokio --all-features --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_cross ${{ matrix.rustflags }}
       # Now run without parking_lot
       - name: Remove `parking_lot` from `full` feature
         run: sed -i '0,/parking_lot/{/parking_lot/d;}' tokio/Cargo.toml
       # The `tokio_no_parking_lot` cfg is here to ensure the `sed` above does not silently break.
       - run: cross test -p tokio --features full,test-util --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot --cfg tokio_cross ${{ matrix.rustflags }}
 
   # See https://github.com/tokio-rs/tokio/issues/5187
   no-atomic-u64:
@@ -393,7 +393,7 @@ jobs:
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: i686-unknown-linux-gnu
-      - run: cargo test -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
+      - run: cargo test -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features -- --test-threads 1 --nocapture
         env:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64
       # https://github.com/tokio-rs/tokio/pull/5356
@@ -442,19 +442,6 @@ jobs:
         with:
           toolchain: ${{ env.rust_min }}
       - uses: Swatinem/rust-cache@v2
-      # First compile just the main tokio crate with minrust and newest version
-      # of all dependencies, then pin once_cell and compile the rest of the
-      # crates with the pinned once_cell version.
-      #
-      # This is necessary because tokio-util transitively depends on once_cell,
-      # which is not compatible with the current minrust after the 1.15.0
-      # release.
-      - name: "check -p tokio --all-features"
-        run: cargo check -p tokio --all-features
-        env:
-          RUSTFLAGS: "" # remove -Dwarnings
-      - name: "pin once_cell version"
-        run: cargo update -p once_cell --precise 1.14.0
       - name: "check --workspace --all-features"
         run: cargo check --workspace --all-features
         env:

@@ -323,8 +323,7 @@ mod group_d {
             // Spawn a task
             let c2 = c1.clone();
             pool.spawn(track(async move {
-                gated().await;
-                gated().await;
+                multi_gated().await;
 
                 if 1 == c1.fetch_add(1, Relaxed) {
                     done_tx1.assert_send(());
@@ -333,8 +332,7 @@ mod group_d {
 
             // Spawn a second task
             pool.spawn(track(async move {
-                gated().await;
-                gated().await;
+                multi_gated().await;
 
                 if 1 == c2.fetch_add(1, Relaxed) {
                     done_tx2.assert_send(());
@@ -349,12 +347,10 @@ mod group_d {
 fn mk_pool(num_threads: usize) -> Runtime {
     runtime::Builder::new_multi_thread()
         .worker_threads(num_threads)
+        // Set the intervals to avoid tuning logic
+        .event_interval(2)
         .build()
         .unwrap()
-}
-
-fn gated() -> impl Future<Output = &'static str> {
-    gated2(false)
 }
 
 fn gated2(thread: bool) -> impl Future<Output = &'static str> {
@@ -392,6 +388,38 @@ fn gated2(thread: bool) -> impl Future<Output = &'static str> {
             Poll::Pending
         }
     })
+}
+
+async fn multi_gated() {
+    struct Gate {
+        waker: loom::future::AtomicWaker,
+        count: AtomicUsize,
+    }
+
+    let gate = Arc::new(Gate {
+        waker: loom::future::AtomicWaker::new(),
+        count: AtomicUsize::new(0),
+    });
+
+    {
+        let gate = gate.clone();
+        spawn(track(async move {
+            for i in 1..3 {
+                gate.count.store(i, SeqCst);
+                gate.waker.wake();
+            }
+        }));
+    }
+
+    poll_fn(move |cx| {
+        if gate.count.load(SeqCst) < 2 {
+            gate.waker.register_by_ref(cx.waker());
+            Poll::Pending
+        } else {
+            Poll::Ready(())
+        }
+    })
+    .await;
 }
 
 fn track<T: Future>(f: T) -> Track<T> {
