@@ -339,13 +339,38 @@ cfg_metrics! {
 cfg_taskdump! {
     impl Handle {
         /// Capture a snapshot of this runtime's state.
-        pub fn dump(&self) -> crate::runtime::Dump {
+        pub async fn dump(&self) -> crate::runtime::Dump {
             match &self.inner {
                 scheduler::Handle::CurrentThread(handle) => handle.dump(),
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                scheduler::Handle::MultiThread(_) =>
-                    unimplemented!("taskdumps are unsupported on the multi-thread runtime"),
+                scheduler::Handle::MultiThread(handle) => {
+                    // perform the trace in a separate thread so that the
+                    // trace itself does not appear in the taskdump.
+                    let handle = handle.clone();
+                    spawn_thread(async {
+                        let handle = handle;
+                        handle.dump().await
+                    }).await
+                },
             }
+        }
+    }
+
+    cfg_rt_multi_thread! {
+        /// Spawn a new thread and asynchronously await on its result.
+        async fn spawn_thread<F>(f: F) -> <F as Future>::Output
+        where
+            F: Future + Send + 'static,
+            <F as Future>::Output: Send + 'static
+        {
+            let (tx, rx) = crate::sync::oneshot::channel();
+            crate::loom::thread::spawn(|| {
+                let rt = crate::runtime::Builder::new_current_thread().build().unwrap();
+                rt.block_on(async {
+                    let _ = tx.send(f.await);
+                });
+            });
+            rx.await.unwrap()
         }
     }
 }

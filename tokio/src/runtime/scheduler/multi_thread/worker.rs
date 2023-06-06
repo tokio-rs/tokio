@@ -74,6 +74,10 @@ use std::cell::RefCell;
 use std::task::Waker;
 use std::time::Duration;
 
+cfg_taskdump! {
+    use crate::loom::sync::Barrier;
+}
+
 /// A scheduler worker
 pub(super) struct Worker {
     /// Reference to scheduler's handle
@@ -112,6 +116,9 @@ struct Core {
     /// True if the scheduler is being shutdown
     is_shutdown: bool,
 
+    /// True if the scheduler is being traced
+    is_traced: bool,
+
     /// Parker
     ///
     /// Stored in an `Option` as the parker is added / removed to make the
@@ -137,7 +144,7 @@ pub(crate) struct Shared {
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    inject: inject::Shared<Arc<Handle>>,
+    pub(super) inject: inject::Shared<Arc<Handle>>,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -155,6 +162,9 @@ pub(crate) struct Shared {
     #[allow(clippy::vec_box)] // we're moving an already-boxed value
     shutdown_cores: Mutex<Vec<Box<Core>>>,
 
+    /// The number of cores that have observed the trace signal.
+    pub(super) trace_status: TraceStatus,
+
     /// Scheduler configuration options
     config: Config,
 
@@ -171,18 +181,18 @@ pub(crate) struct Shared {
 }
 
 /// Data synchronized by the scheduler mutex
-pub(super) struct Synced {
+pub(crate) struct Synced {
     /// Synchronized state for `Idle`.
     pub(super) idle: idle::Synced,
 
     /// Synchronized state for `Inject`.
-    inject: inject::Synced,
+    pub(crate) inject: inject::Synced,
 }
 
 /// Used to communicate with a worker from other threads.
 struct Remote {
     /// Steals tasks from this worker.
-    steal: queue::Steal<Arc<Handle>>,
+    pub(super) steal: queue::Steal<Arc<Handle>>,
 
     /// Unparks the associated worker thread
     unpark: Unparker,
@@ -203,6 +213,82 @@ pub(crate) struct Context {
 
 /// Starts the workers
 pub(crate) struct Launch(Vec<Arc<Worker>>);
+
+cfg_not_taskdump! {
+    pub(super) struct TraceStatus {}
+
+    impl TraceStatus {
+        fn new(_: usize) -> Self {
+            Self {}
+        }
+
+        fn trace_requested(&self) -> bool {
+            false
+        }
+    }
+}
+
+cfg_taskdump! {
+    use crate::sync::notify::Notify;
+    use crate::runtime::dump::Dump;
+    use crate::loom::sync::atomic::{AtomicBool, Ordering};
+
+    /// Tracing status of the worker.
+    pub(super) struct TraceStatus {
+        pub(super) trace_requested: AtomicBool,
+        trace_start: Barrier,
+        trace_end: Barrier,
+        pub(super) result_ready: Notify,
+        pub(super) trace_result: Mutex<Option<Dump>>,
+    }
+
+    impl TraceStatus {
+        fn new(remotes_len: usize) -> Self {
+            Self {
+                trace_requested: AtomicBool::new(false),
+                trace_start: Barrier::new(remotes_len),
+                trace_end: Barrier::new(remotes_len),
+                result_ready: Notify::new(),
+                trace_result: Mutex::new(None),
+            }
+        }
+
+        fn trace_requested(&self) -> bool {
+            self.trace_requested.load(Ordering::Relaxed)
+        }
+
+        pub(super) async fn start_trace_request(&self, handle: &Handle) {
+            while self.trace_requested.compare_exchange(false,
+                true,
+                Ordering::Acquire,
+                Ordering::Relaxed).is_err()
+            {
+                handle.notify_all();
+                crate::task::yield_now().await;
+            }
+        }
+
+        fn stash_result(&self, dump: Dump) {
+            let _ = self.trace_result.lock().insert(dump);
+            self.result_ready.notify_one();
+        }
+
+        pub(super) fn take_result(&self) -> Option<Dump> {
+            self.trace_result.lock().take()
+        }
+
+        pub(super) async fn end_trace_request(&self, handle: &Handle) {
+            while self.trace_requested.compare_exchange(true,
+                false,
+                Ordering::Acquire,
+                Ordering::Relaxed).is_err()
+            {
+                handle.notify_all();
+                crate::task::yield_now().await;
+            }
+        }
+    }
+}
 
 /// Running a task may consume the core. If the core is still available when
 /// running the task completes, it is returned. Otherwise, the worker will need
@@ -249,6 +335,7 @@ pub(super) fn create(
             run_queue,
             is_searching: false,
             is_shutdown: false,
+            is_traced: false,
             park: Some(park),
             global_queue_interval: stats.tuned_global_queue_interval(&config),
             stats,
@@ -262,6 +349,7 @@ pub(super) fn create(
     let (idle, idle_synced) = Idle::new(size);
     let (inject, inject_synced) = inject::Shared::new();
 
+    let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
@@ -273,6 +361,7 @@ pub(super) fn create(
                 inject: inject_synced,
             }),
             shutdown_cores: Mutex::new(vec![]),
+            trace_status: TraceStatus::new(remotes_len),
             config,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
@@ -477,6 +566,10 @@ impl Context {
         while !core.is_shutdown {
             self.assert_lifo_enabled_is_correct(&core);
 
+            if core.is_traced {
+                core = self.worker.handle.trace_core(core);
+            }
+
             // Increment the tick
             core.tick();
 
@@ -650,7 +743,7 @@ impl Context {
         }
 
         if core.transition_to_parked(&self.worker) {
-            while !core.is_shutdown {
+            while !core.is_shutdown && !core.is_traced {
                 core.stats.about_to_park();
                 core = self.park_timeout(core, None);
 
@@ -826,7 +919,7 @@ impl Core {
     /// Returns true if the transition happened, false if there is work to do first.
     fn transition_to_parked(&mut self, worker: &Worker) -> bool {
         // Workers should not park if they have work to do
-        if self.lifo_slot.is_some() || self.run_queue.has_tasks() {
+        if self.lifo_slot.is_some() || self.run_queue.has_tasks() || self.is_traced {
             return false;
         }
 
@@ -890,6 +983,11 @@ impl Core {
             // Check if the scheduler has been shutdown
             let synced = worker.handle.shared.synced.lock();
             self.is_shutdown = worker.inject().is_closed(&synced.inject);
+        }
+
+        if !self.is_traced {
+            // Check if the worker should be tracing.
+            self.is_traced = worker.handle.shared.trace_status.trace_requested();
         }
     }
 
@@ -1049,7 +1147,7 @@ impl Handle {
         }
     }
 
-    fn notify_all(&self) {
+    pub(super) fn notify_all(&self) {
         for remote in &self.shared.remotes[..] {
             remote.unpark.unpark(&self.driver);
         }
@@ -1099,6 +1197,64 @@ impl Handle {
         // We already shut down every task, so we can simply drop the tasks.
         while let Some(task) = self.next_remote_task() {
             drop(task);
+        }
+    }
+
+    cfg_not_taskdump! {
+        fn trace_core(&self, core: Box<Core>) -> Box<Core> {
+                core
+        }
+    }
+
+    cfg_taskdump! {
+        fn trace_core(&self, mut core: Box<Core>) -> Box<Core> {
+            use crate::runtime::dump;
+            use task::trace::trace_multi_thread;
+
+            core.is_traced = false;
+
+            if core.is_shutdown {
+                return core;
+            }
+
+            // wait for other workers, or timeout without tracing
+            let timeout = Duration::from_millis(250); // a _very_ generous timeout
+            let barrier = if let Some(barrier) = self.shared.trace_status.trace_start.wait_timeout(timeout) {
+                barrier
+            } else {
+                // don't attempt to trace
+                return core;
+            };
+
+            if !barrier.is_leader() {
+                // wait for leader to finish tracing
+                self.shared.trace_status.trace_end.wait();
+                return core;
+            }
+
+            // trace
+
+            let owned = &self.shared.owned;
+            let mut local = self.shared.steal_all();
+            let synced = &self.shared.synced;
+            let injection = &self.shared.inject;
+
+            // safety: `trace_multi_thread` is invoked with the same `synced` that `injection`
+            // was created with.
+            let traces = unsafe { trace_multi_thread(owned, &mut local, synced, injection) }
+                .into_iter()
+                .map(dump::Task::new)
+                .collect();
+
+            let result = dump::Dump::new(traces);
+
+            // stash the result
+            self.shared.trace_status.stash_result(result);
+
+            // allow other workers to proceed
+            self.shared.trace_status.trace_end.wait();
+
+            core
         }
     }
 
@@ -1160,6 +1316,29 @@ cfg_metrics! {
 
         pub(super) fn worker_local_queue_depth(&self, worker: usize) -> usize {
             self.remotes[worker].steal.len()
+        }
+    }
+}
+
+cfg_taskdump! {
+    impl Shared {
+        /// Steal all tasks from remotes into a single local queue.
+        pub(super) fn steal_all(&self) -> super::queue::Local<Arc<Handle>> {
+            let (_steal, mut local) = super::queue::local();
+
+            let worker_metrics = WorkerMetrics::new();
+            let mut stats = Stats::new(&worker_metrics);
+
+            for remote in self.remotes.iter() {
+                let steal = &remote.steal;
+                while !steal.is_empty() {
+                    if let Some(task) = steal.steal_into(&mut local, &mut stats) {
+                        local.push_back([task].into_iter());
+                    }
+                }
+            }
+
+            local
         }
     }
 }

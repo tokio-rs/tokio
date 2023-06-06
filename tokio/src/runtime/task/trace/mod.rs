@@ -279,3 +279,52 @@ pub(in crate::runtime) fn trace_current_thread(
         })
         .collect()
 }
+
+cfg_rt_multi_thread! {
+    use crate::loom::sync::Mutex;
+    use crate::runtime::scheduler::multi_thread;
+    use crate::runtime::scheduler::multi_thread::Synced;
+    use crate::runtime::scheduler::inject::Shared;
+
+    /// Trace and poll all tasks of the current_thread runtime.
+    ///
+    /// ## Safety
+    ///
+    /// Must be called with the same `synced` that `injection` was created with.
+    pub(in crate::runtime) unsafe fn trace_multi_thread(
+        owned: &OwnedTasks<Arc<multi_thread::Handle>>,
+        local: &mut multi_thread::queue::Local<Arc<multi_thread::Handle>>,
+        synced: &Mutex<Synced>,
+        injection: &Shared<Arc<multi_thread::Handle>>,
+    ) -> Vec<Trace> {
+        // clear the local queue
+        while let Some(notified) = local.pop() {
+            drop(notified);
+        }
+
+        // clear the injection queue
+        let mut synced = synced.lock();
+        while let Some(notified) = injection.pop(&mut synced.inject) {
+            drop(notified);
+        }
+
+        drop(synced);
+
+        // notify each task
+        let mut traces = vec![];
+        owned.for_each(|task| {
+            // set the notified bit
+            task.as_raw().state().transition_to_notified_for_tracing();
+
+            // trace the task
+            let ((), trace) = Trace::capture(|| task.as_raw().poll());
+            traces.push(trace);
+
+            // reschedule the task
+            let _ = task.as_raw().state().transition_to_notified_by_ref();
+            task.as_raw().schedule();
+        });
+
+        traces
+    }
+}
