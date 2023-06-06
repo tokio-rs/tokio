@@ -861,6 +861,8 @@ impl<T> Sender<T> {
     }
 
     async fn reserve_inner(&self) -> Result<(), SendError<()>> {
+        crate::trace::async_trace_leaf().await;
+
         match self.chan.semaphore().semaphore.acquire(1).await {
             Ok(_) => Ok(()),
             Err(_) => Err(SendError(())),

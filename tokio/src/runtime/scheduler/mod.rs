@@ -1,9 +1,18 @@
 cfg_rt! {
     pub(crate) mod current_thread;
     pub(crate) use current_thread::CurrentThread;
+
+    mod defer;
+    use defer::Defer;
+
+    pub(crate) mod inject;
+    pub(crate) use inject::Inject;
 }
 
 cfg_rt_multi_thread! {
+    mod lock;
+    use lock::Lock;
+
     pub(crate) mod multi_thread;
     pub(crate) use multi_thread::MultiThread;
 }
@@ -56,6 +65,7 @@ cfg_rt! {
     use crate::runtime::context;
     use crate::task::JoinHandle;
     use crate::util::RngSeedGenerator;
+    use std::task::Waker;
 
     impl Handle {
         #[track_caller]
@@ -200,6 +210,14 @@ cfg_rt! {
                 Context::CurrentThread(context) => context,
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 _ => panic!("expected `CurrentThread::Context`")
+            }
+        }
+
+        pub(crate) fn defer(&self, waker: &Waker) {
+            match self {
+                Context::CurrentThread(context) => context.defer(waker),
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                Context::MultiThread(context) => context.defer(waker),
             }
         }
 

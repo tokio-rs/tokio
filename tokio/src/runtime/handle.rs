@@ -269,13 +269,9 @@ impl Handle {
 
         // Enter the runtime context. This sets the current driver handles and
         // prevents blocking an existing runtime.
-        let mut enter = context::enter_runtime(&self.inner, true);
-
-        // Block on the future
-        enter
-            .blocking
-            .block_on(future)
-            .expect("failed to park thread")
+        context::enter_runtime(&self.inner, true, |blocking| {
+            blocking.block_on(future).expect("failed to park thread")
+        })
     }
 
     #[track_caller]

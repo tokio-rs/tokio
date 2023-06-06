@@ -6,8 +6,14 @@ use counters::Counters;
 mod handle;
 pub(crate) use handle::Handle;
 
+mod overflow;
+pub(crate) use overflow::Overflow;
+
 mod idle;
 use self::idle::Idle;
+
+mod stats;
+pub(crate) use stats::Stats;
 
 mod park;
 pub(crate) use park::{Parker, Unparker};
@@ -15,7 +21,7 @@ pub(crate) use park::{Parker, Unparker};
 pub(crate) mod queue;
 
 mod worker;
-pub(crate) use worker::{Context, Launch};
+pub(crate) use worker::{Context, Launch, Shared};
 
 pub(crate) use worker::block_in_place;
 
@@ -65,11 +71,9 @@ impl MultiThread {
     where
         F: Future,
     {
-        let mut enter = crate::runtime::context::enter_runtime(handle, true);
-        enter
-            .blocking
-            .block_on(future)
-            .expect("failed to park thread")
+        crate::runtime::context::enter_runtime(handle, true, |blocking| {
+            blocking.block_on(future).expect("failed to park thread")
+        })
     }
 
     pub(crate) fn shutdown(&mut self, handle: &scheduler::Handle) {

@@ -2,9 +2,9 @@ use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
-use crate::runtime::task::{self, Inject, JoinHandle, OwnedTasks, Schedule, Task};
-use crate::runtime::{blocking, context, scheduler, Config};
-use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
+use crate::runtime::scheduler::{self, Defer, Inject};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::{blocking, context, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
@@ -15,6 +15,7 @@ use std::fmt;
 use std::future::Future;
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
+use std::task::Waker;
 use std::time::Duration;
 
 /// Executes tasks on the current thread
@@ -59,6 +60,9 @@ struct Core {
     /// Metrics batch
     metrics: MetricsBatch,
 
+    /// How often to check the global queue
+    global_queue_interval: u32,
+
     /// True if a task panicked without being handled and the runtime is
     /// configured to shutdown on unhandled panic.
     unhandled_panic: bool,
@@ -95,12 +99,20 @@ pub(crate) struct Context {
     /// Scheduler core, enabling the holder of `Context` to execute the
     /// scheduler.
     core: RefCell<Option<Box<Core>>>,
+
+    /// Deferred tasks, usually ones that called `task::yield_now()`.
+    pub(crate) defer: Defer,
 }
 
 type Notified = task::Notified<Arc<Handle>>;
 
 /// Initial queue capacity.
 const INITIAL_CAPACITY: usize = 64;
+
+/// Used if none is specified. This is a temporary constant and will be removed
+/// as we unify tuning logic between the multi-thread and current-thread
+/// schedulers.
+const DEFAULT_GLOBAL_QUEUE_INTERVAL: u32 = 31;
 
 impl CurrentThread {
     pub(crate) fn new(
@@ -111,6 +123,11 @@ impl CurrentThread {
         config: Config,
     ) -> (CurrentThread, Arc<Handle>) {
         let worker_metrics = WorkerMetrics::from_config(&config);
+
+        // Get the configured global queue interval, or use the default.
+        let global_queue_interval = config
+            .global_queue_interval
+            .unwrap_or(DEFAULT_GLOBAL_QUEUE_INTERVAL);
 
         let handle = Arc::new(Handle {
             shared: Shared {
@@ -131,6 +148,7 @@ impl CurrentThread {
             tick: 0,
             driver: Some(driver),
             metrics: MetricsBatch::new(&handle.shared.worker_metrics),
+            global_queue_interval,
             unhandled_panic: false,
         })));
 
@@ -146,38 +164,38 @@ impl CurrentThread {
     pub(crate) fn block_on<F: Future>(&self, handle: &scheduler::Handle, future: F) -> F::Output {
         pin!(future);
 
-        let mut enter = crate::runtime::context::enter_runtime(handle, false);
-        let handle = handle.as_current_thread();
+        crate::runtime::context::enter_runtime(handle, false, |blocking| {
+            let handle = handle.as_current_thread();
 
-        // Attempt to steal the scheduler core and block_on the future if we can
-        // there, otherwise, lets select on a notification that the core is
-        // available or the future is complete.
-        loop {
-            if let Some(core) = self.take_core(handle) {
-                return core.block_on(future);
-            } else {
-                let notified = self.notify.notified();
-                pin!(notified);
+            // Attempt to steal the scheduler core and block_on the future if we can
+            // there, otherwise, lets select on a notification that the core is
+            // available or the future is complete.
+            loop {
+                if let Some(core) = self.take_core(handle) {
+                    return core.block_on(future);
+                } else {
+                    let notified = self.notify.notified();
+                    pin!(notified);
 
-                if let Some(out) = enter
-                    .blocking
-                    .block_on(poll_fn(|cx| {
-                        if notified.as_mut().poll(cx).is_ready() {
-                            return Ready(None);
-                        }
+                    if let Some(out) = blocking
+                        .block_on(poll_fn(|cx| {
+                            if notified.as_mut().poll(cx).is_ready() {
+                                return Ready(None);
+                            }
 
-                        if let Ready(out) = future.as_mut().poll(cx) {
-                            return Ready(Some(out));
-                        }
+                            if let Ready(out) = future.as_mut().poll(cx) {
+                                return Ready(Some(out));
+                            }
 
-                        Pending
-                    }))
-                    .expect("Failed to `Enter::block_on`")
-                {
-                    return out;
+                            Pending
+                        }))
+                        .expect("Failed to `Enter::block_on`")
+                    {
+                        return out;
+                    }
                 }
             }
-        }
+        })
     }
 
     fn take_core(&self, handle: &Arc<Handle>) -> Option<CoreGuard<'_>> {
@@ -187,6 +205,7 @@ impl CurrentThread {
             context: scheduler::Context::CurrentThread(Context {
                 handle: handle.clone(),
                 core: RefCell::new(Some(core)),
+                defer: Defer::new(),
             }),
             scheduler: self,
         })
@@ -273,7 +292,7 @@ impl Core {
     }
 
     fn next_task(&mut self, handle: &Handle) -> Option<Notified> {
-        if self.tick % handle.shared.config.global_queue_interval == 0 {
+        if self.tick % self.global_queue_interval == 0 {
             handle
                 .next_remote_task()
                 .or_else(|| self.next_local_task(handle))
@@ -306,21 +325,11 @@ impl Core {
     }
 }
 
-fn did_defer_tasks() -> bool {
-    context::with_defer(|deferred| !deferred.is_empty()).unwrap()
-}
-
-fn wake_deferred_tasks() {
-    context::with_defer(|deferred| deferred.wake());
-}
-
 #[cfg(tokio_taskdump)]
-fn wake_deferred_tasks_and_free() {
-    let wakers = context::with_defer(|deferred| deferred.take_deferred());
-    if let Some(wakers) = wakers {
-        for waker in wakers {
-            waker.wake();
-        }
+fn wake_deferred_tasks_and_free(context: &Context) {
+    let wakers = context.defer.take_deferred();
+    for waker in wakers {
+        waker.wake();
     }
 }
 
@@ -358,11 +367,10 @@ impl Context {
 
             let (c, _) = self.enter(core, || {
                 driver.park(&handle.driver);
-                wake_deferred_tasks();
+                self.defer.wake();
             });
 
             core = c;
-            core.metrics.returned_from_park();
         }
 
         if let Some(f) = &handle.shared.config.after_unpark {
@@ -385,7 +393,7 @@ impl Context {
 
         let (mut core, _) = self.enter(core, || {
             driver.park_timeout(&handle.driver, Duration::from_millis(0));
-            wake_deferred_tasks();
+            self.defer.wake();
         });
 
         core.driver = Some(driver);
@@ -404,6 +412,10 @@ impl Context {
         // Take the scheduler core back
         let core = self.core.borrow_mut().take().expect("core missing");
         (core, ret)
+    }
+
+    pub(crate) fn defer(&self, waker: &Waker) {
+        self.defer.defer(waker);
     }
 }
 
@@ -466,12 +478,15 @@ impl Handle {
                 .into_iter()
                 .map(dump::Task::new)
                 .collect();
-        });
 
-        // Taking a taskdump could wakes every task, but we probably don't want
-        // the `yield_now` vector to be that large under normal circumstances.
-        // Therefore, we free its allocation.
-        wake_deferred_tasks_and_free();
+            // Avoid double borrow panic
+            drop(maybe_core);
+
+            // Taking a taskdump could wakes every task, but we probably don't want
+            // the `yield_now` vector to be that large under normal circumstances.
+            // Therefore, we free its allocation.
+            wake_deferred_tasks_and_free(context);
+        });
 
         dump::Dump::new(traces)
     }
@@ -626,6 +641,8 @@ impl CoreGuard<'_> {
 
             pin!(future);
 
+            core.metrics.start_processing_scheduled_tasks();
+
             'outer: loop {
                 let handle = &context.handle;
 
@@ -654,11 +671,15 @@ impl CoreGuard<'_> {
                     let task = match entry {
                         Some(entry) => entry,
                         None => {
-                            core = if did_defer_tasks() {
+                            core.metrics.end_processing_scheduled_tasks();
+
+                            core = if !context.defer.is_empty() {
                                 context.park_yield(core, handle)
                             } else {
                                 context.park(core, handle)
                             };
+
+                            core.metrics.start_processing_scheduled_tasks();
 
                             // Try polling the `block_on` future next
                             continue 'outer;
@@ -674,9 +695,13 @@ impl CoreGuard<'_> {
                     core = c;
                 }
 
+                core.metrics.end_processing_scheduled_tasks();
+
                 // Yield to the driver, this drives the timer and pulls any
                 // pending I/O events.
                 core = context.park_yield(core, handle);
+
+                core.metrics.start_processing_scheduled_tasks();
             }
         });
 
