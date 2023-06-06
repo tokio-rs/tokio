@@ -21,7 +21,6 @@ cfg_rt! {
 
     use crate::runtime::{scheduler, task::Id};
 
-    use std::cell::RefCell;
     use std::task::Waker;
 
     cfg_taskdump! {
@@ -41,7 +40,7 @@ struct Context {
 
     /// Handle to the runtime scheduler running on the current thread.
     #[cfg(feature = "rt")]
-    handle: RefCell<Option<scheduler::Handle>>,
+    current: current::HandleCell,
 
     /// Handle to the scheduler's internal "context"
     #[cfg(feature = "rt")]
@@ -84,7 +83,7 @@ tokio_thread_local! {
             /// Tracks the current runtime handle to use when spawning,
             /// accessing drivers, etc...
             #[cfg(feature = "rt")]
-            handle: RefCell::new(None),
+            current: current::HandleCell::new(),
 
             /// Tracks the current scheduler internal context
             #[cfg(feature = "rt")]
