@@ -1,4 +1,4 @@
-use crate::io::Interest;
+use crate::io::{Interest, Ready};
 use crate::runtime::io::{ReadyEvent, Registration};
 use crate::runtime::scheduler;
 
@@ -201,12 +201,13 @@ pub struct AsyncFdReadyMutGuard<'a, T: AsRawFd> {
     event: Option<ReadyEvent>,
 }
 
-const ALL_INTEREST: Interest = Interest::READABLE.add(Interest::WRITABLE);
-
 impl<T: AsRawFd> AsyncFd<T> {
     /// Creates an AsyncFd backed by (and taking ownership of) an object
     /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
     /// time of creation.
+    ///
+    /// Only configures the [`Interest::READABLE`] and [`Interest::WRITABLE`] interests. For more
+    /// control, use [`AsyncFd::with_interest`].
     ///
     /// This method must be called in the context of a tokio runtime.
     ///
@@ -220,11 +221,12 @@ impl<T: AsRawFd> AsyncFd<T> {
     where
         T: AsRawFd,
     {
-        Self::with_interest(inner, ALL_INTEREST)
+        Self::with_interest(inner, Interest::READABLE | Interest::WRITABLE)
     }
 
-    /// Creates new instance as `new` with additional ability to customize interest,
-    /// allowing to specify whether file descriptor will be polled for read, write or both.
+    /// Creates an AsyncFd backed by (and taking ownership of) an object
+    /// implementing [`AsRawFd`], with a specific [`Interest`]. The backing
+    /// file descriptor is cached at the time of creation.
     ///
     /// # Panics
     ///
@@ -440,7 +442,96 @@ impl<T: AsRawFd> AsyncFd<T> {
         .into()
     }
 
-    async fn readiness(&self, interest: Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
+    /// Waits for any of the requested ready states, returning a
+    /// [`AsyncFdReadyGuard`] that must be dropped to resume
+    /// polling for the requested ready states.
+    ///
+    /// The function may complete without the file descriptor being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
+    /// [`Ready`] set, so you should always check the returned value and possibly
+    /// wait again if the requested states are not set.
+    ///
+    /// When an IO operation does return `io::ErrorKind::WouldBlock`, the readiness must be cleared.
+    /// When a combined interest is used, it is important to clear only the readiness
+    /// that is actually observed to block. For instance when the combined
+    /// interest `Interest::READABLE | Interest::WRITABLE` is used, and a read blocks, only
+    /// read readiness should be cleared using the [`AsyncFdReadyGuard::clear_ready_matching`] method:
+    /// `guard.clear_ready_matching(Ready::READABLE)`.
+    /// Also clearing the write readiness in this case would be incorrect. The [`AsyncFdReadyGuard::clear_ready`]
+    /// method clears all readiness flags.
+    ///
+    /// This method takes `&self`, so it is possible to call this method
+    /// concurrently with other methods on this struct. This method only
+    /// provides shared access to the inner IO resource when handling the
+    /// [`AsyncFdReadyGuard`].
+    ///
+    /// # Examples
+    ///
+    /// Concurrently read and write to a [`std::net::TcpStream`] on the same task without
+    /// splitting.
+    ///
+    /// ```no_run
+    /// use std::error::Error;
+    /// use std::io;
+    /// use std::io::{Read, Write};
+    /// use std::net::TcpStream;
+    /// use tokio::io::unix::AsyncFd;
+    /// use tokio::io::{Interest, Ready};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let stream = TcpStream::connect("127.0.0.1:8080")?;
+    ///     stream.set_nonblocking(true)?;
+    ///     let stream = AsyncFd::new(stream)?;
+    ///
+    ///     loop {
+    ///         let mut guard = stream
+    ///             .ready(Interest::READABLE | Interest::WRITABLE)
+    ///             .await?;
+    ///
+    ///         if guard.ready().is_readable() {
+    ///             let mut data = vec![0; 1024];
+    ///             // Try to read data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.get_ref().read(&mut data) {
+    ///                 Ok(n) => {
+    ///                     println!("read {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     // a read has blocked, but a write might still succeed.
+    ///                     // clear only the read readiness.
+    ///                     guard.clear_ready_matching(Ready::READABLE);
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///
+    ///         if guard.ready().is_writable() {
+    ///             // Try to write data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.get_ref().write(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("write {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     // a write has blocked, but a read might still succeed.
+    ///                     // clear only the write readiness.
+    ///                     guard.clear_ready_matching(Ready::WRITABLE);
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub async fn ready(&self, interest: Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
         let event = self.registration.readiness(interest).await?;
 
         Ok(AsyncFdReadyGuard {
@@ -449,7 +540,94 @@ impl<T: AsRawFd> AsyncFd<T> {
         })
     }
 
-    async fn readiness_mut(
+    /// Waits for any of the requested ready states, returning a
+    /// [`AsyncFdReadyMutGuard`] that must be dropped to resume
+    /// polling for the requested ready states.
+    ///
+    /// The function may complete without the file descriptor being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`. The function can also return with an empty
+    /// [`Ready`] set, so you should always check the returned value and possibly
+    /// wait again if the requested states are not set.
+    ///
+    /// When an IO operation does return `io::ErrorKind::WouldBlock`, the readiness must be cleared.
+    /// When a combined interest is used, it is important to clear only the readiness
+    /// that is actually observed to block. For instance when the combined
+    /// interest `Interest::READABLE | Interest::WRITABLE` is used, and a read blocks, only
+    /// read readiness should be cleared using the [`AsyncFdReadyMutGuard::clear_ready_matching`] method:
+    /// `guard.clear_ready_matching(Ready::READABLE)`.
+    /// Also clearing the write readiness in this case would be incorrect.
+    /// The [`AsyncFdReadyMutGuard::clear_ready`] method clears all readiness flags.
+    ///
+    /// This method takes `&mut self`, so it is possible to access the inner IO
+    /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    ///
+    /// # Examples
+    ///
+    /// Concurrently read and write to a [`std::net::TcpStream`] on the same task without
+    /// splitting.
+    ///
+    /// ```no_run
+    /// use std::error::Error;
+    /// use std::io;
+    /// use std::io::{Read, Write};
+    /// use std::net::TcpStream;
+    /// use tokio::io::unix::AsyncFd;
+    /// use tokio::io::{Interest, Ready};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let stream = TcpStream::connect("127.0.0.1:8080")?;
+    ///     stream.set_nonblocking(true)?;
+    ///     let mut stream = AsyncFd::new(stream)?;
+    ///
+    ///     loop {
+    ///         let mut guard = stream
+    ///             .ready_mut(Interest::READABLE | Interest::WRITABLE)
+    ///             .await?;
+    ///
+    ///         if guard.ready().is_readable() {
+    ///             let mut data = vec![0; 1024];
+    ///             // Try to read data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match guard.get_inner_mut().read(&mut data) {
+    ///                 Ok(n) => {
+    ///                     println!("read {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     // a read has blocked, but a write might still succeed.
+    ///                     // clear only the read readiness.
+    ///                     guard.clear_ready_matching(Ready::READABLE);
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///
+    ///         if guard.ready().is_writable() {
+    ///             // Try to write data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match guard.get_inner_mut().write(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("write {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     // a write has blocked, but a read might still succeed.
+    ///                     // clear only the write readiness.
+    ///                     guard.clear_ready_matching(Ready::WRITABLE);
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub async fn ready_mut(
         &mut self,
         interest: Interest,
     ) -> io::Result<AsyncFdReadyMutGuard<'_, T>> {
@@ -471,7 +649,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// [`AsyncFdReadyGuard`].
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn readable<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
-        self.readiness(Interest::READABLE).await
+        self.ready(Interest::READABLE).await
     }
 
     /// Waits for the file descriptor to become readable, returning a
@@ -482,7 +660,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn readable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
-        self.readiness_mut(Interest::READABLE).await
+        self.ready_mut(Interest::READABLE).await
     }
 
     /// Waits for the file descriptor to become writable, returning a
@@ -495,7 +673,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// [`AsyncFdReadyGuard`].
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn writable<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
-        self.readiness(Interest::WRITABLE).await
+        self.ready(Interest::WRITABLE).await
     }
 
     /// Waits for the file descriptor to become writable, returning a
@@ -506,7 +684,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn writable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
-        self.readiness_mut(Interest::WRITABLE).await
+        self.ready_mut(Interest::WRITABLE).await
     }
 
     /// Reads or writes from the file descriptor using a user-provided IO operation.
@@ -641,19 +819,114 @@ impl<T: AsRawFd> Drop for AsyncFd<T> {
 }
 
 impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
-    /// Indicates to tokio that the file descriptor is no longer ready. The
-    /// internal readiness flag will be cleared, and tokio will wait for the
+    /// Indicates to tokio that the file descriptor is no longer ready. All
+    /// internal readiness flags will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
+    ///
+    /// This function is commonly used with guards returned by [`AsyncFd::readable`] and
+    /// [`AsyncFd::writable`].
     ///
     /// It is critical that this function not be called unless your code
     /// _actually observes_ that the file descriptor is _not_ ready. Do not call
     /// it simply because, for example, a read succeeded; it should be called
     /// when a read is observed to block.
-    ///
-    /// [`drop`]: method@std::mem::drop
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
             self.async_fd.registration.clear_readiness(event);
+        }
+    }
+
+    /// Indicates to tokio that the file descriptor no longer has a specific readiness.
+    /// The internal readiness flag will be cleared, and tokio will wait for the
+    /// next edge-triggered readiness notification from the OS.
+    ///
+    /// This function is useful in combination with the [`AsyncFd::ready`] method when a
+    /// combined interest like `Interest::READABLE | Interest::WRITABLE` is used.
+    ///
+    /// It is critical that this function not be called unless your code
+    /// _actually observes_ that the file descriptor is _not_ ready for the provided `Ready`.
+    /// Do not call it simply because, for example, a read succeeded; it should be called
+    /// when a read is observed to block. Only clear the specific readiness that is observed to
+    /// block. For example when a read blocks when using a combined interest,
+    /// only clear `Ready::READABLE`.
+    ///
+    /// # Examples
+    ///
+    /// Concurrently read and write to a [`std::net::TcpStream`] on the same task without
+    /// splitting.
+    ///
+    /// ```no_run
+    /// use std::error::Error;
+    /// use std::io;
+    /// use std::io::{Read, Write};
+    /// use std::net::TcpStream;
+    /// use tokio::io::unix::AsyncFd;
+    /// use tokio::io::{Interest, Ready};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let stream = TcpStream::connect("127.0.0.1:8080")?;
+    ///     stream.set_nonblocking(true)?;
+    ///     let stream = AsyncFd::new(stream)?;
+    ///
+    ///     loop {
+    ///         let mut guard = stream
+    ///             .ready(Interest::READABLE | Interest::WRITABLE)
+    ///             .await?;
+    ///
+    ///         if guard.ready().is_readable() {
+    ///             let mut data = vec![0; 1024];
+    ///             // Try to read data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.get_ref().read(&mut data) {
+    ///                 Ok(n) => {
+    ///                     println!("read {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     // a read has blocked, but a write might still succeed.
+    ///                     // clear only the read readiness.
+    ///                     guard.clear_ready_matching(Ready::READABLE);
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///
+    ///         if guard.ready().is_writable() {
+    ///             // Try to write data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.get_ref().write(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("write {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     // a write has blocked, but a read might still succeed.
+    ///                     // clear only the write readiness.
+    ///                     guard.clear_ready_matching(Ready::WRITABLE);
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn clear_ready_matching(&mut self, ready: Ready) {
+        if let Some(mut event) = self.event.take() {
+            self.async_fd
+                .registration
+                .clear_readiness(event.with_ready(ready));
+
+            // the event is no longer ready for the readiness that was just cleared
+            event.ready = event.ready - ready;
+
+            if !event.ready.is_empty() {
+                self.event = Some(event);
+            }
         }
     }
 
@@ -664,6 +937,20 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// constraint on the [`AsyncFdReadyGuard`] type.
     pub fn retain_ready(&mut self) {
         // no-op
+    }
+
+    /// Get the [`Ready`] value associated with this guard.
+    ///
+    /// This method will return the empty readiness state if
+    /// [`AsyncFdReadyGuard::clear_ready`] has been called on
+    /// the guard.
+    ///
+    /// [`Ready`]: crate::io::Ready
+    pub fn ready(&self) -> Ready {
+        match &self.event {
+            Some(event) => event.ready,
+            None => Ready::EMPTY,
+        }
     }
 
     /// Performs the provided IO operation.
@@ -751,19 +1038,114 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
 }
 
 impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
-    /// Indicates to tokio that the file descriptor is no longer ready. The
-    /// internal readiness flag will be cleared, and tokio will wait for the
+    /// Indicates to tokio that the file descriptor is no longer ready. All
+    /// internal readiness flags will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
+    ///
+    /// This function is commonly used with guards returned by [`AsyncFd::readable_mut`] and
+    /// [`AsyncFd::writable_mut`].
     ///
     /// It is critical that this function not be called unless your code
     /// _actually observes_ that the file descriptor is _not_ ready. Do not call
     /// it simply because, for example, a read succeeded; it should be called
     /// when a read is observed to block.
-    ///
-    /// [`drop`]: method@std::mem::drop
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
             self.async_fd.registration.clear_readiness(event);
+        }
+    }
+
+    /// Indicates to tokio that the file descriptor no longer has a specific readiness.
+    /// The internal readiness flag will be cleared, and tokio will wait for the
+    /// next edge-triggered readiness notification from the OS.
+    ///
+    /// This function is useful in combination with the [`AsyncFd::ready_mut`] method when a
+    /// combined interest like `Interest::READABLE | Interest::WRITABLE` is used.
+    ///
+    /// It is critical that this function not be called unless your code
+    /// _actually observes_ that the file descriptor is _not_ ready for the provided `Ready`.
+    /// Do not call it simply because, for example, a read succeeded; it should be called
+    /// when a read is observed to block. Only clear the specific readiness that is observed to
+    /// block. For example when a read blocks when using a combined interest,
+    /// only clear `Ready::READABLE`.
+    ///
+    /// # Examples
+    ///
+    /// Concurrently read and write to a [`std::net::TcpStream`] on the same task without
+    /// splitting.
+    ///
+    /// ```no_run
+    /// use std::error::Error;
+    /// use std::io;
+    /// use std::io::{Read, Write};
+    /// use std::net::TcpStream;
+    /// use tokio::io::unix::AsyncFd;
+    /// use tokio::io::{Interest, Ready};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let stream = TcpStream::connect("127.0.0.1:8080")?;
+    ///     stream.set_nonblocking(true)?;
+    ///     let mut stream = AsyncFd::new(stream)?;
+    ///
+    ///     loop {
+    ///         let mut guard = stream
+    ///             .ready_mut(Interest::READABLE | Interest::WRITABLE)
+    ///             .await?;
+    ///
+    ///         if guard.ready().is_readable() {
+    ///             let mut data = vec![0; 1024];
+    ///             // Try to read data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match guard.get_inner_mut().read(&mut data) {
+    ///                 Ok(n) => {
+    ///                     println!("read {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     // a read has blocked, but a write might still succeed.
+    ///                     // clear only the read readiness.
+    ///                     guard.clear_ready_matching(Ready::READABLE);
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///
+    ///         if guard.ready().is_writable() {
+    ///             // Try to write data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match guard.get_inner_mut().write(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("write {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     // a write has blocked, but a read might still succeed.
+    ///                     // clear only the write readiness.
+    ///                     guard.clear_ready_matching(Ready::WRITABLE);
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn clear_ready_matching(&mut self, ready: Ready) {
+        if let Some(mut event) = self.event.take() {
+            self.async_fd
+                .registration
+                .clear_readiness(event.with_ready(ready));
+
+            // the event is no longer ready for the readiness that was just cleared
+            event.ready = event.ready - ready;
+
+            if !event.ready.is_empty() {
+                self.event = Some(event);
+            }
         }
     }
 
@@ -774,6 +1156,20 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// constraint on the [`AsyncFdReadyGuard`] type.
     pub fn retain_ready(&mut self) {
         // no-op
+    }
+
+    /// Get the [`Ready`] value associated with this guard.
+    ///
+    /// This method will return the empty readiness state if
+    /// [`AsyncFdReadyGuard::clear_ready`] has been called on
+    /// the guard.
+    ///
+    /// [`Ready`]: super::Ready
+    pub fn ready(&self) -> Ready {
+        match &self.event {
+            Some(event) => event.ready,
+            None => Ready::EMPTY,
+        }
     }
 
     /// Performs the provided IO operation.

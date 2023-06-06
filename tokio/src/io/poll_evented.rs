@@ -73,6 +73,9 @@ cfg_io_driver! {
 impl<E: Source> PollEvented<E> {
     /// Creates a new `PollEvented` associated with the default reactor.
     ///
+    /// The returned `PollEvented` has readable and writable interests. For more control, use
+    /// [`Self::new_with_interest`].
+    ///
     /// # Panics
     ///
     /// This function panics if thread-local runtime is not set.
