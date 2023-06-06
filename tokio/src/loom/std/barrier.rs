@@ -1,5 +1,5 @@
 //! A `Barrier` that provides `wait_timeout`.
-//! 
+//!
 //! This implementation mirrors that of the Rust standard library.
 
 use crate::loom::sync::{Condvar, Mutex};
@@ -170,8 +170,8 @@ impl Barrier {
             // We need a while loop to guard against spurious wakeups.
             // https://en.wikipedia.org/wiki/Spurious_wakeup
             while local_gen == lock.generation_id {
-                let timeout_result;
-                (lock, timeout_result) = self.cvar.wait_timeout(lock, timeout).unwrap();
+                let (guard, timeout_result) = self.cvar.wait_timeout(lock, timeout).unwrap();
+                lock = guard;
                 if timeout_result.timed_out() {
                     return None;
                 }
