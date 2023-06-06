@@ -35,7 +35,6 @@ fn single_thread() {
 }
 
 #[test]
-#[cfg(not(tokio_cross))]
 fn many_oneshot_futures() {
     // used for notifying the main thread
     const NUM: usize = 1_000;
@@ -595,7 +594,7 @@ async fn test_block_in_place4() {
 // is sufficient. If there is a regression, this test will hang. In theory, we
 // could add limits, but that would be likely to fail on CI.
 #[test]
-#[cfg(not(tokio_cross))]
+#[cfg(not(tokio_no_tuning_tests))]
 fn test_tuning() {
     use std::sync::atomic::AtomicBool;
     use std::time::Duration;
