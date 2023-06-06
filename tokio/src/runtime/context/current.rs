@@ -13,7 +13,7 @@ pub(crate) struct SetCurrentGuard {
     prev: Option<scheduler::Handle>,
 
     // The depth for this guard
-    depth: u16,
+    depth: usize,
 
     // Don't let the type move across threads.
     _p: PhantomData<SyncNotSend>,
@@ -24,7 +24,7 @@ pub(super) struct HandleCell {
     handle: RefCell<Option<scheduler::Handle>>,
 
     /// Tracks the number of nested calls to `try_set_current`.
-    depth: Cell<u16>,
+    depth: Cell<usize>,
 }
 
 /// Sets this [`Handle`] as the current active [`Handle`].
@@ -50,7 +50,7 @@ impl Context {
         let old_handle = self.current.handle.borrow_mut().replace(handle.clone());
         let depth = self.current.depth.get();
 
-        if depth == u16::MAX {
+        if depth == usize::MAX {
             panic!("reached max `enter` depth");
         }
 
