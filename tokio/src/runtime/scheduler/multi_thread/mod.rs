@@ -71,11 +71,9 @@ impl MultiThread {
     where
         F: Future,
     {
-        let mut enter = crate::runtime::context::enter_runtime(handle, true);
-        enter
-            .blocking
-            .block_on(future)
-            .expect("failed to park thread")
+        crate::runtime::context::enter_runtime(handle, true, |blocking| {
+            blocking.block_on(future).expect("failed to park thread")
+        })
     }
 
     pub(crate) fn shutdown(&mut self, handle: &scheduler::Handle) {
