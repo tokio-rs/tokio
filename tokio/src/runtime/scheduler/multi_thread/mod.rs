@@ -24,7 +24,15 @@ mod worker;
 pub(crate) use worker::{Context, Launch, Shared};
 
 cfg_taskdump! {
+    mod trace;
+    use trace::TraceStatus;
+
     pub(crate) use worker::Synced;
+}
+
+cfg_not_taskdump! {
+    mod trace_mock;
+    use trace_mock::TraceStatus;
 }
 
 pub(crate) use worker::block_in_place;

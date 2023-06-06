@@ -60,7 +60,7 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{
-    idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, Unparker,
+    idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
 use crate::runtime::scheduler::{inject, Defer, Lock};
 use crate::runtime::task::OwnedTasks;
@@ -74,8 +74,16 @@ use std::cell::RefCell;
 use std::task::Waker;
 use std::time::Duration;
 
+cfg_metrics! {
+    mod metrics;
+}
+
 cfg_taskdump! {
-    use crate::loom::sync::Barrier;
+    mod taskdump;
+}
+
+cfg_not_taskdump! {
+    mod taskdump_mock;
 }
 
 /// A scheduler worker
@@ -213,82 +221,6 @@ pub(crate) struct Context {
 
 /// Starts the workers
 pub(crate) struct Launch(Vec<Arc<Worker>>);
-
-cfg_not_taskdump! {
-    pub(super) struct TraceStatus {}
-
-    impl TraceStatus {
-        fn new(_: usize) -> Self {
-            Self {}
-        }
-
-        fn trace_requested(&self) -> bool {
-            false
-        }
-    }
-}
-
-cfg_taskdump! {
-    use crate::sync::notify::Notify;
-    use crate::runtime::dump::Dump;
-    use crate::loom::sync::atomic::{AtomicBool, Ordering};
-
-    /// Tracing status of the worker.
-    pub(super) struct TraceStatus {
-        pub(super) trace_requested: AtomicBool,
-        trace_start: Barrier,
-        trace_end: Barrier,
-        pub(super) result_ready: Notify,
-        pub(super) trace_result: Mutex<Option<Dump>>,
-    }
-
-    impl TraceStatus {
-        fn new(remotes_len: usize) -> Self {
-            Self {
-                trace_requested: AtomicBool::new(false),
-                trace_start: Barrier::new(remotes_len),
-                trace_end: Barrier::new(remotes_len),
-                result_ready: Notify::new(),
-                trace_result: Mutex::new(None),
-            }
-        }
-
-        fn trace_requested(&self) -> bool {
-            self.trace_requested.load(Ordering::Relaxed)
-        }
-
-        pub(super) async fn start_trace_request(&self, handle: &Handle) {
-            while self.trace_requested.compare_exchange(false,
-                true,
-                Ordering::Acquire,
-                Ordering::Relaxed).is_err()
-            {
-                handle.notify_all();
-                crate::task::yield_now().await;
-            }
-        }
-
-        fn stash_result(&self, dump: Dump) {
-            let _ = self.trace_result.lock().insert(dump);
-            self.result_ready.notify_one();
-        }
-
-        pub(super) fn take_result(&self) -> Option<Dump> {
-            self.trace_result.lock().take()
-        }
-
-        pub(super) async fn end_trace_request(&self, handle: &Handle) {
-            while self.trace_requested.compare_exchange(true,
-                false,
-                Ordering::Acquire,
-                Ordering::Relaxed).is_err()
-            {
-                handle.notify_all();
-                crate::task::yield_now().await;
-            }
-        }
-    }
-}
 
 /// Running a task may consume the core. If the core is still available when
 /// running the task completes, it is returned. Otherwise, the worker will need
@@ -1200,64 +1132,6 @@ impl Handle {
         }
     }
 
-    cfg_not_taskdump! {
-        fn trace_core(&self, core: Box<Core>) -> Box<Core> {
-                core
-        }
-    }
-
-    cfg_taskdump! {
-        fn trace_core(&self, mut core: Box<Core>) -> Box<Core> {
-            use crate::runtime::dump;
-            use task::trace::trace_multi_thread;
-
-            core.is_traced = false;
-
-            if core.is_shutdown {
-                return core;
-            }
-
-            // wait for other workers, or timeout without tracing
-            let timeout = Duration::from_millis(250); // a _very_ generous timeout
-            let barrier = if let Some(barrier) = self.shared.trace_status.trace_start.wait_timeout(timeout) {
-                barrier
-            } else {
-                // don't attempt to trace
-                return core;
-            };
-
-            if !barrier.is_leader() {
-                // wait for leader to finish tracing
-                self.shared.trace_status.trace_end.wait();
-                return core;
-            }
-
-            // trace
-
-            let owned = &self.shared.owned;
-            let mut local = self.shared.steal_all();
-            let synced = &self.shared.synced;
-            let injection = &self.shared.inject;
-
-            // safety: `trace_multi_thread` is invoked with the same `synced` that `injection`
-            // was created with.
-            let traces = unsafe { trace_multi_thread(owned, &mut local, synced, injection) }
-                .into_iter()
-                .map(dump::Task::new)
-                .collect();
-
-            let result = dump::Dump::new(traces);
-
-            // stash the result
-            self.shared.trace_status.stash_result(result);
-
-            // allow other workers to proceed
-            self.shared.trace_status.trace_end.wait();
-
-            core
-        }
-    }
-
     fn ptr_eq(&self, other: &Handle) -> bool {
         std::ptr::eq(self, other)
     }
@@ -1306,41 +1180,6 @@ fn with_current<R>(f: impl FnOnce(Option<&Context>) -> R) -> R {
         Some(MultiThread(ctx)) => f(Some(ctx)),
         _ => f(None),
     })
-}
-
-cfg_metrics! {
-    impl Shared {
-        pub(super) fn injection_queue_depth(&self) -> usize {
-            self.inject.len()
-        }
-
-        pub(super) fn worker_local_queue_depth(&self, worker: usize) -> usize {
-            self.remotes[worker].steal.len()
-        }
-    }
-}
-
-cfg_taskdump! {
-    impl Shared {
-        /// Steal all tasks from remotes into a single local queue.
-        pub(super) fn steal_all(&self) -> super::queue::Local<Arc<Handle>> {
-            let (_steal, mut local) = super::queue::local();
-
-            let worker_metrics = WorkerMetrics::new();
-            let mut stats = Stats::new(&worker_metrics);
-
-            for remote in self.remotes.iter() {
-                let steal = &remote.steal;
-                while !steal.is_empty() {
-                    if let Some(task) = steal.steal_into(&mut local, &mut stats) {
-                        local.push_back([task].into_iter());
-                    }
-                }
-            }
-
-            local
-        }
-    }
 }
 
 // `u32::abs_diff` is not available on Tokio's MSRV.
