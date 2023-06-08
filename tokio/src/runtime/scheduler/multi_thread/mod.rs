@@ -15,13 +15,10 @@ use self::idle::Idle;
 mod stats;
 pub(crate) use stats::Stats;
 
-mod park;
-pub(crate) use park::{Parker, Unparker};
-
 pub(crate) mod queue;
 
 mod worker;
-pub(crate) use worker::{Context, Launch, Shared};
+pub(crate) use worker::{Context, Shared};
 
 cfg_taskdump! {
     mod trace;
@@ -37,8 +34,8 @@ cfg_not_taskdump! {
 
 pub(crate) use worker::block_in_place;
 
-use crate::loom::sync::Arc;
 use crate::runtime::{
+    self,
     blocking,
     driver::{self, Driver},
     scheduler, Config,
@@ -61,18 +58,17 @@ impl MultiThread {
         blocking_spawner: blocking::Spawner,
         seed_generator: RngSeedGenerator,
         config: Config,
-    ) -> (MultiThread, Arc<Handle>, Launch) {
-        let parker = Parker::new(driver);
-        let (handle, launch) = worker::create(
+    ) -> (MultiThread, runtime::Handle) {
+        let handle = worker::create(
             size,
-            parker,
+            driver,
             driver_handle,
             blocking_spawner,
             seed_generator,
             config,
         );
 
-        (MultiThread, handle, launch)
+        (MultiThread, handle)
     }
 
     /// Blocks the current thread waiting for the future to complete.

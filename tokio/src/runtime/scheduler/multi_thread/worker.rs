@@ -56,16 +56,16 @@
 //! the inject queue indefinitely. This would be a ref-count cycle and a memory
 //! leak.
 
-use crate::loom::sync::{Arc, Condvar, Mutex};
+use crate::loom::sync::{Arc, Condvar, Mutex, MutexGuard};
 use crate::runtime;
 use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{
-    idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
+    idle, queue, Counters, Handle, Idle, Overflow, Stats, TraceStatus,
 };
-use crate::runtime::scheduler::{inject, Defer, Lock};
+use crate::runtime::scheduler::{self, inject, Defer, Lock};
 use crate::runtime::task::OwnedTasks;
 use crate::runtime::{
-    blocking, coop, driver, scheduler, task, Config, Driver, SchedulerMetrics, WorkerMetrics,
+    blocking, coop, driver, task, Config, Driver, SchedulerMetrics, WorkerMetrics,
 };
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
@@ -157,17 +157,6 @@ pub(crate) struct Shared {
     /// Condition variable used to unblock waiting workers
     condvar: Condvar,
 
-    /// Power's Tokio's I/O, timers, etc... the responsibility of polling the
-    /// driver is shared across workers.
-    driver: AtomicCell<Driver>,
-
-    /// Cores that have observed the shutdown signal
-    ///
-    /// The core is **not** placed back in the worker to avoid it from being
-    /// stolen by a thread that was spawned as part of `block_in_place`.
-    #[allow(clippy::vec_box)] // we're moving an already-boxed value
-    shutdown_cores: Mutex<Vec<Box<Core>>>,
-
     /// The number of cores that have observed the trace signal.
     pub(super) trace_status: TraceStatus,
 
@@ -191,20 +180,27 @@ pub(crate) struct Synced {
     /// Cores not currently assigned to workers
     cores: Vec<Box<Core>>,
 
+    /// Cores that have observed the shutdown signal
+    ///
+    /// The core is **not** placed back in the worker to avoid it from being
+    /// stolen by a thread that was spawned as part of `block_in_place`.
+    shutdown_cores: Vec<Box<Core>>,
+
     /// Synchronized state for `Idle`.
     pub(super) idle: idle::Synced,
 
     /// Synchronized state for `Inject`.
     pub(crate) inject: inject::Synced,
+
+    /// Power's Tokio's I/O, timers, etc... the responsibility of polling the
+    /// driver is shared across workers.
+    driver: Option<Box<Driver>>,
 }
 
 /// Used to communicate with a worker from other threads.
 struct Remote {
     /// Steals tasks from this worker.
     pub(super) steal: queue::Steal<Arc<Handle>>,
-
-    /// Unparks the associated worker thread
-    unpark: Unparker,
 }
 
 /// Thread-local context
@@ -218,9 +214,6 @@ pub(crate) struct Context {
     /// handle yielded tasks.
     pub(crate) defer: Defer,
 }
-
-/// Starts the workers
-pub(crate) struct Launch(Vec<Arc<Worker>>);
 
 /// Running a task may consume the core. If the core is still available when
 /// running the task completes, it is returned. Otherwise, the worker will need
@@ -241,24 +234,20 @@ const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 
 pub(super) fn create(
     size: usize,
-    park: Parker,
+    driver: Driver,
     driver_handle: driver::Handle,
     blocking_spawner: blocking::Spawner,
     seed_generator: RngSeedGenerator,
     config: Config,
-) -> (Arc<Handle>, Launch) {
-    /*
+) -> runtime::Handle {
     let mut cores = Vec::with_capacity(size);
     let mut remotes = Vec::with_capacity(size);
-    let mut parkers = Vec::with_capacity(size);
     let mut worker_metrics = Vec::with_capacity(size);
 
     // Create the local queues
     for i in 0..size {
         let (steal, run_queue) = queue::local();
 
-        let park = park.clone();
-        let unpark = park.unpark();
         let metrics = WorkerMetrics::from_config(&config);
         let stats = Stats::new(&metrics);
 
@@ -276,8 +265,7 @@ pub(super) fn create(
             rand: FastRand::from_seed(config.seed_generator.next_seed()),
         }));
 
-        parkers.push(park);
-        remotes.push(Remote { steal, unpark });
+        remotes.push(Remote { steal });
         worker_metrics.push(metrics);
     }
 
@@ -292,10 +280,13 @@ pub(super) fn create(
             idle,
             owned: OwnedTasks::new(),
             synced: Mutex::new(Synced {
+                cores,
+                shutdown_cores: Vec::with_capacity(size),
                 idle: idle_synced,
                 inject: inject_synced,
+                driver: Some(Box::new(driver)),
             }),
-            shutdown_cores: Mutex::new(vec![]),
+            condvar: Condvar::new(),
             trace_status: TraceStatus::new(remotes_len),
             config,
             scheduler_metrics: SchedulerMetrics::new(),
@@ -307,19 +298,23 @@ pub(super) fn create(
         seed_generator,
     });
 
-    let mut launch = Launch(vec![]);
+    let rt_handle = runtime::Handle {
+        inner: scheduler::Handle::MultiThread(handle),
+    };
 
-    for (core, park) in cores.drain(..).zip(parkers.drain(..)) {
-        launch.0.push(Arc::new(Worker {
+    // Eagerly start worker threads
+    for _ in 0..size {
+        let handle = rt_handle.inner.expect_multi_thread();
+        let worker = Worker {
             handle: handle.clone(),
-            park,
-            core: AtomicCell::new(Some(core)),
-        }));
+        };
+
+        handle
+            .blocking_spawner
+            .spawn_blocking(&rt_handle, move || run(worker));
     }
 
-    (handle, launch)
-    */
-    todo!()
+    rt_handle
 }
 
 #[track_caller]
@@ -436,17 +431,6 @@ where
     todo!()
 }
 
-impl Launch {
-    pub(crate) fn launch(mut self) {
-        /*
-        for worker in self.0.drain(..) {
-            runtime::spawn_blocking(move || run(worker));
-        }
-        */
-        todo!();
-    }
-}
-
 fn run(mut worker: Worker) {
     struct AbortOnPanic;
 
@@ -488,12 +472,6 @@ fn run(mut worker: Worker) {
             // Run the worker
             worker.run(&cx);
 
-            /*
-            // This should always be an error. It only returns a `Result` to support
-            // using `?` to short circuit.
-            assert!(cx.run(core).is_err());
-            */
-
             // Check if there are any deferred tasks to notify. This can happen when
             // the worker core is lost due to `block_in_place()` being called from
             // within the task.
@@ -506,11 +484,13 @@ impl Worker {
     fn run(&mut self, cx: &Context) {
         // First, acquire a core. If no cores are available, the thread will
         // block until one becomes available.
-        let mut core = self.acquire_core();
-
-        // Start as "processing" tasks as polling tasks from the local queue
-        // will be one of the first things we do.
-        core.stats.start_processing_scheduled_tasks();
+        //
+        // Acquiring a core will also pull tasks from the injection queue and
+        // run one, if found.
+        let mut core = match self.acquire_core(cx, self.shared().synced.lock()) {
+            Ok(core) => core,
+            Err(_) => return,
+        };
 
         while !core.is_shutdown {
             self.assert_lifo_enabled_is_correct(&core);
@@ -549,15 +529,16 @@ impl Worker {
                     Err(_) => return,
                 };
             } else {
-                /*
                 // Wait for work
-                core = if !self.defer.is_empty() {
-                    self.park_timeout(core, Some(Duration::from_millis(0)))
+                core = if !cx.defer.is_empty() {
+                    // Just run maintenance
+                    self.park_yield(core)
                 } else {
-                    self.park(core)
+                    match self.park(cx, core) {
+                        Ok(core) => core,
+                        Err(_) => return,
+                    }
                 };
-                */
-                todo!()
             }
         }
 
@@ -569,13 +550,49 @@ impl Worker {
         todo!()
     }
 
-    fn acquire_core(&mut self) -> Box<Core> {
-        let mut core = todo!();
+    fn acquire_core(&self, cx: &Context, mut synced: MutexGuard<Synced>) -> RunResult {
+        // Wait until a core is available, then exit the loop.
+        let mut core = loop {
+            if let Some(core) = synced.cores.pop() {
+                break core;
+            }
+
+            // TODO: not always the case
+            assert!(cx.defer.is_empty());
+
+            synced = self.shared().condvar.wait(synced).unwrap();
+        };
 
         // Reset `lifo_enabled` here in case the core was previously stolen from
         // a task that had the LIFO slot disabled.
         self.reset_lifo_enabled(&mut core);
-        todo!()
+
+        // At this point, the local queue should be empty
+        debug_assert!(core.run_queue.is_empty());
+
+        // Update shutdown state while locked
+        core.is_shutdown = self.shared().inject.is_closed(&synced.inject);
+
+        if core.is_shutdown {
+            // Currently shutting down, don't do any more work
+            return Ok(core);
+        }
+
+        // TODO: don't hardcode 128
+        let n = core.run_queue.max_capacity() / 2;
+        let maybe_task = self.next_remote_task_batch(&mut synced, &mut core, n);
+
+        drop(synced);
+
+        // Start as "processing" tasks as polling tasks from the local queue
+        // will be one of the first things we do.
+        core.stats.start_processing_scheduled_tasks();
+
+        if let Some(task) = maybe_task {
+            self.run_task(cx, core, task)
+        } else {
+            Ok(core)
+        }
     }
 
     fn next_task(&self, core: &mut Core) -> Option<Notified> {
@@ -605,25 +622,8 @@ impl Worker {
                 core.run_queue.max_capacity() / 2,
             );
 
-            // The worker is currently idle, pull a batch of work from the
-            // injection queue. We don't want to pull *all* the work so other
-            // workers can also get some.
-            let n = usize::min(
-                self.shared().inject.len() / self.shared().remotes.len() + 1,
-                cap,
-            );
-
             let mut synced = self.shared().synced.lock();
-            // safety: passing in the correct `inject::Synced`.
-            let mut tasks = unsafe { self.shared().inject.pop_n(&mut synced.inject, n) };
-
-            // Pop the first task to return immedietly
-            let ret = tasks.next();
-
-            // Push the rest of the on the run queue
-            core.run_queue.push_back(tasks);
-
-            ret
+            self.next_remote_task_batch(&mut synced, core, cap)
         }
     }
 
@@ -633,8 +633,38 @@ impl Worker {
         }
 
         let mut synced = self.shared().synced.lock();
-        // safety: passing in correct `idle::Synced`
+        self.next_remote_task_synced(&mut synced)
+    }
+
+    fn next_remote_task_synced(&self, synced: &mut Synced) -> Option<Notified> {
+        // safety: we only have access to a valid `Synced` in this file.
         unsafe { self.shared().inject.pop(&mut synced.inject) }
+    }
+
+    fn next_remote_task_batch(
+        &self,
+        synced: &mut Synced,
+        core: &mut Core,
+        max: usize,
+    ) -> Option<Notified> {
+        // The worker is currently idle, pull a batch of work from the
+        // injection queue. We don't want to pull *all* the work so other
+        // workers can also get some.
+        let n = usize::min(
+            self.shared().inject.len() / self.shared().remotes.len() + 1,
+            max,
+        );
+
+        // safety: passing in the correct `inject::Synced`.
+        let mut tasks = unsafe { self.shared().inject.pop_n(&mut synced.inject, n) };
+
+        // Pop the first task to return immedietly
+        let ret = tasks.next();
+
+        // Push the rest of the on the run queue
+        core.run_queue.push_back(tasks);
+
+        ret
     }
 
     fn next_local_task(&self, core: &mut Core) -> Option<Notified> {
@@ -768,13 +798,6 @@ impl Worker {
 
             core.stats.end_processing_scheduled_tasks();
 
-            /*
-            // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
-            // to run without actually putting the thread to sleep.
-            core = self.park_timeout(core, Some(Duration::from_millis(0)));
-            */
-            todo!();
-
             // Run regularly scheduled maintenance
             self.maintenance(&mut core);
 
@@ -786,6 +809,15 @@ impl Worker {
 
     /// Runs maintenance work such as checking the pool's state.
     fn maintenance(&self, core: &mut Core) {
+        /*
+        // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
+        // to run without actually putting the thread to sleep.
+        core = self.park_timeout(core, Some(Duration::from_millis(0)));
+        */
+        if true {
+            todo!();
+        }
+
         core.stats.submit(&self.shared().worker_metrics[core.index]);
 
         if !core.is_shutdown {
@@ -797,6 +829,57 @@ impl Worker {
         if !core.is_traced {
             // Check if the worker should be tracing.
             core.is_traced = self.shared().trace_status.trace_requested();
+        }
+    }
+
+    fn park_yield(&self, mut core: Box<Core>) -> Box<Core> {
+        /*
+        // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
+        // to run without actually putting the thread to sleep.
+        core = self.park_timeout(core, Some(Duration::from_millis(0)));
+        */
+        if true {
+            todo!();
+        }
+
+        self.maintenance(&mut core);
+        core
+    }
+
+    fn park(&self, cx: &Context, mut core: Box<Core>) -> RunResult {
+        if let Some(f) = &self.shared().config.before_park {
+            f();
+        }
+
+        if self.transition_to_parked(&mut core) {
+            debug_assert!(!core.is_shutdown);
+            debug_assert!(!core.is_traced);
+
+            core.stats.about_to_park();
+            core = self.do_park(cx, core)?;
+        } else {
+            // Just run maintenance and carry on
+            core = self.park_yield(core);
+        }
+
+        if let Some(f) = &self.shared().config.after_unpark {
+            f();
+        }
+
+        Ok(core)
+    }
+
+    fn do_park(&self, cx: &Context, mut core: Box<Core>) -> RunResult {
+        let mut synced = self.shared().synced.lock();
+
+        // Return `core` to shared
+        synced.cores.push(core);
+
+        if let Some(mut driver) = synced.driver.take() {
+            todo!()
+        } else {
+            synced = self.shared().condvar.wait(synced).unwrap();
+            self.acquire_core(cx, synced)
         }
     }
 
@@ -822,6 +905,39 @@ impl Worker {
         }
     }
 
+    /// Prepares the worker state for parking.
+    ///
+    /// Returns true if the transition happened, false if there is work to do first.
+    fn transition_to_parked(&self, core: &mut Core) -> bool {
+        // Workers should not park if they have work to do
+        if core.lifo_slot.is_some() || core.run_queue.has_tasks() || core.is_traced {
+            return false;
+        }
+
+        // When the final worker transitions **out** of searching to parked, it
+        // must check all the queues one last time in case work materialized
+        // between the last work scan and transitioning out of searching.
+        let is_last_searcher = self
+            .shared()
+            .idle
+            .transition_worker_to_parked(todo!(), core.is_searching);
+
+        // The worker is no longer searching. Setting this is the local cache
+        // only.
+        core.is_searching = false;
+
+        if is_last_searcher {
+            // worker.handle.notify_if_work_pending();
+            todo!()
+        }
+
+        true
+    }
+
+    fn transition_from_parked(&self, core: &mut Core) -> bool {
+        todo!()
+    }
+
     /// Signals all tasks to shut down, and waits for them to complete. Must run
     /// before we enter the single-threaded phase of shutdown processing.
     fn pre_shutdown(&self, core: &mut Core) {
@@ -836,28 +952,31 @@ impl Worker {
     ///
     /// If all workers have reached this point, the final cleanup is performed.
     fn shutdown_core(&self, core: Box<Core>) {
-        let mut cores = self.shared().shutdown_cores.lock();
-        cores.push(core);
+        let mut synced = self.shared().synced.lock();
+        synced.cores.push(core);
 
-        if cores.len() != self.shared().remotes.len() {
+        if synced.cores.len() != self.shared().remotes.len() {
             return;
         }
 
         debug_assert!(self.shared().owned.is_empty());
 
-        for mut core in cores.drain(..) {
+        for mut core in synced.cores.drain(..) {
             // Drain tasks from the local queue
             while self.next_local_task(&mut core).is_some() {}
         }
 
         // Shutdown the driver
-        let mut driver = self.shared().driver.take().expect("driver missing");
+        let mut driver = synced.driver.take().expect("driver missing");
         driver.shutdown(&self.handle.driver);
 
         // Drain the injection queue
         //
-        // We already shut down every task, so we can simply drop the tasks.
-        while let Some(task) = self.next_remote_task() {
+        // We already shut down every task, so we can simply drop the tasks. We
+        // cannot call `next_remote_task()` because we already hold the lock.
+        //
+        // safety: passing in correct `idle::Synced`
+        while let Some(task) = self.next_remote_task_synced(&mut synced) {
             drop(task);
         }
     }
@@ -898,6 +1017,65 @@ impl Context {
 }
 
 impl Shared {
+    pub(super) fn schedule_task(&self, task: Notified, is_yield: bool) {
+        /*
+        with_current(|maybe_cx| {
+            if let Some(cx) = maybe_cx {
+                // Make sure the task is part of the **current** scheduler.
+                if self.ptr_eq(&cx.worker.handle) {
+                    // And the current thread still holds a core
+                    if let Some(core) = cx.core.borrow_mut().as_mut() {
+                        self.schedule_local(core, task, is_yield);
+                        return;
+                    }
+                }
+            }
+
+            // Otherwise, use the inject queue.
+            self.push_remote_task(task);
+            self.notify_parked_remote();
+        })
+        */
+        todo!()
+    }
+
+    fn schedule_local(&self, core: &mut Core, task: Notified, is_yield: bool) {
+        /*
+        core.stats.inc_local_schedule_count();
+
+        // Spawning from the worker thread. If scheduling a "yield" then the
+        // task must always be pushed to the back of the queue, enabling other
+        // tasks to be executed. If **not** a yield, then there is more
+        // flexibility and the task may go to the front of the queue.
+        let should_notify = if is_yield || !core.lifo_enabled {
+            core.run_queue
+                .push_back_or_overflow(task, self, &mut core.stats);
+            true
+        } else {
+            // Push to the LIFO slot
+            let prev = core.lifo_slot.take();
+            let ret = prev.is_some();
+
+            if let Some(prev) = prev {
+                core.run_queue
+                    .push_back_or_overflow(prev, self, &mut core.stats);
+            }
+
+            core.lifo_slot = Some(task);
+
+            ret
+        };
+
+        // Only notify if not currently parked. If `park` is `None`, then the
+        // scheduling is from a resource driver. As notifications often come in
+        // batches, the notification is delayed until the park is complete.
+        if should_notify && core.park.is_some() {
+            self.notify_parked_local();
+        }
+        */
+        todo!()
+    }
+
     fn notify_parked_local(&self) {
         /*
         super::counters::inc_num_inc_notify_local();
@@ -926,6 +1104,13 @@ impl Shared {
         // safety: passing in correct `idle::Synced`
         unsafe {
             self.inject.push(&mut synced.inject, task);
+        }
+    }
+
+    pub(super) fn close(&self) {
+        if self.inject.close(&mut self.synced.lock().inject) {
+            // self.notify_all();
+            todo!()
         }
     }
 }

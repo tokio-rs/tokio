@@ -43,8 +43,7 @@ impl Handle {
     }
 
     pub(crate) fn shutdown(&self) {
-        // self.close();
-        todo!()
+        self.shared.close();
     }
 
     pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T, id: task::Id) -> JoinHandle<T::Output>
@@ -55,8 +54,7 @@ impl Handle {
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
 
         if let Some(notified) = notified {
-            // me.schedule_task(notified, false);
-            todo!()
+            me.shared.schedule_task(notified, false);
         }
 
         handle

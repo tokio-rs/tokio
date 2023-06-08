@@ -119,6 +119,11 @@ impl<T> Local<T> {
         LOCAL_QUEUE_CAPACITY
     }
 
+    /// Returns `true` if there are no entries in the queue
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
     /// Returns false if there are any entries in the queue
     ///
     /// Separate to is_stealable so that refactors of is_stealable to "protect"

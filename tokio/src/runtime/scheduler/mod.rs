@@ -123,6 +123,15 @@ cfg_rt! {
                 _ => panic!("not a CurrentThread handle"),
             }
         }
+
+        cfg_rt_multi_thread! {
+            pub(crate) fn expect_multi_thread(&self) -> &Arc<multi_thread::Handle> {
+                match self {
+                    Handle::MultiThread(handle) => handle,
+                    _ => panic!("not a `MultiThread` handle"),
+                }
+            }
+        }
     }
 
     cfg_metrics! {

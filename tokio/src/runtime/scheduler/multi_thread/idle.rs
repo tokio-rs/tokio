@@ -84,8 +84,7 @@ impl Idle {
     /// work.
     pub(super) fn transition_worker_to_parked(
         &self,
-        shared: &Shared,
-        worker: usize,
+        synced: &mut Synced,
         is_searching: bool,
     ) -> bool {
         /*
