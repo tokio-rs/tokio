@@ -186,6 +186,7 @@ pub(crate) mod coop;
 pub(crate) mod park;
 
 mod driver;
+use driver::Driver;
 
 pub(crate) mod scheduler;
 
