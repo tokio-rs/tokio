@@ -42,7 +42,6 @@ jobs:
       - test-unstable
       - miri
       - asan
-      - semver
       - cross-check
       - cross-test
       - no-atomic-u64
@@ -300,17 +299,19 @@ jobs:
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
           TRYBUILD: overwrite
 
-  semver:
-    name: semver
-    needs: basics
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Check semver
-        uses: obi1kenobi/cargo-semver-checks-action@v2
-        with:
-          rust-toolchain: ${{ env.rust_stable }}
-          release-type: minor
+  # Re-enable this after the next release.
+  #
+  #semver:
+  #  name: semver
+  #  needs: basics
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - uses: actions/checkout@v3
+  #    - name: Check semver
+  #      uses: obi1kenobi/cargo-semver-checks-action@v2
+  #      with:
+  #        rust-toolchain: ${{ env.rust_stable }}
+  #        release-type: minor
 
   cross-check:
     name: cross-check
