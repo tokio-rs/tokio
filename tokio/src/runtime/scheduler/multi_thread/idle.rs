@@ -103,7 +103,8 @@ impl Idle {
                 shared.condvars[worker].notify_one();
                 return;
             } else {
-                synced.idle.sleepers.push(worker);
+                // synced.idle.sleepers.push(worker);
+                panic!("[tokio] unexpected condition");
             }
         }
 
@@ -120,12 +121,45 @@ impl Idle {
         drop(synced);
     }
 
-    pub(super) fn transition_worker_to_parked(
+    pub(super) fn notify_mult(
         &self,
         synced: &mut worker::Synced,
-        core: Box<Core>,
-        index: Option<usize>,
+        workers: &mut Vec<usize>,
+        num: usize,
     ) {
+        let mut num_idle = self.num_idle.load(Acquire);
+        let mut did_notify = false;
+
+        for _ in 0..num {
+            if let Some(worker) = synced.idle.sleepers.pop() {
+                if let Some(core) = synced.available_cores.pop() {
+                    debug_assert!(!core.is_searching);
+
+                    synced.assigned_cores[worker] = Some(core);
+
+                    num_idle -= 1;
+                    workers.push(worker);
+                    did_notify = true;
+
+                    continue;
+                } else {
+                    panic!("[tokio] unexpected condition");
+                }
+            }
+
+            break;
+        }
+
+        if did_notify {
+            self.num_idle.store(num_idle, Release);
+        } else {
+            self.needs_searching.store(true, Release);
+        }
+    }
+
+    /// The worker releases the given core, making it available to other workers
+    /// that are waiting.
+    pub(super) fn release_core(&self, synced: &mut worker::Synced, core: Box<Core>) {
         // The core should not be searching at this point
         debug_assert!(!core.is_searching);
 
@@ -141,14 +175,14 @@ impl Idle {
 
         // Update `num_idle`
         self.num_idle.store(num_idle + 1, Release);
+    }
 
-        if let Some(index) = index {
-            // Store the worker index in the list of sleepers
-            synced.idle.sleepers.push(index);
+    pub(super) fn transition_worker_to_parked(&self, synced: &mut worker::Synced, index: usize) {
+        // Store the worker index in the list of sleepers
+        synced.idle.sleepers.push(index);
 
-            // The worker's assigned core slot should be empty
-            debug_assert!(synced.assigned_cores[index].is_none());
-        }
+        // The worker's assigned core slot should be empty
+        debug_assert!(synced.assigned_cores[index].is_none());
     }
 
     pub(super) fn try_transition_worker_to_searching(&self, core: &mut Core) {

@@ -62,7 +62,7 @@ use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{
     idle, queue, Counters, Handle, Idle, Overflow, Stats, TraceStatus,
 };
-use crate::runtime::scheduler::{self, inject, Defer, Lock};
+use crate::runtime::scheduler::{self, inject, Lock};
 use crate::runtime::task::OwnedTasks;
 use crate::runtime::{
     blocking, coop, driver, task, Config, Driver, SchedulerMetrics, WorkerMetrics,
@@ -70,6 +70,7 @@ use crate::runtime::{
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
+use std::cmp;
 use std::task::Waker;
 
 cfg_metrics! {
@@ -91,6 +92,9 @@ pub(super) struct Worker {
 
     /// This worker's index in `available_cores` and `condvars`.
     index: usize,
+
+    /// Used to collect a list of workers to notify
+    workers_to_notify: Vec<usize>,
 }
 
 /// Core data
@@ -218,7 +222,7 @@ pub(crate) struct Context {
 
     /// Tasks to wake after resource drivers are polled. This is mostly to
     /// handle yielded tasks.
-    pub(crate) defer: Defer,
+    pub(crate) defer: RefCell<Vec<Notified>>,
 }
 
 /// Running a task may consume the core. If the core is still available when
@@ -261,7 +265,7 @@ pub(super) fn create(
         let metrics = WorkerMetrics::from_config(&config);
         let stats = Stats::new(&metrics);
 
-        cores.push(Some(Box::new(Core {
+        cores.push(Box::new(Core {
             index: i,
             tick: 0,
             lifo_slot: None,
@@ -273,7 +277,7 @@ pub(super) fn create(
             global_queue_interval: stats.tuned_global_queue_interval(&config),
             stats,
             rand: FastRand::from_seed(config.seed_generator.next_seed()),
-        })));
+        }));
 
         remotes.push(Remote { steal });
         worker_metrics.push(metrics);
@@ -291,8 +295,8 @@ pub(super) fn create(
             idle,
             owned: OwnedTasks::new(),
             synced: Mutex::new(Synced {
-                available_cores: Vec::with_capacity(num_cores),
-                assigned_cores: cores,
+                available_cores: cores,
+                assigned_cores: Vec::with_capacity(num_cores),
                 shutdown_cores: Vec::with_capacity(num_cores),
                 idle: idle_synced,
                 inject: inject_synced,
@@ -320,6 +324,7 @@ pub(super) fn create(
         let worker = Worker {
             handle: handle.clone(),
             index,
+            workers_to_notify: Vec::with_capacity(num_workers - 1),
         };
 
         handle
@@ -468,7 +473,7 @@ fn run(mut worker: Worker) {
         let cx = scheduler::Context::MultiThread(Context {
             handle: worker.handle.clone(),
             core: RefCell::new(None),
-            defer: Defer::new(),
+            defer: RefCell::new(Vec::with_capacity(64)),
         });
 
         context::set_scheduler(&cx, || {
@@ -480,21 +485,29 @@ fn run(mut worker: Worker) {
             // Check if there are any deferred tasks to notify. This can happen when
             // the worker core is lost due to `block_in_place()` being called from
             // within the task.
-            cx.defer.wake();
+            if !cx.defer.borrow().is_empty() {
+                // cx.defer.wake();
+                todo!()
+            }
         });
     });
 }
 
 impl Worker {
     fn run(&mut self, cx: &Context) {
-        // First, acquire a core. If no cores are available, the thread will
-        // block until one becomes available.
-        //
-        // Acquiring a core will also pull tasks from the injection queue and
-        // run one, if found.
-        let mut core = match self.acquire_core(cx, self.shared().synced.lock()) {
-            Ok(core) => core,
-            Err(_) => return,
+        let mut core = {
+            let mut synced = cx.shared().synced.lock();
+
+            // First try to acquire an available core
+            if let Some(core) = self.try_acquire_available_core(cx, &mut synced) {
+                core
+            } else {
+                // block the thread to wait for a core to be assinged to us
+                match self.wait_for_core(cx, synced) {
+                    Ok(core) => core,
+                    Err(_) => return,
+                }
+            }
         };
 
         while !core.is_shutdown {
@@ -508,10 +521,10 @@ impl Worker {
             core.tick();
 
             // Run maintenance, if needed
-            core = self.maybe_maintenance(core);
+            core = self.maybe_maintenance(cx, core);
 
             // First, check work available to the current worker.
-            if let Some(task) = self.next_task(&mut core) {
+            if let Some(task) = self.next_task(cx, &mut core) {
                 core = match self.run_task(cx, core, task) {
                     Ok(core) => core,
                     Err(_) => return,
@@ -525,7 +538,7 @@ impl Worker {
 
             // There is no more **local** work to process, try to steal work
             // from other workers.
-            if let Some(task) = self.steal_work(&mut core) {
+            if let Some(task) = self.steal_work(cx, &mut core) {
                 // Found work, switch back to processing
                 core.stats.start_processing_scheduled_tasks();
 
@@ -535,9 +548,9 @@ impl Worker {
                 };
             } else {
                 // Wait for work
-                core = if !cx.defer.is_empty() {
+                core = if !cx.defer.borrow().is_empty() {
                     // Just run maintenance
-                    self.park_yield(core)
+                    self.park_yield(cx, core)
                 } else {
                     match self.park(cx, core) {
                         Ok(core) => core,
@@ -547,34 +560,38 @@ impl Worker {
             }
         }
 
-        self.pre_shutdown(&mut core);
+        self.pre_shutdown(cx, &mut core);
 
         // Signal shutdown
-        self.shutdown_core(core);
+        self.shutdown_core(cx, core);
     }
 
-    fn acquire_core(&self, cx: &Context, mut synced: MutexGuard<'_, Synced>) -> RunResult {
+    // Try to acquire an available core, but do not block the thread
+    fn try_acquire_available_core(&self, cx: &Context, synced: &mut Synced) -> Option<Box<Core>> {
+        if let Some(mut core) = synced.available_cores.pop() {
+            self.reset_acquired_core(cx, synced, &mut core);
+            Some(core)
+        } else {
+            None
+        }
+    }
+
+    // Block the current thread, waiting for an available core
+    fn wait_for_core(&self, cx: &Context, mut synced: MutexGuard<'_, Synced>) -> RunResult {
+        cx.shared()
+            .idle
+            .transition_worker_to_parked(&mut synced, self.index);
+
         // Wait until a core is available, then exit the loop.
         let mut core = loop {
             if let Some(core) = synced.assigned_cores[self.index].take() {
                 break core;
             }
 
-            // TODO: not always the case
-            assert!(cx.defer.is_empty());
-
-            synced = self.shared().condvars[self.index].wait(synced).unwrap();
+            synced = cx.shared().condvars[self.index].wait(synced).unwrap();
         };
 
-        // Reset `lifo_enabled` here in case the core was previously stolen from
-        // a task that had the LIFO slot disabled.
-        self.reset_lifo_enabled(&mut core);
-
-        // At this point, the local queue should be empty
-        debug_assert!(core.run_queue.is_empty());
-
-        // Update shutdown state while locked
-        core.is_shutdown = self.shared().inject.is_closed(&synced.inject);
+        self.reset_acquired_core(cx, &mut synced, &mut core);
 
         if core.is_shutdown {
             // Currently shutting down, don't do any more work
@@ -588,7 +605,7 @@ impl Worker {
 
         // TODO: don't hardcode 128
         let n = core.run_queue.max_capacity() / 2;
-        let maybe_task = self.next_remote_task_batch(&mut synced, &mut core, n);
+        let maybe_task = self.next_remote_task_batch(cx, &mut synced, &mut core, n);
 
         drop(synced);
 
@@ -603,12 +620,25 @@ impl Worker {
         }
     }
 
-    fn next_task(&self, core: &mut Core) -> Option<Notified> {
+    /// Ensure core's state is set correctly for the worker to start using.
+    fn reset_acquired_core(&self, cx: &Context, synced: &mut Synced, core: &mut Core) {
+        // Reset `lifo_enabled` here in case the core was previously stolen from
+        // a task that had the LIFO slot disabled.
+        self.reset_lifo_enabled(core);
+
+        // At this point, the local queue should be empty
+        debug_assert!(core.run_queue.is_empty());
+
+        // Update shutdown state while locked
+        core.is_shutdown = cx.shared().inject.is_closed(&synced.inject);
+    }
+
+    fn next_task(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
         if core.tick % core.global_queue_interval == 0 {
             // Update the global queue interval, if needed
-            self.tune_global_queue_interval(core);
+            self.tune_global_queue_interval(cx, core);
 
-            self.next_remote_task()
+            self.next_remote_task(cx)
                 .or_else(|| self.next_local_task(core))
         } else {
             let maybe_task = self.next_local_task(core);
@@ -617,7 +647,7 @@ impl Worker {
                 return maybe_task;
             }
 
-            if self.shared().inject.is_empty() {
+            if cx.shared().inject.is_empty() {
                 return None;
             }
 
@@ -630,27 +660,28 @@ impl Worker {
                 core.run_queue.max_capacity() / 2,
             );
 
-            let mut synced = self.shared().synced.lock();
-            self.next_remote_task_batch(&mut synced, core, cap)
+            let mut synced = cx.shared().synced.lock();
+            self.next_remote_task_batch(cx, &mut synced, core, cap)
         }
     }
 
-    fn next_remote_task(&self) -> Option<Notified> {
-        if self.shared().inject.is_empty() {
+    fn next_remote_task(&self, cx: &Context) -> Option<Notified> {
+        if cx.shared().inject.is_empty() {
             return None;
         }
 
-        let mut synced = self.shared().synced.lock();
-        self.next_remote_task_synced(&mut synced)
+        let mut synced = cx.shared().synced.lock();
+        self.next_remote_task_synced(cx, &mut synced)
     }
 
-    fn next_remote_task_synced(&self, synced: &mut Synced) -> Option<Notified> {
+    fn next_remote_task_synced(&self, cx: &Context, synced: &mut Synced) -> Option<Notified> {
         // safety: we only have access to a valid `Synced` in this file.
-        unsafe { self.shared().inject.pop(&mut synced.inject) }
+        unsafe { cx.shared().inject.pop(&mut synced.inject) }
     }
 
     fn next_remote_task_batch(
         &self,
+        cx: &Context,
         synced: &mut Synced,
         core: &mut Core,
         max: usize,
@@ -659,12 +690,12 @@ impl Worker {
         // injection queue. We don't want to pull *all* the work so other
         // workers can also get some.
         let n = usize::min(
-            self.shared().inject.len() / self.shared().remotes.len() + 1,
+            cx.shared().inject.len() / cx.shared().remotes.len() + 1,
             max,
         );
 
         // safety: passing in the correct `inject::Synced`.
-        let mut tasks = unsafe { self.shared().inject.pop_n(&mut synced.inject, n) };
+        let mut tasks = unsafe { cx.shared().inject.pop_n(&mut synced.inject, n) };
 
         // Pop the first task to return immedietly
         let ret = tasks.next();
@@ -684,20 +715,20 @@ impl Worker {
     /// Note: Only if less than half the workers are searching for tasks to steal
     /// a new worker will actually try to steal. The idea is to make sure not all
     /// workers will be trying to steal at the same time.
-    fn steal_work(&self, core: &mut Core) -> Option<Notified> {
-        if !self.transition_to_searching(core) {
+    fn steal_work(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
+        if !self.transition_to_searching(cx, core) {
             return None;
         }
 
-        let num = self.shared().remotes.len();
+        let num = cx.shared().remotes.len();
         // Start from a random worker
         let start = core.rand.fastrand_n(num as u32) as usize;
 
-        self.steal_one_round(core, start)
+        self.steal_one_round(cx, core, start)
     }
 
-    fn steal_one_round(&self, core: &mut Core, start: usize) -> Option<Notified> {
-        let num = self.shared().remotes.len();
+    fn steal_one_round(&self, cx: &Context, core: &mut Core, start: usize) -> Option<Notified> {
+        let num = cx.shared().remotes.len();
 
         for i in 0..num {
             let i = (start + i) % num;
@@ -707,7 +738,7 @@ impl Worker {
                 continue;
             }
 
-            let target = &self.shared().remotes[i];
+            let target = &cx.shared().remotes[i];
 
             if let Some(task) = target
                 .steal
@@ -721,12 +752,12 @@ impl Worker {
     }
 
     fn run_task(&self, cx: &Context, mut core: Box<Core>, task: Notified) -> RunResult {
-        let task = self.shared().owned.assert_owner(task);
+        let task = cx.shared().owned.assert_owner(task);
 
         // Make sure the worker is not in the **searching** state. This enables
         // another idle worker to try to steal work.
-        if self.transition_from_searching(&mut core) {
-            self.shared().notify_parked_local();
+        if self.transition_from_searching(cx, &mut core) {
+            cx.shared().notify_parked_local();
         }
 
         self.assert_lifo_enabled_is_correct(&core);
@@ -776,7 +807,7 @@ impl Worker {
                     // Not enough budget left to run the LIFO task, push it to
                     // the back of the queue and return.
                     core.run_queue
-                        .push_back_or_overflow(task, self.shared(), &mut core.stats);
+                        .push_back_or_overflow(task, cx.shared(), &mut core.stats);
                     // If we hit this point, the LIFO slot should be enabled.
                     // There is no need to reset it.
                     debug_assert!(core.lifo_enabled);
@@ -801,20 +832,78 @@ impl Worker {
 
                 // Run the LIFO task, then loop
                 *cx.core.borrow_mut() = Some(core);
-                let task = self.shared().owned.assert_owner(task);
+                let task = cx.shared().owned.assert_owner(task);
                 task.run();
             }
         })
     }
 
-    fn maybe_maintenance(&self, mut core: Box<Core>) -> Box<Core> {
-        if core.tick % self.shared().config.event_interval == 0 {
+    fn schedule_deferred_with_core(
+        &mut self,
+        cx: &Context,
+        core: Box<Core>,
+        mut synced: MutexGuard<'_, Synced>,
+    ) -> RunResult {
+        let mut defer = cx.defer.borrow_mut();
+
+        // Grab a task to run next
+        let task = defer.pop();
+
+        // Number of tasks we want to try to spread across idle workers
+        let num_fanout = cmp::min(defer.len(), synced.available_cores.len());
+
+        if num_fanout > 0 {
+            cx.shared()
+                .push_remote_task_batch_synced(&mut synced, defer.drain(..num_fanout));
+
+            cx.shared()
+                .idle
+                .notify_mult(&mut synced, &mut self.workers_to_notify, num_fanout);
+        }
+
+        // Do not run the task while holding the lock...
+        drop(synced);
+
+        // Notify any workers
+        for worker in self.workers_to_notify.drain(..) {
+            cx.shared().condvars[worker].notify_one()
+        }
+
+        if let Some(task) = task {
+            self.run_task(cx, core, task)
+        } else {
+            Ok(core)
+        }
+    }
+
+    fn schedule_deferred_without_core<'a>(&mut self, cx: &Context, synced: &mut Synced) {
+        let mut defer = cx.defer.borrow_mut();
+        let num = defer.len();
+
+        if num > 0 {
+            // Push all tasks to the injection queue
+            cx.shared()
+                .push_remote_task_batch_synced(synced, defer.drain(..));
+
+            debug_assert!(self.workers_to_notify.is_empty());
+
+            // Notify workers
+            cx.shared()
+                .idle
+                .notify_mult(synced, &mut self.workers_to_notify, num);
+
+            debug_assert!(self.workers_to_notify.is_empty());
+        }
+    }
+
+    fn maybe_maintenance(&self, cx: &Context, mut core: Box<Core>) -> Box<Core> {
+        if core.tick % cx.shared().config.event_interval == 0 {
             super::counters::inc_num_maintenance();
 
             core.stats.end_processing_scheduled_tasks();
 
             // Run regularly scheduled maintenance
-            self.maintenance(&mut core);
+            self.maintenance(cx, &mut core);
 
             core.stats.start_processing_scheduled_tasks();
         }
@@ -823,7 +912,7 @@ impl Worker {
     }
 
     /// Runs maintenance work such as checking the pool's state.
-    fn maintenance(&self, core: &mut Core) {
+    fn maintenance(&self, cx: &Context, core: &mut Core) {
         /*
         // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
         // to run without actually putting the thread to sleep.
@@ -833,21 +922,21 @@ impl Worker {
             todo!();
         }
 
-        core.stats.submit(&self.shared().worker_metrics[core.index]);
+        core.stats.submit(&cx.shared().worker_metrics[core.index]);
 
         if !core.is_shutdown {
             // Check if the scheduler has been shutdown
-            let synced = self.shared().synced.lock();
-            core.is_shutdown = self.shared().inject.is_closed(&synced.inject);
+            let synced = cx.shared().synced.lock();
+            core.is_shutdown = cx.shared().inject.is_closed(&synced.inject);
         }
 
         if !core.is_traced {
             // Check if the worker should be tracing.
-            core.is_traced = self.shared().trace_status.trace_requested();
+            core.is_traced = cx.shared().trace_status.trace_requested();
         }
     }
 
-    fn park_yield(&self, mut core: Box<Core>) -> Box<Core> {
+    fn park_yield(&self, cx: &Context, mut core: Box<Core>) -> Box<Core> {
         /*
         // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
         // to run without actually putting the thread to sleep.
@@ -857,12 +946,12 @@ impl Worker {
             todo!();
         }
 
-        self.maintenance(&mut core);
+        self.maintenance(cx, &mut core);
         core
     }
 
-    fn park(&self, cx: &Context, mut core: Box<Core>) -> RunResult {
-        if let Some(f) = &self.shared().config.before_park {
+    fn park(&mut self, cx: &Context, mut core: Box<Core>) -> RunResult {
+        if let Some(f) = &cx.shared().config.before_park {
             f();
         }
 
@@ -873,41 +962,41 @@ impl Worker {
             core = self.do_park(cx, core)?;
         }
 
-        if let Some(f) = &self.shared().config.after_unpark {
+        if let Some(f) = &cx.shared().config.after_unpark {
             f();
         }
 
         Ok(core)
     }
 
-    fn do_park(&self, cx: &Context, mut core: Box<Core>) -> RunResult {
+    fn do_park(&mut self, cx: &Context, mut core: Box<Core>) -> RunResult {
         core.stats.about_to_park();
 
         let was_searching = core.is_searching;
 
         // Before we park, if we are searching, we need to transition away from searching
-        if self.transition_from_searching(&mut core) {
+        if self.transition_from_searching(cx, &mut core) {
             // We were the last searching worker, we need to do one last check
-            if let Some(task) = self.steal_one_round(&mut core, 0) {
-                self.shared().notify_parked_local();
+            if let Some(task) = self.steal_one_round(cx, &mut core, 0) {
+                cx.shared().notify_parked_local();
 
                 return self.run_task(cx, core, task);
             }
         }
 
         // Acquire the lock
-        let mut synced = self.shared().synced.lock();
+        let mut synced = cx.shared().synced.lock();
 
         // Try one last time to get tasks
         let n = core.run_queue.max_capacity() / 2;
-        if let Some(task) = self.next_remote_task_batch(&mut synced, &mut core, n) {
+        if let Some(task) = self.next_remote_task_batch(cx, &mut synced, &mut core, n) {
             drop(synced);
 
             return self.run_task(cx, core, task);
         }
 
         if !was_searching {
-            if self
+            if cx
                 .shared()
                 .idle
                 .transition_worker_to_searching_if_needed(&mut synced.idle, &mut core)
@@ -920,49 +1009,50 @@ impl Worker {
         // Core being returned must not be in the searching state
         debug_assert!(!core.is_searching);
 
-        if let Some(mut driver) = synced.driver.take() {
-            // Transition to parked without providing the worker's index.
-            // Because we are going to block on the driver, we don't want to be
-            // interrupted by scheduled tasks.
-            self.shared()
-                .idle
-                .transition_worker_to_parked(&mut synced, core, None);
+        // Release the core
+        cx.shared().idle.release_core(&mut synced, core);
 
+        if let Some(mut driver) = synced.driver.take() {
             // Drop the lock before parking on the driver
             drop(synced);
 
             // Wait for driver events
             driver.park(&self.handle.driver);
 
-            // Acquire the lock again
-            synced = self.shared().synced.lock();
+            synced = cx.shared().synced.lock();
 
-            todo!()
+            // Try to acquire an available core to schedule I/O events
+            if let Some(core) = self.try_acquire_available_core(cx, &mut synced) {
+                // This may result in a task being run
+                self.schedule_deferred_with_core(cx, core, synced)
+            } else {
+                // Schedule any deferred tasks
+                self.schedule_deferred_without_core(cx, &mut synced);
+
+                // Wait for a core.
+                self.wait_for_core(cx, synced)
+            }
         } else {
-            self.shared()
-                .idle
-                .transition_worker_to_parked(&mut synced, core, Some(self.index));
-
             // Wait for a core to be assigned to us
-            self.acquire_core(cx, synced)
+            self.wait_for_core(cx, synced)
         }
     }
 
-    fn transition_to_searching(&self, core: &mut Core) -> bool {
+    fn transition_to_searching(&self, cx: &Context, core: &mut Core) -> bool {
         if !core.is_searching {
-            self.shared().idle.try_transition_worker_to_searching(core);
+            cx.shared().idle.try_transition_worker_to_searching(core);
         }
 
         core.is_searching
     }
 
     /// Returns `true` if another worker must be notified
-    fn transition_from_searching(&self, core: &mut Core) -> bool {
+    fn transition_from_searching(&self, cx: &Context, core: &mut Core) -> bool {
         if !core.is_searching {
             return false;
         }
 
-        self.shared().idle.transition_worker_from_searching(core)
+        cx.shared().idle.transition_worker_from_searching(core)
     }
 
     fn can_transition_to_parked(&self, core: &mut Core) -> bool {
@@ -971,26 +1061,26 @@ impl Worker {
 
     /// Signals all tasks to shut down, and waits for them to complete. Must run
     /// before we enter the single-threaded phase of shutdown processing.
-    fn pre_shutdown(&self, core: &mut Core) {
+    fn pre_shutdown(&self, cx: &Context, core: &mut Core) {
         // Signal to all tasks to shut down.
-        self.shared().owned.close_and_shutdown_all();
+        cx.shared().owned.close_and_shutdown_all();
 
-        core.stats.submit(&self.shared().worker_metrics[core.index]);
+        core.stats.submit(&cx.shared().worker_metrics[core.index]);
     }
 
     /// Signals that a worker has observed the shutdown signal and has replaced
     /// its core back into its handle.
     ///
     /// If all workers have reached this point, the final cleanup is performed.
-    fn shutdown_core(&self, core: Box<Core>) {
-        let mut synced = self.shared().synced.lock();
+    fn shutdown_core(&self, cx: &Context, core: Box<Core>) {
+        let mut synced = cx.shared().synced.lock();
         synced.shutdown_cores.push(core);
 
-        if synced.shutdown_cores.len() != self.shared().remotes.len() {
+        if synced.shutdown_cores.len() != cx.shared().remotes.len() {
             return;
         }
 
-        debug_assert!(self.shared().owned.is_empty());
+        debug_assert!(cx.shared().owned.is_empty());
 
         for mut core in synced.shutdown_cores.drain(..) {
             // Drain tasks from the local queue
@@ -1007,7 +1097,7 @@ impl Worker {
         // cannot call `next_remote_task()` because we already hold the lock.
         //
         // safety: passing in correct `idle::Synced`
-        while let Some(task) = self.next_remote_task_synced(&mut synced) {
+        while let Some(task) = self.next_remote_task_synced(cx, &mut synced) {
             drop(task);
         }
     }
@@ -1023,10 +1113,8 @@ impl Worker {
         );
     }
 
-    fn tune_global_queue_interval(&self, core: &mut Core) {
-        let next = core
-            .stats
-            .tuned_global_queue_interval(&self.shared().config);
+    fn tune_global_queue_interval(&self, cx: &Context, core: &mut Core) {
+        let next = core.stats.tuned_global_queue_interval(&cx.shared().config);
 
         debug_assert!(next > 1);
 
@@ -1035,15 +1123,16 @@ impl Worker {
             core.global_queue_interval = next;
         }
     }
-
-    fn shared(&self) -> &Shared {
-        &self.handle.shared
-    }
 }
 
 impl Context {
     pub(crate) fn defer(&self, waker: &Waker) {
-        self.defer.defer(waker);
+        // TODO: refactor defer across all runtimes
+        waker.wake_by_ref();
+    }
+
+    fn shared(&self) -> &Shared {
+        &self.handle.shared
     }
 }
 
@@ -1058,19 +1147,17 @@ impl Shared {
                     // And the current thread still holds a core
                     if let Some(core) = cx.core.borrow_mut().as_mut() {
                         if is_yield {
-                            // In this case, we want to defer the wake
-                            todo!();
+                            cx.defer.borrow_mut().push(task);
                         } else {
                             self.schedule_local(core, task);
                         }
-
-                        return;
                     } else {
                         // This can happen if either the core was stolen
                         // (`block_in_place`) or the notification happens from
                         // the driver.
-                        todo!();
+                        cx.defer.borrow_mut().push(task);
                     }
+                    return;
                 }
             }
 
@@ -1123,6 +1210,24 @@ impl Shared {
             self.inject.push(&mut synced.inject, task);
         }
     }
+
+    fn push_remote_task_batch<I>(&self, iter: I)
+    where
+        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+    {
+        unsafe {
+            self.inject.push_batch(self, iter);
+        }
+    }
+
+    fn push_remote_task_batch_synced<I>(&self, synced: &mut Synced, iter: I)
+    where
+        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+    {
+        unsafe {
+            self.inject.push_batch(&mut synced.inject, iter);
+        }
+    }
 }
 
 impl Overflow<Arc<Handle>> for Shared {
@@ -1134,9 +1239,7 @@ impl Overflow<Arc<Handle>> for Shared {
     where
         I: Iterator<Item = task::Notified<Arc<Handle>>>,
     {
-        unsafe {
-            self.inject.push_batch(self, iter);
-        }
+        self.push_remote_task_batch(iter)
     }
 }
 
