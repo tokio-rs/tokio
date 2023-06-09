@@ -4,21 +4,20 @@ use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::MutexGuard;
 use crate::runtime::scheduler::multi_thread::{worker, Core, Shared};
 
-use std::fmt;
-use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 
 pub(super) struct Idle {
-    /// Number of searching workers
+    /// Number of searching cores
     num_searching: AtomicUsize,
 
-    /// Number of sleeping workers
-    num_sleeping: AtomicUsize,
+    /// Number of idle cores
+    num_idle: AtomicUsize,
 
     /// Used to catch false-negatives when waking workers
     needs_searching: AtomicBool,
 
-    /// Total number of workers
-    num_workers: usize,
+    /// Total number of cores
+    num_cores: usize,
 }
 
 /// Data synchronized by the scheduler mutex
@@ -28,12 +27,12 @@ pub(super) struct Synced {
 }
 
 impl Idle {
-    pub(super) fn new(num_workers: usize) -> (Idle, Synced) {
+    pub(super) fn new(num_cores: usize, num_workers: usize) -> (Idle, Synced) {
         let idle = Idle {
             num_searching: AtomicUsize::new(0),
-            num_sleeping: AtomicUsize::new(0),
+            num_idle: AtomicUsize::new(0),
             needs_searching: AtomicBool::new(false),
-            num_workers,
+            num_cores,
         };
 
         let synced = Synced {
@@ -91,11 +90,11 @@ impl Idle {
                 // Assign the core to the worker
                 synced.assigned_cores[worker] = Some(core);
 
-                let num_sleeping = self.num_sleeping.load(Acquire) - 1;
-                debug_assert_eq!(num_sleeping, synced.idle.sleepers.len());
+                let num_idle = self.num_idle.load(Acquire) - 1;
+                debug_assert_eq!(num_idle, synced.available_cores.len());
 
                 // Update the number of sleeping workers
-                self.num_sleeping.store(num_sleeping, Release);
+                self.num_idle.store(num_idle, Release);
 
                 // Drop the lock before notifying the condvar.
                 drop(synced);
@@ -125,35 +124,40 @@ impl Idle {
         &self,
         synced: &mut worker::Synced,
         core: Box<Core>,
-        index: usize,
+        index: Option<usize>,
     ) {
         // The core should not be searching at this point
         debug_assert!(!core.is_searching);
 
         // Check that this isn't the final worker to go idle *and*
         // `needs_searching` is set.
-        debug_assert!(!self.needs_searching.load(Acquire) || synced.idle.num_active_workers() > 1);
+        debug_assert!(!self.needs_searching.load(Acquire) || num_active_workers(&synced) > 1);
 
-        let num_sleeping = synced.idle.sleepers.len();
-        debug_assert_eq!(num_sleeping, self.num_sleeping.load(Acquire));
-
-        // Store the worker index in the list of sleepers
-        synced.idle.sleepers.push(index);
+        let num_idle = synced.available_cores.len();
+        debug_assert_eq!(num_idle, self.num_idle.load(Acquire));
 
         // Store the core in the list of available cores
         synced.available_cores.push(core);
 
-        // The worker's assigned core slot should be empty
-        debug_assert!(synced.assigned_cores[index].is_none());
+        // Update `num_idle`
+        self.num_idle.store(num_idle + 1, Release);
+
+        if let Some(index) = index {
+            // Store the worker index in the list of sleepers
+            synced.idle.sleepers.push(index);
+
+            // The worker's assigned core slot should be empty
+            debug_assert!(synced.assigned_cores[index].is_none());
+        }
     }
 
     pub(super) fn try_transition_worker_to_searching(&self, core: &mut Core) {
         debug_assert!(!core.is_searching);
 
         let num_searching = self.num_searching.load(Acquire);
-        let num_sleeping = self.num_sleeping.load(Acquire);
+        let num_idle = self.num_idle.load(Acquire);
 
-        if 2 * num_searching >= self.num_workers - num_sleeping {
+        if 2 * num_searching >= self.num_cores - num_idle {
             return;
         }
 
@@ -200,8 +204,6 @@ impl Idle {
     }
 }
 
-impl Synced {
-    fn num_active_workers(&self) -> usize {
-        self.sleepers.capacity() - self.sleepers.len()
-    }
+fn num_active_workers(synced: &worker::Synced) -> usize {
+    synced.available_cores.capacity() - synced.available_cores.len()
 }
