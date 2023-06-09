@@ -18,6 +18,7 @@ pub(crate) use stats::Stats;
 pub(crate) mod queue;
 
 mod worker;
+use worker::Core;
 pub(crate) use worker::{Context, Shared};
 
 cfg_taskdump! {
@@ -35,8 +36,7 @@ cfg_not_taskdump! {
 pub(crate) use worker::block_in_place;
 
 use crate::runtime::{
-    self,
-    blocking,
+    self, blocking,
     driver::{self, Driver},
     scheduler, Config,
 };

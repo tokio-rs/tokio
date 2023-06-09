@@ -1,10 +1,11 @@
 //! Coordinates idling workers
 
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
-use crate::runtime::scheduler::multi_thread::Shared;
+use crate::loom::sync::MutexGuard;
+use crate::runtime::scheduler::multi_thread::{worker, Core, Shared};
 
 use std::fmt;
-use std::sync::atomic::Ordering::{self, SeqCst};
+use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Release};
 
 pub(super) struct Idle {
     /// Number of searching workers
@@ -15,21 +16,23 @@ pub(super) struct Idle {
 
     /// Used to catch false-negatives when waking workers
     needs_searching: AtomicBool,
+
+    /// Total number of workers
+    num_workers: usize,
 }
 
 /// Data synchronized by the scheduler mutex
 pub(super) struct Synced {
-    /// Sleeping workers
+    /// Worker IDs that are currently sleeping
     sleepers: Vec<usize>,
 }
 
 impl Idle {
     pub(super) fn new(num_workers: usize) -> (Idle, Synced) {
-        /*
-        let init = State::new(num_workers);
-
         let idle = Idle {
-            state: AtomicUsize::new(init.into()),
+            num_searching: AtomicUsize::new(0),
+            num_sleeping: AtomicUsize::new(0),
+            needs_searching: AtomicBool::new(false),
             num_workers,
         };
 
@@ -38,131 +41,167 @@ impl Idle {
         };
 
         (idle, synced)
-        */
-        todo!()
     }
 
-    /// If there are no workers actively searching, returns the index of a
-    /// worker currently sleeping.
-    pub(super) fn worker_to_notify(&self, shared: &Shared) -> Option<usize> {
-        /*
-        // If at least one worker is spinning, work being notified will
-        // eventually be found. A searching thread will find **some** work and
-        // notify another worker, eventually leading to our work being found.
-        //
-        // For this to happen, this load must happen before the thread
-        // transitioning `num_searching` to zero. Acquire / Release does not
-        // provide sufficient guarantees, so this load is done with `SeqCst` and
-        // will pair with the `fetch_sub(1)` when transitioning out of
-        // searching.
-        if !self.notify_should_wakeup() {
-            return None;
+    /// We need at least one searching worker
+    pub(super) fn notify_local(&self, shared: &Shared) {
+        if self.num_searching.load(Acquire) != 0 {
+            // There already is a searching worker. Note, that this could be a
+            // false positive. However, because this method is called **from** a
+            // worker, we know that there is at least one worker currently
+            // awake, so the scheduler won't deadlock.
+            return;
+        }
+
+        // There aren't any searching workers. Try to initialize one
+        if self
+            .num_searching
+            .compare_exchange(0, 1, AcqRel, Acquire)
+            .is_err()
+        {
+            // Failing the compare_exchange means another thread concurrently
+            // launched a searching worker.
+            return;
         }
 
         // Acquire the lock
-        let mut lock = shared.synced.lock();
-
-        // Check again, now that the lock is acquired
-        if !self.notify_should_wakeup() {
-            return None;
-        }
-
-        // A worker should be woken up, atomically increment the number of
-        // searching workers as well as the number of unparked workers.
-        State::unpark_one(&self.state, 1);
-
-        // Get the worker to unpark
-        let ret = lock.idle.sleepers.pop();
-        debug_assert!(ret.is_some());
-
-        ret
-        */
-        todo!()
+        let synced = shared.synced.lock();
+        self.notify_synced(synced, shared, true);
     }
 
-    /// Returns `true` if the worker needs to do a final check for submitted
-    /// work.
+    /// Notifies a single worker
+    pub(super) fn notify_remote(&self, synced: MutexGuard<'_, worker::Synced>, shared: &Shared) {
+        self.notify_synced(synced, shared, false);
+    }
+
+    /// Notify a worker while synced
+    fn notify_synced(
+        &self,
+        mut synced: MutexGuard<'_, worker::Synced>,
+        shared: &Shared,
+        is_searching: bool,
+    ) {
+        // Find a sleeping worker
+        if let Some(worker) = synced.idle.sleepers.pop() {
+            // Find an available core
+            if let Some(mut core) = synced.available_cores.pop() {
+                debug_assert!(!core.is_searching);
+                core.is_searching = is_searching;
+
+                // Assign the core to the worker
+                synced.assigned_cores[worker] = Some(core);
+
+                let num_sleeping = self.num_sleeping.load(Acquire) - 1;
+                debug_assert_eq!(num_sleeping, synced.idle.sleepers.len());
+
+                // Update the number of sleeping workers
+                self.num_sleeping.store(num_sleeping, Release);
+
+                // Drop the lock before notifying the condvar.
+                drop(synced);
+
+                // Notify the worker
+                shared.condvars[worker].notify_one();
+                return;
+            } else {
+                synced.idle.sleepers.push(worker);
+            }
+        }
+
+        // Set the `needs_searching` flag, this happens *while* the lock is held.
+        self.needs_searching.store(true, Release);
+
+        if is_searching {
+            self.num_searching.fetch_sub(1, Release);
+        }
+
+        // Explicit mutex guard drop to show that holding the guard to this
+        // point is significant. `needs_searching` and `num_searching` must be
+        // updated in the critical section.
+        drop(synced);
+    }
+
     pub(super) fn transition_worker_to_parked(
         &self,
-        synced: &mut Synced,
-        is_searching: bool,
-    ) -> bool {
-        /*
-        // Acquire the lock
-        let mut lock = shared.synced.lock();
+        synced: &mut worker::Synced,
+        core: Box<Core>,
+        index: usize,
+    ) {
+        // The core should not be searching at this point
+        debug_assert!(!core.is_searching);
 
-        // Decrement the number of unparked threads
-        let ret = State::dec_num_unparked(&self.state, is_searching);
+        // Check that this isn't the final worker to go idle *and*
+        // `needs_searching` is set.
+        debug_assert!(!self.needs_searching.load(Acquire) || synced.idle.num_active_workers() > 1);
 
-        // Track the sleeping worker
-        lock.idle.sleepers.push(worker);
+        let num_sleeping = synced.idle.sleepers.len();
+        debug_assert_eq!(num_sleeping, self.num_sleeping.load(Acquire));
 
-        ret
-        */
-        todo!()
+        // Store the worker index in the list of sleepers
+        synced.idle.sleepers.push(index);
+
+        // Store the core in the list of available cores
+        synced.available_cores.push(core);
+
+        // The worker's assigned core slot should be empty
+        debug_assert!(synced.assigned_cores[index].is_none());
     }
 
-    pub(super) fn transition_worker_to_searching(&self) -> bool {
-        /*
-        let state = State::load(&self.state, SeqCst);
-        if 2 * state.num_searching() >= self.num_workers {
-            return false;
+    pub(super) fn try_transition_worker_to_searching(&self, core: &mut Core) {
+        debug_assert!(!core.is_searching);
+
+        let num_searching = self.num_searching.load(Acquire);
+        let num_sleeping = self.num_sleeping.load(Acquire);
+
+        if 2 * num_searching >= self.num_workers - num_sleeping {
+            return;
         }
 
-        // It is possible for this routine to allow more than 50% of the workers
-        // to search. That is OK. Limiting searchers is only an optimization to
-        // prevent too much contention.
-        State::inc_num_searching(&self.state, SeqCst);
-        true
-        */
-        todo!()
+        self.transition_worker_to_searching(core);
+    }
+
+    /// Needs to happen while synchronized in order to avoid races
+    pub(super) fn transition_worker_to_searching_if_needed(
+        &self,
+        _synced: &mut Synced,
+        core: &mut Core,
+    ) -> bool {
+        if self.needs_searching.load(Acquire) {
+            // Needs to be called while holding the lock
+            self.transition_worker_to_searching(core);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn transition_worker_to_searching(&self, core: &mut Core) {
+        core.is_searching = true;
+        self.num_searching.fetch_add(1, AcqRel);
+        self.needs_searching.store(false, Release);
     }
 
     /// A lightweight transition from searching -> running.
     ///
     /// Returns `true` if this is the final searching worker. The caller
     /// **must** notify a new worker.
-    pub(super) fn transition_worker_from_searching(&self) -> bool {
-        // State::dec_num_searching(&self.state)
-        todo!()
-    }
+    pub(super) fn transition_worker_from_searching(&self, core: &mut Core) -> bool {
+        debug_assert!(core.is_searching);
 
-    /// Unpark a specific worker. This happens if tasks are submitted from
-    /// within the worker's park routine.
-    ///
-    /// Returns `true` if the worker was parked before calling the method.
-    pub(super) fn unpark_worker_by_id(&self, shared: &Shared, worker_id: usize) -> bool {
-        /*
-        let mut lock = shared.synced.lock();
-        let sleepers = &mut lock.idle.sleepers;
+        let prev = self.num_searching.fetch_sub(1, AcqRel);
+        debug_assert!(prev > 0);
 
-        for index in 0..sleepers.len() {
-            if sleepers[index] == worker_id {
-                sleepers.swap_remove(index);
-
-                // Update the state accordingly while the lock is held.
-                State::unpark_one(&self.state, 0);
-
-                return true;
-            }
+        if prev == 1 {
+            false
+        } else {
+            core.is_searching = false;
+            false
         }
-
-        false
-        */
-        todo!()
     }
-
-    /// Returns `true` if `worker_id` is contained in the sleep set.
-    pub(super) fn is_parked(&self, shared: &Shared, worker_id: usize) -> bool {
-        let lock = shared.synced.lock();
-        lock.idle.sleepers.contains(&worker_id)
-    }
-
-/*
-    fn notify_should_wakeup(&self) -> bool {
-        let state = State(self.state.fetch_add(0, SeqCst));
-        state.num_searching() == 0 && state.num_unparked() < self.num_workers
-    }
-    */
 }
 
+impl Synced {
+    fn num_active_workers(&self) -> usize {
+        self.sleepers.capacity() - self.sleepers.len()
+    }
+}
