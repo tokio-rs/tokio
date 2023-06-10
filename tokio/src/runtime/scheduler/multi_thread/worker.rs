@@ -60,7 +60,7 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{
-    idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, Unparker,
+    idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
 use crate::runtime::scheduler::{inject, Defer, Lock};
 use crate::runtime::task::OwnedTasks;
@@ -73,6 +73,18 @@ use crate::util::rand::{FastRand, RngSeedGenerator};
 use std::cell::RefCell;
 use std::task::Waker;
 use std::time::Duration;
+
+cfg_metrics! {
+    mod metrics;
+}
+
+cfg_taskdump! {
+    mod taskdump;
+}
+
+cfg_not_taskdump! {
+    mod taskdump_mock;
+}
 
 /// A scheduler worker
 pub(super) struct Worker {
@@ -112,6 +124,9 @@ struct Core {
     /// True if the scheduler is being shutdown
     is_shutdown: bool,
 
+    /// True if the scheduler is being traced
+    is_traced: bool,
+
     /// Parker
     ///
     /// Stored in an `Option` as the parker is added / removed to make the
@@ -137,7 +152,7 @@ pub(crate) struct Shared {
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    inject: inject::Shared<Arc<Handle>>,
+    pub(super) inject: inject::Shared<Arc<Handle>>,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -155,6 +170,9 @@ pub(crate) struct Shared {
     #[allow(clippy::vec_box)] // we're moving an already-boxed value
     shutdown_cores: Mutex<Vec<Box<Core>>>,
 
+    /// The number of cores that have observed the trace signal.
+    pub(super) trace_status: TraceStatus,
+
     /// Scheduler configuration options
     config: Config,
 
@@ -171,18 +189,18 @@ pub(crate) struct Shared {
 }
 
 /// Data synchronized by the scheduler mutex
-pub(super) struct Synced {
+pub(crate) struct Synced {
     /// Synchronized state for `Idle`.
     pub(super) idle: idle::Synced,
 
     /// Synchronized state for `Inject`.
-    inject: inject::Synced,
+    pub(crate) inject: inject::Synced,
 }
 
 /// Used to communicate with a worker from other threads.
 struct Remote {
     /// Steals tasks from this worker.
-    steal: queue::Steal<Arc<Handle>>,
+    pub(super) steal: queue::Steal<Arc<Handle>>,
 
     /// Unparks the associated worker thread
     unpark: Unparker,
@@ -249,6 +267,7 @@ pub(super) fn create(
             run_queue,
             is_searching: false,
             is_shutdown: false,
+            is_traced: false,
             park: Some(park),
             global_queue_interval: stats.tuned_global_queue_interval(&config),
             stats,
@@ -262,6 +281,7 @@ pub(super) fn create(
     let (idle, idle_synced) = Idle::new(size);
     let (inject, inject_synced) = inject::Shared::new();
 
+    let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
@@ -273,6 +293,7 @@ pub(super) fn create(
                 inject: inject_synced,
             }),
             shutdown_cores: Mutex::new(vec![]),
+            trace_status: TraceStatus::new(remotes_len),
             config,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
@@ -440,26 +461,27 @@ fn run(worker: Arc<Worker>) {
     };
 
     let handle = scheduler::Handle::MultiThread(worker.handle.clone());
-    let _enter = crate::runtime::context::enter_runtime(&handle, true);
 
-    // Set the worker context.
-    let cx = scheduler::Context::MultiThread(Context {
-        worker,
-        core: RefCell::new(None),
-        defer: Defer::new(),
-    });
+    crate::runtime::context::enter_runtime(&handle, true, |_| {
+        // Set the worker context.
+        let cx = scheduler::Context::MultiThread(Context {
+            worker,
+            core: RefCell::new(None),
+            defer: Defer::new(),
+        });
 
-    context::set_scheduler(&cx, || {
-        let cx = cx.expect_multi_thread();
+        context::set_scheduler(&cx, || {
+            let cx = cx.expect_multi_thread();
 
-        // This should always be an error. It only returns a `Result` to support
-        // using `?` to short circuit.
-        assert!(cx.run(core).is_err());
+            // This should always be an error. It only returns a `Result` to support
+            // using `?` to short circuit.
+            assert!(cx.run(core).is_err());
 
-        // Check if there are any deferred tasks to notify. This can happen when
-        // the worker core is lost due to `block_in_place()` being called from
-        // within the task.
-        cx.defer.wake();
+            // Check if there are any deferred tasks to notify. This can happen when
+            // the worker core is lost due to `block_in_place()` being called from
+            // within the task.
+            cx.defer.wake();
+        });
     });
 }
 
@@ -475,6 +497,10 @@ impl Context {
 
         while !core.is_shutdown {
             self.assert_lifo_enabled_is_correct(&core);
+
+            if core.is_traced {
+                core = self.worker.handle.trace_core(core);
+            }
 
             // Increment the tick
             core.tick();
@@ -649,7 +675,7 @@ impl Context {
         }
 
         if core.transition_to_parked(&self.worker) {
-            while !core.is_shutdown {
+            while !core.is_shutdown && !core.is_traced {
                 core.stats.about_to_park();
                 core = self.park_timeout(core, None);
 
@@ -825,7 +851,7 @@ impl Core {
     /// Returns true if the transition happened, false if there is work to do first.
     fn transition_to_parked(&mut self, worker: &Worker) -> bool {
         // Workers should not park if they have work to do
-        if self.lifo_slot.is_some() || self.run_queue.has_tasks() {
+        if self.lifo_slot.is_some() || self.run_queue.has_tasks() || self.is_traced {
             return false;
         }
 
@@ -889,6 +915,11 @@ impl Core {
             // Check if the scheduler has been shutdown
             let synced = worker.handle.shared.synced.lock();
             self.is_shutdown = worker.inject().is_closed(&synced.inject);
+        }
+
+        if !self.is_traced {
+            // Check if the worker should be tracing.
+            self.is_traced = worker.handle.shared.trace_status.trace_requested();
         }
     }
 
@@ -1048,7 +1079,7 @@ impl Handle {
         }
     }
 
-    fn notify_all(&self) {
+    pub(super) fn notify_all(&self) {
         for remote in &self.shared.remotes[..] {
             remote.unpark.unpark(&self.driver);
         }
@@ -1149,18 +1180,6 @@ fn with_current<R>(f: impl FnOnce(Option<&Context>) -> R) -> R {
         Some(MultiThread(ctx)) => f(Some(ctx)),
         _ => f(None),
     })
-}
-
-cfg_metrics! {
-    impl Shared {
-        pub(super) fn injection_queue_depth(&self) -> usize {
-            self.inject.len()
-        }
-
-        pub(super) fn worker_local_queue_depth(&self, worker: usize) -> usize {
-            self.remotes[worker].steal.len()
-        }
-    }
 }
 
 // `u32::abs_diff` is not available on Tokio's MSRV.

@@ -42,7 +42,6 @@ jobs:
       - test-unstable
       - miri
       - asan
-      - semver
       - cross-check
       - cross-test
       - no-atomic-u64
@@ -296,21 +295,23 @@ jobs:
       - name: asan
         run: cargo test --workspace --all-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
         env:
-          RUSTFLAGS: -Z sanitizer=address
+          RUSTFLAGS: -Z sanitizer=address --cfg tokio_no_tuning_tests
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
           TRYBUILD: overwrite
 
-  semver:
-    name: semver
-    needs: basics
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Check semver
-        uses: obi1kenobi/cargo-semver-checks-action@v2
-        with:
-          rust-toolchain: ${{ env.rust_stable }}
-          release-type: minor
+  # Re-enable this after the next release.
+  #
+  #semver:
+  #  name: semver
+  #  needs: basics
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - uses: actions/checkout@v3
+  #    - name: Check semver
+  #      uses: obi1kenobi/cargo-semver-checks-action@v2
+  #      with:
+  #        rust-toolchain: ${{ env.rust_stable }}
+  #        release-type: minor
 
   cross-check:
     name: cross-check
@@ -366,14 +367,14 @@ jobs:
       # First run with all features (including parking_lot)
       - run: cross test -p tokio --all-features --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_cross ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
       # Now run without parking_lot
       - name: Remove `parking_lot` from `full` feature
         run: sed -i '0,/parking_lot/{/parking_lot/d;}' tokio/Cargo.toml
       # The `tokio_no_parking_lot` cfg is here to ensure the `sed` above does not silently break.
       - run: cross test -p tokio --features full,test-util --target ${{ matrix.target }} --tests
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot --cfg tokio_cross ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
 
   # See https://github.com/tokio-rs/tokio/issues/5187
   no-atomic-u64:

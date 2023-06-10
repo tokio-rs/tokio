@@ -35,9 +35,44 @@ pub struct EnterGuard<'a> {
 
 impl Handle {
     /// Enters the runtime context. This allows you to construct types that must
-    /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
-    /// It will also allow you to call methods such as [`tokio::spawn`] and [`Handle::current`]
-    /// without panicking.
+    /// have an executor available on creation such as [`Sleep`] or
+    /// [`TcpStream`]. It will also allow you to call methods such as
+    /// [`tokio::spawn`] and [`Handle::current`] without panicking.
+    ///
+    /// # Panics
+    ///
+    /// When calling `Handle::enter` multiple times, the returned guards
+    /// **must** be dropped in the reverse order that they were acquired.
+    /// Failure to do so will result in a panic and possible memory leaks.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// let rt = Runtime::new().unwrap();
+    ///
+    /// let _guard = rt.enter();
+    /// tokio::spawn(async {
+    ///     println!("Hello world!");
+    /// });
+    /// ```
+    ///
+    /// Do **not** do the following, this shows a scenario that will result in a
+    /// panic and possible memory leak.
+    ///
+    /// ```should_panic
+    /// use tokio::runtime::Runtime;
+    ///
+    /// let rt1 = Runtime::new().unwrap();
+    /// let rt2 = Runtime::new().unwrap();
+    ///
+    /// let enter1 = rt1.enter();
+    /// let enter2 = rt2.enter();
+    ///
+    /// drop(enter1);
+    /// drop(enter2);
+    /// ```
     ///
     /// [`Sleep`]: struct@crate::time::Sleep
     /// [`TcpStream`]: struct@crate::net::TcpStream
@@ -269,13 +304,9 @@ impl Handle {
 
         // Enter the runtime context. This sets the current driver handles and
         // prevents blocking an existing runtime.
-        let mut enter = context::enter_runtime(&self.inner, true);
-
-        // Block on the future
-        enter
-            .blocking
-            .block_on(future)
-            .expect("failed to park thread")
+        context::enter_runtime(&self.inner, true, |blocking| {
+            blocking.block_on(future).expect("failed to park thread")
+        })
     }
 
     #[track_caller]
@@ -343,13 +374,38 @@ cfg_metrics! {
 cfg_taskdump! {
     impl Handle {
         /// Capture a snapshot of this runtime's state.
-        pub fn dump(&self) -> crate::runtime::Dump {
+        pub async fn dump(&self) -> crate::runtime::Dump {
             match &self.inner {
                 scheduler::Handle::CurrentThread(handle) => handle.dump(),
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                scheduler::Handle::MultiThread(_) =>
-                    unimplemented!("taskdumps are unsupported on the multi-thread runtime"),
+                scheduler::Handle::MultiThread(handle) => {
+                    // perform the trace in a separate thread so that the
+                    // trace itself does not appear in the taskdump.
+                    let handle = handle.clone();
+                    spawn_thread(async {
+                        let handle = handle;
+                        handle.dump().await
+                    }).await
+                },
             }
+        }
+    }
+
+    cfg_rt_multi_thread! {
+        /// Spawn a new thread and asynchronously await on its result.
+        async fn spawn_thread<F>(f: F) -> <F as Future>::Output
+        where
+            F: Future + Send + 'static,
+            <F as Future>::Output: Send + 'static
+        {
+            let (tx, rx) = crate::sync::oneshot::channel();
+            crate::loom::thread::spawn(|| {
+                let rt = crate::runtime::Builder::new_current_thread().build().unwrap();
+                rt.block_on(async {
+                    let _ = tx.send(f.await);
+                });
+            });
+            rx.await.unwrap()
         }
     }
 }
