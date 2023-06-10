@@ -67,11 +67,13 @@ use crate::runtime::task::OwnedTasks;
 use crate::runtime::{
     blocking, coop, driver, task, Config, Driver, SchedulerMetrics, WorkerMetrics,
 };
+use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
 use std::cmp;
 use std::task::Waker;
+use std::time::Duration;
 
 cfg_metrics! {
     mod metrics;
@@ -158,6 +160,10 @@ pub(crate) struct Shared {
     /// Data synchronized by the scheduler mutex
     pub(super) synced: Mutex<Synced>,
 
+    /// Power's Tokio's I/O, timers, etc... the responsibility of polling the
+    /// driver is shared across workers.
+    driver: AtomicCell<Driver>,
+
     /// Condition variables used to unblock worker threads. Each worker thread
     /// has its own condvar it waits on.
     pub(super) condvars: Vec<Condvar>,
@@ -200,10 +206,6 @@ pub(crate) struct Synced {
 
     /// Synchronized state for `Inject`.
     pub(crate) inject: inject::Synced,
-
-    /// Power's Tokio's I/O, timers, etc... the responsibility of polling the
-    /// driver is shared across workers.
-    driver: Option<Box<Driver>>,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -300,8 +302,8 @@ pub(super) fn create(
                 shutdown_cores: Vec::with_capacity(num_cores),
                 idle: idle_synced,
                 inject: inject_synced,
-                driver: Some(Box::new(driver)),
             }),
+            driver: AtomicCell::new(Some(Box::new(driver))),
             condvars: (0..num_workers).map(|_| Condvar::new()).collect(),
             trace_status: TraceStatus::new(num_cores),
             config,
@@ -521,7 +523,10 @@ impl Worker {
             core.tick();
 
             // Run maintenance, if needed
-            core = self.maybe_maintenance(cx, core);
+            core = match self.maybe_maintenance(cx, core) {
+                Ok(core) => core,
+                Err(_) => return,
+            };
 
             // First, check work available to the current worker.
             if let Some(task) = self.next_task(cx, &mut core) {
@@ -550,7 +555,10 @@ impl Worker {
                 // Wait for work
                 core = if !cx.defer.borrow().is_empty() {
                     // Just run maintenance
-                    self.park_yield(cx, core)
+                    match self.park_yield(cx, core) {
+                        Ok(core) => core,
+                        Err(_) => return,
+                    }
                 } else {
                     match self.park(cx, core) {
                         Ok(core) => core,
@@ -586,6 +594,11 @@ impl Worker {
         let mut core = loop {
             if let Some(core) = synced.assigned_cores[self.index].take() {
                 break core;
+            }
+
+            // If shutting down, abort
+            if cx.shared().inject.is_closed(&synced.inject) {
+                return Err(());
             }
 
             synced = cx.shared().condvars[self.index].wait(synced).unwrap();
@@ -630,7 +643,7 @@ impl Worker {
         debug_assert!(core.run_queue.is_empty());
 
         // Update shutdown state while locked
-        core.is_shutdown = cx.shared().inject.is_closed(&synced.inject);
+        self.update_global_flags(cx, synced, core);
     }
 
     fn next_task(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
@@ -896,58 +909,51 @@ impl Worker {
         }
     }
 
-    fn maybe_maintenance(&self, cx: &Context, mut core: Box<Core>) -> Box<Core> {
+    fn maybe_maintenance(&mut self, cx: &Context, mut core: Box<Core>) -> RunResult {
         if core.tick % cx.shared().config.event_interval == 0 {
             super::counters::inc_num_maintenance();
 
             core.stats.end_processing_scheduled_tasks();
 
             // Run regularly scheduled maintenance
-            self.maintenance(cx, &mut core);
+            core = self.park_yield(cx, core)?;
 
             core.stats.start_processing_scheduled_tasks();
         }
 
-        core
+        Ok(core)
     }
 
-    /// Runs maintenance work such as checking the pool's state.
-    fn maintenance(&self, cx: &Context, core: &mut Core) {
-        /*
-        // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
-        // to run without actually putting the thread to sleep.
-        core = self.park_timeout(core, Some(Duration::from_millis(0)));
-        */
-        if true {
-            todo!();
-        }
-
+    fn flush_metrics(&self, cx: &Context, core: &mut Core) {
         core.stats.submit(&cx.shared().worker_metrics[core.index]);
+    }
 
+    fn update_global_flags(&self, cx: &Context, synced: &mut Synced, core: &mut Core) {
         if !core.is_shutdown {
-            // Check if the scheduler has been shutdown
-            let synced = cx.shared().synced.lock();
             core.is_shutdown = cx.shared().inject.is_closed(&synced.inject);
         }
 
         if !core.is_traced {
-            // Check if the worker should be tracing.
             core.is_traced = cx.shared().trace_status.trace_requested();
         }
     }
 
-    fn park_yield(&self, cx: &Context, mut core: Box<Core>) -> Box<Core> {
-        /*
+    fn park_yield(&mut self, cx: &Context, mut core: Box<Core>) -> RunResult {
         // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
         // to run without actually putting the thread to sleep.
-        core = self.park_timeout(core, Some(Duration::from_millis(0)));
-        */
-        if true {
-            todo!();
+        if let Some(mut driver) = cx.shared().driver.take() {
+            driver.park_timeout(&cx.handle.driver, Duration::from_millis(0));
+
+            // If there are more I/O events, schedule them.
+            if !cx.defer.borrow().is_empty() {
+                // TODO: don't lock if there is only one task
+                core = self.schedule_deferred_with_core(cx, core, cx.shared().synced.lock())?;
+            }
         }
 
-        self.maintenance(cx, &mut core);
-        core
+        self.flush_metrics(cx, &mut core);
+        self.update_global_flags(cx, &mut cx.shared().synced.lock(), &mut core);
+        Ok(core)
     }
 
     fn park(&mut self, cx: &Context, mut core: Box<Core>) -> RunResult {
@@ -971,6 +977,9 @@ impl Worker {
 
     fn do_park(&mut self, cx: &Context, mut core: Box<Core>) -> RunResult {
         core.stats.about_to_park();
+
+        // Flush metrics to the runtime metrics aggregator
+        self.flush_metrics(cx, &mut core);
 
         let was_searching = core.is_searching;
 
@@ -1012,12 +1021,15 @@ impl Worker {
         // Release the core
         cx.shared().idle.release_core(&mut synced, core);
 
-        if let Some(mut driver) = synced.driver.take() {
+        if let Some(mut driver) = cx.shared().driver.take() {
             // Drop the lock before parking on the driver
             drop(synced);
 
             // Wait for driver events
             driver.park(&self.handle.driver);
+
+            // Put the driver back
+            cx.shared().driver.set(driver);
 
             synced = cx.shared().synced.lock();
 
@@ -1088,7 +1100,7 @@ impl Worker {
         }
 
         // Shutdown the driver
-        let mut driver = synced.driver.take().expect("driver missing");
+        let mut driver = cx.shared().driver.take().expect("driver missing");
         driver.shutdown(&self.handle.driver);
 
         // Drain the injection queue
@@ -1198,9 +1210,15 @@ impl Shared {
     }
 
     pub(super) fn close(&self) {
-        if self.inject.close(&mut self.synced.lock().inject) {
-            // self.notify_all();
-            todo!()
+        let mut synced = self.synced.lock();
+
+        if self.inject.close(&mut synced.inject) {
+            // Set the shutdown flag on all available cores
+            for core in &mut synced.available_cores {
+                core.is_shutdown = true;
+            }
+
+            self.idle.notify_shutdown(&mut synced, self);
         }
     }
 

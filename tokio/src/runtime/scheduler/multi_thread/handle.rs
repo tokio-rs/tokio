@@ -44,6 +44,7 @@ impl Handle {
 
     pub(crate) fn shutdown(&self) {
         self.shared.close();
+        self.driver.unpark();
     }
 
     pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T, id: task::Id) -> JoinHandle<T::Output>

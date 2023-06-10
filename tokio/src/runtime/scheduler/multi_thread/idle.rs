@@ -157,6 +157,17 @@ impl Idle {
         }
     }
 
+    pub(super) fn notify_shutdown(&self, synced: &mut worker::Synced, shared: &Shared) {
+        while let Some(core) = synced.available_cores.pop() {
+            let worker = synced.idle.sleepers.pop().unwrap();
+
+            synced.assigned_cores[worker] = Some(core);
+            shared.condvars[worker].notify_one();
+        }
+
+        self.num_idle.store(0, Release);
+    }
+
     /// The worker releases the given core, making it available to other workers
     /// that are waiting.
     pub(super) fn release_core(&self, synced: &mut worker::Synced, core: Box<Core>) {
