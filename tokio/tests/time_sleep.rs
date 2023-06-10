@@ -274,6 +274,7 @@ async fn issue_5183() {
     let big = std::time::Duration::from_secs(u64::MAX / 10);
     // This is a workaround since awaiting sleep(big) will never finish.
     tokio::select! {
+    biased;
         _ = tokio::time::sleep(big) => {}
         _ = tokio::time::sleep(std::time::Duration::from_nanos(1)) => {}
     }
