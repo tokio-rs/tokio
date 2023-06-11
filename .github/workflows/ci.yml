@@ -677,7 +677,7 @@ jobs:
         working-directory: tests-integration
 
   check-external-types:
-    name: check-external-types
+    name: check-external-types (${{ matrix.os }})
     needs: basics
     runs-on: ${{ matrix.os }}
     strategy:
