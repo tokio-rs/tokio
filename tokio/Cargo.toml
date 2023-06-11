@@ -132,7 +132,7 @@ nix = { version = "0.26", default-features = false, features = ["fs", "socket"] 
 version = "0.48"
 optional = true
 
-[target.'cfg(docsrs)'.dependencies.windows-sys]
+[target.'cfg(windows)'.dev-dependencies.windows-sys]
 version = "0.48"
 features = [
     "Win32_Foundation",
