@@ -1,3 +1,5 @@
+use crate::loom::sync::{Mutex, MutexGuard};
+
 /// A lock (mutex) yielding generic data.
 pub(crate) trait Lock<T> {
     type Handle: AsMut<T>;
