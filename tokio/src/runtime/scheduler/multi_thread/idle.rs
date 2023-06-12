@@ -194,6 +194,11 @@ impl Idle {
         }
 
         self.num_idle.store(0, Release);
+
+        // Wake up any other workers
+        while let Some(index) = synced.idle.sleepers.pop() {
+            shared.condvars[index].notify_one();
+        }
     }
 
     /// The worker releases the given core, making it available to other workers

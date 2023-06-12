@@ -1025,6 +1025,13 @@ impl Worker {
             }
         }
 
+        // If the runtime is shutdown, skip parking
+        self.update_global_flags(cx, &mut synced, &mut core);
+
+        if core.is_shutdown {
+            return Ok((None, core));
+        }
+
         // Core being returned must not be in the searching state
         debug_assert!(!core.is_searching);
 
@@ -1038,10 +1045,15 @@ impl Worker {
             // Wait for driver events
             driver.park(&self.handle.driver);
 
+            synced = cx.shared().synced.lock();
+
             // Put the driver back
             cx.shared().driver.set(driver);
 
-            synced = cx.shared().synced.lock();
+            if cx.shared().inject.is_closed(&mut synced.inject) {
+                self.shutdown_finalize(cx, synced);
+                return Err(());
+            }
 
             // Try to acquire an available core to schedule I/O events
             if let Some(core) = self.try_acquire_available_core(cx, &mut synced) {
@@ -1098,7 +1110,17 @@ impl Worker {
         let mut synced = cx.shared().synced.lock();
         synced.shutdown_cores.push(core);
 
+        self.shutdown_finalize(cx, synced);
+    }
+
+    fn shutdown_finalize(&self, cx: &Context, mut synced: MutexGuard<'_, Synced>) {
+        // Wait for all cores
         if synced.shutdown_cores.len() != cx.shared().remotes.len() {
+            return;
+        }
+
+        // Wait for driver
+        if cx.shared().driver.is_none() {
             return;
         }
 
