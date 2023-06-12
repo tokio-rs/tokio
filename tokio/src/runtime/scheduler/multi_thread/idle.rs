@@ -184,16 +184,24 @@ impl Idle {
     }
 
     pub(super) fn shutdown(&self, synced: &mut worker::Synced, shared: &Shared) {
-        while let Some(mut core) = synced.idle.available_cores.pop() {
+        // First, set the shutdown flag on each core
+        for core in &mut synced.idle.available_cores {
             core.is_shutdown = true;
+        }
 
+        // Wake every sleeping worker and assign a core to it. There may not be
+        // enough sleeping workers for all cores, but other workers will
+        // eventually find the cores and shut them down.
+        while !synced.idle.sleepers.is_empty() && !synced.idle.available_cores.is_empty() {
             let worker = synced.idle.sleepers.pop().unwrap();
+            let core = synced.idle.available_cores.pop().unwrap();
 
             synced.assigned_cores[worker] = Some(core);
             shared.condvars[worker].notify_one();
-        }
 
-        self.num_idle.store(0, Release);
+            self.num_idle
+                .store(synced.idle.available_cores.len(), Release);
+        }
 
         // Wake up any other workers
         while let Some(index) = synced.idle.sleepers.pop() {
