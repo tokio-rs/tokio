@@ -295,7 +295,7 @@ pub(super) fn create(
             idle,
             owned: OwnedTasks::new(),
             synced: Mutex::new(Synced {
-                assigned_cores: Vec::with_capacity(num_cores),
+                assigned_cores: (0..num_workers).map(|_| None).collect(),
                 shutdown_cores: Vec::with_capacity(num_cores),
                 idle: idle_synced,
                 inject: inject_synced,
