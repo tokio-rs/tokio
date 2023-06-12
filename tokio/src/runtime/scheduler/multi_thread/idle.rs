@@ -24,22 +24,45 @@ pub(super) struct Idle {
 pub(super) struct Synced {
     /// Worker IDs that are currently sleeping
     sleepers: Vec<usize>,
+
+    /// Cores available for workers
+    available_cores: Vec<Box<Core>>,
 }
 
 impl Idle {
-    pub(super) fn new(num_cores: usize, num_workers: usize) -> (Idle, Synced) {
+    pub(super) fn new(cores: Vec<Box<Core>>, num_workers: usize) -> (Idle, Synced) {
         let idle = Idle {
             num_searching: AtomicUsize::new(0),
-            num_idle: AtomicUsize::new(0),
+            num_idle: AtomicUsize::new(cores.len()),
             needs_searching: AtomicBool::new(false),
-            num_cores,
+            num_cores: cores.len(),
         };
 
         let synced = Synced {
             sleepers: Vec::with_capacity(num_workers),
+            available_cores: cores,
         };
 
         (idle, synced)
+    }
+
+    pub(super) fn num_idle(&self, synced: &Synced) -> usize {
+        debug_assert_eq!(synced.available_cores.len(), self.num_idle.load(Acquire));
+        synced.available_cores.len()
+    }
+
+    /// Try to acquire an available core
+    pub(super) fn try_acquire_available_core(&self, synced: &mut Synced) -> Option<Box<Core>> {
+        let ret = synced.available_cores.pop();
+
+        if ret.is_some() {
+            // Decrement the number of idle cores
+            let num_idle = self.num_idle.load(Acquire) - 1;
+            debug_assert_eq!(num_idle, synced.available_cores.len());
+            self.num_idle.store(num_idle, Release);
+        }
+
+        ret
     }
 
     /// We need at least one searching worker
@@ -83,15 +106,15 @@ impl Idle {
         // Find a sleeping worker
         if let Some(worker) = synced.idle.sleepers.pop() {
             // Find an available core
-            if let Some(mut core) = synced.available_cores.pop() {
+            if let Some(mut core) = synced.idle.available_cores.pop() {
                 debug_assert!(!core.is_searching);
                 core.is_searching = is_searching;
 
                 // Assign the core to the worker
                 synced.assigned_cores[worker] = Some(core);
 
-                let num_idle = self.num_idle.load(Acquire) - 1;
-                debug_assert_eq!(num_idle, synced.available_cores.len());
+                let num_idle = synced.idle.available_cores.len();
+                debug_assert_eq!(num_idle, self.num_idle.load(Acquire) - 1);
 
                 // Update the number of sleeping workers
                 self.num_idle.store(num_idle, Release);
@@ -127,17 +150,15 @@ impl Idle {
         workers: &mut Vec<usize>,
         num: usize,
     ) {
-        let mut num_idle = self.num_idle.load(Acquire);
         let mut did_notify = false;
 
         for _ in 0..num {
             if let Some(worker) = synced.idle.sleepers.pop() {
-                if let Some(core) = synced.available_cores.pop() {
+                if let Some(core) = synced.idle.available_cores.pop() {
                     debug_assert!(!core.is_searching);
 
                     synced.assigned_cores[worker] = Some(core);
 
-                    num_idle -= 1;
                     workers.push(worker);
                     did_notify = true;
 
@@ -151,14 +172,21 @@ impl Idle {
         }
 
         if did_notify {
+            let num_idle = synced.idle.available_cores.len();
             self.num_idle.store(num_idle, Release);
         } else {
+            debug_assert_eq!(
+                synced.idle.available_cores.len(),
+                self.num_idle.load(Acquire)
+            );
             self.needs_searching.store(true, Release);
         }
     }
 
-    pub(super) fn notify_shutdown(&self, synced: &mut worker::Synced, shared: &Shared) {
-        while let Some(core) = synced.available_cores.pop() {
+    pub(super) fn shutdown(&self, synced: &mut worker::Synced, shared: &Shared) {
+        while let Some(mut core) = synced.idle.available_cores.pop() {
+            core.is_shutdown = true;
+
             let worker = synced.idle.sleepers.pop().unwrap();
 
             synced.assigned_cores[worker] = Some(core);
@@ -176,13 +204,13 @@ impl Idle {
 
         // Check that this isn't the final worker to go idle *and*
         // `needs_searching` is set.
-        debug_assert!(!self.needs_searching.load(Acquire) || num_active_workers(&synced) > 1);
+        debug_assert!(!self.needs_searching.load(Acquire) || num_active_workers(&synced.idle) > 1);
 
-        let num_idle = synced.available_cores.len();
+        let num_idle = synced.idle.available_cores.len();
         debug_assert_eq!(num_idle, self.num_idle.load(Acquire));
 
         // Store the core in the list of available cores
-        synced.available_cores.push(core);
+        synced.idle.available_cores.push(core);
 
         // Update `num_idle`
         self.num_idle.store(num_idle + 1, Release);
@@ -236,19 +264,15 @@ impl Idle {
     /// **must** notify a new worker.
     pub(super) fn transition_worker_from_searching(&self, core: &mut Core) -> bool {
         debug_assert!(core.is_searching);
+        core.is_searching = false;
 
         let prev = self.num_searching.fetch_sub(1, AcqRel);
         debug_assert!(prev > 0);
 
-        if prev == 1 {
-            false
-        } else {
-            core.is_searching = false;
-            false
-        }
+        prev == 1
     }
 }
 
-fn num_active_workers(synced: &worker::Synced) -> usize {
+fn num_active_workers(synced: &Synced) -> usize {
     synced.available_cores.capacity() - synced.available_cores.len()
 }

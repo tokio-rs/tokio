@@ -92,7 +92,7 @@ pub(super) struct Worker {
     /// Reference to scheduler's handle
     handle: Arc<Handle>,
 
-    /// This worker's index in `available_cores` and `condvars`.
+    /// This worker's index in `assigned_cores` and `condvars`.
     index: usize,
 
     /// Used to collect a list of workers to notify
@@ -126,7 +126,7 @@ pub(super) struct Core {
     pub(super) is_searching: bool,
 
     /// True if the scheduler is being shutdown
-    is_shutdown: bool,
+    pub(super) is_shutdown: bool,
 
     /// True if the scheduler is being traced
     is_traced: bool,
@@ -188,9 +188,6 @@ pub(crate) struct Shared {
 
 /// Data synchronized by the scheduler mutex
 pub(crate) struct Synced {
-    /// Cores not currently assigned to workers
-    pub(super) available_cores: Vec<Box<Core>>,
-
     /// When worker is notified, it is assigned a core. The core is placed here
     /// until the worker wakes up to take it.
     pub(super) assigned_cores: Vec<Option<Box<Core>>>,
@@ -288,7 +285,7 @@ pub(super) fn create(
 
     // Allocate num-cores + 1 workers, so one worker can handle the I/O driver,
     // if needed.
-    let (idle, idle_synced) = Idle::new(num_cores, num_workers);
+    let (idle, idle_synced) = Idle::new(cores, num_workers);
     let (inject, inject_synced) = inject::Shared::new();
 
     let handle = Arc::new(Handle {
@@ -298,7 +295,6 @@ pub(super) fn create(
             idle,
             owned: OwnedTasks::new(),
             synced: Mutex::new(Synced {
-                available_cores: cores,
                 assigned_cores: Vec::with_capacity(num_cores),
                 shutdown_cores: Vec::with_capacity(num_cores),
                 idle: idle_synced,
@@ -555,7 +551,11 @@ impl Worker {
 
     // Try to acquire an available core, but do not block the thread
     fn try_acquire_available_core(&self, cx: &Context, synced: &mut Synced) -> Option<Box<Core>> {
-        if let Some(mut core) = synced.available_cores.pop() {
+        if let Some(mut core) = cx
+            .shared()
+            .idle
+            .try_acquire_available_core(&mut synced.idle)
+        {
             self.reset_acquired_core(cx, synced, &mut core);
             Some(core)
         } else {
@@ -881,7 +881,7 @@ impl Worker {
             let mut synced = synced();
 
             // Number of tasks we want to try to spread across idle workers
-            let num_fanout = cmp::min(defer.len(), synced.available_cores.len());
+            let num_fanout = cmp::min(defer.len(), cx.shared().idle.num_idle(&synced.idle));
 
             if num_fanout > 0 {
                 cx.shared()
@@ -1224,11 +1224,7 @@ impl Shared {
 
         if self.inject.close(&mut synced.inject) {
             // Set the shutdown flag on all available cores
-            for core in &mut synced.available_cores {
-                core.is_shutdown = true;
-            }
-
-            self.idle.notify_shutdown(&mut synced, self);
+            self.idle.shutdown(&mut synced, self);
         }
     }
 
