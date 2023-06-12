@@ -107,6 +107,10 @@ pub(super) struct Core {
     /// Used to schedule bookkeeping tasks every so often.
     tick: u32,
 
+    /// Counter used to track when to poll from the local queue vs. the
+    /// injection queue
+    num_seq_local_queue_polls: u32,
+
     /// When a task is scheduled from a worker, it is stored in this slot. The
     /// worker will check this slot for a task **before** checking the run
     /// queue. This effectively results in the **last** scheduled task to be run
@@ -139,6 +143,12 @@ pub(super) struct Core {
 
     /// Fast random number generator.
     rand: FastRand,
+}
+
+impl Drop for Core {
+    fn drop(&mut self) {
+        println!(" DROPPED CORE");
+    }
 }
 
 /// State shared across all workers
@@ -268,6 +278,7 @@ pub(super) fn create(
         cores.push(Box::new(Core {
             index: i,
             tick: 0,
+            num_seq_local_queue_polls: 0,
             lifo_slot: None,
             lifo_enabled: !config.disable_lifo_slot,
             run_queue,
@@ -560,6 +571,7 @@ impl Worker {
             .idle
             .try_acquire_available_core(&mut synced.idle)
         {
+            println!(" + acquired_core; {}", self.index);
             self.reset_acquired_core(cx, synced, &mut core);
             Some(core)
         } else {
@@ -569,6 +581,7 @@ impl Worker {
 
     // Block the current thread, waiting for an available core
     fn wait_for_core(&self, cx: &Context, mut synced: MutexGuard<'_, Synced>) -> NextTaskResult {
+        println!(" + wait_for_core; {}", self.index);
         cx.shared()
             .idle
             .transition_worker_to_parked(&mut synced, self.index);
@@ -582,6 +595,7 @@ impl Worker {
             // If shutting down, abort
             if cx.shared().inject.is_closed(&synced.inject) {
                 self.shutdown_clear_defer(cx);
+                println!(" + wait_for_core; shutdown; {}", self.index);
                 return Err(());
             }
 
@@ -591,18 +605,21 @@ impl Worker {
         self.reset_acquired_core(cx, &mut synced, &mut core);
 
         if core.is_shutdown {
+            println!(" + wait_for_core; CORE(shutdown) {}", self.index);
             // Currently shutting down, don't do any more work
             return Ok((None, core));
         }
 
         // The core was notified to search for work, don't try to take tasks from the injection queue
         if core.is_searching {
+            println!(" + wait_for_core; SEARCHING");
             return Ok((None, core));
         }
 
-        // TODO: don't hardcode 128
         let n = core.run_queue.max_capacity() / 2;
         let maybe_task = self.next_remote_task_batch(cx, &mut synced, &mut core, n);
+
+        println!(" + wait_for_core; task={:?}", maybe_task.is_some());
 
         Ok((maybe_task, core))
     }
@@ -666,7 +683,12 @@ impl Worker {
     }
 
     fn next_notified_task(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
-        if core.tick % core.global_queue_interval == 0 {
+        core.num_seq_local_queue_polls += 1;
+
+        if core.num_seq_local_queue_polls % core.global_queue_interval == 0 {
+            core.num_seq_local_queue_polls = 0;
+
+            println!(" + next_notified_task; REMOTE FIRST");
             // Update the global queue interval, if needed
             self.tune_global_queue_interval(cx, core);
 
@@ -873,7 +895,7 @@ impl Worker {
     fn schedule_deferred_with_core<'a>(
         &mut self,
         cx: &'a Context,
-        core: Box<Core>,
+        mut core: Box<Core>,
         synced: impl FnOnce() -> MutexGuard<'a, Synced>,
     ) -> NextTaskResult {
         let mut defer = cx.defer.borrow_mut();
@@ -907,6 +929,16 @@ impl Worker {
         // Notify any workers
         for worker in self.workers_to_notify.drain(..) {
             cx.shared().condvars[worker].notify_one()
+        }
+
+        if !defer.is_empty() {
+            // Push the rest of the tasks on the local queue
+            for task in defer.drain(..) {
+                core.run_queue
+                    .push_back_or_overflow(task, cx.shared(), &mut core.stats);
+            }
+
+            cx.shared().notify_parked_local();
         }
 
         Ok((task, core))
@@ -962,18 +994,27 @@ impl Worker {
     }
 
     fn park_yield(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
+        println!(" + park_yield; tick={}", core.tick);
+        let mut maybe_task = None;
+
         // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
         // to run without actually putting the thread to sleep.
         if let Some(mut driver) = cx.shared().driver.take() {
             driver.park_timeout(&cx.handle.driver, Duration::from_millis(0));
 
+            cx.shared().driver.set(driver);
+
             // If there are more I/O events, schedule them.
-            core = n!(self.schedule_deferred_with_core(cx, core, || cx.shared().synced.lock()));
+            let res = self.schedule_deferred_with_core(cx, core, || cx.shared().synced.lock())?;
+
+            maybe_task = res.0;
+            core = res.1;
         }
 
         self.flush_metrics(cx, &mut core);
         self.update_global_flags(cx, &mut cx.shared().synced.lock(), &mut core);
-        Ok((None, core))
+
+        Ok((maybe_task, core))
     }
 
     fn park(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
@@ -1050,8 +1091,11 @@ impl Worker {
             // Drop the lock before parking on the driver
             drop(synced);
 
+            println!(" + driver::park");
+
             // Wait for driver events
             driver.park(&self.handle.driver);
+            println!(" + driver::park / done");
 
             synced = cx.shared().synced.lock();
 
@@ -1123,15 +1167,21 @@ impl Worker {
     }
 
     fn shutdown_finalize(&self, cx: &Context, mut synced: MutexGuard<'_, Synced>) {
+        println!(" + shutdown core");
+
         // Wait for all cores
         if synced.shutdown_cores.len() != cx.shared().remotes.len() {
             return;
         }
 
+        println!(" + shutdown_finalize; all cores");
+
         // Wait for driver
         if cx.shared().driver.is_none() {
             return;
         }
+
+        println!(" + shutdown_finalize; have driver");
 
         debug_assert!(cx.shared().owned.is_empty());
 
