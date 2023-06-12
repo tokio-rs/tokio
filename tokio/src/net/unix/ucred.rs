@@ -31,7 +31,12 @@ impl UCred {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "redox", target_os = "android", target_os = "openbsd"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "redox",
+    target_os = "android",
+    target_os = "openbsd"
+))]
 pub(crate) use self::impl_linux::get_peer_cred;
 
 #[cfg(any(target_os = "netbsd"))]
@@ -49,7 +54,12 @@ pub(crate) use self::impl_solaris::get_peer_cred;
 #[cfg(target_os = "aix")]
 pub(crate) use self::impl_aix::get_peer_cred;
 
-#[cfg(any(target_os = "linux", target_os = "redox", target_os = "android", target_os = "openbsd"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "redox",
+    target_os = "android",
+    target_os = "openbsd"
+))]
 pub(crate) mod impl_linux {
     use crate::net::unix::{self, UnixStream};
 
