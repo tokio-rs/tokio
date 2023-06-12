@@ -541,10 +541,14 @@ impl Worker {
             }
         }
 
+        debug_assert!(cx.defer.borrow().is_empty());
+
         self.pre_shutdown(cx, &mut core);
 
         // Signal shutdown
         self.shutdown_core(cx, core);
+
+        debug_assert!(cx.defer.borrow().is_empty());
 
         Err(())
     }
@@ -577,6 +581,7 @@ impl Worker {
 
             // If shutting down, abort
             if cx.shared().inject.is_closed(&synced.inject) {
+                self.shutdown_clear_defer(cx);
                 return Err(());
             }
 
@@ -653,6 +658,9 @@ impl Worker {
                 core = n!(self.park(cx, core));
             }
         }
+
+        // Shutting down, drop any deferred tasks
+        self.shutdown_clear_defer(cx);
 
         Ok((None, core))
     }
@@ -1051,6 +1059,7 @@ impl Worker {
             cx.shared().driver.set(driver);
 
             if cx.shared().inject.is_closed(&mut synced.inject) {
+                self.shutdown_clear_defer(cx);
                 self.shutdown_finalize(cx, synced);
                 return Err(());
             }
@@ -1165,6 +1174,14 @@ impl Worker {
         // Smooth out jitter
         if abs_diff(core.global_queue_interval, next) > 2 {
             core.global_queue_interval = next;
+        }
+    }
+
+    fn shutdown_clear_defer(&self, cx: &Context) {
+        let mut defer = cx.defer.borrow_mut();
+
+        for task in defer.drain(..) {
+            drop(task);
         }
     }
 }
