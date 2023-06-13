@@ -268,6 +268,20 @@ async fn exactly_max() {
 }
 
 #[tokio::test]
+async fn issue_5183() {
+    time::pause();
+
+    let big = std::time::Duration::from_secs(u64::MAX / 10);
+    // This is a workaround since awaiting sleep(big) will never finish.
+    #[rustfmt::skip]
+    tokio::select! {
+	biased;
+        _ = tokio::time::sleep(big) => {}
+        _ = tokio::time::sleep(std::time::Duration::from_nanos(1)) => {}
+    }
+}
+
+#[tokio::test]
 async fn no_out_of_bounds_close_to_max() {
     time::pause();
     time::sleep(ms(MAX_DURATION - 1)).await;

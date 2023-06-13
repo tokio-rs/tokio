@@ -7,7 +7,6 @@ use tokio::process::{Child, Command};
 use tokio_test::assert_ok;
 
 use futures::future::{self, FutureExt};
-use std::convert::TryInto;
 use std::env;
 use std::io;
 use std::process::{ExitStatus, Stdio};

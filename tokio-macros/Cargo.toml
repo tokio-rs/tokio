@@ -5,7 +5,7 @@ name = "tokio-macros"
 # - Update CHANGELOG.md.
 # - Create "tokio-macros-1.x.y" git tag.
 version = "2.1.0"
-edition = "2018"
+edition = "2021"
 rust-version = "1.56"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"

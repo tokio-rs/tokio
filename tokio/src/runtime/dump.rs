@@ -1,26 +1,36 @@
 //! Snapshots of runtime state.
+//!
+//! See [Handle::dump][crate::runtime::Handle::dump].
 
 use std::fmt;
 
 /// A snapshot of a runtime's state.
+///
+/// See [Handle::dump][crate::runtime::Handle::dump].
 #[derive(Debug)]
 pub struct Dump {
     tasks: Tasks,
 }
 
 /// Snapshots of tasks.
+///
+/// See [Handle::dump][crate::runtime::Handle::dump].
 #[derive(Debug)]
 pub struct Tasks {
     tasks: Vec<Task>,
 }
 
 /// A snapshot of a task.
+///
+/// See [Handle::dump][crate::runtime::Handle::dump].
 #[derive(Debug)]
 pub struct Task {
     trace: Trace,
 }
 
 /// An execution trace of a task's last poll.
+///
+/// See [Handle::dump][crate::runtime::Handle::dump].
 #[derive(Debug)]
 pub struct Trace {
     inner: super::task::trace::Trace,
