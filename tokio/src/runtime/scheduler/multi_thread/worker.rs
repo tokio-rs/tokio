@@ -670,6 +670,8 @@ impl Worker {
             // We consumed all work in the queues and will start searching for work.
             core.stats.end_processing_scheduled_tasks();
 
+            core = n!(self.poll_driver(cx, core));
+
             // Try to steal a task from other workers
             if let Some(task) = self.steal_work(cx, &mut core) {
                 core.stats.start_processing_scheduled_tasks();
@@ -1043,6 +1045,23 @@ impl Worker {
         self.update_global_flags(cx, &mut cx.shared().synced.lock(), &mut core);
 
         Ok((maybe_task, core))
+    }
+
+    fn poll_driver(&mut self, cx: &Context, core: Box<Core>) -> NextTaskResult {
+        // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
+        // to run without actually putting the thread to sleep.
+        if let Some(mut driver) = cx.shared().driver.take() {
+            println!(" + DRIVER POLL");
+            driver.park_timeout(&cx.handle.driver, Duration::from_millis(0));
+
+            cx.shared().driver.set(driver);
+
+            // If there are more I/O events, schedule them.
+            self.schedule_deferred_with_core(cx, core, || cx.shared().synced.lock())
+        } else {
+            Ok((None, core))
+        }
+
     }
 
     fn park(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
