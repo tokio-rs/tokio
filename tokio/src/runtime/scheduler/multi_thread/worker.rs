@@ -97,12 +97,15 @@ pub(super) struct Worker {
 
     /// Used to collect a list of workers to notify
     workers_to_notify: Vec<usize>,
+
+    /// Snapshot of idle core list. This helps speedup stealing
+    idle_snapshot: idle::Snapshot,
 }
 
 /// Core data
 pub(super) struct Core {
     /// Index holding this core's remote/shared state.
-    index: usize,
+    pub(super) index: usize,
 
     /// Used to schedule bookkeeping tasks every so often.
     tick: u32,
@@ -340,6 +343,7 @@ pub(super) fn create(
             handle: handle.clone(),
             index,
             workers_to_notify: Vec::with_capacity(num_workers - 1),
+            idle_snapshot: idle::Snapshot::new(&handle.shared.idle),
         };
 
         handle
@@ -823,7 +827,18 @@ impl Worker {
                 continue;
             }
 
+            // If the core is currently idle, then there is nothing to steal.
+            if cx.shared().idle.is_idle(i) {
+                continue;
+            }
+
             let target = &cx.shared().remotes[i];
+
+            if lifo {
+                if let Some(task) = target.lifo_slot.take_remote() {
+                    return Some(task);
+                }
+            }
 
             if let Some(task) = target
                 .steal
@@ -1061,7 +1076,6 @@ impl Worker {
         } else {
             Ok((None, core))
         }
-
     }
 
     fn park(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
