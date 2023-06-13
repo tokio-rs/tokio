@@ -1,4 +1,4 @@
-#![cfg(feature = "compat")]
+#![cfg(all(feature = "compat", not(tokio_wasi)))] // WASI does not support all fs operations
 #![warn(rust_2018_idioms)]
 
 use futures_io::SeekFrom;
