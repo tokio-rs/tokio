@@ -515,8 +515,7 @@ fn run(
             // the worker core is lost due to `block_in_place()` being called from
             // within the task.
             if !cx.defer.borrow().is_empty() {
-                // cx.defer.wake();
-                todo!()
+                worker.schedule_deferred_without_core(&cx, &mut cx.shared().synced.lock());
             }
         });
     });
@@ -1213,6 +1212,7 @@ impl Worker {
     fn can_transition_to_parked(&self, cx: &Context, core: &mut Core) -> bool {
         cx.shared().remotes[core.index].lifo_slot.is_none()
             && core.run_queue.is_empty()
+            && !core.is_shutdown
             && !core.is_traced
     }
 
