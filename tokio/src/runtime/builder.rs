@@ -379,8 +379,10 @@ impl Builder {
     /// - dns resolution through [`ToSocketAddrs`]
     /// - writing to [`Stdout`] or [`Stderr`]
     /// - reading from [`Stdin`]
+    ///
     /// Unlike the [`worker_threads`], they are not always active and will exit
     /// if left idle for too long. You can change this timeout duration with [`thread_keep_alive`].
+    ///
     /// It's recommended to not set this limit too low in order to avoid hanging on operations
     /// requiring [`spawn_blocking`].
     ///
