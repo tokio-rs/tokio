@@ -111,13 +111,6 @@ pub(super) struct Core {
     /// injection queue
     num_seq_local_queue_polls: u32,
 
-    /// When a task is scheduled from a worker, it is stored in this slot. The
-    /// worker will check this slot for a task **before** checking the run
-    /// queue. This effectively results in the **last** scheduled task to be run
-    /// next (LIFO). This is an optimization for improving locality which
-    /// benefits message passing patterns and helps to reduce latency.
-    lifo_slot: Option<Notified>,
-
     /// When `true`, locally scheduled tasks go to the LIFO slot. When `false`,
     /// they go to the back of the `run_queue`.
     lifo_enabled: bool,
@@ -217,6 +210,13 @@ pub(crate) struct Synced {
 
 /// Used to communicate with a worker from other threads.
 struct Remote {
+    /// When a task is scheduled from a worker, it is stored in this slot. The
+    /// worker will check this slot for a task **before** checking the run
+    /// queue. This effectively results in the **last** scheduled task to be run
+    /// next (LIFO). This is an optimization for improving locality which
+    /// benefits message passing patterns and helps to reduce latency.
+    lifo_slot: Lifo,
+
     /// Steals tasks from this worker.
     pub(super) steal: queue::Steal<Arc<Handle>>,
 }
@@ -245,6 +245,9 @@ type Task = task::Task<Arc<Handle>>;
 
 /// A notified task handle
 type Notified = task::Notified<Arc<Handle>>;
+
+/// Stealable LIFO slot
+type Lifo = task::AtomicCell<Arc<Handle>>;
 
 /// Value picked out of thin-air. Running the LIFO slot a handful of times
 /// seemms sufficient to benefit from locality. More than 3 times probably is
@@ -279,7 +282,6 @@ pub(super) fn create(
             index: i,
             tick: 0,
             num_seq_local_queue_polls: 0,
-            lifo_slot: None,
             lifo_enabled: !config.disable_lifo_slot,
             run_queue,
             is_searching: false,
@@ -290,7 +292,10 @@ pub(super) fn create(
             rand: FastRand::from_seed(config.seed_generator.next_seed()),
         }));
 
-        remotes.push(Remote { steal });
+        remotes.push(Remote {
+            steal,
+            lifo_slot: Lifo::new(),
+        });
         worker_metrics.push(metrics);
     }
 
@@ -693,31 +698,30 @@ impl Worker {
             // Update the global queue interval, if needed
             self.tune_global_queue_interval(cx, core);
 
-            self.next_remote_task(cx)
-                .or_else(|| self.next_local_task(core))
-        } else {
-            let maybe_task = self.next_local_task(core);
-
-            if maybe_task.is_some() {
-                return maybe_task;
+            if let Some(task) = self.next_remote_task(cx) {
+                return Some(task);
             }
-
-            if cx.shared().inject.is_empty() {
-                return None;
-            }
-
-            // Other threads can only **remove** tasks from the current worker's
-            // `run_queue`. So, we can be confident that by the time we call
-            // `run_queue.push_back` below, there will be *at least* `cap`
-            // available slots in the queue.
-            let cap = usize::min(
-                core.run_queue.remaining_slots(),
-                core.run_queue.max_capacity() / 2,
-            );
-
-            let mut synced = cx.shared().synced.lock();
-            self.next_remote_task_batch(cx, &mut synced, core, cap)
         }
+
+        if let Some(task) = self.next_local_task(cx, core) {
+            return Some(task);
+        }
+
+        if cx.shared().inject.is_empty() {
+            return None;
+        }
+
+        // Other threads can only **remove** tasks from the current worker's
+        // `run_queue`. So, we can be confident that by the time we call
+        // `run_queue.push_back` below, there will be *at least* `cap`
+        // available slots in the queue.
+        let cap = usize::min(
+            core.run_queue.remaining_slots(),
+            core.run_queue.max_capacity() / 2,
+        );
+
+        let mut synced = cx.shared().synced.lock();
+        self.next_remote_task_batch(cx, &mut synced, core, cap)
     }
 
     fn next_remote_task(&self, cx: &Context) -> Option<Notified> {
@@ -761,8 +765,11 @@ impl Worker {
         ret
     }
 
-    fn next_local_task(&self, core: &mut Core) -> Option<Notified> {
-        core.lifo_slot.take().or_else(|| core.run_queue.pop())
+    fn next_local_task(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
+        cx.shared().remotes[core.index]
+            .lifo_slot
+            .take_local()
+            .or_else(|| core.run_queue.pop())
     }
 
     /// Function responsible for stealing tasks from another worker
@@ -847,7 +854,7 @@ impl Worker {
                 };
 
                 // Check for a task in the LIFO slot
-                let task = match core.lifo_slot.take() {
+                let task = match cx.shared().remotes[core.index].lifo_slot.take_local() {
                     Some(task) => task,
                     None => {
                         self.reset_lifo_enabled(&mut core);
@@ -1022,7 +1029,7 @@ impl Worker {
             f();
         }
 
-        if self.can_transition_to_parked(&mut core) {
+        if self.can_transition_to_parked(cx, &mut core) {
             debug_assert!(!core.is_shutdown);
             debug_assert!(!core.is_traced);
 
@@ -1142,8 +1149,10 @@ impl Worker {
         cx.shared().idle.transition_worker_from_searching(core)
     }
 
-    fn can_transition_to_parked(&self, core: &mut Core) -> bool {
-        core.lifo_slot.is_none() && core.run_queue.is_empty() && !core.is_traced
+    fn can_transition_to_parked(&self, cx: &Context, core: &mut Core) -> bool {
+        cx.shared().remotes[core.index].lifo_slot.is_none()
+            && core.run_queue.is_empty()
+            && !core.is_traced
     }
 
     /// Signals all tasks to shut down, and waits for them to complete. Must run
@@ -1187,7 +1196,7 @@ impl Worker {
 
         for mut core in synced.shutdown_cores.drain(..) {
             // Drain tasks from the local queue
-            while self.next_local_task(&mut core).is_some() {}
+            while self.next_local_task(cx, &mut core).is_some() {}
         }
 
         // Shutdown the driver
@@ -1260,7 +1269,7 @@ impl Shared {
                         if is_yield {
                             cx.defer.borrow_mut().push(task);
                         } else {
-                            self.schedule_local(core, task);
+                            self.schedule_local(cx, core, task);
                         }
                     } else {
                         // This can happen if either the core was stolen
@@ -1277,17 +1286,15 @@ impl Shared {
         })
     }
 
-    fn schedule_local(&self, core: &mut Core, task: Notified) {
+    fn schedule_local(&self, cx: &Context, core: &mut Core, task: Notified) {
         if core.lifo_enabled {
             // Push to the LIFO slot
-            let prev = core.lifo_slot.take();
+            let prev = cx.shared().remotes[core.index].lifo_slot.swap_local(task);
 
             if let Some(prev) = prev {
                 core.run_queue
                     .push_back_or_overflow(prev, self, &mut core.stats);
             }
-
-            core.lifo_slot = Some(task);
         } else {
             core.run_queue
                 .push_back_or_overflow(task, self, &mut core.stats);

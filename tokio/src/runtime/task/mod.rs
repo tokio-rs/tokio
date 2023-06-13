@@ -168,6 +168,9 @@
 // unstable. This should be removed once `JoinSet` is stabilized.
 #![cfg_attr(not(tokio_unstable), allow(dead_code))]
 
+mod atomic_cell;
+pub(crate) use atomic_cell::AtomicCell;
+
 mod core;
 use self::core::Cell;
 use self::core::Header;
