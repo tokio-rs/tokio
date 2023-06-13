@@ -1017,7 +1017,10 @@ impl Worker {
                 .idle
                 .notify_mult(synced, &mut self.workers_to_notify, num);
 
-            debug_assert!(self.workers_to_notify.is_empty());
+            // Notify any workers
+            for worker in self.workers_to_notify.drain(..) {
+                cx.shared().condvars[worker].notify_one()
+            }
         }
     }
 
