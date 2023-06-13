@@ -778,18 +778,39 @@ impl Worker {
     /// a new worker will actually try to steal. The idea is to make sure not all
     /// workers will be trying to steal at the same time.
     fn steal_work(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
+        #[cfg(not(loom))]
+        const ROUNDS: usize = 4;
+
+        #[cfg(loom)]
+        const ROUNDS: usize = 1;
+
         if !self.transition_to_searching(cx, core) {
             return None;
         }
 
         let num = cx.shared().remotes.len();
-        // Start from a random worker
-        let start = core.rand.fastrand_n(num as u32) as usize;
 
-        self.steal_one_round(cx, core, start)
+        for i in 0..ROUNDS {
+            let last = ROUNDS - 1 == i;
+
+            // Start from a random worker
+            let start = core.rand.fastrand_n(num as u32) as usize;
+
+            if let Some(task) = self.steal_one_round(cx, core, start, last) {
+                return Some(task);
+            }
+        }
+
+        None
     }
 
-    fn steal_one_round(&self, cx: &Context, core: &mut Core, start: usize) -> Option<Notified> {
+    fn steal_one_round(
+        &self,
+        cx: &Context,
+        core: &mut Core,
+        start: usize,
+        lifo: bool,
+    ) -> Option<Notified> {
         let num = cx.shared().remotes.len();
 
         for i in 0..num {
@@ -1054,7 +1075,7 @@ impl Worker {
         // Before we park, if we are searching, we need to transition away from searching
         if self.transition_from_searching(cx, &mut core) {
             // We were the last searching worker, we need to do one last check
-            if let Some(task) = self.steal_one_round(cx, &mut core, 0) {
+            if let Some(task) = self.steal_one_round(cx, &mut core, 0, true) {
                 cx.shared().notify_parked_local();
 
                 return Ok((Some(task), core));
