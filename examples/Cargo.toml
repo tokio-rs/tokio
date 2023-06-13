@@ -2,7 +2,7 @@
 name = "examples"
 version = "0.0.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 # If you copy one of the examples into a new project, you should be using
 # [dependencies] instead, and delete the **path**.

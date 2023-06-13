@@ -207,7 +207,7 @@ jobs:
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
           RUSTDOCFLAGS: --cfg tokio_unstable
-    
+
   test-unstable-taskdump:
     name: test tokio full --unstable --taskdump
     needs: basics
@@ -399,10 +399,10 @@ jobs:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64
       # https://github.com/tokio-rs/tokio/pull/5356
       # https://github.com/tokio-rs/tokio/issues/5373
-      - run: cargo hack build -p tokio --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
+      - run: cargo hack build -p tokio --feature-powerset --depth 2 --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64 --cfg tokio_no_const_mutex_new
-      - run: cargo hack build -p tokio --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
+      - run: cargo hack build -p tokio --feature-powerset --depth 2 --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64
 
@@ -421,15 +421,15 @@ jobs:
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
       - name: check --feature-powerset
-        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
+        run: cargo hack check --all --feature-powerset --depth 2 --keep-going
       # Try with unstable feature flags
       - name: check --feature-powerset --unstable
-        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
+        run: cargo hack check --all --feature-powerset --depth 2 --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
       # Try with unstable and taskdump feature flags
       - name: check --feature-powerset --unstable --taskdump
-        run: cargo hack check --all --feature-powerset --depth 2 -Z avoid-dev-deps --keep-going
+        run: cargo hack check --all --feature-powerset --depth 2 --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
@@ -495,8 +495,8 @@ jobs:
       - name: "rustfmt --check"
         # Workaround for rust-lang/cargo#7732
         run: |
-          if ! rustfmt --check --edition 2018 $(git ls-files '*.rs'); then
-            printf "Please run \`rustfmt --edition 2018 \$(git ls-files '*.rs')\` to fix rustfmt errors.\nSee CONTRIBUTING.md for more details.\n" >&2
+          if ! rustfmt --check --edition 2021 $(git ls-files '*.rs'); then
+            printf "Please run \`rustfmt --edition 2021 \$(git ls-files '*.rs')\` to fix rustfmt errors.\nSee CONTRIBUTING.md for more details.\n" >&2
             exit 1
           fi
 
@@ -677,7 +677,7 @@ jobs:
         working-directory: tests-integration
 
   check-external-types:
-    name: check-external-types
+    name: check-external-types (${{ matrix.os }})
     needs: basics
     runs-on: ${{ matrix.os }}
     strategy:
@@ -685,20 +685,23 @@ jobs:
         os:
           - windows-latest
           - ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust nightly-2022-11-16
-        uses: dtolnay/rust-toolchain@master
-        with:
+        rust:
           # `check-external-types` requires a specific Rust nightly version. See
           # the README for details: https://github.com/awslabs/cargo-check-external-types
-          toolchain: nightly-2022-11-16
+          - nightly-2023-05-31
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ matrix.rust }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
       - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-check-external-types
+        uses: taiki-e/cache-cargo-install-action@v1
+        with:
+          tool: cargo-check-external-types@0.1.7
       - name: check-external-types
-        run: |
-          set -x
-          cargo install cargo-check-external-types --locked --version 0.1.6
-          cargo check-external-types --all-features --config external-types.toml
+        run: cargo check-external-types --all-features --config external-types.toml
         working-directory: tokio
 
   check-fuzzing:

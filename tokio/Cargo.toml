@@ -99,7 +99,7 @@ autocfg = "1.1"
 [dependencies]
 tokio-macros = { version = "~2.1.0", path = "../tokio-macros", optional = true }
 
-pin-project-lite = "0.2.0"
+pin-project-lite = "0.2.7"
 
 # Everything else is optional...
 bytes = { version = "1.0.0", optional = true }
@@ -132,7 +132,7 @@ nix = { version = "0.26", default-features = false, features = ["fs", "socket"] 
 version = "0.48"
 optional = true
 
-[target.'cfg(docsrs)'.dependencies.windows-sys]
+[target.'cfg(windows)'.dev-dependencies.windows-sys]
 version = "0.48"
 features = [
     "Win32_Foundation",

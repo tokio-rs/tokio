@@ -18,7 +18,7 @@ use futures::SinkExt;
 use http::{header::HeaderValue, Request, Response, StatusCode};
 #[macro_use]
 extern crate serde_derive;
-use std::{convert::TryFrom, env, error::Error, fmt, io};
+use std::{env, error::Error, fmt, io};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{Decoder, Encoder, Framed};

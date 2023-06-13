@@ -1,3 +1,4 @@
+use pin_project_lite::pin_project;
 use std::cell::RefCell;
 use std::error::Error;
 use std::future::Future;
@@ -299,36 +300,53 @@ impl<T: 'static> fmt::Debug for LocalKey<T> {
     }
 }
 
-/// A future that sets a value `T` of a task local for the future `F` during
-/// its execution.
-///
-/// The value of the task-local must be `'static` and will be dropped on the
-/// completion of the future.
-///
-/// Created by the function [`LocalKey::scope`](self::LocalKey::scope).
-///
-/// ### Examples
-///
-/// ```
-/// # async fn dox() {
-/// tokio::task_local! {
-///     static NUMBER: u32;
-/// }
-///
-/// NUMBER.scope(1, async move {
-///     println!("task local value: {}", NUMBER.get());
-/// }).await;
-/// # }
-/// ```
-// Doesn't use pin_project due to custom Drop.
-pub struct TaskLocalFuture<T, F>
-where
-    T: 'static,
-{
-    local: &'static LocalKey<T>,
-    slot: Option<T>,
-    future: Option<F>,
-    _pinned: PhantomPinned,
+pin_project! {
+    /// A future that sets a value `T` of a task local for the future `F` during
+    /// its execution.
+    ///
+    /// The value of the task-local must be `'static` and will be dropped on the
+    /// completion of the future.
+    ///
+    /// Created by the function [`LocalKey::scope`](self::LocalKey::scope).
+    ///
+    /// ### Examples
+    ///
+    /// ```
+    /// # async fn dox() {
+    /// tokio::task_local! {
+    ///     static NUMBER: u32;
+    /// }
+    ///
+    /// NUMBER.scope(1, async move {
+    ///     println!("task local value: {}", NUMBER.get());
+    /// }).await;
+    /// # }
+    /// ```
+    pub struct TaskLocalFuture<T, F>
+    where
+        T: 'static,
+    {
+        local: &'static LocalKey<T>,
+        slot: Option<T>,
+        #[pin]
+        future: Option<F>,
+        #[pin]
+        _pinned: PhantomPinned,
+    }
+
+    impl<T: 'static, F> PinnedDrop for TaskLocalFuture<T, F> {
+        fn drop(this: Pin<&mut Self>) {
+            let this = this.project();
+            if mem::needs_drop::<F>() && this.future.is_some() {
+                // Drop the future while the task-local is set, if possible. Otherwise
+                // the future is dropped normally when the `Option<F>` field drops.
+                let mut future = this.future;
+                let _ = this.local.scope_inner(this.slot, || {
+                    future.set(None);
+                });
+            }
+        }
+    }
 }
 
 impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
@@ -336,41 +354,26 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
 
     #[track_caller]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // safety: The TaskLocalFuture struct is `!Unpin` so there is no way to
-        // move `self.future` from now on.
-        let this = unsafe { Pin::into_inner_unchecked(self) };
-        let mut future_opt = unsafe { Pin::new_unchecked(&mut this.future) };
+        let this = self.project();
+        let mut future_opt = this.future;
 
-        let res =
-            this.local
-                .scope_inner(&mut this.slot, || match future_opt.as_mut().as_pin_mut() {
-                    Some(fut) => {
-                        let res = fut.poll(cx);
-                        if res.is_ready() {
-                            future_opt.set(None);
-                        }
-                        Some(res)
+        let res = this
+            .local
+            .scope_inner(this.slot, || match future_opt.as_mut().as_pin_mut() {
+                Some(fut) => {
+                    let res = fut.poll(cx);
+                    if res.is_ready() {
+                        future_opt.set(None);
                     }
-                    None => None,
-                });
+                    Some(res)
+                }
+                None => None,
+            });
 
         match res {
             Ok(Some(res)) => res,
             Ok(None) => panic!("`TaskLocalFuture` polled after completion"),
             Err(err) => err.panic(),
-        }
-    }
-}
-
-impl<T: 'static, F> Drop for TaskLocalFuture<T, F> {
-    fn drop(&mut self) {
-        if mem::needs_drop::<F>() && self.future.is_some() {
-            // Drop the future while the task-local is set, if possible. Otherwise
-            // the future is dropped normally when the `Option<F>` field drops.
-            let future = &mut self.future;
-            let _ = self.local.scope_inner(&mut self.slot, || {
-                *future = None;
-            });
         }
     }
 }

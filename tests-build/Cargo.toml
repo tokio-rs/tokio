@@ -2,7 +2,7 @@
 name = "tests-build"
 version = "0.1.0"
 authors = ["Tokio Contributors <team@tokio.rs>"]
-edition = "2018"
+edition = "2021"
 publish = false
 
 [features]
