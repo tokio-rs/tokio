@@ -559,7 +559,9 @@ impl Worker {
         // Signal shutdown
         self.shutdown_core(cx, core);
 
-        debug_assert!(cx.defer.borrow().is_empty());
+        // It is possible that tasks wake others during drop, so we need to
+        // clear the defer list.
+        self.shutdown_clear_defer(cx);
 
         Err(())
     }
@@ -688,7 +690,6 @@ impl Worker {
         if core.num_seq_local_queue_polls % core.global_queue_interval == 0 {
             core.num_seq_local_queue_polls = 0;
 
-            println!(" + next_notified_task; REMOTE FIRST");
             // Update the global queue interval, if needed
             self.tune_global_queue_interval(cx, core);
 
@@ -966,6 +967,7 @@ impl Worker {
 
     fn maybe_maintenance(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
         if core.tick % cx.shared().config.event_interval == 0 {
+            println!(" + MAINT {}", core.tick);
             super::counters::inc_num_maintenance();
 
             core.stats.end_processing_scheduled_tasks();
@@ -994,22 +996,20 @@ impl Worker {
     }
 
     fn park_yield(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
-        println!(" + park_yield; tick={}", core.tick);
-        let mut maybe_task = None;
-
         // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
         // to run without actually putting the thread to sleep.
         if let Some(mut driver) = cx.shared().driver.take() {
+            println!(" + DRIVER POLL");
             driver.park_timeout(&cx.handle.driver, Duration::from_millis(0));
 
             cx.shared().driver.set(driver);
-
-            // If there are more I/O events, schedule them.
-            let res = self.schedule_deferred_with_core(cx, core, || cx.shared().synced.lock())?;
-
-            maybe_task = res.0;
-            core = res.1;
         }
+
+        // If there are more I/O events, schedule them.
+        let res = self.schedule_deferred_with_core(cx, core, || cx.shared().synced.lock())?;
+
+        let maybe_task = res.0;
+        core = res.1;
 
         self.flush_metrics(cx, &mut core);
         self.update_global_flags(cx, &mut cx.shared().synced.lock(), &mut core);
@@ -1278,15 +1278,20 @@ impl Shared {
     }
 
     fn schedule_local(&self, core: &mut Core, task: Notified) {
-        // Push to the LIFO slot
-        let prev = core.lifo_slot.take();
+        if core.lifo_enabled {
+            // Push to the LIFO slot
+            let prev = core.lifo_slot.take();
 
-        if let Some(prev) = prev {
+            if let Some(prev) = prev {
+                core.run_queue
+                    .push_back_or_overflow(prev, self, &mut core.stats);
+            }
+
+            core.lifo_slot = Some(task);
+        } else {
             core.run_queue
-                .push_back_or_overflow(prev, self, &mut core.stats);
+                .push_back_or_overflow(task, self, &mut core.stats);
         }
-
-        core.lifo_slot = Some(task);
 
         self.notify_parked_local();
     }
