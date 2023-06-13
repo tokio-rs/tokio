@@ -24,10 +24,10 @@ async fn compat_file_seek() -> futures_util::io::Result<()> {
     assert_eq!(file.stream_position().await?, 8);
 
     // Modify elements at position 2.
-    assert_eq!(file.seek(SeekFrom::Start(2)).await.unwrap(), 2);
-    file.write_all(&[8, 9]).await.unwrap();
+    assert_eq!(file.seek(SeekFrom::Start(2)).await?, 2);
+    file.write_all(&[8, 9]).await?;
 
-    file.flush().await.unwrap();
+    file.flush().await?;
 
     // Verify we still have 8 elements
     assert_eq!(file.seek(SeekFrom::End(0)).await?, 8);
