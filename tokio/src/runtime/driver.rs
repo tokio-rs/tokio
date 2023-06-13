@@ -14,12 +14,6 @@ pub(crate) struct Driver {
     inner: TimeDriver,
 }
 
-impl Drop for Driver {
-    fn drop(&mut self) {
-        println!(" + DROP DRIVER");
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct Handle {
     /// IO driver handle

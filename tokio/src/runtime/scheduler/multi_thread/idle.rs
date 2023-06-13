@@ -67,6 +67,10 @@ impl Idle {
         self.idle_map.get(index)
     }
 
+    pub(super) fn snapshot(&self, snapshot: &mut Snapshot) {
+        snapshot.update(&self.idle_map)
+    }
+
     /// Try to acquire an available core
     pub(super) fn try_acquire_available_core(&self, synced: &mut Synced) -> Option<Box<Core>> {
         let ret = synced.available_cores.pop();
@@ -207,7 +211,6 @@ impl Idle {
     }
 
     pub(super) fn shutdown(&self, synced: &mut worker::Synced, shared: &Shared) {
-        println!(" + start shutdown");
         // First, set the shutdown flag on each core
         for core in &mut synced.idle.available_cores {
             core.is_shutdown = true;
@@ -225,8 +228,6 @@ impl Idle {
             synced.assigned_cores[worker] = Some(core);
             shared.condvars[worker].notify_one();
 
-            println!(" + notify worker shutdown w/ core");
-
             self.num_idle
                 .store(synced.idle.available_cores.len(), Release);
         }
@@ -236,7 +237,6 @@ impl Idle {
         // Wake up any other workers
         while let Some(index) = synced.idle.sleepers.pop() {
             shared.condvars[index].notify_one();
-            println!(" + notify worker shutdown NO core");
         }
     }
 
@@ -382,7 +382,7 @@ impl Snapshot {
         }
     }
 
-    fn get(&self, index: usize) -> bool {
+    pub(super) fn is_idle(&self, index: usize) -> bool {
         let (chunk, mask) = index_to_mask(index);
         self.chunks[chunk] & mask == mask
     }
