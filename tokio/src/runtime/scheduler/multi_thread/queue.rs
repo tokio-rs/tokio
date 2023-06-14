@@ -204,11 +204,13 @@ impl<T> Local<T> {
                 // There is capacity for the task
                 break tail;
             } else if steal != real {
+                super::counters::inc_num_overflows();
                 // Concurrently stealing, this will free up capacity, so only
                 // push the task onto the inject queue
                 overflow.push(task);
                 return;
             } else {
+                super::counters::inc_num_overflows();
                 // Push the current task and half of the queue into the
                 // inject queue.
                 match self.push_overflow(task, real, tail, overflow, stats) {

@@ -696,6 +696,7 @@ impl Worker {
             if !cx.defer.borrow().is_empty() {
                 core = n!(self.park_yield(cx, core));
             } else {
+                super::counters::inc_num_parks();
                 core = n!(self.park(cx, core));
             }
         }
@@ -789,7 +790,8 @@ impl Worker {
             .take_local()
             .or_else(|| core.run_queue.pop())
             */
-        self.next_lifo_task(cx, core).or_else(|| core.run_queue.pop())
+        self.next_lifo_task(cx, core)
+            .or_else(|| core.run_queue.pop())
     }
 
     fn next_lifo_task(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
@@ -896,6 +898,7 @@ impl Worker {
 
         // Run the task
         coop::budget(|| {
+            super::counters::inc_num_polls();
             task.run();
             let mut lifo_polls = 0;
 
@@ -956,6 +959,7 @@ impl Worker {
                 // Run the LIFO task, then loop
                 *cx.core.borrow_mut() = Some(core);
                 let task = cx.shared().owned.assert_owner(task);
+                super::counters::inc_num_lifo_polls();
                 task.run();
             }
         })
@@ -1383,6 +1387,7 @@ impl Shared {
     }
 
     fn schedule_remote(&self, task: Notified) {
+        super::counters::inc_num_notify_remote();
         self.scheduler_metrics.inc_remote_schedule_count();
 
         let mut synced = self.synced.lock();
