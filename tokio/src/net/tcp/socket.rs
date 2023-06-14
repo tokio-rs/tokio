@@ -654,7 +654,7 @@ impl TcpSocket {
             unsafe { mio::net::TcpStream::from_raw_socket(raw_socket) }
         };
 
-        TcpStream::connect_mio(mio).await
+        TcpStream::connect_mio(mio, Default::default()).await
     }
 
     /// Converts the socket into a `TcpListener`.

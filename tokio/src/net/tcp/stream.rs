@@ -112,12 +112,59 @@ impl TcpStream {
         /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
         /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
         pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
+            Self::connect_with_interest(addr, Default::default()).await
+        }
+
+        /// Opens a TCP connection to a remote host with custom interest
+        /// registration..
+        ///
+        /// `addr` is an address of the remote host. Anything which implements the
+        /// [`ToSocketAddrs`] trait can be supplied as the address.  If `addr`
+        /// yields multiple addresses, connect will be attempted with each of the
+        /// addresses until a connection is successful. If none of the addresses
+        /// result in a successful connection, the error returned from the last
+        /// connection attempt (the last address) is returned.
+        ///
+        /// To configure the socket before connecting, you can use the [`TcpSocket`]
+        /// type.
+        ///
+        /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+        /// [`TcpSocket`]: struct@crate::net::TcpSocket
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpStream;
+        /// use tokio::io::{AsyncWriteExt, Interest};
+        /// use std::error::Error;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> Result<(), Box<dyn Error>> {
+        ///     // Connect to a peer
+        ///     let mut stream = TcpStream::connect_with_interest(
+        ///         "127.0.0.1:8080",
+        ///         Interest::PRIORITY.add(Default::default()),
+        ///     )
+        ///     .await?;
+        ///
+        ///     // Write some data.
+        ///     stream.write_all(b"hello world!").await?;
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        ///
+        /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+        ///
+        /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+        /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+        pub async fn connect_with_interest<A: ToSocketAddrs>(addr: A, interest: Interest) -> io::Result<TcpStream> {
             let addrs = to_socket_addrs(addr).await?;
 
             let mut last_err = None;
 
             for addr in addrs {
-                match TcpStream::connect_addr(addr).await {
+                match TcpStream::connect_addr(addr, interest).await {
                     Ok(stream) => return Ok(stream),
                     Err(e) => last_err = Some(e),
                 }
@@ -132,13 +179,13 @@ impl TcpStream {
         }
 
         /// Establishes a connection to the specified `addr`.
-        async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
+        async fn connect_addr(addr: SocketAddr, interest: Interest) -> io::Result<TcpStream> {
             let sys = mio::net::TcpStream::connect(addr)?;
-            TcpStream::connect_mio(sys).await
+            TcpStream::connect_mio(sys, interest).await
         }
 
-        pub(crate) async fn connect_mio(sys: mio::net::TcpStream) -> io::Result<TcpStream> {
-            let stream = TcpStream::new(sys)?;
+        pub(crate) async fn connect_mio(sys: mio::net::TcpStream, interest: Interest) -> io::Result<TcpStream> {
+            let stream = TcpStream::new_with_interest(sys, interest)?;
 
             // Once we've connected, wait for the stream to be writable as
             // that's when the actual connection has been initiated. Once we're
@@ -158,6 +205,14 @@ impl TcpStream {
 
     pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
         let io = PollEvented::new(connected)?;
+        Ok(TcpStream { io })
+    }
+
+    pub(crate) fn new_with_interest(
+        connected: mio::net::TcpStream,
+        interest: Interest,
+    ) -> io::Result<TcpStream> {
+        let io = PollEvented::new_with_interest(connected, interest)?;
         Ok(TcpStream { io })
     }
 

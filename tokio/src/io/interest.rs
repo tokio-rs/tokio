@@ -115,6 +115,7 @@ impl Interest {
     ///
     /// assert!(BOTH.is_readable());
     /// assert!(BOTH.is_writable());
+    /// ```
     pub const fn add(self, other: Interest) -> Interest {
         Interest(self.0.add(other.0))
     }
@@ -132,6 +133,12 @@ impl Interest {
             Interest::PRIORITY => Ready::PRIORITY | Ready::READ_CLOSED,
             _ => Ready::EMPTY,
         }
+    }
+}
+
+impl Default for Interest {
+    fn default() -> Self {
+        Interest::READABLE.add(Interest::WRITABLE)
     }
 }
 
