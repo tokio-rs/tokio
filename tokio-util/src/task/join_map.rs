@@ -316,6 +316,50 @@ where
         self.insert(key, task);
     }
 
+    /// Spawn the blocking code on the blocking threadpool and store it in this `JoinMap` with the provided
+    /// key.
+    ///
+    /// If a task previously existed in the `JoinMap` for this key, that task
+    /// will be cancelled and replaced with the new one. The previous task will
+    /// be removed from the `JoinMap`; a subsequent call to [`join_next`] will
+    /// *not* return a cancelled [`JoinError`] for that task.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if called outside of a Tokio runtime.
+    ///
+    /// [`join_next`]: Self::join_next
+    #[track_caller]
+    pub fn spawn_blocking<F>(&mut self, key: K, f: F)
+    where
+        F: FnOnce() -> V,
+        F: Send + 'static,
+        V: Send,
+    {
+        let task = self.tasks.spawn_blocking(f);
+        self.insert(key, task)
+    }
+
+    /// Spawn the blocking code on the blocking threadpool of the provided runtime and store it in this
+    /// `JoinMap` with the provided key.
+    ///
+    /// If a task previously existed in the `JoinMap` for this key, that task
+    /// will be cancelled and replaced with the new one. The previous task will
+    /// be removed from the `JoinMap`; a subsequent call to [`join_next`] will
+    /// *not* return a cancelled [`JoinError`] for that task.
+    ///
+    /// [`join_next`]: Self::join_next
+    #[track_caller]
+    pub fn spawn_blocking_on<F>(&mut self, key: K, f: F, handle: &Handle)
+    where
+        F: FnOnce() -> V,
+        F: Send + 'static,
+        V: Send,
+    {
+        let task = self.tasks.spawn_blocking_on(f, handle);
+        self.insert(key, task);
+    }
+
     /// Spawn the provided task on the current [`LocalSet`] and store it in this
     /// `JoinMap` with the provided key.
     ///
