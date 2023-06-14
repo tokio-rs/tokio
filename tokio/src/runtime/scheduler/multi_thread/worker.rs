@@ -119,6 +119,8 @@ pub(super) struct Core {
     /// they go to the back of the `run_queue`.
     lifo_enabled: bool,
 
+    lifo_slot: Option<Notified>,
+
     /// The worker-local run queue.
     run_queue: queue::Local<Arc<Handle>>,
 
@@ -213,7 +215,7 @@ struct Remote {
     /// queue. This effectively results in the **last** scheduled task to be run
     /// next (LIFO). This is an optimization for improving locality which
     /// benefits message passing patterns and helps to reduce latency.
-    lifo_slot: Lifo,
+    // lifo_slot: Lifo,
 
     /// Steals tasks from this worker.
     pub(super) steal: queue::Steal<Arc<Handle>>,
@@ -287,6 +289,7 @@ pub(super) fn create(
             tick: 0,
             num_seq_local_queue_polls: 0,
             lifo_enabled: !config.disable_lifo_slot,
+            lifo_slot: None,
             run_queue,
             is_searching: false,
             is_shutdown: false,
@@ -298,7 +301,7 @@ pub(super) fn create(
 
         remotes.push(Remote {
             steal,
-            lifo_slot: Lifo::new(),
+            // lifo_slot: Lifo::new(),
         });
         worker_metrics.push(metrics);
     }
@@ -780,10 +783,17 @@ impl Worker {
     }
 
     fn next_local_task(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
+        /*
         cx.shared().remotes[core.index]
             .lifo_slot
             .take_local()
             .or_else(|| core.run_queue.pop())
+            */
+        self.next_lifo_task(cx, core).or_else(|| core.run_queue.pop())
+    }
+
+    fn next_lifo_task(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
+        core.lifo_slot.take()
     }
 
     /// Function responsible for stealing tasks from another worker
@@ -793,7 +803,7 @@ impl Worker {
     /// workers will be trying to steal at the same time.
     fn steal_work(&mut self, cx: &Context, core: &mut Core) -> Option<Notified> {
         #[cfg(not(loom))]
-        const ROUNDS: usize = 4;
+        const ROUNDS: usize = 1;
 
         #[cfg(loom)]
         const ROUNDS: usize = 1;
@@ -845,11 +855,13 @@ impl Worker {
 
             let target = &cx.shared().remotes[i];
 
+            /*
             if lifo {
                 if let Some(task) = target.lifo_slot.take_remote() {
                     return Some(task);
                 }
             }
+            */
 
             if let Some(task) = target
                 .steal
@@ -903,7 +915,7 @@ impl Worker {
                 };
 
                 // Check for a task in the LIFO slot
-                let task = match cx.shared().remotes[core.index].lifo_slot.take_local() {
+                let task = match self.next_lifo_task(cx, &mut core) {
                     Some(task) => task,
                     None => {
                         self.reset_lifo_enabled(cx, &mut core);
@@ -1213,7 +1225,8 @@ impl Worker {
     }
 
     fn can_transition_to_parked(&self, cx: &Context, core: &mut Core) -> bool {
-        cx.shared().remotes[core.index].lifo_slot.is_none()
+        core.lifo_slot.is_none()
+        // cx.shared().remotes[core.index].lifo_slot.is_none()
             && core.run_queue.is_empty()
             && !core.is_shutdown
             && !core.is_traced
@@ -1347,7 +1360,8 @@ impl Shared {
     fn schedule_local(&self, cx: &Context, core: &mut Core, task: Notified) {
         if core.lifo_enabled {
             // Push to the LIFO slot
-            let prev = cx.shared().remotes[core.index].lifo_slot.swap_local(task);
+            let prev = std::mem::replace(&mut core.lifo_slot, Some(task));
+            // let prev = cx.shared().remotes[core.index].lifo_slot.swap_local(task);
 
             if let Some(prev) = prev {
                 core.run_queue
