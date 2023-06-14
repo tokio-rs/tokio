@@ -412,8 +412,8 @@ async fn multi_gated() {
     }
 
     poll_fn(move |cx| {
+        gate.waker.register_by_ref(cx.waker());
         if gate.count.load(SeqCst) < 2 {
-            gate.waker.register_by_ref(cx.waker());
             Poll::Pending
         } else {
             Poll::Ready(())
