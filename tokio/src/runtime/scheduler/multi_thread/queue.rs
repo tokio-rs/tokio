@@ -425,6 +425,8 @@ impl<T> Steal<T> {
             return None;
         }
 
+        super::counters::inc_num_steals();
+
         dst_stats.incr_steal_count(n as u16);
         dst_stats.incr_steal_operations();
 

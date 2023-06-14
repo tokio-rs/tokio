@@ -113,6 +113,8 @@ impl Idle {
             return;
         }
 
+        super::counters::inc_num_unparks_local();
+
         // Acquire the lock
         let synced = shared.synced.lock();
         self.notify_synced(synced, shared, true);

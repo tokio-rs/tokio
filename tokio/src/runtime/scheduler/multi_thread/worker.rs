@@ -1366,6 +1366,8 @@ impl Shared {
             if let Some(prev) = prev {
                 core.run_queue
                     .push_back_or_overflow(prev, self, &mut core.stats);
+            } else {
+                return;
             }
         } else {
             core.run_queue

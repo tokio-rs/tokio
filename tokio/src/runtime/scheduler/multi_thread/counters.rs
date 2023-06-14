@@ -8,6 +8,7 @@ mod imp {
     static NUM_UNPARKS_LOCAL: AtomicUsize = AtomicUsize::new(0);
     static NUM_LIFO_SCHEDULES: AtomicUsize = AtomicUsize::new(0);
     static NUM_LIFO_CAPPED: AtomicUsize = AtomicUsize::new(0);
+    static NUM_STEALS: AtomicUsize = AtomicUsize::new(0);
 
     impl Drop for super::Counters {
         fn drop(&mut self) {
@@ -16,6 +17,7 @@ mod imp {
             let maintenance = NUM_MAINTENANCE.load(Relaxed);
             let lifo_scheds = NUM_LIFO_SCHEDULES.load(Relaxed);
             let lifo_capped = NUM_LIFO_CAPPED.load(Relaxed);
+            let num_steals = NUM_STEALS.load(Relaxed);
 
             println!("---");
             println!("notifies (local): {}", notifies_local);
@@ -23,6 +25,7 @@ mod imp {
             println!("     maintenance: {}", maintenance);
             println!("  LIFO schedules: {}", lifo_scheds);
             println!("     LIFO capped: {}", lifo_capped);
+            println!("          steals: {}", num_steals);
         }
     }
 
@@ -45,6 +48,10 @@ mod imp {
     pub(crate) fn inc_lifo_capped() {
         NUM_LIFO_CAPPED.fetch_add(1, Relaxed);
     }
+
+    pub(crate) fn inc_num_steals() {
+        NUM_STEALS.fetch_add(1, Relaxed);
+    }
 }
 
 #[cfg(not(tokio_internal_mt_counters))]
@@ -54,6 +61,7 @@ mod imp {
     pub(crate) fn inc_num_maintenance() {}
     pub(crate) fn inc_lifo_schedules() {}
     pub(crate) fn inc_lifo_capped() {}
+    pub(crate) fn inc_num_steals() {}
 }
 
 #[derive(Debug)]
