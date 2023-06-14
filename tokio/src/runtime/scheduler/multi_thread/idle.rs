@@ -98,6 +98,10 @@ impl Idle {
             return;
         }
 
+        if self.num_idle.load(Acquire) == 0 {
+            return;
+        }
+
         // There aren't any searching workers. Try to initialize one
         if self
             .num_searching
