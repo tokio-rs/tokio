@@ -304,9 +304,6 @@ where
     /// be removed from the `JoinMap`; a subsequent call to [`join_next`] will
     /// *not* return a cancelled [`JoinError`] for that task.
     ///
-    /// Note that blocking tasks can not be cancelled after execution starts and
-    /// therefore replaced blocking tasks will still run to completion.
-    ///
     /// [`join_next`]: Self::join_next
     #[track_caller]
     pub fn spawn_on<F>(&mut self, key: K, task: F, handle: &Handle)
@@ -353,6 +350,9 @@ where
     /// will be cancelled and replaced with the new one. The previous task will
     /// be removed from the `JoinMap`; a subsequent call to [`join_next`] will
     /// *not* return a cancelled [`JoinError`] for that task.
+    ///
+    /// Note that blocking tasks can not be cancelled after execution starts and
+    /// therefore replaced blocking tasks will still run to completion.
     ///
     /// [`join_next`]: Self::join_next
     #[track_caller]
