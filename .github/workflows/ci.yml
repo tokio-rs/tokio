@@ -613,7 +613,7 @@ jobs:
         working-directory: tokio
 
   check-redox:
-    name: check that tokio compiles on redox-os target (pending addition to CI testing)
+    name: build tokio for redox-os
     needs: basics
     runs-on: ubuntu-latest
     steps:
