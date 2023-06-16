@@ -624,7 +624,7 @@ jobs:
           toolchain: ${{ env.rust_nightly }}
           target: x86_64-unknown-redox
       - name: check tokio on redox
-        run: cargo check --target x86_64-unknown-redox
+        run: cargo check --target x86_64-unknown-redox --all-features
         working-directory: tokio
 
   wasm32-unknown-unknown:
