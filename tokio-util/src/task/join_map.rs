@@ -324,8 +324,10 @@ where
     /// be removed from the `JoinMap`; a subsequent call to [`join_next`] will
     /// *not* return a cancelled [`JoinError`] for that task.
     ///
-    /// Note that blocking tasks can not be cancelled after execution starts and
-    /// therefore replaced blocking tasks will still run to completion.
+    /// Note that blocking tasks cannot be cancelled after execution starts.
+    /// Replaced blocking tasks will still run to completion if the task has begun
+    /// to execute when it is replaced. A blocking task which is replaced before
+    /// it has been scheduled on a blocking worker thread will be cancelled.
     ///
     /// # Panics
     ///
@@ -351,8 +353,10 @@ where
     /// be removed from the `JoinMap`; a subsequent call to [`join_next`] will
     /// *not* return a cancelled [`JoinError`] for that task.
     ///
-    /// Note that blocking tasks can not be cancelled after execution starts and
-    /// therefore replaced blocking tasks will still run to completion.
+    /// Note that blocking tasks cannot be cancelled after execution starts.
+    /// Replaced blocking tasks will still run to completion if the task has begun
+    /// to execute when it is replaced. A blocking task which is replaced before
+    /// it has been scheduled on a blocking worker thread will be cancelled.
     ///
     /// [`join_next`]: Self::join_next
     #[track_caller]
