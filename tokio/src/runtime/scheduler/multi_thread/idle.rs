@@ -217,11 +217,6 @@ impl Idle {
     }
 
     pub(super) fn shutdown(&self, synced: &mut worker::Synced, shared: &Shared) {
-        // First, set the shutdown flag on each core
-        for core in &mut synced.idle.available_cores {
-            core.is_shutdown = true;
-        }
-
         // Wake every sleeping worker and assign a core to it. There may not be
         // enough sleeping workers for all cores, but other workers will
         // eventually find the cores and shut them down.
