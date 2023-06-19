@@ -135,12 +135,6 @@ impl ReadDir {
             let success = ret.is_ok();
 
             buf.push_back(ret.map(|std| DirEntry {
-                #[cfg(not(any(
-                    target_os = "solaris",
-                    target_os = "illumos",
-                    target_os = "haiku",
-                    target_os = "vxworks"
-                )))]
                 file_type: std.file_type().ok(),
                 std: Arc::new(std),
             }));
@@ -196,12 +190,6 @@ feature! {
 /// path or possibly other metadata through per-platform extension traits.
 #[derive(Debug)]
 pub struct DirEntry {
-    #[cfg(not(any(
-        target_os = "solaris",
-        target_os = "illumos",
-        target_os = "haiku",
-        target_os = "vxworks"
-    )))]
     file_type: Option<FileType>,
     std: Arc<std::fs::DirEntry>,
 }
@@ -327,12 +315,6 @@ impl DirEntry {
     /// # }
     /// ```
     pub async fn file_type(&self) -> io::Result<FileType> {
-        #[cfg(not(any(
-            target_os = "solaris",
-            target_os = "illumos",
-            target_os = "haiku",
-            target_os = "vxworks"
-        )))]
         if let Some(file_type) = self.file_type {
             return Ok(file_type);
         }
