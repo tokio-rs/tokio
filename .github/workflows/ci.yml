@@ -55,6 +55,7 @@ jobs:
       - check-readme
       - test-hyper
       - x86_64-fortanix-unknown-sgx
+      - check-redox
       - wasm32-unknown-unknown
       - wasm32-wasi
       - check-external-types
@@ -609,6 +610,21 @@ jobs:
       # NOTE: Currently the only test we can run is to build tokio with rt and sync features.
       - name: build tokio
         run: cargo build --target x86_64-fortanix-unknown-sgx --features rt,sync
+        working-directory: tokio
+
+  check-redox:
+    name: build tokio for redox-os
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.rust_nightly }}
+          target: x86_64-unknown-redox
+      - name: check tokio on redox
+        run: cargo check --target x86_64-unknown-redox --all-features
         working-directory: tokio
 
   wasm32-unknown-unknown:
