@@ -28,6 +28,10 @@ pub(crate) struct Ephemeral {
 
     /// Number of tasks polled in the batch of scheduled tasks
     tasks_polled_in_batch: usize,
+
+    /// Used to ensure calls to start / stop batch are paired
+    #[cfg(debug_assertions)]
+    batch_started: bool,
 }
 
 impl Ephemeral {
@@ -35,6 +39,8 @@ impl Ephemeral {
         Ephemeral {
             processing_scheduled_tasks_started_at: Instant::now(),
             tasks_polled_in_batch: 0,
+            #[cfg(debug_assertions)]
+            batch_started: false,
         }
     }
 }
@@ -52,6 +58,9 @@ const MAX_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL: u32 = 127;
 const TARGET_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL: u32 = 61;
 
 impl Stats {
+    pub(crate) const DEFAULT_GLOBAL_QUEUE_INTERVAL: u32 =
+        TARGET_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL;
+
     pub(crate) fn new(worker_metrics: &WorkerMetrics) -> Stats {
         // Seed the value with what we hope to see.
         let task_poll_time_ewma =
@@ -98,12 +107,24 @@ impl Stats {
     pub(crate) fn start_processing_scheduled_tasks(&mut self, ephemeral: &mut Ephemeral) {
         self.batch.start_processing_scheduled_tasks();
 
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(!ephemeral.batch_started);
+            ephemeral.batch_started = true;
+        }
+
         ephemeral.processing_scheduled_tasks_started_at = Instant::now();
         ephemeral.tasks_polled_in_batch = 0;
     }
 
     pub(crate) fn end_processing_scheduled_tasks(&mut self, ephemeral: &mut Ephemeral) {
         self.batch.end_processing_scheduled_tasks();
+
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(ephemeral.batch_started);
+            ephemeral.batch_started = false;
+        }
 
         // Update the EWMA task poll time
         if ephemeral.tasks_polled_in_batch > 0 {

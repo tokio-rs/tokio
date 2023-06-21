@@ -99,6 +99,7 @@ impl Idle {
         }
 
         if self.num_idle.load(Acquire) == 0 {
+            self.needs_searching.store(true, Release);
             return;
         }
 
@@ -117,27 +118,36 @@ impl Idle {
 
         // Acquire the lock
         let synced = shared.synced.lock();
-        self.notify_synced(synced, shared, true);
+        self.notify_synced(synced, shared);
     }
 
     /// Notifies a single worker
     pub(super) fn notify_remote(&self, synced: MutexGuard<'_, worker::Synced>, shared: &Shared) {
-        self.notify_synced(synced, shared, false);
+        if synced.idle.sleepers.is_empty() {
+            self.needs_searching.store(true, Release);
+            return;
+        }
+
+        // We need to establish a stronger barrier than with `notify_local`
+        if self
+            .num_searching
+            .compare_exchange(0, 1, AcqRel, Acquire)
+            .is_err()
+        {
+            return;
+        }
+
+        self.notify_synced(synced, shared);
     }
 
     /// Notify a worker while synced
-    fn notify_synced(
-        &self,
-        mut synced: MutexGuard<'_, worker::Synced>,
-        shared: &Shared,
-        is_searching: bool,
-    ) {
+    fn notify_synced(&self, mut synced: MutexGuard<'_, worker::Synced>, shared: &Shared) {
         // Find a sleeping worker
         if let Some(worker) = synced.idle.sleepers.pop() {
             // Find an available core
             if let Some(mut core) = synced.idle.available_cores.pop() {
                 debug_assert!(!core.is_searching);
-                core.is_searching = is_searching;
+                core.is_searching = true;
 
                 self.idle_map.unset(core.index);
                 debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
@@ -164,10 +174,7 @@ impl Idle {
 
         // Set the `needs_searching` flag, this happens *while* the lock is held.
         self.needs_searching.store(true, Release);
-
-        if is_searching {
-            self.num_searching.fetch_sub(1, Release);
-        }
+        self.num_searching.fetch_sub(1, Release);
 
         // Explicit mutex guard drop to show that holding the guard to this
         // point is significant. `needs_searching` and `num_searching` must be
@@ -327,16 +334,15 @@ const BIT_MASK: usize = (usize::BITS - 1) as usize;
 
 impl IdleMap {
     fn new(cores: &[Box<Core>]) -> IdleMap {
-        let chunks = (0..num_chunks(cores.len()))
-            .map(|_| AtomicUsize::new(0))
-            .collect();
-        let ret = IdleMap { chunks };
-
-        for core in cores {
-            ret.set(core.index);
-        }
+        let ret = IdleMap::new_n(num_chunks(cores.len()));
+        ret.set_all(cores);
 
         ret
+    }
+
+    fn new_n(n: usize) -> IdleMap {
+        let chunks = (0..n).map(|_| AtomicUsize::new(0)).collect();
+        IdleMap { chunks }
     }
 
     fn get(&self, index: usize) -> bool {
@@ -351,6 +357,12 @@ impl IdleMap {
         self.chunks[chunk].store(next, Release);
     }
 
+    fn set_all(&self, cores: &[Box<Core>]) {
+        for core in cores {
+            self.set(core.index);
+        }
+    }
+
     fn unset(&self, index: usize) {
         let (chunk, mask) = index_to_mask(index);
         let prev = self.chunks[chunk].load(Acquire);
@@ -359,19 +371,22 @@ impl IdleMap {
     }
 
     fn matches(&self, idle_cores: &[Box<Core>]) -> bool {
-        let expect = IdleMap::new(idle_cores);
+        let expect = IdleMap::new_n(self.chunks.len());
+        expect.set_all(idle_cores);
+
         for (i, chunk) in expect.chunks.iter().enumerate() {
             if chunk.load(Acquire) != self.chunks[i].load(Acquire) {
                 return false;
             }
         }
+
         true
     }
 }
 
 impl Snapshot {
     pub(crate) fn new(idle: &Idle) -> Snapshot {
-        let chunks = vec![0; num_chunks(idle.idle_map.chunks.len())];
+        let chunks = vec![0; idle.idle_map.chunks.len()];
         let mut ret = Snapshot { chunks };
         ret.update(&idle.idle_map);
         ret
@@ -385,6 +400,12 @@ impl Snapshot {
 
     pub(super) fn is_idle(&self, index: usize) -> bool {
         let (chunk, mask) = index_to_mask(index);
+        debug_assert!(
+            chunk < self.chunks.len(),
+            "index={}; chunks={}",
+            index,
+            self.chunks.len()
+        );
         self.chunks[chunk] & mask == mask
     }
 }
