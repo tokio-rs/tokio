@@ -105,9 +105,9 @@ pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
 }
 
 impl<T> Local<T> {
-    /// Returns true if the queue has entries that can be stolen.
-    pub(crate) fn is_stealable(&self) -> bool {
-        !self.inner.is_empty()
+    /// Returns the number of entries in the queue
+    pub(crate) fn len(&self) -> usize {
+        self.inner.len() as usize
     }
 
     /// How many tasks can be pushed into the queue

@@ -1,3 +1,4 @@
+use super::MAX_SAFE_MILLIS_DURATION;
 use crate::time::{Clock, Duration, Instant};
 
 /// A structure which handles conversion from Instants to u64 timestamps.
@@ -25,7 +26,7 @@ impl TimeSource {
             .unwrap_or_else(|| Duration::from_secs(0));
         let ms = dur.as_millis();
 
-        ms.try_into().unwrap_or(u64::MAX)
+        ms.try_into().unwrap_or(MAX_SAFE_MILLIS_DURATION)
     }
 
     pub(crate) fn tick_to_duration(&self, t: u64) -> Duration {

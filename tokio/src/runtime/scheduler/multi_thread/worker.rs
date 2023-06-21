@@ -1248,11 +1248,11 @@ impl Worker {
     }
 
     fn can_transition_to_parked(&self, cx: &Context, core: &mut Core) -> bool {
-        core.lifo_slot.is_none()
-        // cx.shared().remotes[core.index].lifo_slot.is_none()
-            && core.run_queue.is_empty()
-            && !self.is_shutdown
-            && !self.is_traced
+        !self.has_tasks(core) && !self.is_shutdown && !self.is_traced
+    }
+
+    fn has_tasks(&self, core: &Core) -> bool {
+        core.lifo_slot.is_some() || !core.run_queue.is_empty()
     }
 
     /// Signals all tasks to shut down, and waits for them to complete. Must run

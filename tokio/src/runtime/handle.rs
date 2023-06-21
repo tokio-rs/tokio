@@ -373,7 +373,123 @@ cfg_metrics! {
 
 cfg_taskdump! {
     impl Handle {
-        /// Capture a snapshot of this runtime's state.
+        /// Captures a snapshot of the runtime's state.
+        ///
+        /// This functionality is experimental, and comes with a number of
+        /// requirements and limitations.
+        ///
+        /// # Examples
+        ///
+        /// This can be used to get call traces of each task in the runtime.
+        /// Calls to `Handle::dump` should usually be enclosed in a
+        /// [timeout][crate::time::timeout], so that dumping does not escalate a
+        /// single blocked runtime thread into an entirely blocked runtime.
+        ///
+        /// ```
+        /// # use tokio::runtime::Runtime;
+        /// # fn dox() {
+        /// # let rt = Runtime::new().unwrap();
+        /// # rt.spawn(async {
+        /// use tokio::runtime::Handle;
+        /// use tokio::time::{timeout, Duration};
+        ///
+        /// // Inside an async block or function.
+        /// let handle = Handle::current();
+        /// if let Ok(dump) = timeout(Duration::from_secs(2), handle.dump()).await {
+        ///     for (i, task) in dump.tasks().iter().enumerate() {
+        ///         let trace = task.trace();
+        ///         println!("TASK {i}:");
+        ///         println!("{trace}\n");
+        ///     }
+        /// }
+        /// # });
+        /// # }
+        /// ```
+        ///
+        /// This produces highly detailed traces of tasks; e.g.:
+        ///
+        /// ```plain
+        /// TASK 0:
+        /// ╼ dump::main::{{closure}}::a::{{closure}} at /tokio/examples/dump.rs:18:20
+        /// └╼ dump::main::{{closure}}::b::{{closure}} at /tokio/examples/dump.rs:23:20
+        ///    └╼ dump::main::{{closure}}::c::{{closure}} at /tokio/examples/dump.rs:28:24
+        ///       └╼ tokio::sync::barrier::Barrier::wait::{{closure}} at /tokio/tokio/src/sync/barrier.rs:129:10
+        ///          └╼ <tokio::util::trace::InstrumentedAsyncOp<F> as core::future::future::Future>::poll at /tokio/tokio/src/util/trace.rs:77:46
+        ///             └╼ tokio::sync::barrier::Barrier::wait_internal::{{closure}} at /tokio/tokio/src/sync/barrier.rs:183:36
+        ///                └╼ tokio::sync::watch::Receiver<T>::changed::{{closure}} at /tokio/tokio/src/sync/watch.rs:604:55
+        ///                   └╼ tokio::sync::watch::changed_impl::{{closure}} at /tokio/tokio/src/sync/watch.rs:755:18
+        ///                      └╼ <tokio::sync::notify::Notified as core::future::future::Future>::poll at /tokio/tokio/src/sync/notify.rs:1103:9
+        ///                         └╼ tokio::sync::notify::Notified::poll_notified at /tokio/tokio/src/sync/notify.rs:996:32
+        /// ```
+        ///
+        /// # Requirements
+        ///
+        /// ## Debug Info Must Be Available
+        ///
+        /// To produce task traces, the application must **not** be compiled
+        /// with split debuginfo. On Linux, including debuginfo within the
+        /// application binary is the (correct) default. You can further ensure
+        /// this behavior with the following directive in your `Cargo.toml`:
+        ///
+        /// ```toml
+        /// [profile.*]
+        /// split-debuginfo = "off"
+        /// ```
+        ///
+        /// ## Unstable Features
+        ///
+        /// This functionality is **unstable**, and requires both the
+        /// `tokio_unstable` and `tokio_taskdump` cfg flags to be set.
+        ///
+        /// You can do this by setting the `RUSTFLAGS` environment variable
+        /// before invoking `cargo`; e.g.:
+        /// ```bash
+        /// RUSTFLAGS="--cfg tokio_unstable --cfg tokio_taskdump" cargo run --example dump
+        /// ```
+        ///
+        /// Or by [configuring][cargo-config] `rustflags` in
+        /// `.cargo/config.toml`:
+        /// ```text
+        /// [build]
+        /// rustflags = ["--cfg tokio_unstable", "--cfg tokio_taskdump"]
+        /// ```
+        ///
+        /// [cargo-config]:
+        ///     https://doc.rust-lang.org/cargo/reference/config.html
+        ///
+        /// ## Platform Requirements
+        ///
+        /// Task dumps are supported on Linux atop aarch64, x86 and x86_64.
+        ///
+        /// ## Current Thread Runtime Requirements
+        ///
+        /// On the `current_thread` runtime, task dumps may only be requested
+        /// from *within* the context of the runtime being dumped. Do not, for
+        /// example, await `Handle::dump()` on a different runtime.
+        ///
+        /// # Limitations
+        ///
+        /// ## Performance
+        ///
+        /// Although enabling the `tokio_taskdump` feature imposes virtually no
+        /// additional runtime overhead, actually calling `Handle::dump` is
+        /// expensive. The runtime must synchronize and pause its workers, then
+        /// re-poll every task in a special tracing mode. Avoid requesting dumps
+        /// often.
+        ///
+        /// ## Local Executors
+        ///
+        /// Tasks managed by local executors (e.g., `FuturesUnordered` and
+        /// [`LocalSet`][crate::task::LocalSet]) may not appear in task dumps.
+        ///
+        /// ## Non-Termination When Workers Are Blocked
+        ///
+        /// The future produced by `Handle::dump` may never produce `Ready` if
+        /// another runtime worker is blocked for more than 250ms. This may
+        /// occur if a dump is requested during shutdown, or if another runtime
+        /// worker is infinite looping or synchronously deadlocked. For these
+        /// reasons, task dumping should usually be paired with an explicit
+        /// [timeout][crate::time::timeout].
         pub async fn dump(&self) -> crate::runtime::Dump {
             match &self.inner {
                 scheduler::Handle::CurrentThread(handle) => handle.dump(),

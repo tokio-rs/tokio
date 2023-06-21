@@ -264,7 +264,7 @@ impl Semaphore {
 
             match self.permits.compare_exchange(curr, next, AcqRel, Acquire) {
                 Ok(_) => {
-                    // TODO: Instrument once issue has been solved}
+                    // TODO: Instrument once issue has been solved
                     return Ok(());
                 }
                 Err(actual) => curr = actual,
