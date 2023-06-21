@@ -826,6 +826,9 @@ impl Worker {
         #[cfg(loom)]
         const ROUNDS: usize = 1;
 
+        debug_assert!(core.lifo_slot.is_none());
+        debug_assert!(core.run_queue.is_empty());
+
         if !self.transition_to_searching(cx, core) {
             return None;
         }

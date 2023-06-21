@@ -29,6 +29,7 @@ use std::task::{Context, Poll, Waker};
 /// Any changes to the layout of this struct _must_ also be reflected in the
 /// const fns in raw.rs.
 #[repr(C)]
+#[repr(align(128))]
 pub(super) struct Cell<T: Future, S> {
     /// Hot task state data
     pub(super) header: Header,

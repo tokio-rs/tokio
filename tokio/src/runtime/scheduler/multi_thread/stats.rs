@@ -1,7 +1,6 @@
 use crate::runtime::{Config, MetricsBatch, WorkerMetrics};
 
 use std::cmp;
-use std::f32::consts::E;
 use std::time::{Duration, Instant};
 
 /// Per-worker statistics. This is used for both tuning the scheduler and
