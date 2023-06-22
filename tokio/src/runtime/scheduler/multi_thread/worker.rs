@@ -703,17 +703,22 @@ impl Worker {
         // We consumed all work in the queues and will start searching for work.
         core.stats.end_processing_scheduled_tasks(&mut self.stats);
 
+        if !cx.defer.borrow().is_empty() {
+            // We are deferring tasks, so poll the resource driver and schedule
+            // the deferred tasks.
+            core = try_task_new_batch!(self, self.park_yield(cx, core));
+
+            panic!("what happened to the deferred tasks? 🤔");
+        }
+
         while !self.is_shutdown {
             // Search for more work, this involves trying to poll the resource
             // driver, steal from other workers, and check the global queue
             // again.
             core = try_task_new_batch!(self, self.search_for_work(cx, core));
 
-            if !cx.defer.borrow().is_empty() {
-                core = try_task_new_batch!(self, self.park_yield(cx, core));
-            } else {
-                core = try_task_new_batch!(self, self.park(cx, core));
-            }
+            debug_assert!(cx.defer.borrow().is_empty());
+            core = try_task_new_batch!(self, self.park(cx, core));
         }
 
         // Shutting down, drop any deferred tasks
