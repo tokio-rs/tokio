@@ -659,7 +659,7 @@ impl Worker {
         }
 
         let n = core.run_queue.max_capacity() / 2;
-        let maybe_task = self.next_remote_task_batch(cx, &mut synced, &mut core, n);
+        let maybe_task = self.next_remote_task_batch_synced(cx, &mut synced, &mut core, n);
 
         Ok((maybe_task, core))
     }
@@ -703,11 +703,11 @@ impl Worker {
         // We consumed all work in the queues and will start searching for work.
         core.stats.end_processing_scheduled_tasks(&mut self.stats);
 
-        core = try_task_new_batch!(self, self.poll_driver(cx, core));
-
         while !self.is_shutdown {
-            // Try to steal a task from other workers
-            core = try_task_new_batch!(self, self.steal_work(cx, core));
+            // Search for more work, this involves trying to poll the resource
+            // driver, steal from other workers, and check the global queue
+            // again.
+            core = try_task_new_batch!(self, self.search_for_work(cx, core));
 
             if !cx.defer.borrow().is_empty() {
                 core = try_task_new_batch!(self, self.park_yield(cx, core));
@@ -726,6 +726,8 @@ impl Worker {
         self.num_seq_local_queue_polls += 1;
 
         if self.num_seq_local_queue_polls % self.global_queue_interval == 0 {
+            super::counters::inc_global_queue_interval();
+
             self.num_seq_local_queue_polls = 0;
 
             // Update the global queue interval, if needed
@@ -740,22 +742,7 @@ impl Worker {
             return Ok((Some(task), core));
         }
 
-        if cx.shared().inject.is_empty() {
-            return Ok((None, core));
-        }
-
-        // Other threads can only **remove** tasks from the current worker's
-        // `run_queue`. So, we can be confident that by the time we call
-        // `run_queue.push_back` below, there will be *at least* `cap`
-        // available slots in the queue.
-        let cap = usize::min(
-            core.run_queue.remaining_slots(),
-            core.run_queue.max_capacity() / 2,
-        );
-
-        let mut synced = cx.shared().synced.lock();
-        let maybe_task = self.next_remote_task_batch(cx, &mut synced, &mut core, cap);
-        Ok((maybe_task, core))
+        self.next_remote_task_batch(cx, core)
     }
 
     fn next_remote_task(&self, cx: &Context) -> Option<Notified> {
@@ -772,7 +759,26 @@ impl Worker {
         unsafe { cx.shared().inject.pop(&mut synced.inject) }
     }
 
-    fn next_remote_task_batch(
+    fn next_remote_task_batch(&self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
+        if cx.shared().inject.is_empty() {
+            return Ok((None, core));
+        }
+
+        // Other threads can only **remove** tasks from the current worker's
+        // `run_queue`. So, we can be confident that by the time we call
+        // `run_queue.push_back` below, there will be *at least* `cap`
+        // available slots in the queue.
+        let cap = usize::min(
+            core.run_queue.remaining_slots(),
+            core.run_queue.max_capacity() / 2,
+        );
+
+        let mut synced = cx.shared().synced.lock();
+        let maybe_task = self.next_remote_task_batch_synced(cx, &mut synced, &mut core, cap);
+        Ok((maybe_task, core))
+    }
+
+    fn next_remote_task_batch_synced(
         &self,
         cx: &Context,
         synced: &mut Synced,
@@ -784,10 +790,13 @@ impl Worker {
         // The worker is currently idle, pull a batch of work from the
         // injection queue. We don't want to pull *all* the work so other
         // workers can also get some.
-        let n = usize::min(
-            cx.shared().inject.len() / cx.shared().remotes.len() + 1,
-            max,
-        );
+        let n = if core.is_searching {
+            cx.shared().inject.len() / cx.shared().idle.num_searching() + 1
+        } else {
+            cx.shared().inject.len() / cx.shared().remotes.len() + 1
+        };
+
+        let n = usize::min(n, max);
 
         // safety: passing in the correct `inject::Synced`.
         let mut tasks = unsafe { cx.shared().inject.pop_n(&mut synced.inject, n) };
@@ -821,9 +830,9 @@ impl Worker {
     /// Note: Only if less than half the workers are searching for tasks to steal
     /// a new worker will actually try to steal. The idea is to make sure not all
     /// workers will be trying to steal at the same time.
-    fn steal_work(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
+    fn search_for_work(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
         #[cfg(not(loom))]
-        const ROUNDS: usize = 1;
+        const ROUNDS: usize = 4;
 
         #[cfg(loom)]
         const ROUNDS: usize = 1;
@@ -834,6 +843,8 @@ impl Worker {
         if !self.transition_to_searching(cx, &mut core) {
             return Ok((None, core));
         }
+
+        core = try_task_new_batch!(self, self.poll_driver(cx, core));
 
         // Get a snapshot of which workers are idle
         cx.shared().idle.snapshot(&mut self.idle_snapshot);
@@ -849,6 +860,10 @@ impl Worker {
             if let Some(task) = self.steal_one_round(cx, &mut core, start, last) {
                 return Ok((Some(task), core));
             }
+
+            std::thread::sleep(std::time::Duration::from_micros(3));
+
+            core = try_task_new_batch!(self, self.next_remote_task_batch(cx, core));
         }
 
         Ok((None, core))
@@ -903,6 +918,7 @@ impl Worker {
         // Make sure the worker is not in the **searching** state. This enables
         // another idle worker to try to steal work.
         if self.transition_from_searching(cx, &mut core) {
+            super::counters::inc_num_relay_search();
             cx.shared().notify_parked_local();
         }
 
@@ -1162,7 +1178,7 @@ impl Worker {
 
         // Try one last time to get tasks
         let n = core.run_queue.max_capacity() / 2;
-        if let Some(task) = self.next_remote_task_batch(cx, &mut synced, &mut core, n) {
+        if let Some(task) = self.next_remote_task_batch_synced(cx, &mut synced, &mut core, n) {
             return Ok((Some(task), core));
         }
 

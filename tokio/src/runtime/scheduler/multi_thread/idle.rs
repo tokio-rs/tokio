@@ -63,6 +63,10 @@ impl Idle {
         synced.available_cores.len()
     }
 
+    pub(super) fn num_searching(&self) -> usize {
+        self.num_searching.load(Acquire)
+    }
+
     pub(super) fn is_idle(&self, index: usize) -> bool {
         self.idle_map.get(index)
     }
@@ -173,6 +177,8 @@ impl Idle {
                 synced.idle.sleepers.push(worker);
             }
         }
+
+        super::counters::inc_notify_no_core();
 
         // Set the `needs_searching` flag, this happens *while* the lock is held.
         self.needs_searching.store(true, Release);

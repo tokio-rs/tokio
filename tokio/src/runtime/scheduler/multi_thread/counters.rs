@@ -16,6 +16,9 @@ mod imp {
     static NUM_POLLS: AtomicUsize = AtomicUsize::new(0);
     static NUM_LIFO_POLLS: AtomicUsize = AtomicUsize::new(0);
     static NUM_REMOTE_BATCH: AtomicUsize = AtomicUsize::new(0);
+    static NUM_GLOBAL_QUEUE_INTERVAL: AtomicUsize = AtomicUsize::new(0);
+    static NUM_NO_AVAIL_CORE: AtomicUsize = AtomicUsize::new(0);
+    static NUM_RELAY_SEARCH: AtomicUsize = AtomicUsize::new(0);
 
     impl Drop for super::Counters {
         fn drop(&mut self) {
@@ -32,12 +35,16 @@ mod imp {
             let num_polls = NUM_POLLS.load(Relaxed);
             let num_lifo_polls = NUM_LIFO_POLLS.load(Relaxed);
             let num_remote_batch = NUM_REMOTE_BATCH.load(Relaxed);
+            let num_global_queue_interval = NUM_GLOBAL_QUEUE_INTERVAL.load(Relaxed);
+            let num_no_avail_core = NUM_NO_AVAIL_CORE.load(Relaxed);
+            let num_relay_search = NUM_RELAY_SEARCH.load(Relaxed);
 
             println!("---");
             println!("notifies (remote): {}", notifies_remote);
             println!(" notifies (local): {}", notifies_local);
             println!("  unparks (local): {}", unparks_local);
             println!(" unparks (remote): {}", unparks_remote);
+            println!("  notify, no core: {}", num_no_avail_core);
             println!("      maintenance: {}", maintenance);
             println!("   LIFO schedules: {}", lifo_scheds);
             println!("      LIFO capped: {}", lifo_capped);
@@ -47,6 +54,8 @@ mod imp {
             println!("            polls: {}", num_polls);
             println!("     polls (LIFO): {}", num_lifo_polls);
             println!("remote task batch: {}", num_remote_batch);
+            println!("global Q interval: {}", num_global_queue_interval);
+            println!("     relay search: {}", num_relay_search);
         }
     }
 
@@ -101,6 +110,18 @@ mod imp {
     pub(crate) fn inc_num_remote_batch() {
         NUM_REMOTE_BATCH.fetch_add(1, Relaxed);
     }
+
+    pub(crate) fn inc_global_queue_interval() {
+        NUM_GLOBAL_QUEUE_INTERVAL.fetch_add(1, Relaxed);
+    }
+
+    pub(crate) fn inc_notify_no_core() {
+        NUM_NO_AVAIL_CORE.fetch_add(1, Relaxed);
+    }
+
+    pub(crate) fn inc_num_relay_search() {
+        NUM_RELAY_SEARCH.fetch_add(1, Relaxed);
+    }
 }
 
 #[cfg(not(tokio_internal_mt_counters))]
@@ -118,6 +139,9 @@ mod imp {
     pub(crate) fn inc_num_polls() {}
     pub(crate) fn inc_num_lifo_polls() {}
     pub(crate) fn inc_num_remote_batch() {}
+    pub(crate) fn inc_global_queue_interval() {}
+    pub(crate) fn inc_notify_no_core() {}
+    pub(crate) fn inc_num_relay_search() {}
 }
 
 #[derive(Debug)]
