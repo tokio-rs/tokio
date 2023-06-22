@@ -33,6 +33,7 @@ pub(crate) struct Local<T: 'static> {
 /// Consumer handle. May be used from many threads.
 pub(crate) struct Steal<T: 'static>(Arc<Inner<T>>);
 
+#[repr(align(128))]
 pub(crate) struct Inner<T: 'static> {
     /// Concurrently updated by many threads.
     ///

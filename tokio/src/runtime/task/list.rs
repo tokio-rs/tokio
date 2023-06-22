@@ -53,6 +53,7 @@ cfg_not_has_atomic_u64! {
     }
 }
 
+#[repr(align(128))]
 pub(crate) struct OwnedTasks<S: 'static> {
     inner: Mutex<CountedOwnedTasksInner<S>>,
     id: u64,

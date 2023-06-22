@@ -164,6 +164,8 @@ impl Idle {
                 // Drop the lock before notifying the condvar.
                 drop(synced);
 
+                super::counters::inc_num_unparks_remote();
+
                 // Notify the worker
                 shared.condvars[worker].notify_one();
                 return;

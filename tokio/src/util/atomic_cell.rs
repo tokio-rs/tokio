@@ -27,6 +27,10 @@ impl<T> AtomicCell<T> {
     }
 
     pub(crate) fn take(&self) -> Option<Box<T>> {
+        if self.data.load(Acquire).is_null() {
+            return None;
+        }
+
         self.swap(None)
     }
 

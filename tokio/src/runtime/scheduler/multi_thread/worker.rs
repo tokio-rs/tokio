@@ -712,7 +712,6 @@ impl Worker {
             if !cx.defer.borrow().is_empty() {
                 core = try_task_new_batch!(self, self.park_yield(cx, core));
             } else {
-                super::counters::inc_num_parks();
                 core = try_task_new_batch!(self, self.park(cx, core));
             }
         }
@@ -780,6 +779,8 @@ impl Worker {
         core: &mut Core,
         max: usize,
     ) -> Option<Notified> {
+        super::counters::inc_num_remote_batch();
+
         // The worker is currently idle, pull a batch of work from the
         // injection queue. We don't want to pull *all* the work so other
         // workers can also get some.
@@ -1143,11 +1144,6 @@ impl Worker {
     }
 
     fn do_park(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
-        core.stats.about_to_park();
-
-        // Flush metrics to the runtime metrics aggregator
-        self.flush_metrics(cx, &mut core);
-
         let was_searching = core.is_searching;
 
         // Before we park, if we are searching, we need to transition away from searching
@@ -1180,6 +1176,11 @@ impl Worker {
                 return Ok((None, core));
             }
         }
+
+        super::counters::inc_num_parks();
+        core.stats.about_to_park();
+        // Flush metrics to the runtime metrics aggregator
+        self.flush_metrics(cx, &mut core);
 
         // If the runtime is shutdown, skip parking
         self.update_global_flags(cx, &mut synced, &mut core);
