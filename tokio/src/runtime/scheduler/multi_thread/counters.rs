@@ -19,6 +19,8 @@ mod imp {
     static NUM_GLOBAL_QUEUE_INTERVAL: AtomicUsize = AtomicUsize::new(0);
     static NUM_NO_AVAIL_CORE: AtomicUsize = AtomicUsize::new(0);
     static NUM_RELAY_SEARCH: AtomicUsize = AtomicUsize::new(0);
+    static NUM_SPIN_STALL: AtomicUsize = AtomicUsize::new(0);
+    static NUM_NO_LOCAL_WORK: AtomicUsize = AtomicUsize::new(0);
 
     impl Drop for super::Counters {
         fn drop(&mut self) {
@@ -38,6 +40,8 @@ mod imp {
             let num_global_queue_interval = NUM_GLOBAL_QUEUE_INTERVAL.load(Relaxed);
             let num_no_avail_core = NUM_NO_AVAIL_CORE.load(Relaxed);
             let num_relay_search = NUM_RELAY_SEARCH.load(Relaxed);
+            let num_spin_stall = NUM_SPIN_STALL.load(Relaxed);
+            let num_no_local_work = NUM_NO_LOCAL_WORK.load(Relaxed);
 
             println!("---");
             println!("notifies (remote): {}", notifies_remote);
@@ -56,6 +60,8 @@ mod imp {
             println!("remote task batch: {}", num_remote_batch);
             println!("global Q interval: {}", num_global_queue_interval);
             println!("     relay search: {}", num_relay_search);
+            println!("       spin stall: {}", num_spin_stall);
+            println!("    no local work: {}", num_no_local_work);
         }
     }
 
@@ -122,6 +128,14 @@ mod imp {
     pub(crate) fn inc_num_relay_search() {
         NUM_RELAY_SEARCH.fetch_add(1, Relaxed);
     }
+
+    pub(crate) fn inc_num_spin_stall() {
+        NUM_SPIN_STALL.fetch_add(1, Relaxed);
+    }
+
+    pub(crate) fn inc_num_no_local_work() {
+        NUM_NO_LOCAL_WORK.fetch_add(1, Relaxed);
+    }
 }
 
 #[cfg(not(tokio_internal_mt_counters))]
@@ -142,6 +156,8 @@ mod imp {
     pub(crate) fn inc_global_queue_interval() {}
     pub(crate) fn inc_notify_no_core() {}
     pub(crate) fn inc_num_relay_search() {}
+    pub(crate) fn inc_num_spin_stall() {}
+    pub(crate) fn inc_num_no_local_work() {}
 }
 
 #[derive(Debug)]

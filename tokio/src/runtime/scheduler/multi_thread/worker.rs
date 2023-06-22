@@ -700,6 +700,8 @@ impl Worker {
         // a notified task.
         core = try_task!(self.next_notified_task(cx, core));
 
+        super::counters::inc_num_no_local_work();
+
         // We consumed all work in the queues and will start searching for work.
         core.stats.end_processing_scheduled_tasks(&mut self.stats);
 
@@ -837,7 +839,7 @@ impl Worker {
     /// workers will be trying to steal at the same time.
     fn search_for_work(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
         #[cfg(not(loom))]
-        const ROUNDS: usize = 4;
+        const ROUNDS: usize = 1;
 
         #[cfg(loom)]
         const ROUNDS: usize = 1;
@@ -866,7 +868,10 @@ impl Worker {
                 return Ok((Some(task), core));
             }
 
-            std::thread::sleep(std::time::Duration::from_micros(3));
+            if i > 0 {
+                super::counters::inc_num_spin_stall();
+                std::thread::sleep(std::time::Duration::from_micros(i as u64));
+            }
 
             core = try_task_new_batch!(self, self.next_remote_task_batch(cx, core));
         }
@@ -1403,6 +1408,8 @@ impl Shared {
     }
 
     fn schedule_local(&self, cx: &Context, core: &mut Core, task: Notified) {
+        core.stats.inc_local_schedule_count();
+
         if cx.lifo_enabled.get() {
             // Push to the LIFO slot
             let prev = std::mem::replace(&mut core.lifo_slot, Some(task));
