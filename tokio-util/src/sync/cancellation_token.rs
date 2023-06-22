@@ -77,12 +77,57 @@ pin_project! {
     /// [`CancellationToken`] by value instead of using a reference.
     #[must_use = "futures do nothing unless polled"]
     pub struct WaitForCancellationFutureOwned {
+        // `Notified` references to the cancellation_token internally,
+        // but camouflages the relationship with `'static`.
+        // This can lead to Undefined Behavior, breaking the pointer aliasing rules
+        // if the reference is dangling.
+        // This is fixed here by the use of `MaybeDanglingFuture`, which prevent
+        // the compiler to generate the UB.
         // Since `future` is the first field, it is dropped before the
         // cancellation_token field. This ensures that the reference inside the
-        // `Notified` remains valid.
+        // `Notified` remains valid, hance the safety requirements of
+        // `MaybeDanglingFuture` are satisfied.
         #[pin]
-        future: tokio::sync::futures::Notified<'static>,
+        future: MaybeDanglingFuture<tokio::sync::futures::Notified<'static>>,
         cancellation_token: CancellationToken,
+    }
+}
+
+/// A wrapper type that avoids implicitly asserting the contents are currently valid.
+/// It's safe to contain a dangling reference, as long as it is not used.
+///
+/// # Safety
+///
+/// The inner type must be dropped before the data it references to.
+///
+// Reference
+// See <https://users.rust-lang.org/t/unsafe-code-review-semi-owning-weak-rwlock-t-guard/95706>
+//
+// TODO: replace this with an official solution once RFC #3336 or similar is available.
+// <https://github.com/rust-lang/rfcs/pull/3336>
+#[repr(transparent)]
+struct MaybeDanglingFuture<T>(core::mem::MaybeUninit<T>);
+
+impl<T> Drop for MaybeDanglingFuture<T> {
+    fn drop(&mut self) {
+        // Safety: `0` is always initialized.
+        unsafe { core::ptr::drop_in_place(self.0.as_mut_ptr()) };
+    }
+}
+
+impl<T> MaybeDanglingFuture<T> {
+    fn new(inner: T) -> Self {
+        Self(core::mem::MaybeUninit::new(inner))
+    }
+}
+
+impl<F: Future> Future for MaybeDanglingFuture<F> {
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Safety: `0` is always initialized.
+        let fut = unsafe { self.map_unchecked_mut(|this| this.0.assume_init_mut()) };
+        fut.poll(cx)
     }
 }
 
@@ -279,7 +324,7 @@ impl WaitForCancellationFutureOwned {
             // # Safety
             //
             // cancellation_token is dropped after future due to the field ordering.
-            future: unsafe { Self::new_future(&cancellation_token) },
+            future: MaybeDanglingFuture::new(unsafe { Self::new_future(&cancellation_token) }),
             cancellation_token,
         }
     }
@@ -320,8 +365,9 @@ impl Future for WaitForCancellationFutureOwned {
             // # Safety
             //
             // cancellation_token is dropped after future due to the field ordering.
-            this.future
-                .set(unsafe { Self::new_future(this.cancellation_token) });
+            this.future.set(MaybeDanglingFuture::new(unsafe {
+                Self::new_future(this.cancellation_token)
+            }));
         }
     }
 }
