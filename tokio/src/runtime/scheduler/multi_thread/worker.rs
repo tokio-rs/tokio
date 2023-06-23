@@ -700,12 +700,13 @@ impl Worker {
         // a notified task.
         core = try_task!(self.next_notified_task(cx, core));
 
-        super::counters::inc_num_no_local_work();
-
         // We consumed all work in the queues and will start searching for work.
         core.stats.end_processing_scheduled_tasks(&mut self.stats);
 
+        super::counters::inc_num_no_local_work();
+
         if !cx.defer.borrow().is_empty() {
+            // assert!(!core.is_searching);
             // We are deferring tasks, so poll the resource driver and schedule
             // the deferred tasks.
             core = try_task_new_batch!(self, self.park_yield(cx, core));
@@ -868,12 +869,16 @@ impl Worker {
                 return Ok((Some(task), core));
             }
 
+            core = try_task_new_batch!(self, self.next_remote_task_batch(cx, core));
+
+            // if cx.shared().idle.num_searching() > 1 {
+            //     break;
+            // }
+
             if i > 0 {
                 super::counters::inc_num_spin_stall();
                 std::thread::sleep(std::time::Duration::from_micros(i as u64));
             }
-
-            core = try_task_new_batch!(self, self.next_remote_task_batch(cx, core));
         }
 
         Ok((None, core))
