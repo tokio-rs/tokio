@@ -852,7 +852,7 @@ impl Worker {
             return Ok((None, core));
         }
 
-        core = try_task_new_batch!(self, self.poll_driver(cx, core));
+        // core = try_task_new_batch!(self, self.poll_driver(cx, core));
 
         // Get a snapshot of which workers are idle
         cx.shared().idle.snapshot(&mut self.idle_snapshot);
