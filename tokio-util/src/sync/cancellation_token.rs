@@ -77,16 +77,21 @@ pin_project! {
     /// [`CancellationToken`] by value instead of using a reference.
     #[must_use = "futures do nothing unless polled"]
     pub struct WaitForCancellationFutureOwned {
-        // `Notified` references to the cancellation_token internally,
-        // but camouflages the relationship with `'static`.
-        // This can lead to Undefined Behavior, breaking the pointer aliasing rules
-        // if the reference is dangling.
-        // This is fixed here by the use of `MaybeDanglingFuture`, which prevent
-        // the compiler to generate the UB.
-        // Since `future` is the first field, it is dropped before the
-        // cancellation_token field. This ensures that the reference inside the
-        // `Notified` remains valid, hance the safety requirements of
-        // `MaybeDanglingFuture` are satisfied.
+        // This field internally has a reference to the cancellation token, but camouflages
+        // the relationship with `'static`. To avoid Undefined Behavior, we must ensure
+        // that the reference is only used while the cancellation token is still alive. To
+        // do that, we ensure that the future is the first field, so that it is dropped
+        // before the cancellation token.
+        //
+        // We use `MaybeDanglingFuture` here because without it, the compiler could assert
+        // the reference inside `future` to be valid even after the destructor of that
+        // field runs. (Specifically, when the `WaitForCancellationFutureOwned` is passed
+        // as an argument to a function, the reference can be asserted to be valid for the
+        // rest of that function.) To avoid that, we use `MaybeDangling` which tells the
+        // compiler that the reference stored inside it might not be valid.
+        //
+        // See <https://users.rust-lang.org/t/unsafe-code-review-semi-owning-weak-rwlock-t-guard/95706>
+        // for more info.
         #[pin]
         future: MaybeDanglingFuture<tokio::sync::futures::Notified<'static>>,
         cancellation_token: CancellationToken,
