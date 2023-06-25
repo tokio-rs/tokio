@@ -801,7 +801,7 @@ impl<T> Sender<T> {
 
         if state.is_closed() {
             coop.made_progress();
-            return Poll::Ready(());
+            return Ready(());
         }
 
         if state.is_tx_task_set() {
