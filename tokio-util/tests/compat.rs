@@ -1,4 +1,5 @@
-#![cfg(all(feature = "compat", not(tokio_wasi)))] // WASI does not support all fs operations
+#![cfg(all(feature = "compat"))]
+#![cfg(not(target_os = "wasi"))] // WASI does not support all fs operations
 #![warn(rust_2018_idioms)]
 
 use futures_io::SeekFrom;
@@ -29,7 +30,7 @@ async fn compat_file_seek() -> futures_util::io::Result<()> {
 
     file.flush().await?;
 
-    // Verify we still have 8 elements
+    // Verify we still have 8 elements.
     assert_eq!(file.seek(SeekFrom::End(0)).await?, 8);
     // Seek back to the start of the file to read and verify contents.
     file.seek(SeekFrom::Start(0)).await?;
