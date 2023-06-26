@@ -86,7 +86,7 @@ impl MultiThread {
 
     pub(crate) fn shutdown(&mut self, handle: &scheduler::Handle) {
         match handle {
-            scheduler::Handle::MultiThread(handle) => handle.shutdown(),
+            scheduler::Handle::MultiThreadAlt(handle) => handle.shutdown(),
             _ => panic!("expected MultiThread scheduler"),
         }
     }

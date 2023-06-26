@@ -56,6 +56,7 @@ cfg_loom! {
     mod loom_local;
     mod loom_oneshot;
     mod loom_pool;
+    mod loom_alt_pool;
     mod loom_queue;
     mod loom_shutdown_join;
     mod loom_join_set;
