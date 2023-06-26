@@ -204,6 +204,7 @@ impl<T: fmt::Debug> fmt::Debug for Shared<T> {
 
 pub mod error {
     //! Watch error types.
+
     use std::error::Error;
     use std::fmt;
 
