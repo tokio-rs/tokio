@@ -16,4 +16,4 @@ members = [
 ]
 
 [patch.crates-io]
-loom = { git = "https://github.com/tokio-rs/loom", branch = "increase-max-threads" }
+loom = { git = "https://github.com/tokio-rs/loom" }
