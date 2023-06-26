@@ -835,7 +835,7 @@ impl Worker {
             return Ok((None, core));
         }
 
-        // core = try_task_new_batch!(self, self.poll_driver(cx, core));
+        // core = try_task!(self, self.poll_driver(cx, core));
 
         // Get a snapshot of which workers are idle
         cx.shared().idle.snapshot(&mut self.idle_snapshot);
@@ -850,7 +850,7 @@ impl Worker {
                 return Ok((Some(task), core));
             }
 
-            core = try_task_new_batch!(self, self.next_remote_task_batch(cx, core));
+            core = try_task!(self.next_remote_task_batch(cx, core));
 
             if i > 0 {
                 super::counters::inc_num_spin_stall();
