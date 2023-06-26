@@ -75,7 +75,7 @@ cfg_rt_multi_thread! {
     where
         F: FnOnce() -> R,
     {
-        crate::runtime::scheduler::multi_thread::block_in_place(f)
+        crate::runtime::scheduler::block_in_place(f)
     }
 }
 
