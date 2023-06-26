@@ -160,13 +160,6 @@ cfg_rt! {
         }
 
         cfg_rt_multi_thread! {
-            pub(crate) fn expect_multi_thread(&self) -> &Arc<multi_thread::Handle> {
-                match self {
-                    Handle::MultiThread(handle) => handle,
-                    _ => panic!("not a `MultiThread` handle"),
-                }
-            }
-
             cfg_unstable! {
                 pub(crate) fn expect_multi_thread_alt(&self) -> &Arc<multi_thread_alt::Handle> {
                     match self {

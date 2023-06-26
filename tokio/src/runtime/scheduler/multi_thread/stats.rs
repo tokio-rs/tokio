@@ -10,16 +10,6 @@ pub(crate) struct Stats {
     /// user.
     batch: MetricsBatch,
 
-    /// Exponentially-weighted moving average of time spent polling scheduled a
-    /// task.
-    ///
-    /// Tracked in nanoseconds, stored as a f64 since that is what we use with
-    /// the EWMA calculations
-    task_poll_time_ewma: f64,
-}
-
-/// Transient state
-pub(crate) struct Ephemeral {
     /// Instant at which work last resumed (continued after park).
     ///
     /// This duplicates the value stored in `MetricsBatch`. We will unify
@@ -29,20 +19,12 @@ pub(crate) struct Ephemeral {
     /// Number of tasks polled in the batch of scheduled tasks
     tasks_polled_in_batch: usize,
 
-    /// Used to ensure calls to start / stop batch are paired
-    #[cfg(debug_assertions)]
-    batch_started: bool,
-}
-
-impl Ephemeral {
-    pub(crate) fn new() -> Ephemeral {
-        Ephemeral {
-            processing_scheduled_tasks_started_at: Instant::now(),
-            tasks_polled_in_batch: 0,
-            #[cfg(debug_assertions)]
-            batch_started: false,
-        }
-    }
+    /// Exponentially-weighted moving average of time spent polling scheduled a
+    /// task.
+    ///
+    /// Tracked in nanoseconds, stored as a f64 since that is what we use with
+    /// the EWMA calculations
+    task_poll_time_ewma: f64,
 }
 
 /// How to weigh each individual poll time, value is plucked from thin air.
@@ -58,9 +40,6 @@ const MAX_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL: u32 = 127;
 const TARGET_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL: u32 = 61;
 
 impl Stats {
-    pub(crate) const DEFAULT_GLOBAL_QUEUE_INTERVAL: u32 =
-        TARGET_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL;
-
     pub(crate) fn new(worker_metrics: &WorkerMetrics) -> Stats {
         // Seed the value with what we hope to see.
         let task_poll_time_ewma =
@@ -68,6 +47,8 @@ impl Stats {
 
         Stats {
             batch: MetricsBatch::new(worker_metrics),
+            processing_scheduled_tasks_started_at: Instant::now(),
+            tasks_polled_in_batch: 0,
             task_poll_time_ewma,
         }
     }
@@ -104,36 +85,24 @@ impl Stats {
         self.batch.inc_local_schedule_count();
     }
 
-    pub(crate) fn start_processing_scheduled_tasks(&mut self, ephemeral: &mut Ephemeral) {
+    pub(crate) fn start_processing_scheduled_tasks(&mut self) {
         self.batch.start_processing_scheduled_tasks();
 
-        #[cfg(debug_assertions)]
-        {
-            debug_assert!(!ephemeral.batch_started);
-            ephemeral.batch_started = true;
-        }
-
-        ephemeral.processing_scheduled_tasks_started_at = Instant::now();
-        ephemeral.tasks_polled_in_batch = 0;
+        self.processing_scheduled_tasks_started_at = Instant::now();
+        self.tasks_polled_in_batch = 0;
     }
 
-    pub(crate) fn end_processing_scheduled_tasks(&mut self, ephemeral: &mut Ephemeral) {
+    pub(crate) fn end_processing_scheduled_tasks(&mut self) {
         self.batch.end_processing_scheduled_tasks();
 
-        #[cfg(debug_assertions)]
-        {
-            debug_assert!(ephemeral.batch_started);
-            ephemeral.batch_started = false;
-        }
-
         // Update the EWMA task poll time
-        if ephemeral.tasks_polled_in_batch > 0 {
+        if self.tasks_polled_in_batch > 0 {
             let now = Instant::now();
 
             // If we "overflow" this conversion, we have bigger problems than
             // slightly off stats.
-            let elapsed = (now - ephemeral.processing_scheduled_tasks_started_at).as_nanos() as f64;
-            let num_polls = ephemeral.tasks_polled_in_batch as f64;
+            let elapsed = (now - self.processing_scheduled_tasks_started_at).as_nanos() as f64;
+            let num_polls = self.tasks_polled_in_batch as f64;
 
             // Calculate the mean poll duration for a single task in the batch
             let mean_poll_duration = elapsed / num_polls;
@@ -147,10 +116,10 @@ impl Stats {
         }
     }
 
-    pub(crate) fn start_poll(&mut self, ephemeral: &mut Ephemeral) {
+    pub(crate) fn start_poll(&mut self) {
         self.batch.start_poll();
 
-        ephemeral.tasks_polled_in_batch += 1;
+        self.tasks_polled_in_batch += 1;
     }
 
     pub(crate) fn end_poll(&mut self) {

@@ -33,7 +33,6 @@ pub(crate) struct Local<T: 'static> {
 /// Consumer handle. May be used from many threads.
 pub(crate) struct Steal<T: 'static>(Arc<Inner<T>>);
 
-#[repr(align(128))]
 pub(crate) struct Inner<T: 'static> {
     /// Concurrently updated by many threads.
     ///
@@ -106,6 +105,11 @@ pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
 }
 
 impl<T> Local<T> {
+    /// Returns the number of entries in the queue
+    pub(crate) fn len(&self) -> usize {
+        self.inner.len() as usize
+    }
+
     /// How many tasks can be pushed into the queue
     pub(crate) fn remaining_slots(&self) -> usize {
         self.inner.remaining_slots()
@@ -115,9 +119,12 @@ impl<T> Local<T> {
         LOCAL_QUEUE_CAPACITY
     }
 
-    /// Returns `true` if there are no entries in the queue
-    pub(crate) fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+    /// Returns false if there are any entries in the queue
+    ///
+    /// Separate to is_stealable so that refactors of is_stealable to "protect"
+    /// some tasks from stealing won't affect this
+    pub(crate) fn has_tasks(&self) -> bool {
+        !self.inner.is_empty()
     }
 
     /// Pushes a batch of tasks to the back of the queue. All tasks must fit in
@@ -192,13 +199,11 @@ impl<T> Local<T> {
                 // There is capacity for the task
                 break tail;
             } else if steal != real {
-                super::counters::inc_num_overflows();
                 // Concurrently stealing, this will free up capacity, so only
                 // push the task onto the inject queue
                 overflow.push(task);
                 return;
             } else {
-                super::counters::inc_num_overflows();
                 // Push the current task and half of the queue into the
                 // inject queue.
                 match self.push_overflow(task, real, tail, overflow, stats) {
@@ -381,6 +386,10 @@ impl<T> Local<T> {
 }
 
 impl<T> Steal<T> {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Steals half the tasks from self and place them into `dst`.
     pub(crate) fn steal_into(
         &self,
@@ -410,8 +419,6 @@ impl<T> Steal<T> {
             // No tasks were stolen
             return None;
         }
-
-        super::counters::inc_num_steals();
 
         dst_stats.incr_steal_count(n as u16);
         dst_stats.incr_steal_operations();
