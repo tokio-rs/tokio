@@ -257,9 +257,6 @@ type Task = task::Task<Arc<Handle>>;
 /// A notified task handle
 type Notified = task::Notified<Arc<Handle>>;
 
-/// Stealable LIFO slot
-type Lifo = task::AtomicCell<Arc<Handle>>;
-
 /// Value picked out of thin-air. Running the LIFO slot a handful of times
 /// seemms sufficient to benefit from locality. More than 3 times probably is
 /// overweighing. The value can be tuned in the future with data that shows
