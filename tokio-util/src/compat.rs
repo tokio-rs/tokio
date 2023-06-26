@@ -227,6 +227,8 @@ impl<T: tokio::io::AsyncSeek> futures_io::AsyncSeek for Compat<T> {
         pos: io::SeekFrom,
     ) -> Poll<io::Result<u64>> {
         if self.seek_pos != Some(pos) {
+            // Ensure previous seeks have finished before starting a new one
+            ready!(self.as_mut().project().inner.poll_complete(cx))?;
             self.as_mut().project().inner.start_seek(pos)?;
             *self.as_mut().project().seek_pos = Some(pos);
         }
