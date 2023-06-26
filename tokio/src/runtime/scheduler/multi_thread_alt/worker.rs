@@ -59,15 +59,13 @@
 use crate::loom::sync::{Arc, Condvar, Mutex, MutexGuard};
 use crate::runtime;
 use crate::runtime::context;
+use crate::runtime::driver::Driver;
 use crate::runtime::scheduler::multi_thread_alt::{
     idle, queue, stats, Counters, Handle, Idle, Overflow, Stats, TraceStatus,
 };
 use crate::runtime::scheduler::{self, inject, Lock};
 use crate::runtime::task::OwnedTasks;
-use crate::runtime::{
-    blocking, coop, driver, task, Config, SchedulerMetrics, WorkerMetrics,
-};
-use crate::runtime::driver::Driver;
+use crate::runtime::{blocking, coop, driver, task, Config, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
