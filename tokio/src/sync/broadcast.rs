@@ -207,7 +207,7 @@ pub struct Receiver<T> {
     shared: Arc<Shared<T>>,
 
     /// Next position to read from
-    next: u64,
+    next: usize,
 }
 
 pub mod error {
@@ -248,7 +248,7 @@ pub mod error {
         /// return the oldest message still retained by the channel.
         ///
         /// Includes the number of skipped messages.
-        Lagged(u64),
+        Lagged(usize),
     }
 
     impl fmt::Display for RecvError {
@@ -283,7 +283,7 @@ pub mod error {
         /// retained by the channel.
         ///
         /// Includes the number of skipped messages.
-        Lagged(u64),
+        Lagged(usize),
     }
 
     impl fmt::Display for TryRecvError {
@@ -319,7 +319,7 @@ struct Shared<T> {
 /// Next position to write a value.
 struct Tail {
     /// Next position to write to.
-    pos: u64,
+    pos: usize,
 
     /// Number of active receivers.
     rx_cnt: usize,
@@ -342,7 +342,7 @@ struct Slot<T> {
     rem: AtomicUsize,
 
     /// Uniquely identifies the `send` stored in the slot.
-    pos: u64,
+    pos: usize,
 
     /// The value being broadcast.
     ///
@@ -456,7 +456,7 @@ pub fn channel<T: Clone>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
     for i in 0..capacity {
         buffer.push(RwLock::new(Slot {
             rem: AtomicUsize::new(0),
-            pos: (i as u64).wrapping_sub(capacity as u64),
+            pos: i.wrapping_sub(capacity),
             val: UnsafeCell::new(None),
         }));
     }
@@ -550,7 +550,7 @@ impl<T> Sender<T> {
         // Position to write into
         let pos = tail.pos;
         let rem = tail.rx_cnt;
-        let idx = (pos & self.shared.mask as u64) as usize;
+        let idx = pos & self.shared.mask;
 
         // Update the tail position
         tail.pos = tail.pos.wrapping_add(1);
@@ -646,7 +646,7 @@ impl<T> Sender<T> {
     pub fn len(&self) -> usize {
         let tail = self.shared.tail.lock();
 
-        let base_idx = (tail.pos & self.shared.mask as u64) as usize;
+        let base_idx = tail.pos & self.shared.mask;
         let mut low = 0;
         let mut high = self.shared.buffer.len();
         while low < high {
@@ -693,7 +693,7 @@ impl<T> Sender<T> {
     pub fn is_empty(&self) -> bool {
         let tail = self.shared.tail.lock();
 
-        let idx = (tail.pos.wrapping_sub(1) & self.shared.mask as u64) as usize;
+        let idx = tail.pos.wrapping_sub(1) & self.shared.mask;
         self.shared.buffer[idx].read().unwrap().rem.load(SeqCst) == 0
     }
 
@@ -943,7 +943,7 @@ impl<T> Receiver<T> {
         &mut self,
         waiter: Option<(&UnsafeCell<Waiter>, &Waker)>,
     ) -> Result<RecvGuard<'_, T>, TryRecvError> {
-        let idx = (self.next & self.shared.mask as u64) as usize;
+        let idx = self.next & self.shared.mask;
 
         // The slot holding the next value to read
         let mut slot = self.shared.buffer[idx].read().unwrap();
@@ -969,7 +969,7 @@ impl<T> Receiver<T> {
             // unlikely event that the buffer is wrapped between dropping the
             // read lock and acquiring the tail lock.
             if slot.pos != self.next {
-                let next_pos = slot.pos.wrapping_add(self.shared.buffer.len() as u64);
+                let next_pos = slot.pos.wrapping_add(self.shared.buffer.len());
 
                 if next_pos == self.next {
                     // At this point the channel is empty for *this* receiver. If
@@ -1020,7 +1020,7 @@ impl<T> Receiver<T> {
                 // catch up by skipping dropped messages and setting the
                 // internal cursor to the **oldest** message stored by the
                 // channel.
-                let next = tail.pos.wrapping_sub(self.shared.buffer.len() as u64);
+                let next = tail.pos.wrapping_sub(self.shared.buffer.len());
 
                 let missed = next.wrapping_sub(self.next);
 
