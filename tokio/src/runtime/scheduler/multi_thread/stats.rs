@@ -72,10 +72,6 @@ impl Stats {
         }
     }
 
-    pub(crate) fn mean_task_poll_duration(&self) -> f64 {
-        self.task_poll_time_ewma
-    }
-
     pub(crate) fn tuned_global_queue_interval(&self, config: &Config) -> u32 {
         // If an interval is explicitly set, don't tune.
         if let Some(configured) = config.global_queue_interval {

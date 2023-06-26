@@ -106,11 +106,6 @@ pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
 }
 
 impl<T> Local<T> {
-    /// Returns the number of entries in the queue
-    pub(crate) fn len(&self) -> usize {
-        self.inner.len() as usize
-    }
-
     /// How many tasks can be pushed into the queue
     pub(crate) fn remaining_slots(&self) -> usize {
         self.inner.remaining_slots()
@@ -123,14 +118,6 @@ impl<T> Local<T> {
     /// Returns `true` if there are no entries in the queue
     pub(crate) fn is_empty(&self) -> bool {
         self.inner.is_empty()
-    }
-
-    /// Returns false if there are any entries in the queue
-    ///
-    /// Separate to is_stealable so that refactors of is_stealable to "protect"
-    /// some tasks from stealing won't affect this
-    pub(crate) fn has_tasks(&self) -> bool {
-        !self.inner.is_empty()
     }
 
     /// Pushes a batch of tasks to the back of the queue. All tasks must fit in
@@ -394,10 +381,6 @@ impl<T> Local<T> {
 }
 
 impl<T> Steal<T> {
-    pub(crate) fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
     /// Steals half the tasks from self and place them into `dst`.
     pub(crate) fn steal_into(
         &self,

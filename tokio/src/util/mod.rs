@@ -68,11 +68,6 @@ cfg_rt! {
     pub(crate) use rc_cell::RcCell;
 }
 
-cfg_rt_multi_thread! {
-    mod try_lock;
-    pub(crate) use try_lock::TryLock;
-}
-
 pub(crate) mod trace;
 
 pub(crate) mod error;

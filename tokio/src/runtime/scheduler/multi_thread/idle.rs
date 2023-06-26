@@ -67,10 +67,6 @@ impl Idle {
         self.num_searching.load(Acquire)
     }
 
-    pub(super) fn is_idle(&self, index: usize) -> bool {
-        self.idle_map.get(index)
-    }
-
     pub(super) fn snapshot(&self, snapshot: &mut Snapshot) {
         snapshot.update(&self.idle_map)
     }
@@ -351,11 +347,6 @@ impl IdleMap {
     fn new_n(n: usize) -> IdleMap {
         let chunks = (0..n).map(|_| AtomicUsize::new(0)).collect();
         IdleMap { chunks }
-    }
-
-    fn get(&self, index: usize) -> bool {
-        let (chunk, mask) = index_to_mask(index);
-        self.chunks[chunk].load(Acquire) & mask == mask
     }
 
     fn set(&self, index: usize) {

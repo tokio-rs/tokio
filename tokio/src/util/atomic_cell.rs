@@ -1,7 +1,7 @@
 use crate::loom::sync::atomic::AtomicPtr;
 
 use std::ptr;
-use std::sync::atomic::Ordering::{AcqRel, Acquire};
+use std::sync::atomic::Ordering::AcqRel;
 
 pub(crate) struct AtomicCell<T> {
     data: AtomicPtr<T>,
@@ -27,15 +27,7 @@ impl<T> AtomicCell<T> {
     }
 
     pub(crate) fn take(&self) -> Option<Box<T>> {
-        if self.data.load(Acquire).is_null() {
-            return None;
-        }
-
         self.swap(None)
-    }
-
-    pub(crate) fn is_none(&self) -> bool {
-        self.data.load(Acquire).is_null()
     }
 }
 

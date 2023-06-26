@@ -140,12 +140,6 @@ pub(super) struct Core {
     rand: FastRand,
 }
 
-#[test]
-fn test_size_of_core() {
-    let size_of = std::mem::size_of::<Core>();
-    assert!(size_of <= 64, "actual={}", size_of);
-}
-
 /// State shared across all workers
 pub(crate) struct Shared {
     /// Per-core remote state.
@@ -668,19 +662,19 @@ impl Worker {
 
         // Reset `lifo_enabled` here in case the core was previously stolen from
         // a task that had the LIFO slot disabled.
-        self.reset_lifo_enabled(cx, core);
+        self.reset_lifo_enabled(cx);
 
         // At this point, the local queue should be empty
         debug_assert!(core.run_queue.is_empty());
 
         // Update shutdown state while locked
-        self.update_global_flags(cx, synced, core);
+        self.update_global_flags(cx, synced);
     }
 
     /// Finds the next task to run, this could be from a queue or stealing. If
     /// none are available, the thread sleeps and tries again.
     fn next_task(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
-        self.assert_lifo_enabled_is_correct(cx, &core);
+        self.assert_lifo_enabled_is_correct(cx);
 
         if self.is_traced {
             core = cx.handle.trace_core(core);
@@ -703,10 +697,9 @@ impl Worker {
         super::counters::inc_num_no_local_work();
 
         if !cx.defer.borrow().is_empty() {
-            // assert!(!core.is_searching);
             // We are deferring tasks, so poll the resource driver and schedule
             // the deferred tasks.
-            core = try_task_new_batch!(self, self.park_yield(cx, core));
+            try_task_new_batch!(self, self.park_yield(cx, core));
 
             panic!("what happened to the deferred tasks? 🤔");
         }
@@ -743,7 +736,7 @@ impl Worker {
             }
         }
 
-        if let Some(task) = self.next_local_task(cx, &mut core) {
+        if let Some(task) = self.next_local_task(&mut core) {
             return Ok((Some(task), core));
         }
 
@@ -815,18 +808,11 @@ impl Worker {
         ret
     }
 
-    fn next_local_task(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
-        /*
-        cx.shared().remotes[core.index]
-            .lifo_slot
-            .take_local()
-            .or_else(|| core.run_queue.pop())
-            */
-        self.next_lifo_task(cx, core)
-            .or_else(|| core.run_queue.pop())
+    fn next_local_task(&self, core: &mut Core) -> Option<Notified> {
+        self.next_lifo_task(core).or_else(|| core.run_queue.pop())
     }
 
-    fn next_lifo_task(&self, cx: &Context, core: &mut Core) -> Option<Notified> {
+    fn next_lifo_task(&self, core: &mut Core) -> Option<Notified> {
         core.lifo_slot.take()
     }
 
@@ -857,20 +843,14 @@ impl Worker {
         let num = cx.shared().remotes.len();
 
         for i in 0..ROUNDS {
-            let last = ROUNDS - 1 == i;
-
             // Start from a random worker
             let start = core.rand.fastrand_n(num as u32) as usize;
 
-            if let Some(task) = self.steal_one_round(cx, &mut core, start, last) {
+            if let Some(task) = self.steal_one_round(cx, &mut core, start) {
                 return Ok((Some(task), core));
             }
 
             core = try_task_new_batch!(self, self.next_remote_task_batch(cx, core));
-
-            // if cx.shared().idle.num_searching() > 1 {
-            //     break;
-            // }
 
             if i > 0 {
                 super::counters::inc_num_spin_stall();
@@ -881,13 +861,7 @@ impl Worker {
         Ok((None, core))
     }
 
-    fn steal_one_round(
-        &self,
-        cx: &Context,
-        core: &mut Core,
-        start: usize,
-        lifo: bool,
-    ) -> Option<Notified> {
+    fn steal_one_round(&self, cx: &Context, core: &mut Core, start: usize) -> Option<Notified> {
         let num = cx.shared().remotes.len();
 
         for i in 0..num {
@@ -904,14 +878,6 @@ impl Worker {
             }
 
             let target = &cx.shared().remotes[i];
-
-            /*
-            if lifo {
-                if let Some(task) = target.lifo_slot.take_remote() {
-                    return Some(task);
-                }
-            }
-            */
 
             if let Some(task) = target
                 .steal
@@ -934,7 +900,7 @@ impl Worker {
             cx.shared().notify_parked_local();
         }
 
-        self.assert_lifo_enabled_is_correct(cx, &core);
+        self.assert_lifo_enabled_is_correct(cx);
 
         // Measure the poll start time. Note that we may end up polling other
         // tasks under this measurement. In this case, the tasks came from the
@@ -967,10 +933,10 @@ impl Worker {
                 };
 
                 // Check for a task in the LIFO slot
-                let task = match self.next_lifo_task(cx, &mut core) {
+                let task = match self.next_lifo_task(&mut core) {
                     Some(task) => task,
                     None => {
-                        self.reset_lifo_enabled(cx, &mut core);
+                        self.reset_lifo_enabled(cx);
                         core.stats.end_poll();
                         return Ok(core);
                     }
@@ -1108,7 +1074,7 @@ impl Worker {
         core.stats.submit(&cx.shared().worker_metrics[core.index]);
     }
 
-    fn update_global_flags(&mut self, cx: &Context, synced: &mut Synced, core: &mut Core) {
+    fn update_global_flags(&mut self, cx: &Context, synced: &mut Synced) {
         if !self.is_shutdown {
             self.is_shutdown = cx.shared().inject.is_closed(&synced.inject);
         }
@@ -1132,11 +1098,12 @@ impl Worker {
             self.schedule_deferred_with_core(cx, core, || cx.shared().synced.lock())?;
 
         self.flush_metrics(cx, &mut core);
-        self.update_global_flags(cx, &mut cx.shared().synced.lock(), &mut core);
+        self.update_global_flags(cx, &mut cx.shared().synced.lock());
 
         Ok((maybe_task, core))
     }
 
+    /*
     fn poll_driver(&mut self, cx: &Context, core: Box<Core>) -> NextTaskResult {
         // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
         // to run without actually putting the thread to sleep.
@@ -1151,13 +1118,14 @@ impl Worker {
             Ok((None, core))
         }
     }
+    */
 
     fn park(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
         if let Some(f) = &cx.shared().config.before_park {
             f();
         }
 
-        if self.can_transition_to_parked(cx, &mut core) {
+        if self.can_transition_to_parked(&mut core) {
             debug_assert!(!self.is_shutdown);
             debug_assert!(!self.is_traced);
 
@@ -1178,7 +1146,7 @@ impl Worker {
         if self.transition_from_searching(cx, &mut core) {
             cx.shared().idle.snapshot(&mut self.idle_snapshot);
             // We were the last searching worker, we need to do one last check
-            if let Some(task) = self.steal_one_round(cx, &mut core, 0, true) {
+            if let Some(task) = self.steal_one_round(cx, &mut core, 0) {
                 cx.shared().notify_parked_local();
 
                 return Ok((Some(task), core));
@@ -1211,7 +1179,7 @@ impl Worker {
         self.flush_metrics(cx, &mut core);
 
         // If the runtime is shutdown, skip parking
-        self.update_global_flags(cx, &mut synced, &mut core);
+        self.update_global_flags(cx, &mut synced);
 
         if self.is_shutdown {
             return Ok((None, core));
@@ -1275,7 +1243,7 @@ impl Worker {
         cx.shared().idle.transition_worker_from_searching(core)
     }
 
-    fn can_transition_to_parked(&self, cx: &Context, core: &mut Core) -> bool {
+    fn can_transition_to_parked(&self, core: &mut Core) -> bool {
         !self.has_tasks(core) && !self.is_shutdown && !self.is_traced
     }
 
@@ -1309,20 +1277,19 @@ impl Worker {
             return;
         }
 
-        // Wait for driver
-        if cx.shared().driver.is_none() {
-            return;
-        }
+        let mut driver = match cx.shared().driver.take() {
+            Some(driver) => driver,
+            None => return,
+        };
 
         debug_assert!(cx.shared().owned.is_empty());
 
         for mut core in synced.shutdown_cores.drain(..) {
             // Drain tasks from the local queue
-            while self.next_local_task(cx, &mut core).is_some() {}
+            while self.next_local_task(&mut core).is_some() {}
         }
 
         // Shutdown the driver
-        let mut driver = cx.shared().driver.take().expect("driver missing");
         driver.shutdown(&cx.handle.driver);
 
         // Drain the injection queue
@@ -1336,12 +1303,12 @@ impl Worker {
         }
     }
 
-    fn reset_lifo_enabled(&self, cx: &Context, core: &mut Core) {
+    fn reset_lifo_enabled(&self, cx: &Context) {
         cx.lifo_enabled
             .set(!cx.handle.shared.config.disable_lifo_slot);
     }
 
-    fn assert_lifo_enabled_is_correct(&self, cx: &Context, core: &Core) {
+    fn assert_lifo_enabled_is_correct(&self, cx: &Context) {
         debug_assert_eq!(
             cx.lifo_enabled.get(),
             !cx.handle.shared.config.disable_lifo_slot
