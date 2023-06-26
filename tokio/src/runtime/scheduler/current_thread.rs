@@ -523,6 +523,10 @@ cfg_metrics! {
             &self.shared.worker_metrics
         }
 
+        pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
+            self.worker_metrics(worker).queue_depth()
+        }
+
         pub(crate) fn num_blocking_threads(&self) -> usize {
             self.blocking_spawner.num_threads()
         }
