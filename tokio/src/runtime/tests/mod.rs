@@ -56,6 +56,7 @@ cfg_loom! {
     mod loom_local;
     mod loom_oneshot;
     mod loom_pool;
+    mod loom_alt_pool;
     mod loom_queue;
     mod loom_shutdown_join;
     mod loom_join_set;
@@ -63,7 +64,7 @@ cfg_loom! {
 
     // Make sure debug assertions are enabled
     #[cfg(not(debug_assertions))]
-    compiler_error!("these tests require debug assertions to be enabled");
+    compile_error!("these tests require debug assertions to be enabled");
 }
 
 cfg_not_loom! {
