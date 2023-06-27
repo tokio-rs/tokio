@@ -1,3 +1,7 @@
+mod queue;
+mod shutdown;
+mod yield_now;
+
 /// Full runtime loom tests. These are heavy tests and take significant time to
 /// run on CI.
 ///

@@ -1,5 +1,5 @@
 use crate::runtime::scheduler::multi_thread::{queue, Stats};
-use crate::runtime::tests::NoopSchedule;
+use crate::runtime::tests::{unowned, NoopSchedule};
 
 use loom::thread;
 use std::cell::RefCell;
@@ -37,7 +37,7 @@ fn basic() {
 
         for _ in 0..2 {
             for _ in 0..2 {
-                let (task, _) = super::unowned(async {});
+                let (task, _) = unowned(async {});
                 local.push_back_or_overflow(task, &inject, &mut stats);
             }
 
@@ -46,7 +46,7 @@ fn basic() {
             }
 
             // Push another task
-            let (task, _) = super::unowned(async {});
+            let (task, _) = unowned(async {});
             local.push_back_or_overflow(task, &inject, &mut stats);
 
             while local.pop().is_some() {
@@ -88,7 +88,7 @@ fn steal_overflow() {
         let mut n = 0;
 
         // push a task, pop a task
-        let (task, _) = super::unowned(async {});
+        let (task, _) = unowned(async {});
         local.push_back_or_overflow(task, &inject, &mut stats);
 
         if local.pop().is_some() {
@@ -96,7 +96,7 @@ fn steal_overflow() {
         }
 
         for _ in 0..6 {
-            let (task, _) = super::unowned(async {});
+            let (task, _) = unowned(async {});
             local.push_back_or_overflow(task, &inject, &mut stats);
         }
 
@@ -140,7 +140,7 @@ fn multi_stealer() {
 
         // Push work
         for _ in 0..NUM_TASKS {
-            let (task, _) = super::unowned(async {});
+            let (task, _) = unowned(async {});
             local.push_back_or_overflow(task, &inject, &mut stats);
         }
 
@@ -176,10 +176,10 @@ fn chained_steal() {
 
         // Load up some tasks
         for _ in 0..4 {
-            let (task, _) = super::unowned(async {});
+            let (task, _) = unowned(async {});
             l1.push_back_or_overflow(task, &inject, &mut stats);
 
-            let (task, _) = super::unowned(async {});
+            let (task, _) = unowned(async {});
             l2.push_back_or_overflow(task, &inject, &mut stats);
         }
 
