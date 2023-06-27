@@ -710,7 +710,10 @@ fn test_tuning() {
 }
 
 fn rt() -> runtime::Runtime {
-    Builder::new_multi_thread_alt().enable_all().build()
+    runtime::Builder::new_multi_thread_alt()
+        .enable_all()
+        .build()
+        .unwrap()
 }
 
 #[cfg(tokio_unstable)]
