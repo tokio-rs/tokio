@@ -399,6 +399,7 @@ impl File {
     /// # }
     /// ```
     pub async fn try_clone(&self) -> io::Result<File> {
+        self.inner.lock().await.complete_inflight().await;
         let std = self.std.clone();
         let std_file = asyncify(move || std.try_clone()).await?;
         Ok(File::from_std(std_file))
