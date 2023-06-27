@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "net"), allow(unreachable_pub))]
 
+use crate::io::interest::Interest;
+
 use std::fmt;
 use std::ops;
 
@@ -208,41 +210,35 @@ impl Ready {
     pub(crate) fn as_usize(self) -> usize {
         self.0
     }
-}
 
-cfg_io_readiness! {
-    use crate::io::Interest;
+    pub(crate) fn from_interest(interest: Interest) -> Ready {
+        let mut ready = Ready::EMPTY;
 
-    impl Ready {
-        pub(crate) fn from_interest(interest: Interest) -> Ready {
-            let mut ready = Ready::EMPTY;
-
-            if interest.is_readable() {
-                ready |= Ready::READABLE;
-                ready |= Ready::READ_CLOSED;
-            }
-
-            if interest.is_writable() {
-                ready |= Ready::WRITABLE;
-                ready |= Ready::WRITE_CLOSED;
-            }
-
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            if interest.is_priority() {
-                ready |= Ready::PRIORITY;
-                ready |= Ready::READ_CLOSED;
-            }
-
-            ready
+        if interest.is_readable() {
+            ready |= Ready::READABLE;
+            ready |= Ready::READ_CLOSED;
         }
 
-        pub(crate) fn intersection(self, interest: Interest) -> Ready {
-            Ready(self.0 & Ready::from_interest(interest).0)
+        if interest.is_writable() {
+            ready |= Ready::WRITABLE;
+            ready |= Ready::WRITE_CLOSED;
         }
 
-        pub(crate) fn satisfies(self, interest: Interest) -> bool {
-            self.0 & Ready::from_interest(interest).0 != 0
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if interest.is_priority() {
+            ready |= Ready::PRIORITY;
+            ready |= Ready::READ_CLOSED;
         }
+
+        ready
+    }
+
+    pub(crate) fn intersection(self, interest: Interest) -> Ready {
+        Ready(self.0 & Ready::from_interest(interest).0)
+    }
+
+    pub(crate) fn satisfies(self, interest: Interest) -> bool {
+        self.0 & Ready::from_interest(interest).0 != 0
     }
 }
 
