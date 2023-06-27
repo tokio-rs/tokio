@@ -78,13 +78,7 @@ cfg_metrics! {
     mod metrics;
 }
 
-cfg_taskdump! {
-    mod taskdump;
-}
-
-cfg_not_taskdump! {
-    mod taskdump_mock;
-}
+mod taskdump_mock;
 
 /// A scheduler worker
 ///

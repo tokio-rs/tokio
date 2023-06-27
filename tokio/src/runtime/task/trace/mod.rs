@@ -186,6 +186,8 @@ pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
                     scheduler::Context::CurrentThread(s) => s.defer.defer(cx.waker()),
                     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                     scheduler::Context::MultiThread(s) => s.defer.defer(cx.waker()),
+                    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+                    scheduler::Context::MultiThreadAlt(_) => unimplemented!(),
                 }
             }
         });

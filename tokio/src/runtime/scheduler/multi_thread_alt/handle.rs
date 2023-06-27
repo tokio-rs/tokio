@@ -13,10 +13,6 @@ cfg_metrics! {
     mod metrics;
 }
 
-cfg_taskdump! {
-    mod taskdump;
-}
-
 /// Handle to the multi thread scheduler
 pub(crate) struct Handle {
     /// Task spawner

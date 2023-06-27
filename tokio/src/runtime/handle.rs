@@ -505,6 +505,8 @@ cfg_taskdump! {
                         handle.dump().await
                     }).await
                 },
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+                scheduler::Handle::MultiThreadAlt(_) => panic!("task dump not implemented for this runtime flavor"),
             }
         }
     }
