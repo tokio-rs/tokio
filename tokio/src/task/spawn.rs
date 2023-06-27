@@ -15,6 +15,10 @@ cfg_rt! {
     /// different thread to be executed. The specifics depend on the current
     /// [`Runtime`](crate::runtime::Runtime) configuration.
     ///
+    /// It is guaranteed that spawn will not synchronously poll the task being spawned.
+    /// This means that calling spawn while holding a lock does not pose a risk of
+    /// deadlocking with the spawned task.
+    ///
     /// There is no guarantee that a spawned task will execute to completion.
     /// When a runtime is shutdown, all outstanding tasks are dropped,
     /// regardless of the lifecycle of that task.
