@@ -6,6 +6,9 @@ pub(crate) use driver::{Driver, Handle, ReadyEvent};
 mod registration;
 pub(crate) use registration::Registration;
 
+mod registration_set;
+use registration_set::RegistrationSet;
+
 mod scheduled_io;
 use scheduled_io::ScheduledIo;
 

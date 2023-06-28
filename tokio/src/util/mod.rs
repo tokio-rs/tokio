@@ -1,6 +1,5 @@
 cfg_io_driver! {
     pub(crate) mod bit;
-    pub(crate) mod slab;
 }
 
 #[cfg(feature = "rt")]
