@@ -116,7 +116,8 @@ fn borrow_framed_write() {
         assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
         assert!(pin!(framed).start_send(0x04).is_ok());
 
-        let mut borrow_framed = framed.with_encoder(|_| U64Encoder);
+        let mut new_codec = U64Encoder;
+        let mut borrow_framed = framed.with_encoder(|_| &mut new_codec);
         assert!(assert_ready!(pin!(borrow_framed).poll_ready(cx)).is_ok());
         assert!(pin!(borrow_framed).start_send(0x08).is_ok());
 

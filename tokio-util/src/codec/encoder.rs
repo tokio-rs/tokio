@@ -23,3 +23,11 @@ pub trait Encoder<Item> {
     /// [`FramedWrite`]: crate::codec::FramedWrite
     fn encode(&mut self, item: Item, dst: &mut BytesMut) -> Result<(), Self::Error>;
 }
+
+impl<I, T: Encoder<I>> Encoder<I> for &mut T {
+    type Error = T::Error;
+
+    fn encode(&mut self, item: I, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        (**self).encode(item, dst)
+    }
+}

@@ -182,3 +182,13 @@ pub trait Decoder {
         Framed::new(io, self)
     }
 }
+
+impl<T: Decoder> Decoder for &mut T {
+    type Item = T::Item;
+
+    type Error = T::Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        (**self).decode(src)
+    }
+}
