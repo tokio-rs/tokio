@@ -307,7 +307,7 @@ cfg_io_driver_impl! {
     impl<T: Link> LinkedList<T, T::Target> {
         pub(crate) fn drain_filter<F>(&mut self, filter: F) -> DrainFilter<'_, T, F>
         where
-            F: FnMut(&mut T::Target) -> bool,
+            F: FnMut(&T::Target) -> bool,
         {
             let curr = self.head;
             DrainFilter {
@@ -321,7 +321,7 @@ cfg_io_driver_impl! {
     impl<'a, T, F> Iterator for DrainFilter<'a, T, F>
     where
         T: Link,
-        F: FnMut(&mut T::Target) -> bool,
+        F: FnMut(&T::Target) -> bool,
     {
         type Item = T::Handle;
 
