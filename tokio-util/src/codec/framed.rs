@@ -30,6 +30,22 @@ pin_project! {
     }
 }
 
+pin_project! {
+    /// A borrowed unified [`Stream`] and [`Sink`] interface to an underlying I/O object, using
+    /// the `Encoder` and `Decoder` traits to encode and decode frames.
+    ///
+    /// You can create a `BorrowFramed` instance by using the `with_codec` function of Framed
+    ///
+    /// [`Stream`]: futures_core::Stream
+    /// [`Sink`]: futures_sink::Sink
+    /// [`AsyncRead`]: tokio::io::AsyncRead
+    /// [`Decoder::framed`]: crate::codec::Decoder::framed()
+    pub struct BorrowFramed<'borrow, T, U> {
+        #[pin]
+        inner: FramedImpl<&'borrow mut T, U, &'borrow mut RWFrames>,
+    }
+}
+
 impl<T, U> Framed<T, U>
 where
     T: AsyncRead + AsyncWrite,
@@ -224,6 +240,29 @@ impl<T, U> Framed<T, U> {
         })
     }
 
+    /// Maps the codec `U` to `C` temporarily using &mut self
+    /// preserving the read and write buffers wrapped by `Framed`.
+    ///
+    /// Note that care should be taken to not tamper with the underlying codec
+    /// as it may corrupt the stream of frames otherwise being worked with.
+    pub fn with_codec<C, F>(&mut self, map: F) -> BorrowFramed<'_, T, C>
+    where
+        F: FnOnce(&mut U) -> C,
+    {
+        let FramedImpl {
+            inner,
+            state,
+            codec,
+        } = &mut self.inner;
+        BorrowFramed {
+            inner: FramedImpl {
+                inner,
+                state,
+                codec: map(codec),
+            },
+        }
+    }
+
     /// Returns a mutable reference to the underlying codec wrapped by
     /// `Framed`.
     ///
@@ -338,6 +377,45 @@ where
             .field("io", self.get_ref())
             .field("codec", self.codec())
             .finish()
+    }
+}
+
+// This impl just defers to the underlying FramedImpl
+impl<'borrow, T, U> Stream for BorrowFramed<'borrow, T, U>
+where
+    T: AsyncRead + Unpin,
+    U: Decoder,
+{
+    type Item = Result<U::Item, U::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.project().inner.poll_next(cx)
+    }
+}
+
+// This impl just defers to the underlying FramedImpl
+impl<'borrow, T, I, U> Sink<I> for BorrowFramed<'borrow, T, U>
+where
+    T: AsyncWrite + Unpin,
+    U: Encoder<I>,
+    U::Error: From<io::Error>,
+{
+    type Error = U::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+        self.project().inner.start_send(item)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
     }
 }
 

@@ -115,6 +115,26 @@ impl BorrowMut<WriteFrame> for RWFrames {
         &mut self.write
     }
 }
+impl Borrow<ReadFrame> for &mut RWFrames {
+    fn borrow(&self) -> &ReadFrame {
+        &self.read
+    }
+}
+impl BorrowMut<ReadFrame> for &mut RWFrames {
+    fn borrow_mut(&mut self) -> &mut ReadFrame {
+        &mut self.read
+    }
+}
+impl Borrow<WriteFrame> for &mut RWFrames {
+    fn borrow(&self) -> &WriteFrame {
+        &self.write
+    }
+}
+impl BorrowMut<WriteFrame> for &mut RWFrames {
+    fn borrow_mut(&mut self) -> &mut WriteFrame {
+        &mut self.write
+    }
+}
 impl<T, U, R> Stream for FramedImpl<T, U, R>
 where
     T: AsyncRead,

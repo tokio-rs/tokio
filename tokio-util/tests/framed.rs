@@ -150,3 +150,30 @@ fn external_buf_does_not_shrink() {
 
     assert_eq!(read_buf.capacity(), INITIAL_CAPACITY * 2);
 }
+
+#[tokio::test]
+async fn borrow_framed() {
+    let mut parts = FramedParts::new(DontReadIntoThis, U32Codec::default());
+    parts.read_buf = BytesMut::from(
+        &[
+            0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 84, 0, 0, 0, 0, 0, 0, 0, 84, 0, 0, 0, 42,
+        ][..],
+    );
+
+    let mut framed = Framed::from_parts(parts);
+    let num = assert_ok!(framed.next().await.unwrap());
+
+    assert_eq!(num, 42);
+    assert_eq!(framed.codec().read_bytes, 4);
+
+    let mut borrow_framed = framed.with_codec(|codec| U64Codec {
+        read_bytes: codec.read_bytes,
+    });
+    assert_eq!(assert_ok!(borrow_framed.next().await.unwrap()), 84);
+    assert_eq!(assert_ok!(borrow_framed.next().await.unwrap()), 84);
+
+    let num = assert_ok!(framed.next().await.unwrap());
+
+    assert_eq!(num, 42);
+    assert_eq!(framed.codec().read_bytes, 8);
+}

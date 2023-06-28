@@ -119,6 +119,25 @@ fn read_multi_frame_in_packet_after_codec_changed() {
 }
 
 #[test]
+fn borrow_framed_read() {
+    let mut task = task::spawn(());
+    let mock = mock! {
+        Ok(b"\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x08\x00\x00\x00\x04".to_vec()),
+    };
+    let mut framed = FramedRead::new(mock, U32Decoder);
+
+    task.enter(|cx, _| {
+        assert_read!(pin!(framed).poll_next(cx), 0x04);
+
+        let mut borrow_framed = framed.with_decoder(|_| U64Decoder);
+        assert_read!(pin!(borrow_framed).poll_next(cx), 0x08);
+
+        assert_read!(pin!(framed).poll_next(cx), 0x04);
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+    });
+}
+
+#[test]
 fn read_not_ready() {
     let mut task = task::spawn(());
     let mock = mock! {

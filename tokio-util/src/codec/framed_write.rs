@@ -22,6 +22,16 @@ pin_project! {
     }
 }
 
+pin_project! {
+    /// A [`Sink`] of frames encoded to an `AsyncWrite`.
+    ///
+    /// [`Sink`]: futures_sink::Sink
+    pub struct BorrowFramedWrite<'borrow, T, E> {
+        #[pin]
+        inner: FramedImpl<&'borrow mut T, E, &'borrow mut WriteFrame>,
+    }
+}
+
 impl<T, E> FramedWrite<T, E>
 where
     T: AsyncWrite,
@@ -109,6 +119,27 @@ impl<T, E> FramedWrite<T, E> {
         }
     }
 
+    /// Maps the encoder `E` to `C` temporarily using &mut self,
+    /// preserving the write buffer wrapped by `Framed`.
+    pub fn with_encoder<C, F>(&mut self, map: F) -> BorrowFramedWrite<'_, T, C>
+    where
+        F: FnOnce(&mut E) -> C,
+    {
+        // This could be potentially simplified once rust-lang/rust#86555 hits stable
+        let FramedImpl {
+            inner,
+            state,
+            codec,
+        } = &mut self.inner;
+        BorrowFramedWrite {
+            inner: FramedImpl {
+                inner,
+                state,
+                codec: map(codec),
+            },
+        }
+    }
+
     /// Returns a mutable reference to the underlying encoder.
     pub fn encoder_pin_mut(self: Pin<&mut Self>) -> &mut E {
         self.project().inner.project().codec
@@ -184,5 +215,43 @@ where
             .field("encoder", &self.encoder())
             .field("buffer", &self.inner.state.buffer)
             .finish()
+    }
+}
+
+// This impl just defers to the underlying FramedImpl
+impl<'borrow, T, I, E> Sink<I> for BorrowFramedWrite<'borrow, T, E>
+where
+    T: AsyncWrite + Unpin,
+    E: Encoder<I>,
+    E::Error: From<io::Error>,
+{
+    type Error = E::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+        self.project().inner.start_send(item)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
+    }
+}
+
+// This impl just defers to the underlying T: Stream
+impl<'borrow, T, D> Stream for BorrowFramedWrite<'borrow, T, D>
+where
+    T: Stream + Unpin,
+{
+    type Item = T::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.project().inner.project().inner.poll_next(cx)
     }
 }

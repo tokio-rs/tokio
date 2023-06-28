@@ -22,6 +22,17 @@ pin_project! {
     }
 }
 
+pin_project! {
+    /// A [`Stream`] of messages decoded from an [`AsyncRead`].
+    ///
+    /// [`Stream`]: futures_core::Stream
+    /// [`AsyncRead`]: tokio::io::AsyncRead
+    pub struct BorrowFramedRead<'borrow, T, D> {
+        #[pin]
+        inner: FramedImpl<&'borrow mut T, D, &'borrow mut ReadFrame>,
+    }
+}
+
 // ===== impl FramedRead =====
 
 impl<T, D> FramedRead<T, D>
@@ -129,6 +140,27 @@ impl<T, D> FramedRead<T, D> {
         }
     }
 
+    /// Maps the decoder `D` to `C` temporarily using &mut self,
+    /// preserving the read buffer wrapped by `Framed`.
+    pub fn with_decoder<C, F>(&mut self, map: F) -> BorrowFramedRead<'_, T, C>
+    where
+        F: FnOnce(&mut D) -> C,
+    {
+        // This could be potentially simplified once rust-lang/rust#86555 hits stable
+        let FramedImpl {
+            inner,
+            state,
+            codec,
+        } = &mut self.inner;
+        BorrowFramedRead {
+            inner: FramedImpl {
+                inner,
+                state,
+                codec: map(codec),
+            },
+        }
+    }
+
     /// Returns a mutable reference to the underlying decoder.
     pub fn decoder_pin_mut(self: Pin<&mut Self>) -> &mut D {
         self.project().inner.project().codec
@@ -195,5 +227,42 @@ where
             .field("is_readable", &self.inner.state.is_readable)
             .field("buffer", &self.read_buffer())
             .finish()
+    }
+}
+
+// This impl just defers to the underlying FramedImpl
+impl<'borrow, T, D> Stream for BorrowFramedRead<'borrow, T, D>
+where
+    T: AsyncRead + Unpin,
+    D: Decoder,
+{
+    type Item = Result<D::Item, D::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.project().inner.poll_next(cx)
+    }
+}
+
+// This impl just defers to the underlying T: Sink
+impl<'borrow, T, I, D> Sink<I> for BorrowFramedRead<'borrow, T, D>
+where
+    T: Sink<I> + Unpin,
+{
+    type Error = T::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.project().inner.poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
+        self.project().inner.project().inner.start_send(item)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.project().inner.poll_close(cx)
     }
 }

@@ -105,6 +105,32 @@ fn write_multi_frame_after_codec_changed() {
 }
 
 #[test]
+fn borrow_framed_write() {
+    let mut task = task::spawn(());
+    let mock = mock! {
+        Ok(b"\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x08".to_vec()),
+    };
+    let mut framed = FramedWrite::new(mock, U32Encoder);
+
+    task.enter(|cx, _| {
+        assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
+        assert!(pin!(framed).start_send(0x04).is_ok());
+
+        let mut borrow_framed = framed.with_encoder(|_| U64Encoder);
+        assert!(assert_ready!(pin!(borrow_framed).poll_ready(cx)).is_ok());
+        assert!(pin!(borrow_framed).start_send(0x08).is_ok());
+
+        // Nothing written yet
+        assert_eq!(1, framed.get_ref().calls.len());
+
+        // Flush the writes
+        assert!(assert_ready!(pin!(framed).poll_flush(cx)).is_ok());
+
+        assert_eq!(0, framed.get_ref().calls.len());
+    });
+}
+
+#[test]
 fn write_hits_backpressure() {
     const ITER: usize = 2 * 1024;
 
