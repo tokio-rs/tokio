@@ -6,13 +6,13 @@ use crate::runtime::park::CachedParkThread;
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::{bounded, list, unbounded};
 use crate::sync::notify::Notify;
+use crate::util::cacheline::CachePadded;
 
 use std::fmt;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
-use crate::util::cacheline::CachePadded;
 
 /// Channel sender.
 pub(crate) struct Tx<T, S> {
@@ -109,7 +109,7 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
 
     let chan = Arc::new(Chan {
         notify_rx_closed: Notify::new(),
-        tx : CachePadded::new(tx),
+        tx: CachePadded::new(tx),
         semaphore,
         rx_waker: CachePadded::new(AtomicWaker::new()),
         tx_count: AtomicUsize::new(1),
