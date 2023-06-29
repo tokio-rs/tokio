@@ -5,7 +5,6 @@ use crate::loom::sync::Mutex;
 use crate::runtime::io::{Direction, ReadyEvent, Tick};
 use crate::util::bit;
 use crate::util::linked_list::{self, LinkedList};
-use crate::util::slab::Entry;
 use crate::util::WakeList;
 
 use std::cell::UnsafeCell;
@@ -13,13 +12,15 @@ use std::future::Future;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::task::{Context, Poll, Waker};
 
 /// Stored in the I/O driver resource slab.
 #[derive(Debug)]
 pub(crate) struct ScheduledIo {
-    /// Packs the resource's readiness with the resource's generation.
+    pub(super) linked_list_pointers: UnsafeCell<linked_list::Pointers<Self>>,
+
+    /// Packs the resource's readiness and I/O driver latest tick.
     readiness: AtomicUsize,
 
     waiters: Mutex<Waiters>,
@@ -81,39 +82,22 @@ enum State {
 
 // The `ScheduledIo::readiness` (`AtomicUsize`) is packed full of goodness.
 //
-// | shutdown | generation |  driver tick | readiness |
-// |----------+------------+--------------+-----------|
-// |   1 bit  |   7 bits   +    8 bits    +   16 bits |
+// | shutdown | driver tick | readiness |
+// |----------+-------------+-----------|
+// |   1 bit  |   8 bits    +   16 bits |
 
 const READINESS: bit::Pack = bit::Pack::least_significant(16);
 
 const TICK: bit::Pack = READINESS.then(8);
 
-const GENERATION: bit::Pack = TICK.then(7);
-
-const SHUTDOWN: bit::Pack = GENERATION.then(1);
-
-#[test]
-fn test_generations_assert_same() {
-    assert_eq!(super::driver::GENERATION, GENERATION);
-}
+const SHUTDOWN: bit::Pack = TICK.then(1);
 
 // ===== impl ScheduledIo =====
-
-impl Entry for ScheduledIo {
-    fn reset(&self) {
-        let state = self.readiness.load(Acquire);
-
-        let generation = GENERATION.unpack(state);
-        let next = GENERATION.pack_lossy(generation + 1, 0);
-
-        self.readiness.store(next, Release);
-    }
-}
 
 impl Default for ScheduledIo {
     fn default() -> ScheduledIo {
         ScheduledIo {
+            linked_list_pointers: UnsafeCell::new(linked_list::Pointers::new()),
             readiness: AtomicUsize::new(0),
             waiters: Mutex::new(Default::default()),
         }
@@ -121,8 +105,9 @@ impl Default for ScheduledIo {
 }
 
 impl ScheduledIo {
-    pub(crate) fn generation(&self) -> usize {
-        GENERATION.unpack(self.readiness.load(Acquire))
+    pub(crate) fn token(&self) -> mio::Token {
+        // use `expose_addr` when stable
+        mio::Token(self as *const _ as usize)
     }
 
     /// Invoked when the IO driver is shut down; forces this ScheduledIo into a
@@ -137,61 +122,39 @@ impl ScheduledIo {
     /// the current value, returning the previous readiness value.
     ///
     /// # Arguments
-    /// - `token`: the token for this `ScheduledIo`.
     /// - `tick`: whether setting the tick or trying to clear readiness for a
     ///    specific tick.
     /// - `f`: a closure returning a new readiness value given the previous
     ///   readiness.
-    ///
-    /// # Returns
-    ///
-    /// If the given token's generation no longer matches the `ScheduledIo`'s
-    /// generation, then the corresponding IO resource has been removed and
-    /// replaced with a new resource. In that case, this method returns `Err`.
-    /// Otherwise, this returns the previous readiness.
-    pub(super) fn set_readiness(
-        &self,
-        token: Option<usize>,
-        tick: Tick,
-        f: impl Fn(Ready) -> Ready,
-    ) -> Result<(), ()> {
+    pub(super) fn set_readiness(&self, tick: Tick, f: impl Fn(Ready) -> Ready) {
         let mut current = self.readiness.load(Acquire);
 
+        // The shutdown bit should not be set
+        debug_assert_eq!(0, SHUTDOWN.unpack(current));
+
         loop {
-            let current_generation = GENERATION.unpack(current);
-
-            if let Some(token) = token {
-                // Check that the generation for this access is still the
-                // current one.
-                if GENERATION.unpack(token) != current_generation {
-                    return Err(());
-                }
-            }
-
-            // Mask out the tick/generation bits so that the modifying
-            // function doesn't see them.
+            // Mask out the tick bits so that the modifying function doesn't see
+            // them.
             let current_readiness = Ready::from_usize(current);
             let new = f(current_readiness);
 
-            let packed = match tick {
+            let next = match tick {
                 Tick::Set(t) => TICK.pack(t as usize, new.as_usize()),
                 Tick::Clear(t) => {
                     if TICK.unpack(current) as u8 != t {
                         // Trying to clear readiness with an old event!
-                        return Err(());
+                        return;
                     }
 
                     TICK.pack(t as usize, new.as_usize())
                 }
             };
 
-            let next = GENERATION.pack(current_generation, packed);
-
             match self
                 .readiness
                 .compare_exchange(current, next, AcqRel, Acquire)
             {
-                Ok(_) => return Ok(()),
+                Ok(_) => return,
                 // we lost the race, retry!
                 Err(actual) => current = actual,
             }
@@ -339,9 +302,7 @@ impl ScheduledIo {
         // This consumes the current readiness state **except** for closed
         // states. Closed states are excluded because they are final states.
         let mask_no_closed = event.ready - Ready::READ_CLOSED - Ready::WRITE_CLOSED;
-
-        // result isn't important
-        let _ = self.set_readiness(None, Tick::Clear(event.tick), |curr| curr - mask_no_closed);
+        self.set_readiness(Tick::Clear(event.tick), |curr| curr - mask_no_closed);
     }
 
     pub(crate) fn clear_wakers(&self) {

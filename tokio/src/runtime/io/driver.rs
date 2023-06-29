@@ -5,13 +5,15 @@ cfg_signal_internal_and_unix! {
 
 use crate::io::interest::Interest;
 use crate::io::ready::Ready;
+use crate::loom::sync::Mutex;
 use crate::runtime::driver;
-use crate::runtime::io::{IoDriverMetrics, ScheduledIo};
-use crate::util::slab::{self, Slab};
-use crate::{loom::sync::RwLock, util::bit};
+use crate::runtime::io::registration_set;
+use crate::runtime::io::{IoDriverMetrics, RegistrationSet, ScheduledIo};
 
+use mio::event::Source;
 use std::fmt;
 use std::io;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// I/O driver, backed by Mio.
@@ -26,10 +28,6 @@ pub(crate) struct Driver {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
 
-    /// Primary slab handle containing the state for each resource registered
-    /// with this driver.
-    resources: Slab<ScheduledIo>,
-
     /// The system event queue.
     poll: mio::Poll,
 }
@@ -39,8 +37,11 @@ pub(crate) struct Handle {
     /// Registers I/O resources.
     registry: mio::Registry,
 
-    /// Allocates `ScheduledIo` handles when creating new resources.
-    io_dispatch: RwLock<IoDispatcher>,
+    /// Tracks all registrations
+    registrations: RegistrationSet,
+
+    /// State that should be synchronized
+    synced: Mutex<registration_set::Synced>,
 
     /// Used to wake up the reactor from a call to `turn`.
     /// Not supported on Wasi due to lack of threading support.
@@ -69,11 +70,6 @@ cfg_net_unix!(
     }
 );
 
-struct IoDispatcher {
-    allocator: slab::Allocator<ScheduledIo>,
-    is_shutdown: bool,
-}
-
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub(super) enum Direction {
     Read,
@@ -85,20 +81,8 @@ pub(super) enum Tick {
     Clear(u8),
 }
 
-// TODO: Don't use a fake token. Instead, reserve a slot entry for the wakeup
-// token.
-const TOKEN_WAKEUP: mio::Token = mio::Token(1 << 31);
-const TOKEN_SIGNAL: mio::Token = mio::Token(1 + (1 << 31));
-
-const ADDRESS: bit::Pack = bit::Pack::least_significant(24);
-
-// Packs the generation value in the `readiness` field.
-//
-// The generation prevents a race condition where a slab slot is reused for a
-// new socket while the I/O driver is about to apply a readiness event. The
-// generation value is checked when setting new readiness. If the generation do
-// not match, then the readiness event is discarded.
-pub(super) const GENERATION: bit::Pack = ADDRESS.then(7);
+const TOKEN_WAKEUP: mio::Token = mio::Token(0);
+const TOKEN_SIGNAL: mio::Token = mio::Token(1);
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
@@ -117,20 +101,19 @@ impl Driver {
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
         let registry = poll.registry().try_clone()?;
 
-        let slab = Slab::new();
-        let allocator = slab.allocator();
-
         let driver = Driver {
             tick: 0,
             signal_ready: false,
             events: mio::Events::with_capacity(nevents),
             poll,
-            resources: slab,
         };
+
+        let (registrations, synced) = RegistrationSet::new();
 
         let handle = Handle {
             registry,
-            io_dispatch: RwLock::new(IoDispatcher::new(allocator)),
+            registrations,
+            synced: Mutex::new(synced),
             #[cfg(not(tokio_wasi))]
             waker,
             metrics: IoDriverMetrics::default(),
@@ -151,25 +134,20 @@ impl Driver {
 
     pub(crate) fn shutdown(&mut self, rt_handle: &driver::Handle) {
         let handle = rt_handle.io();
+        let ios = handle.registrations.shutdown(&mut handle.synced.lock());
 
-        if handle.shutdown() {
-            self.resources.for_each(|io| {
-                // If a task is waiting on the I/O resource, notify it that the
-                // runtime is being shutdown. And shutdown will clear all wakers.
-                io.shutdown();
-            });
+        // `shutdown()` must be called without holding the lock.
+        for io in ios {
+            io.shutdown();
         }
     }
 
     fn turn(&mut self, handle: &Handle, max_wait: Option<Duration>) {
-        // How often to call `compact()` on the resource slab
-        const COMPACT_INTERVAL: u8 = 255;
+        debug_assert!(!handle.registrations.is_shutdown(&handle.synced.lock()));
 
         self.tick = self.tick.wrapping_add(1);
 
-        if self.tick == COMPACT_INTERVAL {
-            self.resources.compact()
-        }
+        handle.release_pending_registrations();
 
         let events = &mut self.events;
 
@@ -196,35 +174,24 @@ impl Driver {
             } else if token == TOKEN_SIGNAL {
                 self.signal_ready = true;
             } else {
-                Self::dispatch(
-                    &mut self.resources,
-                    self.tick,
-                    token,
-                    Ready::from_mio(event),
-                );
+                let ready = Ready::from_mio(event);
+                // Use std::ptr::from_exposed_addr when stable
+                let ptr: *const ScheduledIo = token.0 as *const _;
+
+                // Safety: we ensure that the pointers used as tokens are not freed
+                // until they are both deregistered from mio **and** we know the I/O
+                // driver is not concurrently polling. The I/O driver holds ownership of
+                // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
+                let io: &ScheduledIo = unsafe { &*ptr };
+
+                io.set_readiness(Tick::Set(self.tick), |curr| curr | ready);
+                io.wake(ready);
+
                 ready_count += 1;
             }
         }
 
         handle.metrics.incr_ready_count_by(ready_count);
-    }
-
-    fn dispatch(resources: &mut Slab<ScheduledIo>, tick: u8, token: mio::Token, ready: Ready) {
-        let addr = slab::Address::from_usize(ADDRESS.unpack(token.0));
-
-        let io = match resources.get(addr) {
-            Some(io) => io,
-            None => return,
-        };
-
-        let res = io.set_readiness(Some(token.0), Tick::Set(tick), |curr| curr | ready);
-
-        if res.is_err() {
-            // token no longer valid!
-            return;
-        }
-
-        io.wake(ready);
     }
 }
 
@@ -256,69 +223,50 @@ impl Handle {
         &self,
         source: &mut impl mio::event::Source,
         interest: Interest,
-    ) -> io::Result<slab::Ref<ScheduledIo>> {
-        let (address, shared) = self.allocate()?;
+    ) -> io::Result<Arc<ScheduledIo>> {
+        let scheduled_io = self.registrations.allocate(&mut self.synced.lock())?;
+        let token = scheduled_io.token();
 
-        let token = GENERATION.pack(shared.generation(), ADDRESS.pack(address.as_usize(), 0));
+        // TODO: if this returns an err, the `ScheduledIo` leaks...
+        self.registry.register(source, token, interest.to_mio())?;
 
-        self.registry
-            .register(source, mio::Token(token), interest.to_mio())?;
-
+        // TODO: move this logic to `RegistrationSet` and use a `CountedLinkedList`
         self.metrics.incr_fd_count();
 
-        Ok(shared)
+        Ok(scheduled_io)
     }
 
     /// Deregisters an I/O resource from the reactor.
-    pub(super) fn deregister_source(&self, source: &mut impl mio::event::Source) -> io::Result<()> {
+    pub(super) fn deregister_source(
+        &self,
+        registration: &Arc<ScheduledIo>,
+        source: &mut impl Source,
+    ) -> io::Result<()> {
+        // Deregister the source with the OS poller **first**
         self.registry.deregister(source)?;
+
+        if self
+            .registrations
+            .deregister(&mut self.synced.lock(), registration)
+        {
+            self.unpark();
+        }
 
         self.metrics.dec_fd_count();
 
         Ok(())
     }
 
-    /// shutdown the dispatcher.
-    fn shutdown(&self) -> bool {
-        let mut io = self.io_dispatch.write().unwrap();
-        if io.is_shutdown {
-            return false;
+    fn release_pending_registrations(&self) {
+        if self.registrations.needs_release() {
+            self.registrations.release(&mut self.synced.lock());
         }
-        io.is_shutdown = true;
-        true
-    }
-
-    fn allocate(&self) -> io::Result<(slab::Address, slab::Ref<ScheduledIo>)> {
-        let io = self.io_dispatch.read().unwrap();
-        if io.is_shutdown {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
-            ));
-        }
-        io.allocator.allocate().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                "reactor at max registered I/O resources",
-            )
-        })
     }
 }
 
 impl fmt::Debug for Handle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Handle")
-    }
-}
-
-// ===== impl IoDispatcher =====
-
-impl IoDispatcher {
-    fn new(allocator: slab::Allocator<ScheduledIo>) -> Self {
-        Self {
-            allocator,
-            is_shutdown: false,
-        }
     }
 }
 
