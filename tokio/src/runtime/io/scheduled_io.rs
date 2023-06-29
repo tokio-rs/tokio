@@ -106,6 +106,7 @@ impl Default for ScheduledIo {
 
 impl ScheduledIo {
     pub(crate) fn token(&self) -> mio::Token {
+        // use `expose_addr` when stable
         mio::Token(self as *const _ as usize)
     }
 

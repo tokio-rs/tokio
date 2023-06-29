@@ -175,6 +175,7 @@ impl Driver {
                 self.signal_ready = true;
             } else {
                 let ready = Ready::from_mio(event);
+                // Use std::ptr::from_exposed_addr when stable
                 let ptr: *const ScheduledIo = token.0 as *const _;
 
                 // Safety: we ensure that the pointers used as tokens are not freed

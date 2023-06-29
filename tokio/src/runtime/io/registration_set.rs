@@ -60,7 +60,7 @@ impl RegistrationSet {
 
         let ret = Arc::new(ScheduledIo::default());
 
-        // Push a ref into the
+        // Push a ref into the list of all resources.
         synced.registrations.push_front(ret.clone());
 
         Ok(ret)
