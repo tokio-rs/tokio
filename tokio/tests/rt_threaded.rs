@@ -609,7 +609,9 @@ fn test_nested_block_in_place_with_block_on_between() {
                         tokio::task::block_in_place(|| {});
                     });
                 })
-            }).await.unwrap()
+            })
+            .await
+            .unwrap()
         });
     }
 }
