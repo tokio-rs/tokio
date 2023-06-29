@@ -1,3 +1,11 @@
+# 1.29.1 (June 29, 2023)
+
+### Fixed
+
+- rt: fix nesting two `block_in_place` with a `block_on` between ([#5837])
+
+[#5837]: https://github.com/tokio-rs/tokio/pull/5837
+
 # 1.29.0 (June 27, 2023)
 
 Technically a breaking change, the `Send` implementation is removed from
