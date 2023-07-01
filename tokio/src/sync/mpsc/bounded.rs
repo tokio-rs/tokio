@@ -44,10 +44,10 @@ pub struct Sender<T> {
 /// async fn main() {
 ///     let (tx, _rx) = channel::<i32>(15);
 ///     let tx_weak = tx.downgrade();
-///   
+///
 ///     // Upgrading will succeed because `tx` still exists.
 ///     assert!(tx_weak.upgrade().is_some());
-///   
+///
 ///     // If we drop `tx`, then it will fail.
 ///     drop(tx);
 ///     assert!(tx_weak.clone().upgrade().is_none());
@@ -228,6 +228,14 @@ impl<T> Receiver<T> {
     pub async fn recv(&mut self) -> Option<T> {
         use crate::future::poll_fn;
         poll_fn(|cx| self.chan.recv(cx)).await
+    }
+    /// Receives the all available values for this receiver.
+    ///
+    /// Returns an empty vector if has been closed and there are
+    /// no remaining messages in the channel's buffer.
+    pub async fn recv_many(&mut self) -> Vec<T> {
+        use crate::future::poll_fn;
+        poll_fn(|cx| self.chan.recv_many(cx)).await
     }
 
     /// Tries to receive the next value for this receiver.
@@ -1072,7 +1080,7 @@ impl<T> Sender<T> {
     /// #[tokio::main]
     /// async fn main() {
     ///     let (tx, _rx) = mpsc::channel::<()>(5);
-    ///      
+    ///
     ///     // both max capacity and capacity are the same at first
     ///     assert_eq!(tx.max_capacity(), 5);
     ///     assert_eq!(tx.capacity(), 5);

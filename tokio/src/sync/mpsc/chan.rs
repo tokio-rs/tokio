@@ -41,9 +41,13 @@ pub(crate) trait Semaphore {
 
     fn add_permit(&self);
 
+    fn add_permits(&self, n:usize);
+
     fn close(&self);
 
     fn is_closed(&self) -> bool;
+
+    fn num_acquired(&self) -> usize;
 }
 
 pub(super) struct Chan<T, S> {
@@ -293,6 +297,72 @@ impl<T, S: Semaphore> Rx<T, S> {
         })
     }
 
+    pub(crate) fn recv_many(&mut self, cx: &mut Context<'_>) -> Poll<Vec<T>> {
+        use super::block::Read::*;
+
+        ready!(crate::trace::trace_leaf(cx));
+
+        // Keep track of task budget
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+
+        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
+            let rx_fields = unsafe { &mut *rx_fields_ptr };
+
+            macro_rules! try_recv {
+                () => {
+                    match rx_fields.list.pop(&self.inner.tx) {
+                        Some(Value(value)) => {
+                            let capacity = self.inner.semaphore.num_acquired();
+                            let mut result : Vec<T> = Vec::with_capacity( capacity );
+                            result.push(value);
+                            let mut next = rx_fields.list.peek();
+                            while (result.len() < capacity && match next {
+                                Some(Value(value)) => {
+                                    rx_fields.list.pop(&self.inner.tx);
+                                    result.push(value);
+                                    next = rx_fields.list.peek();
+                                    true }
+                                _ => false
+                            }) {}
+                            self.inner.semaphore.add_permits(result.len());
+                            coop.made_progress();
+                            return Ready(result);
+                        }
+                        Some(Closed) => {
+                            // TODO: This check may not be required as it most
+                            // likely can only return `true` at this point. A
+                            // channel is closed when all tx handles are
+                            // dropped. Dropping a tx handle releases memory,
+                            // which ensures that if dropping the tx handle is
+                            // visible, then all messages sent are also visible.
+                            assert!(self.inner.semaphore.is_idle());
+                            coop.made_progress();
+                            return Ready(vec![]);
+                        }
+                        None => {} // fall through
+                    }
+                };
+            }
+
+            try_recv!();
+
+            self.inner.rx_waker.register_by_ref(cx.waker());
+
+            // It is possible that a value was pushed between attempting to read
+            // and registering the task, so we have to check the channel a
+            // second time here.
+            try_recv!();
+
+            if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
+                coop.made_progress();
+                Ready(vec![])
+            } else {
+                Pending
+            }
+        })
+    }
+
+
     /// Try to receive the next value.
     pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
         use super::list::TryPopResult;
@@ -389,6 +459,10 @@ impl Semaphore for bounded::Semaphore {
         self.semaphore.release(1)
     }
 
+    fn add_permits(&self, n:usize) {
+        self.semaphore.release(n)
+    }
+
     fn is_idle(&self) -> bool {
         self.semaphore.available_permits() == self.bound
     }
@@ -400,6 +474,10 @@ impl Semaphore for bounded::Semaphore {
     fn is_closed(&self) -> bool {
         self.semaphore.is_closed()
     }
+
+    fn num_acquired(&self) -> usize {
+        self.bound - self.semaphore.available_permits()
+    }
 }
 
 // ===== impl Semaphore for AtomicUsize =====
@@ -407,6 +485,15 @@ impl Semaphore for bounded::Semaphore {
 impl Semaphore for unbounded::Semaphore {
     fn add_permit(&self) {
         let prev = self.0.fetch_sub(2, Release);
+
+        if prev >> 1 == 0 {
+            // Something went wrong
+            process::abort();
+        }
+    }
+
+    fn add_permits(&self, n:usize) {
+        let prev = self.0.fetch_sub(n << 1, Release);
 
         if prev >> 1 == 0 {
             // Something went wrong
@@ -425,4 +512,9 @@ impl Semaphore for unbounded::Semaphore {
     fn is_closed(&self) -> bool {
         self.0.load(Acquire) & 1 == 1
     }
+
+    fn num_acquired(&self) -> usize {
+        self.0.load(Acquire) >> 1
+    }
+
 }

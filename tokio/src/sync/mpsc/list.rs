@@ -252,6 +252,22 @@ impl<T> Rx<T> {
         }
     }
 
+    /// Peeks at the next value on the queue, if any.
+    pub(crate) fn peek(&mut self) -> Option<block::Read<T>> {
+        // Advance `head`, if needed
+        if !self.try_advancing_head() {
+            return None;
+        }
+
+        unsafe {
+            let block = self.head.as_ref();
+
+            let ret = block.read(self.index);
+
+            ret
+        }
+    }
+
     /// Pops the next value off the queue, detecting whether the block
     /// is busy or empty on failure.
     ///

@@ -122,6 +122,21 @@ async fn async_send_recv_with_buffer() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
+async fn async_send_recv_many_with_buffer() {
+    let (tx, mut rx) = mpsc::channel(16);
+
+    tokio::spawn(async move {
+        assert_ok!(tx.send(1).await);
+        assert_ok!(tx.send(2).await);
+    });
+
+    assert_eq!(vec![1, 2], rx.recv_many().await);
+    assert_eq!(None, rx.recv().await);
+}
+
+
+#[tokio::test]
+#[cfg(feature = "full")]
 async fn start_send_past_cap() {
     use std::future::Future;
 
@@ -170,6 +185,21 @@ async fn send_recv_unbounded() {
 
     assert_eq!(rx.recv().await, Some(1));
     assert_eq!(rx.recv().await, Some(2));
+
+    drop(tx);
+
+    assert!(rx.recv().await.is_none());
+}
+
+#[maybe_tokio_test]
+async fn send_recv_many_unbounded() {
+    let (tx, mut rx) = mpsc::unbounded_channel::<i32>();
+
+    // Using `try_send`
+    assert_ok!(tx.send(1));
+    assert_ok!(tx.send(2));
+
+    assert_eq!(rx.recv_many().await, vec![1,2]);
 
     drop(tx);
 
