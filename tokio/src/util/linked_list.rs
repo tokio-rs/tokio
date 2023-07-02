@@ -297,7 +297,7 @@ impl<L: Link> Default for LinkedList<L, L::Target> {
 
 // ===== impl DrainFilter =====
 
-cfg_io_readiness! {
+cfg_io_driver_impl! {
     pub(crate) struct DrainFilter<'a, T: Link, F> {
         list: &'a mut LinkedList<T, T::Target>,
         filter: F,
@@ -307,7 +307,7 @@ cfg_io_readiness! {
     impl<T: Link> LinkedList<T, T::Target> {
         pub(crate) fn drain_filter<F>(&mut self, filter: F) -> DrainFilter<'_, T, F>
         where
-            F: FnMut(&mut T::Target) -> bool,
+            F: FnMut(&T::Target) -> bool,
         {
             let curr = self.head;
             DrainFilter {
@@ -321,7 +321,7 @@ cfg_io_readiness! {
     impl<'a, T, F> Iterator for DrainFilter<'a, T, F>
     where
         T: Link,
-        F: FnMut(&mut T::Target) -> bool,
+        F: FnMut(&T::Target) -> bool,
     {
         type Item = T::Handle;
 
