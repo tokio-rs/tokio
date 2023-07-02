@@ -296,6 +296,15 @@ mod unstable {
     use tokio::runtime::{Builder, RngSeed, UnhandledPanic};
 
     #[test]
+    fn customize_rt_coop_budget() {
+        let _rt = Builder::new_current_thread()
+            .enable_all()
+            .coop_budget(16)
+            .build()
+            .unwrap();
+    }
+
+    #[test]
     #[should_panic(
         expected = "a spawned task panicked and the runtime is configured to shut down on unhandled panic"
     )]

@@ -53,13 +53,11 @@ impl Budget {
     /// Note that as more yield points are added in the ecosystem, this value
     /// will probably also have to be raised.
     pub(super) const fn initial() -> Budget {
-        Budget(Some(128))
+        Budget::new(128)
     }
 
-    cfg_unstable! {
-        pub(super) fn new(val: u8) -> Budget {
-            Budget(Some(val))
-        }
+    pub(super) const fn new(val: u8) -> Budget {
+        Budget(Some(val))
     }
 
     /// Returns an unconstrained budget. Operations will not be limited.
