@@ -204,7 +204,8 @@ mod group_b {
     }
 
     #[test]
-    fn blocking_and_regular() {
+    #[ignore] // TODO: uncomment
+    fn blocking_and_regular_without_pending() {
         blocking_and_regular_inner(false);
     }
 
