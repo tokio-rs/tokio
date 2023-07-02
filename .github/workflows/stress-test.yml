@@ -28,14 +28,14 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
-      - uses: Swatinem/rust-cache@v2
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
 
+      - uses: Swatinem/rust-cache@v2
       # Compiles each of the stress test examples.
       - name: Compile stress test examples
         run: cargo build -p stress-test --release --example ${{ matrix.stress-test }}
 
       # Runs each of the examples using Valgrind. Detects leaks and displays them.
       - name: Run valgrind
-        run: valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all ./target/release/examples/${{ matrix.stress-test }}
+        run: valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all --fair-sched=yes ./target/release/examples/${{ matrix.stress-test }}
