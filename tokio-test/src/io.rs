@@ -409,6 +409,20 @@ impl AsyncWrite for Mock {
             // If a sleep is set, it has already fired
             self.inner.sleep = None;
 
+            if self.inner.actions.is_empty() {
+                match self.inner.poll_action(cx) {
+                    Poll::Pending => {
+                        // do not propagate pending
+                    }
+                    Poll::Ready(Some(action)) => {
+                        self.inner.actions.push_back(action);
+                    }
+                    Poll::Ready(None) => {
+                        panic!("unexpected write");
+                    }
+                }
+            }
+
             match self.inner.write(buf) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {

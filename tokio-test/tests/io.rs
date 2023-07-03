@@ -52,6 +52,29 @@ async fn write() {
 }
 
 #[tokio::test]
+async fn write_with_handle() {
+    let (mut mock, mut handle) = Builder::new().build_with_handle();
+    handle.write(b"hello ");
+    handle.write(b"world!");
+
+    mock.write_all(b"hello ").await.expect("write 1");
+    mock.write_all(b"world!").await.expect("write 2");
+}
+
+#[tokio::test]
+async fn read_with_handle() {
+    let (mut mock, mut handle) = Builder::new().build_with_handle();
+    handle.read(b"hello ");
+    handle.read(b"world!");
+
+    let mut buf = vec![0; 6];
+    mock.read_exact(&mut buf).await.expect("read 1");
+    assert_eq!(&buf[..], b"hello ");
+    mock.read_exact(&mut buf).await.expect("read 2");
+    assert_eq!(&buf[..], b"world!");
+}
+
+#[tokio::test]
 async fn write_error() {
     let error = io::Error::new(io::ErrorKind::Other, "cruel");
     let mut mock = Builder::new()
