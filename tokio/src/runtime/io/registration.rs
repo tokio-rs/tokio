@@ -3,10 +3,10 @@
 use crate::io::interest::Interest;
 use crate::runtime::io::{Direction, Handle, ReadyEvent, ScheduledIo};
 use crate::runtime::scheduler;
-use crate::util::slab;
 
 use mio::event::Source;
 use std::io;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 cfg_io_driver! {
@@ -45,10 +45,12 @@ cfg_io_driver! {
     #[derive(Debug)]
     pub(crate) struct Registration {
         /// Handle to the associated runtime.
+        ///
+        /// TODO: this can probably be moved into `ScheduledIo`.
         handle: scheduler::Handle,
 
         /// Reference to state stored by the driver.
-        shared: slab::Ref<ScheduledIo>,
+        shared: Arc<ScheduledIo>,
     }
 }
 
@@ -95,7 +97,7 @@ impl Registration {
     ///
     /// `Err` is returned if an error is encountered.
     pub(crate) fn deregister(&mut self, io: &mut impl Source) -> io::Result<()> {
-        self.handle().deregister_source(io)
+        self.handle().deregister_source(&self.shared, io)
     }
 
     pub(crate) fn clear_readiness(&self, event: ReadyEvent) {
@@ -199,6 +201,33 @@ impl Registration {
         }
     }
 
+    pub(crate) async fn readiness(&self, interest: Interest) -> io::Result<ReadyEvent> {
+        let ev = self.shared.readiness(interest).await;
+
+        if ev.is_shutdown {
+            return Err(gone());
+        }
+
+        Ok(ev)
+    }
+
+    pub(crate) async fn async_io<R>(
+        &self,
+        interest: Interest,
+        mut f: impl FnMut() -> io::Result<R>,
+    ) -> io::Result<R> {
+        loop {
+            let event = self.readiness(interest).await?;
+
+            match f() {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.clear_readiness(event);
+                }
+                x => return x,
+            }
+        }
+    }
+
     fn handle(&self) -> &Handle {
         self.handle.driver().io()
     }
@@ -222,31 +251,4 @@ fn gone() -> io::Error {
         io::ErrorKind::Other,
         crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
     )
-}
-
-cfg_io_readiness! {
-    impl Registration {
-        pub(crate) async fn readiness(&self, interest: Interest) -> io::Result<ReadyEvent> {
-            let ev = self.shared.readiness(interest).await;
-
-            if ev.is_shutdown {
-                return Err(gone())
-            }
-
-            Ok(ev)
-        }
-
-        pub(crate) async fn async_io<R>(&self, interest: Interest, mut f: impl FnMut() -> io::Result<R>) -> io::Result<R> {
-            loop {
-                let event = self.readiness(interest).await?;
-
-                match f() {
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        self.clear_readiness(event);
-                    }
-                    x => return x,
-                }
-            }
-        }
-    }
 }
