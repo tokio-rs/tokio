@@ -34,7 +34,7 @@ rt = ["tokio/rt", "tokio/sync", "futures-util", "hashbrown"]
 __docs_rs = ["futures-util"]
 
 [dependencies]
-tokio = { version = "1.22.0", path = "../tokio", features = ["sync"] }
+tokio = { version = "1.28.0", path = "../tokio", features = ["sync"] }
 bytes = "1.0.0"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
@@ -56,6 +56,7 @@ async-stream = "0.3.0"
 futures = "0.3.0"
 futures-test = "0.3.5"
 parking_lot = "0.12.0"
+tempfile = "3.1.0"
 
 [package.metadata.docs.rs]
 all-features = true

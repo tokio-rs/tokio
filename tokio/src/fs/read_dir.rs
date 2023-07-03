@@ -139,7 +139,9 @@ impl ReadDir {
                     target_os = "solaris",
                     target_os = "illumos",
                     target_os = "haiku",
-                    target_os = "vxworks"
+                    target_os = "vxworks",
+                    target_os = "nto",
+                    target_os = "vita",
                 )))]
                 file_type: std.file_type().ok(),
                 std: Arc::new(std),
@@ -200,7 +202,9 @@ pub struct DirEntry {
         target_os = "solaris",
         target_os = "illumos",
         target_os = "haiku",
-        target_os = "vxworks"
+        target_os = "vxworks",
+        target_os = "nto",
+        target_os = "vita",
     )))]
     file_type: Option<FileType>,
     std: Arc<std::fs::DirEntry>,
@@ -331,7 +335,9 @@ impl DirEntry {
             target_os = "solaris",
             target_os = "illumos",
             target_os = "haiku",
-            target_os = "vxworks"
+            target_os = "vxworks",
+            target_os = "nto",
+            target_os = "vita",
         )))]
         if let Some(file_type) = self.file_type {
             return Ok(file_type);
