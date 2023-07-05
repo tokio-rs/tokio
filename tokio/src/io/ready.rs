@@ -254,7 +254,7 @@ impl Ready {
             ready |= Ready::READ_CLOSED;
         }
 
-        // error readiness is reported regardless of interest
+        // an event with the error readiness matches any interest
         ready |= Ready::ERROR;
 
         ready
