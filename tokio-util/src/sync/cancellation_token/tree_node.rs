@@ -298,12 +298,15 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
     if locked_node.is_cancelled {
         return;
     }
+    println!("a");
 
     // One by one, adopt grandchildren and then cancel and detach the child
     while let Some(child) = locked_node.children.pop() {
+        println!("b1");
         // This can't deadlock because the mutex we are already
         // holding is the parent of child.
         let mut locked_child = child.inner.lock().unwrap();
+        println!("b2");
 
         // Detach the child from node
         // No need to modify node.children, as the child already got removed with `.pop`
@@ -356,10 +359,12 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         // Now the child is cancelled and detached and all its children are adopted.
         // Just continue until all (including adopted) children are cancelled and detached.
     }
+    println!("c");
 
     // Cancel the node itself.
     locked_node.is_cancelled = true;
     locked_node.children = Vec::new();
     drop(locked_node);
     node.waker.notify_waiters();
+    println!("d");
 }

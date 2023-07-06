@@ -13,3 +13,6 @@ pub use poll_semaphore::PollSemaphore;
 
 mod reusable_box;
 pub use reusable_box::ReusableBoxFuture;
+
+#[cfg(loom)]
+mod tests;
