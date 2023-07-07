@@ -867,7 +867,7 @@ impl Core {
         if self.is_searching {
             return false;
         }
-        self.lifo_slot.is_some() as usize + self.run_queue.len() > 1
+        self.lifo_slot.as_ref().map_or(0, |_| { 1 }) + self.run_queue.len() > 1
     }
 
     /// Prepares the worker state for parking.
