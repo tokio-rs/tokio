@@ -25,7 +25,7 @@ cfg_rt_multi_thread! {
 /// # Shutdown
 ///
 /// Shutting down the runtime is done by dropping the value, or calling
-/// [`Runtime::shutdown_background`] or [`Runtime::shutdown_timeout`].
+/// [`shutdown_background`] or [`shutdown_timeout`].
 ///
 /// Tasks spawned through [`Runtime::spawn`] keep running until they yield.
 /// Then they are dropped. They are not *guaranteed* to run to completion, but
@@ -38,11 +38,11 @@ cfg_rt_multi_thread! {
 /// stopped. This can take an indefinite amount of time. The `Drop`
 /// implementation waits forever for this.
 ///
-/// `shutdown_background` and `shutdown_timeout` can be used if waiting forever
-/// is undesired. When the timeout is reached, spawned work that did not stop
-/// in time and threads running it are leaked. The work continues to run until
-/// one of the stopping conditions is fulfilled, but the thread initiating the
-/// shutdown is unblocked.
+/// The [`shutdown_background`] and [`shutdown_timeout`] methods can be used if
+/// waiting forever is undesired. When the timeout is reached, spawned work that
+/// did not stop in time and threads running it are leaked. The work continues
+/// to run until one of the stopping conditions is fulfilled, but the thread
+/// initiating the shutdown is unblocked.
 ///
 /// Once the runtime has been dropped, any outstanding I/O resources bound to
 /// it will no longer function. Calling any method on them will result in an
@@ -50,18 +50,43 @@ cfg_rt_multi_thread! {
 ///
 /// # Sharing
 ///
-/// The Tokio runtime implements `Sync` and `Send` to allow you to wrap it
-/// in a `Arc`. Most fn take `&self` to allow you to call them concurrently
-/// across multiple threads.
+/// There are several ways to establish shared access to a Tokio runtime:
 ///
-/// Calls to `shutdown` and `shutdown_timeout` require exclusive ownership of
-/// the runtime type and this can be achieved via `Arc::try_unwrap` when only
-/// one strong count reference is left over.
+///  * Using an <code>[Arc]\<Runtime></code>.
+///  * Using a [`Handle`].
+///  * Entering the runtime context.
+///
+/// Using an <code>[Arc]\<Runtime></code> or [`Handle`] allows you to do various
+/// things with the runtime such as spawning new tasks or entering the runtime
+/// context. Both types can be cloned to create a new handle that allows access
+/// to the same runtime. By passing clones into different tasks or threads, you
+/// will be able to access the runtime from those tasks or threads.
+///
+/// The difference between <code>[Arc]\<Runtime></code> and [`Handle`] is that
+/// an <code>[Arc]\<Runtime></code> will prevent the runtime from shutting down,
+/// whereas a [`Handle`] does not prevent that. This is because shutdown of the
+/// runtime happens when the destructor of the `Runtime` object runs.
+///
+/// Calls to [`shutdown_background`] and [`shutdown_timeout`] require exclusive
+/// ownership of the `Runtime` type. When using an <code>[Arc]\<Runtime></code>,
+/// this can be achieved via [`Arc::try_unwrap`] when only one strong count
+/// reference is left over.
+///
+/// The runtime context is entered using the [`Runtime::enter`] or
+/// [`Handle::enter`] methods, which use a thread-local variable to store the
+/// current runtime. Whenever you are inside the runtime context, methods such
+/// as [`tokio::spawn`] will use the runtime whose context you are inside.
 ///
 /// [timer]: crate::time
 /// [mod]: index.html
 /// [`new`]: method@Self::new
 /// [`Builder`]: struct@Builder
+/// [`Handle`]: struct@Handle
+/// [`tokio::spawn`]: crate::spawn
+/// [`Arc::try_unwrap`]: std::sync::Arc::try_unwrap
+/// [Arc]: std::sync::Arc
+/// [`shutdown_background`]: method@Runtime::shutdown_background
+/// [`shutdown_timeout`]: method@Runtime::shutdown_timeout
 #[derive(Debug)]
 pub struct Runtime {
     /// Task scheduler
