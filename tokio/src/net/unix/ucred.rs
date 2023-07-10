@@ -45,7 +45,7 @@ pub(crate) use self::impl_netbsd::get_peer_cred;
 #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
 pub(crate) use self::impl_bsd::get_peer_cred;
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
 pub(crate) use self::impl_macos::get_peer_cred;
 
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
@@ -187,7 +187,7 @@ pub(crate) mod impl_bsd {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
 pub(crate) mod impl_macos {
     use crate::net::unix::{self, UnixStream};
 
