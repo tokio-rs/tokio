@@ -5,65 +5,70 @@ use crate::io::ready::Ready;
 use std::fmt;
 use std::ops;
 
+// These must be unique.
+// same as mio
+const READABLE: usize = 0b0001;
+const WRITABLE: usize = 0b0010;
+// The following are not available on all platforms.
+#[cfg(target_os = "freebsd")]
+const AIO: usize = 0b0100;
+#[cfg(target_os = "freebsd")]
+const LIO: usize = 0b1000;
+#[cfg(any(target_os = "linux", target_os = "android"))]
+const PRIORITY: usize = 0b0001_0000;
+// error is available on all platforms, but behavior is platform-specific
+// mio does not have this interest
+const ERROR: usize = 0b0010_0000;
+
 /// Readiness event interest.
 ///
 /// Specifies the readiness events the caller is interested in when awaiting on
 /// I/O resource readiness states.
 #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct Interest {
-    mio: Option<mio::Interest>,
-    has_error_interest: bool,
-}
+pub struct Interest(usize);
 
 impl Interest {
-    const fn new(mio: mio::Interest) -> Self {
-        Self {
-            mio: Some(mio),
-            has_error_interest: false,
-        }
-    }
-
     // The non-FreeBSD definitions in this block are active only when
     // building documentation.
     cfg_aio! {
         /// Interest for POSIX AIO.
         #[cfg(target_os = "freebsd")]
-        pub const AIO: Interest = Interest::new(mio::Interest::AIO);
+        pub const AIO: Interest = Interest(AIO);
 
         /// Interest for POSIX AIO.
         #[cfg(not(target_os = "freebsd"))]
-        pub const AIO: Interest = Interest::new(mio::Interest::READABLE);
+        pub const AIO: Interest = Interest(READABLE);
 
         /// Interest for POSIX AIO lio_listio events.
         #[cfg(target_os = "freebsd")]
-        pub const LIO: Interest = Interest::new(mio::Interest::LIO);
+        pub const LIO: Interest = Interest(LIO);
 
         /// Interest for POSIX AIO lio_listio events.
         #[cfg(not(target_os = "freebsd"))]
-        pub const LIO: Interest = Interest::new(mio::Interest::READABLE);
+        pub const LIO: Interest = Interest(READABLE);
     }
 
     /// Interest in all readable events.
     ///
     /// Readable interest includes read-closed events.
-    pub const READABLE: Interest = Interest::new(mio::Interest::READABLE);
+    pub const READABLE: Interest = Interest(READABLE);
 
     /// Interest in all writable events.
     ///
     /// Writable interest includes write-closed events.
-    pub const WRITABLE: Interest = Interest::new(mio::Interest::WRITABLE);
+    pub const WRITABLE: Interest = Interest(WRITABLE);
 
     /// Interest in error events.
-    pub const ERROR: Interest = Interest {
-        mio: None,
-        has_error_interest: true,
-    };
+    ///
+    /// Passes error interest to the underlying OS selector.
+    /// Behavior is platform-specific, read your platform's documentation.
+    pub const ERROR: Interest = Interest(ERROR);
 
     /// Returns a `Interest` set representing priority completion interests.
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
-    pub const PRIORITY: Interest = Interest::new(mio::Interest::PRIORITY);
+    pub const PRIORITY: Interest = Interest(PRIORITY);
 
     /// Returns true if the value includes readable interest.
     ///
@@ -79,10 +84,7 @@ impl Interest {
     /// assert!(both.is_readable());
     /// ```
     pub const fn is_readable(self) -> bool {
-        match self.mio {
-            Some(mio) => mio.is_readable(),
-            None => false,
-        }
+        self.0 & READABLE != 0
     }
 
     /// Returns true if the value includes writable interest.
@@ -99,10 +101,34 @@ impl Interest {
     /// assert!(both.is_writable());
     /// ```
     pub const fn is_writable(self) -> bool {
-        match self.mio {
-            Some(mio) => mio.is_writable(),
-            None => false,
-        }
+        self.0 & WRITABLE != 0
+    }
+
+    /// Returns true if the value includes error interest.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::Interest;
+    ///
+    /// assert!(Interest::ERROR.is_error());
+    /// assert!(!Interest::WRITABLE.is_error());
+    ///
+    /// let combined = Interest::READABLE | Interest::ERROR;
+    /// assert!(combined.is_error());
+    /// ```
+    pub const fn is_error(self) -> bool {
+        self.0 & ERROR != 0
+    }
+
+    #[cfg(target_os = "freebsd")]
+    const fn is_aio(self) -> bool {
+        self.0 & AIO != 0
+    }
+
+    #[cfg(target_os = "freebsd")]
+    const fn is_lio(self) -> bool {
+        self.0 & LIO != 0
     }
 
     /// Returns true if the value includes priority interest.
@@ -121,10 +147,7 @@ impl Interest {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
     pub const fn is_priority(self) -> bool {
-        match self.mio {
-            Some(mio) => mio.is_priority(),
-            None => false,
-        }
+        self.0 & PRIORITY != 0
     }
 
     /// Add together two `Interest` values.
@@ -141,44 +164,51 @@ impl Interest {
     /// assert!(BOTH.is_readable());
     /// assert!(BOTH.is_writable());
     pub const fn add(self, other: Interest) -> Interest {
-        Interest {
-            mio: match (self.mio, other.mio) {
-                (Some(a), Some(b)) => Some(a.add(b)),
-                (Some(c), None) | (None, Some(c)) => Some(c),
-                (None, None) => None,
-            },
-            has_error_interest: self.has_error_interest || other.has_error_interest,
-        }
-    }
-
-    /// Returns true if the value includes error interest.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::io::Interest;
-    ///
-    /// assert!(Interest::ERROR.is_error());
-    /// assert!(!Interest::WRITABLE.is_error());
-    ///
-    /// let combined = Interest::READABLE | Interest::ERROR;
-    /// assert!(combined.is_error());
-    /// ```
-    pub const fn is_error(self) -> bool {
-        self.has_error_interest
+        Self(self.0 | other.0)
     }
 
     // This function must be crate-private to avoid exposing a `mio` dependency.
-    pub(crate) const fn to_mio(self) -> mio::Interest {
-        match self.mio {
-            Some(mio) => mio,
-            None => {
-                // error interest is implicit, and mio does not have a specific Interest::ERROR
-                // so we provide an arbitrary interest here, and filter out the this readiness
-                // in `Interest::mask` and `Ready::from_interest`.
-                mio::Interest::READABLE
-            }
+    pub(crate) fn to_mio(self) -> mio::Interest {
+        // mio does not allow and empty interest, so pick an arbitrary starting value
+        let mut mio = mio::Interest::READABLE;
+
+        if self.is_readable() {
+            mio |= mio::Interest::READABLE;
         }
+
+        if self.is_writable() {
+            mio |= mio::Interest::WRITABLE;
+        }
+
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if self.is_priority() {
+            mio |= mio::Interest::PRIORITY;
+        }
+
+        #[cfg(target_os = "freebsd")]
+        if self.is_aio() {
+            mio |= mio::Interest::AIO;
+        }
+
+        #[cfg(target_os = "freebsd")]
+        if self.is_lio() {
+            mio |= mio::Interest::LIO;
+        }
+
+        // Finally remove the starting value unless either:
+        //
+        // - the readable interest is specified
+        // - the error interest is specified. There is no error interest in mio, because error
+        //    events are always reported. But mio interests cannot be empty and one is needed
+        //    just for the registeration.
+        //
+        //    read readiness is filtered out in `Interest::mask` or `Ready::from_interest` if
+        //    needed
+        if !self.is_readable() && !self.is_error() {
+            mio.remove(mio::Interest::READABLE);
+        }
+
+        mio
     }
 
     pub(crate) fn mask(self) -> Ready {
@@ -211,22 +241,61 @@ impl ops::BitOrAssign for Interest {
 
 impl fmt::Debug for Interest {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.mio {
-            None => {
-                if self.has_error_interest {
-                    write!(fmt, "ERROR")
-                } else {
-                    Ok(())
-                }
+        let mut separator = false;
+
+        if self.is_readable() {
+            if separator {
+                write!(fmt, " | ")?;
             }
-            Some(mio) => {
-                mio.fmt(fmt)?;
-                if self.has_error_interest {
-                    write!(fmt, " | ERROR")
-                } else {
-                    Ok(())
-                }
-            }
+            write!(fmt, "READABLE")?;
+            separator = true;
         }
+
+        if self.is_writable() {
+            if separator {
+                write!(fmt, " | ")?;
+            }
+            write!(fmt, "WRITABLE")?;
+            separator = true;
+        }
+
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if self.is_priority() {
+            if separator {
+                write!(fmt, " | ")?;
+            }
+            write!(fmt, "PRIORITY")?;
+            separator = true;
+        }
+
+        #[cfg(target_os = "freebsd")]
+        if self.is_aio() {
+            if separator {
+                write!(fmt, " | ")?;
+            }
+            write!(fmt, "AIO")?;
+            separator = true;
+        }
+
+        #[cfg(target_os = "freebsd")]
+        if self.is_lio() {
+            if separator {
+                write!(fmt, " | ")?;
+            }
+            write!(fmt, "LIO")?;
+            separator = true;
+        }
+
+        if self.is_error() {
+            if separator {
+                write!(fmt, " | ")?;
+            }
+            write!(fmt, "ERROR")?;
+            separator = true;
+        }
+
+        let _ = separator;
+
+        Ok(())
     }
 }
