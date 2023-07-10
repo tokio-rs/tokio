@@ -52,3 +52,23 @@ jobs:
           LOOM_MAX_PREEMPTIONS: ${{ matrix.max_preemptions }}
           LOOM_MAX_BRANCHES: 10000
           SCOPE: ${{ matrix.scope }}
+  loom-util:
+    name: loom on tokio-util
+    # base_ref is null when it's not a pull request
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom') || (github.base_ref == null))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      - name: loom tokio-util
+        run: cargo test --lib --release --features full -- --nocapture $SCOPE
+        working-directory: tokio-util
+        env:
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings -C debug-assertions
+          LOOM_MAX_PREEMPTIONS: ${{ matrix.max_preemptions }}
+          LOOM_MAX_BRANCHES: 10000
+          SCOPE: ${{ matrix.scope }}
