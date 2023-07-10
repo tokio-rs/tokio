@@ -254,8 +254,9 @@ impl Ready {
             ready |= Ready::READ_CLOSED;
         }
 
-        // an event with the error readiness matches any interest
-        ready |= Ready::ERROR;
+        if interest.is_error() {
+            ready |= Ready::ERROR;
+        }
 
         ready
     }

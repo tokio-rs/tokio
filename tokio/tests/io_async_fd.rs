@@ -711,7 +711,7 @@ async fn await_error_readiness_timestamping() {
     fd.get_ref().send(buf).unwrap();
 
     // the send timestamp should now be in the error queue
-    let guard = fd.ready(Interest::READABLE).await.unwrap();
+    let guard = fd.ready(Interest::ERROR).await.unwrap();
     assert_eq!(guard.ready(), Ready::ERROR);
 }
 
@@ -799,7 +799,6 @@ async fn await_error_readiness_invalid_address() {
 
     let fd = AsyncFd::new(socket).unwrap();
 
-    let guard = fd.ready(Interest::READABLE).await.unwrap();
-
+    let guard = fd.ready(Interest::ERROR).await.unwrap();
     assert_eq!(guard.ready(), Ready::ERROR);
 }
