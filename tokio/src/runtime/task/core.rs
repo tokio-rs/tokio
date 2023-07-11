@@ -237,18 +237,24 @@ impl<T: Future, S: Schedule> Cell<T, S> {
 
         #[cfg(debug_assertions)]
         {
-            let trailer_addr = (&result.trailer) as *const Trailer as usize;
-            let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(&result.header)) };
-            assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
+            // Using a separate function for this code avoids instantiating it separately for every `T`.
+            unsafe fn check<S>(header: &Header, trailer: &Trailer, scheduler: &S, task_id: &Id) {
+                let trailer_addr = trailer as *const Trailer as usize;
+                let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(header)) };
+                assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
 
-            let scheduler_addr = (&result.core.scheduler) as *const S as usize;
-            let scheduler_ptr =
-                unsafe { Header::get_scheduler::<S>(NonNull::from(&result.header)) };
-            assert_eq!(scheduler_addr, scheduler_ptr.as_ptr() as usize);
+                let scheduler_addr = scheduler as *const S as usize;
+                let scheduler_ptr =
+                    unsafe { Header::get_scheduler::<S>(NonNull::from(header)) };
+                assert_eq!(scheduler_addr, scheduler_ptr.as_ptr() as usize);
 
-            let id_addr = (&result.core.task_id) as *const Id as usize;
-            let id_ptr = unsafe { Header::get_id_ptr(NonNull::from(&result.header)) };
-            assert_eq!(id_addr, id_ptr.as_ptr() as usize);
+                let id_addr = task_id as *const Id as usize;
+                let id_ptr = unsafe { Header::get_id_ptr(NonNull::from(header)) };
+                assert_eq!(id_addr, id_ptr.as_ptr() as usize);
+            }
+            unsafe {
+                check(&result.header, &result.trailer, &result.core.scheduler, &result.core.task_id);
+            }
         }
 
         result
