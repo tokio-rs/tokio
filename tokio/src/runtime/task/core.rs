@@ -221,7 +221,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
             Header {
                 state,
                 queue_next: UnsafeCell::new(None),
-                vtable,,
+                vtable,
                 owner_id: UnsafeCell::new(0),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
