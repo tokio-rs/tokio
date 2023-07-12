@@ -101,7 +101,10 @@ impl<S: 'static> OwnedTasks<S> {
     }
 
     /// The part of `bind` that's the same for every type of future.
-    unsafe fn bind_inner(&self, task: Task<S>, notified: Notified<S>) -> Option<Notified<S>> {
+    unsafe fn bind_inner(&self, task: Task<S>, notified: Notified<S>) -> Option<Notified<S>>
+    where
+        S: Schedule,
+    {
         unsafe {
             // safety: We just created the task, so we have exclusive access
             // to the field.

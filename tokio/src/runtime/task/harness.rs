@@ -453,15 +453,14 @@ fn cancel_task<T: Future, S: Schedule>(core: &Core<T, S>) {
         core.drop_future_or_output();
     }));
 
-    core.store_output(panic_result_to_join_error(core.task_id, res));
+    core.store_output(Err(panic_result_to_join_error(core.task_id, res)));
 }
 
-fn panic_result_to_join_error(task_id: Id, res: Result<(), Box<dyn Any + Send + 'static>>) {
-    let err = match res {
+fn panic_result_to_join_error(task_id: Id,res: Result<(), Box<dyn Any + Send + 'static>>) -> JoinError {
+    match res {
         Ok(()) => JoinError::cancelled(task_id),
         Err(panic) => JoinError::panic(task_id, panic),
-    };
-    Err(err)
+    }
 }
 
 /// Polls the future. If the future completes, the output is written to the
