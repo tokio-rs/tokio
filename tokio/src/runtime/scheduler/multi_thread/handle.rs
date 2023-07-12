@@ -53,9 +53,7 @@ impl Handle {
     {
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
 
-        if let Some(notified) = notified {
-            me.schedule_task(notified, false);
-        }
+        me.schedule_option_task_without_yield(notified);
 
         handle
     }
