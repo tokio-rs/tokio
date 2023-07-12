@@ -456,7 +456,10 @@ fn cancel_task<T: Future, S: Schedule>(core: &Core<T, S>) {
     core.store_output(Err(panic_result_to_join_error(core.task_id, res)));
 }
 
-fn panic_result_to_join_error(task_id: Id,res: Result<(), Box<dyn Any + Send + 'static>>) -> JoinError {
+fn panic_result_to_join_error(
+    task_id: Id,
+    res: Result<(), Box<dyn Any + Send + 'static>>,
+) -> JoinError {
     match res {
         Ok(()) => JoinError::cancelled(task_id),
         Err(panic) => JoinError::panic(task_id, panic),
