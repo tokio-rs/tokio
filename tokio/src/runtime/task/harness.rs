@@ -4,6 +4,7 @@ use crate::runtime::task::state::{Snapshot, State};
 use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{Id, JoinError, Notified, RawTask, Schedule, Task};
 
+use std::any::Any;
 use std::mem;
 use std::mem::ManuallyDrop;
 use std::panic;
@@ -452,13 +453,13 @@ fn cancel_task<T: Future, S: Schedule>(core: &Core<T, S>) {
         core.drop_future_or_output();
     }));
 
-    core.store_output(panic_result_to_join_error(res));
+    core.store_output(panic_result_to_join_error(core.task_id, res));
 }
 
-fn panic_result_to_join_error(res: Result<(), Box<dyn Any + Send + 'static>>) {
+fn panic_result_to_join_error(task_id: Id, res: Result<(), Box<dyn Any + Send + 'static>>) {
     let err = match res {
-        Ok(()) => JoinError::cancelled(core.task_id),
-        Err(panic) => JoinError::panic(core.task_id, panic),
+        Ok(()) => JoinError::cancelled(task_id),
+        Err(panic) => JoinError::panic(task_id, panic),
     };
     Err(err)
 }
@@ -507,7 +508,7 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
 fn panic_to_error<S: Schedule>(
     scheduler: &S,
     task_id: Id,
-    panic: Box<dyn Any + Send + 'static,
+    panic: Box<dyn Any + Send + 'static>,
 ) -> JoinError {
     scheduler.unhandled_panic();
     JoinError::panic(task_id, panic)

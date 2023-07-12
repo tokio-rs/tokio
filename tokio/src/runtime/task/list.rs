@@ -96,9 +96,7 @@ impl<S: 'static> OwnedTasks<S> {
         T::Output: Send + 'static,
     {
         let (task, notified, join) = super::new_task(task, scheduler, id);
-        let notified = unsafe {
-            self.bind_inner(task, notified)
-        };
+        let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
 

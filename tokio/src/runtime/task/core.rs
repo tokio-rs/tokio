@@ -215,8 +215,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         fn new_header(
             state: State,
             vtable: &'static Vtable,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            tracing_id: Option<tracing::Id>,
+            #[cfg(all(tokio_unstable, feature = "tracing"))] tracing_id: Option<tracing::Id>,
         ) -> Header {
             Header {
                 state,
