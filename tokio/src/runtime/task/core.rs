@@ -244,8 +244,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
 
                 let scheduler_addr = scheduler as *const S as usize;
-                let scheduler_ptr =
-                    unsafe { Header::get_scheduler::<S>(NonNull::from(header)) };
+                let scheduler_ptr = unsafe { Header::get_scheduler::<S>(NonNull::from(header)) };
                 assert_eq!(scheduler_addr, scheduler_ptr.as_ptr() as usize);
 
                 let id_addr = task_id as *const Id as usize;
@@ -253,7 +252,12 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 assert_eq!(id_addr, id_ptr.as_ptr() as usize);
             }
             unsafe {
-                check(&result.header, &result.trailer, &result.core.scheduler, &result.core.task_id);
+                check(
+                    &result.header,
+                    &result.trailer,
+                    &result.core.scheduler,
+                    &result.core.task_id,
+                );
             }
         }
 
