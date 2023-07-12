@@ -192,6 +192,15 @@ where
 
         match self.state().transition_to_running() {
             TransitionToRunning::Success => {
+                // Separated to reduce LLVM codegen
+                fn transition_result_to_poll_future(result: TransitionToIdle) -> PollFuture {
+                    match result {
+                        TransitionToIdle::Ok => PollFuture::Done,
+                        TransitionToIdle::OkNotified => PollFuture::Notified,
+                        TransitionToIdle::OkDealloc => PollFuture::Dealloc,
+                        TransitionToIdle::Cancelled => PollFuture::Complete,
+                    }
+                }
                 let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<T, S>(&header_ptr);
                 let cx = Context::from_waker(&waker_ref);
@@ -202,17 +211,13 @@ where
                     return PollFuture::Complete;
                 }
 
-                match self.state().transition_to_idle() {
-                    TransitionToIdle::Ok => PollFuture::Done,
-                    TransitionToIdle::OkNotified => PollFuture::Notified,
-                    TransitionToIdle::OkDealloc => PollFuture::Dealloc,
-                    TransitionToIdle::Cancelled => {
-                        // The transition to idle failed because the task was
-                        // cancelled during the poll.
-                        cancel_task(self.core());
-                        PollFuture::Complete
-                    }
+                let transition_res = self.state().transition_to_idle();
+                if let &TransitionToIdle::Cancelled = &transition_res {
+                    // The transition to idle failed because the task was
+                    // cancelled during the poll.
+                    cancel_task(self.core());
                 }
+                transition_result_to_poll_future(transition_res)
             }
             TransitionToRunning::Cancelled => {
                 cancel_task(self.core());
