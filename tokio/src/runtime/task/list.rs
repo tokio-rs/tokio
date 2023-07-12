@@ -118,7 +118,7 @@ impl<S: 'static> OwnedTasks<S> {
             None
         } else {
             lock.list.push_front(task);
-            (join, Some(notified))
+            Some(notified)
         }
     }
 
