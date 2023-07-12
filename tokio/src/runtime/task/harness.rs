@@ -2,7 +2,7 @@ use crate::future::Future;
 use crate::runtime::task::core::{Cell, Core, Header, Trailer};
 use crate::runtime::task::state::{Snapshot, State};
 use crate::runtime::task::waker::waker_ref;
-use crate::runtime::task::{JoinError, Notified, RawTask, Schedule, Task};
+use crate::runtime::task::{Id, JoinError, Notified, RawTask, Schedule, Task};
 
 use std::mem;
 use std::mem::ManuallyDrop;
@@ -482,10 +482,7 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
     let output = match output {
         Ok(Poll::Pending) => return Poll::Pending,
         Ok(Poll::Ready(output)) => Ok(output),
-        Err(panic) => {
-            core.scheduler.unhandled_panic();
-            Err(JoinError::panic(core.task_id, panic))
-        }
+        Err(panic) => Err(panic_to_error(&core.scheduler, core.task_id, panic)),
     };
 
     // Catch and ignore panics if the future panics on drop.
@@ -498,4 +495,14 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
     }
 
     Poll::Ready(())
+}
+
+#[cold]
+fn panic_to_error<S: Schedule>(
+    scheduler: &S,
+    task_id: Id,
+    panic: Box<dyn Any + Send + 'static,
+) -> JoinError {
+    scheduler.unhandled_panic();
+    JoinError::panic(task_id, panic)
 }
