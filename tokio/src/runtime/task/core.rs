@@ -207,8 +207,6 @@ pub(super) enum Stage<T: Future> {
     Consumed,
 }
 
-
-
 impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
