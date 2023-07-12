@@ -207,21 +207,39 @@ pub(super) enum Stage<T: Future> {
     Consumed,
 }
 
+
+
 impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
     pub(super) fn new(future: T, scheduler: S, state: State, task_id: Id) -> Box<Cell<T, S>> {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let tracing_id = future.id();
-        let result = Box::new(Cell {
-            header: Header {
+        // Separated into a non-generic function to reduce LLVM codegen
+        fn new_header(
+            state: State,
+            vtable: &'static Vtable,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            tracing_id: Option<tracing::Id>,
+        ) -> Header {
+            Header {
                 state,
                 queue_next: UnsafeCell::new(None),
-                vtable: raw::vtable::<T, S>(),
+                vtable,,
                 owner_id: UnsafeCell::new(0),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
-            },
+            }
+        }
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let tracing_id = future.id();
+        let vtable = raw::vtable::<T, S>();
+        let result = Box::new(Cell {
+            header: new_header(
+                state,
+                vtable,
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                tracing_id,
+            ),
             core: Core {
                 scheduler,
                 stage: CoreStage {
@@ -229,10 +247,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 },
                 task_id,
             },
-            trailer: Trailer {
-                waker: UnsafeCell::new(None),
-                owned: linked_list::Pointers::new(),
-            },
+            trailer: Trailer::new(),
         });
 
         #[cfg(debug_assertions)]
@@ -452,6 +467,13 @@ impl Header {
 }
 
 impl Trailer {
+    fn new() -> Self {
+        Trailer {
+            waker: UnsafeCell::new(None),
+            owned: linked_list::Pointers::new(),
+        }
+    }
+
     pub(super) unsafe fn set_waker(&self, waker: Option<Waker>) {
         self.waker.with_mut(|ptr| {
             *ptr = waker;
