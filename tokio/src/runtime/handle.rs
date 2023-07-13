@@ -1,3 +1,5 @@
+#[cfg(tokio_unstable)]
+use crate::runtime;
 use crate::runtime::{context, scheduler, RuntimeFlavor};
 
 /// Handle to the runtime.
@@ -355,6 +357,35 @@ impl Handle {
             scheduler::Handle::CurrentThread(_) => RuntimeFlavor::CurrentThread,
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
             scheduler::Handle::MultiThread(_) => RuntimeFlavor::MultiThread,
+        }
+    }
+
+    cfg_unstable! {
+        /// Returns the [`Id`] of the current `Runtime`.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main(flavor = "current_thread")]
+        /// async fn main() {
+        ///   println!("Current runtime id: {}", Handle::current().id());
+        /// }
+        /// ```
+        ///
+        /// **Note**: This is an [unstable API][unstable]. The public API of this type
+        /// may break in 1.x releases. See [the documentation on unstable
+        /// features][unstable] for details.
+        ///
+        /// [unstable]: crate#unstable-features
+        /// [`Id`]: struct@crate::runtime::Id
+        pub fn id(&self) -> runtime::Id {
+            match &self.inner {
+                scheduler::Handle::CurrentThread(handle) => handle.runtime_id,
+                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                scheduler::Handle::MultiThread(handle) => handle.runtime_id,
+            }
         }
     }
 }

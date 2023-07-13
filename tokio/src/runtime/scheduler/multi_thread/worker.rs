@@ -302,6 +302,8 @@ pub(super) fn create(
         driver: driver_handle,
         blocking_spawner,
         seed_generator,
+        #[cfg(tokio_unstable)]
+        runtime_id: runtime::Id::next(),
     });
 
     let mut launch = Launch(vec![]);
