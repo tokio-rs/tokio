@@ -400,7 +400,7 @@ impl Command {
         self
     }
 
-    cfg_windows_unstable! {
+    cfg_unstable_windows! {
         /// [unstable]: crate#unstable-features
         /// Append literal text to the command line without any quoting or escaping.
         ///
