@@ -213,7 +213,7 @@ where
                 }
 
                 let transition_res = self.state().transition_to_idle();
-                if let &TransitionToIdle::Cancelled = &transition_res {
+                if let TransitionToIdle::Cancelled = transition_res {
                     // The transition to idle failed because the task was
                     // cancelled during the poll.
                     cancel_task(self.core());
