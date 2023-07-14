@@ -158,7 +158,7 @@ pub(crate) struct Shared {
     idle: Idle,
 
     /// Collection of all active tasks spawned onto this executor.
-    pub(super) owned: OwnedTasks<Arc<Handle>>,
+    pub(crate) owned: OwnedTasks<Arc<Handle>>,
 
     /// Data synchronized by the scheduler mutex
     pub(super) synced: Mutex<Synced>,
@@ -302,8 +302,6 @@ pub(super) fn create(
         driver: driver_handle,
         blocking_spawner,
         seed_generator,
-        #[cfg(tokio_unstable)]
-        runtime_id: runtime::Id::next(),
     });
 
     let mut launch = Launch(vec![]);

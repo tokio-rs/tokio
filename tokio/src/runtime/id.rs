@@ -6,7 +6,7 @@ use std::fmt;
 /// # Notes
 ///
 /// - Runtime IDs are unique relative to other *currently running* runtimes.
-///   When a task completes, the same ID may be used for another task.
+///   When a runtime completes, the same ID may be used for another runtime.
 /// - Runtime IDs are *not* sequential, and do not indicate the order in which
 ///   runtimes are started or any other data.
 /// - The runtime ID of the currently running task can be obtained from the
@@ -32,18 +32,14 @@ use std::fmt;
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub struct Id(u64);
 
-impl fmt::Display for Id {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+impl Id {
+    pub(crate) fn from_u64(val: u64) -> Self {
+        Id(val)
     }
 }
 
-impl Id {
-    pub(crate) fn next() -> Self {
-        use crate::loom::sync::atomic::{Ordering::Relaxed, StaticAtomicU64};
-
-        static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
-
-        Self(NEXT_ID.fetch_add(1, Relaxed))
+impl fmt::Display for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }

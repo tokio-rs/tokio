@@ -1,8 +1,6 @@
 use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
-#[cfg(tokio_unstable)]
-use crate::runtime;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
@@ -43,9 +41,6 @@ pub(crate) struct Handle {
 
     /// Current random number generator seed
     pub(crate) seed_generator: RngSeedGenerator,
-
-    #[cfg(tokio_unstable)]
-    pub(crate) runtime_id: runtime::Id,
 }
 
 /// Data required for executing the scheduler. The struct is passed around to
@@ -146,8 +141,6 @@ impl CurrentThread {
             driver: driver_handle,
             blocking_spawner,
             seed_generator,
-            #[cfg(tokio_unstable)]
-            runtime_id: runtime::Id::next(),
         });
 
         let core = AtomicCell::new(Some(Box::new(Core {
@@ -545,6 +538,12 @@ cfg_metrics! {
         pub(crate) fn active_tasks_count(&self) -> usize {
             self.shared.owned.active_tasks_count()
         }
+    }
+}
+
+impl Handle {
+    pub(crate) fn owned_id(&self) -> u64 {
+        self.shared.owned.id
     }
 }
 

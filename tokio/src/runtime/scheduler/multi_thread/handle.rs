@@ -1,7 +1,5 @@
 use crate::future::Future;
 use crate::loom::sync::Arc;
-#[cfg(tokio_unstable)]
-use crate::runtime;
 use crate::runtime::scheduler::multi_thread::worker;
 use crate::runtime::{
     blocking, driver,
@@ -32,9 +30,6 @@ pub(crate) struct Handle {
 
     /// Current random number generator seed
     pub(crate) seed_generator: RngSeedGenerator,
-
-    #[cfg(tokio_unstable)]
-    pub(crate) runtime_id: runtime::Id,
 }
 
 impl Handle {
@@ -63,6 +58,10 @@ impl Handle {
         }
 
         handle
+    }
+
+    pub(crate) fn owned_id(&self) -> u64 {
+        self.shared.owned.id
     }
 }
 

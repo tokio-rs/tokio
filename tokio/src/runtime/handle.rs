@@ -381,11 +381,12 @@ impl Handle {
         /// [unstable]: crate#unstable-features
         /// [`Id`]: struct@crate::runtime::Id
         pub fn id(&self) -> runtime::Id {
-            match &self.inner {
-                scheduler::Handle::CurrentThread(handle) => handle.runtime_id,
+            let owned_id = match &self.inner {
+                scheduler::Handle::CurrentThread(handle) => handle.owned_id(),
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                scheduler::Handle::MultiThread(handle) => handle.runtime_id,
-            }
+                scheduler::Handle::MultiThread(handle) => handle.owned_id(),
+            };
+            runtime::Id::from_u64(owned_id)
         }
     }
 }
