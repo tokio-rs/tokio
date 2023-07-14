@@ -401,7 +401,6 @@ impl Command {
     }
 
     cfg_unstable_windows! {
-        /// [unstable]: crate#unstable-features
         /// Append literal text to the command line without any quoting or escaping.
         ///
         /// This is useful for passing arguments to `cmd.exe /c`, which doesn't follow
@@ -410,6 +409,8 @@ impl Command {
         /// **Note**: This is an [unstable API][unstable] but will be stabilised once
         /// tokio's MSRV is sufficiently new. See [the documentation on
         /// unstable features][unstable] for details about using unstable features.
+        ///
+        /// [unstable]: crate#unstable-features
         pub fn raw_arg<S: AsRef<OsStr>>(&mut self, text_to_append_as_is: S) -> &mut Command {
             self.std.raw_arg(text_to_append_as_is);
             self
