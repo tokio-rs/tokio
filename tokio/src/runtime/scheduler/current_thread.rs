@@ -541,9 +541,11 @@ cfg_metrics! {
     }
 }
 
-impl Handle {
-    pub(crate) fn owned_id(&self) -> u64 {
-        self.shared.owned.id
+cfg_unstable! {
+    impl Handle {
+        pub(crate) fn owned_id(&self) -> u64 {
+            self.shared.owned.id
+        }
     }
 }
 
