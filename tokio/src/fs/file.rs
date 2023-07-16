@@ -195,9 +195,9 @@ impl File {
         Ok(File::from_std(std_file))
     }
 
-    /// Returns a new OpenOptions object.
+    /// Returns a new [`OpenOptions`] object.
     ///
-    /// This function returns a new OpenOptions object that you can use to
+    /// This function returns a new `OpenOptions` object that you can use to
     /// open or create a file with specific options if `open()` or `create()`
     /// are not appropriate.
     ///
