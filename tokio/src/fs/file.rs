@@ -217,7 +217,7 @@ impl File {
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut f = File::options().append(true).open("example.log").await?;
-    /// f.write_all(b"new line").await?;
+    /// f.write_all(b"new line\n").await?;
     /// # Ok(())
     /// # }
     /// ```
