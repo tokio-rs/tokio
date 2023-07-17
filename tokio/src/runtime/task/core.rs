@@ -211,17 +211,32 @@ impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
     pub(super) fn new(future: T, scheduler: S, state: State, task_id: Id) -> Box<Cell<T, S>> {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let tracing_id = future.id();
-        let result = Box::new(Cell {
-            header: Header {
+        // Separated into a non-generic function to reduce LLVM codegen
+        fn new_header(
+            state: State,
+            vtable: &'static Vtable,
+            #[cfg(all(tokio_unstable, feature = "tracing"))] tracing_id: Option<tracing::Id>,
+        ) -> Header {
+            Header {
                 state,
                 queue_next: UnsafeCell::new(None),
-                vtable: raw::vtable::<T, S>(),
+                vtable,
                 owner_id: UnsafeCell::new(0),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
-            },
+            }
+        }
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let tracing_id = future.id();
+        let vtable = raw::vtable::<T, S>();
+        let result = Box::new(Cell {
+            header: new_header(
+                state,
+                vtable,
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                tracing_id,
+            ),
             core: Core {
                 scheduler,
                 stage: CoreStage {
@@ -229,26 +244,33 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 },
                 task_id,
             },
-            trailer: Trailer {
-                waker: UnsafeCell::new(None),
-                owned: linked_list::Pointers::new(),
-            },
+            trailer: Trailer::new(),
         });
 
         #[cfg(debug_assertions)]
         {
-            let trailer_addr = (&result.trailer) as *const Trailer as usize;
-            let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(&result.header)) };
-            assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
+            // Using a separate function for this code avoids instantiating it separately for every `T`.
+            unsafe fn check<S>(header: &Header, trailer: &Trailer, scheduler: &S, task_id: &Id) {
+                let trailer_addr = trailer as *const Trailer as usize;
+                let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(header)) };
+                assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
 
-            let scheduler_addr = (&result.core.scheduler) as *const S as usize;
-            let scheduler_ptr =
-                unsafe { Header::get_scheduler::<S>(NonNull::from(&result.header)) };
-            assert_eq!(scheduler_addr, scheduler_ptr.as_ptr() as usize);
+                let scheduler_addr = scheduler as *const S as usize;
+                let scheduler_ptr = unsafe { Header::get_scheduler::<S>(NonNull::from(header)) };
+                assert_eq!(scheduler_addr, scheduler_ptr.as_ptr() as usize);
 
-            let id_addr = (&result.core.task_id) as *const Id as usize;
-            let id_ptr = unsafe { Header::get_id_ptr(NonNull::from(&result.header)) };
-            assert_eq!(id_addr, id_ptr.as_ptr() as usize);
+                let id_addr = task_id as *const Id as usize;
+                let id_ptr = unsafe { Header::get_id_ptr(NonNull::from(header)) };
+                assert_eq!(id_addr, id_ptr.as_ptr() as usize);
+            }
+            unsafe {
+                check(
+                    &result.header,
+                    &result.trailer,
+                    &result.core.scheduler,
+                    &result.core.task_id,
+                );
+            }
         }
 
         result
@@ -442,6 +464,13 @@ impl Header {
 }
 
 impl Trailer {
+    fn new() -> Self {
+        Trailer {
+            waker: UnsafeCell::new(None),
+            owned: linked_list::Pointers::new(),
+        }
+    }
+
     pub(super) unsafe fn set_waker(&self, waker: Option<Waker>) {
         self.waker.with_mut(|ptr| {
             *ptr = waker;
