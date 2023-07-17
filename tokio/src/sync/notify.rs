@@ -690,6 +690,68 @@ impl Notify {
 
         wakers.wake_all();
     }
+
+    /// Notifies one waiting tasks.
+    ///
+    /// If no task is waiting right now, this does nothing.
+    pub fn notify_one_waiter(&self) {
+        let mut waiters = self.waiters.lock();
+
+        // The state must be loaded while the lock is held. The state may only
+        // transition out of WAITING while the lock is held.
+        let curr = self.state.load(SeqCst);
+
+        if matches!(get_state(curr), EMPTY | NOTIFIED) {
+            // There are no waiting tasks. All we need to do is increment the
+            // number of times this method was called.
+            atomic_inc_num_notify_waiters_calls(&self.state);
+            return;
+        }
+
+        // Increment the number of times this method was called
+        // and transition to empty.
+        let new_state = set_state(inc_num_notify_waiters_calls(curr), EMPTY);
+        self.state.store(new_state, SeqCst);
+
+        // It is critical for `GuardedLinkedList` safety that the guard node is
+        // pinned in memory and is not dropped until the guarded list is dropped.
+        let guard = Waiter::new();
+        pin!(guard);
+
+        // We move all waiters to a secondary list. It uses a `GuardedLinkedList`
+        // underneath to allow every waiter to safely remove itself from it.
+        //
+        // * This list will be still guarded by the `waiters` lock.
+        //   `NotifyWaitersList` wrapper makes sure we hold the lock to modify it.
+        // * This wrapper will empty the list on drop. It is critical for safety
+        //   that we will not leave any list entry with a pointer to the local
+        //   guard node after this function returns / panics.
+        let mut list = NotifyWaitersList::new(std::mem::take(&mut *waiters), guard.as_ref(), self);
+
+        let waker = if let Some(waiter) = list.pop_back_locked(&mut waiters) {
+            // Safety: we never make mutable references to waiters.
+            let waiter = unsafe { waiter.as_ref() };
+
+            // Safety: we hold the lock, so we can access the waker.
+            let waker = if let Some(waker) = unsafe { waiter.waker.with_mut(|waker| (*waker).take()) } {
+                waker
+            } else {
+                return;
+            };
+
+            // This waiter is unlinked and will not be shared ever again, release it.
+            waiter.notification.store_release(Notification::All);
+
+            waker
+        } else {
+            // do nothing
+            return;
+        };
+
+        // Release the lock before notifying.
+        drop(waiters);
+        waker.wake();
+    }
 }
 
 impl Default for Notify {
