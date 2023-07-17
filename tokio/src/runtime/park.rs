@@ -222,7 +222,6 @@ impl UnparkThread {
 use crate::loom::thread::AccessError;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::mem;
 use std::rc::Rc;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
@@ -317,16 +316,12 @@ unsafe fn unparker_to_raw_waker(unparker: Arc<Inner>) -> RawWaker {
 }
 
 unsafe fn clone(raw: *const ()) -> RawWaker {
-    let unparker = Inner::from_raw(raw);
-
-    // Increment the ref count
-    mem::forget(unparker.clone());
-
-    unparker_to_raw_waker(unparker)
+    Arc::increment_strong_count(raw as *const Inner);
+    unparker_to_raw_waker(Inner::from_raw(raw))
 }
 
 unsafe fn drop_waker(raw: *const ()) {
-    let _ = Inner::from_raw(raw);
+    drop(Inner::from_raw(raw));
 }
 
 unsafe fn wake(raw: *const ()) {
@@ -335,11 +330,8 @@ unsafe fn wake(raw: *const ()) {
 }
 
 unsafe fn wake_by_ref(raw: *const ()) {
-    let unparker = Inner::from_raw(raw);
-    unparker.unpark();
-
-    // We don't actually own a reference to the unparker
-    mem::forget(unparker);
+    let raw = raw as *const Inner;
+    (*raw).unpark();
 }
 
 #[cfg(loom)]
