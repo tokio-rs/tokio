@@ -13,6 +13,7 @@ use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{CountedLinkedList, Link, LinkedList};
 
 use std::marker::PhantomData;
+use std::num::NonZeroU64;
 
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
@@ -28,10 +29,10 @@ cfg_has_atomic_u64! {
 
     static NEXT_OWNED_TASKS_ID: AtomicU64 = AtomicU64::new(1);
 
-    fn get_next_id() -> u64 {
+    fn get_next_id() -> NonZeroU64 {
         loop {
             let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
-            if id != 0 {
+            if let Some(id) = NonZeroU64::new(id) {
                 return id;
             }
         }
@@ -43,11 +44,11 @@ cfg_not_has_atomic_u64! {
 
     static NEXT_OWNED_TASKS_ID: AtomicU32 = AtomicU32::new(1);
 
-    fn get_next_id() -> u64 {
+    fn get_next_id() -> NonZeroU64 {
         loop {
             let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
-            if id != 0 {
-                return u64::from(id);
+            if let Some(id) = NonZeroU64::new(id) {
+                return id;
             }
         }
     }
@@ -55,7 +56,7 @@ cfg_not_has_atomic_u64! {
 
 pub(crate) struct OwnedTasks<S: 'static> {
     inner: Mutex<CountedOwnedTasksInner<S>>,
-    id: u64,
+    id: NonZeroU64,
 }
 struct CountedOwnedTasksInner<S: 'static> {
     list: CountedLinkedList<Task<S>, <Task<S> as Link>::Target>,
@@ -63,7 +64,7 @@ struct CountedOwnedTasksInner<S: 'static> {
 }
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
-    id: u64,
+    id: NonZeroU64,
     _not_send_or_sync: PhantomData<*const ()>,
 }
 struct OwnedTasksInner<S: 'static> {
@@ -108,7 +109,7 @@ impl<S: 'static> OwnedTasks<S> {
         unsafe {
             // safety: We just created the task, so we have exclusive access
             // to the field.
-            task.header().set_owner_id(self.id);
+            task.header().set_owner_id(Some(self.id));
         }
 
         let mut lock = self.inner.lock();
@@ -127,7 +128,7 @@ impl<S: 'static> OwnedTasks<S> {
     /// a LocalNotified, giving the thread permission to poll this task.
     #[inline]
     pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
-        assert_eq!(task.header().get_owner_id(), self.id);
+        assert_eq!(task.header().get_owner_id(), Some(self.id));
 
         // safety: All tasks bound to this OwnedTasks are Send, so it is safe
         // to poll it on this thread no matter what thread we are on.
@@ -170,11 +171,7 @@ impl<S: 'static> OwnedTasks<S> {
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
-        let task_id = task.header().get_owner_id();
-        if task_id == 0 {
-            // The task is unowned.
-            return None;
-        }
+        let task_id = task.header().get_owner_id()?;
 
         assert_eq!(task_id, self.id);
 
@@ -228,7 +225,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
         unsafe {
             // safety: We just created the task, so we have exclusive access
             // to the field.
-            task.header().set_owner_id(self.id);
+            task.header().set_owner_id(Some(self.id));
         }
 
         if self.is_closed() {
@@ -257,11 +254,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
-        let task_id = task.header().get_owner_id();
-        if task_id == 0 {
-            // The task is unowned.
-            return None;
-        }
+        let task_id = task.header().get_owner_id()?;
 
         assert_eq!(task_id, self.id);
 
@@ -275,7 +268,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
     /// it to a LocalNotified, giving the thread permission to poll this task.
     #[inline]
     pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
-        assert_eq!(task.header().get_owner_id(), self.id);
+        assert_eq!(task.header().get_owner_id(), Some(self.id));
 
         // safety: The task was bound to this LocalOwnedTasks, and the
         // LocalOwnedTasks is not Send or Sync, so we are on the right thread
@@ -315,11 +308,9 @@ mod tests {
     #[test]
     fn test_id_not_broken() {
         let mut last_id = get_next_id();
-        assert_ne!(last_id, 0);
 
         for _ in 0..1000 {
             let next_id = get_next_id();
-            assert_ne!(next_id, 0);
             assert!(last_id < next_id);
             last_id = next_id;
         }
