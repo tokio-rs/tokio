@@ -397,8 +397,8 @@ impl Header {
     // safety: The caller must guarantee exclusive access to this field, and
     // must ensure that the id is either `None` or the id of the OwnedTasks
     // containing this task.
-    pub(super) unsafe fn set_owner_id(&self, owner: Option<NonZeroU64>) {
-        self.owner_id.with_mut(|ptr| *ptr = owner);
+    pub(super) unsafe fn set_owner_id(&self, owner: NonZeroU64) {
+        self.owner_id.with_mut(|ptr| *ptr = Some(owner));
     }
 
     pub(super) fn get_owner_id(&self) -> Option<NonZeroU64> {

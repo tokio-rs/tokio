@@ -17,7 +17,7 @@ use std::num::NonZeroU64;
 
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
-// use zero for tasks not owned by any list.
+// use `None` for tasks not owned by any list.
 //
 // The safety checks in this file can technically be violated if the counter is
 // overflown, but the checks are not supposed to ever fail unless there is a
@@ -47,7 +47,7 @@ cfg_not_has_atomic_u64! {
     fn get_next_id() -> NonZeroU64 {
         loop {
             let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
-            if let Some(id) = NonZeroU64::new(u64::from(id)) {
+            if let Some(id) = NonZeroU64::new(id) {
                 return id;
             }
         }
@@ -109,7 +109,7 @@ impl<S: 'static> OwnedTasks<S> {
         unsafe {
             // safety: We just created the task, so we have exclusive access
             // to the field.
-            task.header().set_owner_id(Some(self.id));
+            task.header().set_owner_id(self.id);
         }
 
         let mut lock = self.inner.lock();
@@ -171,6 +171,8 @@ impl<S: 'static> OwnedTasks<S> {
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
+        // If the task's owner ID is `None` then it is not part of any list and
+        // doesn't need removing.
         let task_id = task.header().get_owner_id()?;
 
         assert_eq!(task_id, self.id);
@@ -225,7 +227,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
         unsafe {
             // safety: We just created the task, so we have exclusive access
             // to the field.
-            task.header().set_owner_id(Some(self.id));
+            task.header().set_owner_id(self.id);
         }
 
         if self.is_closed() {
@@ -254,6 +256,8 @@ impl<S: 'static> LocalOwnedTasks<S> {
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
+        // If the task's owner ID is `None` then it is not part of any list and
+        // doesn't need removing.
         let task_id = task.header().get_owner_id()?;
 
         assert_eq!(task_id, self.id);
