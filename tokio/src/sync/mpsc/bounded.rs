@@ -128,9 +128,9 @@ pub struct Receiver<T> {
 ///
 ///     tokio::spawn(async move {
 ///         for i in 0..10 {
-///             if let Err(_) = tx.send(i).await {
+///             if tx.send(i).await.is_err() {
 ///                 println!("receiver dropped");
-///                 return;
+///                 break;
 ///             }
 ///         }
 ///     });
@@ -459,9 +459,9 @@ impl<T> Sender<T> {
     ///
     ///     tokio::spawn(async move {
     ///         for i in 0..10 {
-    ///             if let Err(_) = tx.send(i).await {
+    ///             if tx.send(i).await.is_err() {
     ///                 println!("receiver dropped");
-    ///                 return;
+    ///                 break;
     ///             }
     ///         }
     ///     });
@@ -630,7 +630,7 @@ impl<T> Sender<T> {
     ///         for i in 0..10 {
     ///             if let Err(e) = tx.send_timeout(i, Duration::from_millis(100)).await {
     ///                 println!("send error: #{:?}", e);
-    ///                 return;
+    ///                 break;
     ///             }
     ///         }
     ///     });
