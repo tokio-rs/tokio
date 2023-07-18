@@ -166,7 +166,7 @@ feature! {
                     Ok(n) => {
                         // if we read a partially full buffer, this is sufficient on unix to show
                         // that the socket buffer has been drained
-                        if n > 0 && (!cfg!(windows) && n < len) {
+                        if n > 0 && (!cfg!(windows) && !cfg!(mio_unsupported_force_poll_poll) && n < len) {
                             self.registration.clear_readiness(evt);
                         }
 
@@ -197,7 +197,7 @@ feature! {
                     Ok(n) => {
                         // if we write only part of our buffer, this is sufficient on unix to show
                         // that the socket buffer is full
-                        if n > 0 && (!cfg!(windows) && n < buf.len()) {
+                        if n > 0 && (!cfg!(windows) && !cfg!(mio_unsupported_force_poll_poll) && n < buf.len()) {
                             self.registration.clear_readiness(evt);
                         }
 
