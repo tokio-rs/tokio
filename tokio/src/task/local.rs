@@ -809,7 +809,7 @@ cfg_unstable! {
         /// [unstable]: crate#unstable-features
         /// [`Id`]: struct@crate::runtime::Id
         pub fn id(&self) -> runtime::Id {
-            runtime::Id::from_u64(self.context.shared.local_state.owned.id)
+            self.context.shared.local_state.owned.id.into()
         }
     }
 }

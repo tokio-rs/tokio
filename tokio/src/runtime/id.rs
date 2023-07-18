@@ -1,4 +1,5 @@
 use std::fmt;
+use std::num::NonZeroU64;
 
 /// An opaque ID that uniquely identifies a runtime relative to all other currently
 /// running runtimes.
@@ -30,11 +31,11 @@ use std::fmt;
 /// [unstable]: crate#unstable-features
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
-pub struct Id(u64);
+pub struct Id(NonZeroU64);
 
-impl Id {
-    pub(crate) fn from_u64(val: u64) -> Self {
-        Id(val)
+impl From<NonZeroU64> for Id {
+    fn from(value: NonZeroU64) -> Self {
+        Id(value)
     }
 }
 

@@ -386,7 +386,7 @@ impl Handle {
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 scheduler::Handle::MultiThread(handle) => handle.owned_id(),
             };
-            runtime::Id::from_u64(owned_id)
+            owned_id.into()
         }
     }
 }
