@@ -292,7 +292,8 @@ cfg_io_util! {
         /// #[tokio::main]
         /// async fn main() -> io::Result<()> {
         ///     let mut f = File::open("foo.txt").await?;
-        ///     let mut buffer = [0; 10];
+        ///     let len = 10;
+        ///     let mut buffer = vec![0; len];
         ///
         ///     // read exactly 10 bytes
         ///     f.read_exact(&mut buffer).await?;

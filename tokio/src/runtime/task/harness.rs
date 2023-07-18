@@ -2,8 +2,9 @@ use crate::future::Future;
 use crate::runtime::task::core::{Cell, Core, Header, Trailer};
 use crate::runtime::task::state::{Snapshot, State};
 use crate::runtime::task::waker::waker_ref;
-use crate::runtime::task::{JoinError, Notified, RawTask, Schedule, Task};
+use crate::runtime::task::{Id, JoinError, Notified, RawTask, Schedule, Task};
 
+use std::any::Any;
 use std::mem;
 use std::mem::ManuallyDrop;
 use std::panic;
@@ -192,6 +193,15 @@ where
 
         match self.state().transition_to_running() {
             TransitionToRunning::Success => {
+                // Separated to reduce LLVM codegen
+                fn transition_result_to_poll_future(result: TransitionToIdle) -> PollFuture {
+                    match result {
+                        TransitionToIdle::Ok => PollFuture::Done,
+                        TransitionToIdle::OkNotified => PollFuture::Notified,
+                        TransitionToIdle::OkDealloc => PollFuture::Dealloc,
+                        TransitionToIdle::Cancelled => PollFuture::Complete,
+                    }
+                }
                 let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<T, S>(&header_ptr);
                 let cx = Context::from_waker(&waker_ref);
@@ -202,17 +212,13 @@ where
                     return PollFuture::Complete;
                 }
 
-                match self.state().transition_to_idle() {
-                    TransitionToIdle::Ok => PollFuture::Done,
-                    TransitionToIdle::OkNotified => PollFuture::Notified,
-                    TransitionToIdle::OkDealloc => PollFuture::Dealloc,
-                    TransitionToIdle::Cancelled => {
-                        // The transition to idle failed because the task was
-                        // cancelled during the poll.
-                        cancel_task(self.core());
-                        PollFuture::Complete
-                    }
+                let transition_res = self.state().transition_to_idle();
+                if let TransitionToIdle::Cancelled = transition_res {
+                    // The transition to idle failed because the task was
+                    // cancelled during the poll.
+                    cancel_task(self.core());
                 }
+                transition_result_to_poll_future(transition_res)
             }
             TransitionToRunning::Cancelled => {
                 cancel_task(self.core());
@@ -447,13 +453,16 @@ fn cancel_task<T: Future, S: Schedule>(core: &Core<T, S>) {
         core.drop_future_or_output();
     }));
 
+    core.store_output(Err(panic_result_to_join_error(core.task_id, res)));
+}
+
+fn panic_result_to_join_error(
+    task_id: Id,
+    res: Result<(), Box<dyn Any + Send + 'static>>,
+) -> JoinError {
     match res {
-        Ok(()) => {
-            core.store_output(Err(JoinError::cancelled(core.task_id)));
-        }
-        Err(panic) => {
-            core.store_output(Err(JoinError::panic(core.task_id, panic)));
-        }
+        Ok(()) => JoinError::cancelled(task_id),
+        Err(panic) => JoinError::panic(task_id, panic),
     }
 }
 
@@ -482,10 +491,7 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
     let output = match output {
         Ok(Poll::Pending) => return Poll::Pending,
         Ok(Poll::Ready(output)) => Ok(output),
-        Err(panic) => {
-            core.scheduler.unhandled_panic();
-            Err(JoinError::panic(core.task_id, panic))
-        }
+        Err(panic) => Err(panic_to_error(&core.scheduler, core.task_id, panic)),
     };
 
     // Catch and ignore panics if the future panics on drop.
@@ -498,4 +504,14 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
     }
 
     Poll::Ready(())
+}
+
+#[cold]
+fn panic_to_error<S: Schedule>(
+    scheduler: &S,
+    task_id: Id,
+    panic: Box<dyn Any + Send + 'static>,
+) -> JoinError {
+    scheduler.unhandled_panic();
+    JoinError::panic(task_id, panic)
 }

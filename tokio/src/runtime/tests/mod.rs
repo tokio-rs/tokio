@@ -63,7 +63,7 @@ cfg_loom! {
 
     // Make sure debug assertions are enabled
     #[cfg(not(debug_assertions))]
-    compiler_error!("these tests require debug assertions to be enabled");
+    compile_error!("these tests require debug assertions to be enabled");
 }
 
 cfg_not_loom! {

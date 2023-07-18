@@ -1024,6 +1024,12 @@ impl Handle {
         })
     }
 
+    pub(super) fn schedule_option_task_without_yield(&self, task: Option<Notified>) {
+        if let Some(task) = task {
+            self.schedule_task(task, false);
+        }
+    }
+
     fn schedule_local(&self, core: &mut Core, task: Notified, is_yield: bool) {
         core.stats.inc_local_schedule_count();
 
