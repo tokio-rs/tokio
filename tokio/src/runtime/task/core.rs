@@ -17,6 +17,7 @@ use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule};
 use crate::util::linked_list;
 
+use std::num::NonZeroU64;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
@@ -164,7 +165,7 @@ pub(crate) struct Header {
 
     /// This integer contains the id of the OwnedTasks or LocalOwnedTasks that
     /// this task is stored in. If the task is not in any list, should be the
-    /// id of the list that it was previously in, or zero if it has never been
+    /// id of the list that it was previously in, or `None` if it has never been
     /// in any list.
     ///
     /// Once a task has been bound to a list, it can never be bound to another
@@ -173,7 +174,7 @@ pub(crate) struct Header {
     /// The id is not unset when removed from a list because we want to be able
     /// to read the id without synchronization, even if it is concurrently being
     /// removed from the list.
-    pub(super) owner_id: UnsafeCell<u64>,
+    pub(super) owner_id: UnsafeCell<Option<NonZeroU64>>,
 
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -221,7 +222,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 state,
                 queue_next: UnsafeCell::new(None),
                 vtable,
-                owner_id: UnsafeCell::new(0),
+                owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
             }
@@ -394,13 +395,13 @@ impl Header {
     }
 
     // safety: The caller must guarantee exclusive access to this field, and
-    // must ensure that the id is either 0 or the id of the OwnedTasks
+    // must ensure that the id is either `None` or the id of the OwnedTasks
     // containing this task.
-    pub(super) unsafe fn set_owner_id(&self, owner: u64) {
-        self.owner_id.with_mut(|ptr| *ptr = owner);
+    pub(super) unsafe fn set_owner_id(&self, owner: NonZeroU64) {
+        self.owner_id.with_mut(|ptr| *ptr = Some(owner));
     }
 
-    pub(super) fn get_owner_id(&self) -> u64 {
+    pub(super) fn get_owner_id(&self) -> Option<NonZeroU64> {
         // safety: If there are concurrent writes, then that write has violated
         // the safety requirements on `set_owner_id`.
         unsafe { self.owner_id.with(|ptr| *ptr) }
