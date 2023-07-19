@@ -56,7 +56,7 @@ cfg_not_has_atomic_u64! {
 
 pub(crate) struct OwnedTasks<S: 'static> {
     inner: Mutex<CountedOwnedTasksInner<S>>,
-    id: NonZeroU64,
+    pub(crate) id: NonZeroU64,
 }
 struct CountedOwnedTasksInner<S: 'static> {
     list: CountedLinkedList<Task<S>, <Task<S> as Link>::Target>,
@@ -64,7 +64,7 @@ struct CountedOwnedTasksInner<S: 'static> {
 }
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
-    id: NonZeroU64,
+    pub(crate) id: NonZeroU64,
     _not_send_or_sync: PhantomData<*const ()>,
 }
 struct OwnedTasksInner<S: 'static> {

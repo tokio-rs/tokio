@@ -59,6 +59,16 @@ impl Handle {
     }
 }
 
+cfg_unstable! {
+    use std::num::NonZeroU64;
+
+    impl Handle {
+        pub(crate) fn owned_id(&self) -> NonZeroU64 {
+            self.shared.owned.id
+        }
+    }
+}
+
 impl fmt::Debug for Handle {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("multi_thread::Handle { ... }").finish()

@@ -226,6 +226,10 @@ cfg_rt! {
     mod builder;
     pub use self::builder::Builder;
     cfg_unstable! {
+        mod id;
+        #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+        pub use id::Id;
+
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
     }
