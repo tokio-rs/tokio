@@ -14,7 +14,7 @@ pub(super) struct Idle {
     num_idle: AtomicUsize,
 
     /// Map of idle cores
-    idle_map: IdleMap,
+    // idle_map: IdleMap,
 
     /// Used to catch false-negatives when waking workers
     needs_searching: AtomicBool,
@@ -28,7 +28,7 @@ pub(super) struct IdleMap {
 }
 
 pub(super) struct Snapshot {
-    chunks: Vec<usize>,
+    // chunks: Vec<usize>,
 }
 
 /// Data synchronized by the scheduler mutex
@@ -45,7 +45,7 @@ impl Idle {
         let idle = Idle {
             num_searching: AtomicUsize::new(0),
             num_idle: AtomicUsize::new(cores.len()),
-            idle_map: IdleMap::new(&cores),
+            // idle_map: IdleMap::new(&cores),
             needs_searching: AtomicBool::new(false),
             num_cores: cores.len(),
         };
@@ -68,7 +68,7 @@ impl Idle {
     }
 
     pub(super) fn snapshot(&self, snapshot: &mut Snapshot) {
-        snapshot.update(&self.idle_map)
+        // snapshot.update(&self.idle_map)
     }
 
     /// Try to acquire an available core
@@ -81,8 +81,8 @@ impl Idle {
             debug_assert_eq!(num_idle, synced.available_cores.len());
             self.num_idle.store(num_idle, Release);
 
-            self.idle_map.unset(core.index);
-            debug_assert!(self.idle_map.matches(&synced.available_cores));
+            // self.idle_map.unset(core.index);
+            // debug_assert!(self.idle_map.matches(&synced.available_cores));
         }
 
         ret
@@ -149,8 +149,8 @@ impl Idle {
                 debug_assert!(!core.is_searching);
                 core.is_searching = true;
 
-                self.idle_map.unset(core.index);
-                debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
+                // self.idle_map.unset(core.index);
+                // debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
 
                 // Assign the core to the worker
                 synced.assigned_cores[worker] = Some(core);
@@ -199,7 +199,7 @@ impl Idle {
                 if let Some(core) = synced.idle.available_cores.pop() {
                     debug_assert!(!core.is_searching);
 
-                    self.idle_map.unset(core.index);
+                    // self.idle_map.unset(core.index);
 
                     synced.assigned_cores[worker] = Some(core);
 
@@ -215,7 +215,7 @@ impl Idle {
         }
 
         if !workers.is_empty() {
-            debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
+            // debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
             let num_idle = synced.idle.available_cores.len();
             self.num_idle.store(num_idle, Release);
         } else {
@@ -235,7 +235,7 @@ impl Idle {
             let worker = synced.idle.sleepers.pop().unwrap();
             let core = synced.idle.available_cores.pop().unwrap();
 
-            self.idle_map.unset(core.index);
+            // self.idle_map.unset(core.index);
 
             synced.assigned_cores[worker] = Some(core);
             shared.condvars[worker].notify_one();
@@ -244,7 +244,7 @@ impl Idle {
                 .store(synced.idle.available_cores.len(), Release);
         }
 
-        debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
+        // debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
 
         // Wake up any other workers
         while let Some(index) = synced.idle.sleepers.pop() {
@@ -265,12 +265,12 @@ impl Idle {
         let num_idle = synced.idle.available_cores.len();
         debug_assert_eq!(num_idle, self.num_idle.load(Acquire));
 
-        self.idle_map.set(core.index);
+        // self.idle_map.set(core.index);
 
         // Store the core in the list of available cores
         synced.idle.available_cores.push(core);
 
-        debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
+        // debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
 
         // Update `num_idle`
         self.num_idle.store(num_idle + 1, Release);
@@ -385,18 +385,24 @@ impl IdleMap {
 
 impl Snapshot {
     pub(crate) fn new(idle: &Idle) -> Snapshot {
+        /*
         let chunks = vec![0; idle.idle_map.chunks.len()];
         let mut ret = Snapshot { chunks };
         ret.update(&idle.idle_map);
         ret
+        */
+        Snapshot {}
     }
 
     fn update(&mut self, idle_map: &IdleMap) {
+        /*
         for i in 0..self.chunks.len() {
             self.chunks[i] = idle_map.chunks[i].load(Acquire);
         }
+        */
     }
 
+    /*
     pub(super) fn is_idle(&self, index: usize) -> bool {
         let (chunk, mask) = index_to_mask(index);
         debug_assert!(
@@ -407,6 +413,7 @@ impl Snapshot {
         );
         self.chunks[chunk] & mask == mask
     }
+    */
 }
 
 fn num_chunks(max_cores: usize) -> usize {
