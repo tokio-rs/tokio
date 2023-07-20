@@ -387,6 +387,8 @@ impl Handle {
                 scheduler::Handle::CurrentThread(handle) => handle.owned_id(),
                 #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
                 scheduler::Handle::MultiThread(handle) => handle.owned_id(),
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+                scheduler::Handle::MultiThreadAlt(handle) => handle.owned_id(),
             };
             owned_id.into()
         }
