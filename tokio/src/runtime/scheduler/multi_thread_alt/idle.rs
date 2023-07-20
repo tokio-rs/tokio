@@ -1,6 +1,5 @@
 //! Coordinates idling workers
 
-
 #![allow(dead_code)]
 
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
