@@ -67,7 +67,7 @@ impl Idle {
         self.num_searching.load(Acquire)
     }
 
-    pub(super) fn snapshot(&self, snapshot: &mut Snapshot) {
+    pub(super) fn snapshot(&self, _snapshot: &mut Snapshot) {
         // snapshot.update(&self.idle_map)
     }
 
@@ -75,7 +75,7 @@ impl Idle {
     pub(super) fn try_acquire_available_core(&self, synced: &mut Synced) -> Option<Box<Core>> {
         let ret = synced.available_cores.pop();
 
-        if let Some(core) = &ret {
+        if let Some(_core) = &ret {
             // Decrement the number of idle cores
             let num_idle = self.num_idle.load(Acquire) - 1;
             debug_assert_eq!(num_idle, synced.available_cores.len());
@@ -384,7 +384,7 @@ impl IdleMap {
 }
 
 impl Snapshot {
-    pub(crate) fn new(idle: &Idle) -> Snapshot {
+    pub(crate) fn new(_idle: &Idle) -> Snapshot {
         /*
         let chunks = vec![0; idle.idle_map.chunks.len()];
         let mut ret = Snapshot { chunks };
@@ -394,7 +394,7 @@ impl Snapshot {
         Snapshot {}
     }
 
-    fn update(&mut self, idle_map: &IdleMap) {
+    fn update(&mut self, _idle_map: &IdleMap) {
         /*
         for i in 0..self.chunks.len() {
             self.chunks[i] = idle_map.chunks[i].load(Acquire);
