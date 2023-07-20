@@ -1,5 +1,8 @@
 //! Coordinates idling workers
 
+
+#![allow(dead_code)]
+
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::MutexGuard;
 use crate::runtime::scheduler::multi_thread_alt::{worker, Core, Shared};
