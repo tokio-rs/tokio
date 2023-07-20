@@ -762,4 +762,22 @@ mod unstable {
             .unwrap();
         })
     }
+
+    #[test]
+    fn runtime_id_is_same() {
+        let rt = rt();
+
+        let handle1 = rt.handle();
+        let handle2 = rt.handle();
+
+        assert_eq!(handle1.id(), handle2.id());
+    }
+
+    #[test]
+    fn runtime_ids_different() {
+        let rt1 = rt();
+        let rt2 = rt();
+
+        assert_ne!(rt1.handle().id(), rt2.handle().id());
+    }
 }
