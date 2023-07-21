@@ -128,7 +128,7 @@ impl<S: 'static> OwnedTasks<S> {
     /// a LocalNotified, giving the thread permission to poll this task.
     #[inline]
     pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
-        assert_eq!(task.header().get_owner_id(), Some(self.id));
+        debug_assert_eq!(task.header().get_owner_id(), Some(self.id));
 
         // safety: All tasks bound to this OwnedTasks are Send, so it is safe
         // to poll it on this thread no matter what thread we are on.

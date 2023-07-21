@@ -9,6 +9,10 @@ use std::time::Duration;
 cfg_rt_multi_thread! {
     use crate::runtime::Builder;
     use crate::runtime::scheduler::MultiThread;
+
+    cfg_unstable! {
+        use crate::runtime::scheduler::MultiThreadAlt;
+    }
 }
 
 /// The Tokio runtime.
@@ -109,6 +113,9 @@ pub enum RuntimeFlavor {
     CurrentThread,
     /// The flavor that executes tasks across multiple threads.
     MultiThread,
+    /// The flavor that executes tasks across multiple threads.
+    #[cfg(tokio_unstable)]
+    MultiThreadAlt,
 }
 
 /// The runtime scheduler is either a multi-thread or a current-thread executor.
@@ -120,6 +127,10 @@ pub(super) enum Scheduler {
     /// Execute tasks across multiple threads.
     #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
     MultiThread(MultiThread),
+
+    /// Execute tasks across multiple threads.
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+    MultiThreadAlt(MultiThreadAlt),
 }
 
 impl Runtime {
@@ -336,6 +347,8 @@ impl Runtime {
             Scheduler::CurrentThread(exec) => exec.block_on(&self.handle.inner, future),
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
             Scheduler::MultiThread(exec) => exec.block_on(&self.handle.inner, future),
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+            Scheduler::MultiThreadAlt(exec) => exec.block_on(&self.handle.inner, future),
         }
     }
 
@@ -452,6 +465,12 @@ impl Drop for Runtime {
             }
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
             Scheduler::MultiThread(multi_thread) => {
+                // The threaded scheduler drops its tasks on its worker threads, which is
+                // already in the runtime's context.
+                multi_thread.shutdown(&self.handle.inner);
+            }
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+            Scheduler::MultiThreadAlt(multi_thread) => {
                 // The threaded scheduler drops its tasks on its worker threads, which is
                 // already in the runtime's context.
                 multi_thread.shutdown(&self.handle.inner);

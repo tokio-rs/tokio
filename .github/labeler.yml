@@ -1,8 +1,28 @@
 
-R-loom:
+R-loom-sync:
 - tokio/src/sync/*
 - tokio/src/sync/**/*
-- tokio-util/src/sync/*
-- tokio-util/src/sync/**/*
-- tokio/src/runtime/*
-- tokio/src/runtime/**/*
+
+R-loom-time-driver:
+- tokio/src/runtime/time/*
+- tokio/src/runtime/time/**/*
+
+R-loom-current-thread:
+- tokio/src/runtime/scheduler/*
+- tokio/src/runtime/scheduler/current_thread/*
+- tokio/src/runtime/task/*
+- tokio/src/runtime/task/**
+
+R-loom-multi-thread:
+- tokio/src/runtime/scheduler/*
+- tokio/src/runtime/scheduler/multi_thread/*
+- tokio/src/runtime/scheduler/multi_thread/**
+- tokio/src/runtime/task/*
+- tokio/src/runtime/task/**
+
+R-loom-multi-thread-alt:
+- tokio/src/runtime/scheduler/*
+- tokio/src/runtime/scheduler/multi_thread_alt/*
+- tokio/src/runtime/scheduler/multi_thread_alt/**
+- tokio/src/runtime/task/*
+- tokio/src/runtime/task/**

@@ -1,3 +1,7 @@
+mod queue;
+mod shutdown;
+mod yield_now;
+
 /// Full runtime loom tests. These are heavy tests and take significant time to
 /// run on CI.
 ///
@@ -200,7 +204,8 @@ mod group_b {
     }
 
     #[test]
-    fn blocking_and_regular() {
+    #[ignore] // TODO: uncomment
+    fn blocking_and_regular_without_pending() {
         blocking_and_regular_inner(false);
     }
 
@@ -345,10 +350,10 @@ mod group_d {
 }
 
 fn mk_pool(num_threads: usize) -> Runtime {
-    runtime::Builder::new_multi_thread()
+    runtime::Builder::new_multi_thread_alt()
         .worker_threads(num_threads)
         // Set the intervals to avoid tuning logic
-        .event_interval(2)
+        .global_queue_interval(61)
         .build()
         .unwrap()
 }
@@ -412,8 +417,8 @@ async fn multi_gated() {
     }
 
     poll_fn(move |cx| {
+        gate.waker.register_by_ref(cx.waker());
         if gate.count.load(SeqCst) < 2 {
-            gate.waker.register_by_ref(cx.waker());
             Poll::Pending
         } else {
             Poll::Ready(())

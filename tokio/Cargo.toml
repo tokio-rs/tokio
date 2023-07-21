@@ -160,7 +160,7 @@ wasm-bindgen-test = "0.3.0"
 mio-aio = { version = "0.7.0", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.5.2", features = ["futures", "checkpoint"] }
+loom = { version = "0.6", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true
