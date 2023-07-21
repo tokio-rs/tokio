@@ -865,12 +865,10 @@ impl Worker {
                 continue;
             }
 
-            /*
             // If the core is currently idle, then there is nothing to steal.
             if self.idle_snapshot.is_idle(i) {
                 continue;
             }
-            */
 
             let target = &cx.shared().remotes[i];
 
