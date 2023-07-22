@@ -177,7 +177,7 @@ fn max_permits_doesnt_panic() {
 
 #[test]
 #[should_panic]
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn validates_max_permits() {
     Semaphore::new(MAX_PERMITS + 1);
 }

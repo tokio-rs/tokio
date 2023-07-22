@@ -101,7 +101,7 @@ fn notify_simple() {
 }
 
 #[test]
-#[cfg(not(tokio_wasm))]
+#[cfg(not(target_family = "wasm"))]
 fn watch_test() {
     let rt = crate::runtime::Builder::new_current_thread()
         .build()

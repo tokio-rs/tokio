@@ -175,7 +175,7 @@
 
 // At the top due to macros
 #[cfg(test)]
-#[cfg(not(tokio_wasm))]
+#[cfg(not(target_family = "wasm"))]
 #[macro_use]
 mod tests;
 

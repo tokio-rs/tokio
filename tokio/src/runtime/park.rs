@@ -67,9 +67,9 @@ impl ParkThread {
         CURRENT_THREAD_PARK_COUNT.with(|count| count.fetch_add(1, SeqCst));
 
         // Wasm doesn't have threads, so just sleep.
-        #[cfg(not(tokio_wasm))]
+        #[cfg(not(target_family = "wasm"))]
         self.inner.park_timeout(duration);
-        #[cfg(tokio_wasm)]
+        #[cfg(target_family = "wasm")]
         std::thread::sleep(duration);
     }
 

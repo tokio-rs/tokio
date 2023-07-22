@@ -37,7 +37,7 @@ fn wake_without_register() {
 }
 
 #[test]
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn atomic_waker_panic_safe() {
     use std::panic;
     use std::ptr;
