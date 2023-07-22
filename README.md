@@ -193,7 +193,7 @@ Note that the MSRV is not increased automatically, and only as part of a minor
 release. The MSRV history for past minor releases can be found below:
 
  * 1.30 to now - Rust 1.63
- * 1.27 to 1.29.1 - Rust 1.56
+ * 1.27 to 1.29 - Rust 1.56
  * 1.17 to 1.26 - Rust 1.49
  * 1.15 to 1.16 - Rust 1.46
  * 1.0 to 1.14 - Rust 1.45
