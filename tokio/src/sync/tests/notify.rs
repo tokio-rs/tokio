@@ -3,8 +3,9 @@ use std::future::Future;
 use std::sync::Arc;
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 
-#[cfg(tokio_wasm_not_wasi)]
-use wasm_bindgen_test::wasm_bindgen_test as test;
+cfg_is_wasm_not_wasi! {
+    use wasm_bindgen_test::wasm_bindgen_test as test;
+}
 
 #[test]
 fn notify_clones_waker_before_lock() {

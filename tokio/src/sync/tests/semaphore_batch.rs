@@ -3,8 +3,9 @@ use tokio_test::*;
 
 const MAX_PERMITS: usize = crate::sync::Semaphore::MAX_PERMITS;
 
-#[cfg(tokio_wasm_not_wasi)]
-use wasm_bindgen_test::wasm_bindgen_test as test;
+cfg_is_wasm_not_wasi! {
+    use wasm_bindgen_test::wasm_bindgen_test as test;
+}
 
 #[test]
 fn poll_acquire_one_available() {

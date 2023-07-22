@@ -45,7 +45,7 @@ pub(crate) struct Handle {
 
     /// Used to wake up the reactor from a call to `turn`.
     /// Not supported on Wasi due to lack of threading support.
-    #[cfg(not(tokio_wasi))]
+    #[cfg(not(target_os = "wasi"))]
     waker: mio::Waker,
 
     pub(crate) metrics: IoDriverMetrics,
@@ -97,7 +97,7 @@ impl Driver {
     /// creation.
     pub(crate) fn new(nevents: usize) -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
-        #[cfg(not(tokio_wasi))]
+        #[cfg(not(target_os = "wasi"))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
         let registry = poll.registry().try_clone()?;
 
@@ -114,7 +114,7 @@ impl Driver {
             registry,
             registrations,
             synced: Mutex::new(synced),
-            #[cfg(not(tokio_wasi))]
+            #[cfg(not(target_os = "wasi"))]
             waker,
             metrics: IoDriverMetrics::default(),
         };
@@ -156,7 +156,7 @@ impl Driver {
         match self.poll.poll(events, max_wait) {
             Ok(_) => {}
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
-            #[cfg(tokio_wasi)]
+            #[cfg(target_os = "wasi")]
             Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
                 // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
                 // just return from the park, as there would be nothing, which wakes us up.
@@ -212,7 +212,7 @@ impl Handle {
     /// blocked in `turn`, then the next call to `turn` will not block and
     /// return immediately.
     pub(crate) fn unpark(&self) {
-        #[cfg(not(tokio_wasi))]
+        #[cfg(not(target_os = "wasi"))]
         self.waker.wake().expect("failed to wake I/O driver");
     }
 

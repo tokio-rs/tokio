@@ -42,7 +42,7 @@ fn interleave_enter_same_rt() {
 }
 
 #[test]
-#[cfg(not(tokio_wasi))]
+#[cfg(not(target_os = "wasi"))]
 fn interleave_then_enter() {
     let _ = std::panic::catch_unwind(|| {
         let rt1 = rt();

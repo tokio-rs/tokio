@@ -32,10 +32,10 @@ pub(crate) enum Handle {
     #[cfg(feature = "rt")]
     CurrentThread(Arc<current_thread::Handle>),
 
-    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
     MultiThread(Arc<multi_thread::Handle>),
 
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
     MultiThreadAlt(Arc<multi_thread_alt::Handle>),
 
     // TODO: This is to avoid triggering "dead code" warnings many other places
@@ -49,10 +49,10 @@ pub(crate) enum Handle {
 pub(super) enum Context {
     CurrentThread(current_thread::Context),
 
-    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
     MultiThread(multi_thread::Context),
 
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
     MultiThreadAlt(multi_thread_alt::Context),
 }
 
@@ -63,10 +63,10 @@ impl Handle {
             #[cfg(feature = "rt")]
             Handle::CurrentThread(ref h) => &h.driver,
 
-            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
             Handle::MultiThread(ref h) => &h.driver,
 
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
             Handle::MultiThreadAlt(ref h) => &h.driver,
 
             #[cfg(not(feature = "rt"))]
@@ -89,10 +89,10 @@ cfg_rt! {
             match $self {
                 $ty::CurrentThread($h) => $e,
 
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 $ty::MultiThread($h) => $e,
 
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
                 $ty::MultiThreadAlt($h) => $e,
             }
         }
@@ -119,10 +119,10 @@ cfg_rt! {
             match self {
                 Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id),
 
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id),
 
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Handle::MultiThreadAlt(h) => multi_thread_alt::Handle::spawn(h, future, id),
             }
         }
@@ -131,10 +131,10 @@ cfg_rt! {
             match *self {
                 Handle::CurrentThread(_) => {},
 
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Handle::MultiThread(ref h) => h.shutdown(),
 
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Handle::MultiThreadAlt(ref h) => h.shutdown(),
             }
         }
@@ -146,7 +146,7 @@ cfg_rt! {
         pub(crate) fn as_current_thread(&self) -> &Arc<current_thread::Handle> {
             match self {
                 Handle::CurrentThread(handle) => handle,
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 _ => panic!("not a CurrentThread handle"),
             }
         }
@@ -170,9 +170,9 @@ cfg_rt! {
             pub(crate) fn num_workers(&self) -> usize {
                 match self {
                     Handle::CurrentThread(_) => 1,
-                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                     Handle::MultiThread(handle) => handle.num_workers(),
-                    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(tokio_wasi)))]
+                    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
                     Handle::MultiThreadAlt(handle) => handle.num_workers(),
                 }
             }
@@ -216,7 +216,7 @@ cfg_rt! {
         pub(crate) fn expect_current_thread(&self) -> &current_thread::Context {
             match self {
                 Context::CurrentThread(context) => context,
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 _ => panic!("expected `CurrentThread::Context`")
             }
         }

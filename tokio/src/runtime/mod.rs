@@ -212,7 +212,7 @@ cfg_rt! {
     use config::Config;
 
     mod blocking;
-    #[cfg_attr(tokio_wasi, allow(unused_imports))]
+    #[cfg_attr(target_os = "wasi", allow(unused_imports))]
     pub(crate) use blocking::spawn_blocking;
 
     cfg_trace! {

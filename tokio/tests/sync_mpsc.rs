@@ -2,17 +2,18 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(tokio_wasm_not_wasi)]
+#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(tokio_wasm_not_wasi)]
+#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
+
+#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
+use tokio::test as maybe_tokio_test;
 
 use std::fmt;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
-#[cfg(not(tokio_wasm_not_wasi))]
-use tokio::test as maybe_tokio_test;
 use tokio_test::*;
 
 #[cfg(not(target_family = "wasm"))]
@@ -87,7 +88,7 @@ async fn reserve_disarm() {
 }
 
 #[tokio::test]
-#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
+#[cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threads
 async fn send_recv_stream_with_buffer() {
     use tokio_stream::StreamExt;
 
@@ -191,7 +192,7 @@ async fn async_send_recv_unbounded() {
 }
 
 #[tokio::test]
-#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
+#[cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threads
 async fn send_recv_stream_unbounded() {
     use tokio_stream::StreamExt;
 
@@ -452,7 +453,7 @@ fn unconsumed_messages_are_dropped() {
 }
 
 #[test]
-#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
+#[cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threads
 fn blocking_recv() {
     let (tx, mut rx) = mpsc::channel::<u8>(1);
 
@@ -477,7 +478,7 @@ async fn blocking_recv_async() {
 }
 
 #[test]
-#[cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support threads
+#[cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threads
 fn blocking_send() {
     let (tx, mut rx) = mpsc::channel::<u8>(1);
 
