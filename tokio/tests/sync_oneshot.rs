@@ -179,7 +179,7 @@ fn explicit_close_try_recv() {
 
 #[test]
 #[should_panic]
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn close_try_recv_poll() {
     let (_tx, rx) = oneshot::channel::<i32>();
     let mut rx = task::spawn(rx);

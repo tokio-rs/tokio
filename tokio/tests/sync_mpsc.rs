@@ -15,7 +15,7 @@ use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
 use tokio::test as maybe_tokio_test;
 use tokio_test::*;
 
-#[cfg(not(tokio_wasm))]
+#[cfg(not(target_family = "wasm"))]
 mod support {
     pub(crate) mod mpsc_stream;
 }
@@ -154,7 +154,7 @@ async fn start_send_past_cap() {
 
 #[test]
 #[should_panic]
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn buffer_gteq_one() {
     mpsc::channel::<i32>(0);
 }
@@ -470,7 +470,7 @@ fn blocking_recv() {
 
 #[tokio::test]
 #[should_panic]
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 async fn blocking_recv_async() {
     let (_tx, mut rx) = mpsc::channel::<()>(1);
     let _ = rx.blocking_recv();
@@ -495,7 +495,7 @@ fn blocking_send() {
 
 #[tokio::test]
 #[should_panic]
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 async fn blocking_send_async() {
     let (tx, _rx) = mpsc::channel::<()>(1);
     let _ = tx.blocking_send(());
@@ -648,7 +648,7 @@ async fn recv_timeout() {
 
 #[test]
 #[should_panic = "there is no reactor running, must be called from the context of a Tokio 1.x runtime"]
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn recv_timeout_panic() {
     use futures::future::FutureExt;
     use tokio::time::Duration;
