@@ -16,7 +16,10 @@ cfg_is_wasm_not_wasi! {
     use wasm_bindgen_test::wasm_bindgen_test as test;
 }
 
-#[test]
+#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
+use std::prelude::v1::test;
+
+#[self::test]
 fn basic_usage() {
     let mut waker = task::spawn(AtomicWaker::new());
 
@@ -26,7 +29,7 @@ fn basic_usage() {
     assert!(waker.is_woken());
 }
 
-#[test]
+#[self::test]
 fn wake_without_register() {
     let mut waker = task::spawn(AtomicWaker::new());
     waker.wake();
@@ -37,7 +40,7 @@ fn wake_without_register() {
     assert!(!waker.is_woken());
 }
 
-#[test]
+#[self::test]
 #[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn atomic_waker_panic_safe() {
     use std::panic;

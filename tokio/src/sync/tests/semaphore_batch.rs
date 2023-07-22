@@ -7,7 +7,10 @@ cfg_is_wasm_not_wasi! {
     use wasm_bindgen_test::wasm_bindgen_test as test;
 }
 
-#[test]
+#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
+use std::prelude::v1::test;
+
+#[self::test]
 fn poll_acquire_one_available() {
     let s = Semaphore::new(100);
     assert_eq!(s.available_permits(), 100);
@@ -17,7 +20,7 @@ fn poll_acquire_one_available() {
     assert_eq!(s.available_permits(), 99);
 }
 
-#[test]
+#[self::test]
 fn poll_acquire_many_available() {
     let s = Semaphore::new(100);
     assert_eq!(s.available_permits(), 100);
@@ -30,7 +33,7 @@ fn poll_acquire_many_available() {
     assert_eq!(s.available_permits(), 90);
 }
 
-#[test]
+#[self::test]
 fn try_acquire_one_available() {
     let s = Semaphore::new(100);
     assert_eq!(s.available_permits(), 100);
@@ -42,7 +45,7 @@ fn try_acquire_one_available() {
     assert_eq!(s.available_permits(), 98);
 }
 
-#[test]
+#[self::test]
 fn try_acquire_many_available() {
     let s = Semaphore::new(100);
     assert_eq!(s.available_permits(), 100);
@@ -54,7 +57,7 @@ fn try_acquire_many_available() {
     assert_eq!(s.available_permits(), 90);
 }
 
-#[test]
+#[self::test]
 fn poll_acquire_one_unavailable() {
     let s = Semaphore::new(1);
 
@@ -78,7 +81,7 @@ fn poll_acquire_one_unavailable() {
     assert_eq!(s.available_permits(), 1);
 }
 
-#[test]
+#[self::test]
 fn poll_acquire_many_unavailable() {
     let s = Semaphore::new(5);
 
@@ -115,7 +118,7 @@ fn poll_acquire_many_unavailable() {
     assert_ready_ok!(acquire_3.poll());
 }
 
-#[test]
+#[self::test]
 fn try_acquire_one_unavailable() {
     let s = Semaphore::new(1);
 
@@ -134,7 +137,7 @@ fn try_acquire_one_unavailable() {
     assert_eq!(s.available_permits(), 1);
 }
 
-#[test]
+#[self::test]
 fn try_acquire_many_unavailable() {
     let s = Semaphore::new(5);
 
@@ -156,7 +159,7 @@ fn try_acquire_many_unavailable() {
     assert_eq!(s.available_permits(), 2);
 }
 
-#[test]
+#[self::test]
 fn poll_acquire_one_zero_permits() {
     let s = Semaphore::new(0);
     assert_eq!(s.available_permits(), 0);
@@ -171,19 +174,19 @@ fn poll_acquire_one_zero_permits() {
     assert_ready_ok!(acquire.poll());
 }
 
-#[test]
+#[self::test]
 fn max_permits_doesnt_panic() {
     Semaphore::new(MAX_PERMITS);
 }
 
-#[test]
+#[self::test]
 #[should_panic]
 #[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn validates_max_permits() {
     Semaphore::new(MAX_PERMITS + 1);
 }
 
-#[test]
+#[self::test]
 fn close_semaphore_prevents_acquire() {
     let s = Semaphore::new(5);
     s.close();
@@ -197,7 +200,7 @@ fn close_semaphore_prevents_acquire() {
     assert_eq!(5, s.available_permits());
 }
 
-#[test]
+#[self::test]
 fn close_semaphore_notifies_permit1() {
     let s = Semaphore::new(0);
     let mut acquire = task::spawn(s.acquire(1));
@@ -210,7 +213,7 @@ fn close_semaphore_notifies_permit1() {
     assert_ready_err!(acquire.poll());
 }
 
-#[test]
+#[self::test]
 fn close_semaphore_notifies_permit2() {
     let s = Semaphore::new(2);
 
@@ -244,7 +247,7 @@ fn close_semaphore_notifies_permit2() {
     assert_eq!(2, s.available_permits());
 }
 
-#[test]
+#[self::test]
 fn cancel_acquire_releases_permits() {
     let s = Semaphore::new(10);
     s.try_acquire(4).expect("uncontended try_acquire succeeds");
@@ -260,7 +263,7 @@ fn cancel_acquire_releases_permits() {
     assert_ok!(s.try_acquire(6));
 }
 
-#[test]
+#[self::test]
 fn release_permits_at_drop() {
     use crate::sync::semaphore::*;
     use futures::task::ArcWake;

@@ -250,11 +250,14 @@ mod test {
         use wasm_bindgen_test::wasm_bindgen_test as test;
     }
 
+    #[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
+    use std::prelude::v1::test;
+
     fn get() -> Budget {
         context::budget(|cell| cell.get()).unwrap_or(Budget::unconstrained())
     }
 
-    #[test]
+    #[self::test]
     fn budgeting() {
         use futures::future::poll_fn;
         use tokio_test::*;
