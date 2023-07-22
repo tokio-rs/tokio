@@ -457,7 +457,7 @@ impl TcpSocket {
     /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
     ///
     /// [`set_tos`]: Self::set_tos
-    // https://docs.rs/socket2/0.4.2/src/socket2/socket.rs.html#1178
+    // https://docs.rs/socket2/0.5.3/src/socket2/socket.rs.html#1464
     #[cfg(not(any(
         target_os = "fuchsia",
         target_os = "redox",
@@ -484,7 +484,7 @@ impl TcpSocket {
     ///
     /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
     /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
-    // https://docs.rs/socket2/0.4.2/src/socket2/socket.rs.html#1178
+    // https://docs.rs/socket2/0.5.3/src/socket2/socket.rs.html#1446
     #[cfg(not(any(
         target_os = "fuchsia",
         target_os = "redox",
