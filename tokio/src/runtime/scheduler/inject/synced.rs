@@ -29,4 +29,8 @@ impl Synced {
         // safety: a `Notified` is pushed into the queue and now it is popped!
         Some(unsafe { task::Notified::from_raw(task) })
     }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.head.is_none()
+    }
 }

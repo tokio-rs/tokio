@@ -15,6 +15,7 @@ pub(crate) mod sync {
         }
 
         #[inline]
+        #[track_caller]
         pub(crate) fn lock(&self) -> MutexGuard<'_, T> {
             self.0.lock().unwrap()
         }

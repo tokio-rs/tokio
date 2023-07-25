@@ -109,6 +109,8 @@ impl<T: 'static> Shared<T> {
     pub(crate) unsafe fn pop_n<'a>(&'a self, synced: &'a mut Synced, n: usize) -> Pop<'a, T> {
         use std::cmp;
 
+        debug_assert!(n > 0);
+
         // safety: All updates to the len atomic are guarded by the mutex. As
         // such, a non-atomic load followed by a store is safe.
         let len = self.len.unsync_load();

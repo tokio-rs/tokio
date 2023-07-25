@@ -322,7 +322,7 @@ fn start_stop_callbacks_called() {
 }
 
 #[test]
-fn blocking() {
+fn blocking_task() {
     // used for notifying the main thread
     const NUM: usize = 1_000;
 
