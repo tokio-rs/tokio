@@ -246,18 +246,14 @@ cfg_coop! {
 mod test {
     use super::*;
 
-    cfg_is_wasm_not_wasi! {
-        use wasm_bindgen_test::wasm_bindgen_test as test;
-    }
-
-    #[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
-    use std::prelude::v1::test;
+    #[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     fn get() -> Budget {
         context::budget(|cell| cell.get()).unwrap_or(Budget::unconstrained())
     }
 
-    #[self::test]
+    #[test]
     fn budgeting() {
         use futures::future::poll_fn;
         use tokio_test::*;

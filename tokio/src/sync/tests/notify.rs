@@ -3,14 +3,10 @@ use std::future::Future;
 use std::sync::Arc;
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 
-cfg_is_wasm_not_wasi! {
-    use wasm_bindgen_test::wasm_bindgen_test as test;
-}
+#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+use wasm_bindgen_test::wasm_bindgen_test as test;
 
-#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
-use std::prelude::v1::test;
-
-#[self::test]
+#[test]
 fn notify_clones_waker_before_lock() {
     const VTABLE: &RawWakerVTable = &RawWakerVTable::new(clone_w, wake, wake_by_ref, drop_w);
 
@@ -50,7 +46,7 @@ fn notify_clones_waker_before_lock() {
 }
 
 #[cfg(panic = "unwind")]
-#[self::test]
+#[test]
 fn notify_waiters_handles_panicking_waker() {
     use futures::task::ArcWake;
 
@@ -88,7 +84,7 @@ fn notify_waiters_handles_panicking_waker() {
     }
 }
 
-#[self::test]
+#[test]
 fn notify_simple() {
     let notify = Notify::new();
 
@@ -104,7 +100,7 @@ fn notify_simple() {
     assert!(fut2.poll().is_ready());
 }
 
-#[self::test]
+#[test]
 #[cfg(not(target_family = "wasm"))]
 fn watch_test() {
     let rt = crate::runtime::Builder::new_current_thread()
