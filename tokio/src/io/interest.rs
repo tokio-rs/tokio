@@ -169,46 +169,55 @@ impl Interest {
 
     // This function must be crate-private to avoid exposing a `mio` dependency.
     pub(crate) fn to_mio(self) -> mio::Interest {
-        // mio does not allow and empty interest, so pick an arbitrary starting value
-        let mut mio = mio::Interest::READABLE;
+        fn mio_add(wrapped: &mut Option<mio::Interest>, add: mio::Interest) {
+            match wrapped {
+                Some(inner) => *inner |= add,
+                None => *wrapped = Some(add),
+            }
+        }
+
+        // mio does not allow and empty interest, so use None for empty
+        let mut mio = None;
 
         if self.is_readable() {
-            mio |= mio::Interest::READABLE;
+            mio_add(&mut mio, mio::Interest::READABLE);
         }
 
         if self.is_writable() {
-            mio |= mio::Interest::WRITABLE;
+            mio_add(&mut mio, mio::Interest::WRITABLE);
         }
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if self.is_priority() {
-            mio |= mio::Interest::PRIORITY;
+            mio_add(&mut mio, mio::Interest::PRIORITY);
         }
 
         #[cfg(target_os = "freebsd")]
         if self.is_aio() {
-            mio |= mio::Interest::AIO;
+            mio_add(&mut mio, mio::Interest::AIO);
         }
 
         #[cfg(target_os = "freebsd")]
         if self.is_lio() {
-            mio |= mio::Interest::LIO;
+            mio_add(&mut mio, mio::Interest::LIO);
         }
 
-        // Finally remove the starting value unless either:
-        //
-        // - the readable interest is specified
-        // - the error interest is specified. There is no error interest in mio, because error
-        //    events are always reported. But mio interests cannot be empty and one is needed
-        //    just for the registeration.
-        //
-        //    read readiness is filtered out in `Interest::mask` or `Ready::from_interest` if
-        //    needed
-        if !self.is_readable() && !self.is_error() {
-            mio.remove(mio::Interest::READABLE);
+        if self.is_error() {
+            // There is no error interest in mio, because error events are always reported.
+            // But mio interests cannot be empty and an interest is needed just for the registeration.
+            //
+            // read readiness is filtered out in `Interest::mask` or `Ready::from_interest` if
+            // the read interest was not specified by the user.
+            mio_add(&mut mio, mio::Interest::READABLE);
         }
 
-        mio
+        // we should now always have a valid mio interest: either an tokio interest with a
+        // corresponding mio interest was used, or - if only the error interest was specified -
+        // we've picked a default interest.
+        match mio {
+            Some(inner) => inner,
+            None => unreachable!("no mio interest is specified"),
+        }
     }
 
     pub(crate) fn mask(self) -> Ready {
