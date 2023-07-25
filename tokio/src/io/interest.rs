@@ -211,13 +211,13 @@ impl Interest {
             mio_add(&mut mio, mio::Interest::READABLE);
         }
 
-        // we should now always have a valid mio interest: either an tokio interest with a
-        // corresponding mio interest was used, or - if only the error interest was specified -
-        // we've picked a default interest.
-        match mio {
-            Some(inner) => inner,
-            None => unreachable!("no mio interest is specified"),
-        }
+        // the default `mio::Interest::READABLE` should never be used in practice. Either
+        //
+        // - at least one tokio interest with a mio counterpart was used
+        // - only the error tokio interest was specified
+        //
+        // in both cases, `mio` is Some already
+        mio.unwrap_or(mio::Interest::READABLE)
     }
 
     pub(crate) fn mask(self) -> Ready {
