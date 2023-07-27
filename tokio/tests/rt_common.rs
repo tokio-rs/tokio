@@ -21,7 +21,7 @@ macro_rules! rt_test {
             }
         }
 
-        #[cfg(not(tokio_wasi))] // Wasi doesn't support threads
+        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
         mod threaded_scheduler_4_threads {
             $($t)*
 
@@ -37,7 +37,7 @@ macro_rules! rt_test {
             }
         }
 
-        #[cfg(not(tokio_wasi))] // Wasi doesn't support threads
+        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
         mod threaded_scheduler_1_thread {
             $($t)*
 
@@ -53,7 +53,7 @@ macro_rules! rt_test {
             }
         }
 
-        #[cfg(not(tokio_wasi))] // Wasi doesn't support threads
+        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
         #[cfg(tokio_unstable)]
         mod alt_threaded_scheduler_4_threads {
             $($t)*
@@ -70,7 +70,7 @@ macro_rules! rt_test {
             }
         }
 
-        #[cfg(not(tokio_wasi))] // Wasi doesn't support threads
+        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
         #[cfg(tokio_unstable)]
         mod alt_threaded_scheduler_1_thread {
             $($t)*
@@ -844,7 +844,7 @@ rt_test! {
         assert_err!(rx.try_recv());
     }
 
-    #[cfg_attr(tokio_wasi, ignore = "Wasi does not support threads or panic recovery")]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support threads or panic recovery")]
     #[test]
     fn panic_in_task() {
         let rt = rt();
@@ -873,7 +873,7 @@ rt_test! {
 
     #[test]
     #[should_panic]
-    #[cfg_attr(tokio_wasi, ignore = "Wasi does not support panic recovery")]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
     fn panic_in_block_on() {
         let rt = rt();
         rt.block_on(async { panic!() });
@@ -1103,7 +1103,7 @@ rt_test! {
     // See https://github.com/rust-lang/rust/issues/74875
     #[test]
     #[cfg(not(windows))]
-    #[cfg_attr(tokio_wasi, ignore = "Wasi does not support threads")]
+    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support threads")]
     fn runtime_in_thread_local() {
         use std::cell::RefCell;
         use std::thread;
@@ -1148,7 +1148,7 @@ rt_test! {
         tx.send(()).unwrap();
     }
 
-    #[cfg(not(tokio_wasi))] // Wasi does not support bind
+    #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
     #[test]
     fn local_set_block_on_socket() {
         let rt = rt();
@@ -1170,7 +1170,7 @@ rt_test! {
         });
     }
 
-    #[cfg(not(tokio_wasi))] // Wasi does not support bind
+    #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
     #[test]
     fn local_set_client_server_block_on() {
         let rt = rt();
@@ -1184,7 +1184,7 @@ rt_test! {
         assert_err!(rx.try_recv());
     }
 
-    #[cfg(not(tokio_wasi))] // Wasi does not support bind
+    #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
     async fn client_server_local(tx: mpsc::Sender<()>) {
         let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 

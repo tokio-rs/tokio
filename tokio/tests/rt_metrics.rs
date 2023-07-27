@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", tokio_unstable, not(tokio_wasi)))]
+#![cfg(all(feature = "full", tokio_unstable, not(target_os = "wasi")))]
 
 use std::future::Future;
 use std::sync::{Arc, Mutex};

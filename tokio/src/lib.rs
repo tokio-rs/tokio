@@ -456,26 +456,9 @@ compile_error! {
     "Tokio requires the platform pointer width to be 32, 64, or 128 bits"
 }
 
-// Ensure that our build script has correctly set cfg flags for wasm.
-//
-// Each condition is written all(a, not(b)). This should be read as
-// "if a, then we must also have b".
-#[cfg(any(
-    all(target_arch = "wasm32", not(tokio_wasm)),
-    all(target_arch = "wasm64", not(tokio_wasm)),
-    all(target_family = "wasm", not(tokio_wasm)),
-    all(target_os = "wasi", not(tokio_wasm)),
-    all(target_os = "wasi", not(tokio_wasi)),
-    all(target_os = "wasi", tokio_wasm_not_wasi),
-    all(tokio_wasm, not(any(target_arch = "wasm32", target_arch = "wasm64"))),
-    all(tokio_wasm_not_wasi, not(tokio_wasm)),
-    all(tokio_wasi, not(tokio_wasm))
-))]
-compile_error!("Tokio's build script has incorrectly detected wasm.");
-
 #[cfg(all(
     not(tokio_unstable),
-    tokio_wasm,
+    target_family = "wasm",
     any(
         feature = "fs",
         feature = "io-std",

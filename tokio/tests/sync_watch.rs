@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(tokio_wasm_not_wasi)]
+#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use tokio::sync::watch;
@@ -214,7 +214,7 @@ fn reopened_after_subscribe() {
 
 #[test]
 #[cfg(panic = "unwind")]
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn send_modify_panic() {
     let (tx, mut rx) = watch::channel("one");
 
