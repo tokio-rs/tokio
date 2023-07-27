@@ -691,9 +691,38 @@ impl Notify {
         wakers.wake_all();
     }
 
-    /// Notifies one waiting tasks.
+    /// Notifies one waiting task.
+    ///
+    /// If tasks are currently waiting, exactly one task is notified. Unlike with
+    /// `notify_one()`, no permit is stored to be used by the next call to
+    /// `notified().await`. The purpose of this method is to notify a single
+    /// already registered waiter. Registering for notification is done by
+    /// acquiring an instance of the `Notified` future via calling `notified()`.
     ///
     /// If no task is waiting right now, this does nothing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Notify;
+    /// use std::sync::Arc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let notify = Arc::new(Notify::new());
+    ///     let notify2 = notify.clone();
+    ///
+    ///     let notified = notify.notified();
+    ///
+    ///     let handle = tokio::spawn(async move {
+    ///         println!("sending notifications");
+    ///         notify2.notify_one_waiter();
+    ///     });
+    ///
+    ///     notified.await;
+    ///     println!("received notification");
+    /// }
+    /// ```
     pub fn notify_one_waiter(&self) {
         let mut waiters = self.waiters.lock();
 
