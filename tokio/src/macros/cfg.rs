@@ -523,7 +523,7 @@ macro_rules! cfg_not_coop {
 macro_rules! cfg_has_atomic_u64 {
     ($($item:item)*) => {
         $(
-            #[cfg(all(target_has_atomic = "64", not(tokio_no_atomic_u64)))]
+            #[cfg(target_has_atomic = "64")]
             $item
         )*
     }
@@ -532,7 +532,7 @@ macro_rules! cfg_has_atomic_u64 {
 macro_rules! cfg_not_has_atomic_u64 {
     ($($item:item)*) => {
         $(
-            #[cfg(any(not(target_has_atomic = "64"), tokio_no_atomic_u64))]
+            #[cfg(not(target_has_atomic = "64"))]
             $item
         )*
     }

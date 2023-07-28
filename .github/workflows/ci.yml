@@ -538,7 +538,7 @@ jobs:
           cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
         env:
           RUST_TEST_THREADS: 1
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64 --cfg tokio_no_tuning_tests
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_tuning_tests
 
   no-atomic-u64-check:
     name: Check tokio --feature-powerset --depth 2 on i686-unknown-linux-gnu without AtomicU64
@@ -561,9 +561,9 @@ jobs:
       # https://github.com/tokio-rs/tokio/pull/5356
       # https://github.com/tokio-rs/tokio/issues/5373
       - name: Check
-        run: cargo hack check -p tokio --feature-powerset --depth 2 --keep-going
+        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --depth 2 --keep-going
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
   features:
     name: features ${{ matrix.name }}
