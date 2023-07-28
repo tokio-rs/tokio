@@ -817,7 +817,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_stable }}
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        uses: taiki-e/install-action@wasm-pack
 
       - uses: Swatinem/rust-cache@v2
       - name: test tokio
