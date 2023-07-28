@@ -39,7 +39,7 @@ impl UCred {
 ))]
 pub(crate) use self::impl_linux::get_peer_cred;
 
-#[cfg(any(target_os = "netbsd"))]
+#[cfg(target_os = "netbsd")]
 pub(crate) use self::impl_netbsd::get_peer_cred;
 
 #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
@@ -114,7 +114,7 @@ pub(crate) mod impl_linux {
     }
 }
 
-#[cfg(any(target_os = "netbsd"))]
+#[cfg(target_os = "netbsd")]
 pub(crate) mod impl_netbsd {
     use crate::net::unix::{self, UnixStream};
 

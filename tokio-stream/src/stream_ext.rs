@@ -994,7 +994,7 @@ pub trait StreamExt: Stream {
     /// assert!(timeout_stream.try_next().await.is_ok(), "expected no more timeouts");
     /// # }
     /// ```
-    #[cfg(all(feature = "time"))]
+    #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     fn timeout(self, duration: Duration) -> Timeout<Self>
     where
@@ -1083,7 +1083,7 @@ pub trait StreamExt: Stream {
     /// assert!(timeout_stream.try_next().await.is_ok(), "expected non-timeout");
     /// # }
     /// ```
-    #[cfg(all(feature = "time"))]
+    #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     fn timeout_repeating(self, interval: Interval) -> TimeoutRepeating<Self>
     where
@@ -1113,7 +1113,7 @@ pub trait StreamExt: Stream {
     /// }
     /// # }
     /// ```
-    #[cfg(all(feature = "time"))]
+    #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     fn throttle(self, duration: Duration) -> Throttle<Self>
     where

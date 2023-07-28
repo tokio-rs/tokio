@@ -303,7 +303,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
