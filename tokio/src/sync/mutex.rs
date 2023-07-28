@@ -378,8 +378,7 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// static LOCK: Mutex<i32> = Mutex::const_new(5);
     /// ```
-    #[cfg(all(feature = "parking_lot", not(all(loom, test)),))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    #[cfg(not(all(loom, test)))]
     pub const fn const_new(t: T) -> Self
     where
         T: Sized,
