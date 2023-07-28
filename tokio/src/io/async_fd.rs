@@ -797,7 +797,6 @@ impl<T: AsRawFd> AsRawFd for AsyncFd<T> {
     }
 }
 
-#[cfg(not(tokio_no_as_fd))]
 impl<T: AsRawFd> std::os::unix::io::AsFd for AsyncFd<T> {
     fn as_fd(&self) -> std::os::unix::io::BorrowedFd<'_> {
         unsafe { std::os::unix::io::BorrowedFd::borrow_raw(self.as_raw_fd()) }
