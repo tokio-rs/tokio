@@ -64,11 +64,11 @@ where
 
         let (lower, upper) = self.stream.size_hint();
 
-        let lower = cmp::min(lower, self.remaining as usize);
+        let lower = cmp::min(lower, self.remaining);
 
         let upper = match upper {
-            Some(x) if x < self.remaining as usize => Some(x),
-            _ => Some(self.remaining as usize),
+            Some(x) if x < self.remaining => Some(x),
+            _ => Some(self.remaining),
         };
 
         (lower, upper)

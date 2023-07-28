@@ -30,7 +30,7 @@ cfg_io_util! {
         ) => {
             $(
                 $(#[$outer])*
-                fn $name<'a>(&'a mut self, n: $ty) -> $($fut)*<&'a mut Self> where Self: Unpin {
+                fn $name(&mut self, n: $ty) -> $($fut)*<&mut Self> where Self: Unpin {
                     $($fut)*::new(self, n)
                 }
             )*
