@@ -10,9 +10,7 @@ use std::ptr;
 use std::task::{Context, Poll};
 
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
-#[cfg(not(tokio_no_as_fd))]
-use crate::os::windows::io::{AsHandle, BorrowedHandle};
-use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
+use crate::os::windows::io::{AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle, RawHandle};
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -930,7 +928,6 @@ impl AsRawHandle for NamedPipeServer {
     }
 }
 
-#[cfg(not(tokio_no_as_fd))]
 impl AsHandle for NamedPipeServer {
     fn as_handle(&self) -> BorrowedHandle<'_> {
         unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
@@ -1720,7 +1717,6 @@ impl AsRawHandle for NamedPipeClient {
     }
 }
 
-#[cfg(not(tokio_no_as_fd))]
 impl AsHandle for NamedPipeClient {
     fn as_handle(&self) -> BorrowedHandle<'_> {
         unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }

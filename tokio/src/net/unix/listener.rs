@@ -3,9 +3,7 @@ use crate::net::unix::{SocketAddr, UnixStream};
 
 use std::fmt;
 use std::io;
-#[cfg(not(tokio_no_as_fd))]
-use std::os::unix::io::{AsFd, BorrowedFd};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
@@ -211,7 +209,6 @@ impl AsRawFd for UnixListener {
     }
 }
 
-#[cfg(not(tokio_no_as_fd))]
 impl AsFd for UnixListener {
     fn as_fd(&self) -> BorrowedFd<'_> {
         unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
