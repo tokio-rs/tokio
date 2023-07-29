@@ -114,12 +114,10 @@ impl<T> Drop for OnceCell<T> {
 
 impl<T> From<T> for OnceCell<T> {
     fn from(value: T) -> Self {
-        let semaphore = Semaphore::new(0);
-        semaphore.close();
         OnceCell {
             value_set: AtomicBool::new(true),
             value: UnsafeCell::new(MaybeUninit::new(value)),
-            semaphore,
+            semaphore: Semaphore::new_closed(),
         }
     }
 }
@@ -139,6 +137,10 @@ impl<T> OnceCell<T> {
     /// If the `Option` is `None`, this is equivalent to `OnceCell::new`.
     ///
     /// [`OnceCell::new`]: crate::sync::OnceCell::new
+    // Once https://github.com/rust-lang/rust/issues/73255 lands
+    // and tokio MSRV is bumped to the rustc version with it stablised,
+    // we can made this function available in const context,
+    // by creating `Semaphore::const_new_closed`.
     pub fn new_with(value: Option<T>) -> Self {
         if let Some(v) = value {
             OnceCell::from(v)
@@ -171,8 +173,7 @@ impl<T> OnceCell<T> {
     ///     assert_eq!(*result, 2);
     /// }
     /// ```
-    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    #[cfg(not(all(loom, test)))]
     pub const fn const_new() -> Self {
         OnceCell {
             value_set: AtomicBool::new(false),

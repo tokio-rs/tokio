@@ -39,7 +39,7 @@ impl UCred {
 ))]
 pub(crate) use self::impl_linux::get_peer_cred;
 
-#[cfg(any(target_os = "netbsd"))]
+#[cfg(target_os = "netbsd")]
 pub(crate) use self::impl_netbsd::get_peer_cred;
 
 #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
@@ -53,6 +53,9 @@ pub(crate) use self::impl_solaris::get_peer_cred;
 
 #[cfg(target_os = "aix")]
 pub(crate) use self::impl_aix::get_peer_cred;
+
+#[cfg(target_os = "espidf")]
+pub(crate) use self::impl_noproc::get_peer_cred;
 
 #[cfg(any(
     target_os = "linux",
@@ -111,7 +114,7 @@ pub(crate) mod impl_linux {
     }
 }
 
-#[cfg(any(target_os = "netbsd"))]
+#[cfg(target_os = "netbsd")]
 pub(crate) mod impl_netbsd {
     use crate::net::unix::{self, UnixStream};
 
@@ -289,5 +292,19 @@ pub(crate) mod impl_aix {
                 Err(io::Error::last_os_error())
             }
         }
+    }
+}
+
+#[cfg(target_os = "espidf")]
+pub(crate) mod impl_noproc {
+    use crate::net::unix::UnixStream;
+    use std::io;
+
+    pub(crate) fn get_peer_cred(_sock: &UnixStream) -> io::Result<super::UCred> {
+        Ok(super::UCred {
+            uid: 0,
+            gid: 0,
+            pid: None,
+        })
     }
 }

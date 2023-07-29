@@ -3,10 +3,10 @@
 use crate::io::interest::Interest;
 use crate::runtime::io::{Direction, Handle, ReadyEvent, ScheduledIo};
 use crate::runtime::scheduler;
-use crate::util::slab;
 
 use mio::event::Source;
 use std::io;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 cfg_io_driver! {
@@ -45,10 +45,12 @@ cfg_io_driver! {
     #[derive(Debug)]
     pub(crate) struct Registration {
         /// Handle to the associated runtime.
+        ///
+        /// TODO: this can probably be moved into `ScheduledIo`.
         handle: scheduler::Handle,
 
         /// Reference to state stored by the driver.
-        shared: slab::Ref<ScheduledIo>,
+        shared: Arc<ScheduledIo>,
     }
 }
 
@@ -95,7 +97,7 @@ impl Registration {
     ///
     /// `Err` is returned if an error is encountered.
     pub(crate) fn deregister(&mut self, io: &mut impl Source) -> io::Result<()> {
-        self.handle().deregister_source(io)
+        self.handle().deregister_source(&self.shared, io)
     }
 
     pub(crate) fn clear_readiness(&self, event: ReadyEvent) {
@@ -116,7 +118,7 @@ impl Registration {
 
     // Uses the poll path, requiring the caller to ensure mutual exclusion for
     // correctness. Only the last task to call this function is notified.
-    #[cfg(not(tokio_wasi))]
+    #[cfg(not(target_os = "wasi"))]
     pub(crate) fn poll_read_io<R>(
         &self,
         cx: &mut Context<'_>,

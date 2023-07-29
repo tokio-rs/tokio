@@ -1,4 +1,3 @@
-use crate::future::Future;
 use crate::runtime::task::{Header, RawTask, Schedule};
 
 use std::marker::PhantomData;
@@ -14,9 +13,8 @@ pub(super) struct WakerRef<'a, S: 'static> {
 
 /// Returns a `WakerRef` which avoids having to preemptively increase the
 /// refcount if there is no need to do so.
-pub(super) fn waker_ref<T, S>(header: &NonNull<Header>) -> WakerRef<'_, S>
+pub(super) fn waker_ref<S>(header: &NonNull<Header>) -> WakerRef<'_, S>
 where
-    T: Future,
     S: Schedule,
 {
     // `Waker::will_wake` uses the VTABLE pointer as part of the check. This

@@ -75,6 +75,21 @@ impl<T: 'static> Shared<T> {
         debug_assert!(unsafe { batch_tail.get_queue_next().is_none() });
 
         let mut synced = shared.lock();
+
+        if synced.as_mut().is_closed {
+            drop(synced);
+
+            let mut curr = Some(batch_head);
+
+            while let Some(task) = curr {
+                curr = task.get_queue_next();
+
+                let _ = unsafe { task::Notified::<T>::from_raw(task) };
+            }
+
+            return;
+        }
+
         let synced = synced.as_mut();
 
         if let Some(tail) = synced.tail {

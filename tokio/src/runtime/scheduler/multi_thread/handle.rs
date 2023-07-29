@@ -53,11 +53,19 @@ impl Handle {
     {
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
 
-        if let Some(notified) = notified {
-            me.schedule_task(notified, false);
-        }
+        me.schedule_option_task_without_yield(notified);
 
         handle
+    }
+}
+
+cfg_unstable! {
+    use std::num::NonZeroU64;
+
+    impl Handle {
+        pub(crate) fn owned_id(&self) -> NonZeroU64 {
+            self.shared.owned.id
+        }
     }
 }
 

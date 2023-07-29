@@ -404,7 +404,7 @@ impl<S: Schedule> LocalNotified<S> {
 impl<S: Schedule> UnownedTask<S> {
     // Used in test of the inject queue.
     #[cfg(test)]
-    #[cfg_attr(tokio_wasm, allow(dead_code))]
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
     pub(super) fn into_notified(self) -> Notified<S> {
         Notified(self.into_task())
     }

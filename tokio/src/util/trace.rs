@@ -11,18 +11,22 @@ cfg_trace! {
         #[inline]
         #[track_caller]
         pub(crate) fn task<F>(task: F, kind: &'static str, name: Option<&str>, id: u64) -> Instrumented<F> {
+            #[track_caller]
+            fn get_span(kind: &'static str, name: Option<&str>, id: u64) -> tracing::Span {
+                let location = std::panic::Location::caller();
+                tracing::trace_span!(
+                    target: "tokio::task",
+                    "runtime.spawn",
+                    %kind,
+                    task.name = %name.unwrap_or_default(),
+                    task.id = id,
+                    loc.file = location.file(),
+                    loc.line = location.line(),
+                    loc.col = location.column(),
+                )
+            }
             use tracing::instrument::Instrument;
-            let location = std::panic::Location::caller();
-            let span = tracing::trace_span!(
-                target: "tokio::task",
-                "runtime.spawn",
-                %kind,
-                task.name = %name.unwrap_or_default(),
-                task.id = id,
-                loc.file = location.file(),
-                loc.line = location.line(),
-                loc.col = location.column(),
-            );
+            let span = get_span(kind, name, id);
             task.instrument(span)
         }
 

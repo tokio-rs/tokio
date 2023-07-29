@@ -1,6 +1,6 @@
 #![cfg(feature = "sync")]
 
-#[cfg(tokio_wasm_not_wasi)]
+#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use std::sync::Arc;
@@ -78,7 +78,7 @@ fn merge() {
 }
 
 #[test]
-#[cfg(not(tokio_wasm))] // No stack unwinding on wasm targets
+#[cfg(not(target_family = "wasm"))] // No stack unwinding on wasm targets
 #[should_panic]
 fn merge_unrelated_permits() {
     let sem1 = Arc::new(Semaphore::new(3));
@@ -118,7 +118,7 @@ fn add_max_amount_permits() {
     assert_eq!(s.available_permits(), tokio::sync::Semaphore::MAX_PERMITS);
 }
 
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 #[test]
 #[should_panic]
 fn add_more_than_max_amount_permits1() {
@@ -126,7 +126,7 @@ fn add_more_than_max_amount_permits1() {
     s.add_permits(tokio::sync::Semaphore::MAX_PERMITS);
 }
 
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 #[test]
 #[should_panic]
 fn add_more_than_max_amount_permits2() {
@@ -135,7 +135,7 @@ fn add_more_than_max_amount_permits2() {
     s.add_permits(1);
 }
 
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 #[test]
 #[should_panic]
 fn panic_when_exceeds_maxpermits() {

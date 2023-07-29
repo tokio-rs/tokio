@@ -4,7 +4,11 @@
 use std::mem;
 use std::ops::Drop;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
+use tokio::runtime;
 use tokio::sync::OnceCell;
+use tokio::sync::SetError;
+use tokio::time;
 
 #[test]
 fn drop_cell() {
@@ -102,184 +106,170 @@ fn from() {
     assert_eq!(*cell.get().unwrap(), 2);
 }
 
-#[cfg(feature = "parking_lot")]
-mod parking_lot {
-    use super::*;
+async fn func1() -> u32 {
+    5
+}
 
-    use tokio::runtime;
-    use tokio::sync::SetError;
-    use tokio::time;
+async fn func2() -> u32 {
+    time::sleep(Duration::from_millis(1)).await;
+    10
+}
 
-    use std::time::Duration;
+async fn func_err() -> Result<u32, ()> {
+    Err(())
+}
 
-    async fn func1() -> u32 {
-        5
-    }
+async fn func_ok() -> Result<u32, ()> {
+    Ok(10)
+}
 
-    async fn func2() -> u32 {
-        time::sleep(Duration::from_millis(1)).await;
-        10
-    }
+async fn func_panic() -> u32 {
+    time::sleep(Duration::from_millis(1)).await;
+    panic!();
+}
 
-    async fn func_err() -> Result<u32, ()> {
-        Err(())
-    }
+async fn sleep_and_set() -> u32 {
+    // Simulate sleep by pausing time and waiting for another thread to
+    // resume clock when calling `set`, then finding the cell being initialized
+    // by this call
+    time::sleep(Duration::from_millis(2)).await;
+    5
+}
 
-    async fn func_ok() -> Result<u32, ()> {
-        Ok(10)
-    }
+async fn advance_time_and_set(cell: &'static OnceCell<u32>, v: u32) -> Result<(), SetError<u32>> {
+    time::advance(Duration::from_millis(1)).await;
+    cell.set(v)
+}
 
-    async fn func_panic() -> u32 {
-        time::sleep(Duration::from_millis(1)).await;
-        panic!();
-    }
+#[test]
+fn get_or_init() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .unwrap();
 
-    async fn sleep_and_set() -> u32 {
-        // Simulate sleep by pausing time and waiting for another thread to
-        // resume clock when calling `set`, then finding the cell being initialized
-        // by this call
-        time::sleep(Duration::from_millis(2)).await;
-        5
-    }
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
 
-    async fn advance_time_and_set(
-        cell: &'static OnceCell<u32>,
-        v: u32,
-    ) -> Result<(), SetError<u32>> {
+    rt.block_on(async {
+        let handle1 = rt.spawn(async { ONCE.get_or_init(func1).await });
+        let handle2 = rt.spawn(async { ONCE.get_or_init(func2).await });
+
         time::advance(Duration::from_millis(1)).await;
-        cell.set(v)
-    }
+        time::resume();
 
-    #[test]
-    fn get_or_init() {
-        let rt = runtime::Builder::new_current_thread()
-            .enable_time()
-            .start_paused(true)
-            .build()
-            .unwrap();
+        let result1 = handle1.await.unwrap();
+        let result2 = handle2.await.unwrap();
 
-        static ONCE: OnceCell<u32> = OnceCell::const_new();
+        assert_eq!(*result1, 5);
+        assert_eq!(*result2, 5);
+    });
+}
 
-        rt.block_on(async {
-            let handle1 = rt.spawn(async { ONCE.get_or_init(func1).await });
-            let handle2 = rt.spawn(async { ONCE.get_or_init(func2).await });
+#[test]
+fn get_or_init_panic() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
 
-            time::advance(Duration::from_millis(1)).await;
-            time::resume();
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
 
-            let result1 = handle1.await.unwrap();
-            let result2 = handle2.await.unwrap();
+    rt.block_on(async {
+        time::pause();
 
-            assert_eq!(*result1, 5);
-            assert_eq!(*result2, 5);
-        });
-    }
+        let handle1 = rt.spawn(async { ONCE.get_or_init(func1).await });
+        let handle2 = rt.spawn(async { ONCE.get_or_init(func_panic).await });
 
-    #[test]
-    fn get_or_init_panic() {
-        let rt = runtime::Builder::new_current_thread()
-            .enable_time()
-            .build()
-            .unwrap();
+        time::advance(Duration::from_millis(1)).await;
 
-        static ONCE: OnceCell<u32> = OnceCell::const_new();
+        let result1 = handle1.await.unwrap();
+        let result2 = handle2.await.unwrap();
 
-        rt.block_on(async {
-            time::pause();
+        assert_eq!(*result1, 5);
+        assert_eq!(*result2, 5);
+    });
+}
 
-            let handle1 = rt.spawn(async { ONCE.get_or_init(func1).await });
-            let handle2 = rt.spawn(async { ONCE.get_or_init(func_panic).await });
+#[test]
+fn set_and_get() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
 
-            time::advance(Duration::from_millis(1)).await;
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
 
-            let result1 = handle1.await.unwrap();
-            let result2 = handle2.await.unwrap();
+    rt.block_on(async {
+        let _ = rt.spawn(async { ONCE.set(5) }).await;
+        let value = ONCE.get().unwrap();
+        assert_eq!(*value, 5);
+    });
+}
 
-            assert_eq!(*result1, 5);
-            assert_eq!(*result2, 5);
-        });
-    }
+#[test]
+fn get_uninit() {
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
+    let uninit = ONCE.get();
+    assert!(uninit.is_none());
+}
 
-    #[test]
-    fn set_and_get() {
-        let rt = runtime::Builder::new_current_thread()
-            .enable_time()
-            .build()
-            .unwrap();
+#[test]
+fn set_twice() {
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
 
-        static ONCE: OnceCell<u32> = OnceCell::const_new();
+    let first = ONCE.set(5);
+    assert_eq!(first, Ok(()));
+    let second = ONCE.set(6);
+    assert!(second.err().unwrap().is_already_init_err());
+}
 
-        rt.block_on(async {
-            let _ = rt.spawn(async { ONCE.set(5) }).await;
-            let value = ONCE.get().unwrap();
-            assert_eq!(*value, 5);
-        });
-    }
+#[test]
+fn set_while_initializing() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
 
-    #[test]
-    fn get_uninit() {
-        static ONCE: OnceCell<u32> = OnceCell::const_new();
-        let uninit = ONCE.get();
-        assert!(uninit.is_none());
-    }
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
 
-    #[test]
-    fn set_twice() {
-        static ONCE: OnceCell<u32> = OnceCell::const_new();
+    rt.block_on(async {
+        time::pause();
 
-        let first = ONCE.set(5);
-        assert_eq!(first, Ok(()));
-        let second = ONCE.set(6);
-        assert!(second.err().unwrap().is_already_init_err());
-    }
+        let handle1 = rt.spawn(async { ONCE.get_or_init(sleep_and_set).await });
+        let handle2 = rt.spawn(async { advance_time_and_set(&ONCE, 10).await });
 
-    #[test]
-    fn set_while_initializing() {
-        let rt = runtime::Builder::new_current_thread()
-            .enable_time()
-            .build()
-            .unwrap();
+        time::advance(Duration::from_millis(2)).await;
 
-        static ONCE: OnceCell<u32> = OnceCell::const_new();
+        let result1 = handle1.await.unwrap();
+        let result2 = handle2.await.unwrap();
 
-        rt.block_on(async {
-            time::pause();
+        assert_eq!(*result1, 5);
+        assert!(result2.err().unwrap().is_initializing_err());
+    });
+}
 
-            let handle1 = rt.spawn(async { ONCE.get_or_init(sleep_and_set).await });
-            let handle2 = rt.spawn(async { advance_time_and_set(&ONCE, 10).await });
+#[test]
+fn get_or_try_init() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .unwrap();
 
-            time::advance(Duration::from_millis(2)).await;
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
 
-            let result1 = handle1.await.unwrap();
-            let result2 = handle2.await.unwrap();
+    rt.block_on(async {
+        let handle1 = rt.spawn(async { ONCE.get_or_try_init(func_err).await });
+        let handle2 = rt.spawn(async { ONCE.get_or_try_init(func_ok).await });
 
-            assert_eq!(*result1, 5);
-            assert!(result2.err().unwrap().is_initializing_err());
-        });
-    }
+        time::advance(Duration::from_millis(1)).await;
+        time::resume();
 
-    #[test]
-    fn get_or_try_init() {
-        let rt = runtime::Builder::new_current_thread()
-            .enable_time()
-            .start_paused(true)
-            .build()
-            .unwrap();
+        let result1 = handle1.await.unwrap();
+        assert!(result1.is_err());
 
-        static ONCE: OnceCell<u32> = OnceCell::const_new();
-
-        rt.block_on(async {
-            let handle1 = rt.spawn(async { ONCE.get_or_try_init(func_err).await });
-            let handle2 = rt.spawn(async { ONCE.get_or_try_init(func_ok).await });
-
-            time::advance(Duration::from_millis(1)).await;
-            time::resume();
-
-            let result1 = handle1.await.unwrap();
-            assert!(result1.is_err());
-
-            let result2 = handle2.await.unwrap();
-            assert_eq!(*result2.unwrap(), 10);
-        });
-    }
+        let result2 = handle2.await.unwrap();
+        assert_eq!(*result2.unwrap(), 10);
+    });
 }

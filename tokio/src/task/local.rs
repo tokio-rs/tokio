@@ -1,6 +1,8 @@
 //! Runs `!Send` futures on the current thread.
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
+#[cfg(tokio_unstable)]
+use crate::runtime;
 use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
 use crate::runtime::{context, ThreadId};
 use crate::sync::AtomicWaker;
@@ -784,6 +786,30 @@ cfg_unstable! {
                 .expect("Unhandled Panic behavior modified after starting LocalSet")
                 .unhandled_panic = behavior;
             self
+        }
+
+        /// Returns the [`Id`] of the current `LocalSet` runtime.
+        ///
+        /// # Examples
+        ///
+        /// ```rust
+        /// use tokio::task;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let local_set = task::LocalSet::new();
+        ///     println!("Local set id: {}", local_set.id());
+        /// }
+        /// ```
+        ///
+        /// **Note**: This is an [unstable API][unstable]. The public API of this type
+        /// may break in 1.x releases. See [the documentation on unstable
+        /// features][unstable] for details.
+        ///
+        /// [unstable]: crate#unstable-features
+        /// [`Id`]: struct@crate::runtime::Id
+        pub fn id(&self) -> runtime::Id {
+            self.context.shared.local_state.owned.id.into()
         }
     }
 }

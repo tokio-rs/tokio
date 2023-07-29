@@ -1,3 +1,5 @@
+mod yield_now;
+
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
 use crate::loom::thread;

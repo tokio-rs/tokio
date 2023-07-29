@@ -52,18 +52,16 @@ mod unowned_wrapper {
 
 cfg_loom! {
     mod loom_blocking;
-    mod loom_current_thread_scheduler;
-    mod loom_local;
-    mod loom_oneshot;
-    mod loom_pool;
-    mod loom_queue;
-    mod loom_shutdown_join;
+    mod loom_current_thread;
     mod loom_join_set;
-    mod loom_yield;
+    mod loom_local;
+    mod loom_multi_thread;
+    mod loom_multi_thread_alt;
+    mod loom_oneshot;
 
     // Make sure debug assertions are enabled
     #[cfg(not(debug_assertions))]
-    compiler_error!("these tests require debug assertions to be enabled");
+    compile_error!("these tests require debug assertions to be enabled");
 }
 
 cfg_not_loom! {

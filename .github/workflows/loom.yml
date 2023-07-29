@@ -8,7 +8,9 @@ on:
 name: Loom
 
 env:
-  RUSTFLAGS: -Dwarnings
+  RUSTFLAGS: -Dwarnings --cfg loom --cfg tokio_unstable -C debug_assertions
+  LOOM_MAX_PREEMPTIONS: 2
+  LOOM_MAX_BRANCHES: 10000
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
   rust_stable: stable
@@ -17,26 +19,66 @@ permissions:
   contents: read
 
 jobs:
-  loom:
-    name: loom
+  loom-sync:
+    name: loom tokio::sync
     # base_ref is null when it's not a pull request
-    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom') || (github.base_ref == null))
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-sync') || (github.base_ref == null))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      - name: run tests
+        run: cargo test --lib --release --features full -- --nocapture sync::tests
+        working-directory: tokio
+
+  loom-time-driver:
+    name: loom time driver
+    # base_ref is null when it's not a pull request
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-time-driver') || (github.base_ref == null))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      - name: run tests
+        run: cargo test --lib --release --features full -- --nocapture runtime::time::tests
+        working-directory: tokio
+
+  loom-current-thread:
+    name: loom current-thread scheduler
+    # base_ref is null when it's not a pull request
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-current-thread') || (github.base_ref == null))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      - name: run tests
+        run: cargo test --lib --release --features full -- --nocapture loom_current_thread
+        working-directory: tokio
+
+  loom-multi-thread:
+    name: loom multi-thread scheduler
+    # base_ref is null when it's not a pull request
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-multi-thread') || (github.base_ref == null))
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - scope: --skip loom_pool
-            max_preemptions: 2
-          - scope: loom_pool::group_a
-            max_preemptions: 2
-          - scope: loom_pool::group_b
-            max_preemptions: 2
-          - scope: loom_pool::group_c
-            max_preemptions: 2
-          - scope: loom_pool::group_d
-            max_preemptions: 2
-          - scope: time::driver
-            max_preemptions: 2
+          - scope: loom_multi_thread::group_a
+          - scope: loom_multi_thread::group_b
+          - scope: loom_multi_thread::group_c
+          - scope: loom_multi_thread::group_d
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
@@ -45,10 +87,34 @@ jobs:
             toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: loom ${{ matrix.scope }}
-        run: cargo test --lib --release --features full -- --nocapture $SCOPE
+        run: cargo test --lib --release --features full -- $SCOPE
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings -C debug-assertions
-          LOOM_MAX_PREEMPTIONS: ${{ matrix.max_preemptions }}
-          LOOM_MAX_BRANCHES: 10000
           SCOPE: ${{ matrix.scope }}
+
+  loom-multi-thread-alt:
+    name: loom ALT multi-thread scheduler
+    # base_ref is null when it's not a pull request
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-multi-thread-alt') || (github.base_ref == null))
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - scope: loom_multi_thread_alt::group_a
+          - scope: loom_multi_thread_alt::group_b
+          - scope: loom_multi_thread_alt::group_c
+          - scope: loom_multi_thread_alt::group_d
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      - name: loom ${{ matrix.scope }}
+        run: cargo test --lib --release --features full -- $SCOPE
+        working-directory: tokio
+        env:
+          SCOPE: ${{ matrix.scope }}
+          # TODO: remove this before stabilizing
+          LOOM_MAX_PREEMPTIONS: 1

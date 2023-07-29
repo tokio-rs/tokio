@@ -523,6 +523,10 @@ cfg_metrics! {
             &self.shared.worker_metrics
         }
 
+        pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
+            self.worker_metrics(worker).queue_depth()
+        }
+
         pub(crate) fn num_blocking_threads(&self) -> usize {
             self.blocking_spawner.num_threads()
         }
@@ -537,6 +541,16 @@ cfg_metrics! {
 
         pub(crate) fn active_tasks_count(&self) -> usize {
             self.shared.owned.active_tasks_count()
+        }
+    }
+}
+
+cfg_unstable! {
+    use std::num::NonZeroU64;
+
+    impl Handle {
+        pub(crate) fn owned_id(&self) -> NonZeroU64 {
+            self.shared.owned.id
         }
     }
 }

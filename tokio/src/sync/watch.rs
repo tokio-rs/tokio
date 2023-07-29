@@ -205,6 +205,7 @@ impl<T: fmt::Debug> fmt::Debug for Shared<T> {
 pub mod error {
     //! Watch error types.
 
+    use std::error::Error;
     use std::fmt;
 
     /// Error produced when sending a value fails.
@@ -225,7 +226,7 @@ pub mod error {
         }
     }
 
-    impl<T> std::error::Error for SendError<T> {}
+    impl<T> Error for SendError<T> {}
 
     /// Error produced when receiving a change notification.
     #[derive(Debug, Clone)]
@@ -239,7 +240,7 @@ pub mod error {
         }
     }
 
-    impl std::error::Error for RecvError {}
+    impl Error for RecvError {}
 }
 
 mod big_notify {

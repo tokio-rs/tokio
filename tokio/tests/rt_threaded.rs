@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(tokio_wasi)))]
+#![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -588,6 +588,34 @@ async fn test_block_in_place4() {
     tokio::task::block_in_place(|| {});
 }
 
+// Repro for tokio-rs/tokio#5239
+#[test]
+fn test_nested_block_in_place_with_block_on_between() {
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        // Needs to be more than 0
+        .max_blocking_threads(1)
+        .build()
+        .unwrap();
+
+    // Triggered by a race condition, so run a few times to make sure it is OK.
+    for _ in 0..100 {
+        let h = rt.handle().clone();
+
+        rt.block_on(async move {
+            tokio::spawn(async move {
+                tokio::task::block_in_place(|| {
+                    h.block_on(async {
+                        tokio::task::block_in_place(|| {});
+                    });
+                })
+            })
+            .await
+            .unwrap()
+        });
+    }
+}
+
 // Testing the tuning logic is tricky as it is inherently timing based, and more
 // of a heuristic than an exact behavior. This test checks that the interval
 // changes over time based on load factors. There are no assertions, completion
@@ -733,5 +761,23 @@ mod unstable {
             .await
             .unwrap();
         })
+    }
+
+    #[test]
+    fn runtime_id_is_same() {
+        let rt = rt();
+
+        let handle1 = rt.handle();
+        let handle2 = rt.handle();
+
+        assert_eq!(handle1.id(), handle2.id());
+    }
+
+    #[test]
+    fn runtime_ids_different() {
+        let rt1 = rt();
+        let rt2 = rt();
+
+        assert_ne!(rt1.handle().id(), rt2.handle().id());
     }
 }
