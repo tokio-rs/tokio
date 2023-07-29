@@ -130,36 +130,17 @@ impl Semaphore {
     /// Exceeding this limit typically results in a panic.
     pub const MAX_PERMITS: usize = super::batch_semaphore::Semaphore::MAX_PERMITS;
 
-    /// Creates a new semaphore with the initial number of permits.
-    ///
-    /// Panics if `permits` exceeds [`Semaphore::MAX_PERMITS`].
-    #[track_caller]
-    pub fn new(permits: usize) -> Self {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = {
-            let location = std::panic::Location::caller();
-
-            tracing::trace_span!(
-                "runtime.resource",
-                concrete_type = "Semaphore",
-                kind = "Sync",
-                loc.file = location.file(),
-                loc.line = location.line(),
-                loc.col = location.column(),
-                inherits_child_attrs = true,
-            )
-        };
-
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let ll_sem = resource_span.in_scope(|| ll::Semaphore::new(permits));
-
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let ll_sem = ll::Semaphore::new(permits);
-
-        Self {
-            ll_sem,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
+    cfg_const_if_has_const_mutex_new! {
+        /// Creates a new semaphore with the initial number of permits.
+        ///
+        /// Panics if `permits` exceeds [`Semaphore::MAX_PERMITS`].
+        #[track_caller]
+        pub const fn new(permits: usize) -> Self {
+            Self {
+                ll_sem: ll::Semaphore::new(permits),
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                resource_span: tracing::Span::none(),
+            }
         }
     }
 
@@ -174,11 +155,7 @@ impl Semaphore {
     /// ```
     #[cfg(not(all(loom, test)))]
     pub const fn const_new(permits: usize) -> Self {
-        Self {
-            ll_sem: ll::Semaphore::const_new(permits),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: tracing::Span::none(),
-        }
+        Self::new(permits)
     }
 
     /// Creates a new closed semaphore with 0 permits.

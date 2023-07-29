@@ -123,12 +123,14 @@ impl<T> From<T> for OnceCell<T> {
 }
 
 impl<T> OnceCell<T> {
-    /// Creates a new empty `OnceCell` instance.
-    pub fn new() -> Self {
-        OnceCell {
-            value_set: AtomicBool::new(false),
-            value: UnsafeCell::new(MaybeUninit::uninit()),
-            semaphore: Semaphore::new(1),
+    cfg_const_if_has_const_mutex_new! {
+        /// Creates a new empty `OnceCell` instance.
+        pub const fn new() -> Self {
+            OnceCell {
+                value_set: AtomicBool::new(false),
+                value: UnsafeCell::new(MaybeUninit::uninit()),
+                semaphore: Semaphore::new(1),
+            }
         }
     }
 
@@ -175,11 +177,7 @@ impl<T> OnceCell<T> {
     /// ```
     #[cfg(not(all(loom, test)))]
     pub const fn const_new() -> Self {
-        OnceCell {
-            value_set: AtomicBool::new(false),
-            value: UnsafeCell::new(MaybeUninit::uninit()),
-            semaphore: Semaphore::const_new(1),
-        }
+        Self::new()
     }
 
     /// Returns `true` if the `OnceCell` currently contains a value, and `false`

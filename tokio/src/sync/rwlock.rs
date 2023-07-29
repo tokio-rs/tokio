@@ -191,137 +191,54 @@ where
 }
 
 impl<T: ?Sized> RwLock<T> {
-    /// Creates a new instance of an `RwLock<T>` which is unlocked.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::sync::RwLock;
-    ///
-    /// let lock = RwLock::new(5);
-    /// ```
-    #[track_caller]
-    pub fn new(value: T) -> RwLock<T>
-    where
-        T: Sized,
-    {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = {
-            let location = std::panic::Location::caller();
-            let resource_span = tracing::trace_span!(
-                "runtime.resource",
-                concrete_type = "RwLock",
-                kind = "Sync",
-                loc.file = location.file(),
-                loc.line = location.line(),
-                loc.col = location.column(),
-            );
-
-            resource_span.in_scope(|| {
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    max_readers = MAX_READS,
-                );
-
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    write_locked = false,
-                );
-
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    current_readers = 0,
-                );
-            });
-
-            resource_span
-        };
-
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let s = resource_span.in_scope(|| Semaphore::new(MAX_READS as usize));
-
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let s = Semaphore::new(MAX_READS as usize);
-
-        RwLock {
-            mr: MAX_READS,
-            c: UnsafeCell::new(value),
-            s,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
+    cfg_const_if_has_const_mutex_new! {
+        /// Creates a new instance of an `RwLock<T>` which is unlocked.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::sync::RwLock;
+        ///
+        /// let lock = RwLock::new(5);
+        /// ```
+        #[track_caller]
+        pub const fn new(value: T) -> RwLock<T>
+        where
+            T: Sized,
+        {
+            Self::with_max_readers(value, MAX_READS)
         }
     }
 
-    /// Creates a new instance of an `RwLock<T>` which is unlocked
-    /// and allows a maximum of `max_reads` concurrent readers.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::sync::RwLock;
-    ///
-    /// let lock = RwLock::with_max_readers(5, 1024);
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if `max_reads` is more than `u32::MAX >> 3`.
-    #[track_caller]
-    pub fn with_max_readers(value: T, max_reads: u32) -> RwLock<T>
-    where
-        T: Sized,
-    {
-        assert!(
-            max_reads <= MAX_READS,
-            "a RwLock may not be created with more than {} readers",
-            MAX_READS
-        );
+    cfg_const_if_has_const_mutex_new! {
+        /// Creates a new instance of an `RwLock<T>` which is unlocked
+        /// and allows a maximum of `max_reads` concurrent readers.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::sync::RwLock;
+        ///
+        /// let lock = RwLock::with_max_readers(5, 1024);
+        /// ```
+        ///
+        /// # Panics
+        ///
+        /// Panics if `max_reads` is more than `u32::MAX >> 3`.
+        #[track_caller]
+        pub const fn with_max_readers(value: T, max_reads: u32) -> RwLock<T>
+        where
+            T: Sized,
+        {
+            assert!(max_reads <= MAX_READS);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = {
-            let location = std::panic::Location::caller();
-
-            let resource_span = tracing::trace_span!(
-                "runtime.resource",
-                concrete_type = "RwLock",
-                kind = "Sync",
-                loc.file = location.file(),
-                loc.line = location.line(),
-                loc.col = location.column(),
-            );
-
-            resource_span.in_scope(|| {
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    max_readers = max_reads,
-                );
-
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    write_locked = false,
-                );
-
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    current_readers = 0,
-                );
-            });
-
-            resource_span
-        };
-
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let s = resource_span.in_scope(|| Semaphore::new(max_reads as usize));
-
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let s = Semaphore::new(max_reads as usize);
-
-        RwLock {
-            mr: max_reads,
-            c: UnsafeCell::new(value),
-            s,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
+            RwLock {
+                mr: max_reads,
+                c: UnsafeCell::new(value),
+                s: Semaphore::new(max_reads as usize),
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                resource_span: tracing::Span::none(),
+            }
         }
     }
 
@@ -339,13 +256,7 @@ impl<T: ?Sized> RwLock<T> {
     where
         T: Sized,
     {
-        RwLock {
-            mr: MAX_READS,
-            c: UnsafeCell::new(value),
-            s: Semaphore::const_new(MAX_READS as usize),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: tracing::Span::none(),
-        }
+        Self::new(value)
     }
 
     /// Creates a new instance of an `RwLock<T>` which is unlocked
@@ -363,15 +274,7 @@ impl<T: ?Sized> RwLock<T> {
     where
         T: Sized,
     {
-        assert!(max_reads <= MAX_READS);
-
-        RwLock {
-            mr: max_reads,
-            c: UnsafeCell::new(value),
-            s: Semaphore::const_new(max_reads as usize),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: tracing::Span::none(),
-        }
+        Self::with_max_readers(value, max_reads)
     }
 
     /// Locks this `RwLock` with shared read access, causing the current task

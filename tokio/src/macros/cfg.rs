@@ -556,6 +556,18 @@ macro_rules! cfg_not_has_const_mutex_new {
     }
 }
 
+macro_rules! cfg_const_if_has_const_mutex_new {
+    ($(#[$attr:meta])* $vis:vis const fn $fn_name:ident $( $rest : tt )*) => {
+        #[cfg(not(all(loom, test)))]
+        $(#[$attr])*
+        $vis const fn $fn_name $( $rest )*
+
+        #[cfg(all(loom, test))]
+        $(#[$attr])*
+        $vis fn $fn_name $( $rest )*
+    }
+}
+
 macro_rules! cfg_not_wasi {
     ($($item:item)*) => {
         $(

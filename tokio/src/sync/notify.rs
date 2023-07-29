@@ -418,19 +418,21 @@ fn atomic_inc_num_notify_waiters_calls(data: &AtomicUsize) {
 }
 
 impl Notify {
-    /// Create a new `Notify`, initialized without a permit.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::sync::Notify;
-    ///
-    /// let notify = Notify::new();
-    /// ```
-    pub fn new() -> Notify {
-        Notify {
-            state: AtomicUsize::new(0),
-            waiters: Mutex::new(LinkedList::new()),
+    cfg_const_if_has_const_mutex_new! {
+        /// Create a new `Notify`, initialized without a permit.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::sync::Notify;
+        ///
+        /// let notify = Notify::new();
+        /// ```
+        pub const fn new() -> Notify {
+            Notify {
+                state: AtomicUsize::new(0),
+                waiters: Mutex::new(LinkedList::new()),
+            }
         }
     }
 
@@ -445,10 +447,7 @@ impl Notify {
     /// ```
     #[cfg(not(all(loom, test)))]
     pub const fn const_new() -> Notify {
-        Notify {
-            state: AtomicUsize::new(0),
-            waiters: Mutex::const_new(LinkedList::new()),
-        }
+        Self::new()
     }
 
     /// Wait for a notification.

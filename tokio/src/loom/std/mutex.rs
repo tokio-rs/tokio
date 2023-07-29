@@ -8,12 +8,7 @@ pub(crate) struct Mutex<T: ?Sized>(sync::Mutex<T>);
 #[allow(dead_code)]
 impl<T> Mutex<T> {
     #[inline]
-    pub(crate) fn new(t: T) -> Mutex<T> {
-        Mutex(sync::Mutex::new(t))
-    }
-
-    #[inline]
-    pub(crate) const fn const_new(t: T) -> Mutex<T> {
+    pub(crate) const fn new(t: T) -> Mutex<T> {
         Mutex(sync::Mutex::new(t))
     }
 

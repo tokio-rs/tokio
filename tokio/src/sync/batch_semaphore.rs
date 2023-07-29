@@ -135,61 +135,22 @@ impl Semaphore {
     // PERMIT_SHIFT is used to leave that bit for that purpose.
     const PERMIT_SHIFT: usize = 1;
 
-    /// Creates a new semaphore with the initial number of permits
-    ///
-    /// Maximum number of permits on 32-bit platforms is `1<<29`.
-    pub(crate) fn new(permits: usize) -> Self {
-        assert!(
-            permits <= Self::MAX_PERMITS,
-            "a semaphore may not have more than MAX_PERMITS permits ({})",
-            Self::MAX_PERMITS
-        );
+    cfg_const_if_has_const_mutex_new! {
+        /// Creates a new semaphore with the initial number of permits
+        ///
+        /// Maximum number of permits on 32-bit platforms is `1<<29`.
+        pub(crate) const fn new(permits: usize) -> Self {
+            assert!(permits <= Self::MAX_PERMITS);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = {
-            let resource_span = tracing::trace_span!(
-                "runtime.resource",
-                concrete_type = "Semaphore",
-                kind = "Sync",
-                is_internal = true
-            );
-
-            resource_span.in_scope(|| {
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    permits = permits,
-                    permits.op = "override",
-                )
-            });
-            resource_span
-        };
-
-        Self {
-            permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
-            waiters: Mutex::new(Waitlist {
-                queue: LinkedList::new(),
-                closed: false,
-            }),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
-        }
-    }
-
-    /// Creates a new semaphore with the initial number of permits.
-    ///
-    /// Maximum number of permits on 32-bit platforms is `1<<29`.
-    #[cfg(not(all(loom, test)))]
-    pub(crate) const fn const_new(permits: usize) -> Self {
-        assert!(permits <= Self::MAX_PERMITS);
-
-        Self {
-            permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
-            waiters: Mutex::const_new(Waitlist {
-                queue: LinkedList::new(),
-                closed: false,
-            }),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: tracing::Span::none(),
+            Self {
+                permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
+                waiters: Mutex::new(Waitlist {
+                    queue: LinkedList::new(),
+                    closed: false,
+                }),
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                resource_span: tracing::Span::none(),
+            }
         }
     }
 

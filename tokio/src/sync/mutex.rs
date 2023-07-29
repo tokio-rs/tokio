@@ -321,51 +321,27 @@ fn bounds() {
 }
 
 impl<T: ?Sized> Mutex<T> {
-    /// Creates a new lock in an unlocked state ready for use.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::sync::Mutex;
-    ///
-    /// let lock = Mutex::new(5);
-    /// ```
-    #[track_caller]
-    pub fn new(t: T) -> Self
-    where
-        T: Sized,
-    {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = {
-            let location = std::panic::Location::caller();
-
-            tracing::trace_span!(
-                "runtime.resource",
-                concrete_type = "Mutex",
-                kind = "Sync",
-                loc.file = location.file(),
-                loc.line = location.line(),
-                loc.col = location.column(),
-            )
-        };
-
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let s = resource_span.in_scope(|| {
-            tracing::trace!(
-                target: "runtime::resource::state_update",
-                locked = false,
-            );
-            semaphore::Semaphore::new(1)
-        });
-
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let s = semaphore::Semaphore::new(1);
-
-        Self {
-            c: UnsafeCell::new(t),
-            s,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
+    cfg_const_if_has_const_mutex_new! {
+        /// Creates a new lock in an unlocked state ready for use.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::sync::Mutex;
+        ///
+        /// let lock = Mutex::new(5);
+        /// ```
+        #[track_caller]
+        pub const fn new(t: T) -> Self
+        where
+            T: Sized,
+        {
+            Self {
+                c: UnsafeCell::new(t),
+                s: semaphore::Semaphore::new(1),
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                resource_span: tracing::Span::none(),
+            }
         }
     }
 
@@ -383,12 +359,7 @@ impl<T: ?Sized> Mutex<T> {
     where
         T: Sized,
     {
-        Self {
-            c: UnsafeCell::new(t),
-            s: semaphore::Semaphore::const_new(1),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: tracing::Span::none(),
-        }
+        Self::new(t)
     }
 
     /// Locks this mutex, causing the current task to yield until the lock has
