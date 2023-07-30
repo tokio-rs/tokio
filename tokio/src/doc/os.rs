@@ -11,6 +11,9 @@ pub mod windows {
         /// See [std::os::windows::io::RawHandle](https://doc.rust-lang.org/std/os/windows/io/type.RawHandle.html)
         pub type RawHandle = crate::doc::NotDefinedHere;
 
+        /// See [std::os::windows::io::OwnedHandle](https://doc.rust-lang.org/std/os/windows/io/struct.OwnedHandle.html)
+        pub type OwnedHandle = crate::doc::NotDefinedHere;
+
         /// See [std::os::windows::io::AsRawHandle](https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html)
         pub trait AsRawHandle {
             /// See [std::os::windows::io::AsRawHandle::as_raw_handle](https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html#tymethod.as_raw_handle)
