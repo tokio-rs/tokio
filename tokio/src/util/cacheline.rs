@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
 use std::ops::{Deref, DerefMut};
 
 /// Pads and aligns a value to the length of a cache line.
