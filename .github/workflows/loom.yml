@@ -7,6 +7,10 @@ on:
 
 name: Loom
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   RUSTFLAGS: -Dwarnings --cfg loom --cfg tokio_unstable -C debug_assertions
   LOOM_MAX_PREEMPTIONS: 2

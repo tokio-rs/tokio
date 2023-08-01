@@ -439,9 +439,6 @@ jobs:
           - target: armv7-unknown-linux-gnueabihf
           - target: aarch64-unknown-linux-gnu
             rustflags: --cfg tokio_taskdump
-
-          # Run a platform without AtomicU64 and no const Mutex::new
-          - target: armv5te-unknown-linux-gnueabi
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust stable
@@ -464,10 +461,10 @@ jobs:
         run: |
           set -euxo pipefail
           cargo nextest run -p tokio --all-features --target ${{ matrix.target }}
-          cargo test --doc -p tokio --all-features --target ${{ matrix.target }} -- --test-threads 1
+          cargo test --doc -p tokio --all-features --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
 
   cross-test-without-parking_lot:
     needs: basics
@@ -481,9 +478,6 @@ jobs:
           - target: armv7-unknown-linux-gnueabihf
           - target: aarch64-unknown-linux-gnu
             rustflags: --cfg tokio_taskdump
-
-          # Run a platform without AtomicU64 and no const Mutex::new
-          - target: armv5te-unknown-linux-gnueabi
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust stable
@@ -510,10 +504,10 @@ jobs:
         run: |
           set -euxo pipefail
           cargo nextest run -p tokio --features full,test-util --target ${{ matrix.target }}
-          cargo test --doc -p tokio --features full,test-util --target ${{ matrix.target }} -- --test-threads 1
+          cargo test --doc -p tokio --features full,test-util --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_ipv6 --cfg tokio_no_parking_lot --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_parking_lot --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
 
   # See https://github.com/tokio-rs/tokio/issues/5187
   no-atomic-u64-test:
@@ -541,10 +535,10 @@ jobs:
       - name: test tokio --all-features
         run: |
           cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
-          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features -- --test-threads 1
+          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
         env:
           RUST_TEST_THREADS: 1
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64 --cfg tokio_no_tuning_tests
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_tuning_tests
 
   no-atomic-u64-check:
     name: Check tokio --feature-powerset --depth 2 on i686-unknown-linux-gnu without AtomicU64
@@ -566,10 +560,10 @@ jobs:
 
       # https://github.com/tokio-rs/tokio/pull/5356
       # https://github.com/tokio-rs/tokio/issues/5373
-      - name: Check with const_mutex_new
-        run: cargo hack check -p tokio --feature-powerset --depth 2 --keep-going
+      - name: Check
+        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --depth 2 --keep-going
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_atomic_u64
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
   features:
     name: features ${{ matrix.name }}
@@ -823,7 +817,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_stable }}
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        uses: taiki-e/install-action@wasm-pack
 
       - uses: Swatinem/rust-cache@v2
       - name: test tokio

@@ -35,7 +35,6 @@ async fn connect_v4() {
 }
 
 #[tokio::test]
-#[cfg(not(tokio_no_ipv6))]
 async fn connect_v6() {
     let srv = assert_ok!(TcpListener::bind("[::1]:0").await);
     let addr = assert_ok!(srv.local_addr());
