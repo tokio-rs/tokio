@@ -962,7 +962,7 @@ rt_test! {
         let (tx1, rx1) = oneshot::channel();
         let (tx2, rx2) = oneshot::channel();
 
-        let barrier = Arc::new(Barrier::new(4));
+        let barrier = Arc::new(Barrier::new(3));
         let barrier1 = barrier.clone();
         let barrier2 = barrier.clone();
 
