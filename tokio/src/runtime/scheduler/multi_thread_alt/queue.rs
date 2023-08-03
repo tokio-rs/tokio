@@ -129,10 +129,6 @@ impl<T> Local<T> {
         // safety: this is the **only** thread that updates this cell.
         let mut tail = unsafe { self.inner.tail.unsync_load() };
 
-        if real.wrapping_sub(steal) >= 4 {
-            panic!("steal={}; real={}; tail={}", steal, real, tail);
-        }
-
         if tail.wrapping_sub(steal) <= (self.inner.buffer.len() - len) as UnsignedShort {
             // Yes, this if condition is structured a bit weird (first block
             // does nothing, second returns an error). It is this way to match
