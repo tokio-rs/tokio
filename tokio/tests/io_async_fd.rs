@@ -707,6 +707,11 @@ async fn await_error_readiness_timestamping() {
 
     let fd = AsyncFd::new(socket).unwrap();
 
+    tokio::select! {
+        _ = fd.ready(Interest::ERROR) => panic!(),
+        _ = tokio::time::sleep(Duration::from_millis(10)) => {}
+    }
+
     let buf = b"hello there";
     fd.get_ref().send(buf).unwrap();
 
