@@ -228,6 +228,11 @@ cfg_not_io_driver! {
         pub(crate) fn shutdown(&mut self, _handle: &Handle) {
             self.0.shutdown();
         }
+
+        /// This is not a "real" driver, so it is not considered enabled.
+        pub(crate) fn is_enabled(&self) -> bool {
+            false
+        }
     }
 }
 
