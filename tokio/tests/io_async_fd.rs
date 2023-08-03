@@ -766,12 +766,15 @@ async fn await_error_readiness_invalid_address() {
     // Spawn a separate thread for sending messages
     tokio::spawn(async move {
         // Set the destination address. This address is invalid in this context. the OS will notice
-        // that nobody is listening on port 1234. Normally this is ignored (UDP is "fire and forget"),
+        // that nobody is listening on port this port. Normally this is ignored (UDP is "fire and forget"),
         // but because IP_RECVERR is enabled, the error will actually be reported to the sending socket
         let mut dest_addr =
             unsafe { std::mem::MaybeUninit::<libc::sockaddr_in>::zeroed().assume_init() };
         dest_addr.sin_family = libc::AF_INET as _;
-        dest_addr.sin_port = 1234u16.to_be(); // Destination port
+        // based on https://en.wikipedia.org/wiki/Ephemeral_port, we should pick a port number
+        // below 1024 to guarantee that other tests don't select this port by accident when they
+        // use port 0 to select an ephemeral port.
+        dest_addr.sin_port = 512u16.to_be(); // Destination port
 
         // Prepare the message data
         let message = "Hello, Socket!";
