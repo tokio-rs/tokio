@@ -1,4 +1,7 @@
-#![cfg_attr(not(all(tokio_unstable, feature = "full")), allow(dead_code))]
+#![cfg_attr(
+    any(not(all(tokio_unstable, feature = "full")), target_family = "wasm"),
+    allow(dead_code)
+)]
 
 use crate::runtime::task;
 
