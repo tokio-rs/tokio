@@ -75,3 +75,5 @@ pub(crate) mod error;
 pub(crate) mod memchr;
 
 pub(crate) mod markers;
+
+pub(crate) mod cacheline;
