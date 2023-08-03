@@ -1200,7 +1200,11 @@ impl Worker {
 
         drop(synced);
 
-        d!("[{}] dropped lock; was_searching={:?}", cx.index, was_searching);
+        d!(
+            "[{}] dropped lock; was_searching={:?}",
+            cx.index,
+            was_searching
+        );
 
         if was_searching {
             if cx.shared().idle.transition_worker_from_searching() {
