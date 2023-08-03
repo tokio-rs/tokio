@@ -519,6 +519,7 @@ impl Builder {
     ///     .build();
     /// # }
     /// ```
+    #[cfg(not(loom))]
     pub fn on_thread_start<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn() + Send + Sync + 'static,
