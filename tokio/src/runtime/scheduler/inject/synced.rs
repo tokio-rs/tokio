@@ -1,3 +1,5 @@
+#![cfg_attr(not(all(tokio_unstable, feature = "full")), allow(dead_code))]
+
 use crate::runtime::task;
 
 pub(crate) struct Synced {

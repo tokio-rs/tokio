@@ -2,7 +2,7 @@
 
 // Eventually, this file will see significant refactoring / cleanup. For now, we
 // don't need to worry much about dead code with certain feature permutations.
-#![cfg_attr(not(feature = "full"), allow(dead_code))]
+#![cfg_attr(not(all(tokio_unstable, feature = "full")), allow(dead_code))]
 
 use crate::runtime::park::{ParkThread, UnparkThread};
 
