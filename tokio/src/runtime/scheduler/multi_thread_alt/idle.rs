@@ -131,7 +131,6 @@ impl Idle {
     /// Notifies a single worker
     pub(super) fn notify_remote(&self, synced: MutexGuard<'_, worker::Synced>, shared: &Shared) {
         if synced.idle.sleepers.is_empty() {
-            d!(" + notify_remote; idle.sleepers.is_empty()");
             self.needs_searching.store(true, Release);
             return;
         }
@@ -148,7 +147,6 @@ impl Idle {
         if let Some(worker) = synced.idle.sleepers.pop() {
             // Find an available core
             if let Some(mut core) = synced.idle.available_cores.pop() {
-                d!(" + notify_synced; found core");
                 debug_assert!(!core.is_searching);
                 core.is_searching = true;
 
@@ -177,8 +175,6 @@ impl Idle {
                 synced.idle.sleepers.push(worker);
             }
         }
-
-        d!(" + notify_sync; no core");
 
         super::counters::inc_notify_no_core();
 

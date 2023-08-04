@@ -1,11 +1,5 @@
 //! Multi-threaded runtime
 
-macro_rules! d {
-    ( $($t:tt)* ) => {
-        // println!( $($t)* )
-    };
-}
-
 mod counters;
 use counters::Counters;
 

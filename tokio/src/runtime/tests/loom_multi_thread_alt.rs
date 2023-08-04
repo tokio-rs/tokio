@@ -74,13 +74,6 @@ impl<T> AtomicOneshot<T> {
     }
 }
 
-#[allow(unused_macros)]
-macro_rules! d {
-    ( $($t:tt)* ) => {
-        // println!( $($t)* )
-    };
-}
-
 /// Tests are divided into groups to make the runs faster on CI.
 mod group_a {
     use super::*;

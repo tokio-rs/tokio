@@ -1156,7 +1156,6 @@ impl Worker {
 
     fn do_park(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
         let was_searching = core.is_searching;
-        d!("[{}] do_park; was_searching={:?}", cx.index, was_searching);
 
         // Acquire the lock
         let mut synced = cx.shared().synced.lock();
@@ -1200,12 +1199,6 @@ impl Worker {
 
         drop(synced);
 
-        d!(
-            "[{}] dropped lock; was_searching={:?}",
-            cx.index,
-            was_searching
-        );
-
         if was_searching {
             if cx.shared().idle.transition_worker_from_searching() {
                 // cx.shared().idle.snapshot(&mut self.idle_snapshot);
@@ -1228,11 +1221,8 @@ impl Worker {
         }
 
         if let Some(mut driver) = cx.shared().take_driver() {
-            d!("[{}] - driver park", cx.index);
             // Wait for driver events
             driver.park(&cx.handle.driver);
-
-            d!("[{}] - driver park - RETURN", cx.index);
 
             synced = cx.shared().synced.lock();
 
@@ -1259,12 +1249,9 @@ impl Worker {
             }
         } else {
             synced = cx.shared().synced.lock();
-            d!("[{}] - condvar park", cx.index);
 
             // Wait for a core to be assigned to us
-            let ret = self.wait_for_core(cx, synced);
-            d!("[{}] - condvar park - RETURN", cx.index);
-            ret
+            self.wait_for_core(cx, synced)
         }
     }
 
