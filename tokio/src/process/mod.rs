@@ -1484,7 +1484,7 @@ mod sys {
     impl_traits!(ChildStderr);
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, docsrs))]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 mod windows {
     use super::*;
