@@ -190,6 +190,9 @@ pub(crate) struct Synced {
     /// stolen by a thread that was spawned as part of `block_in_place`.
     shutdown_cores: Vec<Box<Core>>,
 
+    /// The driver goes here when shutting down
+    shutdown_driver: Option<Box<Driver>>,
+
     /// Synchronized state for `Idle`.
     pub(super) idle: idle::Synced,
 
@@ -258,9 +261,14 @@ pub(super) fn create(
     seed_generator: RngSeedGenerator,
     config: Config,
 ) -> runtime::Handle {
-    // Allocate num_cores + 1 workers so that one worker can handle the I/O
-    // driver, if needed.
-    let num_workers = num_cores + 1;
+    let mut num_workers = num_cores;
+
+    // If the driver is enabled, we need an extra thread to handle polling the
+    // driver when all cores are busy.
+    if driver.is_enabled() {
+        num_workers += 1;
+    }
+
     let mut cores = Vec::with_capacity(num_cores);
     let mut remotes = Vec::with_capacity(num_cores);
     // Worker metrics are actually core based
@@ -268,7 +276,7 @@ pub(super) fn create(
 
     // Create the local queues
     for i in 0..num_cores {
-        let (steal, run_queue) = queue::local();
+        let (steal, run_queue) = queue::local(config.local_queue_capacity);
 
         let metrics = WorkerMetrics::from_config(&config);
         let stats = Stats::new(&metrics);
@@ -303,6 +311,7 @@ pub(super) fn create(
             synced: Mutex::new(Synced {
                 assigned_cores: (0..num_workers).map(|_| None).collect(),
                 shutdown_cores: Vec::with_capacity(num_cores),
+                shutdown_driver: None,
                 idle: idle_synced,
                 inject: inject_synced,
             }),
@@ -616,6 +625,13 @@ impl Worker {
         cx: &Context,
         mut synced: MutexGuard<'_, Synced>,
     ) -> NextTaskResult {
+        if cx.shared().idle.needs_searching() {
+            if let Some(mut core) = self.try_acquire_available_core(cx, &mut synced) {
+                cx.shared().idle.transition_worker_to_searching(&mut core);
+                return Ok((None, core));
+            }
+        }
+
         cx.shared()
             .idle
             .transition_worker_to_parked(&mut synced, cx.index);
@@ -642,7 +658,7 @@ impl Worker {
             return Ok((None, core));
         }
 
-        let n = core.run_queue.max_capacity() / 2;
+        let n = cmp::max(core.run_queue.remaining_slots() / 2, 1);
         let maybe_task = self.next_remote_task_batch_synced(cx, &mut synced, &mut core, n);
 
         Ok((maybe_task, core))
@@ -658,6 +674,7 @@ impl Worker {
         self.reset_lifo_enabled(cx);
 
         // At this point, the local queue should be empty
+        #[cfg(not(loom))]
         debug_assert!(core.run_queue.is_empty());
 
         // Update shutdown state while locked
@@ -761,7 +778,7 @@ impl Worker {
         // available slots in the queue.
         let cap = usize::min(
             core.run_queue.remaining_slots(),
-            core.run_queue.max_capacity() / 2,
+            usize::max(core.run_queue.max_capacity() / 2, 1),
         );
 
         let mut synced = cx.shared().synced.lock();
@@ -787,7 +804,7 @@ impl Worker {
             cx.shared().inject.len() / cx.shared().remotes.len() + 1
         };
 
-        let n = usize::min(n, max);
+        let n = usize::min(n, max) + 1;
 
         // safety: passing in the correct `inject::Synced`.
         let mut tasks = unsafe { cx.shared().inject.pop_n(&mut synced.inject, n) };
@@ -822,7 +839,12 @@ impl Worker {
         const ROUNDS: usize = 1;
 
         debug_assert!(core.lifo_slot.is_none());
+        #[cfg(not(loom))]
         debug_assert!(core.run_queue.is_empty());
+
+        if !core.run_queue.can_steal() {
+            return Ok((None, core));
+        }
 
         if !self.transition_to_searching(cx, &mut core) {
             return Ok((None, core));
@@ -1135,22 +1157,15 @@ impl Worker {
     fn do_park(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
         let was_searching = core.is_searching;
 
-        // Before we park, if we are searching, we need to transition away from searching
-        if self.transition_from_searching(cx, &mut core) {
-            cx.shared().idle.snapshot(&mut self.idle_snapshot);
-            // We were the last searching worker, we need to do one last check
-            if let Some(task) = self.steal_one_round(cx, &mut core, 0) {
-                cx.shared().notify_parked_local();
-
-                return Ok((Some(task), core));
-            }
-        }
-
         // Acquire the lock
         let mut synced = cx.shared().synced.lock();
 
+        // The local queue should be empty at this point
+        #[cfg(not(loom))]
+        debug_assert!(core.run_queue.is_empty());
+
         // Try one last time to get tasks
-        let n = core.run_queue.max_capacity() / 2;
+        let n = cmp::max(core.run_queue.remaining_slots() / 2, 1);
         if let Some(task) = self.next_remote_task_batch_synced(cx, &mut synced, &mut core, n) {
             return Ok((Some(task), core));
         }
@@ -1178,29 +1193,48 @@ impl Worker {
             return Ok((None, core));
         }
 
-        // Core being returned must not be in the searching state
-        debug_assert!(!core.is_searching);
-
         // Release the core
+        core.is_searching = false;
         cx.shared().idle.release_core(&mut synced, core);
 
-        if let Some(mut driver) = cx.shared().driver.take() {
-            // Drop the lock before parking on the driver
-            drop(synced);
+        drop(synced);
 
+        if was_searching {
+            if cx.shared().idle.transition_worker_from_searching() {
+                // cx.shared().idle.snapshot(&mut self.idle_snapshot);
+                // We were the last searching worker, we need to do one last check
+                for i in 0..cx.shared().remotes.len() {
+                    if !cx.shared().remotes[i].steal.is_empty() {
+                        let mut synced = cx.shared().synced.lock();
+
+                        // Try to get a core
+                        if let Some(mut core) = self.try_acquire_available_core(cx, &mut synced) {
+                            cx.shared().idle.transition_worker_to_searching(&mut core);
+                            return Ok((None, core));
+                        } else {
+                            // Fall back to the park routine
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(mut driver) = cx.shared().take_driver() {
             // Wait for driver events
             driver.park(&cx.handle.driver);
 
             synced = cx.shared().synced.lock();
 
-            // Put the driver back
-            cx.shared().driver.set(driver);
-
             if cx.shared().inject.is_closed(&mut synced.inject) {
+                synced.shutdown_driver = Some(driver);
                 self.shutdown_clear_defer(cx);
                 self.shutdown_finalize(cx, synced);
                 return Err(());
             }
+
+            // Put the driver back
+            cx.shared().driver.set(driver);
 
             // Try to acquire an available core to schedule I/O events
             if let Some(core) = self.try_acquire_available_core(cx, &mut synced) {
@@ -1214,6 +1248,8 @@ impl Worker {
                 self.wait_for_core(cx, synced)
             }
         } else {
+            synced = cx.shared().synced.lock();
+
             // Wait for a core to be assigned to us
             self.wait_for_core(cx, synced)
         }
@@ -1233,7 +1269,8 @@ impl Worker {
             return false;
         }
 
-        cx.shared().idle.transition_worker_from_searching(core)
+        core.is_searching = false;
+        cx.shared().idle.transition_worker_from_searching()
     }
 
     fn can_transition_to_parked(&self, core: &mut Core) -> bool {
@@ -1270,10 +1307,11 @@ impl Worker {
             return;
         }
 
-        let mut driver = match cx.shared().driver.take() {
-            Some(driver) => driver,
-            None => return,
-        };
+        let driver = synced.shutdown_driver.take();
+
+        if cx.shared().driver_enabled() && driver.is_none() {
+            return;
+        }
 
         debug_assert!(cx.shared().owned.is_empty());
 
@@ -1283,7 +1321,9 @@ impl Worker {
         }
 
         // Shutdown the driver
-        driver.shutdown(&cx.handle.driver);
+        if let Some(mut driver) = driver {
+            driver.shutdown(&cx.handle.driver);
+        }
 
         // Drain the injection queue
         //
@@ -1412,6 +1452,10 @@ impl Shared {
     pub(super) fn close(&self) {
         let mut synced = self.synced.lock();
 
+        if let Some(driver) = self.driver.take() {
+            synced.shutdown_driver = Some(driver);
+        }
+
         if self.inject.close(&mut synced.inject) {
             // Set the shutdown flag on all available cores
             self.idle.shutdown(&mut synced, self);
@@ -1441,6 +1485,18 @@ impl Shared {
         unsafe {
             self.inject.push_batch(&mut synced.inject, iter);
         }
+    }
+
+    fn take_driver(&self) -> Option<Box<Driver>> {
+        if !self.driver_enabled() {
+            return None;
+        }
+
+        self.driver.take()
+    }
+
+    fn driver_enabled(&self) -> bool {
+        self.condvars.len() > self.remotes.len()
     }
 }
 

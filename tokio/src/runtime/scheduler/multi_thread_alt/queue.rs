@@ -54,46 +54,30 @@ pub(crate) struct Inner<T: 'static> {
     tail: AtomicUnsignedShort,
 
     /// Elements
-    buffer: Box<[UnsafeCell<MaybeUninit<task::Notified<T>>>; LOCAL_QUEUE_CAPACITY]>,
+    buffer: Box<[UnsafeCell<MaybeUninit<task::Notified<T>>>]>,
+
+    mask: usize,
 }
 
 unsafe impl<T> Send for Inner<T> {}
 unsafe impl<T> Sync for Inner<T> {}
 
-#[cfg(not(loom))]
-const LOCAL_QUEUE_CAPACITY: usize = 256;
-
-// Shrink the size of the local queue when using loom. This shouldn't impact
-// logic, but allows loom to test more edge cases in a reasonable a mount of
-// time.
-#[cfg(loom)]
-const LOCAL_QUEUE_CAPACITY: usize = 4;
-
-const MASK: usize = LOCAL_QUEUE_CAPACITY - 1;
-
-// Constructing the fixed size array directly is very awkward. The only way to
-// do it is to repeat `UnsafeCell::new(MaybeUninit::uninit())` 256 times, as
-// the contents are not Copy. The trick with defining a const doesn't work for
-// generic types.
-fn make_fixed_size<T>(buffer: Box<[T]>) -> Box<[T; LOCAL_QUEUE_CAPACITY]> {
-    assert_eq!(buffer.len(), LOCAL_QUEUE_CAPACITY);
-
-    // safety: We check that the length is correct.
-    unsafe { Box::from_raw(Box::into_raw(buffer).cast()) }
-}
-
 /// Create a new local run-queue
-pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
-    let mut buffer = Vec::with_capacity(LOCAL_QUEUE_CAPACITY);
+pub(crate) fn local<T: 'static>(capacity: usize) -> (Steal<T>, Local<T>) {
+    assert!(capacity <= 4096);
+    assert!(capacity >= 1);
 
-    for _ in 0..LOCAL_QUEUE_CAPACITY {
+    let mut buffer = Vec::with_capacity(capacity);
+
+    for _ in 0..capacity {
         buffer.push(UnsafeCell::new(MaybeUninit::uninit()));
     }
 
     let inner = Arc::new(Inner {
         head: AtomicUnsignedLong::new(0),
         tail: AtomicUnsignedShort::new(0),
-        buffer: make_fixed_size(buffer.into_boxed_slice()),
+        buffer: buffer.into_boxed_slice(),
+        mask: capacity - 1,
     });
 
     let local = Local {
@@ -112,12 +96,16 @@ impl<T> Local<T> {
     }
 
     pub(crate) fn max_capacity(&self) -> usize {
-        LOCAL_QUEUE_CAPACITY
+        self.inner.buffer.len()
     }
 
     /// Returns `true` if there are no entries in the queue
     pub(crate) fn is_empty(&self) -> bool {
         self.inner.is_empty()
+    }
+
+    pub(crate) fn can_steal(&self) -> bool {
+        self.remaining_slots() >= self.max_capacity() - self.max_capacity() / 2
     }
 
     /// Pushes a batch of tasks to the back of the queue. All tasks must fit in
@@ -128,7 +116,7 @@ impl<T> Local<T> {
     /// The method panics if there is not enough capacity to fit in the queue.
     pub(crate) fn push_back(&mut self, tasks: impl ExactSizeIterator<Item = task::Notified<T>>) {
         let len = tasks.len();
-        assert!(len <= LOCAL_QUEUE_CAPACITY);
+        assert!(len <= self.inner.buffer.len());
 
         if len == 0 {
             // Nothing to do
@@ -136,21 +124,24 @@ impl<T> Local<T> {
         }
 
         let head = self.inner.head.load(Acquire);
-        let (steal, _) = unpack(head);
+        let (steal, real) = unpack(head);
 
         // safety: this is the **only** thread that updates this cell.
         let mut tail = unsafe { self.inner.tail.unsync_load() };
 
-        if tail.wrapping_sub(steal) <= (LOCAL_QUEUE_CAPACITY - len) as UnsignedShort {
+        if tail.wrapping_sub(steal) <= (self.inner.buffer.len() - len) as UnsignedShort {
             // Yes, this if condition is structured a bit weird (first block
             // does nothing, second returns an error). It is this way to match
             // `push_back_or_overflow`.
         } else {
-            panic!()
+            panic!(
+                "not enough capacity; len={}; tail={}; steal={}; real={}",
+                len, tail, steal, real
+            );
         }
 
         for task in tasks {
-            let idx = tail as usize & MASK;
+            let idx = tail as usize & self.inner.mask;
 
             self.inner.buffer[idx].with_mut(|ptr| {
                 // Write the task to the slot
@@ -188,7 +179,7 @@ impl<T> Local<T> {
             // safety: this is the **only** thread that updates this cell.
             let tail = unsafe { self.inner.tail.unsync_load() };
 
-            if tail.wrapping_sub(steal) < LOCAL_QUEUE_CAPACITY as UnsignedShort {
+            if tail.wrapping_sub(steal) < self.inner.buffer.len() as UnsignedShort {
                 // There is capacity for the task
                 break tail;
             } else if steal != real {
@@ -217,7 +208,7 @@ impl<T> Local<T> {
     // Second half of `push_back`
     fn push_back_finish(&self, task: task::Notified<T>, tail: UnsignedShort) {
         // Map the position to a slot index.
-        let idx = tail as usize & MASK;
+        let idx = tail as usize & self.inner.mask;
 
         self.inner.buffer[idx].with_mut(|ptr| {
             // Write the task to the slot
@@ -250,15 +241,15 @@ impl<T> Local<T> {
         overflow: &O,
         stats: &mut Stats,
     ) -> Result<(), task::Notified<T>> {
-        /// How many elements are we taking from the local queue.
-        ///
-        /// This is one less than the number of tasks pushed to the inject
-        /// queue as we are also inserting the `task` argument.
-        const NUM_TASKS_TAKEN: UnsignedShort = (LOCAL_QUEUE_CAPACITY / 2) as UnsignedShort;
+        // How many elements are we taking from the local queue.
+        //
+        // This is one less than the number of tasks pushed to the inject
+        // queue as we are also inserting the `task` argument.
+        let num_tasks_taken: UnsignedShort = (self.inner.buffer.len() / 2) as UnsignedShort;
 
         assert_eq!(
             tail.wrapping_sub(head) as usize,
-            LOCAL_QUEUE_CAPACITY,
+            self.inner.buffer.len(),
             "queue is not full; tail = {}; head = {}",
             tail,
             head
@@ -282,8 +273,8 @@ impl<T> Local<T> {
             .compare_exchange(
                 prev,
                 pack(
-                    head.wrapping_add(NUM_TASKS_TAKEN),
-                    head.wrapping_add(NUM_TASKS_TAKEN),
+                    head.wrapping_add(num_tasks_taken),
+                    head.wrapping_add(num_tasks_taken),
                 ),
                 Release,
                 Relaxed,
@@ -298,19 +289,21 @@ impl<T> Local<T> {
 
         /// An iterator that takes elements out of the run queue.
         struct BatchTaskIter<'a, T: 'static> {
-            buffer: &'a [UnsafeCell<MaybeUninit<task::Notified<T>>>; LOCAL_QUEUE_CAPACITY],
+            buffer: &'a [UnsafeCell<MaybeUninit<task::Notified<T>>>],
+            mask: usize,
             head: UnsignedLong,
             i: UnsignedLong,
+            num: UnsignedShort,
         }
         impl<'a, T: 'static> Iterator for BatchTaskIter<'a, T> {
             type Item = task::Notified<T>;
 
             #[inline]
             fn next(&mut self) -> Option<task::Notified<T>> {
-                if self.i == UnsignedLong::from(NUM_TASKS_TAKEN) {
+                if self.i == UnsignedLong::from(self.num) {
                     None
                 } else {
-                    let i_idx = self.i.wrapping_add(self.head) as usize & MASK;
+                    let i_idx = self.i.wrapping_add(self.head) as usize & self.mask;
                     let slot = &self.buffer[i_idx];
 
                     // safety: Our CAS from before has assumed exclusive ownership
@@ -327,8 +320,10 @@ impl<T> Local<T> {
         // values again, and we are the only producer.
         let batch_iter = BatchTaskIter {
             buffer: &self.inner.buffer,
+            mask: self.inner.mask,
             head: head as UnsignedLong,
             i: 0,
+            num: num_tasks_taken,
         };
         overflow.push_batch(batch_iter.chain(std::iter::once(task)));
 
@@ -371,7 +366,7 @@ impl<T> Local<T> {
                 .compare_exchange(head, next, AcqRel, Acquire);
 
             match res {
-                Ok(_) => break real as usize & MASK,
+                Ok(_) => break real as usize & self.inner.mask,
                 Err(actual) => head = actual,
             }
         };
@@ -381,6 +376,10 @@ impl<T> Local<T> {
 }
 
 impl<T> Steal<T> {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Steals half the tasks from self and place them into `dst`.
     pub(crate) fn steal_into(
         &self,
@@ -396,7 +395,7 @@ impl<T> Steal<T> {
         // from `dst` there may not be enough capacity to steal.
         let (steal, _) = unpack(dst.inner.head.load(Acquire));
 
-        if dst_tail.wrapping_sub(steal) > LOCAL_QUEUE_CAPACITY as UnsignedShort / 2 {
+        if dst_tail.wrapping_sub(steal) > self.0.buffer.len() as UnsignedShort / 2 {
             // we *could* try to steal less here, but for simplicity, we're just
             // going to abort.
             return None;
@@ -420,7 +419,7 @@ impl<T> Steal<T> {
         n -= 1;
 
         let ret_pos = dst_tail.wrapping_add(n);
-        let ret_idx = ret_pos as usize & MASK;
+        let ret_idx = ret_pos as usize & dst.inner.mask;
 
         // safety: the value was written as part of `steal_into2` and not
         // exposed to stealers, so no other thread can access it.
@@ -481,8 +480,8 @@ impl<T> Steal<T> {
             }
         };
 
-        assert!(
-            n <= LOCAL_QUEUE_CAPACITY as UnsignedShort / 2,
+        debug_assert!(
+            n <= (self.0.buffer.len() - self.0.buffer.len() / 2) as UnsignedShort,
             "actual = {}",
             n
         );
@@ -496,8 +495,8 @@ impl<T> Steal<T> {
             let dst_pos = dst_tail.wrapping_add(i);
 
             // Map to slots
-            let src_idx = src_pos as usize & MASK;
-            let dst_idx = dst_pos as usize & MASK;
+            let src_idx = src_pos as usize & self.0.mask;
+            let dst_idx = dst_pos as usize & self.0.mask;
 
             // Read the task
             //
@@ -566,7 +565,7 @@ impl<T> Inner<T> {
         let (steal, _) = unpack(self.head.load(Acquire));
         let tail = self.tail.load(Acquire);
 
-        LOCAL_QUEUE_CAPACITY - (tail.wrapping_sub(steal) as usize)
+        self.buffer.len() - (tail.wrapping_sub(steal) as usize)
     }
 
     fn len(&self) -> UnsignedShort {
@@ -593,9 +592,4 @@ fn unpack(n: UnsignedLong) -> (UnsignedShort, UnsignedShort) {
 /// Join the two head values
 fn pack(steal: UnsignedShort, real: UnsignedShort) -> UnsignedLong {
     (real as UnsignedLong) | ((steal as UnsignedLong) << (mem::size_of::<UnsignedShort>() * 8))
-}
-
-#[test]
-fn test_local_queue_capacity() {
-    assert!(LOCAL_QUEUE_CAPACITY - 1 <= u8::MAX as usize);
 }

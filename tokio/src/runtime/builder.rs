@@ -93,6 +93,8 @@ pub struct Builder {
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
 
+    pub(super) local_queue_capacity: usize,
+
     /// When true, the multi-threade scheduler LIFO slot should not be used.
     ///
     /// This option should only be exposed as unstable.
@@ -296,6 +298,12 @@ impl Builder {
             // as parameters.
             global_queue_interval: None,
             event_interval,
+
+            #[cfg(not(loom))]
+            local_queue_capacity: 256,
+
+            #[cfg(loom)]
+            local_queue_capacity: 4,
 
             seed_generator: RngSeedGenerator::new(RngSeed::new()),
 
@@ -1046,6 +1054,14 @@ impl Builder {
         }
     }
 
+    cfg_loom! {
+        pub(crate) fn local_queue_capacity(&mut self, value: usize) -> &mut Self {
+            assert!(value.is_power_of_two());
+            self.local_queue_capacity = value;
+            self
+        }
+    }
+
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::scheduler::{self, CurrentThread};
         use crate::runtime::{runtime::Scheduler, Config};
@@ -1074,6 +1090,7 @@ impl Builder {
                 after_unpark: self.after_unpark.clone(),
                 global_queue_interval: self.global_queue_interval,
                 event_interval: self.event_interval,
+                local_queue_capacity: self.local_queue_capacity,
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
@@ -1224,6 +1241,7 @@ cfg_rt_multi_thread! {
                     after_unpark: self.after_unpark.clone(),
                     global_queue_interval: self.global_queue_interval,
                     event_interval: self.event_interval,
+                    local_queue_capacity: self.local_queue_capacity,
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
@@ -1271,6 +1289,7 @@ cfg_rt_multi_thread! {
                         after_unpark: self.after_unpark.clone(),
                         global_queue_interval: self.global_queue_interval,
                         event_interval: self.event_interval,
+                        local_queue_capacity: self.local_queue_capacity,
                         #[cfg(tokio_unstable)]
                         unhandled_panic: self.unhandled_panic.clone(),
                         disable_lifo_slot: self.disable_lifo_slot,
