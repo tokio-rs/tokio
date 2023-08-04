@@ -1488,8 +1488,9 @@ mod sys {
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 mod windows {
     use super::*;
-    use crate::os::windows::io::{AsHandle, BorrowedHandle, OwnedHandle};
+    use crate::os::windows::io::{AsHandle, AsRawHandle, BorrowedHandle, OwnedHandle, RawHandle};
 
+    #[cfg(not(docsrs))]
     macro_rules! impl_traits {
         ($type:ty) => {
             impl $type {
@@ -1508,6 +1509,30 @@ mod windows {
             impl AsHandle for $type {
                 fn as_handle(&self) -> BorrowedHandle<'_> {
                     unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
+                }
+            }
+        };
+    }
+
+    #[cfg(docsrs)]
+    macro_rules! impl_traits {
+        ($type:ty) => {
+            impl $type {
+                /// Convert into [`OwnedHandle`].
+                pub fn into_owned_handle(self) -> io::Result<OwnedHandle> {
+                    todo!("For doc generation only")
+                }
+            }
+
+            impl AsRawHandle for $type {
+                fn as_raw_handle(&self) -> RawHandle {
+                    todo!("For doc generation only")
+                }
+            }
+
+            impl AsHandle for $type {
+                fn as_handle(&self) -> BorrowedHandle<'_> {
+                    todo!("For doc generation only")
                 }
             }
         };
