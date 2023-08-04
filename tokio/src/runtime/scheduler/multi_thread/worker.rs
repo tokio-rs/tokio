@@ -787,6 +787,10 @@ impl Core {
                 cap,
             );
 
+            // Take at least one task since the first task is returned directly
+            // and nto pushed onto the local queue.
+            let n = usize::max(1, n);
+
             let mut synced = worker.handle.shared.synced.lock();
             // safety: passing in the correct `inject::Synced`.
             let mut tasks = unsafe { worker.inject().pop_n(&mut synced.inject, n) };
