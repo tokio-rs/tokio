@@ -276,6 +276,11 @@ impl TcpListener {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std_unchecked(listener: net::TcpListener) -> io::Result<TcpListener> {
+        debug_check_non_blocking!(
+            listener,
+            "TcpListener::from_std",
+            "TcpListener::from_std_set_nonblocking"
+        );
         let io = mio::net::TcpListener::from_std(listener);
         let io = PollEvented::new(io)?;
         Ok(TcpListener { io })
@@ -295,11 +300,6 @@ impl TcpListener {
     /// [`TcpListener::from_std_unchecked`].
     #[track_caller]
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
-        debug_check_non_blocking!(
-            listener,
-            "TcpListener::from_std",
-            "TcpListener::from_std_set_nonblocking"
-        );
         Self::from_std_unchecked(listener)
     }
 
@@ -462,7 +462,7 @@ impl TryFrom<net::TcpListener> for TcpListener {
     /// [`from_std_set_nonblocking`](TcpListener::from_std_set_nonblocking),
     /// which sets `nonblocking`.
     fn try_from(stream: net::TcpListener) -> Result<Self, Self::Error> {
-        Self::from_std(stream)
+        Self::from_std_unchecked(stream)
     }
 }
 
