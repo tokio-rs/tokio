@@ -37,7 +37,7 @@ async fn timeout_value() {
     expected = "there is no reactor running, must be called from the context of a Tokio 1.x runtime"
 )]
 fn io_panics_when_no_tokio_context() {
-    let _ = tokio::net::TcpListener::from_std_unchecked(
+    let _ = tokio::net::TcpListener::from_std_assume_nonblocking(
         std::net::TcpListener::bind("127.0.0.1:0").unwrap(),
     );
 }

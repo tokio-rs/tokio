@@ -40,7 +40,7 @@ fn tcp_listener_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = runtime_without_io();
         rt.block_on(async {
-            let _ = TcpListener::from_std_unchecked(std_listener);
+            let _ = TcpListener::from_std_assume_nonblocking(std_listener);
         });
     });
 

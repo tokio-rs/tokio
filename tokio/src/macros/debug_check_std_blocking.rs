@@ -1,10 +1,10 @@
-//! Debug assertions that from_std_unchecked is not used on blocking sockets.
+//! Debug assertions that from_std_assume_nonblocking is not used on blocking sockets.
 //!
 //! These are displayed warnings in debug mode, panics in test mode
 //! (so that nothing slips through in the tokio test suite), and no-ops in release mode.
 
 #[cfg(all(debug_assertions, not(test)))]
-/// Debug assertions that from_std_unchecked is not used on blocking sockets.
+/// Debug assertions that from_std_assume_nonblocking is not used on blocking sockets.
 ///
 /// These are displayed warnings in debug mode, panics in test mode
 /// (so that nothing slips through in the tokio test suite), and no-ops in release mode.
@@ -46,7 +46,7 @@ macro_rules! debug_check_non_blocking {
 }
 
 #[cfg(test)]
-/// Debug assertions that from_std_unchecked is not used on blocking sockets.
+/// Debug assertions that from_std_assume_nonblocking is not used on blocking sockets.
 ///
 /// These are displayed warnings in debug mode, panics in test mode
 /// (so that nothing slips through in the tokio test suite), and no-ops in release mode.
@@ -79,7 +79,7 @@ macro_rules! debug_check_non_blocking {
 }
 
 #[cfg(not(debug_assertions))]
-/// Debug assertions that from_std_unchecked is not used on blocking sockets.
+/// Debug assertions that from_std_assume_nonblocking is not used on blocking sockets.
 ///
 /// These are displayed warnings in debug mode, panics in test mode
 /// (so that nothing slips through in the tokio test suite), and no-ops in release mode.
