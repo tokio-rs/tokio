@@ -96,7 +96,7 @@ stats = []
 [dependencies]
 tokio-macros = { version = "~2.1.0", path = "../tokio-macros", optional = true }
 
-pin-project-lite = "0.2.7"
+pin-project-lite = "0.2.11"
 
 # Everything else is optional...
 bytes = { version = "1.0.0", optional = true }
