@@ -37,3 +37,6 @@ cfg_macros! {
 // Includes re-exports needed to implement macros
 #[doc(hidden)]
 pub mod support;
+
+#[macro_use]
+mod debug_check_std_blocking;

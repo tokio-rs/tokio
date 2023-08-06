@@ -203,8 +203,7 @@ impl TcpListener {
     ///
     /// # Notes
     ///
-    /// This sets the socket to non-blocking mode if not already done, which
-    /// is necessary for normal operation within Tokio.
+    /// This sets the socket to non-blocking mode if it isn't already non-blocking.
     ///
     /// # Examples
     ///
@@ -231,7 +230,7 @@ impl TcpListener {
     #[track_caller]
     pub fn from_std_set_nonblocking(listener: net::TcpListener) -> io::Result<TcpListener> {
         listener.set_nonblocking(true)?;
-        Self::from_tcp_unchecked(listener)
+        Self::from_std_unchecked(listener)
     }
 
     /// Creates new `TcpListener` from a `std::net::TcpListener` without
@@ -262,7 +261,7 @@ impl TcpListener {
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let std_listener = std::net::TcpListener::bind("127.0.0.1:0")?;
     ///     std_listener.set_nonblocking(true)?;
-    ///     let listener = TcpListener::from_tcp_unchecked(std_listener)?;
+    ///     let listener = TcpListener::from_std_unchecked(std_listener)?;
     ///     Ok(())
     /// }
     /// ```
@@ -276,15 +275,16 @@ impl TcpListener {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
-    pub fn from_tcp_unchecked(listener: net::TcpListener) -> io::Result<TcpListener> {
+    pub fn from_std_unchecked(listener: net::TcpListener) -> io::Result<TcpListener> {
         let io = mio::net::TcpListener::from_std(listener);
         let io = PollEvented::new(io)?;
         Ok(TcpListener { io })
     }
 
+    #[doc(hidden)]
     /// Creates new `TcpListener` from a `std::net::TcpListener`.
     ///
-    /// This function is deprecated because it's easy to misuse,
+    /// This function is doc-hidden because it's easy to misuse,
     /// and naming doesn't warn enough about it.
     ///
     /// It may be preferrable to use
@@ -292,11 +292,15 @@ impl TcpListener {
     /// which sets `nonblocking`.
     ///
     /// This function however has the same behavior as
-    /// [`TcpListener::from_tcp_unchecked`].
+    /// [`TcpListener::from_std_unchecked`].
     #[track_caller]
-    #[deprecated = "Easy to misuse - use from_std_set_nonblocking or from_tcp_unchecked instead"]
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
-        Self::from_tcp_unchecked(listener)
+        debug_check_non_blocking!(
+            listener,
+            "TcpListener::from_std",
+            "TcpListener::from_std_set_nonblocking"
+        );
+        Self::from_std_unchecked(listener)
     }
 
     /// Turns a [`tokio::net::TcpListener`] into a [`std::net::TcpListener`].
@@ -443,7 +447,7 @@ impl TryFrom<net::TcpListener> for TcpListener {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`TcpListener::from_tcp_unchecked(stream)`](TcpListener::from_tcp_unchecked).
+    /// [`TcpListener::from_std_unchecked(stream)`](TcpListener::from_std_unchecked).
     ///
     /// # Notes
     ///
@@ -458,7 +462,7 @@ impl TryFrom<net::TcpListener> for TcpListener {
     /// [`from_std_set_nonblocking`](TcpListener::from_std_set_nonblocking),
     /// which sets `nonblocking`.
     fn try_from(stream: net::TcpListener) -> Result<Self, Self::Error> {
-        Self::from_tcp_unchecked(stream)
+        Self::from_std(stream)
     }
 }
 
