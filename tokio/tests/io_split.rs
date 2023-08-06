@@ -108,7 +108,7 @@ fn method_delegation() {
                 .await
                 .unwrap()
         );
-        // assert!(w.is_write_vectored());
+        assert!(w.is_write_vectored());
 
         assert!(w.flush().await.is_ok());
         assert!(w.shutdown().await.is_ok());

@@ -24,6 +24,7 @@ cfg_io_util! {
     /// The writable half of a value returned from [`split`](split()).
     pub struct WriteHalf<T> {
         inner: Arc<Inner<T>>,
+        is_write_vectored: bool,
     }
 
     /// Splits a single value implementing `AsyncRead + AsyncWrite` into separate
@@ -35,6 +36,8 @@ cfg_io_util! {
     where
         T: AsyncRead + AsyncWrite,
     {
+        let is_write_vectored = stream.is_write_vectored();
+
         let inner = Arc::new(Inner {
             locked: AtomicBool::new(false),
             stream: UnsafeCell::new(stream),
@@ -44,7 +47,7 @@ cfg_io_util! {
             inner: inner.clone(),
         };
 
-        let wr = WriteHalf { inner };
+        let wr = WriteHalf { inner, is_write_vectored };
 
         (rd, wr)
     }
@@ -139,6 +142,10 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
     ) -> Poll<Result<usize, io::Error>> {
         let mut inner = ready!(self.inner.poll_lock(cx));
         inner.stream_pin().poll_write_vectored(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.is_write_vectored
     }
 }
 
