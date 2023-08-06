@@ -73,7 +73,7 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// [`PollSemaphore`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSemaphore.html
+/// [`PollSemaphore`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSemaphore.html
 /// [`Semaphore::acquire_owned`]: crate::sync::Semaphore::acquire_owned
 #[derive(Debug)]
 pub struct Semaphore {
@@ -125,7 +125,7 @@ fn bounds() {
 }
 
 impl Semaphore {
-    /// The maximum number of permits which a semaphore can hold. It is `usize::MAX >>> 3`.
+    /// The maximum number of permits which a semaphore can hold. It is `usize::MAX >> 3`.
     ///
     /// Exceeding this limit typically results in a panic.
     pub const MAX_PERMITS: usize = super::batch_semaphore::Semaphore::MAX_PERMITS;
@@ -172,20 +172,22 @@ impl Semaphore {
     ///
     /// static SEM: Semaphore = Semaphore::const_new(10);
     /// ```
-    ///
-    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    #[cfg(not(all(loom, test)))]
     pub const fn const_new(permits: usize) -> Self {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Self {
+        Self {
             ll_sem: ll::Semaphore::const_new(permits),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: tracing::Span::none(),
-        };
+        }
+    }
 
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        return Self {
-            ll_sem: ll::Semaphore::const_new(permits),
-        };
+    /// Creates a new closed semaphore with 0 permits.
+    pub(crate) fn new_closed() -> Self {
+        Self {
+            ll_sem: ll::Semaphore::new_closed(),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: tracing::Span::none(),
+        }
     }
 
     /// Returns the current number of available permits.
@@ -675,6 +677,11 @@ impl OwnedSemaphorePermit {
         );
         self.permits += other.permits;
         other.permits = 0;
+    }
+
+    /// Returns the [`Semaphore`] from which this permit was acquired.
+    pub fn semaphore(&self) -> &Arc<Semaphore> {
+        &self.sem
     }
 }
 

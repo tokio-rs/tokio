@@ -17,6 +17,7 @@ use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule};
 use crate::util::linked_list;
 
+use std::num::NonZeroU64;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
@@ -28,6 +29,94 @@ use std::task::{Context, Poll, Waker};
 ///
 /// Any changes to the layout of this struct _must_ also be reflected in the
 /// const fns in raw.rs.
+///
+// # This struct should be cache padded to avoid false sharing. The cache padding rules are copied
+// from crossbeam-utils/src/cache_padded.rs
+//
+// Starting from Intel's Sandy Bridge, spatial prefetcher is now pulling pairs of 64-byte cache
+// lines at a time, so we have to align to 128 bytes rather than 64.
+//
+// Sources:
+// - https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-optimization-manual.pdf
+// - https://github.com/facebook/folly/blob/1b5288e6eea6df074758f877c849b6e73bbb9fbb/folly/lang/Align.h#L107
+//
+// ARM's big.LITTLE architecture has asymmetric cores and "big" cores have 128-byte cache line size.
+//
+// Sources:
+// - https://www.mono-project.com/news/2016/09/12/arm64-icache/
+//
+// powerpc64 has 128-byte cache line size.
+//
+// Sources:
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_ppc64x.go#L9
+#[cfg_attr(
+    any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "powerpc64",
+    ),
+    repr(align(128))
+)]
+// arm, mips, mips64, riscv64, sparc, and hexagon have 32-byte cache line size.
+//
+// Sources:
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_arm.go#L7
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mips.go#L7
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mipsle.go#L7
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mips64x.go#L9
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_riscv64.go#L7
+// - https://github.com/torvalds/linux/blob/3516bd729358a2a9b090c1905bd2a3fa926e24c6/arch/sparc/include/asm/cache.h#L17
+// - https://github.com/torvalds/linux/blob/3516bd729358a2a9b090c1905bd2a3fa926e24c6/arch/hexagon/include/asm/cache.h#L12
+//
+// riscv32 is assumed not to exceed the cache line size of riscv64.
+#[cfg_attr(
+    any(
+        target_arch = "arm",
+        target_arch = "mips",
+        target_arch = "mips64",
+        target_arch = "riscv32",
+        target_arch = "riscv64",
+        target_arch = "sparc",
+        target_arch = "hexagon",
+    ),
+    repr(align(32))
+)]
+// m68k has 16-byte cache line size.
+//
+// Sources:
+// - https://github.com/torvalds/linux/blob/3516bd729358a2a9b090c1905bd2a3fa926e24c6/arch/m68k/include/asm/cache.h#L9
+#[cfg_attr(target_arch = "m68k", repr(align(16)))]
+// s390x has 256-byte cache line size.
+//
+// Sources:
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_s390x.go#L7
+// - https://github.com/torvalds/linux/blob/3516bd729358a2a9b090c1905bd2a3fa926e24c6/arch/s390/include/asm/cache.h#L13
+#[cfg_attr(target_arch = "s390x", repr(align(256)))]
+// x86, wasm, and sparc64 have 64-byte cache line size.
+//
+// Sources:
+// - https://github.com/golang/go/blob/dda2991c2ea0c5914714469c4defc2562a907230/src/internal/cpu/cpu_x86.go#L9
+// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_wasm.go#L7
+// - https://github.com/torvalds/linux/blob/3516bd729358a2a9b090c1905bd2a3fa926e24c6/arch/sparc/include/asm/cache.h#L19
+//
+// All others are assumed to have 64-byte cache line size.
+#[cfg_attr(
+    not(any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "powerpc64",
+        target_arch = "arm",
+        target_arch = "mips",
+        target_arch = "mips64",
+        target_arch = "riscv32",
+        target_arch = "riscv64",
+        target_arch = "sparc",
+        target_arch = "hexagon",
+        target_arch = "m68k",
+        target_arch = "s390x",
+    )),
+    repr(align(64))
+)]
 #[repr(C)]
 pub(super) struct Cell<T: Future, S> {
     /// Hot task state data
@@ -76,7 +165,7 @@ pub(crate) struct Header {
 
     /// This integer contains the id of the OwnedTasks or LocalOwnedTasks that
     /// this task is stored in. If the task is not in any list, should be the
-    /// id of the list that it was previously in, or zero if it has never been
+    /// id of the list that it was previously in, or `None` if it has never been
     /// in any list.
     ///
     /// Once a task has been bound to a list, it can never be bound to another
@@ -85,7 +174,7 @@ pub(crate) struct Header {
     /// The id is not unset when removed from a list because we want to be able
     /// to read the id without synchronization, even if it is concurrently being
     /// removed from the list.
-    pub(super) owner_id: UnsafeCell<u64>,
+    pub(super) owner_id: UnsafeCell<Option<NonZeroU64>>,
 
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -123,17 +212,32 @@ impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
     pub(super) fn new(future: T, scheduler: S, state: State, task_id: Id) -> Box<Cell<T, S>> {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let tracing_id = future.id();
-        let result = Box::new(Cell {
-            header: Header {
+        // Separated into a non-generic function to reduce LLVM codegen
+        fn new_header(
+            state: State,
+            vtable: &'static Vtable,
+            #[cfg(all(tokio_unstable, feature = "tracing"))] tracing_id: Option<tracing::Id>,
+        ) -> Header {
+            Header {
                 state,
                 queue_next: UnsafeCell::new(None),
-                vtable: raw::vtable::<T, S>(),
-                owner_id: UnsafeCell::new(0),
+                vtable,
+                owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
-            },
+            }
+        }
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let tracing_id = future.id();
+        let vtable = raw::vtable::<T, S>();
+        let result = Box::new(Cell {
+            header: new_header(
+                state,
+                vtable,
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                tracing_id,
+            ),
             core: Core {
                 scheduler,
                 stage: CoreStage {
@@ -141,26 +245,33 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 },
                 task_id,
             },
-            trailer: Trailer {
-                waker: UnsafeCell::new(None),
-                owned: linked_list::Pointers::new(),
-            },
+            trailer: Trailer::new(),
         });
 
         #[cfg(debug_assertions)]
         {
-            let trailer_addr = (&result.trailer) as *const Trailer as usize;
-            let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(&result.header)) };
-            assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
+            // Using a separate function for this code avoids instantiating it separately for every `T`.
+            unsafe fn check<S>(header: &Header, trailer: &Trailer, scheduler: &S, task_id: &Id) {
+                let trailer_addr = trailer as *const Trailer as usize;
+                let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(header)) };
+                assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
 
-            let scheduler_addr = (&result.core.scheduler) as *const S as usize;
-            let scheduler_ptr =
-                unsafe { Header::get_scheduler::<S>(NonNull::from(&result.header)) };
-            assert_eq!(scheduler_addr, scheduler_ptr.as_ptr() as usize);
+                let scheduler_addr = scheduler as *const S as usize;
+                let scheduler_ptr = unsafe { Header::get_scheduler::<S>(NonNull::from(header)) };
+                assert_eq!(scheduler_addr, scheduler_ptr.as_ptr() as usize);
 
-            let id_addr = (&result.core.task_id) as *const Id as usize;
-            let id_ptr = unsafe { Header::get_id_ptr(NonNull::from(&result.header)) };
-            assert_eq!(id_addr, id_ptr.as_ptr() as usize);
+                let id_addr = task_id as *const Id as usize;
+                let id_ptr = unsafe { Header::get_id_ptr(NonNull::from(header)) };
+                assert_eq!(id_addr, id_ptr.as_ptr() as usize);
+            }
+            unsafe {
+                check(
+                    &result.header,
+                    &result.trailer,
+                    &result.core.scheduler,
+                    &result.core.task_id,
+                );
+            }
         }
 
         result
@@ -278,23 +389,19 @@ impl<T: Future, S: Schedule> Core<T, S> {
     }
 }
 
-cfg_rt_multi_thread! {
-    impl Header {
-        pub(super) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
-            self.queue_next.with_mut(|ptr| *ptr = next);
-        }
-    }
-}
-
 impl Header {
-    // safety: The caller must guarantee exclusive access to this field, and
-    // must ensure that the id is either 0 or the id of the OwnedTasks
-    // containing this task.
-    pub(super) unsafe fn set_owner_id(&self, owner: u64) {
-        self.owner_id.with_mut(|ptr| *ptr = owner);
+    pub(super) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
+        self.queue_next.with_mut(|ptr| *ptr = next);
     }
 
-    pub(super) fn get_owner_id(&self) -> u64 {
+    // safety: The caller must guarantee exclusive access to this field, and
+    // must ensure that the id is either `None` or the id of the OwnedTasks
+    // containing this task.
+    pub(super) unsafe fn set_owner_id(&self, owner: NonZeroU64) {
+        self.owner_id.with_mut(|ptr| *ptr = Some(owner));
+    }
+
+    pub(super) fn get_owner_id(&self) -> Option<NonZeroU64> {
         // safety: If there are concurrent writes, then that write has violated
         // the safety requirements on `set_owner_id`.
         unsafe { self.owner_id.with(|ptr| *ptr) }
@@ -358,6 +465,13 @@ impl Header {
 }
 
 impl Trailer {
+    fn new() -> Self {
+        Trailer {
+            waker: UnsafeCell::new(None),
+            owned: linked_list::Pointers::new(),
+        }
+    }
+
     pub(super) unsafe fn set_waker(&self, waker: Option<Waker>) {
         self.waker.with_mut(|ptr| {
             *ptr = waker;

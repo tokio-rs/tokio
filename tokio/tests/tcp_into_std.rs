@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi doesn't support bind
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support bind
 
 use std::io::Read;
 use std::io::Result;

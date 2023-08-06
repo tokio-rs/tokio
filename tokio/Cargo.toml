@@ -6,9 +6,9 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.27.0"
+version = "1.29.1"
 edition = "2021"
-rust-version = "1.56"
+rust-version = "1.63"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
@@ -93,49 +93,48 @@ time = []
 # a few releases.
 stats = []
 
-[build-dependencies]
-autocfg = "1.1"
-
 [dependencies]
-tokio-macros = { version = "~2.0.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "~2.1.0", path = "../tokio-macros", optional = true }
 
-pin-project-lite = "0.2.0"
+pin-project-lite = "0.2.11"
 
 # Everything else is optional...
 bytes = { version = "1.0.0", optional = true }
-mio = { version = "0.8.4", optional = true }
+mio = { version = "0.8.6", optional = true, default-features = false }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.12.0", optional = true }
 
-[target.'cfg(not(any(target_arch = "wasm32", target_arch = "wasm64")))'.dependencies]
-socket2 = { version = "0.4.9", optional = true, features = [ "all" ] }
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+socket2 = { version = "0.5.3", optional = true, features = [ "all" ] }
 
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
 [target.'cfg(tokio_unstable)'.dependencies]
 tracing = { version = "0.1.25", default-features = false, features = ["std"], optional = true } # Not in full
 
+# Currently unstable. The API exposed by these features may be broken at any time.
+# Requires `--cfg tokio_unstable` to enable.
+[target.'cfg(tokio_taskdump)'.dependencies]
+backtrace = { version = "0.3.58" }
+
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.42", optional = true }
+libc = { version = "0.2.145", optional = true }
 signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
-libc = { version = "0.2.42" }
+libc = { version = "0.2.145" }
 nix = { version = "0.26", default-features = false, features = ["fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.48"
 optional = true
 
-[target.'cfg(docsrs)'.dependencies.windows-sys]
+[target.'cfg(windows)'.dev-dependencies.windows-sys]
 version = "0.48"
 features = [
     "Win32_Foundation",
     "Win32_Security_Authorization",
 ]
-
-[target.'cfg(windows)'.dev-dependencies.ntapi]
-version = "0.3.6"
 
 [dev-dependencies]
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
@@ -144,21 +143,21 @@ futures = { version = "0.3.0", features = ["async-await"] }
 mockall = "0.11.1"
 async-stream = "0.3"
 
-[target.'cfg(not(any(target_arch = "wasm32", target_arch = "wasm64")))'.dev-dependencies]
-socket2 = "0.4.9"
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+socket2 = "0.5.3"
 tempfile = "3.1.0"
 
-[target.'cfg(not(all(any(target_arch = "wasm32", target_arch = "wasm64"), target_os = "unknown")))'.dev-dependencies]
+[target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dev-dependencies]
 rand = "0.8.0"
 
-[target.'cfg(all(any(target_arch = "wasm32", target_arch = "wasm64"), not(target_os = "wasi")))'.dev-dependencies]
+[target.'cfg(all(target_family = "wasm", not(target_os = "wasi")))'.dev-dependencies]
 wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]
 mio-aio = { version = "0.7.0", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.5.2", features = ["futures", "checkpoint"] }
+loom = { version = "0.7", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true

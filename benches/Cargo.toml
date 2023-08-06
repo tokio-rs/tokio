@@ -2,7 +2,7 @@
 name = "benches"
 version = "0.0.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [features]
 test-util = ["tokio/test-util"]
@@ -41,10 +41,19 @@ path = "sync_watch.rs"
 harness = false
 
 [[bench]]
+name = "rt_current_thread"
+path = "rt_current_thread.rs"
+harness = false
+
+[[bench]]
 name = "rt_multi_threaded"
 path = "rt_multi_threaded.rs"
 harness = false
 
+[[bench]]
+name = "sync_notify"
+path = "sync_notify.rs"
+harness = false
 
 [[bench]]
 name = "sync_rwlock"

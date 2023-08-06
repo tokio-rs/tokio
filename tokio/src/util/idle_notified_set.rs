@@ -421,7 +421,7 @@ impl<T: 'static> Wake for ListEntry<T> {
             // We move ourself to the notified list.
             let me = unsafe {
                 // Safety: We just checked that we are in this particular list.
-                lock.idle.remove(NonNull::from(&**me)).unwrap()
+                lock.idle.remove(ListEntry::as_raw(me)).unwrap()
             };
             lock.notified.push_front(me);
 
@@ -458,5 +458,24 @@ unsafe impl<T> linked_list::Link for ListEntry<T> {
         target: NonNull<ListEntry<T>>,
     ) -> NonNull<linked_list::Pointers<ListEntry<T>>> {
         ListEntry::addr_of_pointers(target)
+    }
+}
+
+#[cfg(all(test, not(loom)))]
+mod tests {
+    use crate::runtime::Builder;
+    use crate::task::JoinSet;
+
+    // A test that runs under miri.
+    //
+    // https://github.com/tokio-rs/tokio/pull/5693
+    #[test]
+    fn join_set_test() {
+        let rt = Builder::new_current_thread().build().unwrap();
+
+        let mut set = JoinSet::new();
+        set.spawn_on(futures::future::ready(()), rt.handle());
+
+        rt.block_on(set.join_next()).unwrap().unwrap();
     }
 }

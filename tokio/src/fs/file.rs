@@ -3,7 +3,7 @@
 //! [`File`]: File
 
 use self::State::*;
-use crate::fs::asyncify;
+use crate::fs::{asyncify, OpenOptions};
 use crate::io::blocking::Buf;
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
@@ -124,8 +124,6 @@ impl File {
     ///
     /// See [`OpenOptions`] for more details.
     ///
-    /// [`OpenOptions`]: super::OpenOptions
-    ///
     /// # Errors
     ///
     /// This function will return an error if called from outside of the Tokio
@@ -167,8 +165,6 @@ impl File {
     ///
     /// See [`OpenOptions`] for more details.
     ///
-    /// [`OpenOptions`]: super::OpenOptions
-    ///
     /// # Errors
     ///
     /// Results in an error if called from outside of the Tokio runtime or if
@@ -197,6 +193,37 @@ impl File {
         let path = path.as_ref().to_owned();
         let std_file = asyncify(move || StdFile::create(path)).await?;
         Ok(File::from_std(std_file))
+    }
+
+    /// Returns a new [`OpenOptions`] object.
+    ///
+    /// This function returns a new `OpenOptions` object that you can use to
+    /// open or create a file with specific options if `open()` or `create()`
+    /// are not appropriate.
+    ///
+    /// It is equivalent to `OpenOptions::new()`, but allows you to write more
+    /// readable code. Instead of
+    /// `OpenOptions::new().append(true).open("example.log")`,
+    /// you can write `File::options().append(true).open("example.log")`. This
+    /// also avoids the need to import `OpenOptions`.
+    ///
+    /// See the [`OpenOptions::new`] function for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    /// use tokio::io::AsyncWriteExt;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut f = File::options().append(true).open("example.log").await?;
+    /// f.write_all(b"new line\n").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn options() -> OpenOptions {
+        OpenOptions::new()
     }
 
     /// Converts a [`std::fs::File`][std] to a [`tokio::fs::File`][file].
@@ -399,6 +426,7 @@ impl File {
     /// # }
     /// ```
     pub async fn try_clone(&self) -> io::Result<File> {
+        self.inner.lock().await.complete_inflight().await;
         let std = self.std.clone();
         let std_file = asyncify(move || std.try_clone()).await?;
         Ok(File::from_std(std_file))
@@ -498,6 +526,7 @@ impl AsyncRead for File {
         cx: &mut Context<'_>,
         dst: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
+        ready!(crate::trace::trace_leaf(cx));
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
@@ -594,6 +623,7 @@ impl AsyncSeek for File {
     }
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        ready!(crate::trace::trace_leaf(cx));
         let inner = self.inner.get_mut();
 
         loop {
@@ -629,6 +659,7 @@ impl AsyncWrite for File {
         cx: &mut Context<'_>,
         src: &[u8],
     ) -> Poll<io::Result<usize>> {
+        ready!(crate::trace::trace_leaf(cx));
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
@@ -695,11 +726,13 @@ impl AsyncWrite for File {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
         let inner = self.inner.get_mut();
         inner.poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
         self.poll_flush(cx)
     }
 }
@@ -725,7 +758,7 @@ impl std::os::unix::io::AsRawFd for File {
     }
 }
 
-#[cfg(all(unix, not(tokio_no_as_fd)))]
+#[cfg(unix)]
 impl std::os::unix::io::AsFd for File {
     fn as_fd(&self) -> std::os::unix::io::BorrowedFd<'_> {
         unsafe {
@@ -742,9 +775,7 @@ impl std::os::unix::io::FromRawFd for File {
 }
 
 cfg_windows! {
-    use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
-    #[cfg(not(tokio_no_as_fd))]
-    use crate::os::windows::io::{AsHandle, BorrowedHandle};
+    use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, AsHandle, BorrowedHandle};
 
     impl AsRawHandle for File {
         fn as_raw_handle(&self) -> RawHandle {
@@ -752,7 +783,6 @@ cfg_windows! {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for File {
         fn as_handle(&self) -> BorrowedHandle<'_> {
             unsafe {
@@ -774,8 +804,18 @@ impl Inner {
     async fn complete_inflight(&mut self) {
         use crate::future::poll_fn;
 
-        if let Err(e) = poll_fn(|cx| Pin::new(&mut *self).poll_flush(cx)).await {
-            self.last_write_err = Some(e.kind());
+        poll_fn(|cx| self.poll_complete_inflight(cx)).await
+    }
+
+    fn poll_complete_inflight(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        ready!(crate::trace::trace_leaf(cx));
+        match self.poll_flush(cx) {
+            Poll::Ready(Err(e)) => {
+                self.last_write_err = Some(e.kind());
+                Poll::Ready(())
+            }
+            Poll::Ready(Ok(())) => Poll::Ready(()),
+            Poll::Pending => Poll::Pending,
         }
     }
 

@@ -18,7 +18,7 @@ use std::task::{Context, Poll};
 /// To convert the `Sender` into a `Sink` or use it in a poll function, you can
 /// use the [`PollSender`] utility.
 ///
-/// [`PollSender`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSender.html
+/// [`PollSender`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSender.html
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -861,6 +861,8 @@ impl<T> Sender<T> {
     }
 
     async fn reserve_inner(&self) -> Result<(), SendError<()>> {
+        crate::trace::async_trace_leaf().await;
+
         match self.chan.semaphore().semaphore.acquire(1).await {
             Ok(_) => Ok(()),
             Err(_) => Err(SendError(())),

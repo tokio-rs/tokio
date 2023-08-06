@@ -67,9 +67,9 @@ impl ParkThread {
         CURRENT_THREAD_PARK_COUNT.with(|count| count.fetch_add(1, SeqCst));
 
         // Wasm doesn't have threads, so just sleep.
-        #[cfg(not(tokio_wasm))]
+        #[cfg(not(target_family = "wasm"))]
         self.inner.park_timeout(duration);
-        #[cfg(tokio_wasm)]
+        #[cfg(target_family = "wasm")]
         std::thread::sleep(duration);
     }
 
@@ -222,7 +222,6 @@ impl UnparkThread {
 use crate::loom::thread::AccessError;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::mem;
 use std::rc::Rc;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
@@ -284,11 +283,6 @@ impl CachedParkThread {
                 return Ok(v);
             }
 
-            // Wake any yielded tasks before parking in order to avoid
-            // blocking.
-            #[cfg(feature = "rt")]
-            crate::runtime::context::with_defer(|defer| defer.wake());
-
             self.park();
         }
     }
@@ -322,16 +316,12 @@ unsafe fn unparker_to_raw_waker(unparker: Arc<Inner>) -> RawWaker {
 }
 
 unsafe fn clone(raw: *const ()) -> RawWaker {
-    let unparker = Inner::from_raw(raw);
-
-    // Increment the ref count
-    mem::forget(unparker.clone());
-
-    unparker_to_raw_waker(unparker)
+    Arc::increment_strong_count(raw as *const Inner);
+    unparker_to_raw_waker(Inner::from_raw(raw))
 }
 
 unsafe fn drop_waker(raw: *const ()) {
-    let _ = Inner::from_raw(raw);
+    drop(Inner::from_raw(raw));
 }
 
 unsafe fn wake(raw: *const ()) {
@@ -340,11 +330,8 @@ unsafe fn wake(raw: *const ()) {
 }
 
 unsafe fn wake_by_ref(raw: *const ()) {
-    let unparker = Inner::from_raw(raw);
-    unparker.unpark();
-
-    // We don't actually own a reference to the unparker
-    mem::forget(unparker);
+    let raw = raw as *const Inner;
+    (*raw).unpark();
 }
 
 #[cfg(loom)]

@@ -131,8 +131,11 @@ cargo check --all-features
 cargo test --all-features
 ```
 
-Clippy must be run using the MSRV, so Tokio can avoid having to `#[allow]` new
-lints whose fixes would be incompatible with the current MSRV:
+Ideally, you should use the same version of clippy as the one used in CI
+(defined by `env.rust_clippy` in [ci.yml][ci.yml]), because newer versions
+might have new lints:
+
+[ci.yml]: .github/workflows/ci.yml
 
 <!--
 When updating this, also update:
@@ -146,7 +149,7 @@ When updating this, also update:
 -->
 
 ```
-cargo +1.49.0 clippy --all --tests --all-features
+cargo +1.65.0 clippy --all --tests --all-features
 ```
 
 When building documentation normally, the markers that list the features
@@ -170,10 +173,10 @@ command below instead:
 
 ```
 # Mac or Linux
-rustfmt --check --edition 2018 $(git ls-files '*.rs')
+rustfmt --check --edition 2021 $(git ls-files '*.rs')
 
 # Powershell
-Get-ChildItem . -Filter "*.rs" -Recurse | foreach { rustfmt --check --edition 2018 $_.FullName }
+Get-ChildItem . -Filter "*.rs" -Recurse | foreach { rustfmt --check --edition 2021 $_.FullName }
 ```
 The `--check` argument prints the things that need to be fixed. If you remove
 it, `rustfmt` will update your files locally instead.
@@ -227,7 +230,7 @@ integration tests in the crate and follow the style.
 
 Some of our crates include a set of fuzz tests, this will be marked by a
 directory `fuzz`. It is a good idea to run fuzz tests after each change.
-To get started with fuzz testing you'll need to install 
+To get started with fuzz testing you'll need to install
 [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz).
 
 `cargo install cargo-fuzz`

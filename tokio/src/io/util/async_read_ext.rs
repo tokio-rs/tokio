@@ -27,7 +27,7 @@ cfg_io_util! {
         ) => {
             $(
                 $(#[$outer])*
-                fn $name<'a>(&'a mut self) -> $($fut)*<&'a mut Self> where Self: Unpin {
+                fn $name(&mut self) -> $($fut)*<&mut Self> where Self: Unpin {
                     $($fut)*::new(self)
                 }
             )*
@@ -292,7 +292,8 @@ cfg_io_util! {
         /// #[tokio::main]
         /// async fn main() -> io::Result<()> {
         ///     let mut f = File::open("foo.txt").await?;
-        ///     let mut buffer = [0; 10];
+        ///     let len = 10;
+        ///     let mut buffer = vec![0; len];
         ///
         ///     // read exactly 10 bytes
         ///     f.read_exact(&mut buffer).await?;

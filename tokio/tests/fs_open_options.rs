@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(tokio_wasi)))] // WASI does not support all fs operations
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
 
 use std::io::Write;
 use tempfile::NamedTempFile;

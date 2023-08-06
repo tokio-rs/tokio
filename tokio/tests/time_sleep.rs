@@ -168,7 +168,7 @@ async fn reset_sleep_to_past() {
     assert_ready!(sleep.poll());
 }
 
-#[cfg(not(tokio_wasi))] // Wasi doesn't support panic recovery
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #[test]
 #[should_panic]
 fn creating_sleep_outside_of_context() {
@@ -265,6 +265,20 @@ const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 async fn exactly_max() {
     time::pause();
     time::sleep(ms(MAX_DURATION)).await;
+}
+
+#[tokio::test]
+async fn issue_5183() {
+    time::pause();
+
+    let big = std::time::Duration::from_secs(u64::MAX / 10);
+    // This is a workaround since awaiting sleep(big) will never finish.
+    #[rustfmt::skip]
+    tokio::select! {
+	biased;
+        _ = tokio::time::sleep(big) => {}
+        _ = tokio::time::sleep(std::time::Duration::from_nanos(1)) => {}
+    }
 }
 
 #[tokio::test]

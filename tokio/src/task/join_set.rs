@@ -201,6 +201,67 @@ impl<T: 'static> JoinSet<T> {
         self.insert(local_set.spawn_local(task))
     }
 
+    /// Spawn the blocking code on the blocking threadpool and store
+    /// it in this `JoinSet`, returning an [`AbortHandle`] that can be
+    /// used to remotely cancel the task.
+    ///
+    /// # Examples
+    ///
+    /// Spawn multiple blocking tasks and wait for them.
+    ///
+    /// ```
+    /// use tokio::task::JoinSet;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut set = JoinSet::new();
+    ///
+    ///     for i in 0..10 {
+    ///         set.spawn_blocking(move || { i });
+    ///     }
+    ///
+    ///     let mut seen = [false; 10];
+    ///     while let Some(res) = set.join_next().await {
+    ///         let idx = res.unwrap();
+    ///         seen[idx] = true;
+    ///     }
+    ///
+    ///     for i in 0..10 {
+    ///         assert!(seen[i]);
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This method panics if called outside of a Tokio runtime.
+    ///
+    /// [`AbortHandle`]: crate::task::AbortHandle
+    #[track_caller]
+    pub fn spawn_blocking<F>(&mut self, f: F) -> AbortHandle
+    where
+        F: FnOnce() -> T,
+        F: Send + 'static,
+        T: Send,
+    {
+        self.insert(crate::runtime::spawn_blocking(f))
+    }
+
+    /// Spawn the blocking code on the blocking threadpool of the
+    /// provided runtime and store it in this `JoinSet`, returning an
+    /// [`AbortHandle`] that can be used to remotely cancel the task.
+    ///
+    /// [`AbortHandle`]: crate::task::AbortHandle
+    #[track_caller]
+    pub fn spawn_blocking_on<F>(&mut self, f: F, handle: &Handle) -> AbortHandle
+    where
+        F: FnOnce() -> T,
+        F: Send + 'static,
+        T: Send,
+    {
+        self.insert(handle.spawn_blocking(f))
+    }
+
     fn insert(&mut self, jh: JoinHandle<T>) -> AbortHandle {
         let abort = jh.abort_handle();
         let mut entry = self.inner.insert_idle(jh);
@@ -301,7 +362,7 @@ impl<T: 'static> JoinSet<T> {
     /// This can happen if the [coop budget] is reached.
     ///
     /// [coop budget]: crate::task#cooperative-scheduling
-    fn poll_join_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<T, JoinError>>> {
+    pub fn poll_join_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<T, JoinError>>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
         let mut entry = match self.inner.pop_notified(cx.waker()) {
@@ -358,7 +419,8 @@ impl<T: 'static> JoinSet<T> {
     /// [coop budget]: crate::task#cooperative-scheduling
     /// [task ID]: crate::task::Id
     #[cfg(tokio_unstable)]
-    fn poll_join_next_with_id(
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn poll_join_next_with_id(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<(Id, T), JoinError>>> {

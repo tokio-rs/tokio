@@ -73,6 +73,9 @@ cfg_io_driver! {
 impl<E: Source> PollEvented<E> {
     /// Creates a new `PollEvented` associated with the default reactor.
     ///
+    /// The returned `PollEvented` has readable and writable interests. For more control, use
+    /// [`Self::new_with_interest`].
+    ///
     /// # Panics
     ///
     /// This function panics if thread-local runtime is not set.
@@ -121,7 +124,7 @@ impl<E: Source> PollEvented<E> {
     }
 
     /// Returns a reference to the registration.
-    #[cfg(any(feature = "net"))]
+    #[cfg(feature = "net")]
     pub(crate) fn registration(&self) -> &Registration {
         &self.registration
     }
@@ -162,8 +165,10 @@ feature! {
                 match self.io.as_ref().unwrap().read(b) {
                     Ok(n) => {
                         // if we read a partially full buffer, this is sufficient on unix to show
-                        // that the socket buffer has been drained
-                        if n > 0 && (!cfg!(windows) && n < len) {
+                        // that the socket buffer has been drained.  Unfortunately this assumption
+                        // fails for level-triggered selectors (like on Windows or poll even for
+                        // UNIX): https://github.com/tokio-rs/tokio/issues/5866
+                        if n > 0 && (!cfg!(windows) && !cfg!(mio_unsupported_force_poll_poll) && n < len) {
                             self.registration.clear_readiness(evt);
                         }
 
@@ -193,8 +198,10 @@ feature! {
                 match self.io.as_ref().unwrap().write(buf) {
                     Ok(n) => {
                         // if we write only part of our buffer, this is sufficient on unix to show
-                        // that the socket buffer is full
-                        if n > 0 && (!cfg!(windows) && n < buf.len()) {
+                        // that the socket buffer is full.  Unfortunately this assumption
+                        // fails for level-triggered selectors (like on Windows or poll even for
+                        // UNIX): https://github.com/tokio-rs/tokio/issues/5866
+                        if n > 0 && (!cfg!(windows) && !cfg!(mio_unsupported_force_poll_poll) && n < buf.len()) {
                             self.registration.clear_readiness(evt);
                         }
 

@@ -220,6 +220,7 @@ pin_project! {
     /// [`select!`]: ../macro.select.html
     /// [`tokio::pin!`]: ../macro.pin.html
     // Alias for old name in 0.2
+    #[project(!Unpin)]
     #[cfg_attr(docsrs, doc(alias = "Delay"))]
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -399,6 +400,8 @@ impl Sleep {
 
     fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
         let me = self.project();
+
+        ready!(crate::trace::trace_leaf(cx));
 
         // Keep track of task budget
         #[cfg(all(tokio_unstable, feature = "tracing"))]

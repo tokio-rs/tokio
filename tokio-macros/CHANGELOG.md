@@ -1,3 +1,11 @@
+# 2.1.0 (April 25th, 2023)
+
+- macros: fix typo in `#[tokio::test]` docs ([#5636])
+- macros: make entrypoints more efficient ([#5621])
+
+[#5621]: https://github.com/tokio-rs/tokio/pull/5621
+[#5636]: https://github.com/tokio-rs/tokio/pull/5636
+
 # 2.0.0 (March 24th, 2023)
 
 This major release updates the dependency on the syn crate to 2.0.0, and

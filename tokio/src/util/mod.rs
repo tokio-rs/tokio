@@ -1,17 +1,11 @@
 cfg_io_driver! {
     pub(crate) mod bit;
-    pub(crate) mod slab;
 }
 
 #[cfg(feature = "rt")]
 pub(crate) mod atomic_cell;
 
-#[cfg(any(
-    feature = "rt",
-    feature = "signal",
-    feature = "process",
-    tokio_no_const_mutex_new,
-))]
+#[cfg(any(feature = "rt", feature = "signal", feature = "process"))]
 pub(crate) mod once_cell;
 
 #[cfg(any(
@@ -79,3 +73,7 @@ pub(crate) mod error;
 
 #[cfg(feature = "io-util")]
 pub(crate) mod memchr;
+
+pub(crate) mod markers;
+
+pub(crate) mod cacheline;

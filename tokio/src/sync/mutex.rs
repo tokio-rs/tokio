@@ -378,8 +378,7 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// static LOCK: Mutex<i32> = Mutex::const_new(5);
     /// ```
-    #[cfg(all(feature = "parking_lot", not(all(loom, test)),))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    #[cfg(not(all(loom, test)))]
     pub const fn const_new(t: T) -> Self
     where
         T: Sized,
@@ -629,6 +628,8 @@ impl<T: ?Sized> Mutex<T> {
     }
 
     async fn acquire(&self) {
+        crate::trace::async_trace_leaf().await;
+
         self.s.acquire(1).await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and
             // we own it exclusively, which means that this can never happen.

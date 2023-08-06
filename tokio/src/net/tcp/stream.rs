@@ -258,7 +258,7 @@ impl TcpStream {
                 .map(|raw_socket| unsafe { std::net::TcpStream::from_raw_socket(raw_socket) })
         }
 
-        #[cfg(tokio_wasi)]
+        #[cfg(target_os = "wasi")]
         {
             use std::os::wasi::io::{FromRawFd, IntoRawFd};
             self.io
@@ -1378,7 +1378,6 @@ mod sys {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsFd for TcpStream {
         fn as_fd(&self) -> BorrowedFd<'_> {
             unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
@@ -1387,9 +1386,7 @@ mod sys {
 }
 
 cfg_windows! {
-    use crate::os::windows::io::{AsRawSocket, RawSocket};
-    #[cfg(not(tokio_no_as_fd))]
-    use crate::os::windows::io::{AsSocket, BorrowedSocket};
+    use crate::os::windows::io::{AsRawSocket, RawSocket, AsSocket, BorrowedSocket};
 
     impl AsRawSocket for TcpStream {
         fn as_raw_socket(&self) -> RawSocket {
@@ -1397,7 +1394,6 @@ cfg_windows! {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsSocket for TcpStream {
         fn as_socket(&self) -> BorrowedSocket<'_> {
             unsafe { BorrowedSocket::borrow_raw(self.as_raw_socket()) }
@@ -1405,7 +1401,7 @@ cfg_windows! {
     }
 }
 
-#[cfg(all(tokio_unstable, tokio_wasi))]
+#[cfg(all(tokio_unstable, target_os = "wasi"))]
 mod sys {
     use super::TcpStream;
     use std::os::wasi::prelude::*;
@@ -1416,7 +1412,6 @@ mod sys {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsFd for TcpStream {
         fn as_fd(&self) -> BorrowedFd<'_> {
             unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }

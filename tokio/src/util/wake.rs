@@ -50,16 +50,8 @@ fn waker_vtable<W: Wake>() -> &'static RawWakerVTable {
     )
 }
 
-unsafe fn inc_ref_count<T: Wake>(data: *const ()) {
-    // Retain Arc, but don't touch refcount by wrapping in ManuallyDrop
-    let arc = ManuallyDrop::new(Arc::<T>::from_raw(data as *const T));
-
-    // Now increase refcount, but don't drop new refcount either
-    let _arc_clone: ManuallyDrop<_> = arc.clone();
-}
-
 unsafe fn clone_arc_raw<T: Wake>(data: *const ()) -> RawWaker {
-    inc_ref_count::<T>(data);
+    Arc::<T>::increment_strong_count(data as *const T);
     RawWaker::new(data, waker_vtable::<T>())
 }
 

@@ -1,11 +1,28 @@
 cfg_rt! {
     pub(crate) mod current_thread;
     pub(crate) use current_thread::CurrentThread;
+
+    mod defer;
+    use defer::Defer;
+
+    pub(crate) mod inject;
+    pub(crate) use inject::Inject;
 }
 
 cfg_rt_multi_thread! {
+    mod block_in_place;
+    pub(crate) use block_in_place::block_in_place;
+
+    mod lock;
+    use lock::Lock;
+
     pub(crate) mod multi_thread;
     pub(crate) use multi_thread::MultiThread;
+
+    cfg_unstable! {
+        pub(crate) mod multi_thread_alt;
+        pub(crate) use multi_thread_alt::MultiThread as MultiThreadAlt;
+    }
 }
 
 use crate::runtime::driver;
@@ -15,14 +32,28 @@ pub(crate) enum Handle {
     #[cfg(feature = "rt")]
     CurrentThread(Arc<current_thread::Handle>),
 
-    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
     MultiThread(Arc<multi_thread::Handle>),
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+    MultiThreadAlt(Arc<multi_thread_alt::Handle>),
 
     // TODO: This is to avoid triggering "dead code" warnings many other places
     // in the codebase. Remove this during a later cleanup
     #[cfg(not(feature = "rt"))]
     #[allow(dead_code)]
     Disabled,
+}
+
+#[cfg(feature = "rt")]
+pub(super) enum Context {
+    CurrentThread(current_thread::Context),
+
+    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+    MultiThread(multi_thread::Context),
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+    MultiThreadAlt(multi_thread_alt::Context),
 }
 
 impl Handle {
@@ -32,8 +63,11 @@ impl Handle {
             #[cfg(feature = "rt")]
             Handle::CurrentThread(ref h) => &h.driver,
 
-            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
             Handle::MultiThread(ref h) => &h.driver,
+
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+            Handle::MultiThreadAlt(ref h) => &h.driver,
 
             #[cfg(not(feature = "rt"))]
             Handle::Disabled => unreachable!(),
@@ -48,23 +82,33 @@ cfg_rt! {
     use crate::runtime::context;
     use crate::task::JoinHandle;
     use crate::util::RngSeedGenerator;
+    use std::task::Waker;
+
+    macro_rules! match_flavor {
+        ($self:expr, $ty:ident($h:ident) => $e:expr) => {
+            match $self {
+                $ty::CurrentThread($h) => $e,
+
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                $ty::MultiThread($h) => $e,
+
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                $ty::MultiThreadAlt($h) => $e,
+            }
+        }
+    }
 
     impl Handle {
         #[track_caller]
         pub(crate) fn current() -> Handle {
-            match context::try_current() {
+            match context::with_current(Clone::clone) {
                 Ok(handle) => handle,
                 Err(e) => panic!("{}", e),
             }
         }
 
         pub(crate) fn blocking_spawner(&self) -> &blocking::Spawner {
-            match self {
-                Handle::CurrentThread(h) => &h.blocking_spawner,
-
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                Handle::MultiThread(h) => &h.blocking_spawner,
-            }
+            match_flavor!(self, Handle(h) => &h.blocking_spawner)
         }
 
         pub(crate) fn spawn<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
@@ -75,8 +119,11 @@ cfg_rt! {
             match self {
                 Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id),
 
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id),
+
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                Handle::MultiThreadAlt(h) => multi_thread_alt::Handle::spawn(h, future, id),
             }
         }
 
@@ -84,25 +131,34 @@ cfg_rt! {
             match *self {
                 Handle::CurrentThread(_) => {},
 
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Handle::MultiThread(ref h) => h.shutdown(),
+
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                Handle::MultiThreadAlt(ref h) => h.shutdown(),
             }
         }
 
         pub(crate) fn seed_generator(&self) -> &RngSeedGenerator {
-            match self {
-                Handle::CurrentThread(h) => &h.seed_generator,
-
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                Handle::MultiThread(h) => &h.seed_generator,
-            }
+            match_flavor!(self, Handle(h) => &h.seed_generator)
         }
 
         pub(crate) fn as_current_thread(&self) -> &Arc<current_thread::Handle> {
             match self {
                 Handle::CurrentThread(handle) => handle,
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 _ => panic!("not a CurrentThread handle"),
+            }
+        }
+
+        cfg_rt_multi_thread! {
+            cfg_unstable! {
+                pub(crate) fn expect_multi_thread_alt(&self) -> &Arc<multi_thread_alt::Handle> {
+                    match self {
+                        Handle::MultiThreadAlt(handle) => handle,
+                        _ => panic!("not a `MultiThreadAlt` handle"),
+                    }
+                }
             }
         }
     }
@@ -114,64 +170,77 @@ cfg_rt! {
             pub(crate) fn num_workers(&self) -> usize {
                 match self {
                     Handle::CurrentThread(_) => 1,
-                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                     Handle::MultiThread(handle) => handle.num_workers(),
+                    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                    Handle::MultiThreadAlt(handle) => handle.num_workers(),
                 }
             }
 
             pub(crate) fn num_blocking_threads(&self) -> usize {
-                match self {
-                    Handle::CurrentThread(handle) => handle.num_blocking_threads(),
-                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                    Handle::MultiThread(handle) => handle.num_blocking_threads(),
-                }
+                match_flavor!(self, Handle(handle) => handle.num_blocking_threads())
             }
 
             pub(crate) fn num_idle_blocking_threads(&self) -> usize {
-                match self {
-                    Handle::CurrentThread(handle) => handle.num_idle_blocking_threads(),
-                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                    Handle::MultiThread(handle) => handle.num_idle_blocking_threads(),
-                }
+                match_flavor!(self, Handle(handle) => handle.num_idle_blocking_threads())
+            }
+
+            pub(crate) fn active_tasks_count(&self) -> usize {
+                match_flavor!(self, Handle(handle) => handle.active_tasks_count())
             }
 
             pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
-                match self {
-                    Handle::CurrentThread(handle) => handle.scheduler_metrics(),
-                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                    Handle::MultiThread(handle) => handle.scheduler_metrics(),
-                }
+                match_flavor!(self, Handle(handle) => handle.scheduler_metrics())
             }
 
             pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
-                match self {
-                    Handle::CurrentThread(handle) => handle.worker_metrics(worker),
-                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                    Handle::MultiThread(handle) => handle.worker_metrics(worker),
-                }
+                match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
             }
 
             pub(crate) fn injection_queue_depth(&self) -> usize {
-                match self {
-                    Handle::CurrentThread(handle) => handle.injection_queue_depth(),
-                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                    Handle::MultiThread(handle) => handle.injection_queue_depth(),
-                }
+                match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
             }
 
             pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
-                match self {
-                    Handle::CurrentThread(handle) => handle.worker_metrics(worker).queue_depth(),
-                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                    Handle::MultiThread(handle) => handle.worker_local_queue_depth(worker),
-                }
+                match_flavor!(self, Handle(handle) => handle.worker_local_queue_depth(worker))
             }
 
             pub(crate) fn blocking_queue_depth(&self) -> usize {
+                match_flavor!(self, Handle(handle) => handle.blocking_queue_depth())
+            }
+        }
+    }
+
+    impl Context {
+        #[track_caller]
+        pub(crate) fn expect_current_thread(&self) -> &current_thread::Context {
+            match self {
+                Context::CurrentThread(context) => context,
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                _ => panic!("expected `CurrentThread::Context`")
+            }
+        }
+
+        pub(crate) fn defer(&self, waker: &Waker) {
+            match_flavor!(self, Context(context) => context.defer(waker))
+        }
+
+        cfg_rt_multi_thread! {
+            #[track_caller]
+            pub(crate) fn expect_multi_thread(&self) -> &multi_thread::Context {
                 match self {
-                    Handle::CurrentThread(handle) => handle.blocking_queue_depth(),
-                    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-                    Handle::MultiThread(handle) => handle.blocking_queue_depth(),
+                    Context::MultiThread(context) => context,
+                    _ => panic!("expected `MultiThread::Context`")
+                }
+            }
+
+            cfg_unstable! {
+                #[track_caller]
+                pub(crate) fn expect_multi_thread_alt(&self) -> &multi_thread_alt::Context {
+                    match self {
+                        Context::MultiThreadAlt(context) => context,
+                        _ => panic!("expected `MultiThreadAlt::Context`")
+                    }
                 }
             }
         }

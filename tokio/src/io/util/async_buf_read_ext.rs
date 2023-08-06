@@ -146,7 +146,7 @@ cfg_io_util! {
         ///    [`next_line`] method.
         ///  * Use [`tokio_util::codec::LinesCodec`][LinesCodec].
         ///
-        /// [LinesCodec]: https://docs.rs/tokio-util/0.6/tokio_util/codec/struct.LinesCodec.html
+        /// [LinesCodec]: https://docs.rs/tokio-util/latest/tokio_util/codec/struct.LinesCodec.html
         /// [`read_until`]: Self::read_until
         /// [`lines`]: Self::lines
         /// [`next_line`]: crate::io::Lines::next_line

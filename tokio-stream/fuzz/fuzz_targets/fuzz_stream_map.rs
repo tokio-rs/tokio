@@ -3,17 +3,8 @@
 use libfuzzer_sys::fuzz_target;
 use std::pin::Pin;
 
-use tokio_stream::{self as stream, pending, Stream, StreamExt, StreamMap};
-use tokio_test::{assert_ok, assert_pending, assert_ready, task};
-
-macro_rules! assert_ready_some {
-    ($($t:tt)*) => {
-        match assert_ready!($($t)*) {
-            Some(v) => v,
-            None => panic!("expected `Some`, got `None`"),
-        }
-    };
-}
+use tokio_stream::{self as stream, Stream, StreamMap};
+use tokio_test::{assert_pending, assert_ready, task};
 
 macro_rules! assert_ready_none {
     ($($t:tt)*) => {
@@ -28,7 +19,7 @@ fn pin_box<T: Stream<Item = U> + 'static, U>(s: T) -> Pin<Box<dyn Stream<Item = 
     Box::pin(s)
 }
 
-fuzz_target!(|data: &[u8]| {
+fuzz_target!(|data: [bool; 64]| {
     use std::task::{Context, Poll};
 
     struct DidPoll<T> {
@@ -45,11 +36,12 @@ fuzz_target!(|data: &[u8]| {
         }
     }
 
-    for _ in 0..10 {
+    // Try the test with each possible length.
+    for len in 0..data.len() {
         let mut map = task::spawn(StreamMap::new());
         let mut expect = 0;
 
-        for (i, is_empty) in data.iter().map(|x| *x != 0).enumerate() {
+        for (i, is_empty) in data[..len].iter().copied().enumerate() {
             let inner = if is_empty {
                 pin_box(stream::empty::<()>())
             } else {

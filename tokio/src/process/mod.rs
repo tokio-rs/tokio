@@ -259,9 +259,7 @@ use std::os::unix::process::CommandExt;
 use std::os::windows::process::CommandExt;
 
 cfg_windows! {
-    use crate::os::windows::io::{AsRawHandle, RawHandle};
-    #[cfg(not(tokio_no_as_fd))]
-    use crate::os::windows::io::{AsHandle, BorrowedHandle};
+    use crate::os::windows::io::{AsRawHandle, RawHandle, AsHandle, BorrowedHandle};
 }
 
 /// This structure mimics the API of [`std::process::Command`] found in the standard library, but
@@ -398,6 +396,23 @@ impl Command {
     {
         self.std.args(args);
         self
+    }
+
+    cfg_unstable_windows! {
+        /// Append literal text to the command line without any quoting or escaping.
+        ///
+        /// This is useful for passing arguments to `cmd.exe /c`, which doesn't follow
+        /// `CommandLineToArgvW` escaping rules.
+        ///
+        /// **Note**: This is an [unstable API][unstable] but will be stabilised once
+        /// tokio's MSRV is sufficiently new. See [the documentation on
+        /// unstable features][unstable] for details about using unstable features.
+        ///
+        /// [unstable]: crate#unstable-features
+        pub fn raw_arg<S: AsRef<OsStr>>(&mut self, text_to_append_as_is: S) -> &mut Command {
+            self.std.raw_arg(text_to_append_as_is);
+            self
+        }
     }
 
     /// Inserts or updates an environment variable mapping.
@@ -995,6 +1010,7 @@ where
     type Output = Result<T, E>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        ready!(crate::trace::trace_leaf(cx));
         // Keep track of task budget
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
@@ -1432,9 +1448,7 @@ impl TryInto<Stdio> for ChildStderr {
 
 #[cfg(unix)]
 mod sys {
-    #[cfg(not(tokio_no_as_fd))]
-    use std::os::unix::io::{AsFd, BorrowedFd};
-    use std::os::unix::io::{AsRawFd, RawFd};
+    use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, RawFd};
 
     use super::{ChildStderr, ChildStdin, ChildStdout};
 
@@ -1444,7 +1458,6 @@ mod sys {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsFd for ChildStdin {
         fn as_fd(&self) -> BorrowedFd<'_> {
             unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
@@ -1457,7 +1470,6 @@ mod sys {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsFd for ChildStdout {
         fn as_fd(&self) -> BorrowedFd<'_> {
             unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
@@ -1470,7 +1482,6 @@ mod sys {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsFd for ChildStderr {
         fn as_fd(&self) -> BorrowedFd<'_> {
             unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
@@ -1485,7 +1496,6 @@ cfg_windows! {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for ChildStdin {
         fn as_handle(&self) -> BorrowedHandle<'_> {
             unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
@@ -1498,7 +1508,6 @@ cfg_windows! {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for ChildStdout {
         fn as_handle(&self) -> BorrowedHandle<'_> {
             unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
@@ -1511,7 +1520,6 @@ cfg_windows! {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for ChildStderr {
         fn as_handle(&self) -> BorrowedHandle<'_> {
             unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }

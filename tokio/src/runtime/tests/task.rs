@@ -1,11 +1,10 @@
 use crate::runtime::task::{self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::tests::NoopSchedule;
-use crate::util::TryLock;
 
 use std::collections::VecDeque;
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 struct AssertDropHandle {
     is_dropped: Arc<AtomicBool>,
@@ -243,7 +242,7 @@ fn with(f: impl FnOnce(Runtime)) {
 
     let rt = Runtime(Arc::new(Inner {
         owned: OwnedTasks::new(),
-        core: TryLock::new(Core {
+        core: Mutex::new(Core {
             queue: VecDeque::new(),
         }),
     }));
@@ -256,7 +255,7 @@ fn with(f: impl FnOnce(Runtime)) {
 struct Runtime(Arc<Inner>);
 
 struct Inner {
-    core: TryLock<Core>,
+    core: Mutex<Core>,
     owned: OwnedTasks<Runtime>,
 }
 
@@ -264,7 +263,7 @@ struct Core {
     queue: VecDeque<task::Notified<Runtime>>,
 }
 
-static CURRENT: TryLock<Option<Runtime>> = TryLock::new(None);
+static CURRENT: Mutex<Option<Runtime>> = Mutex::new(None);
 
 impl Runtime {
     fn spawn<T>(&self, future: T) -> JoinHandle<T::Output>

@@ -2,8 +2,8 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::Arc;
-use crate::runtime::task::{self, Inject};
-use crate::runtime::MetricsBatch;
+use crate::runtime::scheduler::multi_thread::{Overflow, Stats};
+use crate::runtime::task;
 
 use std::mem::{self, MaybeUninit};
 use std::ptr;
@@ -105,9 +105,18 @@ pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
 }
 
 impl<T> Local<T> {
-    /// Returns true if the queue has entries that can be stolen.
-    pub(crate) fn is_stealable(&self) -> bool {
-        !self.inner.is_empty()
+    /// Returns the number of entries in the queue
+    pub(crate) fn len(&self) -> usize {
+        self.inner.len() as usize
+    }
+
+    /// How many tasks can be pushed into the queue
+    pub(crate) fn remaining_slots(&self) -> usize {
+        self.inner.remaining_slots()
+    }
+
+    pub(crate) fn max_capacity(&self) -> usize {
+        LOCAL_QUEUE_CAPACITY
     }
 
     /// Returns false if there are any entries in the queue
@@ -118,12 +127,66 @@ impl<T> Local<T> {
         !self.inner.is_empty()
     }
 
-    /// Pushes a task to the back of the local queue, skipping the LIFO slot.
-    pub(crate) fn push_back(
+    /// Pushes a batch of tasks to the back of the queue. All tasks must fit in
+    /// the local queue.
+    ///
+    /// # Panics
+    ///
+    /// The method panics if there is not enough capacity to fit in the queue.
+    pub(crate) fn push_back(&mut self, tasks: impl ExactSizeIterator<Item = task::Notified<T>>) {
+        let len = tasks.len();
+        assert!(len <= LOCAL_QUEUE_CAPACITY);
+
+        if len == 0 {
+            // Nothing to do
+            return;
+        }
+
+        let head = self.inner.head.load(Acquire);
+        let (steal, _) = unpack(head);
+
+        // safety: this is the **only** thread that updates this cell.
+        let mut tail = unsafe { self.inner.tail.unsync_load() };
+
+        if tail.wrapping_sub(steal) <= (LOCAL_QUEUE_CAPACITY - len) as UnsignedShort {
+            // Yes, this if condition is structured a bit weird (first block
+            // does nothing, second returns an error). It is this way to match
+            // `push_back_or_overflow`.
+        } else {
+            panic!()
+        }
+
+        for task in tasks {
+            let idx = tail as usize & MASK;
+
+            self.inner.buffer[idx].with_mut(|ptr| {
+                // Write the task to the slot
+                //
+                // Safety: There is only one producer and the above `if`
+                // condition ensures we don't touch a cell if there is a
+                // value, thus no consumer.
+                unsafe {
+                    ptr::write((*ptr).as_mut_ptr(), task);
+                }
+            });
+
+            tail = tail.wrapping_add(1);
+        }
+
+        self.inner.tail.store(tail, Release);
+    }
+
+    /// Pushes a task to the back of the local queue, if there is not enough
+    /// capacity in the queue, this triggers the overflow operation.
+    ///
+    /// When the queue overflows, half of the curent contents of the queue is
+    /// moved to the given Injection queue. This frees up capacity for more
+    /// tasks to be pushed into the local queue.
+    pub(crate) fn push_back_or_overflow<O: Overflow<T>>(
         &mut self,
         mut task: task::Notified<T>,
-        inject: &Inject<T>,
-        metrics: &mut MetricsBatch,
+        overflow: &O,
+        stats: &mut Stats,
     ) {
         let tail = loop {
             let head = self.inner.head.load(Acquire);
@@ -138,12 +201,12 @@ impl<T> Local<T> {
             } else if steal != real {
                 // Concurrently stealing, this will free up capacity, so only
                 // push the task onto the inject queue
-                inject.push(task);
+                overflow.push(task);
                 return;
             } else {
                 // Push the current task and half of the queue into the
                 // inject queue.
-                match self.push_overflow(task, real, tail, inject, metrics) {
+                match self.push_overflow(task, real, tail, overflow, stats) {
                     Ok(_) => return,
                     // Lost the race, try again
                     Err(v) => {
@@ -153,6 +216,11 @@ impl<T> Local<T> {
             }
         };
 
+        self.push_back_finish(task, tail);
+    }
+
+    // Second half of `push_back`
+    fn push_back_finish(&self, task: task::Notified<T>, tail: UnsignedShort) {
         // Map the position to a slot index.
         let idx = tail as usize & MASK;
 
@@ -179,13 +247,13 @@ impl<T> Local<T> {
     /// workers "missed" some of the tasks during a steal, they will get
     /// another opportunity.
     #[inline(never)]
-    fn push_overflow(
+    fn push_overflow<O: Overflow<T>>(
         &mut self,
         task: task::Notified<T>,
         head: UnsignedShort,
         tail: UnsignedShort,
-        inject: &Inject<T>,
-        metrics: &mut MetricsBatch,
+        overflow: &O,
+        stats: &mut Stats,
     ) -> Result<(), task::Notified<T>> {
         /// How many elements are we taking from the local queue.
         ///
@@ -267,10 +335,10 @@ impl<T> Local<T> {
             head: head as UnsignedLong,
             i: 0,
         };
-        inject.push_batch(batch_iter.chain(std::iter::once(task)));
+        overflow.push_batch(batch_iter.chain(std::iter::once(task)));
 
         // Add 1 to factor in the task currently being scheduled.
-        metrics.incr_overflow_count();
+        stats.incr_overflow_count();
 
         Ok(())
     }
@@ -326,7 +394,7 @@ impl<T> Steal<T> {
     pub(crate) fn steal_into(
         &self,
         dst: &mut Local<T>,
-        dst_metrics: &mut MetricsBatch,
+        dst_stats: &mut Stats,
     ) -> Option<task::Notified<T>> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
@@ -352,8 +420,8 @@ impl<T> Steal<T> {
             return None;
         }
 
-        dst_metrics.incr_steal_count(n as u16);
-        dst_metrics.incr_steal_operations();
+        dst_stats.incr_steal_count(n as u16);
+        dst_stats.incr_steal_operations();
 
         // We are returning a task here
         n -= 1;
@@ -501,6 +569,13 @@ impl<T> Drop for Local<T> {
 }
 
 impl<T> Inner<T> {
+    fn remaining_slots(&self) -> usize {
+        let (steal, _) = unpack(self.head.load(Acquire));
+        let tail = self.tail.load(Acquire);
+
+        LOCAL_QUEUE_CAPACITY - (tail.wrapping_sub(steal) as usize)
+    }
+
     fn len(&self) -> UnsignedShort {
         let (_, head) = unpack(self.head.load(Acquire));
         let tail = self.tail.load(Acquire);

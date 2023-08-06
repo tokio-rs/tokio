@@ -4,16 +4,12 @@ use std::fmt;
 use std::io;
 use std::net::SocketAddr;
 
-#[cfg(all(unix, not(tokio_no_as_fd)))]
-use std::os::unix::io::{AsFd, BorrowedFd};
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::time::Duration;
 
 cfg_windows! {
-    use crate::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-    #[cfg(not(tokio_no_as_fd))]
-    use crate::os::windows::io::{AsSocket, BorrowedSocket};
+    use crate::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket, AsSocket, BorrowedSocket};
 }
 
 cfg_net! {
@@ -404,6 +400,51 @@ impl TcpSocket {
         self.inner.linger()
     }
 
+    /// Sets the value of the `TCP_NODELAY` option on this socket.
+    ///
+    /// If set, this option disables the Nagle algorithm. This means that segments are always
+    /// sent as soon as possible, even if there is only a small amount of data. When not set,
+    /// data is buffered until there is a sufficient amount to send out, thereby avoiding
+    /// the frequent sending of small packets.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let socket = TcpSocket::new_v4()?;
+    ///
+    /// println!("{:?}", socket.nodelay()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
+        self.inner.set_nodelay(nodelay)
+    }
+
+    /// Gets the value of the `TCP_NODELAY` option on this socket.
+    ///
+    /// For more information about this option, see [`set_nodelay`].
+    ///
+    /// [`set_nodelay`]: TcpSocket::set_nodelay
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = TcpSocket::new_v4()?;
+    ///
+    /// stream.set_nodelay(true)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn nodelay(&self) -> io::Result<bool> {
+        self.inner.nodelay()
+    }
+
     /// Gets the value of the `IP_TOS` option for this socket.
     ///
     /// For more information about this option, see [`set_tos`].
@@ -412,7 +453,7 @@ impl TcpSocket {
     /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
     ///
     /// [`set_tos`]: Self::set_tos
-    // https://docs.rs/socket2/0.4.2/src/socket2/socket.rs.html#1178
+    // https://docs.rs/socket2/0.5.3/src/socket2/socket.rs.html#1464
     #[cfg(not(any(
         target_os = "fuchsia",
         target_os = "redox",
@@ -439,7 +480,7 @@ impl TcpSocket {
     ///
     /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
     /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
-    // https://docs.rs/socket2/0.4.2/src/socket2/socket.rs.html#1178
+    // https://docs.rs/socket2/0.5.3/src/socket2/socket.rs.html#1446
     #[cfg(not(any(
         target_os = "fuchsia",
         target_os = "redox",
@@ -478,7 +519,7 @@ impl TcpSocket {
     /// works for some socket types, particularly `AF_INET` sockets.
     ///
     /// If `interface` is `None` or an empty string it removes the binding.
-    #[cfg(all(any(target_os = "android", target_os = "fuchsia", target_os = "linux")))]
+    #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
     #[cfg_attr(
         docsrs,
         doc(cfg(all(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))))
@@ -743,7 +784,7 @@ impl AsRawFd for TcpSocket {
     }
 }
 
-#[cfg(all(unix, not(tokio_no_as_fd)))]
+#[cfg(unix)]
 impl AsFd for TcpSocket {
     fn as_fd(&self) -> BorrowedFd<'_> {
         unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
@@ -784,7 +825,6 @@ cfg_windows! {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsSocket for TcpSocket {
         fn as_socket(&self) -> BorrowedSocket<'_> {
             unsafe { BorrowedSocket::borrow_raw(self.as_raw_socket()) }

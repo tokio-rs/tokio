@@ -139,6 +139,12 @@ where
         self.next_expiration().map(|expiration| expiration.deadline)
     }
 
+    /// Next key that will expire
+    pub(crate) fn peek(&self) -> Option<T::Owned> {
+        self.next_expiration()
+            .and_then(|expiration| self.peek_entry(&expiration))
+    }
+
     /// Advances the timer up to the instant represented by `now`.
     pub(crate) fn poll(&mut self, now: u64, store: &mut T::Store) -> Option<T::Owned> {
         loop {
@@ -244,6 +250,10 @@ where
         self.levels[expiration.level].pop_entry_slot(expiration.slot, store)
     }
 
+    fn peek_entry(&self, expiration: &Expiration) -> Option<T::Owned> {
+        self.levels[expiration.level].peek_entry_slot(expiration.slot)
+    }
+
     fn level_for(&self, when: u64) -> usize {
         level_for(self.elapsed, when)
     }
@@ -254,8 +264,11 @@ fn level_for(elapsed: u64, when: u64) -> usize {
 
     // Mask in the trailing bits ignored by the level calculation in order to cap
     // the possible leading zeros
-    let masked = elapsed ^ when | SLOT_MASK;
-
+    let mut masked = elapsed ^ when | SLOT_MASK;
+    if masked >= MAX_DURATION {
+        // Fudge the timer into the top level
+        masked = MAX_DURATION - 1;
+    }
     let leading_zeros = masked.leading_zeros() as usize;
     let significant = 63 - leading_zeros;
     significant / 6

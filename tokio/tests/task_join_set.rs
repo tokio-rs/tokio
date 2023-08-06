@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full"))]
+#![cfg(feature = "full")]
 
+use futures::future::FutureExt;
 use tokio::sync::oneshot;
 use tokio::task::JoinSet;
 use tokio::time::Duration;
@@ -184,52 +185,45 @@ async fn abort_all() {
     assert_eq!(set.len(), 0);
 }
 
-#[cfg(feature = "parking_lot")]
-mod parking_lot {
-    use super::*;
+// This ensures that `join_next` works correctly when the coop budget is
+// exhausted.
+#[tokio::test(flavor = "current_thread")]
+async fn join_set_coop() {
+    // Large enough to trigger coop.
+    const TASK_NUM: u32 = 1000;
 
-    use futures::future::FutureExt;
+    static SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(0);
 
-    // This ensures that `join_next` works correctly when the coop budget is
-    // exhausted.
-    #[tokio::test(flavor = "current_thread")]
-    async fn join_set_coop() {
-        // Large enough to trigger coop.
-        const TASK_NUM: u32 = 1000;
+    let mut set = JoinSet::new();
 
-        static SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(0);
-
-        let mut set = JoinSet::new();
-
-        for _ in 0..TASK_NUM {
-            set.spawn(async {
-                SEM.add_permits(1);
-            });
-        }
-
-        // Wait for all tasks to complete.
-        //
-        // Since this is a `current_thread` runtime, there's no race condition
-        // between the last permit being added and the task completing.
-        let _ = SEM.acquire_many(TASK_NUM).await.unwrap();
-
-        let mut count = 0;
-        let mut coop_count = 0;
-        loop {
-            match set.join_next().now_or_never() {
-                Some(Some(Ok(()))) => {}
-                Some(Some(Err(err))) => panic!("failed: {}", err),
-                None => {
-                    coop_count += 1;
-                    tokio::task::yield_now().await;
-                    continue;
-                }
-                Some(None) => break,
-            }
-
-            count += 1;
-        }
-        assert!(coop_count >= 1);
-        assert_eq!(count, TASK_NUM);
+    for _ in 0..TASK_NUM {
+        set.spawn(async {
+            SEM.add_permits(1);
+        });
     }
+
+    // Wait for all tasks to complete.
+    //
+    // Since this is a `current_thread` runtime, there's no race condition
+    // between the last permit being added and the task completing.
+    let _ = SEM.acquire_many(TASK_NUM).await.unwrap();
+
+    let mut count = 0;
+    let mut coop_count = 0;
+    loop {
+        match set.join_next().now_or_never() {
+            Some(Some(Ok(()))) => {}
+            Some(Some(Err(err))) => panic!("failed: {}", err),
+            None => {
+                coop_count += 1;
+                tokio::task::yield_now().await;
+                continue;
+            }
+            Some(None) => break,
+        }
+
+        count += 1;
+    }
+    assert!(coop_count >= 1);
+    assert_eq!(count, TASK_NUM);
 }

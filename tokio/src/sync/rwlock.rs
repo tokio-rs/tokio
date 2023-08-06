@@ -85,7 +85,6 @@ const MAX_READS: u32 = 10;
 /// [`RwLockWriteGuard`]: struct@RwLockWriteGuard
 /// [`Send`]: trait@std::marker::Send
 /// [_write-preferring_]: https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock#Priority_policies
-#[derive(Debug)]
 pub struct RwLock<T: ?Sized> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
@@ -335,8 +334,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// static LOCK: RwLock<i32> = RwLock::const_new(5);
     /// ```
-    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    #[cfg(not(all(loom, test)))]
     pub const fn const_new(value: T) -> RwLock<T>
     where
         T: Sized,
@@ -360,13 +358,13 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// static LOCK: RwLock<i32> = RwLock::const_with_max_readers(5, 1024);
     /// ```
-    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
-    pub const fn const_with_max_readers(value: T, mut max_reads: u32) -> RwLock<T>
+    #[cfg(not(all(loom, test)))]
+    pub const fn const_with_max_readers(value: T, max_reads: u32) -> RwLock<T>
     where
         T: Sized,
     {
-        max_reads &= MAX_READS;
+        assert!(max_reads <= MAX_READS);
+
         RwLock {
             mr: max_reads,
             c: UnsafeCell::new(value),
@@ -1093,5 +1091,19 @@ where
 {
     fn default() -> Self {
         Self::new(T::default())
+    }
+}
+
+impl<T: ?Sized> std::fmt::Debug for RwLock<T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("RwLock");
+        match self.try_read() {
+            Ok(inner) => d.field("data", &&*inner),
+            Err(_) => d.field("data", &format_args!("<locked>")),
+        };
+        d.finish()
     }
 }

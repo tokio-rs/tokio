@@ -4,6 +4,7 @@ mod atomic_u16;
 mod atomic_u32;
 mod atomic_u64;
 mod atomic_usize;
+mod barrier;
 mod mutex;
 #[cfg(feature = "parking_lot")]
 mod parking_lot;
@@ -76,6 +77,8 @@ pub(crate) mod sync {
 
         pub(crate) use std::sync::atomic::{fence, AtomicBool, AtomicPtr, AtomicU8, Ordering};
     }
+
+    pub(crate) use super::barrier::Barrier;
 }
 
 pub(crate) mod sys {

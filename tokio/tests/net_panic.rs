@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(tokio_wasi)))]
+#![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 use std::error::Error;
 use tokio::net::{TcpListener, TcpStream};

@@ -132,6 +132,8 @@ impl Barrier {
         return self.wait_internal().await;
     }
     async fn wait_internal(&self) -> BarrierWaitResult {
+        crate::trace::async_trace_leaf().await;
+
         // NOTE: we are taking a _synchronous_ lock here.
         // It is okay to do so because the critical section is fast and never yields, so it cannot
         // deadlock even if another future is concurrently holding the lock.

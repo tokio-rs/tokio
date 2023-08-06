@@ -46,21 +46,15 @@ pub async fn yield_now() {
         type Output = ();
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            ready!(crate::trace::trace_leaf(cx));
+
             if self.yielded {
                 return Poll::Ready(());
             }
 
             self.yielded = true;
 
-            let defer = context::with_defer(|rt| {
-                rt.defer(cx.waker().clone());
-            });
-
-            if defer.is_none() {
-                //  Not currently in a runtime, just notify ourselves
-                //  immediately.
-                cx.waker().wake_by_ref();
-            }
+            context::defer(cx.waker());
 
             Poll::Pending
         }
