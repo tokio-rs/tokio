@@ -215,7 +215,7 @@ impl TcpListener {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let std_listener = std::net::TcpListener::bind("127.0.0.1:0")?;
-    ///     let listener = TcpListener::from_tcp(std_listener)?;
+    ///     let listener = TcpListener::from_std_set_nonblocking(std_listener)?;
     ///     Ok(())
     /// }
     /// ```
@@ -229,7 +229,7 @@ impl TcpListener {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
-    pub fn from_tcp(listener: net::TcpListener) -> io::Result<TcpListener> {
+    pub fn from_std_set_nonblocking(listener: net::TcpListener) -> io::Result<TcpListener> {
         listener.set_nonblocking(true)?;
         Self::from_tcp_unchecked(listener)
     }
@@ -248,8 +248,9 @@ impl TcpListener {
     ///
     /// [`set_nonblocking`]: std::net::TcpListener::set_nonblocking
     ///
-    /// You may generally prefer using [`from_tcp`](TcpListener::from_tcp),
-    /// which does that for you if not already done.
+    /// It may be preferrable to use
+    /// [`from_std_set_nonblocking`](TcpListener::from_std_set_nonblocking),
+    /// which sets `nonblocking`.
     ///
     /// # Examples
     ///
@@ -286,14 +287,14 @@ impl TcpListener {
     /// This function is deprecated because it's easy to misuse,
     /// and naming doesn't warn enough about it.
     ///
-    /// You should typically favor using
-    /// [`from_tcp`](TcpListener::from_tcp) instead of
-    /// [`from_tcp_unchecked`](TcpListener::from_tcp_unchecked.
+    /// It may be preferrable to use
+    /// [`from_std_set_nonblocking`](TcpListener::from_std_set_nonblocking),
+    /// which sets `nonblocking`.
     ///
     /// This function however has the same behavior as
     /// [`TcpListener::from_tcp_unchecked`].
     #[track_caller]
-    #[deprecated = "Easy to misuse - use from_tcp or from_tcp_unchecked instead"]
+    #[deprecated = "Easy to misuse - use from_std_set_nonblocking or from_tcp_unchecked instead"]
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
         Self::from_tcp_unchecked(listener)
     }
@@ -453,8 +454,9 @@ impl TryFrom<net::TcpListener> for TcpListener {
     ///
     /// [`set_nonblocking`]: std::net::TcpListener::set_nonblocking
     ///
-    /// You may generally prefer using [`TcpListener::from_tcp`],
-    /// which does that for you if not already done.
+    /// It may be preferrable to use
+    /// [`from_std_set_nonblocking`](TcpListener::from_std_set_nonblocking),
+    /// which sets `nonblocking`.
     fn try_from(stream: net::TcpListener) -> Result<Self, Self::Error> {
         Self::from_tcp_unchecked(stream)
     }
