@@ -40,7 +40,7 @@ futures-core = "0.3.0"
 futures-sink = "0.3.0"
 futures-io = { version = "0.3.0", optional = true }
 futures-util = { version = "0.3.0", optional = true }
-pin-project-lite = "0.2.7"
+pin-project-lite = "0.2.11"
 slab = { version = "0.4.4", optional = true } # Backs `DelayQueue`
 tracing = { version = "0.1.25", default-features = false, features = ["std"], optional = true }
 
