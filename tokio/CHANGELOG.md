@@ -3,18 +3,11 @@
 tokio: bump MSRV to 1.63 (#5887)
 
 ### Fixed
-- sync: fix import style for `std::error::Error` (#5818)
-- util: fix broken intra-doc link (#5849)
-- process: fix `raw_arg` not showing up in docs (#5865)
-- ci: fix clippy warnings (#5891)
 - runtime: fix flaky test `wake_while_rt_is_dropping` (#5905)
 
 ### Changed
 
-- Speedup CI (#5691)
 - tokio: reduce LLVM code generation (#5859)
-- runtime: use `Arc::increment_strong_count` instead of `mem::forget` (#5872)
-- rt: use optional non-zero value for task `owner_id` (#5876)
 - poll: Do not clear readiness on short read/writes. (#5881)
 - sync: make `const_new` methods always available (#5885)
 - sync: avoid false sharing in mpsc channel (#5829)  
@@ -23,9 +16,6 @@ tokio: bump MSRV to 1.63 (#5887)
 - sync: add `broadcast::Sender::new` (#5824)
 - net: implement `UCred` for espidf (#5868)
 - fs: add `File::options()` (#5869)
-- rt: add runtime ID (#5864)
-- test: fetch actions from mock handle before write (#5814)
-- rt: initial implementation of new threaded runtime (#5823)
 - time: implement extra reset variants for `Interval` (#5878)
 - rt: pop at least one task from inject queue (#5908)
 
@@ -40,10 +30,13 @@ tokio: bump MSRV to 1.63 (#5887)
 - runtime: expand on sharing runtime docs (#5858)
 - io: use vec in example for `AsyncReadExt::read_exact` (#5863)
 - time: mark `Sleep` as `!Unpin` in docs (#5916)
+- process: fix `raw_arg` not showing up in docs (#5865)
 
 ### Unstable
 - rt(alt): fix a number of concurrency bugs (#5907)
 - rt(alt): track which workers are idle. (#5886)
+- rt: add runtime ID (#5864)
+- rt: initial implementation of new threaded runtime (#5823)
 
 # 1.29.1 (June 29, 2023)
 
