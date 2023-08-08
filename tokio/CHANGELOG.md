@@ -2,9 +2,6 @@
 
 tokio: bump MSRV to 1.63 ([#5887])
 
-### Fixed
-- runtime: fix flaky test `wake_while_rt_is_dropping` ([#5905])
-
 ### Changed
 
 - tokio: reduce LLVM code generation ([#5859])
@@ -23,7 +20,7 @@ tokio: bump MSRV to 1.63 ([#5887])
 ### Removed
 
 - tokio: removed unused `tokio_*` cfgs ([#5890])
-- remove build script to speed up compilation ([#5890])
+- remove build script to speed up compilation ([#5887])
 
 ### Documented
 
@@ -38,7 +35,6 @@ tokio: bump MSRV to 1.63 ([#5887])
 - rt: initial implementation of new threaded runtime ([#5823])
 
 [#5887]: https://github.com/tokio-rs/tokio/pull/5887
-[#5905]: https://github.com/tokio-rs/tokio/pull/5905
 [#5859]: https://github.com/tokio-rs/tokio/pull/5859
 [#5859]: https://github.com/tokio-rs/tokio/pull/5881
 [#5885]: https://github.com/tokio-rs/tokio/pull/5885
