@@ -1,6 +1,6 @@
 # 1.30.0 (August 6, 2023)
 
-tokio: bump MSRV to 1.63 ([#5887])
+This release bumps the MSRV of Tokio to 1.63. ([#5887])
 
 ### Changed
 
