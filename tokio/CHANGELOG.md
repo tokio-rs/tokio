@@ -33,8 +33,6 @@ tokio: bump MSRV to 1.63 (#5887)
 - process: fix `raw_arg` not showing up in docs (#5865)
 
 ### Unstable
-- rt(alt): fix a number of concurrency bugs (#5907)
-- rt(alt): track which workers are idle. (#5886)
 - rt: add runtime ID (#5864)
 - rt: initial implementation of new threaded runtime (#5823)
 
