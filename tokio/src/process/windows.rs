@@ -24,7 +24,7 @@ use std::fmt;
 use std::fs::File as StdFile;
 use std::future::Future;
 use std::io;
-use std::os::windows::prelude::{AsRawHandle, IntoRawHandle, RawHandle};
+use std::os::windows::prelude::{AsRawHandle, IntoRawHandle, OwnedHandle, RawHandle};
 use std::pin::Pin;
 use std::process::Stdio;
 use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
@@ -195,6 +195,12 @@ pub(crate) struct ChildStdio {
     io: Blocking<ArcFile>,
 }
 
+impl ChildStdio {
+    pub(super) fn into_owned_handle(self) -> io::Result<OwnedHandle> {
+        convert_to_file(self).map(OwnedHandle::from)
+    }
+}
+
 impl AsRawHandle for ChildStdio {
     fn as_raw_handle(&self) -> RawHandle {
         self.raw.as_raw_handle()
@@ -240,13 +246,15 @@ where
     Ok(ChildStdio { raw, io })
 }
 
-pub(crate) fn convert_to_stdio(child_stdio: ChildStdio) -> io::Result<Stdio> {
+fn convert_to_file(child_stdio: ChildStdio) -> io::Result<StdFile> {
     let ChildStdio { raw, io } = child_stdio;
     drop(io); // Try to drop the Arc count here
 
-    Arc::try_unwrap(raw)
-        .or_else(|raw| duplicate_handle(&*raw))
-        .map(Stdio::from)
+    Arc::try_unwrap(raw).or_else(|raw| duplicate_handle(&*raw))
+}
+
+pub(crate) fn convert_to_stdio(child_stdio: ChildStdio) -> io::Result<Stdio> {
+    convert_to_file(child_stdio).map(Stdio::from)
 }
 
 fn duplicate_handle<T: AsRawHandle>(io: &T) -> io::Result<StdFile> {
