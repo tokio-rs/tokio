@@ -16,7 +16,7 @@ This release bumps the MSRV of Tokio to 1.63. ([#5887])
 - net: implement `UCred` for espidf ([#5868])
 - fs: add `File::options()` ([#5869])
 - time: implement extra reset variants for `Interval` ([#5878])
-- process: add {ChildStd*}::into_owned_{fd, handle} ([#5899])
+- process: add `{ChildStd*}::into_owned_{fd, handle}` ([#5899])
 
 ### Removed
 
@@ -32,6 +32,7 @@ This release bumps the MSRV of Tokio to 1.63. ([#5887])
 - process: fix `raw_arg` not showing up in docs ([#5865])
 
 ### Unstable
+
 - rt: add runtime ID ([#5864])
 - rt: initial implementation of new threaded runtime ([#5823])
 
