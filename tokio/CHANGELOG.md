@@ -46,7 +46,7 @@ This release bumps the MSRV of Tokio to 1.63. ([#5887])
 [#5868]: https://github.com/tokio-rs/tokio/pull/5868
 [#5869]: https://github.com/tokio-rs/tokio/pull/5869
 [#5878]: https://github.com/tokio-rs/tokio/pull/5878
-[#5885]: https://github.com/tokio-rs/tokio/pull/5881
+[#5881]: https://github.com/tokio-rs/tokio/pull/5881
 [#5885]: https://github.com/tokio-rs/tokio/pull/5885
 [#5887]: https://github.com/tokio-rs/tokio/pull/5887
 [#5890]: https://github.com/tokio-rs/tokio/pull/5890
