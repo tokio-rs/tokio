@@ -16,6 +16,7 @@ This release bumps the MSRV of Tokio to 1.63. ([#5887])
 - net: implement `UCred` for espidf ([#5868])
 - fs: add `File::options()` ([#5869])
 - time: implement extra reset variants for `Interval` ([#5878])
+- process: add {ChildStd*}::into_owned_{fd, handle} ([#5899])
 
 ### Removed
 
@@ -50,6 +51,7 @@ This release bumps the MSRV of Tokio to 1.63. ([#5887])
 [#5885]: https://github.com/tokio-rs/tokio/pull/5885
 [#5887]: https://github.com/tokio-rs/tokio/pull/5887
 [#5890]: https://github.com/tokio-rs/tokio/pull/5890
+[#5899]: https://github.com/tokio-rs/tokio/pull/5899
 [#5908]: https://github.com/tokio-rs/tokio/pull/5908
 [#5916]: https://github.com/tokio-rs/tokio/pull/5916
 
