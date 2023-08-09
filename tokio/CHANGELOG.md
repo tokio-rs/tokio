@@ -1,4 +1,4 @@
-# 1.30.0 (August 6, 2023)
+# 1.30.0 (August 9, 2023)
 
 This release bumps the MSRV of Tokio to 1.63. ([#5887])
 
