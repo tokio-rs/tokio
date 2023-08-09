@@ -309,6 +309,113 @@ mod group_c {
             drop(pool);
         });
     }
+
+    #[test]
+    fn fill_local_queue() {
+        const NUM_SPAWNS: usize = 3;
+        loom::model(|| {
+            // using std versions here as it is just to control shutdown.
+            let cnt = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let (tx, rx) = oneshot::channel();
+            let tx = AtomicOneshot::new(tx);
+
+            let pool = runtime::Builder::new_multi_thread_alt()
+                .worker_threads(2)
+                // Set the intervals to avoid tuning logic
+                .global_queue_interval(61)
+                .local_queue_capacity(1)
+                .build()
+                .unwrap();
+
+            for _ in 0..NUM_SPAWNS {
+                let cnt = cnt.clone();
+                let tx = tx.clone();
+                pool.spawn(track(async move {
+                    if NUM_SPAWNS == 1 + cnt.fetch_add(1, Relaxed) {
+                        tx.assert_send(());
+                    }
+                }));
+            }
+
+            rx.recv();
+        });
+    }
+
+    // This tests a very specific case that happened when a worker has no more
+    // available work to process because a peer is in the process of stealing
+    // (but does not finish stealing), and the worker happens to find more work
+    // from the injection queue *right* before parking.
+    #[test]
+    fn pool_concurrent_park_with_steal_with_inject() {
+        const DEPTH: usize = 4;
+
+        let mut model = loom::model::Builder::new();
+        model.expect_explicit_explore = true;
+        model.preemption_bound = Some(3);
+
+        model.check(|| {
+            let pool = runtime::Builder::new_multi_thread_alt()
+                .worker_threads(2)
+                // Set the intervals to avoid tuning logic
+                .global_queue_interval(61)
+                .local_queue_capacity(DEPTH)
+                .build()
+                .unwrap();
+
+            // Use std types to avoid adding backtracking.
+            type Flag = std::sync::Arc<std::sync::atomic::AtomicIsize>;
+            let flag: Flag = Default::default();
+            let flag1 = flag.clone();
+
+            let (tx1, rx1) = oneshot::channel();
+
+            async fn task(expect: isize, flag: Flag) {
+                if expect == flag.load(Relaxed) {
+                    flag.store(expect + 1, Relaxed);
+                } else {
+                    flag.store(-1, Relaxed);
+                    loom::skip_branch();
+                }
+            }
+
+            pool.spawn(track(async move {
+                let flag = flag1;
+                // First 2 spawned task should be stolen
+                crate::spawn(task(1, flag.clone()));
+                crate::spawn(task(2, flag.clone()));
+                crate::spawn(async move {
+                    task(0, flag.clone()).await;
+                    tx1.send(());
+                });
+
+                // One to fill the LIFO slot
+                crate::spawn(async move {});
+
+                loom::explore();
+            }));
+
+            rx1.recv();
+
+            if 1 == flag.load(Relaxed) {
+                loom::stop_exploring();
+
+                let (tx3, rx3) = oneshot::channel();
+                pool.spawn(async move {
+                    loom::skip_branch();
+                    tx3.send(());
+                });
+
+                pool.spawn(async {});
+                pool.spawn(async {});
+
+                loom::explore();
+
+                rx3.recv();
+            } else {
+                loom::skip_branch();
+            }
+        });
+    }
 }
 
 mod group_d {

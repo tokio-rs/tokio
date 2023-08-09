@@ -6,6 +6,7 @@ use crate::runtime::park::CachedParkThread;
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::{bounded, list, unbounded};
 use crate::sync::notify::Notify;
+use crate::util::cacheline::CachePadded;
 
 use std::fmt;
 use std::process;
@@ -46,17 +47,17 @@ pub(crate) trait Semaphore {
 }
 
 pub(super) struct Chan<T, S> {
+    /// Handle to the push half of the lock-free list.
+    tx: CachePadded<list::Tx<T>>,
+
+    /// Receiver waker. Notified when a value is pushed into the channel.
+    rx_waker: CachePadded<AtomicWaker>,
+
     /// Notifies all tasks listening for the receiver being dropped.
     notify_rx_closed: Notify,
 
-    /// Handle to the push half of the lock-free list.
-    tx: list::Tx<T>,
-
     /// Coordinates access to channel's capacity.
     semaphore: S,
-
-    /// Receiver waker. Notified when a value is pushed into the channel.
-    rx_waker: AtomicWaker,
 
     /// Tracks the number of outstanding sender handles.
     ///
@@ -73,9 +74,9 @@ where
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Chan")
-            .field("tx", &self.tx)
+            .field("tx", &*self.tx)
             .field("semaphore", &self.semaphore)
-            .field("rx_waker", &self.rx_waker)
+            .field("rx_waker", &*self.rx_waker)
             .field("tx_count", &self.tx_count)
             .field("rx_fields", &"...")
             .finish()
@@ -108,9 +109,9 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
 
     let chan = Arc::new(Chan {
         notify_rx_closed: Notify::new(),
-        tx,
+        tx: CachePadded::new(tx),
         semaphore,
-        rx_waker: AtomicWaker::new(),
+        rx_waker: CachePadded::new(AtomicWaker::new()),
         tx_count: AtomicUsize::new(1),
         rx_fields: UnsafeCell::new(RxFields {
             list: rx,
