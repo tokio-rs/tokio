@@ -34,24 +34,23 @@ This release bumps the MSRV of Tokio to 1.63. ([#5887])
 - rt: add runtime ID ([#5864])
 - rt: initial implementation of new threaded runtime ([#5823])
 
-[#5887]: https://github.com/tokio-rs/tokio/pull/5887
-[#5859]: https://github.com/tokio-rs/tokio/pull/5859
-[#5859]: https://github.com/tokio-rs/tokio/pull/5881
-[#5885]: https://github.com/tokio-rs/tokio/pull/5885
-[#5829]: https://github.com/tokio-rs/tokio/pull/5829
-[#5908]: https://github.com/tokio-rs/tokio/pull/5908
+[#5820]: https://github.com/tokio-rs/tokio/pull/5820
+[#5823]: https://github.com/tokio-rs/tokio/pull/5823
 [#5824]: https://github.com/tokio-rs/tokio/pull/5824
+[#5829]: https://github.com/tokio-rs/tokio/pull/5829
+[#5858]: https://github.com/tokio-rs/tokio/pull/5858
+[#5859]: https://github.com/tokio-rs/tokio/pull/5859
+[#5863]: https://github.com/tokio-rs/tokio/pull/5863
+[#5864]: https://github.com/tokio-rs/tokio/pull/5864
+[#5865]: https://github.com/tokio-rs/tokio/pull/5865
 [#5868]: https://github.com/tokio-rs/tokio/pull/5868
 [#5869]: https://github.com/tokio-rs/tokio/pull/5869
 [#5878]: https://github.com/tokio-rs/tokio/pull/5878
+[#5885]: https://github.com/tokio-rs/tokio/pull/5885
+[#5887]: https://github.com/tokio-rs/tokio/pull/5887
 [#5890]: https://github.com/tokio-rs/tokio/pull/5890
-[#5820]: https://github.com/tokio-rs/tokio/pull/5820
-[#5858]: https://github.com/tokio-rs/tokio/pull/5858
-[#5863]: https://github.com/tokio-rs/tokio/pull/5863
+[#5908]: https://github.com/tokio-rs/tokio/pull/5908
 [#5916]: https://github.com/tokio-rs/tokio/pull/5916
-[#5865]: https://github.com/tokio-rs/tokio/pull/5865
-[#5864]: https://github.com/tokio-rs/tokio/pull/5864
-[#5823]: https://github.com/tokio-rs/tokio/pull/5823
 
 # 1.29.1 (June 29, 2023)
 
