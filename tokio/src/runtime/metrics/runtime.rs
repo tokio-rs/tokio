@@ -801,7 +801,8 @@ impl RuntimeMetrics {
     /// ```
     #[track_caller]
     pub fn worker_mean_poll_time(&self, worker: usize) -> Duration {
-        let nanos = self.handle
+        let nanos = self
+            .handle
             .inner
             .worker_metrics(worker)
             .mean_poll_time
