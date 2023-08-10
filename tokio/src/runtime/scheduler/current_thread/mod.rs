@@ -321,7 +321,7 @@ impl Core {
     }
 
     fn submit_metrics(&mut self, handle: &Handle) {
-        self.metrics.submit(&handle.shared.worker_metrics);
+        self.metrics.submit(&handle.shared.worker_metrics, 0);
     }
 }
 
