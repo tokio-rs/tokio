@@ -73,7 +73,8 @@ impl MetricsBatch {
         }
     }
 
-    pub(crate) fn submit(&mut self, worker: &WorkerMetrics) {
+    pub(crate) fn submit(&mut self, worker: &WorkerMetrics, mean_poll_time: u64) {
+        worker.mean_poll_time.store(mean_poll_time, Relaxed);
         worker.park_count.store(self.park_count, Relaxed);
         worker.noop_count.store(self.noop_count, Relaxed);
         worker.steal_count.store(self.steal_count, Relaxed);
