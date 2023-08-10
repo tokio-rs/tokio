@@ -120,5 +120,3 @@ jobs:
         working-directory: tokio
         env:
           SCOPE: ${{ matrix.scope }}
-          # TODO: remove this before stabilizing
-          LOOM_MAX_PREEMPTIONS: 1
