@@ -74,7 +74,7 @@ impl Stats {
     }
 
     pub(crate) fn submit(&mut self, to: &WorkerMetrics) {
-        self.batch.submit(to);
+        self.batch.submit(to, self.task_poll_time_ewma as u64);
     }
 
     pub(crate) fn about_to_park(&mut self) {

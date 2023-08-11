@@ -39,7 +39,7 @@ impl Handle {
     }
 
     pub(crate) fn shutdown(&self) {
-        self.shared.close();
+        self.shared.close(self);
         self.driver.unpark();
     }
 

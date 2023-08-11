@@ -28,6 +28,9 @@ pub(crate) struct WorkerMetrics {
     /// Number of tasks the worker polled.
     pub(crate) poll_count: AtomicU64,
 
+    /// EWMA task poll time, in nanoseconds.
+    pub(crate) mean_poll_time: AtomicU64,
+
     /// Amount of time the worker spent doing work vs. parking.
     pub(crate) busy_duration_total: AtomicU64,
 
@@ -62,6 +65,7 @@ impl WorkerMetrics {
             steal_count: AtomicU64::new(0),
             steal_operations: AtomicU64::new(0),
             poll_count: AtomicU64::new(0),
+            mean_poll_time: AtomicU64::new(0),
             overflow_count: AtomicU64::new(0),
             busy_duration_total: AtomicU64::new(0),
             local_schedule_count: AtomicU64::new(0),

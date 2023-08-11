@@ -4,7 +4,7 @@
 
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::MutexGuard;
-use crate::runtime::scheduler::multi_thread_alt::{worker, Core, Shared};
+use crate::runtime::scheduler::multi_thread_alt::{worker, Core, Handle, Shared};
 
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 
@@ -146,22 +146,12 @@ impl Idle {
         // Find a sleeping worker
         if let Some(worker) = synced.idle.sleepers.pop() {
             // Find an available core
-            if let Some(mut core) = synced.idle.available_cores.pop() {
+            if let Some(mut core) = self.try_acquire_available_core(&mut synced.idle) {
                 debug_assert!(!core.is_searching);
                 core.is_searching = true;
 
-                self.idle_map.unset(core.index);
-                debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
-
                 // Assign the core to the worker
                 synced.assigned_cores[worker] = Some(core);
-
-                let num_idle = synced.idle.available_cores.len();
-                #[cfg(not(loom))]
-                debug_assert_eq!(num_idle, self.num_idle.load(Acquire) - 1);
-
-                // Update the number of sleeping workers
-                self.num_idle.store(num_idle, Release);
 
                 // Drop the lock before notifying the condvar.
                 drop(synced);
@@ -198,6 +188,7 @@ impl Idle {
 
         for _ in 0..num {
             if let Some(worker) = synced.idle.sleepers.pop() {
+                // TODO: can this be switched to use next_available_core?
                 if let Some(core) = synced.idle.available_cores.pop() {
                     debug_assert!(!core.is_searching);
 
@@ -236,15 +227,10 @@ impl Idle {
         // eventually find the cores and shut them down.
         while !synced.idle.sleepers.is_empty() && !synced.idle.available_cores.is_empty() {
             let worker = synced.idle.sleepers.pop().unwrap();
-            let core = synced.idle.available_cores.pop().unwrap();
-
-            self.idle_map.unset(core.index);
+            let core = self.try_acquire_available_core(&mut synced.idle).unwrap();
 
             synced.assigned_cores[worker] = Some(core);
             shared.condvars[worker].notify_one();
-
-            self.num_idle
-                .store(synced.idle.available_cores.len(), Release);
         }
 
         debug_assert!(self.idle_map.matches(&synced.idle.available_cores));
@@ -252,6 +238,18 @@ impl Idle {
         // Wake up any other workers
         while let Some(index) = synced.idle.sleepers.pop() {
             shared.condvars[index].notify_one();
+        }
+    }
+
+    pub(super) fn shutdown_unassigned_cores(&self, handle: &Handle, shared: &Shared) {
+        // If there are any remaining cores, shut them down here.
+        //
+        // This code is a bit convoluted to avoid lock-reentry.
+        while let Some(core) = {
+            let mut synced = shared.synced.lock();
+            self.try_acquire_available_core(&mut synced.idle)
+        } {
+            shared.shutdown_core(handle, core);
         }
     }
 
