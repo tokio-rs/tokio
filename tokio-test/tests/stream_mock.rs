@@ -41,3 +41,10 @@ async fn test_stream_mock_drop_without_consuming_all() {
     let stream_mock = StreamMockBuilder::new().next(1).next(2).build();
     drop(stream_mock);
 }
+
+#[tokio::test]
+#[should_panic(expected = "test panic was not masked")]
+async fn test_stream_mock_drop_during_panic_doesnt_mask_panic() {
+    let _stream_mock = StreamMockBuilder::new().next(1).next(2).build();
+    panic!("test panic was not masked");
+}

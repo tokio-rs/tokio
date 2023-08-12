@@ -39,8 +39,8 @@ use std::pin::Pin;
 use std::task::Poll;
 use std::time::Duration;
 
-use futures_core::Future;
 use futures_core::{ready, Stream};
+use std::future::Future;
 use tokio::time::{sleep_until, Instant, Sleep};
 
 #[derive(Debug, Clone)]
@@ -145,6 +145,11 @@ impl<T: Unpin> Stream for StreamMock<T> {
 
 impl<T: Unpin> Drop for StreamMock<T> {
     fn drop(&mut self) {
+        // Avoid double panicking to make debugging easier.
+        if std::thread::panicking() {
+            return;
+        }
+
         let undropped_count = self
             .actions
             .iter()
