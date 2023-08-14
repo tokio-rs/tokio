@@ -320,11 +320,10 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
         let event = ready!(self.registration.poll_read_ready(cx))?;
 
-        Ok(AsyncFdReadyGuard {
+        Poll::Ready(Ok(AsyncFdReadyGuard {
             async_fd: self,
             event: Some(event),
-        })
-        .into()
+        }))
     }
 
     /// Polls for read readiness.
@@ -358,11 +357,10 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> Poll<io::Result<AsyncFdReadyMutGuard<'a, T>>> {
         let event = ready!(self.registration.poll_read_ready(cx))?;
 
-        Ok(AsyncFdReadyMutGuard {
+        Poll::Ready(Ok(AsyncFdReadyMutGuard {
             async_fd: self,
             event: Some(event),
-        })
-        .into()
+        }))
     }
 
     /// Polls for write readiness.
@@ -398,11 +396,10 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
         let event = ready!(self.registration.poll_write_ready(cx))?;
 
-        Ok(AsyncFdReadyGuard {
+        Poll::Ready(Ok(AsyncFdReadyGuard {
             async_fd: self,
             event: Some(event),
-        })
-        .into()
+        }))
     }
 
     /// Polls for write readiness.
@@ -436,11 +433,10 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> Poll<io::Result<AsyncFdReadyMutGuard<'a, T>>> {
         let event = ready!(self.registration.poll_write_ready(cx))?;
 
-        Ok(AsyncFdReadyMutGuard {
+        Poll::Ready(Ok(AsyncFdReadyMutGuard {
             async_fd: self,
             event: Some(event),
-        })
-        .into()
+        }))
     }
 
     /// Waits for any of the requested ready states, returning a
