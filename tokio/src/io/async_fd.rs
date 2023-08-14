@@ -1013,14 +1013,11 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     ) -> Result<io::Result<R>, TryIoError> {
         let result = f(self.async_fd);
 
-        if let Err(e) = result.as_ref() {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                self.clear_ready();
-            }
-        }
-
         match result {
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
+                self.clear_ready();
+                Err(TryIoError(()))
+            }
             result => Ok(result),
         }
     }
@@ -1193,14 +1190,11 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     ) -> Result<io::Result<R>, TryIoError> {
         let result = f(self.async_fd);
 
-        if let Err(e) = result.as_ref() {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                self.clear_ready();
-            }
-        }
-
         match result {
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
+                self.clear_ready();
+                Err(TryIoError(()))
+            }
             result => Ok(result),
         }
     }
