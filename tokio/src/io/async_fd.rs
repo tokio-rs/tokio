@@ -176,6 +176,8 @@ use std::{task::Context, task::Poll};
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 pub struct AsyncFd<T: AsRawFd> {
     registration: Registration,
+    // The inner value is always present. the Option is required for `drop` and `into_inner`.
+    // In all other methods `unwrap` is valid, and will never panic.
     inner: Option<T>,
 }
 
@@ -271,13 +273,12 @@ impl<T: AsRawFd> AsyncFd<T> {
     }
 
     fn take_inner(&mut self) -> Option<T> {
-        let fd = self.inner.as_ref().map(AsRawFd::as_raw_fd);
+        let inner = self.inner.take()?;
+        let fd = inner.as_raw_fd();
 
-        if let Some(fd) = fd {
-            let _ = self.registration.deregister(&mut SourceFd(&fd));
-        }
+        let _ = self.registration.deregister(&mut SourceFd(&fd));
 
-        self.inner.take()
+        Some(inner)
     }
 
     /// Deregisters this file descriptor and returns ownership of the backing
