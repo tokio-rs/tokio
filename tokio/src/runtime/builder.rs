@@ -404,9 +404,17 @@ impl Builder {
     /// Specifies the limit for additional threads spawned by the Runtime.
     ///
     /// These threads are used for blocking operations like tasks spawned
-    /// through [`spawn_blocking`]. Unlike the [`worker_threads`], they are not
-    /// always active and will exit if left idle for too long. You can change
-    /// this timeout duration with [`thread_keep_alive`].
+    /// through [`spawn_blocking`], this includes but is not limited to:
+    /// - [`fs`] operations
+    /// - dns resolution through [`ToSocketAddrs`]
+    /// - writing to [`Stdout`] or [`Stderr`]
+    /// - reading from [`Stdin`]
+    ///
+    /// Unlike the [`worker_threads`], they are not always active and will exit
+    /// if left idle for too long. You can change this timeout duration with [`thread_keep_alive`].
+    ///
+    /// It's recommended to not set this limit too low in order to avoid hanging on operations
+    /// requiring [`spawn_blocking`].
     ///
     /// The default value is 512.
     ///
@@ -420,6 +428,11 @@ impl Builder {
     /// current `max_blocking_threads` does not include async worker threads in the count.
     ///
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
+    /// [`fs`]: mod@crate::fs
+    /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+    /// [`Stdout`]: struct@crate::io::Stdout
+    /// [`Stdin`]: struct@crate::io::Stdin
+    /// [`Stderr`]: struct@crate::io::Stderr
     /// [`worker_threads`]: Self::worker_threads
     /// [`thread_keep_alive`]: Self::thread_keep_alive
     #[track_caller]
