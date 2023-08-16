@@ -59,7 +59,7 @@
 use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering::Relaxed;
+use crate::loom::sync::atomic::Ordering::{Relaxed, SeqCst};
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 use std::mem;
@@ -80,7 +80,7 @@ pub struct Receiver<T> {
     shared: Arc<Shared<T>>,
 
     /// Last observed version
-    version: Version,
+    version: usize,
 }
 
 /// Sends values to the associated [`Receiver`](struct@Receiver).
@@ -89,6 +89,18 @@ pub struct Receiver<T> {
 #[derive(Debug)]
 pub struct Sender<T> {
     shared: Arc<Shared<T>>,
+}
+
+impl<T> Clone for Sender<T> {
+    fn clone(&self) -> Self {
+        // No synchronization necessary as this is only used as a counter and
+        // not memory access.
+        self.shared.ref_count_tx.fetch_add(1, Relaxed);
+
+        Self {
+            shared: self.shared.clone(),
+        }
+    }
 }
 
 /// Returns a reference to the inner value.
@@ -175,13 +187,13 @@ struct Shared<T> {
     value: RwLock<T>,
 
     /// The current version.
-    ///
-    /// The lowest bit represents a "closed" state. The rest of the bits
-    /// represent the current version.
-    state: AtomicState,
+    version: AtomicUsize,
 
     /// Tracks the number of `Receiver` instances.
     ref_count_rx: AtomicUsize,
+
+    /// Tracks the number of `Sender` instances.
+    ref_count_tx: AtomicUsize,
 
     /// Notifies waiting receivers that the value changed.
     notify_rx: big_notify::BigNotify,
@@ -192,13 +204,26 @@ struct Shared<T> {
 
 impl<T: fmt::Debug> fmt::Debug for Shared<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let state = self.state.load();
         f.debug_struct("Shared")
             .field("value", &self.value)
-            .field("version", &state.version())
-            .field("is_closed", &state.is_closed())
+            .field("version", &self.version())
             .field("ref_count_rx", &self.ref_count_rx)
+            .field("ref_count_tx", &self.ref_count_tx)
             .finish()
+    }
+}
+
+impl<T> Shared<T> {
+    fn is_sender_closed(&self) -> bool {
+        self.ref_count_tx.load(Relaxed) == 0
+    }
+
+    fn version(&self) -> usize {
+        self.version.load(SeqCst)
+    }
+
+    fn increment_version(&self) {
+        self.version.fetch_add(1, SeqCst);
     }
 }
 
@@ -299,73 +324,6 @@ mod big_notify {
     }
 }
 
-use self::state::{AtomicState, Version};
-mod state {
-    use crate::loom::sync::atomic::AtomicUsize;
-    use crate::loom::sync::atomic::Ordering::SeqCst;
-
-    const CLOSED: usize = 1;
-
-    /// The version part of the state. The lowest bit is always zero.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    pub(super) struct Version(usize);
-
-    /// Snapshot of the state. The first bit is used as the CLOSED bit.
-    /// The remaining bits are used as the version.
-    ///
-    /// The CLOSED bit tracks whether the Sender has been dropped. Dropping all
-    /// receivers does not set it.
-    #[derive(Copy, Clone, Debug)]
-    pub(super) struct StateSnapshot(usize);
-
-    /// The state stored in an atomic integer.
-    #[derive(Debug)]
-    pub(super) struct AtomicState(AtomicUsize);
-
-    impl Version {
-        /// Get the initial version when creating the channel.
-        pub(super) fn initial() -> Self {
-            Version(0)
-        }
-    }
-
-    impl StateSnapshot {
-        /// Extract the version from the state.
-        pub(super) fn version(self) -> Version {
-            Version(self.0 & !CLOSED)
-        }
-
-        /// Is the closed bit set?
-        pub(super) fn is_closed(self) -> bool {
-            (self.0 & CLOSED) == CLOSED
-        }
-    }
-
-    impl AtomicState {
-        /// Create a new `AtomicState` that is not closed and which has the
-        /// version set to `Version::initial()`.
-        pub(super) fn new() -> Self {
-            AtomicState(AtomicUsize::new(0))
-        }
-
-        /// Load the current value of the state.
-        pub(super) fn load(&self) -> StateSnapshot {
-            StateSnapshot(self.0.load(SeqCst))
-        }
-
-        /// Increment the version counter.
-        pub(super) fn increment_version(&self) {
-            // Increment by two to avoid touching the CLOSED bit.
-            self.0.fetch_add(2, SeqCst);
-        }
-
-        /// Set the closed bit in the state.
-        pub(super) fn set_closed(&self) {
-            self.0.fetch_or(CLOSED, SeqCst);
-        }
-    }
-}
-
 /// Creates a new watch channel, returning the "send" and "receive" handles.
 ///
 /// All values sent by [`Sender`] will become visible to the [`Receiver`] handles.
@@ -396,8 +354,9 @@ mod state {
 pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
     let shared = Arc::new(Shared {
         value: RwLock::new(init),
-        state: AtomicState::new(),
+        version: AtomicUsize::new(0),
         ref_count_rx: AtomicUsize::new(1),
+        ref_count_tx: AtomicUsize::new(1),
         notify_rx: big_notify::BigNotify::new(),
         notify_tx: Notify::new(),
     });
@@ -406,16 +365,13 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
         shared: shared.clone(),
     };
 
-    let rx = Receiver {
-        shared,
-        version: Version::initial(),
-    };
+    let rx = Receiver { shared, version: 0 };
 
     (tx, rx)
 }
 
 impl<T> Receiver<T> {
-    fn from_shared(version: Version, shared: Arc<Shared<T>>) -> Self {
+    fn from_shared(version: usize, shared: Arc<Shared<T>>) -> Self {
         // No synchronization necessary as this is only used as a counter and
         // not memory access.
         shared.ref_count_rx.fetch_add(1, Relaxed);
@@ -468,7 +424,7 @@ impl<T> Receiver<T> {
 
         // After obtaining a read-lock no concurrent writes could occur
         // and the loaded version matches that of the borrowed reference.
-        let new_version = self.shared.state.load().version();
+        let new_version = self.shared.version();
         let has_changed = self.version != new_version;
 
         Ref { inner, has_changed }
@@ -511,7 +467,7 @@ impl<T> Receiver<T> {
 
         // After obtaining a read-lock no concurrent writes could occur
         // and the loaded version matches that of the borrowed reference.
-        let new_version = self.shared.state.load().version();
+        let new_version = self.shared.version();
         let has_changed = self.version != new_version;
 
         // Mark the shared value as seen by updating the version
@@ -551,14 +507,13 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub fn has_changed(&self) -> Result<bool, error::RecvError> {
-        // Load the version from the state
-        let state = self.shared.state.load();
-        if state.is_closed() {
+        if self.shared.is_sender_closed() {
             // The sender has dropped.
             return Err(error::RecvError(()));
         }
-        let new_version = state.version();
 
+        // Load the version from the state
+        let new_version = self.shared.version();
         Ok(self.version != new_version)
     }
 
@@ -674,7 +629,7 @@ impl<T> Receiver<T> {
             {
                 let inner = self.shared.value.read().unwrap();
 
-                let new_version = self.shared.state.load().version();
+                let new_version = self.shared.version();
                 let has_changed = self.version != new_version;
                 self.version = new_version;
 
@@ -717,11 +672,10 @@ impl<T> Receiver<T> {
 
 fn maybe_changed<T>(
     shared: &Shared<T>,
-    version: &mut Version,
+    version: &mut usize,
 ) -> Option<Result<(), error::RecvError>> {
     // Load the version from the state
-    let state = shared.state.load();
-    let new_version = state.version();
+    let new_version = shared.version();
 
     if *version != new_version {
         // Observe the new version and return
@@ -729,7 +683,7 @@ fn maybe_changed<T>(
         return Some(Ok(()));
     }
 
-    if state.is_closed() {
+    if shared.is_sender_closed() {
         // All receivers have dropped.
         return Some(Err(error::RecvError(())));
     }
@@ -737,10 +691,7 @@ fn maybe_changed<T>(
     None
 }
 
-async fn changed_impl<T>(
-    shared: &Shared<T>,
-    version: &mut Version,
-) -> Result<(), error::RecvError> {
+async fn changed_impl<T>(shared: &Shared<T>, version: &mut usize) -> Result<(), error::RecvError> {
     crate::trace::async_trace_leaf().await;
 
     loop {
@@ -931,7 +882,7 @@ impl<T> Sender<T> {
                 }
             };
 
-            self.shared.state.increment_version();
+            self.shared.increment_version();
 
             // Release the write lock.
             //
@@ -1113,7 +1064,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
-        let version = shared.state.load().version();
+        let version = shared.version();
 
         // The CLOSED bit in the state tracks only whether the sender is
         // dropped, so we do not need to unset it if this reopens the channel.
@@ -1145,7 +1096,7 @@ impl<T> Sender<T> {
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.shared.state.set_closed();
+        self.shared.ref_count_tx.fetch_sub(1, Relaxed);
         self.shared.notify_rx.notify_waiters();
     }
 }
