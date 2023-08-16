@@ -13,6 +13,11 @@
 
 - rt(alt): improve scalability of alt runtime as the number of cores grows ([#5935])
 
+[#5925]: https://github.com/tokio-rs/tokio/pull/5925
+[#5930]: https://github.com/tokio-rs/tokio/pull/5930
+[#5781]: https://github.com/tokio-rs/tokio/pull/5781
+[#5935]: https://github.com/tokio-rs/tokio/pull/5935
+
 # 1.31.0 (August 10, 2023)
 
 ### Fixed
