@@ -495,6 +495,8 @@ impl Interval {
     ///
     /// This method ignores [`MissedTickBehavior`] strategy.
     ///
+    /// This is equivalent to calling `reset_at(Instant::now() + period)`.
+    ///
     /// # Examples
     ///
     /// ```
@@ -519,6 +521,107 @@ impl Interval {
     /// ```
     pub fn reset(&mut self) {
         self.delay.as_mut().reset(Instant::now() + self.period);
+    }
+
+    /// Resets the interval immediately.
+    ///
+    /// This method ignores [`MissedTickBehavior`] strategy.
+    ///
+    /// This is equivalent to calling `reset_at(Instant::now())`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::time;
+    ///
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut interval = time::interval(Duration::from_millis(100));
+    ///
+    ///     interval.tick().await;
+    ///
+    ///     time::sleep(Duration::from_millis(50)).await;
+    ///     interval.reset_immediately();
+    ///
+    ///     interval.tick().await;
+    ///     interval.tick().await;
+    ///
+    ///     // approximately 150ms have elapsed.
+    /// }
+    /// ```
+    pub fn reset_immediately(&mut self) {
+        self.delay.as_mut().reset(Instant::now());
+    }
+
+    /// Resets the interval after the specified [`std::time::Duration`].
+    ///
+    /// This method ignores [`MissedTickBehavior`] strategy.
+    ///
+    /// This is equivalent to calling `reset_at(Instant::now() + after)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::time;
+    ///
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut interval = time::interval(Duration::from_millis(100));
+    ///     interval.tick().await;
+    ///
+    ///     time::sleep(Duration::from_millis(50)).await;
+    ///
+    ///     let after = Duration::from_millis(20);
+    ///     interval.reset_after(after);
+    ///
+    ///     interval.tick().await;
+    ///     interval.tick().await;
+    ///
+    ///     // approximately 170ms have elapsed.
+    /// }
+    /// ```
+    pub fn reset_after(&mut self, after: Duration) {
+        self.delay.as_mut().reset(Instant::now() + after);
+    }
+
+    /// Resets the interval to a [`crate::time::Instant`] deadline.
+    ///
+    /// Sets the next tick to expire at the given instant. If the instant is in
+    /// the past, then the [`MissedTickBehavior`] strategy will be used to
+    /// catch up. If the instant is in the future, then the next tick will
+    /// complete at the given instant, even if that means that it will sleep for
+    /// longer than the duration of this [`Interval`]. If the [`Interval`] had
+    /// any missed ticks before calling this method, then those are discarded.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::time::{self, Instant};
+    ///
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut interval = time::interval(Duration::from_millis(100));
+    ///     interval.tick().await;
+    ///
+    ///     time::sleep(Duration::from_millis(50)).await;
+    ///
+    ///     let deadline = Instant::now() + Duration::from_millis(30);
+    ///     interval.reset_at(deadline);
+    ///
+    ///     interval.tick().await;
+    ///     interval.tick().await;
+    ///
+    ///     // approximately 180ms have elapsed.
+    /// }
+    /// ```
+    pub fn reset_at(&mut self, deadline: Instant) {
+        self.delay.as_mut().reset(deadline);
     }
 
     /// Returns the [`MissedTickBehavior`] strategy currently being used.

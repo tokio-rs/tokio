@@ -172,20 +172,22 @@ impl Semaphore {
     ///
     /// static SEM: Semaphore = Semaphore::const_new(10);
     /// ```
-    ///
-    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    #[cfg(not(all(loom, test)))]
     pub const fn const_new(permits: usize) -> Self {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return Self {
+        Self {
             ll_sem: ll::Semaphore::const_new(permits),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: tracing::Span::none(),
-        };
+        }
+    }
 
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        return Self {
-            ll_sem: ll::Semaphore::const_new(permits),
-        };
+    /// Creates a new closed semaphore with 0 permits.
+    pub(crate) fn new_closed() -> Self {
+        Self {
+            ll_sem: ll::Semaphore::new_closed(),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: tracing::Span::none(),
+        }
     }
 
     /// Returns the current number of available permits.

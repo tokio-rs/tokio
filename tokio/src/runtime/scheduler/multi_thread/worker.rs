@@ -158,7 +158,7 @@ pub(crate) struct Shared {
     idle: Idle,
 
     /// Collection of all active tasks spawned onto this executor.
-    pub(super) owned: OwnedTasks<Arc<Handle>>,
+    pub(crate) owned: OwnedTasks<Arc<Handle>>,
 
     /// Data synchronized by the scheduler mutex
     pub(super) synced: Mutex<Synced>,
@@ -323,26 +323,32 @@ where
     F: FnOnce() -> R,
 {
     // Try to steal the worker core back
-    struct Reset(coop::Budget);
+    struct Reset {
+        take_core: bool,
+        budget: coop::Budget,
+    }
 
     impl Drop for Reset {
         fn drop(&mut self) {
             with_current(|maybe_cx| {
                 if let Some(cx) = maybe_cx {
-                    let core = cx.worker.core.take();
-                    let mut cx_core = cx.core.borrow_mut();
-                    assert!(cx_core.is_none());
-                    *cx_core = core;
+                    if self.take_core {
+                        let core = cx.worker.core.take();
+                        let mut cx_core = cx.core.borrow_mut();
+                        assert!(cx_core.is_none());
+                        *cx_core = core;
+                    }
 
                     // Reset the task budget as we are re-entering the
                     // runtime.
-                    coop::set(self.0);
+                    coop::set(self.budget);
                 }
             });
         }
     }
 
     let mut had_entered = false;
+    let mut take_core = false;
 
     let setup_result = with_current(|maybe_cx| {
         match (
@@ -394,6 +400,10 @@ where
             None => return Ok(()),
         };
 
+        // We are taking the core from the context and sending it to another
+        // thread.
+        take_core = true;
+
         // The parker should be set here
         assert!(core.park.is_some());
 
@@ -420,7 +430,10 @@ where
     if had_entered {
         // Unset the current task's budget. Blocking sections are not
         // constrained by task budgets.
-        let _reset = Reset(coop::stop());
+        let _reset = Reset {
+            take_core,
+            budget: coop::stop(),
+        };
 
         crate::runtime::context::exit_runtime(f)
     } else {
@@ -718,9 +731,7 @@ impl Context {
         // Place `park` back in `core`
         core.park = Some(park);
 
-        // If there are tasks available to steal, but this worker is not
-        // looking for tasks to steal, notify another worker.
-        if !core.is_searching && core.run_queue.is_stealable() {
+        if core.should_notify_others() {
             self.worker.handle.notify_parked_local();
         }
 
@@ -775,6 +786,10 @@ impl Core {
                 worker.inject().len() / worker.handle.shared.remotes.len() + 1,
                 cap,
             );
+
+            // Take at least one task since the first task is returned directly
+            // and nto pushed onto the local queue.
+            let n = usize::max(1, n);
 
             let mut synced = worker.handle.shared.synced.lock();
             // safety: passing in the correct `inject::Synced`.
@@ -846,12 +861,25 @@ impl Core {
         worker.handle.transition_worker_from_searching();
     }
 
+    fn has_tasks(&self) -> bool {
+        self.lifo_slot.is_some() || self.run_queue.has_tasks()
+    }
+
+    fn should_notify_others(&self) -> bool {
+        // If there are tasks available to steal, but this worker is not
+        // looking for tasks to steal, notify another worker.
+        if self.is_searching {
+            return false;
+        }
+        self.lifo_slot.is_some() as usize + self.run_queue.len() > 1
+    }
+
     /// Prepares the worker state for parking.
     ///
     /// Returns true if the transition happened, false if there is work to do first.
     fn transition_to_parked(&mut self, worker: &Worker) -> bool {
         // Workers should not park if they have work to do
-        if self.lifo_slot.is_some() || self.run_queue.has_tasks() || self.is_traced {
+        if self.has_tasks() || self.is_traced {
             return false;
         }
 
@@ -877,9 +905,9 @@ impl Core {
 
     /// Returns `true` if the transition happened.
     fn transition_from_parked(&mut self, worker: &Worker) -> bool {
-        // If a task is in the lifo slot, then we must unpark regardless of
+        // If a task is in the lifo slot/run queue, then we must unpark regardless of
         // being notified
-        if self.lifo_slot.is_some() {
+        if self.has_tasks() {
             // When a worker wakes, it should only transition to the "searching"
             // state when the wake originates from another worker *or* a new task
             // is pushed. We do *not* want the worker to transition to "searching"
@@ -998,6 +1026,12 @@ impl Handle {
             self.push_remote_task(task);
             self.notify_parked_remote();
         })
+    }
+
+    pub(super) fn schedule_option_task_without_yield(&self, task: Option<Notified>) {
+        if let Some(task) = task {
+            self.schedule_task(task, false);
+        }
     }
 
     fn schedule_local(&self, core: &mut Core, task: Notified, is_yield: bool) {

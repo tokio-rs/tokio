@@ -685,3 +685,128 @@ async fn clear_ready_matching_clears_ready_mut() {
     guard.clear_ready_matching(Ready::WRITABLE);
     assert_eq!(guard.ready(), Ready::EMPTY);
 }
+
+#[tokio::test]
+#[cfg(target_os = "linux")]
+async fn await_error_readiness_timestamping() {
+    use std::net::{Ipv4Addr, SocketAddr};
+
+    use tokio::io::{Interest, Ready};
+
+    let address_a = SocketAddr::from((Ipv4Addr::LOCALHOST, 0));
+    let address_b = SocketAddr::from((Ipv4Addr::LOCALHOST, 0));
+
+    let socket = std::net::UdpSocket::bind(address_a).unwrap();
+
+    socket.set_nonblocking(true).unwrap();
+
+    // configure send timestamps
+    configure_timestamping_socket(&socket).unwrap();
+
+    socket.connect(address_b).unwrap();
+
+    let fd = AsyncFd::new(socket).unwrap();
+
+    tokio::select! {
+        _ = fd.ready(Interest::ERROR) => panic!(),
+        _ = tokio::time::sleep(Duration::from_millis(10)) => {}
+    }
+
+    let buf = b"hello there";
+    fd.get_ref().send(buf).unwrap();
+
+    // the send timestamp should now be in the error queue
+    let guard = fd.ready(Interest::ERROR).await.unwrap();
+    assert_eq!(guard.ready(), Ready::ERROR);
+}
+
+#[cfg(target_os = "linux")]
+fn configure_timestamping_socket(udp_socket: &std::net::UdpSocket) -> std::io::Result<libc::c_int> {
+    // enable software timestamping, and specifically software send timestamping
+    let options = libc::SOF_TIMESTAMPING_SOFTWARE | libc::SOF_TIMESTAMPING_TX_SOFTWARE;
+
+    let res = unsafe {
+        libc::setsockopt(
+            udp_socket.as_raw_fd(),
+            libc::SOL_SOCKET,
+            libc::SO_TIMESTAMP,
+            &options as *const _ as *const libc::c_void,
+            std::mem::size_of_val(&options) as libc::socklen_t,
+        )
+    };
+
+    if res == -1 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(res)
+    }
+}
+
+#[tokio::test]
+#[cfg(target_os = "linux")]
+async fn await_error_readiness_invalid_address() {
+    use std::net::{Ipv4Addr, SocketAddr};
+    use tokio::io::{Interest, Ready};
+
+    let socket_addr = SocketAddr::from((Ipv4Addr::LOCALHOST, 0));
+    let socket = std::net::UdpSocket::bind(socket_addr).unwrap();
+    let socket_fd = socket.as_raw_fd();
+
+    // Enable IP_RECVERR option to receive error messages
+    // https://man7.org/linux/man-pages/man7/ip.7.html has some extra information
+    let recv_err: libc::c_int = 1;
+    unsafe {
+        let res = libc::setsockopt(
+            socket.as_raw_fd(),
+            libc::SOL_IP,
+            libc::IP_RECVERR,
+            &recv_err as *const _ as *const libc::c_void,
+            std::mem::size_of_val(&recv_err) as libc::socklen_t,
+        );
+        if res == -1 {
+            panic!("{:?}", std::io::Error::last_os_error());
+        }
+    }
+
+    // Spawn a separate thread for sending messages
+    tokio::spawn(async move {
+        // Set the destination address. This address is invalid in this context. the OS will notice
+        // that nobody is listening on port this port. Normally this is ignored (UDP is "fire and forget"),
+        // but because IP_RECVERR is enabled, the error will actually be reported to the sending socket
+        let mut dest_addr =
+            unsafe { std::mem::MaybeUninit::<libc::sockaddr_in>::zeroed().assume_init() };
+        dest_addr.sin_family = libc::AF_INET as _;
+        // based on https://en.wikipedia.org/wiki/Ephemeral_port, we should pick a port number
+        // below 1024 to guarantee that other tests don't select this port by accident when they
+        // use port 0 to select an ephemeral port.
+        dest_addr.sin_port = 512u16.to_be(); // Destination port
+
+        // Prepare the message data
+        let message = "Hello, Socket!";
+
+        // Prepare the message structure for sendmsg
+        let mut iov = libc::iovec {
+            iov_base: message.as_ptr() as *mut libc::c_void,
+            iov_len: message.len(),
+        };
+
+        // Prepare the destination address for the sendmsg call
+        let dest_sockaddr: *const libc::sockaddr = &dest_addr as *const _ as *const libc::sockaddr;
+        let dest_addrlen: libc::socklen_t = std::mem::size_of_val(&dest_addr) as libc::socklen_t;
+
+        let mut msg: libc::msghdr = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        msg.msg_name = dest_sockaddr as *mut libc::c_void;
+        msg.msg_namelen = dest_addrlen;
+        msg.msg_iov = &mut iov;
+        msg.msg_iovlen = 1;
+
+        if unsafe { libc::sendmsg(socket_fd, &msg, 0) } == -1 {
+            Err(std::io::Error::last_os_error()).unwrap()
+        }
+    });
+
+    let fd = AsyncFd::new(socket).unwrap();
+
+    let guard = fd.ready(Interest::ERROR).await.unwrap();
+    assert_eq!(guard.ready(), Ready::ERROR);
+}

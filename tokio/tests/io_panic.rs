@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support panic recovery
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support panic recovery
 
 use std::task::{Context, Poll};
 use std::{error::Error, pin::Pin};

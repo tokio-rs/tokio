@@ -19,7 +19,7 @@ impl<T> fmt::Display for SendError<T> {
     }
 }
 
-impl<T> std::error::Error for SendError<T> {}
+impl<T> Error for SendError<T> {}
 
 // ===== TrySendError =====
 

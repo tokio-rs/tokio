@@ -4,6 +4,7 @@ pub(crate) mod guard;
 mod tree_node;
 
 use crate::loom::sync::Arc;
+use crate::util::MaybeDangling;
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
@@ -77,11 +78,23 @@ pin_project! {
     /// [`CancellationToken`] by value instead of using a reference.
     #[must_use = "futures do nothing unless polled"]
     pub struct WaitForCancellationFutureOwned {
-        // Since `future` is the first field, it is dropped before the
-        // cancellation_token field. This ensures that the reference inside the
-        // `Notified` remains valid.
+        // This field internally has a reference to the cancellation token, but camouflages
+        // the relationship with `'static`. To avoid Undefined Behavior, we must ensure
+        // that the reference is only used while the cancellation token is still alive. To
+        // do that, we ensure that the future is the first field, so that it is dropped
+        // before the cancellation token.
+        //
+        // We use `MaybeDanglingFuture` here because without it, the compiler could assert
+        // the reference inside `future` to be valid even after the destructor of that
+        // field runs. (Specifically, when the `WaitForCancellationFutureOwned` is passed
+        // as an argument to a function, the reference can be asserted to be valid for the
+        // rest of that function.) To avoid that, we use `MaybeDangling` which tells the
+        // compiler that the reference stored inside it might not be valid.
+        //
+        // See <https://users.rust-lang.org/t/unsafe-code-review-semi-owning-weak-rwlock-t-guard/95706>
+        // for more info.
         #[pin]
-        future: tokio::sync::futures::Notified<'static>,
+        future: MaybeDangling<tokio::sync::futures::Notified<'static>>,
         cancellation_token: CancellationToken,
     }
 }
@@ -279,7 +292,7 @@ impl WaitForCancellationFutureOwned {
             // # Safety
             //
             // cancellation_token is dropped after future due to the field ordering.
-            future: unsafe { Self::new_future(&cancellation_token) },
+            future: MaybeDangling::new(unsafe { Self::new_future(&cancellation_token) }),
             cancellation_token,
         }
     }
@@ -320,8 +333,9 @@ impl Future for WaitForCancellationFutureOwned {
             // # Safety
             //
             // cancellation_token is dropped after future due to the field ordering.
-            this.future
-                .set(unsafe { Self::new_future(this.cancellation_token) });
+            this.future.set(MaybeDangling::new(unsafe {
+                Self::new_future(this.cancellation_token)
+            }));
         }
     }
 }

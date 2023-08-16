@@ -1,10 +1,10 @@
 #![cfg(feature = "macros")]
 #![allow(clippy::disallowed_names)]
 
-#[cfg(tokio_wasm_not_wasi)]
+#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(tokio_wasm_not_wasi))]
+#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
 use tokio::test as maybe_tokio_test;
 
 use tokio::sync::oneshot;
@@ -633,7 +633,7 @@ mod unstable {
     }
 
     #[test]
-    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
     fn deterministic_select_multi_thread() {
         let seed = b"bytes used to generate seed";
         let rt1 = tokio::runtime::Builder::new_multi_thread()

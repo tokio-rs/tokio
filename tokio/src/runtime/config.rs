@@ -1,4 +1,7 @@
-#![cfg_attr(any(not(feature = "full"), tokio_wasm), allow(dead_code))]
+#![cfg_attr(
+    any(not(all(tokio_unstable, feature = "full")), target_family = "wasm"),
+    allow(dead_code)
+)]
 use crate::runtime::Callback;
 use crate::util::RngSeedGenerator;
 
@@ -8,6 +11,9 @@ pub(crate) struct Config {
 
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(crate) event_interval: u32,
+
+    /// How big to make each worker's local queue
+    pub(crate) local_queue_capacity: usize,
 
     /// Callback for a worker parking itself
     pub(crate) before_park: Option<Callback>,

@@ -27,7 +27,7 @@ cfg_io_util! {
         ) => {
             $(
                 $(#[$outer])*
-                fn $name<'a>(&'a mut self) -> $($fut)*<&'a mut Self> where Self: Unpin {
+                fn $name(&mut self) -> $($fut)*<&mut Self> where Self: Unpin {
                     $($fut)*::new(self)
                 }
             )*
@@ -230,10 +230,13 @@ cfg_io_util! {
         ///     let mut buffer = BytesMut::with_capacity(10);
         ///
         ///     assert!(buffer.is_empty());
+        ///     assert!(buffer.capacity() >= 10);
         ///
-        ///     // read up to 10 bytes, note that the return value is not needed
-        ///     // to access the data that was read as `buffer`'s internal
-        ///     // cursor is updated.
+        ///     // note that the return value is not needed to access the data
+        ///     // that was read as `buffer`'s internal cursor is updated.
+        ///     //
+        ///     // this might read more than 10 bytes if the capacity of `buffer`
+        ///     // is larger than 10.
         ///     f.read_buf(&mut buffer).await?;
         ///
         ///     println!("The bytes: {:?}", &buffer[..]);
@@ -292,7 +295,8 @@ cfg_io_util! {
         /// #[tokio::main]
         /// async fn main() -> io::Result<()> {
         ///     let mut f = File::open("foo.txt").await?;
-        ///     let mut buffer = [0; 10];
+        ///     let len = 10;
+        ///     let mut buffer = vec![0; len];
         ///
         ///     // read exactly 10 bytes
         ///     f.read_exact(&mut buffer).await?;

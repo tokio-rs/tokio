@@ -75,9 +75,7 @@ cfg_io_std! {
 
 #[cfg(unix)]
 mod sys {
-    #[cfg(not(tokio_no_as_fd))]
-    use std::os::unix::io::{AsFd, BorrowedFd};
-    use std::os::unix::io::{AsRawFd, RawFd};
+    use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, RawFd};
 
     use super::Stderr;
 
@@ -87,7 +85,6 @@ mod sys {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsFd for Stderr {
         fn as_fd(&self) -> BorrowedFd<'_> {
             unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
@@ -96,9 +93,7 @@ mod sys {
 }
 
 cfg_windows! {
-    #[cfg(not(tokio_no_as_fd))]
-    use crate::os::windows::io::{AsHandle, BorrowedHandle};
-    use crate::os::windows::io::{AsRawHandle, RawHandle};
+    use crate::os::windows::io::{AsHandle, BorrowedHandle, AsRawHandle, RawHandle};
 
     impl AsRawHandle for Stderr {
         fn as_raw_handle(&self) -> RawHandle {
@@ -106,7 +101,6 @@ cfg_windows! {
         }
     }
 
-    #[cfg(not(tokio_no_as_fd))]
     impl AsHandle for Stderr {
         fn as_handle(&self) -> BorrowedHandle<'_> {
             unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }

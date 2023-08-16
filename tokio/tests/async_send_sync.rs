@@ -130,7 +130,7 @@ macro_rules! assert_value {
 macro_rules! cfg_not_wasi {
     ($($item:item)*) => {
         $(
-            #[cfg(not(tokio_wasi))]
+            #[cfg(not(target_os = "wasi"))]
             $item
         )*
     }

@@ -1,3 +1,149 @@
+# 1.31.0 (August 10, 2023)
+
+### Fixed
+
+* io: delegate `WriteHalf::poll_write_vectored` ([#5914])
+
+### Unstable
+
+* rt(unstable): fix memory leak in unstable next-gen scheduler prototype ([#5911])
+* rt: expose mean task poll time metric ([#5927])
+
+[#5914]: https://github.com/tokio-rs/tokio/pull/5914
+[#5911]: https://github.com/tokio-rs/tokio/pull/5911
+[#5927]: https://github.com/tokio-rs/tokio/pull/5927
+
+# 1.30.0 (August 9, 2023)
+
+This release bumps the MSRV of Tokio to 1.63. ([#5887])
+
+### Changed
+
+- tokio: reduce LLVM code generation ([#5859])
+- io: support `--cfg mio_unsupported_force_poll_poll` flag ([#5881])
+- sync: make `const_new` methods always available ([#5885])
+- sync: avoid false sharing in mpsc channel ([#5829])
+- rt: pop at least one task from inject queue ([#5908])
+
+### Added
+
+- sync: add `broadcast::Sender::new` ([#5824])
+- net: implement `UCred` for espidf ([#5868])
+- fs: add `File::options()` ([#5869])
+- time: implement extra reset variants for `Interval` ([#5878])
+- process: add `{ChildStd*}::into_owned_{fd, handle}` ([#5899])
+
+### Removed
+
+- tokio: removed unused `tokio_*` cfgs ([#5890])
+- remove build script to speed up compilation ([#5887])
+
+### Documented
+
+- sync: mention lagging in docs for `broadcast::send` ([#5820])
+- runtime: expand on sharing runtime docs ([#5858])
+- io: use vec in example for `AsyncReadExt::read_exact` ([#5863])
+- time: mark `Sleep` as `!Unpin` in docs ([#5916])
+- process: fix `raw_arg` not showing up in docs ([#5865])
+
+### Unstable
+
+- rt: add runtime ID ([#5864])
+- rt: initial implementation of new threaded runtime ([#5823])
+
+[#5820]: https://github.com/tokio-rs/tokio/pull/5820
+[#5823]: https://github.com/tokio-rs/tokio/pull/5823
+[#5824]: https://github.com/tokio-rs/tokio/pull/5824
+[#5829]: https://github.com/tokio-rs/tokio/pull/5829
+[#5858]: https://github.com/tokio-rs/tokio/pull/5858
+[#5859]: https://github.com/tokio-rs/tokio/pull/5859
+[#5863]: https://github.com/tokio-rs/tokio/pull/5863
+[#5864]: https://github.com/tokio-rs/tokio/pull/5864
+[#5865]: https://github.com/tokio-rs/tokio/pull/5865
+[#5868]: https://github.com/tokio-rs/tokio/pull/5868
+[#5869]: https://github.com/tokio-rs/tokio/pull/5869
+[#5878]: https://github.com/tokio-rs/tokio/pull/5878
+[#5881]: https://github.com/tokio-rs/tokio/pull/5881
+[#5885]: https://github.com/tokio-rs/tokio/pull/5885
+[#5887]: https://github.com/tokio-rs/tokio/pull/5887
+[#5890]: https://github.com/tokio-rs/tokio/pull/5890
+[#5899]: https://github.com/tokio-rs/tokio/pull/5899
+[#5908]: https://github.com/tokio-rs/tokio/pull/5908
+[#5916]: https://github.com/tokio-rs/tokio/pull/5916
+
+# 1.29.1 (June 29, 2023)
+
+### Fixed
+
+- rt: fix nesting two `block_in_place` with a `block_on` between ([#5837])
+
+[#5837]: https://github.com/tokio-rs/tokio/pull/5837
+
+# 1.29.0 (June 27, 2023)
+
+Technically a breaking change, the `Send` implementation is removed from
+`runtime::EnterGuard`. This change fixes a bug and should not impact most users.
+
+### Breaking
+
+- rt: `EnterGuard` should not be `Send` ([#5766])
+
+### Fixed
+
+- fs: reduce blocking ops in `fs::read_dir` ([#5653])
+- rt: fix possible starvation ([#5686], [#5712])
+- rt: fix stacked borrows issue in `JoinSet` ([#5693])
+- rt: panic if `EnterGuard` dropped incorrect order ([#5772])
+- time: do not overflow to signal value ([#5710])
+- fs: wait for in-flight ops before cloning `File` ([#5803])
+
+### Changed
+
+- rt: reduce time to poll tasks scheduled from outside the runtime ([#5705], [#5720])
+
+### Added
+
+- net: add uds doc alias for unix sockets ([#5659])
+- rt: add metric for number of tasks ([#5628])
+- sync: implement more traits for channel errors ([#5666])
+- net: add nodelay methods on TcpSocket ([#5672])
+- sync: add `broadcast::Receiver::blocking_recv` ([#5690])
+- process: add `raw_arg` method to `Command` ([#5704])
+- io: support PRIORITY epoll events ([#5566])
+- task: add `JoinSet::poll_join_next` ([#5721])
+- net: add support for Redox OS ([#5790])
+
+
+### Unstable
+
+- rt: add the ability to dump task backtraces ([#5608], [#5676], [#5708], [#5717])
+- rt: instrument task poll times with a histogram ([#5685])
+
+[#5766]: https://github.com/tokio-rs/tokio/pull/5766
+[#5653]: https://github.com/tokio-rs/tokio/pull/5653
+[#5686]: https://github.com/tokio-rs/tokio/pull/5686
+[#5712]: https://github.com/tokio-rs/tokio/pull/5712
+[#5693]: https://github.com/tokio-rs/tokio/pull/5693
+[#5772]: https://github.com/tokio-rs/tokio/pull/5772
+[#5710]: https://github.com/tokio-rs/tokio/pull/5710
+[#5803]: https://github.com/tokio-rs/tokio/pull/5803
+[#5705]: https://github.com/tokio-rs/tokio/pull/5705
+[#5720]: https://github.com/tokio-rs/tokio/pull/5720
+[#5659]: https://github.com/tokio-rs/tokio/pull/5659
+[#5628]: https://github.com/tokio-rs/tokio/pull/5628
+[#5666]: https://github.com/tokio-rs/tokio/pull/5666
+[#5672]: https://github.com/tokio-rs/tokio/pull/5672
+[#5690]: https://github.com/tokio-rs/tokio/pull/5690
+[#5704]: https://github.com/tokio-rs/tokio/pull/5704
+[#5566]: https://github.com/tokio-rs/tokio/pull/5566
+[#5721]: https://github.com/tokio-rs/tokio/pull/5721
+[#5790]: https://github.com/tokio-rs/tokio/pull/5790
+[#5608]: https://github.com/tokio-rs/tokio/pull/5608
+[#5676]: https://github.com/tokio-rs/tokio/pull/5676
+[#5708]: https://github.com/tokio-rs/tokio/pull/5708
+[#5717]: https://github.com/tokio-rs/tokio/pull/5717
+[#5685]: https://github.com/tokio-rs/tokio/pull/5685
+
 # 1.28.2 (May 28, 2023)
 
 Forward ports 1.18.6 changes.

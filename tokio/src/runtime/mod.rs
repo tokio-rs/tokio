@@ -175,7 +175,7 @@
 
 // At the top due to macros
 #[cfg(test)]
-#[cfg(not(tokio_wasm))]
+#[cfg(not(target_family = "wasm"))]
 #[macro_use]
 mod tests;
 
@@ -212,7 +212,7 @@ cfg_rt! {
     use config::Config;
 
     mod blocking;
-    #[cfg_attr(tokio_wasi, allow(unused_imports))]
+    #[cfg_attr(target_os = "wasi", allow(unused_imports))]
     pub(crate) use blocking::spawn_blocking;
 
     cfg_trace! {
@@ -226,6 +226,10 @@ cfg_rt! {
     mod builder;
     pub use self::builder::Builder;
     cfg_unstable! {
+        mod id;
+        #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+        pub use id::Id;
+
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
     }

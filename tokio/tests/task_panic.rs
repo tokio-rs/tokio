@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![allow(clippy::declare_interior_mutable_const)]
-#![cfg(all(feature = "full", not(tokio_wasi)))]
+#![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 use futures::future;
 use std::error::Error;

@@ -1,7 +1,9 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(tokio_wasi)))] // Wasi does not support panic recovery
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support panic recovery
 
-use tokio::io::{split, AsyncRead, AsyncWrite, ReadBuf, ReadHalf, WriteHalf};
+use tokio::io::{
+    split, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf, ReadHalf, WriteHalf,
+};
 
 use std::io;
 use std::pin::Pin;
@@ -35,6 +37,18 @@ impl AsyncWrite for RW {
 
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         Poll::Ready(Ok(()))
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _bufs: &[io::IoSlice<'_>],
+    ) -> Poll<Result<usize, io::Error>> {
+        Poll::Ready(Ok(2))
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
     }
 }
 
@@ -76,4 +90,27 @@ fn unsplit_err2() {
     let (_, w) = split(RW);
     let (r, _) = split(RW);
     r.unsplit(w);
+}
+
+#[test]
+fn method_delegation() {
+    let (mut r, mut w) = split(RW);
+    let mut buf = [0; 1];
+
+    tokio_test::block_on(async move {
+        assert_eq!(1, r.read(&mut buf).await.unwrap());
+        assert_eq!(b'z', buf[0]);
+
+        assert_eq!(1, w.write(&[b'x']).await.unwrap());
+        assert_eq!(
+            2,
+            w.write_vectored(&[io::IoSlice::new(&[b'x'])])
+                .await
+                .unwrap()
+        );
+        assert!(w.is_write_vectored());
+
+        assert!(w.flush().await.is_ok());
+        assert!(w.shutdown().await.is_ok());
+    });
 }

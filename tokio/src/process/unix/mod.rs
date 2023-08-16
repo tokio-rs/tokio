@@ -39,9 +39,7 @@ use std::fmt;
 use std::fs::File;
 use std::future::Future;
 use std::io;
-#[cfg(not(tokio_no_as_fd))]
-use std::os::unix::io::{AsFd, BorrowedFd};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::pin::Pin;
 use std::process::{Child as StdChild, ExitStatus, Stdio};
 use std::task::Context;
@@ -196,14 +194,13 @@ impl AsRawFd for Pipe {
     }
 }
 
-#[cfg(not(tokio_no_as_fd))]
 impl AsFd for Pipe {
     fn as_fd(&self) -> BorrowedFd<'_> {
         unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
     }
 }
 
-pub(crate) fn convert_to_stdio(io: ChildStdio) -> io::Result<Stdio> {
+fn convert_to_blocking_file(io: ChildStdio) -> io::Result<File> {
     let mut fd = io.inner.into_inner()?.fd;
 
     // Ensure that the fd to be inherited is set to *blocking* mode, as this
@@ -212,7 +209,11 @@ pub(crate) fn convert_to_stdio(io: ChildStdio) -> io::Result<Stdio> {
     // change it to nonblocking mode.
     set_nonblocking(&mut fd, false)?;
 
-    Ok(Stdio::from(fd))
+    Ok(fd)
+}
+
+pub(crate) fn convert_to_stdio(io: ChildStdio) -> io::Result<Stdio> {
+    convert_to_blocking_file(io).map(Stdio::from)
 }
 
 impl Source for Pipe {
@@ -243,6 +244,12 @@ pub(crate) struct ChildStdio {
     inner: PollEvented<Pipe>,
 }
 
+impl ChildStdio {
+    pub(super) fn into_owned_fd(self) -> io::Result<OwnedFd> {
+        convert_to_blocking_file(self).map(OwnedFd::from)
+    }
+}
+
 impl fmt::Debug for ChildStdio {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(fmt)
@@ -255,7 +262,6 @@ impl AsRawFd for ChildStdio {
     }
 }
 
-#[cfg(not(tokio_no_as_fd))]
 impl AsFd for ChildStdio {
     fn as_fd(&self) -> BorrowedFd<'_> {
         unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }

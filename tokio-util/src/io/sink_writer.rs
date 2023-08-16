@@ -59,7 +59,7 @@ pin_project! {
     /// [`CopyToBytes`]: crate::io::CopyToBytes
     /// [`Encoder`]: crate::codec::Encoder
     /// [`Sink`]: futures_sink::Sink
-    /// [`codec`]: tokio_util::codec
+    /// [`codec`]: crate::codec
     #[derive(Debug)]
     pub struct SinkWriter<S> {
         #[pin]
