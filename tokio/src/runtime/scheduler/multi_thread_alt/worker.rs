@@ -817,7 +817,7 @@ impl Worker {
     /// workers will be trying to steal at the same time.
     fn search_for_work(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
         #[cfg(not(loom))]
-        const ROUNDS: usize = 1;
+        const ROUNDS: usize = 4;
 
         #[cfg(loom)]
         const ROUNDS: usize = 1;
@@ -999,6 +999,14 @@ impl Worker {
 
             // Number of tasks we want to try to spread across idle workers
             let num_fanout = cmp::min(defer.len(), cx.shared().idle.num_idle(&synced.idle));
+
+            // Cap the number of threads woken up at one time. This is to limit
+            // the number of no-op wakes and reduce mutext contention.
+            //
+            // This number was picked after some basic benchmarks, but it can
+            // probably be tuned using the mean poll time value (slower task
+            // polls can leverage more woken workers).
+            let num_fanout = cmp::min(2, num_fanout);
 
             if num_fanout > 0 {
                 cx.shared()
