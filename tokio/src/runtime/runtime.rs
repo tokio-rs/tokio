@@ -260,6 +260,7 @@ impl Runtime {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
+    /// ```
     #[track_caller]
     pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
