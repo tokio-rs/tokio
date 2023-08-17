@@ -190,7 +190,7 @@ mod imp {
     pub(crate) fn inc_num_driver_wakes_no_core() {}
 
     impl super::Counters {
-        pub(crate) fn dump(&mut self, _: &[WorkerMetrics]) {}
+        pub(crate) fn dump(&self, _: &[WorkerMetrics]) {}
     }
 }
 

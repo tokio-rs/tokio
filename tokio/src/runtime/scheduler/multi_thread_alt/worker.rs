@@ -178,12 +178,6 @@ pub(crate) struct Shared {
     counters: Counters,
 }
 
-impl Drop for Shared {
-    fn drop(&mut self) {
-        self.counters.dump(&self.worker_metrics);
-    }
-}
-
 /// Data synchronized by the scheduler mutex
 pub(crate) struct Synced {
     /// When worker is notified, it is assigned a core. The core is placed here
@@ -1512,6 +1506,9 @@ impl Shared {
         while let Some(task) = self.next_remote_task_synced(synced) {
             drop(task);
         }
+
+        // Drop counters if enabled
+        handle.shared.counters.dump(&handle.shared.worker_metrics);
     }
 }
 
