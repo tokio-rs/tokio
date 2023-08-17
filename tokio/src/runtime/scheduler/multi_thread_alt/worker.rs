@@ -175,7 +175,13 @@ pub(crate) struct Shared {
     /// runtime metrics that can be useful when doing performance
     /// investigations. This does nothing (empty struct, no drop impl) unless
     /// the `tokio_internal_mt_counters` cfg flag is set.
-    _counters: Counters,
+    counters: Counters,
+}
+
+impl Drop for Shared {
+    fn drop(&mut self) {
+        self.counters.dump(&self.worker_metrics);
+    }
 }
 
 /// Data synchronized by the scheduler mutex
@@ -321,7 +327,7 @@ pub(super) fn create(
             config,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
-            _counters: Counters,
+            counters: Counters,
         },
         driver: driver_handle,
         blocking_spawner,
@@ -1215,6 +1221,7 @@ impl Worker {
         if let Some(mut driver) = cx.shared().take_driver() {
             // Wait for driver events
             driver.park(&cx.handle.driver);
+            super::counters::inc_num_driver_wakes();
 
             synced = cx.shared().synced.lock();
 
@@ -1233,6 +1240,8 @@ impl Worker {
                 // This may result in a task being run
                 self.schedule_deferred_with_core(cx, core, move || synced)
             } else {
+                super::counters::inc_num_driver_wakes_no_core();
+
                 // Schedule any deferred tasks
                 self.schedule_deferred_without_core(cx, &mut synced);
 

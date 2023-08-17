@@ -2,6 +2,8 @@
 mod imp {
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering::Relaxed;
+    use std::time::Duration;
+    use crate::runtime::WorkerMetrics;
 
     static NUM_MAINTENANCE: AtomicUsize = AtomicUsize::new(0);
     static NUM_NOTIFY_LOCAL: AtomicUsize = AtomicUsize::new(0);
@@ -21,9 +23,11 @@ mod imp {
     static NUM_RELAY_SEARCH: AtomicUsize = AtomicUsize::new(0);
     static NUM_SPIN_STALL: AtomicUsize = AtomicUsize::new(0);
     static NUM_NO_LOCAL_WORK: AtomicUsize = AtomicUsize::new(0);
+    static NUM_DRIVER_WAKE: AtomicUsize = AtomicUsize::new(0);
+    static NUM_DRIVER_WAKE_NO_CORE: AtomicUsize = AtomicUsize::new(0);
 
-    impl Drop for super::Counters {
-        fn drop(&mut self) {
+    impl super::Counters {
+        pub(crate) fn dump(&self, worker_metrics: &[WorkerMetrics]) {
             let notifies_local = NUM_NOTIFY_LOCAL.load(Relaxed);
             let notifies_remote = NUM_NOTIFY_REMOTE.load(Relaxed);
             let unparks_local = NUM_UNPARKS_LOCAL.load(Relaxed);
@@ -42,6 +46,8 @@ mod imp {
             let num_relay_search = NUM_RELAY_SEARCH.load(Relaxed);
             let num_spin_stall = NUM_SPIN_STALL.load(Relaxed);
             let num_no_local_work = NUM_NO_LOCAL_WORK.load(Relaxed);
+            let num_driver_wake = NUM_DRIVER_WAKE.load(Relaxed);
+            let num_driver_wake_no_core = NUM_DRIVER_WAKE_NO_CORE.load(Relaxed);
 
             println!("---");
             println!("notifies (remote): {}", notifies_remote);
@@ -62,6 +68,18 @@ mod imp {
             println!("     relay search: {}", num_relay_search);
             println!("       spin stall: {}", num_spin_stall);
             println!("    no local work: {}", num_no_local_work);
+            println!("     driver wakes: {}", num_driver_wake);
+            println!("        (no core): {}", num_driver_wake_no_core);
+            println!("");
+            println!("worker metrics:");
+
+            for (i, worker) in worker_metrics.iter().enumerate() {
+                let mean_poll_time = Duration::from_nanos(worker.mean_poll_time.load(Relaxed));
+
+                println!("");
+                println!("{}:", i);
+                println!("  mean poll time: {:?}", mean_poll_time);
+            }
         }
     }
 
@@ -136,10 +154,20 @@ mod imp {
     pub(crate) fn inc_num_no_local_work() {
         NUM_NO_LOCAL_WORK.fetch_add(1, Relaxed);
     }
+
+    pub(crate) fn inc_num_driver_wakes() {
+        NUM_DRIVER_WAKE.fetch_add(1, Relaxed);
+    }
+
+    pub(crate) fn inc_num_driver_wakes_no_core() {
+        NUM_DRIVER_WAKE_NO_CORE.fetch_add(1, Relaxed);
+    }
 }
 
 #[cfg(not(tokio_internal_mt_counters))]
 mod imp {
+    use crate::runtime::WorkerMetrics;
+
     pub(crate) fn inc_num_inc_notify_local() {}
     pub(crate) fn inc_num_notify_remote() {}
     pub(crate) fn inc_num_unparks_local() {}
@@ -158,6 +186,12 @@ mod imp {
     pub(crate) fn inc_num_relay_search() {}
     pub(crate) fn inc_num_spin_stall() {}
     pub(crate) fn inc_num_no_local_work() {}
+    pub(crate) fn inc_num_driver_wakes() {}
+    pub(crate) fn inc_num_driver_wakes_no_core() {}
+
+    impl super::Counters {
+        pub(crate) fn dump(&mut self, _: &[WorkerMetrics]) {}
+    }
 }
 
 #[derive(Debug)]
