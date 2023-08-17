@@ -50,6 +50,8 @@ impl Handle {
     {
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
 
+        super::counters::inc_num_spawns();
+
         if let Some(notified) = notified {
             me.shared.schedule_task(notified, false);
         }

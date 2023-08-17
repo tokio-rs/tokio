@@ -25,6 +25,7 @@ mod imp {
     static NUM_NO_LOCAL_WORK: AtomicUsize = AtomicUsize::new(0);
     static NUM_DRIVER_WAKE: AtomicUsize = AtomicUsize::new(0);
     static NUM_DRIVER_WAKE_NO_CORE: AtomicUsize = AtomicUsize::new(0);
+    static NUM_SPAWNS: AtomicUsize = AtomicUsize::new(0);
 
     impl super::Counters {
         pub(crate) fn dump(&self, worker_metrics: &[WorkerMetrics]) {
@@ -48,6 +49,7 @@ mod imp {
             let num_no_local_work = NUM_NO_LOCAL_WORK.load(Relaxed);
             let num_driver_wake = NUM_DRIVER_WAKE.load(Relaxed);
             let num_driver_wake_no_core = NUM_DRIVER_WAKE_NO_CORE.load(Relaxed);
+            let num_spawns = NUM_SPAWNS.load(Relaxed);
 
             println!("---");
             println!("notifies (remote): {}", notifies_remote);
@@ -70,6 +72,7 @@ mod imp {
             println!("    no local work: {}", num_no_local_work);
             println!("     driver wakes: {}", num_driver_wake);
             println!("        (no core): {}", num_driver_wake_no_core);
+            println!("       num spawns: {}", num_spawns);
             println!("");
             println!("worker metrics:");
 
@@ -162,6 +165,10 @@ mod imp {
     pub(crate) fn inc_num_driver_wakes_no_core() {
         NUM_DRIVER_WAKE_NO_CORE.fetch_add(1, Relaxed);
     }
+
+    pub(crate) fn inc_num_spawns() {
+        NUM_SPAWNS.fetch_add(1, Relaxed);
+    }
 }
 
 #[cfg(not(tokio_internal_mt_counters))]
@@ -188,6 +195,7 @@ mod imp {
     pub(crate) fn inc_num_no_local_work() {}
     pub(crate) fn inc_num_driver_wakes() {}
     pub(crate) fn inc_num_driver_wakes_no_core() {}
+    pub(crate) fn inc_num_spawns() {}
 
     impl super::Counters {
         pub(crate) fn dump(&self, _: &[WorkerMetrics]) {}
