@@ -73,6 +73,21 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
+/// Limit access to a file:
+/// ```
+/// use std::io::{Result, Write};
+/// use std::fs::File;
+///
+/// static PERMITS: Semaphore = Semaphore::const_new(100);
+///
+/// async fn write_to_file(message: &[u8]) -> Result<()> {
+///     let _permit = PERMITS.acquire().await.unwrap();
+///     let mut buffer = File::create("example.txt")?;
+///     buffer.write_all(message)?;
+///     Ok(())
+/// }
+/// ```
+///
 /// [`PollSemaphore`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSemaphore.html
 /// [`Semaphore::acquire_owned`]: crate::sync::Semaphore::acquire_owned
 #[derive(Debug)]
