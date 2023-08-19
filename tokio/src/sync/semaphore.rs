@@ -75,15 +75,17 @@ use std::sync::Arc;
 ///
 /// Limit access to a file:
 /// ```
-/// use std::io::{Result, Write};
+/// use std::io::Result;
 /// use tokio::fs::File;
+/// use tokio::sync::Semaphore;
+/// use tokio::io::AsyncWriteExt;
 ///
 /// static PERMITS: Semaphore = Semaphore::const_new(100);
 ///
 /// async fn write_to_file(message: &[u8]) -> Result<()> {
 ///     let _permit = PERMITS.acquire().await.unwrap();
-///     let mut buffer = File::create("example.txt")?;
-///     buffer.write_all(message)?;
+///     let mut buffer = File::create("example.txt").await?;
+///     buffer.write_all(message).await?;
 ///     Ok(())
 /// }
 /// ```
