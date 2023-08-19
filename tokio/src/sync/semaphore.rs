@@ -76,7 +76,7 @@ use std::sync::Arc;
 /// Limit access to a file:
 /// ```
 /// use std::io::{Result, Write};
-/// use std::fs::File;
+/// use tokio::fs::File;
 ///
 /// static PERMITS: Semaphore = Semaphore::const_new(100);
 ///
