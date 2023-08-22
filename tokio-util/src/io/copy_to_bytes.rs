@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use futures_core::stream::Stream;
 use futures_sink::Sink;
 use pin_project_lite::pin_project;
 use std::pin::Pin;
@@ -64,5 +65,12 @@ where
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project().inner.poll_close(cx)
+    }
+}
+
+impl<S: Stream> Stream for CopyToBytes<S> {
+    type Item = S::Item;
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.project().inner.poll_next(cx)
     }
 }
