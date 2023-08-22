@@ -1,6 +1,7 @@
 use futures_core::ready;
 use futures_sink::Sink;
 
+use futures_core::stream::Stream;
 use pin_project_lite::pin_project;
 use std::io;
 use std::pin::Pin;
@@ -113,5 +114,12 @@ where
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         self.project().inner.poll_close(cx).map_err(Into::into)
+    }
+}
+
+impl<S: Stream> Stream for SinkWriter<S> {
+    type Item = S::Item;
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.project().inner.poll_next(cx)
     }
 }
