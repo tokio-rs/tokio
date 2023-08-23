@@ -1,3 +1,17 @@
+# 0.4.3 (August 23, 2023)
+
+- deps: fix minimum required version of `async-stream` ([#5347])
+- deps: fix minimum required version of `tokio-stream` ([#4376])
+- docs: improve `tokio_test::task` docs ([#5132])
+- io: fetch actions from mock handle before write ([#5814])
+- io: fix wait operation on mock ([#5554])
+
+[#4376]: https://github.com/tokio-rs/tokio/pull/4376
+[#5132]: https://github.com/tokio-rs/tokio/pull/5132
+[#5347]: https://github.com/tokio-rs/tokio/pull/5347
+[#5554]: https://github.com/tokio-rs/tokio/pull/5554
+[#5814]: https://github.com/tokio-rs/tokio/pull/5814
+
 # 0.4.2 (May 14, 2021)
 
 - test: add `assert_elapsed!` macro ([#3728])
