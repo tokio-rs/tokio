@@ -206,6 +206,20 @@ impl Semaphore {
         }
     }
 
+    /// Creates a new closed semaphore with 0 permits.
+    #[cfg(not(all(loom, test)))]
+    pub(crate) const fn const_new_closed() -> Self {
+        Self {
+            permits: AtomicUsize::new(Self::CLOSED),
+            waiters: Mutex::const_new(Waitlist {
+                queue: LinkedList::new(),
+                closed: true,
+            }),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: tracing::Span::none(),
+        }
+    }
+
     /// Returns the current number of available permits.
     pub(crate) fn available_permits(&self) -> usize {
         self.permits.load(Acquire) >> Self::PERMIT_SHIFT

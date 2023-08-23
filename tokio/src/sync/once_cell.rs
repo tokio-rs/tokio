@@ -149,6 +149,36 @@ impl<T> OnceCell<T> {
         }
     }
 
+    /// Creates a new `OnceCell` that contains the provided value.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio::sync::OnceCell;
+    ///
+    /// static ONCE: OnceCell<u32> = OnceCell::const_new_with(1);
+    ///
+    /// async fn get_global_integer() -> &'static u32 {
+    ///     ONCE.get_or_init(|| async {
+    ///         1 + 1
+    ///     }).await
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let result = get_global_integer().await;
+    ///     assert_eq!(*result, 1);
+    /// }
+    /// ```
+    #[cfg(not(all(loom, test)))]
+    pub const fn const_new_with(value: T) -> Self {
+        OnceCell {
+            value_set: AtomicBool::new(true),
+            value: UnsafeCell::new(MaybeUninit::new(value)),
+            semaphore: Semaphore::const_new_closed(),
+        }
+    }
+
     /// Creates a new empty `OnceCell` instance.
     ///
     /// Equivalent to `OnceCell::new`, except that it can be used in static
