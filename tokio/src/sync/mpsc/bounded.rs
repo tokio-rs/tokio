@@ -439,7 +439,7 @@ impl<T> Sender<T> {
     ///
     /// If `send` is used as the event in a [`tokio::select!`](crate::select)
     /// statement and some other branch completes first, then it is guaranteed
-    /// that the message was not sent. **However, in that case the message
+    /// that the message was not sent. **However, in that case, the message
     /// is dropped and will be lost.**
     ///
     /// To avoid losing messages, use [`reserve`](Self::reserve) to reserve
