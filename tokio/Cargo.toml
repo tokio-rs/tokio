@@ -88,11 +88,6 @@ sync = []
 test-util = ["rt", "sync", "time"]
 time = []
 
-# Technically, removing this is a breaking change even though it only ever did
-# anything with the unstable flag on. It is probably safe to get rid of it after
-# a few releases.
-stats = []
-
 [dependencies]
 tokio-macros = { version = "~2.1.0", path = "../tokio-macros", optional = true }
 
