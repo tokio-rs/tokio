@@ -14,7 +14,7 @@ homepage = "https://tokio.rs"
 description = """
 Testing utilities for Tokio- and futures-based code
 """
-categories = ["asynchronous", "testing"]
+categories = ["asynchronous", "development-tools::testing"]
 
 [dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["rt", "sync", "time", "test-util"] }
