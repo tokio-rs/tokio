@@ -10,24 +10,63 @@
 //!
 //! [`channel`] returns a [`Sender`] / [`Receiver`] pair. These are the producer
 //! and consumer halves of the channel. The channel is created with an initial
-//! value. The **latest** value stored in the channel is accessed with
-//! [`Receiver::borrow()`]. Awaiting [`Receiver::changed()`] waits for a new
-//! value to be sent by the [`Sender`] half.
+//! value.
+//!
+//! Each [`Receiver`] independently tracks the last value *seen* by its caller.
+//!
+//! To access the **latest** value stored in the channel and mark it as *seen*,
+//! use [`Receiver::borrow_and_update()`].
+//!
+//! To access the latest value but **not** mark it as seen, use
+//! [`Receiver::borrow()`].
+//!
+//! ## Change notifications
+//!
+//! The [`Receiver`] half provides an asynchronous [`changed`] method. This
+//! method is ready when a new, *unseen* value is sent via the [`Sender`] half.
+//!
+//! * The [`changed`] method returns `Ok(())` on receiving a new value, or
+//!   `Err(_)` if the [`Sender`] has been closed.
+//! * On completion, the [`changed`] method marks the new value as *seen*. If
+//!   [`Receiver::changed()`] is called again, it will not be ready unless a
+//!   subsequent value is sent.
+//! * At creation, the initial value is considered *seen*. In other words,
+//!   [`Receiver::changed()`] will not be ready until a subsequent value is sent
+//!   via the [`Sender`] half.
+//! * New [`Receiver`] instances can be created with [`Sender::subscribe()`].
+//!   The current value at the time the [`Receiver`] is created is considered
+//!   *seen*. [`Receiver::changed()`] will only be ready after subsequent values
+//!   are sent.
 //!
 //! # Examples
 //!
+//! In a loop with [`Receiver::changed()`], [`Receiver::borrow_and_update()`] is
+//! recommended over [`Receiver::borrow()`]. This avoids a potential race where
+//! a new value is sent between [`changed`] being ready and the value being
+//! read. If [`Receiver::borrow()`] is used, the loop may run twice with the
+//! same value.
+//!
+//! The following example prints `hello! world! `.
+//!
 //! ```
 //! use tokio::sync::watch;
+//! use tokio::time::{Duration, sleep};
 //!
 //! # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
 //! let (tx, mut rx) = watch::channel("hello");
 //!
 //! tokio::spawn(async move {
-//!     while rx.changed().await.is_ok() {
-//!         println!("received = {:?}", *rx.borrow());
+//!     // Use the equivalent of a "do-while" loop so the initial value is
+//!     // processed.
+//!     loop {
+//!         println!("{}! ", *rx.borrow_and_update());
+//!         if rx.changed().await.is_err() {
+//!             break;
+//!         }
 //!     }
 //! });
 //!
+//! sleep(Duration::from_millis(100)).await;
 //! tx.send("world")?;
 //! # Ok(())
 //! # }
@@ -39,8 +78,8 @@
 //! when all [`Receiver`] handles have been dropped. This indicates that there
 //! is no further interest in the values being produced and work can be stopped.
 //!
-//! The value in the channel will not be dropped until the sender and all receivers
-//! have been dropped.
+//! The value in the channel will not be dropped until the sender and all
+//! receivers have been dropped.
 //!
 //! # Thread safety
 //!
@@ -50,11 +89,15 @@
 //!
 //! [`Sender`]: crate::sync::watch::Sender
 //! [`Receiver`]: crate::sync::watch::Receiver
+//! [`changed`]: crate::sync::watch::Receiver::changed
 //! [`Receiver::changed()`]: crate::sync::watch::Receiver::changed
 //! [`Receiver::borrow()`]: crate::sync::watch::Receiver::borrow
+//! [`Receiver::borrow_and_update()`]:
+//!     crate::sync::watch::Receiver::borrow_and_update
 //! [`channel`]: crate::sync::watch::channel
 //! [`Sender::is_closed`]: crate::sync::watch::Sender::is_closed
 //! [`Sender::closed`]: crate::sync::watch::Sender::closed
+//! [`Sender::subscribe()`]: crate::sync::watch::Sender::subscribe
 
 use crate::sync::notify::Notify;
 
@@ -374,19 +417,28 @@ mod state {
 ///
 /// # Examples
 ///
+/// The following example prints `hello! world! `.
+///
 /// ```
 /// use tokio::sync::watch;
+/// use tokio::time::{Duration, sleep};
 ///
 /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-///     let (tx, mut rx) = watch::channel("hello");
+/// let (tx, mut rx) = watch::channel("hello");
 ///
-///     tokio::spawn(async move {
-///         while rx.changed().await.is_ok() {
-///             println!("received = {:?}", *rx.borrow());
+/// tokio::spawn(async move {
+///     // Use the equivalent of a "do-while" loop so the initial value is
+///     // processed.
+///     loop {
+///         println!("{}! ", *rx.borrow_and_update());
+///         if rx.changed().await.is_err() {
+///             break;
 ///         }
-///     });
+///     }
+/// });
 ///
-///     tx.send("world")?;
+/// sleep(Duration::from_millis(100)).await;
+/// tx.send("world")?;
 /// # Ok(())
 /// # }
 /// ```
@@ -595,7 +647,7 @@ impl<T> Receiver<T> {
     ///     });
     ///
     ///     assert!(rx.changed().await.is_ok());
-    ///     assert_eq!(*rx.borrow(), "goodbye");
+    ///     assert_eq!(*rx.borrow_and_update(), "goodbye");
     ///
     ///     // The `tx` handle has been dropped
     ///     assert!(rx.changed().await.is_err());
