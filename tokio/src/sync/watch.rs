@@ -28,14 +28,14 @@
 //! * The [`changed`] method returns `Ok(())` on receiving a new value, or
 //!   `Err(_)` if the [`Sender`] has been closed.
 //! * On completion, the [`changed`] method marks the new value as *seen*. If
-//!   [`Receiver::changed()`] is called again, it will not be ready unless a
-//!   subsequent value is sent.
+//!   [`Receiver::changed()`] is called again, it will not return immediately
+//!   unless a subsequent value is sent.
 //! * At creation, the initial value is considered *seen*. In other words,
-//!   [`Receiver::changed()`] will not be ready until a subsequent value is sent
-//!   via the [`Sender`] half.
+//!   [`Receiver::changed()`] will not return immediately until a subsequent
+//!   value is sent via the [`Sender`] half.
 //! * New [`Receiver`] instances can be created with [`Sender::subscribe()`].
 //!   The current value at the time the [`Receiver`] is created is considered
-//!   *seen*. [`Receiver::changed()`] will only be ready after subsequent values
+//!   *seen*. [`Receiver::changed()`] will only return after subsequent values
 //!   are sent.
 //!
 //! # Examples
