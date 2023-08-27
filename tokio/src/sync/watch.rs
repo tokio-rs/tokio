@@ -17,8 +17,9 @@
 //! To access the **latest** value stored in the channel and mark it as *seen*,
 //! use [`Receiver::borrow_and_update()`].
 //!
-//! To access the latest value but **not** mark it as seen, use
-//! [`Receiver::borrow()`].
+//! To access the latest value **without** changing its state to *seen*, use
+//! [`Receiver::borrow()`]. (If the value has already been marked *seen*,
+//! [`Receiver::borrow()`] is equivalent to [`Receiver::borrow_and_update()`].)
 //!
 //! ## Change notifications
 //!
@@ -31,12 +32,12 @@
 //!   [`Receiver::changed()`] is called again, it will not return immediately
 //!   unless a subsequent value is sent.
 //! * At creation, the initial value is considered *seen*. In other words,
-//!   [`Receiver::changed()`] will not return immediately until a subsequent
-//!   value is sent via the [`Sender`] half.
+//!   [`Receiver::changed()`] will not return until a subsequent value is sent
+//!   via the [`Sender`] half.
 //! * New [`Receiver`] instances can be created with [`Sender::subscribe()`].
 //!   The current value at the time the [`Receiver`] is created is considered
-//!   *seen*. [`Receiver::changed()`] will only return after subsequent values
-//!   are sent.
+//!   *seen*. [`Receiver::changed()`] will not return until a subsequent value
+//!   is sent.
 //!
 //! # Examples
 //!
