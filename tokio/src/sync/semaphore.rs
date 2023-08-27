@@ -47,7 +47,23 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// Use [`Semaphore::acquire_owned`] to move permits across tasks:
+/// Limit number of incoming requests being handled at the same time, using a task-safe semaphore
+/// via [`Semaphore::acquire_owned`].
+///
+/// Similar to limiting the numer of simultaneous opened files, network handles are a limited resource.
+/// Allowing an unbounded amount of requests to be processed could result in a denial-of-service,
+/// and many other issues.
+///
+/// However, in contrast to the file example, this example uses a non-static, `Arc`-wrapped `Semaphore`
+/// for more fine-grained lifetime and ownership control. The `Arc` allows multiple threads and tasks
+/// to share ownership of the semaphore. Here we create a shallow-copy of the `Arc<Semaphore>` reference
+/// using `clone`. Then we move the `Arc` into our task, where we will wait to acquire a new permit
+/// via [`Semaphore::acquire_owned`] so we can start processing. Once our processing is done, we
+/// will drop the permit to allow other tasks to acquire it.
+///
+/// If we leave the scope where the `Arc<Semaphore>` was defined, and references still exist in any
+/// of our tasks to it, the `Semaphore` will continue to exist in a static-like context, until all
+/// `Arc`s have been dropped.
 ///
 /// ```
 /// use std::sync::Arc;
@@ -59,17 +75,22 @@ use std::sync::Arc;
 ///     let mut join_handles = Vec::new();
 ///
 ///     for _ in 0..5 {
-///         let permit = semaphore.clone().acquire_owned().await.unwrap();
+///         let semaphore_clone = semaphore.clone();
 ///         join_handles.push(tokio::spawn(async move {
-///             // perform task...
-///             // explicitly own `permit` in the task
-///             drop(permit);
+///             perform_task(semaphore_clone).await;
 ///         }));
 ///     }
 ///
 ///     for handle in join_handles {
 ///         handle.await.unwrap();
 ///     }
+/// }
+///
+/// async fn perform_task(semaphore: Arc<Semaphore>) {
+///     let permit = semaphore.acquire_owned().await.unwrap();
+///     // perform task...
+///     // explicitly own `permit` in the task
+///     drop(permit);
 /// }
 /// ```
 ///
