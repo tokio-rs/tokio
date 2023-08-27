@@ -815,7 +815,10 @@ impl<T> Sender<T> {
 fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     let mut tail = shared.tail.lock();
 
-    if tail.rx_cnt == MAX_RECEIVERS {
+    if tail.rx_cnt == 0 {
+        // Go back to drop values earlier, potentially consuming less memory
+        tail.pos = 0;
+    } else if tail.rx_cnt == MAX_RECEIVERS {
         panic!("max receivers");
     }
 
