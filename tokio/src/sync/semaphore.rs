@@ -73,6 +73,35 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
+/// Limit the number of simultaneously opened files in your program.
+///
+/// Most operating systems have limits on the number of open file
+/// handles. Even in systems without explicit limits, resource constraints
+/// implicitly set an upper bound on the number of open files. If your
+/// program attempts to open a large number of files and exceeds this
+/// limit, it will result in an error.
+///
+/// This example uses a Semaphore with 100 permits. By acquiring a permit from
+/// the Semaphore before accessing a file, you ensure that your program opens
+/// no more than 100 files at a time. When trying to open the 101st
+/// file, the program will wait until a permit becomes available before
+/// proceeding to open another file.
+/// ```
+/// use std::io::Result;
+/// use tokio::fs::File;
+/// use tokio::sync::Semaphore;
+/// use tokio::io::AsyncWriteExt;
+///
+/// static PERMITS: Semaphore = Semaphore::const_new(100);
+///
+/// async fn write_to_file(message: &[u8]) -> Result<()> {
+///     let _permit = PERMITS.acquire().await.unwrap();
+///     let mut buffer = File::create("example.txt").await?;
+///     buffer.write_all(message).await?;
+///     Ok(()) // Permit goes out of scope here, and is available again for acquisition
+/// }
+/// ```
+///
 /// [`PollSemaphore`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSemaphore.html
 /// [`Semaphore::acquire_owned`]: crate::sync::Semaphore::acquire_owned
 #[derive(Debug)]
@@ -185,6 +214,16 @@ impl Semaphore {
     pub(crate) fn new_closed() -> Self {
         Self {
             ll_sem: ll::Semaphore::new_closed(),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: tracing::Span::none(),
+        }
+    }
+
+    /// Creates a new closed semaphore with 0 permits.
+    #[cfg(not(all(loom, test)))]
+    pub(crate) const fn const_new_closed() -> Self {
+        Self {
+            ll_sem: ll::Semaphore::const_new_closed(),
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: tracing::Span::none(),
         }

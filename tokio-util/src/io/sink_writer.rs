@@ -1,11 +1,12 @@
 use futures_core::ready;
 use futures_sink::Sink;
 
+use futures_core::stream::Stream;
 use pin_project_lite::pin_project;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio::io::AsyncWrite;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 pin_project! {
     /// Convert a [`Sink`] of byte chunks into an [`AsyncWrite`].
@@ -113,5 +114,22 @@ where
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         self.project().inner.poll_close(cx).map_err(Into::into)
+    }
+}
+
+impl<S: Stream> Stream for SinkWriter<S> {
+    type Item = S::Item;
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.project().inner.poll_next(cx)
+    }
+}
+
+impl<S: AsyncRead> AsyncRead for SinkWriter<S> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        self.project().inner.poll_read(cx, buf)
     }
 }

@@ -4,7 +4,7 @@ name = "tokio-test"
 # - Remove path dependencies
 # - Update CHANGELOG.md.
 # - Create "tokio-test-0.4.x" git tag.
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
 rust-version = "1.56"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -14,7 +14,7 @@ homepage = "https://tokio.rs"
 description = """
 Testing utilities for Tokio- and futures-based code
 """
-categories = ["asynchronous", "testing"]
+categories = ["asynchronous", "development-tools::testing"]
 
 [dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["rt", "sync", "time", "test-util"] }

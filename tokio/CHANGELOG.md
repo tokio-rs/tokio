@@ -1,3 +1,23 @@
+# 1.32.0 (August 16, 2023)
+
+### Fixed
+
+- sync: fix potential quadradic behavior in `broadcast::Receiver` ([#5925])
+
+### Added
+
+- process: stabilize `Command::raw_arg` ([#5930])
+- io: enable awaiting error readiness ([#5781])
+
+### Unstable
+
+- rt(alt): improve scalability of alt runtime as the number of cores grows ([#5935])
+
+[#5925]: https://github.com/tokio-rs/tokio/pull/5925
+[#5930]: https://github.com/tokio-rs/tokio/pull/5930
+[#5781]: https://github.com/tokio-rs/tokio/pull/5781
+[#5935]: https://github.com/tokio-rs/tokio/pull/5935
+
 # 1.31.0 (August 10, 2023)
 
 ### Fixed
@@ -6,7 +26,7 @@
 
 ### Unstable
 
-* rt(unstable): fix memory leak in unstable next-gen scheduler prototype ([#5911])
+* rt(alt): fix memory leak in unstable next-gen scheduler prototype ([#5911])
 * rt: expose mean task poll time metric ([#5927])
 
 [#5914]: https://github.com/tokio-rs/tokio/pull/5914

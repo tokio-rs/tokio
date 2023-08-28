@@ -439,7 +439,11 @@ impl<T> Sender<T> {
     ///
     /// If `send` is used as the event in a [`tokio::select!`](crate::select)
     /// statement and some other branch completes first, then it is guaranteed
-    /// that the message was not sent.
+    /// that the message was not sent. **However, in that case, the message
+    /// is dropped and will be lost.**
+    ///
+    /// To avoid losing messages, use [`reserve`](Self::reserve) to reserve
+    /// capacity, then use the returned [`Permit`] to send the message.
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve`
     /// complete in the order they were requested.  Cancelling a call to

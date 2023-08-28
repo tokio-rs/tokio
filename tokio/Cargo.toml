@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.31.0"
+version = "1.32.0"
 edition = "2021"
 rust-version = "1.63"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -87,11 +87,6 @@ signal = [
 sync = []
 test-util = ["rt", "sync", "time"]
 time = []
-
-# Technically, removing this is a breaking change even though it only ever did
-# anything with the unstable flag on. It is probably safe to get rid of it after
-# a few releases.
-stats = []
 
 [dependencies]
 tokio-macros = { version = "~2.1.0", path = "../tokio-macros", optional = true }
