@@ -749,7 +749,7 @@ impl AsyncWrite for File {
                         None
                     };
 
-                    let n = buf.copy_from_bufs(bufs)?;
+                    let n = buf.copy_from_bufs(bufs);
                     let std = me.std.clone();
 
                     let blocking_task_join_handle = spawn_mandatory_blocking(move || {

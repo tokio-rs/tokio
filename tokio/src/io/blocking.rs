@@ -277,18 +277,23 @@ cfg_fs! {
             ret
         }
 
-        pub(crate) fn copy_from_bufs(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
-            let len = bufs.iter().map(|b| b.len()).sum();
-            if len > MAX_BUF {
-                return Err(io::Error::new(io::ErrorKind::Other, "The sum of bufs is too large"));
-            }
+        pub(crate) fn copy_from_bufs(&mut self, bufs: &[io::IoSlice<'_>]) -> usize {
+            assert!(self.is_empty());
 
-            self.buf.reserve(len);
+            let n = bufs.iter().map(|b| b.len()).sum::<usize>().min(MAX_BUF);
+
+            let mut rem = n;
             for buf in bufs {
-                self.buf.extend_from_slice(buf);
+                if rem == 0 {
+                    break
+                }
+
+                let len = buf.len().min(rem);
+                self.buf.extend_from_slice(&buf[..len]);
+                rem -= len;
             }
 
-            Ok(len)
+            n
         }
     }
 }
