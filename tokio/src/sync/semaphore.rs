@@ -57,40 +57,32 @@ use std::sync::Arc;
 /// However, in contrast to the file example, this example uses a non-static, `Arc`-wrapped `Semaphore`
 /// for more fine-grained lifetime and ownership control. The `Arc` allows multiple threads and tasks
 /// to share ownership of the semaphore. Here we create a shallow-copy of the `Arc<Semaphore>` reference
-/// using `clone`. Then we move the `Arc` into our task, where we will wait to acquire a new permit
-/// via [`Semaphore::acquire_owned`] so we can start processing. Once our processing is done, we
-/// will drop the permit to allow other tasks to acquire it.
+/// using `clone`. Then we acquire a permit through the `Arc` from the `Semaphore` via [`Semaphore::acquire_owned`],
+/// and move it inside the task. This ensures no non-`'static` variables are referenced from within
+/// said task.
 ///
 /// If we leave the scope where the `Arc<Semaphore>` was defined, and references still exist in any
 /// of our tasks to it, the `Semaphore` will continue to exist in a static-like context, until all
 /// `Arc`s have been dropped.
 ///
 /// ```
-/// use std::sync::Arc;
-/// use tokio::sync::Semaphore;
-///
 /// #[tokio::main]
 /// async fn main() {
 ///     let semaphore = Arc::new(Semaphore::new(3));
 ///     let mut join_handles = Vec::new();
 ///
 ///     for _ in 0..5 {
-///         let semaphore_clone = semaphore.clone();
+///         let permit = semaphore.clone().acquire_owned().await.unwrap();
 ///         join_handles.push(tokio::spawn(async move {
-///             perform_task(semaphore_clone).await;
+///             // perform task...
+///             // explicitly own `permit` in the task
+///             drop(permit);
 ///         }));
 ///     }
 ///
 ///     for handle in join_handles {
 ///         handle.await.unwrap();
 ///     }
-/// }
-///
-/// async fn perform_task(semaphore: Arc<Semaphore>) {
-///     let permit = semaphore.acquire_owned().await.unwrap();
-///     // perform task...
-///     // explicitly own `permit` in the task
-///     drop(permit);
 /// }
 /// ```
 ///
