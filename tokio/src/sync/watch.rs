@@ -21,6 +21,9 @@
 //! [`Receiver::borrow()`]. (If the value has already been marked *seen*,
 //! [`Receiver::borrow()`] is equivalent to [`Receiver::borrow_and_update()`].)
 //!
+//! For more information on when to use these methods, see
+//! [here](#borrow_and_update-versus-borrow).
+//!
 //! ## Change notifications
 //!
 //! The [`Receiver`] half provides an asynchronous [`changed`] method. This
@@ -514,7 +517,11 @@ impl<T> Receiver<T> {
     /// ```
     /// </details>
     ///
+    /// For more information on when to use this method versus
+    /// [`borrow_and_update`], see [here](self#borrow_and_update-versus-borrow).
+    ///
     /// [`changed`]: Receiver::changed
+    /// [`borrow_and_update`]: Receiver::borrow_and_update
     ///
     /// # Examples
     ///
@@ -566,7 +573,11 @@ impl<T> Receiver<T> {
     /// ```
     /// </details>
     ///
+    /// For more information on when to use this method versus [`borrow`], see
+    /// [here](self#borrow_and_update-versus-borrow).
+    ///
     /// [`changed`]: Receiver::changed
+    /// [`borrow`]: Receiver::borrow
     pub fn borrow_and_update(&mut self) -> Ref<'_, T> {
         let inner = self.shared.value.read().unwrap();
 
