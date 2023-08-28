@@ -525,7 +525,8 @@ impl<T> Receiver<T> {
     /// method sleeps until a new message is sent by the [`Sender`] connected to
     /// this `Receiver`, or until the [`Sender`] is dropped.
     ///
-    /// This method returns an error if and only if the [`Sender`] is dropped.
+    /// This method returns an error if there is no new value in the channel that
+    /// has not yet been marked seen and all [`Sender`]s are dropped.
     ///
     /// # Cancel safety
     ///
