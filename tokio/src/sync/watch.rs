@@ -26,18 +26,18 @@
 //! The [`Receiver`] half provides an asynchronous [`changed`] method. This
 //! method is ready when a new, *unseen* value is sent via the [`Sender`] half.
 //!
-//! * The [`changed`] method returns `Ok(())` on receiving a new value, or
-//!   `Err(_)` if the [`Sender`] has been closed.
-//! * On completion, the [`changed`] method marks the new value as *seen*. If
-//!   [`Receiver::changed()`] is called again, it will not return immediately
-//!   unless a subsequent value is sent.
+//! * [`Receiver::changed()`] returns `Ok(())` on receiving a new value, or
+//!   `Err(_)` if the [`Sender`] has been dropped.
+//! * If the latest value is *unseen* when calling [`changed`], then [`changed`]
+//!   will return immediately. If the latest message is *seen*, then it will
+//!   sleep until either a new message is sent via the [`Sender`] half, or the
+//!   [`Sender`] is dropped.
+//! * On completion, the [`changed`] method marks the new value as *seen*.
 //! * At creation, the initial value is considered *seen*. In other words,
-//!   [`Receiver::changed()`] will not return until a subsequent value is sent
-//!   via the [`Sender`] half.
+//!   [`Receiver::changed()`] will not return until a subsequent value is sent.
 //! * New [`Receiver`] instances can be created with [`Sender::subscribe()`].
 //!   The current value at the time the [`Receiver`] is created is considered
-//!   *seen*. [`Receiver::changed()`] will not return until a subsequent value
-//!   is sent.
+//!   *seen*.
 //!
 //! # Examples
 //!
