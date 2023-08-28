@@ -1,5 +1,6 @@
 use bytes::Buf;
 use futures_core::stream::Stream;
+use futures_sink::Sink;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -322,5 +323,24 @@ impl<S, B> StreamReader<S, B> {
             inner: unsafe { Pin::new_unchecked(&mut me.inner) },
             chunk: &mut me.chunk,
         }
+    }
+}
+
+impl<S: Sink<T, Error = E>, E, T> Sink<T> for StreamReader<S, E> {
+    type Error = E;
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        self.project().inner.start_send(item)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
     }
 }

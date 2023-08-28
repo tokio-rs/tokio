@@ -411,9 +411,7 @@ jobs:
         target:
           - powerpc-unknown-linux-gnu
           - powerpc64-unknown-linux-gnu
-          - mips-unknown-linux-gnu
           - arm-linux-androideabi
-          - mipsel-unknown-linux-musl
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust ${{ env.rust_stable }}
