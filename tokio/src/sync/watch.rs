@@ -14,10 +14,10 @@
 //!
 //! Each [`Receiver`] independently tracks the last value *seen* by its caller.
 //!
-//! To access the **latest** value stored in the channel and mark it as *seen*,
-//! use [`Receiver::borrow_and_update()`].
+//! To access the **current** value stored in the channel and mark it as *seen*
+//! by a given [`Receiver`], use [`Receiver::borrow_and_update()`].
 //!
-//! To access the latest value **without** changing its state to *seen*, use
+//! To access the current value **without** marking it as *seen*, use
 //! [`Receiver::borrow()`]. (If the value has already been marked *seen*,
 //! [`Receiver::borrow()`] is equivalent to [`Receiver::borrow_and_update()`].)
 //!
@@ -27,11 +27,11 @@
 //! method is ready when a new, *unseen* value is sent via the [`Sender`] half.
 //!
 //! * [`Receiver::changed()`] returns `Ok(())` on receiving a new value, or
-//!   `Err(_)` if the [`Sender`] has been dropped.
-//! * If the latest value is *unseen* when calling [`changed`], then [`changed`]
-//!   will return immediately. If the latest message is *seen*, then it will
-//!   sleep until either a new message is sent via the [`Sender`] half, or the
-//!   [`Sender`] is dropped.
+//!   `Err(`[`error::RecvError`]`)` if the [`Sender`] has been dropped.
+//! * If the current value is *unseen* when calling [`changed`], then
+//!   [`changed`] will return immediately. If the current value is *seen*, then
+//!   it will sleep until either a new message is sent via the [`Sender`] half,
+//!   or the [`Sender`] is dropped.
 //! * On completion, the [`changed`] method marks the new value as *seen*.
 //! * At creation, the initial value is considered *seen*. In other words,
 //!   [`Receiver::changed()`] will not return until a subsequent value is sent.
@@ -39,13 +39,21 @@
 //!   The current value at the time the [`Receiver`] is created is considered
 //!   *seen*.
 //!
-//! # Examples
+//! ## `borrow_and_update` versus `borrow`
 //!
-//! In a loop with [`Receiver::changed()`], [`Receiver::borrow_and_update()`] is
-//! recommended over [`Receiver::borrow()`]. This avoids a potential race where
-//! a new value is sent between [`changed`] being ready and the value being
-//! read. If [`Receiver::borrow()`] is used, the loop may run twice with the
-//! same value.
+//! If the receiver intends to await notifications from [`changed`] in a loop,
+//! [`Receiver::borrow_and_update()`] should be preferred over
+//! [`Receiver::borrow()`].  This avoids a potential race where a new value is
+//! sent between [`changed`] being ready and the value being read. (If
+//! [`Receiver::borrow()`] is used, the loop may run twice with the same value.)
+//!
+//! If the receiver is only interested in the current value, and does not intend
+//! to wait for changes, then [`Receiver::borrow()`] can be used. It may be more
+//! convenient to use [`borrow`](Receiver::borrow) since it's an `&self`
+//! method---[`borrow_and_update`](Receiver::borrow_and_update) requires `&mut
+//! self`.
+//!
+//! # Examples
 //!
 //! The following example prints `hello! world! `.
 //!
@@ -58,7 +66,7 @@
 //!
 //! tokio::spawn(async move {
 //!     // Use the equivalent of a "do-while" loop so the initial value is
-//!     // processed.
+//!     // processed before awaiting the `changed()` future.
 //!     loop {
 //!         println!("{}! ", *rx.borrow_and_update());
 //!         if rx.changed().await.is_err() {
@@ -429,7 +437,7 @@ mod state {
 ///
 /// tokio::spawn(async move {
 ///     // Use the equivalent of a "do-while" loop so the initial value is
-///     // processed.
+///     // processed before awaiting the `changed()` future.
 ///     loop {
 ///         println!("{}! ", *rx.borrow_and_update());
 ///         if rx.changed().await.is_err() {
@@ -624,6 +632,9 @@ impl<T> Receiver<T> {
     /// this `Receiver`, or until the [`Sender`] is dropped.
     ///
     /// This method returns an error if and only if the [`Sender`] is dropped.
+    ///
+    /// For more information, see
+    /// [*Change notifications*](self#change-notifications) in the module-level documentation.
     ///
     /// # Cancel safety
     ///
