@@ -46,7 +46,7 @@ fn single_rx_recv() {
 
 #[test]
 fn rx_mark_unseen() {
-    let (tx, mut rx) = watch::channel("one");
+    let (_tx, mut rx) = watch::channel("one");
 
     let mut rx2 = rx.clone();
     let mut rx3 = rx.clone();

@@ -489,7 +489,11 @@ impl<T> Receiver<T> {
         // not memory access.
         shared.ref_count_rx.fetch_add(1, Relaxed);
 
-        Self { shared, version, unseen: Mutex::new(Cell::new(false)) }
+        Self {
+            shared,
+            version,
+            unseen: Mutex::new(Cell::new(false)),
+        }
     }
 
     /// Returns a reference to the most recently sent value.
@@ -691,12 +695,12 @@ impl<T> Receiver<T> {
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
         {
-        let unseen = self.unseen.lock();
+            let unseen = self.unseen.lock();
 
-        if unseen.get() {
-            unseen.set(false);
-            return Ok(());
-        }
+            if unseen.get() {
+                unseen.set(false);
+                return Ok(());
+            }
         }
         changed_impl(&self.shared, &mut self.version).await
     }
