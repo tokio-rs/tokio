@@ -45,6 +45,41 @@ fn single_rx_recv() {
 }
 
 #[test]
+fn rx_mark_unseen() {
+    let (tx, mut rx) = watch::channel("one");
+
+    let mut rx2 = rx.clone();
+    let mut rx3 = rx.clone();
+
+    {
+        rx.mark_unseen();
+        assert!(rx.has_changed().unwrap());
+
+        let mut t = spawn(rx.changed());
+        assert_ready_ok!(t.poll());
+    }
+
+    {
+        assert!(!rx2.has_changed().unwrap());
+
+        let mut t = spawn(rx2.changed());
+        assert_pending!(t.poll());
+    }
+
+    {
+        rx3.mark_unseen();
+        assert_eq!(*rx3.borrow(), "one");
+
+        assert!(!rx3.has_changed().unwrap());
+
+        let mut t = spawn(rx3.changed());
+        assert_pending!(t.poll());
+    }
+
+    assert_eq!(*rx.borrow(), "one");
+}
+
+#[test]
 fn multi_rx() {
     let (tx, mut rx1) = watch::channel("one");
     let mut rx2 = rx1.clone();
