@@ -47,8 +47,7 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// Limit number of incoming requests being handled at the same time, using a task-safe semaphore
-/// via [`Semaphore::acquire_owned`].
+/// Limit number of incoming requests being handled at the same time.
 ///
 /// Similar to limiting the numer of simultaneous opened files, network handles are a limited resource.
 /// Allowing an unbounded amount of requests to be processed could result in a denial-of-service,
