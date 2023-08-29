@@ -725,6 +725,81 @@ impl AsyncWrite for File {
         }
     }
 
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<Result<usize, io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
+        let me = self.get_mut();
+        let inner = me.inner.get_mut();
+
+        if let Some(e) = inner.last_write_err.take() {
+            return Ready(Err(e.into()));
+        }
+
+        loop {
+            match inner.state {
+                Idle(ref mut buf_cell) => {
+                    let mut buf = buf_cell.take().unwrap();
+
+                    let seek = if !buf.is_empty() {
+                        Some(SeekFrom::Current(buf.discard_read()))
+                    } else {
+                        None
+                    };
+
+                    let n = buf.copy_from_bufs(bufs);
+                    let std = me.std.clone();
+
+                    let blocking_task_join_handle = spawn_mandatory_blocking(move || {
+                        let res = if let Some(seek) = seek {
+                            (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
+                        } else {
+                            buf.write_to(&mut &*std)
+                        };
+
+                        (Operation::Write(res), buf)
+                    })
+                    .ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::Other, "background task failed")
+                    })?;
+
+                    inner.state = Busy(blocking_task_join_handle);
+
+                    return Ready(Ok(n));
+                }
+                Busy(ref mut rx) => {
+                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
+                    inner.state = Idle(Some(buf));
+
+                    match op {
+                        Operation::Read(_) => {
+                            // We don't care about the result here. The fact
+                            // that the cursor has advanced will be reflected in
+                            // the next iteration of the loop
+                            continue;
+                        }
+                        Operation::Write(res) => {
+                            // If the previous write was successful, continue.
+                            // Otherwise, error.
+                            res?;
+                            continue;
+                        }
+                        Operation::Seek(_) => {
+                            // Ignore the seek
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         ready!(crate::trace::trace_leaf(cx));
         let inner = self.inner.get_mut();

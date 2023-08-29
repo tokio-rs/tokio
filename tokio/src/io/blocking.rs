@@ -276,5 +276,22 @@ cfg_fs! {
             self.buf.truncate(0);
             ret
         }
+
+        pub(crate) fn copy_from_bufs(&mut self, bufs: &[io::IoSlice<'_>]) -> usize {
+            assert!(self.is_empty());
+
+            let mut rem = MAX_BUF;
+            for buf in bufs {
+                if rem == 0 {
+                    break
+                }
+
+                let len = buf.len().min(rem);
+                self.buf.extend_from_slice(&buf[..len]);
+                rem -= len;
+            }
+
+            MAX_BUF - rem
+        }
     }
 }
