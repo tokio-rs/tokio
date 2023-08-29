@@ -190,6 +190,9 @@ where
 
     fn encode(&mut self, line: T, buf: &mut BytesMut) -> Result<(), LinesCodecError> {
         let line = line.as_ref();
+        if line.contains('\n') {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "The input contains line separator.").into());
+        }
         buf.reserve(line.len() + 1);
         buf.put(line.as_bytes());
         buf.put_u8(b'\n');

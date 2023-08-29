@@ -236,6 +236,8 @@ fn lines_encoder() {
 
     codec.encode("line 2", &mut buf).unwrap();
     assert_eq!("line 1\nline 2\n", buf);
+
+    assert!(codec.encode("abc\n", &mut buf).is_err())
 }
 
 #[test]
