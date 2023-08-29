@@ -796,6 +796,10 @@ impl AsyncWrite for File {
         }
     }
 
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         ready!(crate::trace::trace_leaf(cx));
         let inner = self.inner.get_mut();
