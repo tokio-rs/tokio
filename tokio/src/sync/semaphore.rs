@@ -64,6 +64,8 @@ use std::sync::Arc;
 /// of our tasks to it, the `Semaphore` will continue to exist in a static-like context, until all
 /// `Arc`s have been dropped.
 ///
+/// In this example, a `for` loop is used for the outer loop to pass tests. In practice, this would be
+/// a bare `loop`.
 /// ```
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
@@ -71,11 +73,12 @@ use std::sync::Arc;
 /// use tokio::io::{AsyncReadExt, AsyncWriteExt};
 ///
 /// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// async fn main() {
 ///     let semaphore = Arc::new(Semaphore::new(3));
 ///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
 ///
-///     loop {
+///     // Replace the for loop, with a bare loop
+///     for _ in 0..5 {
 ///         let permit = semaphore.clone().acquire_owned().await.unwrap();
 ///         let (mut socket, _) = listener.accept().await?;
 ///
