@@ -56,9 +56,11 @@ async fn write_vectored() {
 
     let mut file = File::create(tempfile.path()).await.unwrap();
 
-    file.write_vectored(&[IoSlice::new(HELLO), IoSlice::new(HELLO)])
+    let ret = file
+        .write_vectored(&[IoSlice::new(HELLO), IoSlice::new(HELLO)])
         .await
         .unwrap();
+    assert_eq!(ret, HELLO.bytes().count() * 2);
     file.flush().await.unwrap();
 
     let file = std::fs::read(tempfile.path()).unwrap();
@@ -71,9 +73,11 @@ async fn write_vectored_and_shutdown() {
 
     let mut file = File::create(tempfile.path()).await.unwrap();
 
-    file.write_vectored(&[IoSlice::new(HELLO), IoSlice::new(HELLO)])
+    let ret = file
+        .write_vectored(&[IoSlice::new(HELLO), IoSlice::new(HELLO)])
         .await
         .unwrap();
+    assert_eq!(ret, HELLO.bytes().count() * 2);
     file.shutdown().await.unwrap();
 
     let file = std::fs::read(tempfile.path()).unwrap();
