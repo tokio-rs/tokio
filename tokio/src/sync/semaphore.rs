@@ -67,23 +67,43 @@ use std::sync::Arc;
 /// ```
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
+/// use tokio::net::TcpListener;
+/// use tokio::io::{AsyncReadExt, AsyncWriteExt};
 ///
 /// #[tokio::main]
-/// async fn main() {
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let semaphore = Arc::new(Semaphore::new(3));
-///     let mut join_handles = Vec::new();
+///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
 ///
-///     for _ in 0..5 {
+///     loop {
 ///         let permit = semaphore.clone().acquire_owned().await.unwrap();
-///         join_handles.push(tokio::spawn(async move {
-///             // perform task...
-///             // explicitly own `permit` in the task
-///             drop(permit);
-///         }));
-///     }
+///         let (mut socket, _) = listener.accept().await?;
 ///
-///     for handle in join_handles {
-///         handle.await.unwrap();
+///         tokio::spawn(async move {
+///                 let mut buf = [0; 1024];
+///
+///                 // In a loop, read data from the socket and write the data back.
+///                 loop {
+///                     let n = match socket.read(&mut buf).await {
+///                         // socket closed
+///                         Ok(n) if n == 0 => break,
+///                         Ok(n) => n,
+///                         Err(e) => {
+///                             eprintln!("failed to read from socket; err = {:?}", e);
+///                             break;
+///                         }
+///                     };
+///
+///                     // Write the data back
+///                     if let Err(e) = socket.write_all(&buf[0..n]).await {
+///                         eprintln!("failed to write to socket; err = {:?}", e);
+///                         break;
+///                     }
+///                 }
+///
+///                 // Drop the permit, so more tasks can be created
+///                 drop(permit);
+///         });
 ///     }
 /// }
 /// ```
