@@ -2,6 +2,7 @@
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
 
 use std::io::prelude::*;
+use std::io::IoSlice;
 use tempfile::NamedTempFile;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
@@ -47,6 +48,40 @@ async fn basic_write_and_shutdown() {
 
     let file = std::fs::read(tempfile.path()).unwrap();
     assert_eq!(file, HELLO);
+}
+
+#[tokio::test]
+async fn write_vectored() {
+    let tempfile = tempfile();
+
+    let mut file = File::create(tempfile.path()).await.unwrap();
+
+    let ret = file
+        .write_vectored(&[IoSlice::new(HELLO), IoSlice::new(HELLO)])
+        .await
+        .unwrap();
+    assert_eq!(ret, HELLO.len() * 2);
+    file.flush().await.unwrap();
+
+    let file = std::fs::read(tempfile.path()).unwrap();
+    assert_eq!(file, [HELLO, HELLO].concat());
+}
+
+#[tokio::test]
+async fn write_vectored_and_shutdown() {
+    let tempfile = tempfile();
+
+    let mut file = File::create(tempfile.path()).await.unwrap();
+
+    let ret = file
+        .write_vectored(&[IoSlice::new(HELLO), IoSlice::new(HELLO)])
+        .await
+        .unwrap();
+    assert_eq!(ret, HELLO.len() * 2);
+    file.shutdown().await.unwrap();
+
+    let file = std::fs::read(tempfile.path()).unwrap();
+    assert_eq!(file, [HELLO, HELLO].concat());
 }
 
 #[tokio::test]

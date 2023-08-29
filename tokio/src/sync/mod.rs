@@ -383,7 +383,7 @@
 //!                         sleep.set(time::sleep_until(op_start + conf.timeout));
 //!                     }
 //!                     _ = rx.changed() => {
-//!                         conf = rx.borrow().clone();
+//!                         conf = rx.borrow_and_update().clone();
 //!
 //!                         // The configuration has been updated. Update the
 //!                         // `sleep` using the new `timeout` value.
