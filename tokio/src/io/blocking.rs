@@ -280,9 +280,7 @@ cfg_fs! {
         pub(crate) fn copy_from_bufs(&mut self, bufs: &[io::IoSlice<'_>]) -> usize {
             assert!(self.is_empty());
 
-            let n = bufs.iter().map(|b| b.len()).sum::<usize>().min(MAX_BUF);
-
-            let mut rem = n;
+            let mut rem = MAX_BUF;
             for buf in bufs {
                 if rem == 0 {
                     break
@@ -293,7 +291,7 @@ cfg_fs! {
                 rem -= len;
             }
 
-            n
+            MAX_BUF - rem
         }
     }
 }

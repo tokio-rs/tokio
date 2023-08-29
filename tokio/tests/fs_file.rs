@@ -60,7 +60,7 @@ async fn write_vectored() {
         .write_vectored(&[IoSlice::new(HELLO), IoSlice::new(HELLO)])
         .await
         .unwrap();
-    assert_eq!(ret, HELLO.bytes().count() * 2);
+    assert_eq!(ret, HELLO.len() * 2);
     file.flush().await.unwrap();
 
     let file = std::fs::read(tempfile.path()).unwrap();
@@ -77,7 +77,7 @@ async fn write_vectored_and_shutdown() {
         .write_vectored(&[IoSlice::new(HELLO), IoSlice::new(HELLO)])
         .await
         .unwrap();
-    assert_eq!(ret, HELLO.bytes().count() * 2);
+    assert_eq!(ret, HELLO.len() * 2);
     file.shutdown().await.unwrap();
 
     let file = std::fs::read(tempfile.path()).unwrap();
