@@ -102,8 +102,9 @@ use std::sync::Arc;
 ///                  }
 ///              }
 ///
-///              // Drop the permit, so more tasks can be created
-///              drop(permit);
+///                 drop(socket);
+///                 // Drop the permit, so more tasks can be created
+///                 drop(permit);
 ///         });
 ///     }
 /// }
