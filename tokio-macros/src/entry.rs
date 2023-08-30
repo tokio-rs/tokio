@@ -29,6 +29,7 @@ struct FinalConfig {
     flavor: RuntimeFlavor,
     worker_threads: Option<usize>,
     start_paused: Option<bool>,
+    spawn: Option<bool>,
     crate_name: Option<Path>,
 }
 
@@ -37,6 +38,7 @@ const DEFAULT_ERROR_CONFIG: FinalConfig = FinalConfig {
     flavor: RuntimeFlavor::CurrentThread,
     worker_threads: None,
     start_paused: None,
+    spawn: None,
     crate_name: None,
 };
 
@@ -46,6 +48,7 @@ struct Configuration {
     flavor: Option<RuntimeFlavor>,
     worker_threads: Option<(usize, Span)>,
     start_paused: Option<(bool, Span)>,
+    spawn: Option<bool>,
     is_test: bool,
     crate_name: Option<Path>,
 }
@@ -61,6 +64,7 @@ impl Configuration {
             flavor: None,
             worker_threads: None,
             start_paused: None,
+            spawn: None,
             is_test,
             crate_name: None,
         }
@@ -105,6 +109,16 @@ impl Configuration {
 
         let start_paused = parse_bool(start_paused, span, "start_paused")?;
         self.start_paused = Some((start_paused, span));
+        Ok(())
+    }
+
+    fn set_spawn(&mut self, spawn: syn::Lit, span: Span) -> Result<(), syn::Error> {
+        if self.spawn.is_some() {
+            return Err(syn::Error::new(span, "`spawn` set multiple times."));
+        }
+
+        let spawn = parse_bool(spawn, span, "spawn")?;
+        self.spawn = Some(spawn);
         Ok(())
     }
 
@@ -168,6 +182,7 @@ impl Configuration {
             flavor,
             worker_threads,
             start_paused,
+            spawn: self.spawn,
         })
     }
 }
@@ -268,6 +283,9 @@ fn build_config(
                     "start_paused" => {
                         config.set_start_paused(lit.clone(), syn::spanned::Spanned::span(lit))?;
                     }
+                    "spawn" => {
+                        config.set_spawn(lit.clone(), syn::spanned::Spanned::span(lit))?;
+                    }
                     "core_threads" => {
                         let msg = "Attribute `core_threads` is renamed to `worker_threads`";
                         return Err(syn::Error::new_spanned(namevalue, msg));
@@ -277,7 +295,7 @@ fn build_config(
                     }
                     name => {
                         let msg = format!(
-                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`",
+                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `spawn`, `crate`",
                             name,
                         );
                         return Err(syn::Error::new_spanned(namevalue, msg));
@@ -303,11 +321,11 @@ fn build_config(
                             macro_name
                         )
                     }
-                    "flavor" | "worker_threads" | "start_paused" => {
+                    "flavor" | "worker_threads" | "start_paused" | "spawn" => {
                         format!("The `{}` attribute requires an argument.", name)
                     }
                     name => {
-                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`", name)
+                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `spawn`, `crate`", name)
                     }
                 };
                 return Err(syn::Error::new_spanned(path, msg));
@@ -369,14 +387,32 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     };
 
     let body_ident = quote! { body };
-    let last_block = quote_spanned! {last_stmt_end_span=>
-        #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
-        {
-            return #rt
-                .enable_all()
-                .build()
-                .expect("Failed building the Runtime")
-                .block_on(#body_ident);
+    let spawn = config.spawn.unwrap_or(false);
+    let last_block = if spawn {
+        quote_spanned! {last_stmt_end_span=>
+            #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
+            {
+                let runtime =  #rt
+                    .enable_all()
+                    .build()
+                    .expect("Failed building the Runtime");
+                let handle = runtime.spawn(#body_ident);
+                runtime.block_on(async move {
+                    // propagate the panic
+                    handle.await.unwrap()
+                });
+            }
+        }
+    } else {
+        quote_spanned! {last_stmt_end_span=>
+            #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
+            {
+                return #rt
+                    .enable_all()
+                    .build()
+                    .expect("Failed building the Runtime")
+                    .block_on(#body_ident);
+            }
         }
     };
 
@@ -391,7 +427,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     //
     // We don't do this for the main function as it should only be used once so
     // there will be no benefit.
-    let body = if is_test {
+    let body = if is_test && !spawn {
         let output_type = match &input.sig.output {
             // For functions with no return value syn doesn't print anything,
             // but that doesn't work as `Output` for our boxed `Future`, so

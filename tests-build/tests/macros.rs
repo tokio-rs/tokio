@@ -15,6 +15,9 @@ fn compile_fail_full() {
     t.compile_fail("tests/fail/macros_invalid_input.rs");
 
     #[cfg(feature = "full")]
+    t.compile_fail("tests/fail/macros_spawn_no_send.rs");
+
+    #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_dead_code.rs");
 
     #[cfg(feature = "full")]

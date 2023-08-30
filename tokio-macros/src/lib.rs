@@ -175,6 +175,32 @@ use proc_macro::TokenStream;
 ///
 /// Note that `start_paused` requires the `test-util` feature to be enabled.
 ///
+/// ### Spawn and join entry future
+///
+/// ```no_run
+/// #[tokio::main(spawn = true)]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```no_run
+/// fn main() {
+///     let runtime = tokio::runtime::Builder::new_multi_thread()
+///         .enable_all()
+///         .build()
+///         .unwrap();
+///     let handle = runtime.spawn(async {
+///         println!("Hello world");
+///     });
+///     runtime.block_on(async move {
+///         handle.await.unwrap()
+///     });
+/// }
+/// ```
+///
 /// ### Rename package
 ///
 /// ```rust
@@ -237,6 +263,32 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///         .block_on(async {
 ///             println!("Hello world");
 ///         })
+/// }
+/// ```
+///
+/// ### Spawn and join entry future
+///
+/// ```no_run
+/// #[tokio::main(flavor = "current_thread", spawn = true)]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```no_run
+/// fn main() {
+///     let runtime = tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .build()
+///         .unwrap();
+///     let handle = runtime.spawn(async {
+///         println!("Hello world");
+///     });
+///     runtime.block_on(async move {
+///         handle.await.unwrap()
+///     });
 /// }
 /// ```
 ///
@@ -413,6 +465,33 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// Note that `start_paused` requires the `test-util` feature to be enabled.
+///
+/// ### Spawn and join entry future
+///
+/// ```no_run
+/// #[tokio::test(spawn = true)]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// #[test]
+/// fn my_test() {
+///     let runtime = tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .build()
+///         .unwrap();
+///     let handle = runtime.spawn(async {
+///         assert!(true);
+///     });
+///     runtime.block_on(async move {
+///         handle.await.unwrap()
+///     });
+/// }
+/// ```
 ///
 /// ### Rename package
 ///

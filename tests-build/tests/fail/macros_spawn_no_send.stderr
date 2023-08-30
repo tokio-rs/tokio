@@ -1,0 +1,24 @@
+error: future cannot be sent between threads safely
+  --> tests/fail/macros_spawn_no_send.rs:13:1
+   |
+13 | #[tokio::main(spawn = true)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ future created by async block is not `Send`
+   |
+   = help: within `[async block@$DIR/tests/fail/macros_spawn_no_send.rs:13:1: 13:29]`, the trait `Send` is not implemented for `Rc<i32>`
+note: future is not `Send` as this value is used across an await
+  --> tests/fail/macros_spawn_no_send.rs:16:14
+   |
+15 |     let _value = Rc::new(0);
+   |         ------ has type `Rc<i32>` which is not `Send`
+16 |     send_f().await;
+   |              ^^^^^ await occurs here, with `_value` maybe used later
+17 | }
+   | - `_value` is later dropped here
+note: required by a bound in `Runtime::spawn`
+  --> $WORKSPACE/tokio/src/runtime/runtime.rs
+   |
+   |     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+   |            ----- required by a bound in this associated function
+   |     where
+   |         F: Future + Send + 'static,
+   |                     ^^^^ required by this bound in `Runtime::spawn`
