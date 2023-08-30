@@ -463,6 +463,8 @@ impl Future for Readiness<'_> {
             (&me.scheduled_io, &mut me.state, &me.waiter)
         };
 
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+
         loop {
             match *state {
                 State::Init => {
@@ -479,6 +481,7 @@ impl Future for Readiness<'_> {
                         // Currently ready!
                         let tick = TICK.unpack(curr) as u8;
                         *state = State::Done;
+                        coop.made_progress();
                         return Poll::Ready(ReadyEvent {
                             tick,
                             ready,
@@ -503,6 +506,7 @@ impl Future for Readiness<'_> {
                         // Currently ready!
                         let tick = TICK.unpack(curr) as u8;
                         *state = State::Done;
+                        coop.made_progress();
                         return Poll::Ready(ReadyEvent {
                             tick,
                             ready,
@@ -572,6 +576,7 @@ impl Future for Readiness<'_> {
                     let curr_ready = Ready::from_usize(READINESS.unpack(curr));
                     let ready = curr_ready.intersection(w.interest);
 
+                    coop.made_progress();
                     return Poll::Ready(ReadyEvent {
                         tick,
                         ready,
