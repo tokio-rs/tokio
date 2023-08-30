@@ -70,6 +70,10 @@ fn rx_mark_unseen() {
         rx3.mark_unseen();
         assert_eq!(*rx3.borrow(), "one");
 
+        assert!(rx3.has_changed().unwrap());
+
+        assert_eq!(*rx3.borrow_and_update(), "one");
+
         assert!(!rx3.has_changed().unwrap());
 
         let mut t = spawn(rx3.changed());

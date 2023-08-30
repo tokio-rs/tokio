@@ -115,8 +115,7 @@ use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::Relaxed;
-use crate::loom::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
-use std::cell::Cell;
+use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 use std::mem;
 use std::ops;
@@ -137,9 +136,6 @@ pub struct Receiver<T> {
 
     /// Last observed version
     version: Version,
-
-    /// Whether current version is marked as unseen
-    unseen: Mutex<Cell<bool>>,
 }
 
 /// Sends values to the associated [`Receiver`](struct@Receiver).
@@ -360,14 +356,14 @@ mod big_notify {
 
 use self::state::{AtomicState, Version};
 mod state {
-    use crate::loom::sync::atomic::AtomicUsize;
+    use crate::loom::sync::atomic::AtomicIsize;
     use crate::loom::sync::atomic::Ordering::SeqCst;
 
-    const CLOSED: usize = 1;
+    const CLOSED: isize = 1;
 
     /// The version part of the state. The lowest bit is always zero.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    pub(super) struct Version(usize);
+    pub(super) struct Version(isize);
 
     /// Snapshot of the state. The first bit is used as the CLOSED bit.
     /// The remaining bits are used as the version.
@@ -375,16 +371,22 @@ mod state {
     /// The CLOSED bit tracks whether the Sender has been dropped. Dropping all
     /// receivers does not set it.
     #[derive(Copy, Clone, Debug)]
-    pub(super) struct StateSnapshot(usize);
+    pub(super) struct StateSnapshot(isize);
 
     /// The state stored in an atomic integer.
     #[derive(Debug)]
-    pub(super) struct AtomicState(AtomicUsize);
+    pub(super) struct AtomicState(AtomicIsize);
 
     impl Version {
         /// Get the initial version when creating the channel.
         pub(super) fn initial() -> Self {
             Version(0)
+        }
+
+        /// Decrements the version.
+        pub(super) fn decrement(&mut self) {
+            // Decrement by two to avoid touching the CLOSED bit.
+            self.0 -= 2;
         }
     }
 
@@ -404,7 +406,7 @@ mod state {
         /// Create a new `AtomicState` that is not closed and which has the
         /// version set to `Version::initial()`.
         pub(super) fn new() -> Self {
-            AtomicState(AtomicUsize::new(0))
+            AtomicState(AtomicIsize::new(0))
         }
 
         /// Load the current value of the state.
@@ -477,7 +479,6 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
     let rx = Receiver {
         shared,
         version: Version::initial(),
-        unseen: Mutex::new(Cell::new(false)),
     };
 
     (tx, rx)
@@ -489,11 +490,7 @@ impl<T> Receiver<T> {
         // not memory access.
         shared.ref_count_rx.fetch_add(1, Relaxed);
 
-        Self {
-            shared,
-            version,
-            unseen: Mutex::new(Cell::new(false)),
-        }
+        Self { shared, version }
     }
 
     /// Returns a reference to the most recently sent value.
@@ -546,10 +543,7 @@ impl<T> Receiver<T> {
         // After obtaining a read-lock no concurrent writes could occur
         // and the loaded version matches that of the borrowed reference.
         let new_version = self.shared.state.load().version();
-        let unseen = self.unseen.lock();
-        let has_changed = self.version != new_version || unseen.get();
-
-        unseen.set(false);
+        let has_changed = self.version != new_version;
 
         Ref { inner, has_changed }
     }
@@ -643,12 +637,13 @@ impl<T> Receiver<T> {
         }
         let new_version = state.version();
 
-        Ok(self.version != new_version || self.unseen.lock().get())
+        println!("observed: {:?}, current: {new_version:?}", self.version);
+        Ok(self.version != new_version)
     }
 
     /// Marks the state as unseen.
     pub fn mark_unseen(&mut self) {
-        self.unseen.lock().set(true);
+        self.version.decrement();
     }
 
     /// Waits for a change notification, then marks the newest value as seen.
@@ -694,14 +689,6 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
-        {
-            let unseen = self.unseen.lock();
-
-            if unseen.get() {
-                unseen.set(false);
-                return Ok(());
-            }
-        }
         changed_impl(&self.shared, &mut self.version).await
     }
 
@@ -775,12 +762,10 @@ impl<T> Receiver<T> {
                 let inner = self.shared.value.read().unwrap();
 
                 let new_version = self.shared.state.load().version();
-                let unseen = self.unseen.lock();
-                let has_changed = self.version != new_version || unseen.get();
+                let has_changed = self.version != new_version;
                 self.version = new_version;
 
                 if (!closed || has_changed) && f(&inner) {
-                    unseen.set(false);
                     return Ok(Ref { inner, has_changed });
                 }
             }
