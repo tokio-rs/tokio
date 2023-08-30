@@ -637,7 +637,6 @@ impl<T> Receiver<T> {
         }
         let new_version = state.version();
 
-        println!("observed: {:?}, current: {new_version:?}", self.version);
         Ok(self.version != new_version)
     }
 
