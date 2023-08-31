@@ -80,9 +80,11 @@ use std::sync::Arc;
 ///         let (mut socket, _) = listener.accept().await?;
 ///
 ///         tokio::spawn(async move {
-///             // Do work, and drop socket after
+///             // Do work using the socket.
 ///             handle_connection(&mut socket).await;
-///             // Explicitly drop the permit, so more tasks can be created
+///             // Drop socket while the permit is still live.
+///             drop(socket);
+///             // Drop the permit, so more tasks can be created.
 ///             drop(permit);
 ///         });
 ///     }
