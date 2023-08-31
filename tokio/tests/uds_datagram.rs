@@ -411,3 +411,47 @@ async fn poll_ready() -> io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn coop_uds() -> io::Result<()> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{Duration, Instant};
+
+    const HELLO: &[u8] = b"hello world";
+    const DURATION: Duration = Duration::from_secs(3);
+
+    let dir = tempfile::tempdir().unwrap();
+    let server_path = dir.path().join("server.sock");
+
+    let client = std::os::unix::net::UnixDatagram::unbound().unwrap();
+    let server = UnixDatagram::bind(&server_path).unwrap();
+
+    let counter = Arc::new(AtomicU64::new(0));
+
+    let counter_jh = tokio::spawn({
+        let counter = counter.clone();
+
+        async move {
+            loop {
+                tokio::time::sleep(Duration::from_millis(250)).await;
+                counter.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    });
+
+    let mut buf = [0; HELLO.len()];
+    let start = Instant::now();
+    while Instant::now().duration_since(start) < DURATION {
+        let _ = client.send_to(HELLO, &server_path);
+        let _ = server.recv(&mut buf[..]).await.unwrap();
+    }
+
+    counter_jh.abort();
+    let _ = counter_jh.await;
+
+    let expected = ((DURATION.as_secs() * 4) as f64 * 0.9) as u64;
+    let counter = counter.load(Ordering::Relaxed);
+    assert!(counter >= expected);
+
+    Ok(())
+}
