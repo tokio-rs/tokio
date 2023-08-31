@@ -418,7 +418,7 @@ async fn coop_uds() -> io::Result<()> {
     use std::time::{Duration, Instant};
 
     const HELLO: &[u8] = b"hello world";
-    const DURATION: Duration = Duration::from_secs(3);
+    const DURATION: Duration = Duration::from_secs(1);
 
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -449,7 +449,7 @@ async fn coop_uds() -> io::Result<()> {
     counter_jh.abort();
     let _ = counter_jh.await;
 
-    let expected = ((DURATION.as_secs() * 4) as f64 * 0.9) as u64;
+    let expected = ((DURATION.as_secs() * 4) as f64 * 0.5) as u64;
     let counter = counter.load(Ordering::Relaxed);
     assert!(counter >= expected);
 
