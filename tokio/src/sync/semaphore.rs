@@ -47,50 +47,6 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// Limit number of incoming requests being handled at the same time.
-///
-/// Similar to limiting the numer of simultaneous opened files, network handles are a limited resource.
-/// Allowing an unbounded amount of requests to be processed could result in a denial-of-service,
-/// and many other issues.
-///
-/// However, in contrast to the file example, this example uses a non-static, `Arc`-wrapped `Semaphore`
-/// for more fine-grained lifetime and ownership control. The `Arc` allows multiple threads and tasks
-/// to share ownership of the semaphore. Here we create a shallow-copy of the `Arc<Semaphore>` reference
-/// using `clone`. Then we acquire a permit through the `Arc` from the `Semaphore` via [`Semaphore::acquire_owned`],
-/// and move it inside the task. This ensures no non-`'static` variables are referenced from within
-/// said task.
-///
-/// If we leave the scope where the `Arc<Semaphore>` was defined, and references still exist in any
-/// of our tasks to it, the `Semaphore` will continue to exist in a static-like context, until all
-/// `Arc`s have been dropped.
-///
-/// ```compile_fail
-/// use std::sync::Arc;
-/// use tokio::sync::Semaphore;
-/// use tokio::net::{TcpListener};
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let semaphore = Arc::new(Semaphore::new(3));
-///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
-///
-///     loop {
-///         // Acquire permit before accepting, to avoid needlessly taking up a (finite) file descriptor
-///         let permit = semaphore.clone().acquire_owned().await.unwrap();
-///         let (mut socket, _) = listener.accept().await?;
-///
-///         tokio::spawn(async move {
-///             // Do work using the socket.
-///             handle_connection(&mut socket).await;
-///             // Drop socket while the permit is still live.
-///             drop(socket);
-///             // Drop the permit, so more tasks can be created.
-///             drop(permit);
-///         });
-///     }
-/// }
-/// ```
-///
 /// Limit the number of simultaneously opened files in your program.
 ///
 /// Most operating systems have limits on the number of open file
@@ -118,6 +74,54 @@ use std::sync::Arc;
 ///     buffer.write_all(message).await?;
 ///     Ok(()) // Permit goes out of scope here, and is available again for acquisition
 /// }
+/// ```
+///
+/// Limit number of incoming requests being handled at the same time.
+///
+/// Similar to limiting the number of simultaneous opened files, network handles
+/// are a limited resource. Allowing an unbounded amount of requests to be processed
+/// could result in a denial-of-service, among many other issues.
+///
+/// However, in contrast to the file example, this example uses an `Arc<Semaphore>`.
+/// Before we spawn a new task to process a request, we must acquire a permit from
+/// this semaphore, in order to limit usage of system resources (like file descriptors,
+/// memory usage, CPU time, etc.). Once acquired, a new task is spawned; and once
+/// finished, the permit is dropped inside of the task to allow others to spawn.
+/// Permits must be acquired via [`Semaphore::acquire_owned`], in order to be
+/// movable across the task boundary. Contrastingly, if the semaphore were a global,
+/// as in the file-limiting example, only ['Semaphore::acquire'] would be necessary.
+/// This is because a `Permit<'static>` would be returned, which is movable across
+/// task boundaries, since the semaphore lives forever.
+///
+/// ```no_run
+/// use std::sync::Arc;
+/// use tokio::sync::Semaphore;
+/// use tokio::net::{TcpListener, TcpStream};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let semaphore = Arc::new(Semaphore::new(3));
+///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
+///
+///     loop {
+///         // Acquire permit before accepting, to avoid needlessly taking up a (finite) file descriptor
+///         let permit = semaphore.clone().acquire_owned().await.unwrap();
+///         let (mut socket, _) = listener.accept().await?;
+///
+///         tokio::spawn(async move {
+///             // Do work using the socket.
+///             handle_connection(&mut socket).await;
+///             // Drop socket while the permit is still live.
+///             drop(socket);
+///             // Drop the permit, so more tasks can be created.
+///             drop(permit);
+///         });
+///     }
+/// }
+///
+/// # async fn handle_connection(socket: &mut TcpStream) {
+/// #   todo!()
+/// # }
 /// ```
 ///
 /// [`PollSemaphore`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSemaphore.html
