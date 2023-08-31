@@ -120,7 +120,7 @@ use std::sync::Arc;
 /// }
 ///
 /// # async fn handle_connection(socket: &mut TcpStream) {
-/// #   todo!()
+/// #   // Do work
 /// # }
 /// ```
 ///
