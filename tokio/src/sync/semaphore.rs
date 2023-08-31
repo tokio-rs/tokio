@@ -76,9 +76,9 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// Limit number of incoming requests being handled at the same time.
+/// Limit the number of incoming requests being handled at the same time.
 ///
-/// Similar to limiting the number of simultaneous opened files, network handles
+/// Similar to limiting the number of simultaneously opened files, network handles
 /// are a limited resource. Allowing an unbounded amount of requests to be processed
 /// could result in a denial-of-service, among many other issues.
 ///
