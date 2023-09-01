@@ -126,21 +126,22 @@ impl Configuration {
     }
 
     fn build(&self) -> Result<FinalConfig, syn::Error> {
-        let flavor = self.flavor.unwrap_or(self.default_flavor);
+        use RuntimeFlavor as F;
 
+        let flavor = self.flavor.unwrap_or(self.default_flavor);
         let worker_threads = match (flavor, self.worker_threads) {
-            (RuntimeFlavor::CurrentThread, Some((_, worker_threads_span))) => {
+            (F::CurrentThread, Some((_, worker_threads_span))) => {
                 let msg = format!(
                     "The `worker_threads` option requires the `multi_thread` runtime flavor. Use `#[{}(flavor = \"multi_thread\")]`",
                     self.macro_name(),
                 );
                 return Err(syn::Error::new(worker_threads_span, msg));
             }
-            (RuntimeFlavor::CurrentThread, None) => None,
-            (RuntimeFlavor::Threaded, worker_threads) if self.rt_multi_thread_available => {
+            (F::CurrentThread, None) => None,
+            (F::Threaded, worker_threads) if self.rt_multi_thread_available => {
                 worker_threads.map(|(val, _span)| val)
             }
-            (RuntimeFlavor::Threaded, _) => {
+            (F::Threaded, _) => {
                 let msg = if self.flavor.is_none() {
                     "The default runtime flavor is `multi_thread`, but the `rt-multi-thread` feature is disabled."
                 } else {
@@ -151,14 +152,14 @@ impl Configuration {
         };
 
         let start_paused = match (flavor, self.start_paused) {
-            (RuntimeFlavor::Threaded, Some((_, start_paused_span))) => {
+            (F::Threaded, Some((_, start_paused_span))) => {
                 let msg = format!(
                     "The `start_paused` option requires the `current_thread` runtime flavor. Use `#[{}(flavor = \"current_thread\")]`",
                     self.macro_name(),
                 );
                 return Err(syn::Error::new(start_paused_span, msg));
             }
-            (RuntimeFlavor::CurrentThread, Some((start_paused, _))) => Some(start_paused),
+            (F::CurrentThread, Some((start_paused, _))) => Some(start_paused),
             (_, None) => None,
         };
 

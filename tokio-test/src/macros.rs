@@ -202,17 +202,17 @@ macro_rules! assert_ok {
         assert_ok!($e,)
     };
     ($e:expr,) => {{
-        use std::result::Result;
+        use std::result::Result::*;
         match $e {
-            Result::Ok(v) => v,
-            Result::Err(e) => panic!("assertion failed: Err({:?})", e),
+            Ok(v) => v,
+            Err(e) => panic!("assertion failed: Err({:?})", e),
         }
     }};
     ($e:expr, $($arg:tt)+) => {{
-        use std::result::Result;
+        use std::result::Result::*;
         match $e {
-            Result::Ok(v) => v,
-            Result::Err(e) => panic!("assertion failed: Err({:?}): {}", e, format_args!($($arg)+)),
+            Ok(v) => v,
+            Err(e) => panic!("assertion failed: Err({:?}): {}", e, format_args!($($arg)+)),
         }
     }};
 }
@@ -245,17 +245,17 @@ macro_rules! assert_err {
         assert_err!($e,);
     };
     ($e:expr,) => {{
-        use std::result::Result;
+        use std::result::Result::*;
         match $e {
-            Result::Ok(v) => panic!("assertion failed: Ok({:?})", v),
-            Result::Err(e) => e,
+            Ok(v) => panic!("assertion failed: Ok({:?})", v),
+            Err(e) => e,
         }
     }};
     ($e:expr, $($arg:tt)+) => {{
-        use std::result::Result;
+        use std::result::Result::*;
         match $e {
-            Result::Ok(v) => panic!("assertion failed: Ok({:?}): {}", v, format_args!($($arg)+)),
-            Result::Err(e) => e,
+            Ok(v) => panic!("assertion failed: Ok({:?}): {}", v, format_args!($($arg)+)),
+            Err(e) => e,
         }
     }};
 }
