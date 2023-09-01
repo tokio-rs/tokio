@@ -283,7 +283,10 @@ impl Semaphore {
 
             let next = curr - num_permits;
 
-            match self.permits.compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire) {
+            match self
+                .permits
+                .compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire)
+            {
                 Ok(_) => {
                     // TODO: Instrument once issue has been solved
                     return Ok(());
@@ -338,7 +341,9 @@ impl Semaphore {
                     "cannot add more than MAX_PERMITS permits ({})",
                     Self::MAX_PERMITS
                 );
-                let prev = self.permits.fetch_add(rem << Self::PERMIT_SHIFT, Ordering::Release);
+                let prev = self
+                    .permits
+                    .fetch_add(rem << Self::PERMIT_SHIFT, Ordering::Release);
                 let prev = prev >> Self::PERMIT_SHIFT;
                 assert!(
                     prev + permits <= Self::MAX_PERMITS,
@@ -416,7 +421,10 @@ impl Semaphore {
                 lock = Some(self.waiters.lock());
             }
 
-            match self.permits.compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire) {
+            match self
+                .permits
+                .compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire)
+            {
                 Ok(_) => {
                     acquired += acq;
                     if remaining == 0 {
@@ -528,7 +536,10 @@ impl Waiter {
         loop {
             let assign = cmp::min(curr, *n);
             let next = curr - assign;
-            match self.state.compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire) {
+            match self
+                .state
+                .compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire)
+            {
                 Ok(_) => {
                     *n -= assign;
                     #[cfg(all(tokio_unstable, feature = "tracing"))]

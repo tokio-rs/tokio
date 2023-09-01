@@ -90,7 +90,9 @@ impl error::Error for Error {}
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let descr = match self.0 {
-            Kind::Shutdown => "the timer is shutdown, must be called from the context of Tokio runtime",
+            Kind::Shutdown => {
+                "the timer is shutdown, must be called from the context of Tokio runtime"
+            }
             Kind::AtCapacity => "timer is at capacity and cannot create a new entry",
             Kind::Invalid => "timer duration exceeds maximum duration",
         };
