@@ -140,4 +140,9 @@ impl<T: Unpin> SyncIoBridge<T> {
     pub fn new_with_handle(src: T, rt: tokio::runtime::Handle) -> Self {
         Self { src, rt }
     }
+
+    /// Consume this bridge, returning the underlying stream.
+    pub fn into_inner(self) -> T {
+        self.src
+    }
 }

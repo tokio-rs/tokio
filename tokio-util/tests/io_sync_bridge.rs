@@ -44,6 +44,18 @@ async fn test_async_write_to_sync() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+async fn test_into_inner() -> Result<(), Box<dyn Error>> {
+    let mut buf = Vec::new();
+    SyncIoBridge::new(tokio::io::empty())
+        .into_inner()
+        .read_to_end(&mut buf)
+        .await
+        .unwrap();
+    assert_eq!(buf.len(), 0);
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_shutdown() -> Result<(), Box<dyn Error>> {
     let (s1, mut s2) = tokio::io::duplex(1024);
     let (_rh, wh) = tokio::io::split(s1);
