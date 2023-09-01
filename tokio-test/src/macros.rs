@@ -22,17 +22,17 @@
 #[macro_export]
 macro_rules! assert_ready {
     ($e:expr) => {{
-        use core::task::Poll::*;
+        use core::task::Poll;
         match $e {
-            Ready(v) => v,
-            Pending => panic!("pending"),
+            Poll::Ready(v) => v,
+            Poll::Pending => panic!("pending"),
         }
     }};
     ($e:expr, $($msg:tt)+) => {{
-        use core::task::Poll::*;
+        use core::task::Poll;
         match $e {
-            Ready(v) => v,
-            Pending => {
+            Poll::Ready(v) => v,
+            Poll::Pending => {
                 panic!("pending; {}", format_args!($($msg)+))
             }
         }
@@ -127,17 +127,17 @@ macro_rules! assert_ready_err {
 #[macro_export]
 macro_rules! assert_pending {
     ($e:expr) => {{
-        use core::task::Poll::*;
+        use core::task::Poll;
         match $e {
-            Pending => {}
-            Ready(v) => panic!("ready; value = {:?}", v),
+            Poll::Pending => {}
+            Poll::Ready(v) => panic!("ready; value = {:?}", v),
         }
     }};
     ($e:expr, $($msg:tt)+) => {{
-        use core::task::Poll::*;
+        use core::task::Poll;
         match $e {
-            Pending => {}
-            Ready(v) => {
+            Poll::Pending => {}
+            Poll::Ready(v) => {
                 panic!("ready; value = {:?}; {}", v, format_args!($($msg)+))
             }
         }
@@ -202,17 +202,17 @@ macro_rules! assert_ok {
         assert_ok!($e,)
     };
     ($e:expr,) => {{
-        use std::result::Result::*;
+        use std::result::Result;
         match $e {
-            Ok(v) => v,
-            Err(e) => panic!("assertion failed: Err({:?})", e),
+            Result::Ok(v) => v,
+            Result::Err(e) => panic!("assertion failed: Err({:?})", e),
         }
     }};
     ($e:expr, $($arg:tt)+) => {{
-        use std::result::Result::*;
+        use std::result::Result;
         match $e {
-            Ok(v) => v,
-            Err(e) => panic!("assertion failed: Err({:?}): {}", e, format_args!($($arg)+)),
+            Result::Ok(v) => v,
+            Result::Err(e) => panic!("assertion failed: Err({:?}): {}", e, format_args!($($arg)+)),
         }
     }};
 }
@@ -245,17 +245,17 @@ macro_rules! assert_err {
         assert_err!($e,);
     };
     ($e:expr,) => {{
-        use std::result::Result::*;
+        use std::result::Result;
         match $e {
-            Ok(v) => panic!("assertion failed: Ok({:?})", v),
-            Err(e) => e,
+            Result::Ok(v) => panic!("assertion failed: Ok({:?})", v),
+            Result::Err(e) => e,
         }
     }};
     ($e:expr, $($arg:tt)+) => {{
-        use std::result::Result::*;
+        use std::result::Result;
         match $e {
-            Ok(v) => panic!("assertion failed: Ok({:?}): {}", v, format_args!($($arg)+)),
-            Err(e) => e,
+            Result::Ok(v) => panic!("assertion failed: Ok({:?}): {}", v, format_args!($($arg)+)),
+            Result::Err(e) => e,
         }
     }};
 }

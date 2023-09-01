@@ -27,8 +27,7 @@ use std::future::Future;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::sync::atomic::Ordering::*;
-use std::task::Poll::*;
+use std::sync::atomic::Ordering;
 use std::task::{Context, Poll, Waker};
 use std::{cmp, fmt};
 
@@ -222,7 +221,7 @@ impl Semaphore {
 
     /// Returns the current number of available permits.
     pub(crate) fn available_permits(&self) -> usize {
-        self.permits.load(Acquire) >> Self::PERMIT_SHIFT
+        self.permits.load(Ordering::Acquire) >> Self::PERMIT_SHIFT
     }
 
     /// Adds `added` new permits to the semaphore.
@@ -248,7 +247,7 @@ impl Semaphore {
         // holding the lock --- otherwise, if we set the bit and then wait
         // to acquire the lock we'll enter an inconsistent state where the
         // permit counter is closed, but the wait list is not.
-        self.permits.fetch_or(Self::CLOSED, Release);
+        self.permits.fetch_or(Self::CLOSED, Ordering::Release);
         waiters.closed = true;
         while let Some(mut waiter) = waiters.queue.pop_back() {
             let waker = unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) };
@@ -260,7 +259,7 @@ impl Semaphore {
 
     /// Returns true if the semaphore is closed.
     pub(crate) fn is_closed(&self) -> bool {
-        self.permits.load(Acquire) & Self::CLOSED == Self::CLOSED
+        self.permits.load(Ordering::Acquire) & Self::CLOSED == Self::CLOSED
     }
 
     pub(crate) fn try_acquire(&self, num_permits: u32) -> Result<(), TryAcquireError> {
@@ -270,7 +269,7 @@ impl Semaphore {
             Self::MAX_PERMITS
         );
         let num_permits = (num_permits as usize) << Self::PERMIT_SHIFT;
-        let mut curr = self.permits.load(Acquire);
+        let mut curr = self.permits.load(Ordering::Acquire);
         loop {
             // Has the semaphore closed?
             if curr & Self::CLOSED == Self::CLOSED {
@@ -284,7 +283,7 @@ impl Semaphore {
 
             let next = curr - num_permits;
 
-            match self.permits.compare_exchange(curr, next, AcqRel, Acquire) {
+            match self.permits.compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire) {
                 Ok(_) => {
                     // TODO: Instrument once issue has been solved
                     return Ok(());
@@ -339,7 +338,7 @@ impl Semaphore {
                     "cannot add more than MAX_PERMITS permits ({})",
                     Self::MAX_PERMITS
                 );
-                let prev = self.permits.fetch_add(rem << Self::PERMIT_SHIFT, Release);
+                let prev = self.permits.fetch_add(rem << Self::PERMIT_SHIFT, Ordering::Release);
                 let prev = prev >> Self::PERMIT_SHIFT;
                 assert!(
                     prev + permits <= Self::MAX_PERMITS,
@@ -379,7 +378,7 @@ impl Semaphore {
         let mut acquired = 0;
 
         let needed = if queued {
-            node.state.load(Acquire) << Self::PERMIT_SHIFT
+            node.state.load(Ordering::Acquire) << Self::PERMIT_SHIFT
         } else {
             (num_permits as usize) << Self::PERMIT_SHIFT
         };
@@ -387,11 +386,11 @@ impl Semaphore {
         let mut lock = None;
         // First, try to take the requested number of permits from the
         // semaphore.
-        let mut curr = self.permits.load(Acquire);
+        let mut curr = self.permits.load(Ordering::Acquire);
         let mut waiters = loop {
             // Has the semaphore closed?
             if curr & Self::CLOSED > 0 {
-                return Ready(Err(AcquireError::closed()));
+                return Poll::Ready(Err(AcquireError::closed()));
             }
 
             let mut remaining = 0;
@@ -417,7 +416,7 @@ impl Semaphore {
                 lock = Some(self.waiters.lock());
             }
 
-            match self.permits.compare_exchange(curr, next, AcqRel, Acquire) {
+            match self.permits.compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire) {
                 Ok(_) => {
                     acquired += acq;
                     if remaining == 0 {
@@ -436,7 +435,7 @@ impl Semaphore {
                                 )
                             });
 
-                            return Ready(Ok(()));
+                            return Poll::Ready(Ok(()));
                         } else if lock.is_none() {
                             break self.waiters.lock();
                         }
@@ -448,7 +447,7 @@ impl Semaphore {
         };
 
         if waiters.closed {
-            return Ready(Err(AcquireError::closed()));
+            return Poll::Ready(Err(AcquireError::closed()));
         }
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -462,7 +461,7 @@ impl Semaphore {
 
         if node.assign_permits(&mut acquired) {
             self.add_permits_locked(acquired, waiters);
-            return Ready(Ok(()));
+            return Poll::Ready(Ok(()));
         }
 
         assert_eq!(acquired, 0);
@@ -494,7 +493,7 @@ impl Semaphore {
         drop(waiters);
         drop(old_waker);
 
-        Pending
+        Poll::Pending
     }
 }
 
@@ -525,11 +524,11 @@ impl Waiter {
     ///
     /// Returns `true` if the waiter should be removed from the queue
     fn assign_permits(&self, n: &mut usize) -> bool {
-        let mut curr = self.state.load(Acquire);
+        let mut curr = self.state.load(Ordering::Acquire);
         loop {
             let assign = cmp::min(curr, *n);
             let next = curr - assign;
-            match self.state.compare_exchange(curr, next, AcqRel, Acquire) {
+            match self.state.compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire) {
                 Ok(_) => {
                     *n -= assign;
                     #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -572,15 +571,15 @@ impl Future for Acquire<'_> {
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         let result = match semaphore.poll_acquire(cx, needed, node, *queued) {
-            Pending => {
+            Poll::Pending => {
                 *queued = true;
-                Pending
+                Poll::Pending
             }
-            Ready(r) => {
+            Poll::Ready(r) => {
                 coop.made_progress();
                 r?;
                 *queued = false;
-                Ready(Ok(()))
+                Poll::Ready(Ok(()))
             }
         };
 
@@ -675,7 +674,7 @@ impl Drop for Acquire<'_> {
         // Safety: we have locked the wait list.
         unsafe { waiters.queue.remove(node) };
 
-        let acquired_permits = self.num_permits as usize - self.node.state.load(Acquire);
+        let acquired_permits = self.num_permits as usize - self.node.state.load(Ordering::Acquire);
         if acquired_permits > 0 {
             self.semaphore.add_permits_locked(acquired_permits, waiters);
         }
