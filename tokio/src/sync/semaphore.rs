@@ -82,7 +82,7 @@ use std::sync::Arc;
 /// are a limited resource. Allowing an unbounded amount of requests to be processed
 /// could result in a denial-of-service, among many other issues.
 ///
-/// However, in contrast to the file example, this example uses an `Arc<Semaphore>`.
+/// This example uses an `Arc<Semaphore>` instead of a global variable.
 /// Before we spawn a new task to process a request, we must acquire a permit from
 /// this semaphore, in order to limit usage of system resources (like file descriptors,
 /// memory usage, CPU time, etc.). Once acquired, a new task is spawned; and once
