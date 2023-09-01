@@ -356,14 +356,14 @@ mod big_notify {
 
 use self::state::{AtomicState, Version};
 mod state {
-    use crate::loom::sync::atomic::AtomicIsize;
+    use crate::loom::sync::atomic::AtomicUsize;
     use crate::loom::sync::atomic::Ordering::SeqCst;
 
-    const CLOSED: isize = 1;
+    const CLOSED: usize = 1;
 
     /// The version part of the state. The lowest bit is always zero.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    pub(super) struct Version(isize);
+    pub(super) struct Version(usize);
 
     /// Snapshot of the state. The first bit is used as the CLOSED bit.
     /// The remaining bits are used as the version.
@@ -371,22 +371,26 @@ mod state {
     /// The CLOSED bit tracks whether the Sender has been dropped. Dropping all
     /// receivers does not set it.
     #[derive(Copy, Clone, Debug)]
-    pub(super) struct StateSnapshot(isize);
+    pub(super) struct StateSnapshot(usize);
 
     /// The state stored in an atomic integer.
     #[derive(Debug)]
-    pub(super) struct AtomicState(AtomicIsize);
+    pub(super) struct AtomicState(AtomicUsize);
 
     impl Version {
         /// Get the initial version when creating the channel.
         pub(super) fn initial() -> Self {
-            Version(0)
+            // We start counting at 2 so that we can mark the
+            // Receiver as unread on creation.
+            Version(2)
         }
 
         /// Decrements the version.
         pub(super) fn decrement(&mut self) {
             // Decrement by two to avoid touching the CLOSED bit.
-            self.0 -= 2;
+            if self.0 >= 2 {
+                self.0 -= 2;
+            }
         }
     }
 
@@ -406,7 +410,7 @@ mod state {
         /// Create a new `AtomicState` that is not closed and which has the
         /// version set to `Version::initial()`.
         pub(super) fn new() -> Self {
-            AtomicState(AtomicIsize::new(0))
+            AtomicState(AtomicUsize::new(2))
         }
 
         /// Load the current value of the state.

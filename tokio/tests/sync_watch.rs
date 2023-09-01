@@ -45,6 +45,15 @@ fn single_rx_recv() {
 }
 
 #[test]
+fn rx_version_underflow() {
+    let (_tx, mut rx) = watch::channel("one");
+
+    // Version starts at 2, validate we do not underflow
+    rx.mark_unseen();
+    rx.mark_unseen();
+}
+
+#[test]
 fn rx_mark_unseen() {
     let (_tx, mut rx) = watch::channel("one");
 

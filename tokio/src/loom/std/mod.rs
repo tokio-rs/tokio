@@ -1,6 +1,5 @@
 #![cfg_attr(any(not(feature = "full"), loom), allow(unused_imports, dead_code))]
 
-mod atomic_isize;
 mod atomic_u16;
 mod atomic_u32;
 mod atomic_u64;
@@ -71,7 +70,6 @@ pub(crate) mod sync {
     pub(crate) use crate::loom::std::mutex::Mutex;
 
     pub(crate) mod atomic {
-        pub(crate) use crate::loom::std::atomic_isize::AtomicIsize;
         pub(crate) use crate::loom::std::atomic_u16::AtomicU16;
         pub(crate) use crate::loom::std::atomic_u32::AtomicU32;
         pub(crate) use crate::loom::std::atomic_u64::{AtomicU64, StaticAtomicU64};
