@@ -87,7 +87,7 @@ use std::sync::Arc;
 /// this semaphore, in order to limit usage of system resources (like file descriptors,
 /// memory usage, CPU time, etc.). Once acquired, a new task is spawned; and once
 /// finished, the permit is dropped inside of the task to allow others to spawn.
-/// Permits must be acquired via [`Semaphore::acquire_owned`], in order to be
+/// Permits must be acquired via [`Semaphore::acquire_owned`] to be
 /// movable across the task boundary. Contrastingly, if the semaphore were a global,
 /// as in the file-limiting example, only ['Semaphore::acquire'] would be necessary.
 /// This is because a `Permit<'static>` would be returned, which is movable across
