@@ -735,7 +735,7 @@ impl AsyncWrite for Mock {
             }
             Some(Poll::Ready(Ok(_))) => panic!(),
             Some(Poll::Ready(Err(e))) => Poll::Ready(Err(e)),
-            Some(Pending) => Pending,
+            Some(Poll::Pending) => Poll::Pending,
             None => Poll::Ready(Ok(0)),
         }
     }
