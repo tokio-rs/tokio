@@ -414,7 +414,7 @@ async fn poll_ready() -> io::Result<()> {
 
 #[tokio::test(flavor = "current_thread")]
 async fn coop_uds() -> io::Result<()> {
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::atomic::{AtomicU32, Ordering};
     use std::time::{Duration, Instant};
 
     const HELLO: &[u8] = b"hello world";
@@ -426,7 +426,7 @@ async fn coop_uds() -> io::Result<()> {
     let client = std::os::unix::net::UnixDatagram::unbound().unwrap();
     let server = UnixDatagram::bind(&server_path).unwrap();
 
-    let counter = Arc::new(AtomicU64::new(0));
+    let counter = Arc::new(AtomicU32::new(0));
 
     let counter_jh = tokio::spawn({
         let counter = counter.clone();
@@ -449,7 +449,7 @@ async fn coop_uds() -> io::Result<()> {
     counter_jh.abort();
     let _ = counter_jh.await;
 
-    let expected = ((DURATION.as_secs() * 4) as f64 * 0.5) as u64;
+    let expected = ((DURATION.as_secs() * 4) as f64 * 0.5) as u32;
     let counter = counter.load(Ordering::Relaxed);
     assert!(counter >= expected);
 
