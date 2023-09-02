@@ -101,7 +101,7 @@ use std::sync::Arc;
 ///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
 ///
 ///     loop {
-///         // Acquire permit before accepting, to avoid needlessly taking up a (finite) file descriptor
+///         // Acquire permit before accepting the next socket.
 ///         let permit = semaphore.clone().acquire_owned().await.unwrap();
 ///         let (mut socket, _) = listener.accept().await?;
 ///
