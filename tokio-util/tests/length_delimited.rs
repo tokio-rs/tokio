@@ -185,11 +185,11 @@ fn read_single_frame_multi_packet_wait() {
     let io = FramedRead::new(
         mock! {
             data(b"\x00\x00"),
-            Pending,
+            Poll::Pending,
             data(b"\x00\x09abc"),
-            Pending,
+            Poll::Pending,
             data(b"defghi"),
-            Pending,
+            Poll::Pending,
         },
         LengthDelimitedCodec::new(),
     );
@@ -207,15 +207,15 @@ fn read_multi_frame_multi_packet_wait() {
     let io = FramedRead::new(
         mock! {
             data(b"\x00\x00"),
-            Pending,
+            Poll::Pending,
             data(b"\x00\x09abc"),
-            Pending,
+            Poll::Pending,
             data(b"defghi"),
-            Pending,
+            Poll::Pending,
             data(b"\x00\x00\x00\x0312"),
-            Pending,
+            Poll::Pending,
             data(b"3\x00\x00\x00\x0bhello world"),
-            Pending,
+            Poll::Pending,
         },
         LengthDelimitedCodec::new(),
     );
@@ -639,7 +639,7 @@ fn write_update_max_frame_len_in_flight() {
     let io = length_delimited::Builder::new().new_write(mock! {
         data(b"\x00\x00\x00\x06"),
         data(b"ab"),
-        Pending,
+        Poll::Pending,
         data(b"cdef"),
         flush(),
     });
@@ -714,7 +714,7 @@ impl AsyncRead for Mock {
             }
             Some(Poll::Ready(Ok(_))) => panic!(),
             Some(Poll::Ready(Err(e))) => Poll::Ready(Err(e)),
-            Some(Pending) => Pending,
+            Some(Poll::Pending) => Poll::Pending,
             None => Poll::Ready(Ok(())),
         }
     }
