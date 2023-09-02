@@ -83,12 +83,12 @@ use std::sync::Arc;
 /// could result in a denial-of-service, among many other issues.
 ///
 /// This example uses an `Arc<Semaphore>` instead of a global variable.
-/// Before we spawn a new task to process a request, we must acquire a permit from
-/// this semaphore, in order to limit usage of system resources (like file descriptors,
-/// memory usage, CPU time, etc.). Once acquired, a new task is spawned; and once
-/// finished, the permit is dropped inside of the task to allow others to spawn.
-/// Permits must be acquired via [`Semaphore::acquire_owned`] to be
-/// movable across the task boundary. (Since our semaphore is not a global variable — if it was, then `acquire` would be enough.)
+/// To limit the number of requests that can be processed at the time,
+/// we acquire a permit for each task before spawning it. Once acquired,
+/// a new task is spawned; and once finished, the permit is dropped inside
+/// of the task to allow others to spawn. Permits must be acquired via
+/// [`Semaphore::acquire_owned`] to be movable across the task boundary.
+/// (Since our semaphore is not a global variable — if it was, then `acquire` would be enough.)
 ///
 /// ```no_run
 /// use std::sync::Arc;
