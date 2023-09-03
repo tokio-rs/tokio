@@ -1166,6 +1166,10 @@ impl Child {
     /// If the caller wishes to explicitly control when the child's stdin
     /// handle is closed, they may `.take()` it before calling `.wait()`:
     ///
+    /// # Cancel safety
+    ///
+    /// This function is cancel safe.
+    ///
     /// ```
     /// # #[cfg(not(unix))]fn main(){}
     /// # #[cfg(unix)]
