@@ -55,11 +55,11 @@ fn rx_version_underflow() {
 
 #[test]
 fn rx_mark_unseen() {
-    let (_tx, mut rx) = watch::channel("one");
+    let (tx, mut rx) = watch::channel("one");
 
     let mut rx2 = rx.clone();
     let mut rx3 = rx.clone();
-
+    let mut rx4 = rx.clone();
     {
         rx.mark_unseen();
         assert!(rx.has_changed().unwrap());
@@ -89,7 +89,17 @@ fn rx_mark_unseen() {
         assert_pending!(t.poll());
     }
 
-    assert_eq!(*rx.borrow(), "one");
+    {
+        tx.send("two").unwrap();
+        assert!(rx4.has_changed().unwrap());
+        assert_eq!(*rx4.borrow_and_update(), "two");
+
+        rx4.mark_unseen();
+        assert!(rx4.has_changed().unwrap());
+        assert_eq!(*rx4.borrow_and_update(), "two")
+    }
+
+    assert_eq!(*rx.borrow(), "two");
 }
 
 #[test]

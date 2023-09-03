@@ -380,8 +380,8 @@ mod state {
     impl Version {
         /// Get the initial version when creating the channel.
         pub(super) fn initial() -> Self {
-            // We start counting at 2 so that we can mark the
-            // Receiver as unread on creation.
+            // The initial version is 1 so that `mark_unseen` can decrement by one.
+            // (The value is 2 due to the closed bit.)
             Version(2)
         }
 
