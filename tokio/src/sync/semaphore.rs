@@ -102,6 +102,78 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
+/// Implement a simple token bucket for rate limiting
+///
+/// Many applications and systems have constraints on the rate at which certain
+/// operations should occur. Exceeding this rate can result in suboptimal
+/// performance or even errors.
+///
+/// The provided example uses a `TokenBucket`, implemented using a semaphore, that
+/// limits operations to a specific rate. The token bucket will be refilled gradually.
+/// When the rate is exceeded, the `acquire` method will await until a token is available.
+/// ```
+/// use std::sync::Arc;
+/// use tokio::sync::{AcquireError, Semaphore, SemaphorePermit};
+/// use tokio::time::{sleep, Duration};
+///
+/// struct TokenBucket {
+///     sem: Arc<Semaphore>,
+///     jh: tokio::task::JoinHandle<()>,
+/// }
+///
+/// impl TokenBucket {
+///     fn new(rate: usize) -> Self {
+///         let sem = Arc::new(Semaphore::new(rate));
+///
+///         // refills the permits each 1/rate seconds.
+///         let jh = tokio::spawn({
+///             let sem = sem.clone();
+///
+///             async move {
+///                 let time_slice = 1.0 / (rate as f32);
+///
+///                 loop {
+///                     sleep(Duration::from_secs_f32(time_slice)).await;
+///
+///                     let cap = rate - sem.available_permits();
+///                     sem.add_permits(std::cmp::min(cap, 1));
+///                 }
+///             }
+///         });
+///
+///         Self { jh, sem }
+///     }
+///
+///     async fn acquire(&self) -> Result<SemaphorePermit<'_>, AcquireError> {
+///         self.sem.acquire().await
+///     }
+///
+///     async fn close(self) {
+///         self.jh.abort();
+///         let _ = self.jh.await;
+///
+///         self.sem.close();
+///     }
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let bucket = TokenBucket::new(1);
+///
+///     for _ in 0..5 {
+///         bucket
+///             .acquire()
+///             .await
+///             .map(|permit| permit.forget())
+///             .unwrap();
+///
+///         // do the operation
+///     }
+///
+///     bucket.close().await;
+/// }
+/// ```
+///
 /// [`PollSemaphore`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSemaphore.html
 /// [`Semaphore::acquire_owned`]: crate::sync::Semaphore::acquire_owned
 #[derive(Debug)]
