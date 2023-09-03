@@ -604,10 +604,9 @@ enum TryCurrentErrorKind {
 
 impl fmt::Debug for TryCurrentErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use TryCurrentErrorKind as E;
         match self {
-            E::NoContext => f.write_str("NoContext"),
-            E::ThreadLocalDestroyed => f.write_str("ThreadLocalDestroyed"),
+            TryCurrentErrorKind::NoContext => f.write_str("NoContext"),
+            TryCurrentErrorKind::ThreadLocalDestroyed => f.write_str("ThreadLocalDestroyed"),
         }
     }
 }
