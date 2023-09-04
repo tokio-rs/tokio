@@ -1,8 +1,9 @@
-use bencher::Bencher;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use tokio::sync::Notify;
+
+use criterion::{criterion_group, criterion_main, Criterion};
 
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
@@ -11,7 +12,7 @@ fn rt() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
-fn notify_waiters<const N_WAITERS: usize>(b: &mut Bencher) {
+fn notify_waiters<const N_WAITERS: usize>(c: &mut Criterion) {
     let rt = rt();
     let notify = Arc::new(Notify::new());
     let counter = Arc::new(AtomicUsize::new(0));
@@ -29,18 +30,20 @@ fn notify_waiters<const N_WAITERS: usize>(b: &mut Bencher) {
     }
 
     const N_ITERS: usize = 500;
-    b.iter(|| {
-        counter.store(0, Ordering::Relaxed);
-        loop {
-            notify.notify_waiters();
-            if counter.load(Ordering::Relaxed) >= N_ITERS {
-                break;
+    c.bench_function("notify_waiters", |b| {
+        b.iter(|| {
+            counter.store(0, Ordering::Relaxed);
+            loop {
+                notify.notify_waiters();
+                if counter.load(Ordering::Relaxed) >= N_ITERS {
+                    break;
+                }
             }
-        }
+        })
     });
 }
 
-fn notify_one<const N_WAITERS: usize>(b: &mut Bencher) {
+fn notify_one<const N_WAITERS: usize>(c: &mut Criterion) {
     let rt = rt();
     let notify = Arc::new(Notify::new());
     let counter = Arc::new(AtomicUsize::new(0));
@@ -58,18 +61,20 @@ fn notify_one<const N_WAITERS: usize>(b: &mut Bencher) {
     }
 
     const N_ITERS: usize = 500;
-    b.iter(|| {
-        counter.store(0, Ordering::Relaxed);
-        loop {
-            notify.notify_one();
-            if counter.load(Ordering::Relaxed) >= N_ITERS {
-                break;
+    c.bench_function("notify_one", |b| {
+        b.iter(|| {
+            counter.store(0, Ordering::Relaxed);
+            loop {
+                notify.notify_one();
+                if counter.load(Ordering::Relaxed) >= N_ITERS {
+                    break;
+                }
             }
-        }
+        })
     });
 }
 
-bencher::benchmark_group!(
+criterion_group!(
     notify_waiters_simple,
     notify_waiters::<10>,
     notify_waiters::<50>,
@@ -78,7 +83,7 @@ bencher::benchmark_group!(
     notify_waiters::<500>
 );
 
-bencher::benchmark_group!(
+criterion_group!(
     notify_one_simple,
     notify_one::<10>,
     notify_one::<50>,
@@ -87,4 +92,4 @@ bencher::benchmark_group!(
     notify_one::<500>
 );
 
-bencher::benchmark_main!(notify_waiters_simple, notify_one_simple);
+criterion_main!(notify_waiters_simple, notify_one_simple);
