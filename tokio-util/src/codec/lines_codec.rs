@@ -6,6 +6,8 @@ use std::{cmp, fmt, io, str, usize};
 
 /// A simple [`Decoder`] and [`Encoder`] implementation that splits up data into lines.
 ///
+/// Character `\n` is the line ending.
+///
 /// [`Decoder`]: crate::codec::Decoder
 /// [`Encoder`]: crate::codec::Encoder
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
