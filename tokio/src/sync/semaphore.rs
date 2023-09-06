@@ -96,7 +96,7 @@ use std::sync::Arc;
 /// use tokio::net::{TcpListener, TcpStream};
 ///
 /// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// async fn main() -> std::io::Result<()> {
 ///     let semaphore = Arc::new(Semaphore::new(3));
 ///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
 ///
