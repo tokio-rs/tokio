@@ -102,6 +102,9 @@ use std::sync::Arc;
 ///
 ///     loop {
 ///         // Acquire permit before accepting the next socket.
+///         //
+///         // We use `acquire_owned` so that we can move `permit` into
+///         // other tasks.
 ///         let permit = semaphore.clone().acquire_owned().await.unwrap();
 ///         let (mut socket, _) = listener.accept().await?;
 ///
