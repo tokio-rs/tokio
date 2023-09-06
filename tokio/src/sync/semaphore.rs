@@ -118,7 +118,7 @@ use std::sync::Arc;
 ///         });
 ///     }
 /// }
-/// # async fn handle_connection(socket: &mut TcpStream) {
+/// # async fn handle_connection(_socket: &mut tokio::net::TcpStream) {
 /// #   // Do work
 /// # }
 /// ```
