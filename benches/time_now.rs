@@ -19,6 +19,6 @@ fn time_now_current_thread(c: &mut Criterion) {
     });
 }
 
-criterion_group!(time_now, time_now_current_thread,);
+criterion_group!(time_now, time_now_current_thread);
 
 criterion_main!(time_now);

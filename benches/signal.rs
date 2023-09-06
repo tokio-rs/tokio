@@ -92,6 +92,6 @@ fn many_signals(c: &mut Criterion) {
     });
 }
 
-criterion_group!(signal_group, many_signals,);
+criterion_group!(signal_group, many_signals);
 
 criterion_main!(signal_group);

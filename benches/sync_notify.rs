@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use tokio::sync::Notify;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::measurement::WallTime;
+use criterion::{criterion_group, criterion_main, BenchmarkGroup, Criterion};
 
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
@@ -12,7 +13,7 @@ fn rt() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
-fn notify_waiters<const N_WAITERS: usize>(c: &mut Criterion) {
+fn notify_waiters<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
     let notify = Arc::new(Notify::new());
     let counter = Arc::new(AtomicUsize::new(0));
@@ -30,7 +31,7 @@ fn notify_waiters<const N_WAITERS: usize>(c: &mut Criterion) {
     }
 
     const N_ITERS: usize = 500;
-    c.bench_function("notify_waiters", |b| {
+    g.bench_function(N_WAITERS.to_string(), |b| {
         b.iter(|| {
             counter.store(0, Ordering::Relaxed);
             loop {
@@ -43,7 +44,7 @@ fn notify_waiters<const N_WAITERS: usize>(c: &mut Criterion) {
     });
 }
 
-fn notify_one<const N_WAITERS: usize>(c: &mut Criterion) {
+fn notify_one<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
     let notify = Arc::new(Notify::new());
     let counter = Arc::new(AtomicUsize::new(0));
@@ -61,7 +62,7 @@ fn notify_one<const N_WAITERS: usize>(c: &mut Criterion) {
     }
 
     const N_ITERS: usize = 500;
-    c.bench_function("notify_one", |b| {
+    g.bench_function(N_WAITERS.to_string(), |b| {
         b.iter(|| {
             counter.store(0, Ordering::Relaxed);
             loop {
@@ -74,22 +75,30 @@ fn notify_one<const N_WAITERS: usize>(c: &mut Criterion) {
     });
 }
 
+fn group_notify_one(c: &mut Criterion) {
+    let mut group = c.benchmark_group("notify_one");
+    notify_one::<10>(&mut group);
+    notify_one::<50>(&mut group);
+    notify_one::<100>(&mut group);
+    notify_one::<200>(&mut group);
+    notify_one::<500>(&mut group);
+    group.finish();
+}
+
+fn group_notify_waiters(c: &mut Criterion) {
+    let mut group = c.benchmark_group("notify_waiters");
+    notify_waiters::<10>(&mut group);
+    notify_waiters::<50>(&mut group);
+    notify_waiters::<100>(&mut group);
+    notify_waiters::<200>(&mut group);
+    notify_waiters::<500>(&mut group);
+    group.finish();
+}
+
 criterion_group!(
     notify_waiters_simple,
-    notify_waiters::<10>,
-    notify_waiters::<50>,
-    notify_waiters::<100>,
-    notify_waiters::<200>,
-    notify_waiters::<500>
+    group_notify_one,
+    group_notify_waiters
 );
 
-criterion_group!(
-    notify_one_simple,
-    notify_one::<10>,
-    notify_one::<50>,
-    notify_one::<100>,
-    notify_one::<200>,
-    notify_one::<500>
-);
-
-criterion_main!(notify_waiters_simple, notify_one_simple);
+criterion_main!(notify_waiters_simple);

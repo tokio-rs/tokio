@@ -1,9 +1,23 @@
 use tokio::sync::mpsc;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::measurement::WallTime;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkGroup, Criterion};
 
-type Medium = [usize; 64];
-type Large = [Medium; 64];
+#[derive(Debug, Copy, Clone)]
+struct Medium([usize; 64]);
+impl Default for Medium {
+    fn default() -> Self {
+        Medium([0; 64])
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+struct Large([Medium; 64]);
+impl Default for Large {
+    fn default() -> Self {
+        Large([Medium::default(); 64])
+    }
+}
 
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
@@ -12,62 +26,32 @@ fn rt() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
-fn create_1_medium(c: &mut Criterion) {
-    c.bench_function("create_1_medium", |b| {
+fn create_medium<const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>) {
+    g.bench_function(SIZE.to_string(), |b| {
         b.iter(|| {
-            black_box(&mpsc::channel::<Medium>(1));
+            black_box(&mpsc::channel::<Medium>(SIZE));
         })
     });
 }
 
-fn create_100_medium(c: &mut Criterion) {
-    c.bench_function("create_100_medium", |b| {
-        b.iter(|| {
-            black_box(&mpsc::channel::<Medium>(100));
-        })
-    });
-}
-
-fn create_100_000_medium(c: &mut Criterion) {
-    c.bench_function("create_100_000_medium", |b| {
-        b.iter(|| {
-            black_box(&mpsc::channel::<Medium>(100_000));
-        })
-    });
-}
-
-fn send_medium(c: &mut Criterion) {
+fn send_data<T: Default, const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>, prefix: &str) {
     let rt = rt();
 
-    c.bench_function("send_medium", |b| {
+    g.bench_function(format!("{}_{}", prefix, SIZE), |b| {
         b.iter(|| {
-            let (tx, mut rx) = mpsc::channel::<Medium>(1000);
+            let (tx, mut rx) = mpsc::channel::<T>(SIZE);
 
-            let _ = rt.block_on(tx.send([0; 64]));
+            let _ = rt.block_on(tx.send(T::default()));
 
             rt.block_on(rx.recv()).unwrap();
         })
     });
 }
 
-fn send_large(c: &mut Criterion) {
+fn contention_bounded(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
 
-    c.bench_function("send_large", |b| {
-        b.iter(|| {
-            let (tx, mut rx) = mpsc::channel::<Large>(1000);
-
-            let _ = rt.block_on(tx.send([[0; 64]; 64]));
-
-            rt.block_on(rx.recv()).unwrap();
-        })
-    });
-}
-
-fn contention_bounded(c: &mut Criterion) {
-    let rt = rt();
-
-    c.bench_function("contention_bounded", |b| {
+    g.bench_function("bounded", |b| {
         b.iter(|| {
             rt.block_on(async move {
                 let (tx, mut rx) = mpsc::channel::<usize>(1_000_000);
@@ -89,10 +73,10 @@ fn contention_bounded(c: &mut Criterion) {
     });
 }
 
-fn contention_bounded_full(c: &mut Criterion) {
+fn contention_bounded_full(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
 
-    c.bench_function("contention_bounded_full", |b| {
+    g.bench_function("bounded_full", |b| {
         b.iter(|| {
             rt.block_on(async move {
                 let (tx, mut rx) = mpsc::channel::<usize>(100);
@@ -114,10 +98,10 @@ fn contention_bounded_full(c: &mut Criterion) {
     });
 }
 
-fn contention_unbounded(c: &mut Criterion) {
+fn contention_unbounded(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
 
-    c.bench_function("contention_unbounded", |b| {
+    g.bench_function("unbounded", |b| {
         b.iter(|| {
             rt.block_on(async move {
                 let (tx, mut rx) = mpsc::unbounded_channel::<usize>();
@@ -139,10 +123,10 @@ fn contention_unbounded(c: &mut Criterion) {
     });
 }
 
-fn uncontented_bounded(c: &mut Criterion) {
+fn uncontented_bounded(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
 
-    c.bench_function("uncontented_bounded", |b| {
+    g.bench_function("bounded", |b| {
         b.iter(|| {
             rt.block_on(async move {
                 let (tx, mut rx) = mpsc::channel::<usize>(1_000_000);
@@ -159,10 +143,10 @@ fn uncontented_bounded(c: &mut Criterion) {
     });
 }
 
-fn uncontented_unbounded(c: &mut Criterion) {
+fn uncontented_unbounded(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
 
-    c.bench_function("uncontented_unbounded", |b| {
+    g.bench_function("unbounded", |b| {
         b.iter(|| {
             rt.block_on(async move {
                 let (tx, mut rx) = mpsc::unbounded_channel::<usize>();
@@ -179,22 +163,39 @@ fn uncontented_unbounded(c: &mut Criterion) {
     });
 }
 
-criterion_group!(
-    create,
-    create_1_medium,
-    create_100_medium,
-    create_100_000_medium
-);
+fn group_create_medium(c: &mut Criterion) {
+    let mut group = c.benchmark_group("create_medium");
+    create_medium::<1>(&mut group);
+    create_medium::<100>(&mut group);
+    create_medium::<100_000>(&mut group);
+    group.finish();
+}
 
-criterion_group!(send, send_medium, send_large);
+fn group_send(c: &mut Criterion) {
+    let mut group = c.benchmark_group("send");
+    send_data::<Medium, 1000>(&mut group, "Medium");
+    send_data::<Large, 1000>(&mut group, "Medium");
+    group.finish();
+}
 
-criterion_group!(
-    contention,
-    contention_bounded,
-    contention_bounded_full,
-    contention_unbounded,
-    uncontented_bounded,
-    uncontented_unbounded
-);
+fn group_contention(c: &mut Criterion) {
+    let mut group = c.benchmark_group("contention");
+    contention_bounded(&mut group);
+    contention_bounded_full(&mut group);
+    contention_unbounded(&mut group);
+    group.finish();
+}
 
-criterion_main!(create, send, contention);
+fn group_uncontented(c: &mut Criterion) {
+    let mut group = c.benchmark_group("uncontented");
+    uncontented_bounded(&mut group);
+    uncontented_unbounded(&mut group);
+    group.finish();
+}
+
+criterion_group!(create, group_create_medium);
+criterion_group!(send, group_send);
+criterion_group!(contention, group_contention);
+criterion_group!(uncontented, group_uncontented);
+
+criterion_main!(create, send, contention, uncontented);

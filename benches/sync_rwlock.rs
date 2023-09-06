@@ -1,16 +1,17 @@
 use std::sync::Arc;
 use tokio::{sync::RwLock, task};
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::measurement::WallTime;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkGroup, Criterion};
 
-fn read_uncontended(c: &mut Criterion) {
+fn read_uncontended(g: &mut BenchmarkGroup<WallTime>) {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(6)
         .build()
         .unwrap();
 
     let lock = Arc::new(RwLock::new(()));
-    c.bench_function("read_uncontended", |b| {
+    g.bench_function("read", |b| {
         b.iter(|| {
             let lock = lock.clone();
             rt.block_on(async move {
@@ -23,7 +24,7 @@ fn read_uncontended(c: &mut Criterion) {
     });
 }
 
-fn read_concurrent_uncontended_multi(c: &mut Criterion) {
+fn read_concurrent_uncontended_multi(g: &mut BenchmarkGroup<WallTime>) {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(6)
         .build()
@@ -35,7 +36,7 @@ fn read_concurrent_uncontended_multi(c: &mut Criterion) {
     }
 
     let lock = Arc::new(RwLock::new(()));
-    c.bench_function("read_concurrent_uncontended_multi", |b| {
+    g.bench_function("read_concurrent_multi", |b| {
         b.iter(|| {
             let lock = lock.clone();
             rt.block_on(async move {
@@ -53,7 +54,7 @@ fn read_concurrent_uncontended_multi(c: &mut Criterion) {
     });
 }
 
-fn read_concurrent_uncontended(c: &mut Criterion) {
+fn read_concurrent_uncontended(g: &mut BenchmarkGroup<WallTime>) {
     let rt = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
@@ -64,7 +65,7 @@ fn read_concurrent_uncontended(c: &mut Criterion) {
     }
 
     let lock = Arc::new(RwLock::new(()));
-    c.bench_function("read_concurrent_uncontended", |b| {
+    g.bench_function("read_concurrent", |b| {
         b.iter(|| {
             let lock = lock.clone();
             rt.block_on(async move {
@@ -81,7 +82,7 @@ fn read_concurrent_uncontended(c: &mut Criterion) {
     });
 }
 
-fn read_concurrent_contended_multi(c: &mut Criterion) {
+fn read_concurrent_contended_multi(g: &mut BenchmarkGroup<WallTime>) {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(6)
         .build()
@@ -93,7 +94,7 @@ fn read_concurrent_contended_multi(c: &mut Criterion) {
     }
 
     let lock = Arc::new(RwLock::new(()));
-    c.bench_function("read_concurrent_contended_multi", |b| {
+    g.bench_function("read_concurrent_multi", |b| {
         b.iter(|| {
             let lock = lock.clone();
             rt.block_on(async move {
@@ -112,7 +113,7 @@ fn read_concurrent_contended_multi(c: &mut Criterion) {
     });
 }
 
-fn read_concurrent_contended(c: &mut Criterion) {
+fn read_concurrent_contended(g: &mut BenchmarkGroup<WallTime>) {
     let rt = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
@@ -123,7 +124,7 @@ fn read_concurrent_contended(c: &mut Criterion) {
     }
 
     let lock = Arc::new(RwLock::new(()));
-    c.bench_function("read_concurrent_contended", |b| {
+    g.bench_function("read_concurrent", |b| {
         b.iter(|| {
             let lock = lock.clone();
             rt.block_on(async move {
@@ -141,13 +142,22 @@ fn read_concurrent_contended(c: &mut Criterion) {
     });
 }
 
-criterion_group!(
-    sync_rwlock,
-    read_uncontended,
-    read_concurrent_uncontended,
-    read_concurrent_uncontended_multi,
-    read_concurrent_contended,
-    read_concurrent_contended_multi
-);
+fn group_contention(c: &mut Criterion) {
+    let mut group = c.benchmark_group("contention");
+    read_concurrent_contended(&mut group);
+    read_concurrent_contended_multi(&mut group);
+    group.finish();
+}
 
-criterion_main!(sync_rwlock);
+fn group_uncontented(c: &mut Criterion) {
+    let mut group = c.benchmark_group("uncontented");
+    read_uncontended(&mut group);
+    read_concurrent_uncontended(&mut group);
+    read_concurrent_uncontended_multi(&mut group);
+    group.finish();
+}
+
+criterion_group!(contention, group_contention);
+criterion_group!(uncontented, group_uncontented);
+
+criterion_main!(contention, uncontented);
