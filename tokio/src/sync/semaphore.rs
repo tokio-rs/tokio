@@ -93,7 +93,7 @@ use std::sync::Arc;
 /// ```no_run
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
-/// use tokio::net::{TcpListener, TcpStream};
+/// use tokio::net::TcpListener;
 ///
 /// #[tokio::main]
 /// async fn main() -> std::io::Result<()> {
