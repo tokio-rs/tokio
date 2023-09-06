@@ -575,6 +575,7 @@ impl LocalSet {
         run_until.await
     }
 
+    #[track_caller]
     pub(in crate::task) fn spawn_named<F>(
         &self,
         future: F,
