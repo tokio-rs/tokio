@@ -169,6 +169,8 @@ impl Interest {
 
     /// Remove `Interest` from `self`.
     ///
+    /// Interests present in `other` but *not* in `self` are ignored.
+    ///
     /// Returns `None` if the set would be empty after removing `Interest`.
     ///
     /// # Examples
