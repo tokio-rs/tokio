@@ -163,7 +163,7 @@ fn uncontented_unbounded(g: &mut BenchmarkGroup<WallTime>) {
     });
 }
 
-fn group_create_medium(c: &mut Criterion) {
+fn bench_create_medium(c: &mut Criterion) {
     let mut group = c.benchmark_group("create_medium");
     create_medium::<1>(&mut group);
     create_medium::<100>(&mut group);
@@ -171,14 +171,14 @@ fn group_create_medium(c: &mut Criterion) {
     group.finish();
 }
 
-fn group_send(c: &mut Criterion) {
+fn bench_send(c: &mut Criterion) {
     let mut group = c.benchmark_group("send");
-    send_data::<Medium, 1000>(&mut group, "Medium");
-    send_data::<Large, 1000>(&mut group, "Medium");
+    send_data::<Medium, 1000>(&mut group, "medium");
+    send_data::<Large, 1000>(&mut group, "large");
     group.finish();
 }
 
-fn group_contention(c: &mut Criterion) {
+fn bench_contention(c: &mut Criterion) {
     let mut group = c.benchmark_group("contention");
     contention_bounded(&mut group);
     contention_bounded_full(&mut group);
@@ -186,16 +186,16 @@ fn group_contention(c: &mut Criterion) {
     group.finish();
 }
 
-fn group_uncontented(c: &mut Criterion) {
+fn bench_uncontented(c: &mut Criterion) {
     let mut group = c.benchmark_group("uncontented");
     uncontented_bounded(&mut group);
     uncontented_unbounded(&mut group);
     group.finish();
 }
 
-criterion_group!(create, group_create_medium);
-criterion_group!(send, group_send);
-criterion_group!(contention, group_contention);
-criterion_group!(uncontented, group_uncontented);
+criterion_group!(create, bench_create_medium);
+criterion_group!(send, bench_send);
+criterion_group!(contention, bench_contention);
+criterion_group!(uncontented, bench_uncontented);
 
 criterion_main!(create, send, contention, uncontented);

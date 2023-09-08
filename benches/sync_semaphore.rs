@@ -1,14 +1,25 @@
 use std::sync::Arc;
+use tokio::runtime::Runtime;
 use tokio::{sync::Semaphore, task};
 
 use criterion::measurement::WallTime;
 use criterion::{criterion_group, criterion_main, BenchmarkGroup, Criterion};
 
-fn uncontended(g: &mut BenchmarkGroup<WallTime>) {
-    let rt = tokio::runtime::Builder::new_multi_thread()
+fn single_rt() -> Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap()
+}
+
+fn multi_rt() -> Runtime {
+    tokio::runtime::Builder::new_multi_thread()
         .worker_threads(6)
         .build()
-        .unwrap();
+        .unwrap()
+}
+
+fn uncontended(g: &mut BenchmarkGroup<WallTime>) {
+    let rt = multi_rt();
 
     let s = Arc::new(Semaphore::new(10));
     g.bench_function("multi", |b| {
@@ -30,10 +41,7 @@ async fn task(s: Arc<Semaphore>) {
 }
 
 fn uncontended_concurrent_multi(g: &mut BenchmarkGroup<WallTime>) {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(6)
-        .build()
-        .unwrap();
+    let rt = multi_rt();
 
     let s = Arc::new(Semaphore::new(10));
     g.bench_function("concurrent_multi", |b| {
@@ -55,9 +63,7 @@ fn uncontended_concurrent_multi(g: &mut BenchmarkGroup<WallTime>) {
 }
 
 fn uncontended_concurrent_single(g: &mut BenchmarkGroup<WallTime>) {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap();
+    let rt = single_rt();
 
     let s = Arc::new(Semaphore::new(10));
     g.bench_function("concurrent_single", |b| {
@@ -78,10 +84,7 @@ fn uncontended_concurrent_single(g: &mut BenchmarkGroup<WallTime>) {
 }
 
 fn contended_concurrent_multi(g: &mut BenchmarkGroup<WallTime>) {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(6)
-        .build()
-        .unwrap();
+    let rt = multi_rt();
 
     let s = Arc::new(Semaphore::new(5));
     g.bench_function("concurrent_multi", |b| {
@@ -103,9 +106,7 @@ fn contended_concurrent_multi(g: &mut BenchmarkGroup<WallTime>) {
 }
 
 fn contended_concurrent_single(g: &mut BenchmarkGroup<WallTime>) {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap();
+    let rt = single_rt();
 
     let s = Arc::new(Semaphore::new(5));
     g.bench_function("concurrent_single", |b| {
@@ -125,14 +126,14 @@ fn contended_concurrent_single(g: &mut BenchmarkGroup<WallTime>) {
     });
 }
 
-fn group_contention(c: &mut Criterion) {
+fn bench_contention(c: &mut Criterion) {
     let mut group = c.benchmark_group("contention");
     contended_concurrent_multi(&mut group);
     contended_concurrent_single(&mut group);
     group.finish();
 }
 
-fn group_uncontented(c: &mut Criterion) {
+fn bench_uncontented(c: &mut Criterion) {
     let mut group = c.benchmark_group("uncontented");
     uncontended(&mut group);
     uncontended_concurrent_multi(&mut group);
@@ -140,7 +141,7 @@ fn group_uncontented(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(contention, group_contention);
-criterion_group!(uncontented, group_uncontented);
+criterion_group!(contention, bench_contention);
+criterion_group!(uncontented, bench_uncontented);
 
 criterion_main!(contention, uncontented);

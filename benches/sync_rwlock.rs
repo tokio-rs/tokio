@@ -142,14 +142,14 @@ fn read_concurrent_contended(g: &mut BenchmarkGroup<WallTime>) {
     });
 }
 
-fn group_contention(c: &mut Criterion) {
+fn bench_contention(c: &mut Criterion) {
     let mut group = c.benchmark_group("contention");
     read_concurrent_contended(&mut group);
     read_concurrent_contended_multi(&mut group);
     group.finish();
 }
 
-fn group_uncontented(c: &mut Criterion) {
+fn bench_uncontented(c: &mut Criterion) {
     let mut group = c.benchmark_group("uncontented");
     read_uncontended(&mut group);
     read_concurrent_uncontended(&mut group);
@@ -157,7 +157,7 @@ fn group_uncontented(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(contention, group_contention);
-criterion_group!(uncontented, group_uncontented);
+criterion_group!(contention, bench_contention);
+criterion_group!(uncontented, bench_uncontented);
 
 criterion_main!(contention, uncontented);

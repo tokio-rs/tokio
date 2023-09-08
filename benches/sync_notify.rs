@@ -75,7 +75,7 @@ fn notify_one<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
     });
 }
 
-fn group_notify_one(c: &mut Criterion) {
+fn bench_notify_one(c: &mut Criterion) {
     let mut group = c.benchmark_group("notify_one");
     notify_one::<10>(&mut group);
     notify_one::<50>(&mut group);
@@ -85,7 +85,7 @@ fn group_notify_one(c: &mut Criterion) {
     group.finish();
 }
 
-fn group_notify_waiters(c: &mut Criterion) {
+fn bench_notify_waiters(c: &mut Criterion) {
     let mut group = c.benchmark_group("notify_waiters");
     notify_waiters::<10>(&mut group);
     notify_waiters::<50>(&mut group);
@@ -97,8 +97,8 @@ fn group_notify_waiters(c: &mut Criterion) {
 
 criterion_group!(
     notify_waiters_simple,
-    group_notify_one,
-    group_notify_waiters
+    bench_notify_one,
+    bench_notify_waiters
 );
 
 criterion_main!(notify_waiters_simple);
