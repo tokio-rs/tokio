@@ -139,7 +139,7 @@ use std::sync::Arc;
 ///                     interval.tick().await;
 ///
 ///                     let cap = rate - sem.available_permits();
-///                     sem.add_permits(std::cmp::min(cap, 1));
+///                     sem.add_permits(cap.min(1));
 ///                 }
 ///             }
 ///         });
