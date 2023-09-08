@@ -402,7 +402,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         quote! {
             let body = async #body;
             #crate_path::pin!(body);
-            let body: ::std::pin::Pin<&mut dyn ::std::future::Future<Output = #output_type>> = body;
+            let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
         }
     } else {
         quote! {
