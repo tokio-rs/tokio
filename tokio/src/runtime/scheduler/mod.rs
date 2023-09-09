@@ -27,6 +27,8 @@ cfg_rt_multi_thread! {
 
 use crate::runtime::driver;
 
+use super::task::Schedule;
+
 #[derive(Debug, Clone)]
 pub(crate) enum Handle {
     #[cfg(feature = "rt")]
@@ -83,6 +85,8 @@ cfg_rt! {
     use crate::task::JoinHandle;
     use crate::util::RngSeedGenerator;
     use std::task::Waker;
+    use crate::runtime::task::Task;
+    use crate::runtime::task::Notified;
 
     macro_rules! match_flavor {
         ($self:expr, $ty:ident($h:ident) => $e:expr) => {
@@ -124,6 +128,44 @@ cfg_rt! {
 
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Handle::MultiThreadAlt(h) => multi_thread_alt::Handle::spawn(h, future, id),
+            }
+        }
+
+        pub(crate) fn release(&self, task: &Task) -> Option<Task>
+        {
+            match self {
+                Handle::CurrentThread(h) => h.release(task),
+
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                Handle::MultiThread(h) => h.release(task),
+
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                Handle::MultiThreadAlt(h) => h.release(task),
+            }
+        }
+
+        pub(crate) fn schedule(&self, task: Notified)
+        {
+            match self {
+                Handle::CurrentThread(h) => h.schedule(task),
+
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                Handle::MultiThread(h) => h.schedule(task),
+
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                Handle::MultiThreadAlt(h) => h.schedule(task),
+            }
+        }
+
+        pub(crate) fn yield_now(&self, task: Notified) {
+            match self {
+                Handle::CurrentThread(h) => h.yield_now(task),
+
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                Handle::MultiThread(h) => h.yield_now(task),
+
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                Handle::MultiThreadAlt(h) => h.yield_now(task),
             }
         }
 

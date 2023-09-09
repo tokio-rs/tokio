@@ -19,7 +19,7 @@ impl AsMut<Synced> for Synced {
     }
 }
 
-impl<T: 'static> Shared<T> {
+impl Shared {
     /// Pushes several values into the queue.
     ///
     /// # Safety
@@ -29,7 +29,7 @@ impl<T: 'static> Shared<T> {
     pub(crate) unsafe fn push_batch<L, I>(&self, shared: L, mut iter: I)
     where
         L: Lock<Synced>,
-        I: Iterator<Item = task::Notified<T>>,
+        I: Iterator<Item = task::Notified>,
     {
         let first = match iter.next() {
             Some(first) => first.into_raw(),
@@ -84,7 +84,7 @@ impl<T: 'static> Shared<T> {
             while let Some(task) = curr {
                 curr = task.get_queue_next();
 
-                let _ = unsafe { task::Notified::<T>::from_raw(task) };
+                let _ = unsafe { task::Notified::from_raw(task) };
             }
 
             return;

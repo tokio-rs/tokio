@@ -71,7 +71,7 @@ struct Core {
 /// Scheduler state shared between threads.
 struct Shared {
     /// Remote run queue
-    inject: Inject<Arc<Handle>>,
+    inject: Inject,
 
     /// Collection of all active tasks spawned onto this executor.
     owned: OwnedTasks<Arc<Handle>>,
@@ -104,7 +104,7 @@ pub(crate) struct Context {
     pub(crate) defer: Defer,
 }
 
-type Notified = task::Notified<Arc<Handle>>;
+type Notified = task::Notified;
 
 /// Initial queue capacity.
 const INITIAL_CAPACITY: usize = 64;
@@ -432,7 +432,7 @@ impl Handle {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
+        let (handle, notified) = me.shared.owned.bind(future, None, id);
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -564,11 +564,11 @@ impl fmt::Debug for Handle {
 // ===== impl Shared =====
 
 impl Schedule for Arc<Handle> {
-    fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
+    fn release(&self, task: &Task) -> Option<Task> {
         self.shared.owned.remove(task)
     }
 
-    fn schedule(&self, task: task::Notified<Self>) {
+    fn schedule(&self, task: task::Notified) {
         use scheduler::Context::CurrentThread;
 
         context::with_scheduler(|maybe_cx| match maybe_cx {

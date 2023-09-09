@@ -120,7 +120,7 @@ struct Shared {
 }
 
 pub(crate) struct Task {
-    task: task::UnownedTask<BlockingSchedule>,
+    task: task::UnownedTask,
     mandatory: Mandatory,
 }
 
@@ -151,7 +151,7 @@ impl From<SpawnError> for io::Error {
 }
 
 impl Task {
-    pub(crate) fn new(task: task::UnownedTask<BlockingSchedule>, mandatory: Mandatory) -> Task {
+    pub(crate) fn new(task: task::UnownedTask, mandatory: Mandatory) -> Task {
         Task { task, mandatory }
     }
 
@@ -381,7 +381,7 @@ impl Spawner {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let _ = name;
 
-        let (task, handle) = task::unowned(fut, BlockingSchedule::new(rt), id);
+        let (task, handle) = task::unowned(fut,Some(BlockingSchedule::new(rt)), id);
 
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
         (handle, spawned)

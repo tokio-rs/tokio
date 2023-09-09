@@ -37,7 +37,7 @@ impl BlockingSchedule {
 }
 
 impl task::Schedule for BlockingSchedule {
-    fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
+    fn release(&self, _task: &Task) -> Option<Task> {
         #[cfg(feature = "test-util")]
         {
             match &self.handle.inner {
@@ -54,7 +54,7 @@ impl task::Schedule for BlockingSchedule {
         None
     }
 
-    fn schedule(&self, _task: task::Notified<Self>) {
+    fn schedule(&self, _task: task::Notified) {
         unreachable!();
     }
 }

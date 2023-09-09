@@ -3,23 +3,23 @@ use crate::runtime::task;
 #[cfg(test)]
 use std::cell::RefCell;
 
-pub(crate) trait Overflow<T: 'static> {
-    fn push(&self, task: task::Notified<T>);
+pub(crate) trait Overflow {
+    fn push(&self, task: task::Notified);
 
     fn push_batch<I>(&self, iter: I)
     where
-        I: Iterator<Item = task::Notified<T>>;
+        I: Iterator<Item = task::Notified>;
 }
 
 #[cfg(test)]
-impl<T: 'static> Overflow<T> for RefCell<Vec<task::Notified<T>>> {
-    fn push(&self, task: task::Notified<T>) {
+impl Overflow for RefCell<Vec<task::Notified>> {
+    fn push(&self, task: task::Notified) {
         self.borrow_mut().push(task);
     }
 
     fn push_batch<I>(&self, iter: I)
     where
-        I: Iterator<Item = task::Notified<T>>,
+        I: Iterator<Item = task::Notified>,
     {
         self.borrow_mut().extend(iter);
     }

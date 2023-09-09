@@ -20,7 +20,7 @@ unsafe impl Send for Synced {}
 unsafe impl Sync for Synced {}
 
 impl Synced {
-    pub(super) fn pop<T: 'static>(&mut self) -> Option<task::Notified<T>> {
+    pub(super) fn pop(&mut self) -> Option<task::Notified> {
         let task = self.head?;
 
         self.head = unsafe { task.get_queue_next() };

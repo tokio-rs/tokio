@@ -3,25 +3,21 @@ use super::{Pop, Synced};
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::runtime::task;
 
-use std::marker::PhantomData;
 use std::sync::atomic::Ordering::{Acquire, Release};
 
-pub(crate) struct Shared<T: 'static> {
+pub(crate) struct Shared {
     /// Number of pending tasks in the queue. This helps prevent unnecessary
     /// locking in the hot path.
     pub(super) len: AtomicUsize,
-
-    _p: PhantomData<T>,
 }
 
-unsafe impl<T> Send for Shared<T> {}
-unsafe impl<T> Sync for Shared<T> {}
+unsafe impl Send for Shared {}
+unsafe impl Sync for Shared {}
 
-impl<T: 'static> Shared<T> {
-    pub(crate) fn new() -> (Shared<T>, Synced) {
+impl Shared {
+    pub(crate) fn new() -> (Shared, Synced) {
         let inject = Shared {
             len: AtomicUsize::new(0),
-            _p: PhantomData,
         };
 
         let synced = Synced {
@@ -68,7 +64,7 @@ impl<T: 'static> Shared<T> {
     /// # Safety
     ///
     /// Must be called with the same `Synced` instance returned by `Inject::new`
-    pub(crate) unsafe fn push(&self, synced: &mut Synced, task: task::Notified<T>) {
+    pub(crate) unsafe fn push(&self, synced: &mut Synced, task: task::Notified) {
         if synced.is_closed {
             return;
         }
@@ -97,7 +93,7 @@ impl<T: 'static> Shared<T> {
     /// # Safety
     ///
     /// Must be called with the same `Synced` instance returned by `Inject::new`
-    pub(crate) unsafe fn pop(&self, synced: &mut Synced) -> Option<task::Notified<T>> {
+    pub(crate) unsafe fn pop(&self, synced: &mut Synced) -> Option<task::Notified> {
         self.pop_n(synced, 1).next()
     }
 
@@ -106,7 +102,7 @@ impl<T: 'static> Shared<T> {
     /// # Safety
     ///
     /// Must be called with the same `Synced` instance returned by `Inject::new`
-    pub(crate) unsafe fn pop_n<'a>(&'a self, synced: &'a mut Synced, n: usize) -> Pop<'a, T> {
+    pub(crate) unsafe fn pop_n<'a>(&'a self, synced: &'a mut Synced, n: usize) -> Pop<'a> {
         use std::cmp;
 
         debug_assert!(n > 0);

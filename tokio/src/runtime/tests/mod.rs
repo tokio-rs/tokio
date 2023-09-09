@@ -45,7 +45,7 @@ mod unowned_wrapper {
         T: std::future::Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (task, handle) = crate::runtime::task::unowned(task, NoopSchedule, Id::next());
+        let (task, handle) = crate::runtime::task::unowned(task, Some(NoopSchedule), Id::next());
         (task.into_notified(), handle)
     }
 }

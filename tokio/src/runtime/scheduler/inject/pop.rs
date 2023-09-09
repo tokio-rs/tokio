@@ -2,26 +2,22 @@ use super::Synced;
 
 use crate::runtime::task;
 
-use std::marker::PhantomData;
-
-pub(crate) struct Pop<'a, T: 'static> {
+pub(crate) struct Pop<'a> {
     len: usize,
     synced: &'a mut Synced,
-    _p: PhantomData<T>,
 }
 
-impl<'a, T: 'static> Pop<'a, T> {
-    pub(super) fn new(len: usize, synced: &'a mut Synced) -> Pop<'a, T> {
+impl<'a> Pop<'a> {
+    pub(super) fn new(len: usize, synced: &'a mut Synced) -> Pop<'a> {
         Pop {
             len,
             synced,
-            _p: PhantomData,
         }
     }
 }
 
-impl<'a, T: 'static> Iterator for Pop<'a, T> {
-    type Item = task::Notified<T>;
+impl<'a> Iterator for Pop<'a> {
+    type Item = task::Notified;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.len == 0 {
@@ -42,13 +38,13 @@ impl<'a, T: 'static> Iterator for Pop<'a, T> {
     }
 }
 
-impl<'a, T: 'static> ExactSizeIterator for Pop<'a, T> {
+impl<'a> ExactSizeIterator for Pop<'a> {
     fn len(&self) -> usize {
         self.len
     }
 }
 
-impl<'a, T: 'static> Drop for Pop<'a, T> {
+impl<'a> Drop for Pop<'a> {
     fn drop(&mut self) {
         for _ in self.by_ref() {}
     }

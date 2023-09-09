@@ -142,7 +142,7 @@ pub(super) struct CoreStage<T: Future> {
 #[repr(C)]
 pub(super) struct Core<T: Future, S> {
     /// Scheduler used to drive this future.
-    pub(super) scheduler: S,
+    pub(super) scheduler: Option<S>,
 
     /// The task's ID, used for populating `JoinError`s.
     pub(super) task_id: Id,
@@ -211,7 +211,7 @@ pub(super) enum Stage<T: Future> {
 impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
-    pub(super) fn new(future: T, scheduler: S, state: State, task_id: Id) -> Box<Cell<T, S>> {
+    pub(super) fn new(future: T, scheduler: Option<S>, state: State, task_id: Id) -> Box<Cell<T, S>> {
         // Separated into a non-generic function to reduce LLVM codegen
         fn new_header(
             state: State,

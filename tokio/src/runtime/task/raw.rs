@@ -156,7 +156,7 @@ const fn get_id_offset(
 }
 
 impl RawTask {
-    pub(super) fn new<T, S>(task: T, scheduler: S, id: Id) -> RawTask
+    pub(super) fn new<T, S>(task: T, scheduler: Option<S>, id: Id) -> RawTask
     where
         T: Future,
         S: Schedule,
@@ -279,10 +279,12 @@ unsafe fn poll<T: Future, S: Schedule>(ptr: NonNull<Header>) {
 unsafe fn schedule<S: Schedule>(ptr: NonNull<Header>) {
     use crate::runtime::task::{Notified, Task};
 
-    let scheduler = Header::get_scheduler::<S>(ptr);
-    scheduler
-        .as_ref()
-        .schedule(Notified(Task::from_raw(ptr.cast())));
+    let scheduler = Header::get_scheduler::<Option<S>>(ptr).as_ref();
+    let notify = Notified(Task::from_raw(ptr.cast()));
+    match scheduler {
+        Some(scheduler) => scheduler.schedule(notify),
+        None => crate::task::schedule(notify),
+    }
 }
 
 unsafe fn dealloc<T: Future, S: Schedule>(ptr: NonNull<Header>) {

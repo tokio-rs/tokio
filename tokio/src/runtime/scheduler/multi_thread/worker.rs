@@ -115,7 +115,7 @@ struct Core {
     lifo_enabled: bool,
 
     /// The worker-local run queue.
-    run_queue: queue::Local<Arc<Handle>>,
+    run_queue: queue::Local,
 
     /// True if the worker is currently searching for more work. Searching
     /// involves attempting to steal from other workers.
@@ -152,7 +152,7 @@ pub(crate) struct Shared {
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    pub(super) inject: inject::Shared<Arc<Handle>>,
+    pub(super) inject: inject::Shared,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -200,7 +200,7 @@ pub(crate) struct Synced {
 /// Used to communicate with a worker from other threads.
 struct Remote {
     /// Steals tasks from this worker.
-    pub(super) steal: queue::Steal<Arc<Handle>>,
+    pub(super) steal: queue::Steal,
 
     /// Unparks the associated worker thread
     unpark: Unparker,
@@ -228,10 +228,10 @@ pub(crate) struct Launch(Vec<Arc<Worker>>);
 type RunResult = Result<Box<Core>, ()>;
 
 /// A task handle
-type Task = task::Task<Arc<Handle>>;
+type Task = task::Task;
 
 /// A notified task handle
-type Notified = task::Notified<Arc<Handle>>;
+type Notified = task::Notified;
 
 /// Value picked out of thin-air. Running the LIFO slot a handful of times
 /// seemms sufficient to benefit from locality. More than 3 times probably is
@@ -988,7 +988,7 @@ impl Core {
 
 impl Worker {
     /// Returns a reference to the scheduler's injection queue.
-    fn inject(&self) -> &inject::Shared<Arc<Handle>> {
+    fn inject(&self) -> &inject::Shared {
         &self.handle.shared.inject
     }
 }
@@ -1171,14 +1171,14 @@ impl Handle {
     }
 }
 
-impl Overflow<Arc<Handle>> for Handle {
-    fn push(&self, task: task::Notified<Arc<Handle>>) {
+impl Overflow for Handle {
+    fn push(&self, task: task::Notified) {
         self.push_remote_task(task);
     }
 
     fn push_batch<I>(&self, iter: I)
     where
-        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+        I: Iterator<Item = task::Notified>,
     {
         unsafe {
             self.shared.inject.push_batch(self, iter);

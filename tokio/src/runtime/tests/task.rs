@@ -53,7 +53,7 @@ fn create_drop1() {
             drop(ad);
             unreachable!()
         },
-        NoopSchedule,
+        Some(NoopSchedule),
         Id::next(),
     );
     drop(notified);
@@ -70,7 +70,7 @@ fn create_drop2() {
             drop(ad);
             unreachable!()
         },
-        NoopSchedule,
+        Some(NoopSchedule),
         Id::next(),
     );
     drop(join);
@@ -87,7 +87,7 @@ fn drop_abort_handle1() {
             drop(ad);
             unreachable!()
         },
-        NoopSchedule,
+        Some(NoopSchedule),
         Id::next(),
     );
     let abort = join.abort_handle();
@@ -107,7 +107,7 @@ fn drop_abort_handle2() {
             drop(ad);
             unreachable!()
         },
-        NoopSchedule,
+        Some(NoopSchedule),
         Id::next(),
     );
     let abort = join.abort_handle();
@@ -128,7 +128,7 @@ fn create_shutdown1() {
             drop(ad);
             unreachable!()
         },
-        NoopSchedule,
+        Some(NoopSchedule),
         Id::next(),
     );
     drop(join);
@@ -145,7 +145,7 @@ fn create_shutdown2() {
             drop(ad);
             unreachable!()
         },
-        NoopSchedule,
+        Some(NoopSchedule),
         Id::next(),
     );
     handle.assert_not_dropped();
@@ -156,7 +156,7 @@ fn create_shutdown2() {
 
 #[test]
 fn unowned_poll() {
-    let (task, _) = unowned(async {}, NoopSchedule, Id::next());
+    let (task, _) = unowned(async {}, Some(NoopSchedule), Id::next());
     task.run();
 }
 
@@ -271,7 +271,7 @@ impl Runtime {
         T: 'static + Send + Future,
         T::Output: 'static + Send,
     {
-        let (handle, notified) = self.0.owned.bind(future, self.clone(), Id::next());
+        let (handle, notified) = self.0.owned.bind::<Self>(future, None, Id::next());
 
         if let Some(notified) = notified {
             self.schedule(notified);

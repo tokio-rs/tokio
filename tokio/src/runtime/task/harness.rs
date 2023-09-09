@@ -154,10 +154,16 @@ where
             PollFuture::Notified => {
                 // The `poll_inner` call has given us two ref-counts back.
                 // We give one of them to a new task and call `yield_now`.
-                self.core()
-                    .scheduler
-                    .yield_now(Notified(self.get_new_task()));
-
+                
+                // if task has a scheduler, then use it, otherwise use scheduer in context of thread
+                match &self.core().scheduler {
+                    Some(scheduler) =>{
+                        scheduler.yield_now(Notified(self.get_new_task()));
+                    },
+                    None => {
+                        crate::task::yield_now2(Notified(self.get_new_task()));
+                    }
+                }
                 // The remaining ref-count is now dropped. We kept the extra
                 // ref-count until now to ensure that even if the `yield_now`
                 // call drops the provided task, the task isn't deallocated
@@ -344,12 +350,27 @@ where
         // never destroyed, so that's ok.
         let me = ManuallyDrop::new(self.get_new_task());
 
-        if let Some(task) = self.core().scheduler.release(&me) {
-            mem::forget(task);
-            2
-        } else {
-            1
-        }
+        // if task has a scheduler, then use it, otherwise use scheduer in context of thread
+        match &self.core().scheduler{
+            Some(scheduler) => {
+                if let Some(task) = scheduler.release(&me) {
+                    mem::forget(task);
+                    2
+                } else {
+                    1
+                }
+            },
+            None => {
+                if let Some(task) = crate::task::release(&me){
+                    mem::forget(task);
+                    2
+                }else{
+                1
+                }
+            },
+        } 
+
+        
     }
 
     /// Creates a new task that holds its own ref-count.
@@ -360,7 +381,7 @@ where
     /// task holds the task alive until after the use of `self`. Passing the
     /// returned Task to any method on `self` is unsound if dropping the Task
     /// could drop `self` before the call on `self` returned.
-    fn get_new_task(&self) -> Task<S> {
+    fn get_new_task(&self) -> Task {
         // safety: The header is at the beginning of the cell, so this cast is
         // safe.
         unsafe { Task::from_raw(self.cell.cast()) }
@@ -491,7 +512,7 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
     let output = match output {
         Ok(Poll::Pending) => return Poll::Pending,
         Ok(Poll::Ready(output)) => Ok(output),
-        Err(panic) => Err(panic_to_error(&core.scheduler, core.task_id, panic)),
+        Err(panic) => Err(panic_to_error(core.scheduler.as_ref(), core.task_id, panic)),
     };
 
     // Catch and ignore panics if the future panics on drop.
@@ -500,7 +521,10 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
     }));
 
     if res.is_err() {
-        core.scheduler.unhandled_panic();
+        match &core.scheduler {
+            Some(scheduler) => scheduler.unhandled_panic(),
+            None => todo!(),
+        }
     }
 
     Poll::Ready(())
@@ -508,10 +532,18 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
 
 #[cold]
 fn panic_to_error<S: Schedule>(
-    scheduler: &S,
+    scheduler: Option<&S>,
     task_id: Id,
     panic: Box<dyn Any + Send + 'static>,
 ) -> JoinError {
-    scheduler.unhandled_panic();
+   // if task has a scheduler, then use it, otherwise use scheduer in context of thread
+   match scheduler{
+       Some(scheduler) => {
+            scheduler.unhandled_panic();
+        },
+        None => {
+            // currently do nothing here
+        }
+    }
     JoinError::panic(task_id, panic)
 }

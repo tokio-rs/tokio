@@ -22,13 +22,13 @@ cfg_metrics! {
 
 /// Growable, MPMC queue used to inject new tasks into the scheduler and as an
 /// overflow queue when the local, fixed-size, array queue overflows.
-pub(crate) struct Inject<T: 'static> {
-    shared: Shared<T>,
+pub(crate) struct Inject {
+    shared: Shared,
     synced: Mutex<Synced>,
 }
 
-impl<T: 'static> Inject<T> {
-    pub(crate) fn new() -> Inject<T> {
+impl Inject {
+    pub(crate) fn new() -> Inject {
         let (shared, synced) = Shared::new();
 
         Inject {
@@ -54,13 +54,13 @@ impl<T: 'static> Inject<T> {
     /// Pushes a value into the queue.
     ///
     /// This does nothing if the queue is closed.
-    pub(crate) fn push(&self, task: task::Notified<T>) {
+    pub(crate) fn push(&self, task: task::Notified) {
         let mut synced = self.synced.lock();
         // safety: passing correct `Synced`
         unsafe { self.shared.push(&mut synced, task) }
     }
 
-    pub(crate) fn pop(&self) -> Option<task::Notified<T>> {
+    pub(crate) fn pop(&self) -> Option<task::Notified> {
         if self.shared.is_empty() {
             return None;
         }

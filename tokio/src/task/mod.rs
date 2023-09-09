@@ -285,6 +285,9 @@ cfg_rt! {
 
     mod spawn;
     pub use spawn::spawn;
+    pub(crate) use spawn::release;
+    pub(crate) use spawn::schedule;
+    pub(crate) use spawn::yield_now2;
 
     cfg_rt_multi_thread! {
         pub use blocking::block_in_place;

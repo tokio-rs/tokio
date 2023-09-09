@@ -215,41 +215,39 @@ use std::{fmt, mem};
 
 /// An owned handle to the task, tracked by ref count.
 #[repr(transparent)]
-pub(crate) struct Task<S: 'static> {
-    raw: RawTask,
-    _p: PhantomData<S>,
+pub(crate) struct Task {
+    pub(crate) raw: RawTask,
 }
 
-unsafe impl<S> Send for Task<S> {}
-unsafe impl<S> Sync for Task<S> {}
+unsafe impl Send for Task {}
+unsafe impl Sync for Task {}
 
 /// A task was notified.
 #[repr(transparent)]
-pub(crate) struct Notified<S: 'static>(Task<S>);
+pub(crate) struct Notified(Task);
 
 // safety: This type cannot be used to touch the task without first verifying
 // that the value is on a thread where it is safe to poll the task.
-unsafe impl<S: Schedule> Send for Notified<S> {}
-unsafe impl<S: Schedule> Sync for Notified<S> {}
+unsafe impl Send for Notified {}
+unsafe impl Sync for Notified {}
 
 /// A non-Send variant of Notified with the invariant that it is on a thread
 /// where it is safe to poll it.
 #[repr(transparent)]
-pub(crate) struct LocalNotified<S: 'static> {
-    task: Task<S>,
+pub(crate) struct LocalNotified {
+    task: Task,
     _not_send: PhantomData<*const ()>,
 }
 
 /// A task that is not owned by any OwnedTasks. Used for blocking tasks.
 /// This type holds two ref-counts.
-pub(crate) struct UnownedTask<S: 'static> {
+pub(crate) struct UnownedTask {
     raw: RawTask,
-    _p: PhantomData<S>,
 }
 
 // safety: This type can only be created given a Send task.
-unsafe impl<S> Send for UnownedTask<S> {}
-unsafe impl<S> Sync for UnownedTask<S> {}
+unsafe impl Send for UnownedTask {}
+unsafe impl Sync for UnownedTask {}
 
 /// Task result sent back.
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
@@ -260,14 +258,14 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     /// the ref-dec with setting other options.
     ///
     /// If the scheduler has already released the task, then None is returned.
-    fn release(&self, task: &Task<Self>) -> Option<Task<Self>>;
+    fn release(&self, task: &Task) -> Option<Task>;
 
     /// Schedule the task
-    fn schedule(&self, task: Notified<Self>);
+    fn schedule(&self, task: Notified);
 
     /// Schedule the task to run in the near future, yielding the thread to
     /// other tasks.
-    fn yield_now(&self, task: Notified<Self>) {
+    fn yield_now(&self, task: Notified) {
         self.schedule(task);
     }
 
@@ -284,9 +282,9 @@ cfg_rt! {
     /// notification.
     fn new_task<T, S>(
         task: T,
-        scheduler: S,
+        scheduler: Option<S>,
         id: Id,
-    ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
+    ) -> (Task, Notified, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Future + 'static,
@@ -295,11 +293,9 @@ cfg_rt! {
         let raw = RawTask::new::<T, S>(task, scheduler, id);
         let task = Task {
             raw,
-            _p: PhantomData,
         };
         let notified = Notified(Task {
             raw,
-            _p: PhantomData,
         });
         let join = JoinHandle::new(raw);
 
@@ -310,7 +306,7 @@ cfg_rt! {
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.
-    pub(crate) fn unowned<T, S>(task: T, scheduler: S, id: Id) -> (UnownedTask<S>, JoinHandle<T::Output>)
+    pub(crate) fn unowned<T, S>(task: T, scheduler: Option<S>, id: Id) -> (UnownedTask, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Send + Future + 'static,
@@ -322,7 +318,6 @@ cfg_rt! {
         // This is valid because an UnownedTask holds two ref-counts.
         let unowned = UnownedTask {
             raw: task.raw,
-            _p: PhantomData,
         };
         std::mem::forget(task);
         std::mem::forget(notified);
@@ -331,15 +326,14 @@ cfg_rt! {
     }
 }
 
-impl<S: 'static> Task<S> {
-    unsafe fn new(raw: RawTask) -> Task<S> {
+impl Task {
+    unsafe fn new(raw: RawTask) -> Task {
         Task {
             raw,
-            _p: PhantomData,
         }
     }
 
-    unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
+    unsafe fn from_raw(ptr: NonNull<Header>) -> Task {
         Task::new(RawTask::from_raw(ptr))
     }
 
@@ -363,19 +357,19 @@ impl<S: 'static> Task<S> {
     }
 }
 
-impl<S: 'static> Notified<S> {
+impl Notified {
     fn header(&self) -> &Header {
         self.0.header()
     }
 }
 
-impl<S: 'static> Notified<S> {
-    pub(crate) unsafe fn from_raw(ptr: RawTask) -> Notified<S> {
+impl Notified {
+    pub(crate) unsafe fn from_raw(ptr: RawTask) -> Notified {
         Notified(Task::new(ptr))
     }
 }
 
-impl<S: 'static> Notified<S> {
+impl Notified {
     pub(crate) fn into_raw(self) -> RawTask {
         let raw = self.0.raw;
         mem::forget(self);
@@ -383,7 +377,7 @@ impl<S: 'static> Notified<S> {
     }
 }
 
-impl<S: Schedule> Task<S> {
+impl Task {
     /// Preemptively cancels the task as part of the shutdown process.
     pub(crate) fn shutdown(self) {
         let raw = self.raw;
@@ -392,7 +386,7 @@ impl<S: Schedule> Task<S> {
     }
 }
 
-impl<S: Schedule> LocalNotified<S> {
+impl LocalNotified {
     /// Runs the task.
     pub(crate) fn run(self) {
         let raw = self.task.raw;
@@ -401,19 +395,18 @@ impl<S: Schedule> LocalNotified<S> {
     }
 }
 
-impl<S: Schedule> UnownedTask<S> {
+impl UnownedTask {
     // Used in test of the inject queue.
     #[cfg(test)]
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
-    pub(super) fn into_notified(self) -> Notified<S> {
+    pub(super) fn into_notified(self) -> Notified {
         Notified(self.into_task())
     }
 
-    fn into_task(self) -> Task<S> {
+    fn into_task(self) -> Task {
         // Convert into a task.
         let task = Task {
             raw: self.raw,
-            _p: PhantomData,
         };
         mem::forget(self);
 
@@ -428,9 +421,8 @@ impl<S: Schedule> UnownedTask<S> {
         mem::forget(self);
 
         // Transfer one ref-count to a Task object.
-        let task = Task::<S> {
+        let task = Task {
             raw,
-            _p: PhantomData,
         };
 
         // Use the other ref-count to poll the task.
@@ -444,7 +436,7 @@ impl<S: Schedule> UnownedTask<S> {
     }
 }
 
-impl<S: 'static> Drop for Task<S> {
+impl Drop for Task {
     fn drop(&mut self) {
         // Decrement the ref count
         if self.header().state.ref_dec() {
@@ -454,7 +446,7 @@ impl<S: 'static> Drop for Task<S> {
     }
 }
 
-impl<S: 'static> Drop for UnownedTask<S> {
+impl Drop for UnownedTask {
     fn drop(&mut self) {
         // Decrement the ref count
         if self.raw.header().state.ref_dec_twice() {
@@ -464,13 +456,13 @@ impl<S: 'static> Drop for UnownedTask<S> {
     }
 }
 
-impl<S> fmt::Debug for Task<S> {
+impl fmt::Debug for Task {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "Task({:p})", self.header())
     }
 }
 
-impl<S> fmt::Debug for Notified<S> {
+impl fmt::Debug for Notified {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "task::Notified({:p})", self.0.header())
     }
@@ -479,15 +471,15 @@ impl<S> fmt::Debug for Notified<S> {
 /// # Safety
 ///
 /// Tasks are pinned.
-unsafe impl<S> linked_list::Link for Task<S> {
-    type Handle = Task<S>;
+unsafe impl linked_list::Link for Task {
+    type Handle = Task;
     type Target = Header;
 
-    fn as_raw(handle: &Task<S>) -> NonNull<Header> {
+    fn as_raw(handle: &Task) -> NonNull<Header> {
         handle.raw.header_ptr()
     }
 
-    unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
+    unsafe fn from_raw(ptr: NonNull<Header>) -> Task {
         Task::from_raw(ptr)
     }
 
