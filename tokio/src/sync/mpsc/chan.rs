@@ -297,13 +297,16 @@ impl<T, S: Semaphore> Rx<T, S> {
         })
     }
 
-    pub(crate) fn recv_many(&mut self, cx: &mut Context<'_>) -> Poll<Vec<T>> {
+    /// Receives available values into result buffer whose capacity increases as needed
+    pub(crate) fn recv_many(&mut self, cx: &mut Context<'_>, buffer: &mut Vec<T>) -> Poll<usize> {
         use super::block::Read::*;
 
         ready!(crate::trace::trace_leaf(cx));
 
         // Keep track of task budget
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+
+        buffer.clear();
 
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
@@ -313,20 +316,22 @@ impl<T, S: Semaphore> Rx<T, S> {
                     match rx_fields.list.pop(&self.inner.tx) {
                         Some(Value(value)) => {
                             let capacity = self.inner.semaphore.num_acquired();
-                            let mut result : Vec<T> = Vec::with_capacity( capacity );
-                            result.push(value);
+                            if buffer.capacity() < capacity {
+                                buffer.reserve(capacity);
+                            }
+                            buffer.push(value);
                             let mut next = rx_fields.list.peek();
-                            while (result.len() < capacity && match next {
+                            while (buffer.len() < capacity && match next {
                                 Some(Value(value)) => {
                                     rx_fields.list.pop(&self.inner.tx);
-                                    result.push(value);
+                                    buffer.push(value);
                                     next = rx_fields.list.peek();
                                     true }
                                 _ => false
                             }) {}
-                            self.inner.semaphore.add_permits(result.len());
+                            self.inner.semaphore.add_permits(buffer.len());
                             coop.made_progress();
-                            return Ready(result);
+                            return Ready(buffer.len());
                         }
                         Some(Closed) => {
                             // TODO: This check may not be required as it most
@@ -337,7 +342,7 @@ impl<T, S: Semaphore> Rx<T, S> {
                             // visible, then all messages sent are also visible.
                             assert!(self.inner.semaphore.is_idle());
                             coop.made_progress();
-                            return Ready(vec![]);
+                            return Ready(0usize);
                         }
                         None => {} // fall through
                     }
@@ -355,7 +360,7 @@ impl<T, S: Semaphore> Rx<T, S> {
 
             if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
                 coop.made_progress();
-                Ready(vec![])
+                Ready(0usize)
             } else {
                 Pending
             }

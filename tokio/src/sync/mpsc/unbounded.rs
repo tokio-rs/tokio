@@ -172,13 +172,13 @@ impl<T> UnboundedReceiver<T> {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Receives the all available values for this receiver.
+    /// Receives the all available values for this receiver
     ///
-    /// Returns an empty vector if has been closed and there are
-    /// no remaining messages in the channel's buffer.
-    pub async fn recv_many(&mut self) -> Vec<T> {
+    /// Returns the number of elements populated in the passed-in
+    /// result buffer.  The capacity of the buffer is not reduced.
+    pub async fn recv_many(&mut self, buffer: &mut Vec<T>) -> usize {
         use crate::future::poll_fn;
-        poll_fn(|cx| self.chan.recv_many(cx)).await
+        poll_fn(|cx| self.chan.recv_many(cx, buffer)).await
     }
 
     /// Tries to receive the next value for this receiver.

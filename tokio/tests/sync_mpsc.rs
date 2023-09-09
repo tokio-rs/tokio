@@ -123,14 +123,31 @@ async fn async_send_recv_with_buffer() {
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn async_send_recv_many_with_buffer() {
-    let (tx, mut rx) = mpsc::channel(16);
+    let (tx, mut rx) = mpsc::channel(2);
 
     tokio::spawn(async move {
         assert_ok!(tx.send(1).await);
         assert_ok!(tx.send(2).await);
+        assert_ok!(tx.send(7).await);
     });
 
-    assert_eq!(vec![1, 2], rx.recv_many().await);
+    let mut buffer = vec![0; 16];
+    let mut recv_count = 0usize;
+    let mut sum = 0;
+    let mut iter = 0;
+    while recv_count < 3 {
+        let n = rx.recv_many(&mut buffer).await;
+        recv_count += n;
+        assert_eq!(buffer.len(), n);
+        sum += buffer.iter().sum::<i32>();
+        iter += 1;
+        assert!(buffer.capacity() >= 16);
+    }
+
+    assert_eq!(3, recv_count);
+    assert_eq!(10, sum);
+    assert!(iter > 1);
+
     assert_eq!(None, rx.recv().await);
 }
 
@@ -196,10 +213,15 @@ async fn send_recv_many_unbounded() {
     let (tx, mut rx) = mpsc::unbounded_channel::<i32>();
 
     // Using `try_send`
-    assert_ok!(tx.send(1));
-    assert_ok!(tx.send(2));
+    assert_ok!(tx.send(7));
+    assert_ok!(tx.send(13));
+    assert_ok!(tx.send(100));
+    assert_ok!(tx.send(1002));
 
-    assert_eq!(rx.recv_many().await, vec![1,2]);
+    let mut buffer = vec![0; 0];
+    assert_eq!(rx.recv_many(&mut buffer).await, 4);
+    assert_eq!(vec![7,13,100,1002], buffer);
+    assert!(buffer.capacity() >= 4);
 
     drop(tx);
 
