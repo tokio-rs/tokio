@@ -154,12 +154,12 @@ where
             PollFuture::Notified => {
                 // The `poll_inner` call has given us two ref-counts back.
                 // We give one of them to a new task and call `yield_now`.
-                
+
                 // if task has a scheduler, then use it, otherwise use scheduer in context of thread
                 match &self.core().scheduler {
-                    Some(scheduler) =>{
+                    Some(scheduler) => {
                         scheduler.yield_now(Notified(self.get_new_task()));
-                    },
+                    }
                     None => {
                         crate::task::yield_now2(Notified(self.get_new_task()));
                     }
@@ -351,7 +351,7 @@ where
         let me = ManuallyDrop::new(self.get_new_task());
 
         // if task has a scheduler, then use it, otherwise use scheduer in context of thread
-        match &self.core().scheduler{
+        match &self.core().scheduler {
             Some(scheduler) => {
                 if let Some(task) = scheduler.release(&me) {
                     mem::forget(task);
@@ -359,18 +359,16 @@ where
                 } else {
                     1
                 }
-            },
+            }
             None => {
-                if let Some(task) = crate::task::release(&me){
+                if let Some(task) = crate::task::release(&me) {
                     mem::forget(task);
                     2
-                }else{
-                1
+                } else {
+                    1
                 }
-            },
-        } 
-
-        
+            }
+        }
     }
 
     /// Creates a new task that holds its own ref-count.
@@ -536,11 +534,11 @@ fn panic_to_error<S: Schedule>(
     task_id: Id,
     panic: Box<dyn Any + Send + 'static>,
 ) -> JoinError {
-   // if task has a scheduler, then use it, otherwise use scheduer in context of thread
-   match scheduler{
-       Some(scheduler) => {
+    // if task has a scheduler, then use it, otherwise use scheduer in context of thread
+    match scheduler {
+        Some(scheduler) => {
             scheduler.unhandled_panic();
-        },
+        }
         None => {
             // currently do nothing here
         }

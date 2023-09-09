@@ -915,10 +915,7 @@ impl Context {
         // Safety: called from the thread that owns the `LocalSet`
         let (handle, notified) = {
             self.shared.local_state.assert_called_from_owner_thread();
-            self.shared
-                .local_state
-                .owned
-                .bind(future, None, id)
+            self.shared.local_state.owned.bind(future, None, id)
         };
 
         if let Some(notified) = notified {
@@ -1091,10 +1088,7 @@ impl LocalState {
         self.owned.is_empty()
     }
 
-    unsafe fn assert_owner(
-        &self,
-        task: task::Notified,
-    ) -> task::LocalNotified {
+    unsafe fn assert_owner(&self, task: task::Notified) -> task::LocalNotified {
         // The caller ensures it is called from the same thread that owns
         // the LocalSet.
         self.assert_called_from_owner_thread();

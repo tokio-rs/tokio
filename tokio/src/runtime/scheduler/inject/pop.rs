@@ -9,10 +9,7 @@ pub(crate) struct Pop<'a> {
 
 impl<'a> Pop<'a> {
     pub(super) fn new(len: usize, synced: &'a mut Synced) -> Pop<'a> {
-        Pop {
-            len,
-            synced,
-        }
+        Pop { len, synced }
     }
 }
 

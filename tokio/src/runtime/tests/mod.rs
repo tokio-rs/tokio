@@ -12,11 +12,11 @@ mod noop_scheduler {
     pub(crate) struct NoopSchedule;
 
     impl task::Schedule for NoopSchedule {
-        fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
+        fn release(&self, _task: &Task) -> Option<Task> {
             None
         }
 
-        fn schedule(&self, _task: task::Notified<Self>) {
+        fn schedule(&self, _task: task::Notified) {
             unreachable!();
         }
     }
@@ -40,7 +40,7 @@ mod unowned_wrapper {
     }
 
     #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-    pub(crate) fn unowned<T>(task: T) -> (Notified<NoopSchedule>, JoinHandle<T::Output>)
+    pub(crate) fn unowned<T>(task: T) -> (Notified, JoinHandle<T::Output>)
     where
         T: std::future::Future + Send + 'static,
         T::Output: Send + 'static,

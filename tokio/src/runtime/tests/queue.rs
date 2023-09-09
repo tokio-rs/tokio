@@ -273,11 +273,11 @@ fn stress2() {
 struct Runtime;
 
 impl Schedule for Runtime {
-    fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
+    fn release(&self, _task: &Task) -> Option<Task> {
         None
     }
 
-    fn schedule(&self, _task: task::Notified<Self>) {
+    fn schedule(&self, _task: task::Notified) {
         unreachable!();
     }
 }

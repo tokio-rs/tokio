@@ -205,12 +205,10 @@ cfg_rt! {
     }
 }
 
-
-use crate::runtime::task::Task;
 use crate::runtime::task::Notified;
+use crate::runtime::task::Task;
 
-pub(crate) fn release(task: &Task) -> Option<Task>
-{
+pub(crate) fn release(task: &Task) -> Option<Task> {
     use crate::runtime::context;
 
     match context::with_current(|handle| handle.release(task)) {
@@ -219,8 +217,7 @@ pub(crate) fn release(task: &Task) -> Option<Task>
     }
 }
 
-pub(crate) fn schedule(task: Notified)
-{
+pub(crate) fn schedule(task: Notified) {
     use crate::runtime::context;
 
     match context::with_current(|handle| handle.schedule(task)) {
@@ -229,8 +226,7 @@ pub(crate) fn schedule(task: Notified)
     }
 }
 
-pub(crate) fn yield_now2(task: Notified)
-{
+pub(crate) fn yield_now2(task: Notified) {
     use crate::runtime::context;
 
     match context::with_current(|handle| handle.yield_now(task)) {

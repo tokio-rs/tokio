@@ -33,7 +33,7 @@ pub(crate) struct Local {
 /// Consumer handle. May be used from many threads.
 pub(crate) struct Steal(Arc<Inner>);
 
-pub(crate) struct Inner{
+pub(crate) struct Inner {
     /// Concurrently updated by many threads.
     ///
     /// Contains two `UnsignedShort` values. The LSB byte is the "real" head of

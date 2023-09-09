@@ -328,9 +328,7 @@ cfg_rt! {
 
 impl Task {
     unsafe fn new(raw: RawTask) -> Task {
-        Task {
-            raw,
-        }
+        Task { raw }
     }
 
     unsafe fn from_raw(ptr: NonNull<Header>) -> Task {
@@ -405,9 +403,7 @@ impl UnownedTask {
 
     fn into_task(self) -> Task {
         // Convert into a task.
-        let task = Task {
-            raw: self.raw,
-        };
+        let task = Task { raw: self.raw };
         mem::forget(self);
 
         // Drop a ref-count since an UnownedTask holds two.
@@ -421,9 +417,7 @@ impl UnownedTask {
         mem::forget(self);
 
         // Transfer one ref-count to a Task object.
-        let task = Task {
-            raw,
-        };
+        let task = Task { raw };
 
         // Use the other ref-count to poll the task.
         raw.poll();

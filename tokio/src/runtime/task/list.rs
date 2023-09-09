@@ -91,7 +91,7 @@ impl<S> OwnedTasks<S> {
     pub(crate) fn bind<T>(
         &self,
         task: T,
-        scheduler: Option<S>,   
+        scheduler: Option<S>,
         id: super::Id,
     ) -> (JoinHandle<T::Output>, Option<Notified>)
     where
