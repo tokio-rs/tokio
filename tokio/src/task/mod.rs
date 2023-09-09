@@ -285,7 +285,7 @@ cfg_rt! {
 
     mod spawn;
     pub use spawn::spawn;
-    
+
     pub(crate) mod schedule;
 
     cfg_rt_multi_thread! {
