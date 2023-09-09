@@ -283,7 +283,7 @@ unsafe fn schedule<S: Schedule>(ptr: NonNull<Header>) {
     let notify = Notified(Task::from_raw(ptr.cast()));
     match scheduler {
         Some(scheduler) => scheduler.schedule(notify),
-        None => crate::task::schedule(notify),
+        None => crate::task::schedule::schedule(notify),
     }
 }
 

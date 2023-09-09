@@ -161,7 +161,7 @@ where
                         scheduler.yield_now(Notified(self.get_new_task()));
                     }
                     None => {
-                        crate::task::yield_now2(Notified(self.get_new_task()));
+                        crate::task::schedule::yield_now(Notified(self.get_new_task()));
                     }
                 }
                 // The remaining ref-count is now dropped. We kept the extra
@@ -361,7 +361,7 @@ where
                 }
             }
             None => {
-                if let Some(task) = crate::task::release(&me) {
+                if let Some(task) = crate::task::schedule::release(&me) {
                     mem::forget(task);
                     2
                 } else {
