@@ -846,6 +846,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
     #[inline]
     pub fn map<U, F>(mut this: Self, f: F) -> MappedMutexGuard<'a, U>
     where
+        U: ?Sized,
         F: FnOnce(&mut T) -> &mut U,
     {
         let data = f(&mut *this) as *mut U;
@@ -894,6 +895,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
     #[inline]
     pub fn try_map<U, F>(mut this: Self, f: F) -> Result<MappedMutexGuard<'a, U>, Self>
     where
+        U: ?Sized,
         F: FnOnce(&mut T) -> Option<&mut U>,
     {
         let data = match f(&mut *this) {
@@ -1026,6 +1028,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
     #[inline]
     pub fn map<U, F>(mut this: Self, f: F) -> OwnedMappedMutexGuard<T, U>
     where
+        U: ?Sized,
         F: FnOnce(&mut T) -> &mut U,
     {
         let data = f(&mut *this) as *mut U;
@@ -1074,6 +1077,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
     #[inline]
     pub fn try_map<U, F>(mut this: Self, f: F) -> Result<OwnedMappedMutexGuard<T, U>, Self>
     where
+        U: ?Sized,
         F: FnOnce(&mut T) -> Option<&mut U>,
     {
         let data = match f(&mut *this) {
