@@ -59,7 +59,7 @@ impl Handle {
 
 impl Shared {
     /// Steal all tasks from remotes into a single local queue.
-    pub(super) fn steal_all(&self) -> super::queue::Local<Arc<Handle>> {
+    pub(super) fn steal_all(&self) -> super::queue::Local {
         let (_steal, mut local) = super::queue::local();
 
         let worker_metrics = WorkerMetrics::new();

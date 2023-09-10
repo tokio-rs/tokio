@@ -195,7 +195,7 @@ cfg_taskdump! {
         /// Locks the tasks, and calls `f` on an iterator over them.
         pub(crate) fn for_each<F>(&self, f: F)
         where
-            F: FnMut(&Task<S>)
+            F: FnMut(&Task)
         {
             self.inner.lock().list.for_each(f)
         }

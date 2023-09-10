@@ -547,7 +547,7 @@ impl Steal {
 }
 
 cfg_metrics! {
-    impl<T> Steal<T> {
+    impl Steal {
         pub(crate) fn len(&self) -> usize {
             self.0.len() as _
         }

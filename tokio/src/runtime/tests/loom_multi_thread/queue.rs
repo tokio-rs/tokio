@@ -116,7 +116,7 @@ fn steal_overflow() {
 fn multi_stealer() {
     const NUM_TASKS: usize = 5;
 
-    fn steal_tasks(steal: queue::Steal<NoopSchedule>) -> usize {
+    fn steal_tasks(steal: queue::Steal) -> usize {
         let mut stats = new_stats();
         let (_, mut local) = queue::local();
 

@@ -258,8 +258,8 @@ impl<T: Future> Future for Root<T> {
 /// Trace and poll all tasks of the current_thread runtime.
 pub(in crate::runtime) fn trace_current_thread(
     owned: &OwnedTasks<Arc<current_thread::Handle>>,
-    local: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
-    injection: &Inject<Arc<current_thread::Handle>>,
+    local: &mut VecDeque<Notified>,
+    injection: &Inject,
 ) -> Vec<Trace> {
     // clear the local and injection queues
     local.clear();
@@ -299,9 +299,9 @@ cfg_rt_multi_thread! {
     /// Must be called with the same `synced` that `injection` was created with.
     pub(in crate::runtime) unsafe fn trace_multi_thread(
         owned: &OwnedTasks<Arc<multi_thread::Handle>>,
-        local: &mut multi_thread::queue::Local<Arc<multi_thread::Handle>>,
+        local: &mut multi_thread::queue::Local,
         synced: &Mutex<Synced>,
-        injection: &Shared<Arc<multi_thread::Handle>>,
+        injection: &Shared,
     ) -> Vec<Trace> {
         // clear the local queue
         while let Some(notified) = local.pop() {
