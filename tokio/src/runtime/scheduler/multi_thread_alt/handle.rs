@@ -48,7 +48,7 @@ impl Handle {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
+        let (handle, notified) = me.shared.owned.bind(future, None, id);
 
         if let Some(notified) = notified {
             me.shared.schedule_task(notified, false);

@@ -120,7 +120,7 @@ pub(super) struct Core {
     lifo_slot: Option<Notified>,
 
     /// The worker-local run queue.
-    run_queue: queue::Local<Arc<Handle>>,
+    run_queue: queue::Local,
 
     /// True if the worker is currently searching for more work. Searching
     /// involves attempting to steal from other workers.
@@ -141,7 +141,7 @@ pub(crate) struct Shared {
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    pub(super) inject: inject::Shared<Arc<Handle>>,
+    pub(super) inject: inject::Shared,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -210,7 +210,7 @@ struct Remote {
     // lifo_slot: Lifo,
 
     /// Steals tasks from this worker.
-    pub(super) steal: queue::Steal<Arc<Handle>>,
+    pub(super) steal: queue::Steal,
 }
 
 /// Thread-local context
@@ -242,10 +242,10 @@ type RunResult = Result<Box<Core>, ()>;
 type NextTaskResult = Result<(Option<Notified>, Box<Core>), ()>;
 
 /// A task handle
-type Task = task::Task<Arc<Handle>>;
+type Task = task::Task;
 
 /// A notified task handle
-type Notified = task::Notified<Arc<Handle>>;
+type Notified = task::Notified;
 
 /// Value picked out of thin-air. Running the LIFO slot a handful of times
 /// seemms sufficient to benefit from locality. More than 3 times probably is
@@ -1431,7 +1431,7 @@ impl Shared {
 
     fn push_remote_task_batch<I>(&self, iter: I)
     where
-        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+        I: Iterator<Item = task::Notified>,
     {
         unsafe {
             self.inject.push_batch(self, iter);
@@ -1440,7 +1440,7 @@ impl Shared {
 
     fn push_remote_task_batch_synced<I>(&self, synced: &mut Synced, iter: I)
     where
-        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+        I: Iterator<Item = task::Notified>,
     {
         unsafe {
             self.inject.push_batch(&mut synced.inject, iter);
@@ -1506,14 +1506,14 @@ impl Shared {
     }
 }
 
-impl Overflow<Arc<Handle>> for Shared {
-    fn push(&self, task: task::Notified<Arc<Handle>>) {
+impl Overflow for Shared {
+    fn push(&self, task: task::Notified) {
         self.push_remote_task(&mut self.synced.lock(), task);
     }
 
     fn push_batch<I>(&self, iter: I)
     where
-        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+        I: Iterator<Item = task::Notified>,
     {
         self.push_remote_task_batch(iter)
     }

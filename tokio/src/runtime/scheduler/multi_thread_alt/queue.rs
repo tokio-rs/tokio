@@ -26,15 +26,15 @@ cfg_not_has_atomic_u64! {
 }
 
 /// Producer handle. May only be used from a single thread.
-pub(crate) struct Local<T: 'static> {
-    inner: Arc<Inner<T>>,
+pub(crate) struct Local {
+    inner: Arc<Inner>,
 }
 
 /// Consumer handle. May be used from many threads.
-pub(crate) struct Steal<T: 'static>(Arc<Inner<T>>);
+pub(crate) struct Steal(Arc<Inner>);
 
 #[repr(align(128))]
-pub(crate) struct Inner<T: 'static> {
+pub(crate) struct Inner {
     /// Concurrently updated by many threads.
     ///
     /// Contains two `UnsignedShort` values. The LSB byte is the "real" head of
@@ -54,16 +54,16 @@ pub(crate) struct Inner<T: 'static> {
     tail: AtomicUnsignedShort,
 
     /// Elements
-    buffer: Box<[UnsafeCell<MaybeUninit<task::Notified<T>>>]>,
+    buffer: Box<[UnsafeCell<MaybeUninit<task::Notified>>]>,
 
     mask: usize,
 }
 
-unsafe impl<T> Send for Inner<T> {}
-unsafe impl<T> Sync for Inner<T> {}
+unsafe impl Send for Inner {}
+unsafe impl Sync for Inner {}
 
 /// Create a new local run-queue
-pub(crate) fn local<T: 'static>(capacity: usize) -> (Steal<T>, Local<T>) {
+pub(crate) fn local(capacity: usize) -> (Steal, Local) {
     assert!(capacity <= 4096);
     assert!(capacity >= 1);
 
@@ -89,7 +89,7 @@ pub(crate) fn local<T: 'static>(capacity: usize) -> (Steal<T>, Local<T>) {
     (remote, local)
 }
 
-impl<T> Local<T> {
+impl Local {
     /// How many tasks can be pushed into the queue
     pub(crate) fn remaining_slots(&self) -> usize {
         self.inner.remaining_slots()
@@ -114,7 +114,7 @@ impl<T> Local<T> {
     /// # Panics
     ///
     /// The method panics if there is not enough capacity to fit in the queue.
-    pub(crate) fn push_back(&mut self, tasks: impl ExactSizeIterator<Item = task::Notified<T>>) {
+    pub(crate) fn push_back(&mut self, tasks: impl ExactSizeIterator<Item = task::Notified>) {
         let len = tasks.len();
         assert!(len <= self.inner.buffer.len());
 
@@ -166,9 +166,9 @@ impl<T> Local<T> {
     /// When the queue overflows, half of the curent contents of the queue is
     /// moved to the given Injection queue. This frees up capacity for more
     /// tasks to be pushed into the local queue.
-    pub(crate) fn push_back_or_overflow<O: Overflow<T>>(
+    pub(crate) fn push_back_or_overflow<O: Overflow>(
         &mut self,
-        mut task: task::Notified<T>,
+        mut task: task::Notified,
         overflow: &O,
         stats: &mut Stats,
     ) {
@@ -206,7 +206,7 @@ impl<T> Local<T> {
     }
 
     // Second half of `push_back`
-    fn push_back_finish(&self, task: task::Notified<T>, tail: UnsignedShort) {
+    fn push_back_finish(&self, task: task::Notified, tail: UnsignedShort) {
         // Map the position to a slot index.
         let idx = tail as usize & self.inner.mask;
 
@@ -233,14 +233,14 @@ impl<T> Local<T> {
     /// workers "missed" some of the tasks during a steal, they will get
     /// another opportunity.
     #[inline(never)]
-    fn push_overflow<O: Overflow<T>>(
+    fn push_overflow<O: Overflow>(
         &mut self,
-        task: task::Notified<T>,
+        task: task::Notified,
         head: UnsignedShort,
         tail: UnsignedShort,
         overflow: &O,
         stats: &mut Stats,
-    ) -> Result<(), task::Notified<T>> {
+    ) -> Result<(), task::Notified> {
         // How many elements are we taking from the local queue.
         //
         // This is one less than the number of tasks pushed to the inject
@@ -288,18 +288,18 @@ impl<T> Local<T> {
         }
 
         /// An iterator that takes elements out of the run queue.
-        struct BatchTaskIter<'a, T: 'static> {
-            buffer: &'a [UnsafeCell<MaybeUninit<task::Notified<T>>>],
+        struct BatchTaskIter<'a> {
+            buffer: &'a [UnsafeCell<MaybeUninit<task::Notified>>],
             mask: usize,
             head: UnsignedLong,
             i: UnsignedLong,
             num: UnsignedShort,
         }
-        impl<'a, T: 'static> Iterator for BatchTaskIter<'a, T> {
-            type Item = task::Notified<T>;
+        impl<'a> Iterator for BatchTaskIter<'a> {
+            type Item = task::Notified;
 
             #[inline]
-            fn next(&mut self) -> Option<task::Notified<T>> {
+            fn next(&mut self) -> Option<task::Notified> {
                 if self.i == UnsignedLong::from(self.num) {
                     None
                 } else {
@@ -334,7 +334,7 @@ impl<T> Local<T> {
     }
 
     /// Pops a task from the local queue.
-    pub(crate) fn pop(&mut self) -> Option<task::Notified<T>> {
+    pub(crate) fn pop(&mut self) -> Option<task::Notified> {
         let mut head = self.inner.head.load(Acquire);
 
         let idx = loop {
@@ -375,7 +375,7 @@ impl<T> Local<T> {
     }
 }
 
-impl<T> Steal<T> {
+impl Steal {
     pub(crate) fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -383,9 +383,9 @@ impl<T> Steal<T> {
     /// Steals half the tasks from self and place them into `dst`.
     pub(crate) fn steal_into(
         &self,
-        dst: &mut Local<T>,
+        dst: &mut Local,
         dst_stats: &mut Stats,
-    ) -> Option<task::Notified<T>> {
+    ) -> Option<task::Notified> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
         let dst_tail = unsafe { dst.inner.tail.unsync_load() };
@@ -438,7 +438,7 @@ impl<T> Steal<T> {
 
     // Steal tasks from `self`, placing them into `dst`. Returns the number of
     // tasks that were stolen.
-    fn steal_into2(&self, dst: &mut Local<T>, dst_tail: UnsignedShort) -> UnsignedShort {
+    fn steal_into2(&self, dst: &mut Local, dst_tail: UnsignedShort) -> UnsignedShort {
         let mut prev_packed = self.0.head.load(Acquire);
         let mut next_packed;
 
@@ -539,20 +539,20 @@ impl<T> Steal<T> {
 }
 
 cfg_metrics! {
-    impl<T> Steal<T> {
+    impl Steal {
         pub(crate) fn len(&self) -> usize {
             self.0.len() as _
         }
     }
 }
 
-impl<T> Clone for Steal<T> {
-    fn clone(&self) -> Steal<T> {
+impl Clone for Steal {
+    fn clone(&self) -> Steal {
         Steal(self.0.clone())
     }
 }
 
-impl<T> Drop for Local<T> {
+impl Drop for Local {
     fn drop(&mut self) {
         if !std::thread::panicking() {
             assert!(self.pop().is_none(), "queue not empty");
@@ -560,7 +560,7 @@ impl<T> Drop for Local<T> {
     }
 }
 
-impl<T> Inner<T> {
+impl Inner {
     fn remaining_slots(&self) -> usize {
         let (steal, _) = unpack(self.head.load(Acquire));
         let tail = self.tail.load(Acquire);
