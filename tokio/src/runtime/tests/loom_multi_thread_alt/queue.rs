@@ -1,5 +1,5 @@
 use crate::runtime::scheduler::multi_thread::{queue, Stats};
-use crate::runtime::tests::{unowned, NoopSchedule};
+use crate::runtime::tests::unowned;
 
 use loom::thread;
 use std::cell::RefCell;
