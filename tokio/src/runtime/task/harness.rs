@@ -535,7 +535,7 @@ fn panic_to_error<S: Schedule>(
     panic: Box<dyn Any + Send + 'static>,
 ) -> JoinError {
     // if task has a scheduler, then use it, otherwise use scheduer in the context of current thread
-    if let Some(scheduler) = scheduler{
+    if let Some(scheduler) = scheduler {
         scheduler.unhandled_panic();
     }
     JoinError::panic(task_id, panic)
