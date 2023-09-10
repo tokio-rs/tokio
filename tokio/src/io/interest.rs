@@ -190,6 +190,7 @@ impl Interest {
     /// // Remove all interests at once.
     /// assert_eq!(RW_INTEREST.remove(RW_INTEREST), None);
     /// ```
+    #[must_use = "this returns the result of the operation, without modifying the original"]
     pub fn remove(self, other: Interest) -> Option<Interest> {
         let value = self.0 & !other.0;
 
