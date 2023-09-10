@@ -260,7 +260,7 @@ struct Inner {
 }
 
 struct Core {
-    queue: VecDeque<task::Notified<Runtime>>,
+    queue: VecDeque<task::Notified>,
 }
 
 static CURRENT: Mutex<Option<Runtime>> = Mutex::new(None);
@@ -301,7 +301,7 @@ impl Runtime {
         self.0.core.try_lock().unwrap().queue.is_empty()
     }
 
-    fn next_task(&self) -> task::Notified<Runtime> {
+    fn next_task(&self) -> task::Notified {
         self.0.core.try_lock().unwrap().queue.pop_front().unwrap()
     }
 
@@ -321,11 +321,11 @@ impl Runtime {
 }
 
 impl Schedule for Runtime {
-    fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
+    fn release(&self, task: &Task) -> Option<Task> {
         self.0.owned.remove(task)
     }
 
-    fn schedule(&self, task: task::Notified<Self>) {
+    fn schedule(&self, task: task::Notified) {
         self.0.core.try_lock().unwrap().queue.push_back(task);
     }
 }
