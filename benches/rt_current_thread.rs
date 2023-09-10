@@ -4,46 +4,50 @@
 
 use tokio::runtime::{self, Runtime};
 
-use bencher::{benchmark_group, benchmark_main, Bencher};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 const NUM_SPAWN: usize = 1_000;
 
-fn spawn_many_local(b: &mut Bencher) {
+fn spawn_many_local(c: &mut Criterion) {
     let rt = rt();
     let mut handles = Vec::with_capacity(NUM_SPAWN);
 
-    b.iter(|| {
-        rt.block_on(async {
-            for _ in 0..NUM_SPAWN {
-                handles.push(tokio::spawn(async move {}));
-            }
+    c.bench_function("spawn_many_local", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                for _ in 0..NUM_SPAWN {
+                    handles.push(tokio::spawn(async move {}));
+                }
 
-            for handle in handles.drain(..) {
-                handle.await.unwrap();
-            }
-        });
+                for handle in handles.drain(..) {
+                    handle.await.unwrap();
+                }
+            });
+        })
     });
 }
 
-fn spawn_many_remote_idle(b: &mut Bencher) {
+fn spawn_many_remote_idle(c: &mut Criterion) {
     let rt = rt();
     let rt_handle = rt.handle();
     let mut handles = Vec::with_capacity(NUM_SPAWN);
 
-    b.iter(|| {
-        for _ in 0..NUM_SPAWN {
-            handles.push(rt_handle.spawn(async {}));
-        }
-
-        rt.block_on(async {
-            for handle in handles.drain(..) {
-                handle.await.unwrap();
+    c.bench_function("spawn_many_remote_idle", |b| {
+        b.iter(|| {
+            for _ in 0..NUM_SPAWN {
+                handles.push(rt_handle.spawn(async {}));
             }
-        });
+
+            rt.block_on(async {
+                for handle in handles.drain(..) {
+                    handle.await.unwrap();
+                }
+            });
+        })
     });
 }
 
-fn spawn_many_remote_busy(b: &mut Bencher) {
+fn spawn_many_remote_busy(c: &mut Criterion) {
     let rt = rt();
     let rt_handle = rt.handle();
     let mut handles = Vec::with_capacity(NUM_SPAWN);
@@ -56,16 +60,18 @@ fn spawn_many_remote_busy(b: &mut Bencher) {
         iter()
     });
 
-    b.iter(|| {
-        for _ in 0..NUM_SPAWN {
-            handles.push(rt_handle.spawn(async {}));
-        }
-
-        rt.block_on(async {
-            for handle in handles.drain(..) {
-                handle.await.unwrap();
+    c.bench_function("spawn_many_remote_busy", |b| {
+        b.iter(|| {
+            for _ in 0..NUM_SPAWN {
+                handles.push(rt_handle.spawn(async {}));
             }
-        });
+
+            rt.block_on(async {
+                for handle in handles.drain(..) {
+                    handle.await.unwrap();
+                }
+            });
+        })
     });
 }
 
@@ -73,11 +79,11 @@ fn rt() -> Runtime {
     runtime::Builder::new_current_thread().build().unwrap()
 }
 
-benchmark_group!(
+criterion_group!(
     scheduler,
     spawn_many_local,
     spawn_many_remote_idle,
     spawn_many_remote_busy
 );
 
-benchmark_main!(scheduler);
+criterion_main!(scheduler);

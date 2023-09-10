@@ -1,7 +1,7 @@
 //! Benchmark the delay in propagating OS signals to any listeners.
 #![cfg(unix)]
 
-use bencher::{benchmark_group, benchmark_main, Bencher};
+use criterion::{criterion_group, criterion_main, Criterion};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -41,7 +41,7 @@ pub fn send_signal(signal: libc::c_int) {
     }
 }
 
-fn many_signals(bench: &mut Bencher) {
+fn many_signals(c: &mut Criterion) {
     let num_signals = 10;
     let (tx, mut rx) = mpsc::channel(num_signals);
 
@@ -75,21 +75,23 @@ fn many_signals(bench: &mut Bencher) {
     // tasks have been polled at least once
     rt.block_on(Spinner::new());
 
-    bench.iter(|| {
-        rt.block_on(async {
-            send_signal(libc::SIGCHLD);
-            for _ in 0..num_signals {
-                rx.recv().await.expect("channel closed");
-            }
+    c.bench_function("many_signals", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                send_signal(libc::SIGCHLD);
+                for _ in 0..num_signals {
+                    rx.recv().await.expect("channel closed");
+                }
 
-            send_signal(libc::SIGIO);
-            for _ in 0..num_signals {
-                rx.recv().await.expect("channel closed");
-            }
-        });
+                send_signal(libc::SIGIO);
+                for _ in 0..num_signals {
+                    rx.recv().await.expect("channel closed");
+                }
+            });
+        })
     });
 }
 
-benchmark_group!(signal_group, many_signals,);
+criterion_group!(signal_group, many_signals);
 
-benchmark_main!(signal_group);
+criterion_main!(signal_group);
