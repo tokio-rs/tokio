@@ -2,24 +2,23 @@
 //! This essentially measure the time to enqueue a task in the local and remote
 //! case.
 
-#[macro_use]
-extern crate bencher;
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use bencher::{black_box, Bencher};
-
-fn time_now_current_thread(bench: &mut Bencher) {
+fn time_now_current_thread(c: &mut Criterion) {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()
         .unwrap();
 
-    bench.iter(|| {
-        rt.block_on(async {
-            black_box(tokio::time::Instant::now());
+    c.bench_function("time_now_current_thread", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                black_box(tokio::time::Instant::now());
+            })
         })
-    })
+    });
 }
 
-bencher::benchmark_group!(time_now, time_now_current_thread,);
+criterion_group!(time_now, time_now_current_thread);
 
-bencher::benchmark_main!(time_now);
+criterion_main!(time_now);

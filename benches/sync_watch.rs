@@ -1,8 +1,9 @@
-use bencher::{black_box, Bencher};
 use rand::prelude::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{watch, Notify};
+
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
@@ -24,7 +25,7 @@ fn do_work(rng: &mut impl RngCore) -> u32 {
         .fold(0, u32::wrapping_add)
 }
 
-fn contention_resubscribe(b: &mut Bencher) {
+fn contention_resubscribe(c: &mut Criterion) {
     const NTASK: u64 = 1000;
 
     let rt = rt();
@@ -46,19 +47,21 @@ fn contention_resubscribe(b: &mut Bencher) {
         });
     }
 
-    b.iter(|| {
-        rt.block_on(async {
-            for _ in 0..100 {
-                assert_eq!(wg.0.fetch_add(NTASK, Ordering::Relaxed), 0);
-                let _ = snd.send(black_box(42));
-                while wg.0.load(Ordering::Acquire) > 0 {
-                    wg.1.notified().await;
+    c.bench_function("contention_resubscribe", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                for _ in 0..100 {
+                    assert_eq!(wg.0.fetch_add(NTASK, Ordering::Relaxed), 0);
+                    let _ = snd.send(black_box(42));
+                    while wg.0.load(Ordering::Acquire) > 0 {
+                        wg.1.notified().await;
+                    }
                 }
-            }
-        });
+            });
+        })
     });
 }
 
-bencher::benchmark_group!(contention, contention_resubscribe);
+criterion_group!(contention, contention_resubscribe);
 
-bencher::benchmark_main!(contention);
+criterion_main!(contention);
