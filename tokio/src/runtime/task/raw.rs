@@ -279,7 +279,7 @@ unsafe fn poll<T: Future, S: Schedule>(ptr: NonNull<Header>) {
 unsafe fn schedule<S: Schedule>(ptr: NonNull<Header>) {
     use crate::runtime::task::{Notified, Task};
 
-    let scheduler = Header::get_scheduler::<Option<S>>(ptr).as_ref();
+    let scheduler = Header::get_scheduler::<S>(ptr).as_ref();
     let notify = Notified(Task::from_raw(ptr.cast()));
     match scheduler {
         Some(scheduler) => scheduler.schedule(notify),

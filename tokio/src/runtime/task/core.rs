@@ -431,9 +431,9 @@ impl Header {
     ///
     /// The generic type S must be set to the correct scheduler type for this
     /// task.
-    pub(super) unsafe fn get_scheduler<S>(me: NonNull<Header>) -> NonNull<S> {
+    pub(super) unsafe fn get_scheduler<S>(me: NonNull<Header>) -> NonNull<Option<S>> {
         let offset = me.as_ref().vtable.scheduler_offset;
-        let scheduler = me.as_ptr().cast::<u8>().add(offset).cast::<S>();
+        let scheduler = me.as_ptr().cast::<u8>().add(offset).cast::<Option<S>>();
         NonNull::new_unchecked(scheduler)
     }
 

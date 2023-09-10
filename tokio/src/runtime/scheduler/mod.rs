@@ -27,7 +27,8 @@ cfg_rt_multi_thread! {
 
 use crate::runtime::driver;
 
-use super::task::Schedule;
+#[cfg(feature = "rt")]
+use crate::runtime::task::Schedule;
 
 #[derive(Debug, Clone)]
 pub(crate) enum Handle {
@@ -130,7 +131,7 @@ cfg_rt! {
                 Handle::MultiThreadAlt(h) => multi_thread_alt::Handle::spawn(h, future, id),
             }
         }
-
+        #[cfg(feature = "rt")]
         pub(crate) fn release(&self, task: &Task) -> Option<Task>
         {
             match self {
@@ -144,6 +145,7 @@ cfg_rt! {
             }
         }
 
+        #[cfg(feature = "rt")]
         pub(crate) fn schedule(&self, task: Notified)
         {
             match self {
@@ -156,7 +158,7 @@ cfg_rt! {
                 Handle::MultiThreadAlt(h) => h.schedule(task),
             }
         }
-
+        #[cfg(feature = "rt")]
         pub(crate) fn yield_now(&self, task: Notified) {
             match self {
                 Handle::CurrentThread(h) => h.yield_now(task),
