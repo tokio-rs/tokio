@@ -256,12 +256,17 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         #[cfg(debug_assertions)]
         {
             // Using a separate function for this code avoids instantiating it separately for every `T`.
-            unsafe fn check<S>(header: &Header, trailer: &Trailer, scheduler: &S, task_id: &Id) {
+            unsafe fn check<S>(
+                header: &Header,
+                trailer: &Trailer,
+                scheduler: &Option<S>,
+                task_id: &Id,
+            ) {
                 let trailer_addr = trailer as *const Trailer as usize;
                 let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(header)) };
                 assert_eq!(trailer_addr, trailer_ptr.as_ptr() as usize);
 
-                let scheduler_addr = scheduler as *const S as usize;
+                let scheduler_addr = scheduler as *const Option<S> as usize;
                 let scheduler_ptr = unsafe { Header::get_scheduler::<S>(NonNull::from(header)) };
                 assert_eq!(scheduler_addr, scheduler_ptr.as_ptr() as usize);
 

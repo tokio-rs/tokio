@@ -85,7 +85,7 @@ impl<T: Future, S: Schedule> OffsetHelper<T, S> {
     const ID_OFFSET: usize = get_id_offset(
         std::mem::size_of::<Header>(),
         std::mem::align_of::<Core<T, S>>(),
-        std::mem::size_of::<S>(),
+        std::mem::size_of::<Option<S>>(),
         std::mem::align_of::<Id>(),
     );
 }
