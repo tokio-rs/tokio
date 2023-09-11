@@ -1,4 +1,4 @@
-use bencher::{benchmark_group, benchmark_main, Bencher};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -174,65 +174,77 @@ fn rt() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
-fn copy_mem_to_mem(b: &mut Bencher) {
+fn copy_mem_to_mem(c: &mut Criterion) {
     let rt = rt();
 
-    b.iter(|| {
-        let task = || async {
-            let mut source = repeat(0).take(SOURCE_SIZE);
-            let mut dest = Vec::new();
-            copy(&mut source, &mut dest).await.unwrap();
-        };
+    c.bench_function("copy_mem_to_mem", |b| {
+        b.iter(|| {
+            let task = || async {
+                let mut source = repeat(0).take(SOURCE_SIZE);
+                let mut dest = Vec::new();
+                copy(&mut source, &mut dest).await.unwrap();
+            };
 
-        rt.block_on(task());
-    })
+            rt.block_on(task());
+        })
+    });
 }
 
-fn copy_mem_to_slow_hdd(b: &mut Bencher) {
+fn copy_mem_to_slow_hdd(c: &mut Criterion) {
     let rt = rt();
 
-    b.iter(|| {
-        let task = || async {
-            let mut source = repeat(0).take(SOURCE_SIZE);
-            let mut dest = SlowHddWriter::new(WRITE_SERVICE_PERIOD, WRITE_BUFFER);
-            copy(&mut source, &mut dest).await.unwrap();
-        };
+    c.bench_function("copy_mem_to_slow_hdd", |b| {
+        b.iter(|| {
+            let task = || async {
+                let mut source = repeat(0).take(SOURCE_SIZE);
+                let mut dest = SlowHddWriter::new(WRITE_SERVICE_PERIOD, WRITE_BUFFER);
+                copy(&mut source, &mut dest).await.unwrap();
+            };
 
-        rt.block_on(task());
-    })
+            rt.block_on(task());
+        })
+    });
 }
 
-fn copy_chunk_to_mem(b: &mut Bencher) {
+fn copy_chunk_to_mem(c: &mut Criterion) {
     let rt = rt();
-    b.iter(|| {
-        let task = || async {
-            let mut source = ChunkReader::new(CHUNK_SIZE, READ_SERVICE_PERIOD).take(SOURCE_SIZE);
-            let mut dest = Vec::new();
-            copy(&mut source, &mut dest).await.unwrap();
-        };
 
-        rt.block_on(task());
-    })
+    c.bench_function("copy_chunk_to_mem", |b| {
+        b.iter(|| {
+            let task = || async {
+                let mut source =
+                    ChunkReader::new(CHUNK_SIZE, READ_SERVICE_PERIOD).take(SOURCE_SIZE);
+                let mut dest = Vec::new();
+                copy(&mut source, &mut dest).await.unwrap();
+            };
+
+            rt.block_on(task());
+        })
+    });
 }
 
-fn copy_chunk_to_slow_hdd(b: &mut Bencher) {
+fn copy_chunk_to_slow_hdd(c: &mut Criterion) {
     let rt = rt();
-    b.iter(|| {
-        let task = || async {
-            let mut source = ChunkReader::new(CHUNK_SIZE, READ_SERVICE_PERIOD).take(SOURCE_SIZE);
-            let mut dest = SlowHddWriter::new(WRITE_SERVICE_PERIOD, WRITE_BUFFER);
-            copy(&mut source, &mut dest).await.unwrap();
-        };
 
-        rt.block_on(task());
-    })
+    c.bench_function("copy_chunk_to_slow_hdd", |b| {
+        b.iter(|| {
+            let task = || async {
+                let mut source =
+                    ChunkReader::new(CHUNK_SIZE, READ_SERVICE_PERIOD).take(SOURCE_SIZE);
+                let mut dest = SlowHddWriter::new(WRITE_SERVICE_PERIOD, WRITE_BUFFER);
+                copy(&mut source, &mut dest).await.unwrap();
+            };
+
+            rt.block_on(task());
+        })
+    });
 }
 
-benchmark_group!(
+criterion_group!(
     copy_bench,
     copy_mem_to_mem,
     copy_mem_to_slow_hdd,
     copy_chunk_to_mem,
     copy_chunk_to_slow_hdd,
 );
-benchmark_main!(copy_bench);
+criterion_main!(copy_bench);
