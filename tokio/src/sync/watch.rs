@@ -857,7 +857,7 @@ impl<T> Sender<T> {
     /// Creates the sending-half of the [`watch`] channel.
     ///
     /// See documentation of [`watch::channel`] for errors when calling this function.
-    /// Beware that attempting to send a value when no one subscribed to the channel will
+    /// Beware that attempting to send a value when there are no receivers will
     /// return an error.
     ///
     /// [`watch`]: crate::sync::watch
