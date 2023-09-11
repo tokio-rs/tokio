@@ -866,9 +866,10 @@ impl<T> Sender<T> {
     /// # Examples
     /// ```
     /// let sender = tokio::sync::watch::Sender::new(0u8);
-    /// assert!(sender.send(3).is_err())
-    /// let _rec = sender.subscribe()
-    /// assert!(sender.send(4).is_ok())
+    /// assert!(sender.send(3).is_err());
+    /// let _rec = sender.subscribe();
+    /// assert!(sender.send(4).is_ok());
+    /// ```
     pub fn new(init: T) -> Self {
         let (tx, _) = channel(init);
         tx
