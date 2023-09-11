@@ -179,6 +179,9 @@ pub(crate) struct Header {
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) tracing_id: Option<tracing::Id>,
+
+    /// The task's ID, is used for deciding which list to put it in.
+    pub(super) task_id: Id,
 }
 
 unsafe impl Send for Header {}
@@ -216,12 +219,14 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         fn new_header(
             state: State,
             vtable: &'static Vtable,
+            task_id: Id,
             #[cfg(all(tokio_unstable, feature = "tracing"))] tracing_id: Option<tracing::Id>,
         ) -> Header {
             Header {
                 state,
                 queue_next: UnsafeCell::new(None),
                 vtable,
+                task_id,
                 owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
@@ -235,6 +240,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
             header: new_header(
                 state,
                 vtable,
+                task_id,
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
             ),

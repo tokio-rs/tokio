@@ -24,7 +24,7 @@ use std::fmt;
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
-pub struct Id(u64);
+pub struct Id(pub(crate) u64);
 
 /// Returns the [`Id`] of the currently running task.
 ///

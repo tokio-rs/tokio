@@ -132,7 +132,7 @@ impl CurrentThread {
         let handle = Arc::new(Handle {
             shared: Shared {
                 inject: Inject::new(),
-                owned: OwnedTasks::new(),
+                owned: OwnedTasks::new(1),
                 woken: AtomicBool::new(false),
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),

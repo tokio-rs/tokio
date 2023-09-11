@@ -8,12 +8,14 @@
 
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
+use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
-use crate::util::linked_list::{CountedLinkedList, Link, LinkedList};
+use crate::util::linked_list::{Link, LinkedList};
 
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
+use std::sync::atomic::AtomicBool;
 
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
@@ -55,12 +57,14 @@ cfg_not_has_atomic_u64! {
 }
 
 pub(crate) struct OwnedTasks<S: 'static> {
-    inner: Mutex<CountedOwnedTasksInner<S>>,
+    lists: Vec<Mutex<CountedOwnedTasksInner<S>>>,
     pub(crate) id: NonZeroU64,
+    closed: AtomicBool,
+    grain: usize,
+    count: AtomicUsize,
 }
 struct CountedOwnedTasksInner<S: 'static> {
-    list: CountedLinkedList<Task<S>, <Task<S> as Link>::Target>,
-    closed: bool,
+    list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
 }
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
@@ -73,13 +77,25 @@ struct OwnedTasksInner<S: 'static> {
 }
 
 impl<S: 'static> OwnedTasks<S> {
-    pub(crate) fn new() -> Self {
+    /// grain must be an integer power of 2
+    pub(crate) fn new(grain: usize) -> Self {
+        assert_eq!(
+            grain & (grain - 1),
+            0,
+            "grain must be an integer power of 2"
+        );
+        let mut lists = Vec::with_capacity(grain);
+        for _ in 0..grain {
+            lists.push(Mutex::new(CountedOwnedTasksInner {
+                list: LinkedList::new(),
+            }))
+        }
         Self {
-            inner: Mutex::new(CountedOwnedTasksInner {
-                list: CountedLinkedList::new(),
-                closed: false,
-            }),
+            lists,
+            closed: AtomicBool::new(false),
             id: get_next_id(),
+            grain,
+            count: AtomicUsize::new(0),
         }
     }
 
@@ -97,12 +113,17 @@ impl<S: 'static> OwnedTasks<S> {
         T::Output: Send + 'static,
     {
         let (task, notified, join) = super::new_task(task, scheduler, id);
-        let notified = unsafe { self.bind_inner(task, notified) };
+        let notified = unsafe { self.bind_inner(task, notified, id) };
         (join, notified)
     }
 
     /// The part of `bind` that's the same for every type of future.
-    unsafe fn bind_inner(&self, task: Task<S>, notified: Notified<S>) -> Option<Notified<S>>
+    unsafe fn bind_inner(
+        &self,
+        task: Task<S>,
+        notified: Notified<S>,
+        id: super::Id,
+    ) -> Option<Notified<S>>
     where
         S: Schedule,
     {
@@ -111,17 +132,16 @@ impl<S: 'static> OwnedTasks<S> {
             // to the field.
             task.header().set_owner_id(self.id);
         }
-
-        let mut lock = self.inner.lock();
-        if lock.closed {
-            drop(lock);
-            drop(notified);
+        // check close flag
+        if self.closed.load(Ordering::Relaxed) {
             task.shutdown();
-            None
-        } else {
-            lock.list.push_front(task);
-            Some(notified)
+            return None;
         }
+
+        let mut lock = self.lists[id.0 as usize & (self.grain - 1)].lock();
+        lock.list.push_front(task);
+        self.count.fetch_add(1, Ordering::Relaxed);
+        Some(notified)
     }
 
     /// Asserts that the given task is owned by this OwnedTasks and convert it to
@@ -129,7 +149,6 @@ impl<S: 'static> OwnedTasks<S> {
     #[inline]
     pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
         debug_assert_eq!(task.header().get_owner_id(), Some(self.id));
-
         // safety: All tasks bound to this OwnedTasks are Send, so it is safe
         // to poll it on this thread no matter what thread we are on.
         LocalNotified {
@@ -146,28 +165,35 @@ impl<S: 'static> OwnedTasks<S> {
     {
         // The first iteration of the loop was unrolled so it can set the
         // closed bool.
-        let first_task = {
-            let mut lock = self.inner.lock();
-            lock.closed = true;
-            lock.list.pop_back()
-        };
-        match first_task {
-            Some(task) => task.shutdown(),
-            None => return,
-        }
+        self.closed.fetch_and(true, Ordering::SeqCst);
 
-        loop {
-            let task = match self.inner.lock().list.pop_back() {
-                Some(task) => task,
-                None => return,
+        for inner in &self.lists {
+            let first_task = {
+                let mut lock = inner.lock();
+                lock.list.pop_back()
             };
+            match first_task {
+                Some(task) => {
+                    self.count.fetch_sub(1, Ordering::Relaxed);
+                    task.shutdown();
+                }
+                None => return,
+            }
 
-            task.shutdown();
+            loop {
+                match inner.lock().list.pop_back() {
+                    Some(task) => {
+                        self.count.fetch_sub(1, Ordering::Relaxed);
+                        task.shutdown();
+                    }
+                    None => return,
+                };
+            }
         }
     }
 
     pub(crate) fn active_tasks_count(&self) -> usize {
-        self.inner.lock().list.count()
+        self.count.load(Ordering::Relaxed)
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
@@ -179,11 +205,23 @@ impl<S: 'static> OwnedTasks<S> {
 
         // safety: We just checked that the provided task is not in some other
         // linked list.
-        unsafe { self.inner.lock().list.remove(task.header_ptr()) }
+        unsafe {
+            match self.lists[(task.header().task_id.0) as usize & (self.grain - 1)]
+                .lock()
+                .list
+                .remove(task.header_ptr())
+            {
+                Some(t) => {
+                    self.count.fetch_sub(1, Ordering::Relaxed);
+                    Some(t)
+                }
+                None => None,
+            }
+        }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.inner.lock().list.is_empty()
+        self.count.load(Ordering::SeqCst) == 0
     }
 }
 

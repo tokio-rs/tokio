@@ -287,7 +287,7 @@ pub(super) fn create(
             remotes: remotes.into_boxed_slice(),
             inject,
             idle,
-            owned: OwnedTasks::new(),
+            owned: OwnedTasks::new(16),
             synced: Mutex::new(Synced {
                 idle: idle_synced,
                 inject: inject_synced,
