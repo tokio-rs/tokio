@@ -307,7 +307,7 @@ pub(super) fn create(
             remotes: remotes.into_boxed_slice(),
             inject,
             idle,
-            owned: OwnedTasks::new(),
+            owned: OwnedTasks::new(16),
             synced: Mutex::new(Synced {
                 assigned_cores: (0..num_workers).map(|_| None).collect(),
                 shutdown_cores: Vec::with_capacity(num_cores),
