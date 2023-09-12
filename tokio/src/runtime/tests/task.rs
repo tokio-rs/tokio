@@ -241,7 +241,7 @@ fn with(f: impl FnOnce(Runtime)) {
     let _reset = Reset;
 
     let rt = Runtime(Arc::new(Inner {
-        owned: OwnedTasks::new(),
+        owned: OwnedTasks::new(16),
         core: Mutex::new(Core {
             queue: VecDeque::new(),
         }),
