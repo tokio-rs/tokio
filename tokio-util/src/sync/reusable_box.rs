@@ -1,7 +1,6 @@
 use std::alloc::Layout;
 use std::fmt;
-use std::future::Future;
-use std::marker::PhantomData;
+use std::future::{self, Future};
 use std::mem::{self, ManuallyDrop};
 use std::pin::Pin;
 use std::ptr;
@@ -61,7 +60,7 @@ impl<'a, T> ReusableBoxFuture<'a, T> {
             F: Future + Send + 'a,
         {
             // future::Pending<T> is a ZST so this never allocates.
-            let boxed = mem::replace(&mut this.boxed, Box::pin(Pending(PhantomData)));
+            let boxed = mem::replace(&mut this.boxed, Box::pin(future::pending()));
             reuse_pin_box(boxed, future, |boxed| this.boxed = Pin::from(boxed))
         }
 
@@ -154,18 +153,5 @@ impl<O, F: FnOnce() -> O> Drop for CallOnDrop<O, F> {
     fn drop(&mut self) {
         let f = unsafe { ManuallyDrop::take(&mut self.f) };
         f();
-    }
-}
-
-/// The same as `std::future::Pending<T>`; we can't use that type directly because on rustc
-/// versions <1.60 it didn't unconditionally implement `Send`.
-// FIXME: use `std::future::Pending<T>` once the MSRV is >=1.60
-struct Pending<T>(PhantomData<fn() -> T>);
-
-impl<T> Future for Pending<T> {
-    type Output = T;
-
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Pending
     }
 }

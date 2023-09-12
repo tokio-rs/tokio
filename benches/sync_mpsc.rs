@@ -1,8 +1,23 @@
-use bencher::{black_box, Bencher};
 use tokio::sync::mpsc;
 
-type Medium = [usize; 64];
-type Large = [Medium; 64];
+use criterion::measurement::WallTime;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkGroup, Criterion};
+
+#[derive(Debug, Copy, Clone)]
+struct Medium([usize; 64]);
+impl Default for Medium {
+    fn default() -> Self {
+        Medium([0; 64])
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+struct Large([Medium; 64]);
+impl Default for Large {
+    fn default() -> Self {
+        Large([Medium::default(); 64])
+    }
+}
 
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
@@ -11,169 +26,176 @@ fn rt() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
-fn create_1_medium(b: &mut Bencher) {
-    b.iter(|| {
-        black_box(&mpsc::channel::<Medium>(1));
-    });
-}
-
-fn create_100_medium(b: &mut Bencher) {
-    b.iter(|| {
-        black_box(&mpsc::channel::<Medium>(100));
-    });
-}
-
-fn create_100_000_medium(b: &mut Bencher) {
-    b.iter(|| {
-        black_box(&mpsc::channel::<Medium>(100_000));
-    });
-}
-
-fn send_medium(b: &mut Bencher) {
-    let rt = rt();
-
-    b.iter(|| {
-        let (tx, mut rx) = mpsc::channel::<Medium>(1000);
-
-        let _ = rt.block_on(tx.send([0; 64]));
-
-        rt.block_on(rx.recv()).unwrap();
-    });
-}
-
-fn send_large(b: &mut Bencher) {
-    let rt = rt();
-
-    b.iter(|| {
-        let (tx, mut rx) = mpsc::channel::<Large>(1000);
-
-        let _ = rt.block_on(tx.send([[0; 64]; 64]));
-
-        rt.block_on(rx.recv()).unwrap();
-    });
-}
-
-fn contention_bounded(b: &mut Bencher) {
-    let rt = rt();
-
-    b.iter(|| {
-        rt.block_on(async move {
-            let (tx, mut rx) = mpsc::channel::<usize>(1_000_000);
-
-            for _ in 0..5 {
-                let tx = tx.clone();
-                tokio::spawn(async move {
-                    for i in 0..1000 {
-                        tx.send(i).await.unwrap();
-                    }
-                });
-            }
-
-            for _ in 0..1_000 * 5 {
-                let _ = rx.recv().await;
-            }
+fn create_medium<const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>) {
+    g.bench_function(SIZE.to_string(), |b| {
+        b.iter(|| {
+            black_box(&mpsc::channel::<Medium>(SIZE));
         })
     });
 }
 
-fn contention_bounded_full(b: &mut Bencher) {
+fn send_data<T: Default, const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>, prefix: &str) {
     let rt = rt();
 
-    b.iter(|| {
-        rt.block_on(async move {
-            let (tx, mut rx) = mpsc::channel::<usize>(100);
+    g.bench_function(format!("{}_{}", prefix, SIZE), |b| {
+        b.iter(|| {
+            let (tx, mut rx) = mpsc::channel::<T>(SIZE);
 
-            for _ in 0..5 {
-                let tx = tx.clone();
-                tokio::spawn(async move {
-                    for i in 0..1000 {
-                        tx.send(i).await.unwrap();
-                    }
-                });
-            }
+            let _ = rt.block_on(tx.send(T::default()));
 
-            for _ in 0..1_000 * 5 {
-                let _ = rx.recv().await;
-            }
+            rt.block_on(rx.recv()).unwrap();
         })
     });
 }
 
-fn contention_unbounded(b: &mut Bencher) {
+fn contention_bounded(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
 
-    b.iter(|| {
-        rt.block_on(async move {
-            let (tx, mut rx) = mpsc::unbounded_channel::<usize>();
+    g.bench_function("bounded", |b| {
+        b.iter(|| {
+            rt.block_on(async move {
+                let (tx, mut rx) = mpsc::channel::<usize>(1_000_000);
 
-            for _ in 0..5 {
-                let tx = tx.clone();
-                tokio::spawn(async move {
-                    for i in 0..1000 {
-                        tx.send(i).unwrap();
-                    }
-                });
-            }
+                for _ in 0..5 {
+                    let tx = tx.clone();
+                    tokio::spawn(async move {
+                        for i in 0..1000 {
+                            tx.send(i).await.unwrap();
+                        }
+                    });
+                }
 
-            for _ in 0..1_000 * 5 {
-                let _ = rx.recv().await;
-            }
+                for _ in 0..1_000 * 5 {
+                    let _ = rx.recv().await;
+                }
+            })
         })
     });
 }
 
-fn uncontented_bounded(b: &mut Bencher) {
+fn contention_bounded_full(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
 
-    b.iter(|| {
-        rt.block_on(async move {
-            let (tx, mut rx) = mpsc::channel::<usize>(1_000_000);
+    g.bench_function("bounded_full", |b| {
+        b.iter(|| {
+            rt.block_on(async move {
+                let (tx, mut rx) = mpsc::channel::<usize>(100);
 
-            for i in 0..5000 {
-                tx.send(i).await.unwrap();
-            }
+                for _ in 0..5 {
+                    let tx = tx.clone();
+                    tokio::spawn(async move {
+                        for i in 0..1000 {
+                            tx.send(i).await.unwrap();
+                        }
+                    });
+                }
 
-            for _ in 0..5_000 {
-                let _ = rx.recv().await;
-            }
+                for _ in 0..1_000 * 5 {
+                    let _ = rx.recv().await;
+                }
+            })
         })
     });
 }
 
-fn uncontented_unbounded(b: &mut Bencher) {
+fn contention_unbounded(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
 
-    b.iter(|| {
-        rt.block_on(async move {
-            let (tx, mut rx) = mpsc::unbounded_channel::<usize>();
+    g.bench_function("unbounded", |b| {
+        b.iter(|| {
+            rt.block_on(async move {
+                let (tx, mut rx) = mpsc::unbounded_channel::<usize>();
 
-            for i in 0..5000 {
-                tx.send(i).unwrap();
-            }
+                for _ in 0..5 {
+                    let tx = tx.clone();
+                    tokio::spawn(async move {
+                        for i in 0..1000 {
+                            tx.send(i).unwrap();
+                        }
+                    });
+                }
 
-            for _ in 0..5_000 {
-                let _ = rx.recv().await;
-            }
+                for _ in 0..1_000 * 5 {
+                    let _ = rx.recv().await;
+                }
+            })
         })
     });
 }
 
-bencher::benchmark_group!(
-    create,
-    create_1_medium,
-    create_100_medium,
-    create_100_000_medium
-);
+fn uncontented_bounded(g: &mut BenchmarkGroup<WallTime>) {
+    let rt = rt();
 
-bencher::benchmark_group!(send, send_medium, send_large);
+    g.bench_function("bounded", |b| {
+        b.iter(|| {
+            rt.block_on(async move {
+                let (tx, mut rx) = mpsc::channel::<usize>(1_000_000);
 
-bencher::benchmark_group!(
-    contention,
-    contention_bounded,
-    contention_bounded_full,
-    contention_unbounded,
-    uncontented_bounded,
-    uncontented_unbounded
-);
+                for i in 0..5000 {
+                    tx.send(i).await.unwrap();
+                }
 
-bencher::benchmark_main!(create, send, contention);
+                for _ in 0..5_000 {
+                    let _ = rx.recv().await;
+                }
+            })
+        })
+    });
+}
+
+fn uncontented_unbounded(g: &mut BenchmarkGroup<WallTime>) {
+    let rt = rt();
+
+    g.bench_function("unbounded", |b| {
+        b.iter(|| {
+            rt.block_on(async move {
+                let (tx, mut rx) = mpsc::unbounded_channel::<usize>();
+
+                for i in 0..5000 {
+                    tx.send(i).unwrap();
+                }
+
+                for _ in 0..5_000 {
+                    let _ = rx.recv().await;
+                }
+            })
+        })
+    });
+}
+
+fn bench_create_medium(c: &mut Criterion) {
+    let mut group = c.benchmark_group("create_medium");
+    create_medium::<1>(&mut group);
+    create_medium::<100>(&mut group);
+    create_medium::<100_000>(&mut group);
+    group.finish();
+}
+
+fn bench_send(c: &mut Criterion) {
+    let mut group = c.benchmark_group("send");
+    send_data::<Medium, 1000>(&mut group, "medium");
+    send_data::<Large, 1000>(&mut group, "large");
+    group.finish();
+}
+
+fn bench_contention(c: &mut Criterion) {
+    let mut group = c.benchmark_group("contention");
+    contention_bounded(&mut group);
+    contention_bounded_full(&mut group);
+    contention_unbounded(&mut group);
+    group.finish();
+}
+
+fn bench_uncontented(c: &mut Criterion) {
+    let mut group = c.benchmark_group("uncontented");
+    uncontented_bounded(&mut group);
+    uncontented_unbounded(&mut group);
+    group.finish();
+}
+
+criterion_group!(create, bench_create_medium);
+criterion_group!(send, bench_send);
+criterion_group!(contention, bench_contention);
+criterion_group!(uncontented, bench_uncontented);
+
+criterion_main!(create, send, contention, uncontented);
