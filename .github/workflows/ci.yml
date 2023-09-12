@@ -220,7 +220,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
           override: true
-      - uses: Swatinem/rust-cache@v1
+      # - uses: Swatinem/rust-cache@v1
       - name: asan
         run: cargo test --workspace --all-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1
         env:
