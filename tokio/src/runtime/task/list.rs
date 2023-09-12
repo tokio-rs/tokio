@@ -14,8 +14,9 @@ use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
 
 use std::marker::PhantomData;
-use std::num::NonZeroU64;
+use std::num::NonZeroU32;
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
@@ -26,39 +27,20 @@ use std::sync::atomic::AtomicBool;
 // bug in Tokio, so we accept that certain bugs would not be caught if the two
 // mixed up runtimes happen to have the same id.
 
-cfg_has_atomic_u64! {
-    use std::sync::atomic::{AtomicU64, Ordering};
+static NEXT_OWNED_TASKS_ID: AtomicU32 = AtomicU32::new(1);
 
-    static NEXT_OWNED_TASKS_ID: AtomicU64 = AtomicU64::new(1);
-
-    fn get_next_id() -> NonZeroU64 {
-        loop {
-            let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
-            if let Some(id) = NonZeroU64::new(id) {
-                return id;
-            }
-        }
-    }
-}
-
-cfg_not_has_atomic_u64! {
-    use std::sync::atomic::{AtomicU32, Ordering};
-
-    static NEXT_OWNED_TASKS_ID: AtomicU32 = AtomicU32::new(1);
-
-    fn get_next_id() -> NonZeroU64 {
-        loop {
-            let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
-            if let Some(id) = NonZeroU64::new(u64::from(id)) {
-                return id;
-            }
+fn get_next_id() -> NonZeroU32 {
+    loop {
+        let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
+        if let Some(id) = NonZeroU32::new(id) {
+            return id;
         }
     }
 }
 
 pub(crate) struct OwnedTasks<S: 'static> {
     lists: Vec<Mutex<CountedOwnedTasksInner<S>>>,
-    pub(crate) id: NonZeroU64,
+    pub(crate) id: NonZeroU32,
     closed: AtomicBool,
     grain: usize,
     count: AtomicUsize,
@@ -68,7 +50,7 @@ struct CountedOwnedTasksInner<S: 'static> {
 }
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
-    pub(crate) id: NonZeroU64,
+    pub(crate) id: NonZeroU32,
     _not_send_or_sync: PhantomData<*const ()>,
 }
 struct OwnedTasksInner<S: 'static> {
@@ -233,8 +215,8 @@ cfg_taskdump! {
             F: FnMut(&Task<S>)
         {
             let mut f = f;
-            for list in &self.lists{
-                f = list.lock().list.for_each(f);
+            for inner in &self.lists{
+                f = inner.lock().list.for_each(f);
             }
         }
     }

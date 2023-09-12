@@ -60,10 +60,10 @@ impl Handle {
 }
 
 cfg_unstable! {
-    use std::num::NonZeroU64;
+    use std::num::NonZeroU32;
 
     impl Handle {
-        pub(crate) fn owned_id(&self) -> NonZeroU64 {
+        pub(crate) fn owned_id(&self) -> NonZeroU32 {
             self.shared.owned.id
         }
     }
