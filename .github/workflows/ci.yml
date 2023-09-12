@@ -408,10 +408,10 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install Rust ${{ env.rust_stable }}
+      - name: Install Rust 1.65.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ env.rust_stable }}
+          toolchain: 1.65.0
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Test hyper
