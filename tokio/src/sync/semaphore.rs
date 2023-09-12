@@ -194,6 +194,11 @@ impl Semaphore {
 
     /// Creates a new semaphore with the initial number of permits.
     ///
+    /// When using the `tracing` [unstable feature], a `Semaphore` created with
+    /// `const_new` will not be instrumented. As such, it will not be visible
+    /// in [`tokio-console`]. Instead, [`Semaphore::new`] should be used to
+    /// create an instrumented object if that is needed.
+    ///
     /// # Examples
     ///
     /// ```
@@ -201,6 +206,9 @@ impl Semaphore {
     ///
     /// static SEM: Semaphore = Semaphore::const_new(10);
     /// ```
+    ///
+    /// [`tokio-console`]: https://github.com/tokio-rs/console
+    /// [unstable feature]: crate#unstable-features
     #[cfg(not(all(loom, test)))]
     pub const fn const_new(permits: usize) -> Self {
         Self {
