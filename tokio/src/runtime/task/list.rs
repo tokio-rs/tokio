@@ -232,7 +232,10 @@ cfg_taskdump! {
         where
             F: FnMut(&Task<S>)
         {
-            self.inner.lock().list.for_each(f)
+            let mut f = f;
+            for list in &self.lists{
+                f = list.lock().list.for_each(f);
+            }
         }
     }
 }

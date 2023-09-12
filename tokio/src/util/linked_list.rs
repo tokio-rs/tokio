@@ -295,21 +295,11 @@ cfg_io_driver_impl! {
 }
 
 cfg_taskdump! {
-    impl<T: Link> CountedLinkedList<T, T::Target> {
-        pub(crate) fn for_each<F>(&mut self, f: F)
-        where
-            F: FnMut(&T::Handle),
-        {
-            self.list.for_each(f)
-        }
-    }
-
     impl<T: Link> LinkedList<T, T::Target> {
-        pub(crate) fn for_each<F>(&mut self, mut f: F)
+        pub(crate) fn for_each<F>(&mut self, mut f: F) -> F
         where
             F: FnMut(&T::Handle),
         {
-            use std::mem::ManuallyDrop;
 
             let mut next = self.head;
 
@@ -320,6 +310,7 @@ cfg_taskdump! {
                     next = T::pointers(curr).as_ref().get_next();
                 }
             }
+         f
         }
     }
 }
