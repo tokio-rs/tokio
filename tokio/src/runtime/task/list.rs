@@ -157,7 +157,7 @@ impl<S: 'static> OwnedTasks<S> {
             loop {
                 let task = match self.pop_back_inner(i) {
                     Some(task) => task,
-                    None => continue,
+                    None => break,
                 };
                 task.shutdown();
             }
