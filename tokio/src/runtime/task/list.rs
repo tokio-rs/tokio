@@ -151,7 +151,7 @@ impl<S: 'static> OwnedTasks<S> {
     {
         // The first iteration of the loop was unrolled so it can set the
         // closed bool.
-        self.closed.fetch_and(true, Ordering::Release);
+        self.closed.store(true, Ordering::Release);
 
         for i in 0..self.lists.len() {
             loop {
