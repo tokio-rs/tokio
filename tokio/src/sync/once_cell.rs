@@ -153,6 +153,11 @@ impl<T> OnceCell<T> {
     ///
     /// # Example
     ///
+    /// When using the `tracing` [unstable feature], a `OnceCell` created with
+    /// `const_new_with` will not be instrumented. As such, it will not be
+    /// visible in [`tokio-console`]. Instead, [`OnceCell::new_with`] should be
+    /// used to create an instrumented object if that is needed.
+    ///
     /// ```
     /// use tokio::sync::OnceCell;
     ///
@@ -170,6 +175,9 @@ impl<T> OnceCell<T> {
     ///     assert_eq!(*result, 1);
     /// }
     /// ```
+    ///
+    /// [`tokio-console`]: https://github.com/tokio-rs/console
+    /// [unstable feature]: crate#unstable-features
     #[cfg(not(all(loom, test)))]
     pub const fn const_new_with(value: T) -> Self {
         OnceCell {
@@ -183,6 +191,11 @@ impl<T> OnceCell<T> {
     ///
     /// Equivalent to `OnceCell::new`, except that it can be used in static
     /// variables.
+    ///
+    /// When using the `tracing` [unstable feature], a `OnceCell` created with
+    /// `const_new` will not be instrumented. As such, it will not be visible
+    /// in [`tokio-console`]. Instead, [`OnceCell::new`] should be used to
+    /// create an instrumented object if that is needed.
     ///
     /// # Example
     ///
@@ -203,6 +216,9 @@ impl<T> OnceCell<T> {
     ///     assert_eq!(*result, 2);
     /// }
     /// ```
+    ///
+    /// [`tokio-console`]: https://github.com/tokio-rs/console
+    /// [unstable feature]: crate#unstable-features
     #[cfg(not(all(loom, test)))]
     pub const fn const_new() -> Self {
         OnceCell {
