@@ -64,7 +64,7 @@ impl<S: 'static> OwnedTasks<S> {
         assert_eq!(
             grain & (grain - 1),
             0,
-            "grain must be an integer power of 2"
+            "the grain of OwnedTasks must be an integer power of 2"
         );
         let mut lists = Vec::with_capacity(grain);
         for _ in 0..grain {
@@ -119,11 +119,15 @@ impl<S: 'static> OwnedTasks<S> {
             task.shutdown();
             return None;
         }
+        self.push_inner(id, task);
+        Some(notified)
+    }
 
-        let mut lock = self.lists[id.0 as usize & (self.grain - 1)].lock();
+    #[inline]
+    fn push_inner(&self, task_id: super::Id, task: Task<S>) {
+        let mut lock = self.lists[task_id.0 as usize & (self.grain - 1)].lock();
         lock.list.push_front(task);
         self.count.fetch_add(1, Ordering::Relaxed);
-        Some(notified)
     }
 
     /// Asserts that the given task is owned by this OwnedTasks and convert it to
@@ -149,28 +153,30 @@ impl<S: 'static> OwnedTasks<S> {
         // closed bool.
         self.closed.fetch_and(true, Ordering::SeqCst);
 
-        for inner in &self.lists {
-            let first_task = {
-                let mut lock = inner.lock();
-                lock.list.pop_back()
-            };
+        for i in 0..self.lists.len() {
+            let first_task = self.pop_back_inner(i);
             match first_task {
-                Some(task) => {
-                    self.count.fetch_sub(1, Ordering::Relaxed);
-                    task.shutdown();
-                }
+                Some(task) => task.shutdown(),
                 None => return,
             }
-
             loop {
-                match inner.lock().list.pop_back() {
-                    Some(task) => {
-                        self.count.fetch_sub(1, Ordering::Relaxed);
-                        task.shutdown();
-                    }
+                let task = match self.pop_back_inner(i) {
+                    Some(task) => task,
                     None => return,
                 };
+                task.shutdown();
             }
+        }
+    }
+
+    fn pop_back_inner(&self, index: usize) -> Option<Task<S>> {
+        debug_assert!(index < self.lists.len());
+        match self.lists[index].lock().list.pop_back() {
+            Some(task) => {
+                self.count.fetch_sub(1, Ordering::Relaxed);
+                Some(task)
+            }
+            None => None,
         }
     }
 
@@ -187,18 +193,21 @@ impl<S: 'static> OwnedTasks<S> {
 
         // safety: We just checked that the provided task is not in some other
         // linked list.
-        unsafe {
-            match self.lists[(task.header().task_id.0) as usize & (self.grain - 1)]
-                .lock()
-                .list
-                .remove(task.header_ptr())
-            {
-                Some(t) => {
-                    self.count.fetch_sub(1, Ordering::Relaxed);
-                    Some(t)
-                }
-                None => None,
+        unsafe { self.remove_inner(task) }
+    }
+
+    #[inline]
+    unsafe fn remove_inner(&self, task: &Task<S>) -> Option<Task<S>> {
+        match self.lists[(task.header().task_id.0) as usize & (self.grain - 1)]
+            .lock()
+            .list
+            .remove(task.header_ptr())
+        {
+            Some(task) => {
+                self.count.fetch_sub(1, Ordering::Relaxed);
+                Some(task)
             }
+            None => None,
         }
     }
 
