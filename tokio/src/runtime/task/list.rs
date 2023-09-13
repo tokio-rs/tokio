@@ -154,15 +154,10 @@ impl<S: 'static> OwnedTasks<S> {
         self.closed.fetch_and(true, Ordering::Release);
 
         for i in 0..self.lists.len() {
-            let first_task = self.pop_back_inner(i);
-            match first_task {
-                Some(task) => task.shutdown(),
-                None => return,
-            }
             loop {
                 let task = match self.pop_back_inner(i) {
                     Some(task) => task,
-                    None => return,
+                    None => continue,
                 };
                 task.shutdown();
             }
