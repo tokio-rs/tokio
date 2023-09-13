@@ -264,6 +264,7 @@ fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
         drop(task);
     }
 
+    assert!(handle.shared.owned.is_closed());
     assert!(handle.shared.owned.is_empty());
 
     // Submit metrics

@@ -115,7 +115,7 @@ impl<S: 'static> OwnedTasks<S> {
             task.header().set_owner_id(self.id);
         }
         // check close flag
-        if self.closed.load(Ordering::Relaxed) {
+        if self.closed.load(Ordering::Acquire) {
             task.shutdown();
             return None;
         }
@@ -151,7 +151,7 @@ impl<S: 'static> OwnedTasks<S> {
     {
         // The first iteration of the loop was unrolled so it can set the
         // closed bool.
-        self.closed.fetch_and(true, Ordering::SeqCst);
+        self.closed.fetch_and(true, Ordering::Release);
 
         for i in 0..self.lists.len() {
             let first_task = self.pop_back_inner(i);
@@ -211,8 +211,12 @@ impl<S: 'static> OwnedTasks<S> {
         }
     }
 
+    pub(crate) fn is_closed(&self) -> bool {
+        self.closed.load(Ordering::Acquire)
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
-        self.count.load(Ordering::SeqCst) == 0
+        self.count.load(Ordering::Relaxed) == 0
     }
 }
 
