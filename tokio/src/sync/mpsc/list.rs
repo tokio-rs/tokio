@@ -262,9 +262,7 @@ impl<T> Rx<T> {
         unsafe {
             let block = self.head.as_ref();
 
-            let ret = block.read(self.index);
-
-            ret
+            block.read(self.index)
         }
     }
 
