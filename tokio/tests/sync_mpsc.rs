@@ -151,7 +151,6 @@ async fn async_send_recv_many_with_buffer() {
     assert_eq!(None, rx.recv().await);
 }
 
-
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn start_send_past_cap() {
@@ -220,7 +219,7 @@ async fn send_recv_many_unbounded() {
 
     let mut buffer = vec![0; 0];
     assert_eq!(rx.recv_many(&mut buffer).await, 4);
-    assert_eq!(vec![7,13,100,1002], buffer);
+    assert_eq!(vec![7, 13, 100, 1002], buffer);
     assert!(buffer.capacity() >= 4);
 
     drop(tx);

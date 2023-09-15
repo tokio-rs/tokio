@@ -10,7 +10,7 @@ fn rt() -> tokio::runtime::Runtime {
 
 // Simulate a use case of an actor that must update
 // a resource, but resource only needs last value
-fn publish_last_value(last_value:usize) -> usize {
+fn publish_last_value(last_value: usize) -> usize {
     std::thread::sleep(std::time::Duration::from_nanos(1));
     last_value
 }
@@ -64,14 +64,13 @@ fn contention_bounded_updater_recv_many(b: &mut Bencher) {
                 let count = rx.recv_many(&mut buffer).await;
                 total += count;
                 if count > 0 {
-                    last_value = buffer[buffer.len()-1]
+                    last_value = buffer[buffer.len() - 1]
                 }
             }
             last_value
         })
     });
 }
-
 
 fn contention_bounded_updater_publish_recv(b: &mut Bencher) {
     let rt = rt();
@@ -89,7 +88,7 @@ fn contention_bounded_updater_publish_recv(b: &mut Bencher) {
                 });
             }
 
-            for _ in 0..1_000  {
+            for _ in 0..1_000 {
                 let Some(v) = rx.recv().await else {continue};
                 let _ = publish_last_value(v);
             }
@@ -119,7 +118,7 @@ fn contention_bounded_updater_publish_recv_many(b: &mut Bencher) {
                 let count = rx.recv_many(&mut buffer).await;
                 total += count;
                 if count > 0 {
-                    publish_last_value(buffer[buffer.len()-1]);
+                    publish_last_value(buffer[buffer.len() - 1]);
                 }
             }
         })
@@ -175,7 +174,7 @@ fn contention_bounded_full_updater_recv_many(b: &mut Bencher) {
                 let count = rx.recv_many(&mut buffer).await;
                 total += count;
                 if count > 0 {
-                    last_value = buffer[buffer.len()-1]
+                    last_value = buffer[buffer.len() - 1]
                 }
             }
             last_value
@@ -232,7 +231,7 @@ fn contention_unbounded_updater_recv_many(b: &mut Bencher) {
                 let count = rx.recv_many(&mut buffer).await;
                 total += count;
                 if count > 0 {
-                    last_value = buffer[buffer.len()-1]
+                    last_value = buffer[buffer.len() - 1]
                 }
             }
             last_value
@@ -279,14 +278,13 @@ fn uncontented_bounded_updater_recv_many(b: &mut Bencher) {
                 let count = rx.recv_many(&mut buffer).await;
                 total += count;
                 if count > 0 {
-                    last_value = buffer[buffer.len()-1]
+                    last_value = buffer[buffer.len() - 1]
                 }
             }
             last_value
         })
     });
 }
-
 
 fn uncontented_unbounded_updater_recv(b: &mut Bencher) {
     let rt = rt();
@@ -327,7 +325,7 @@ fn uncontented_unbounded_updater_recv_many(b: &mut Bencher) {
                 let count = rx.recv_many(&mut buffer).await;
                 total += count;
                 if count > 0 {
-                    last_value = buffer[buffer.len()-1]
+                    last_value = buffer[buffer.len() - 1]
                 }
             }
             last_value
@@ -346,7 +344,6 @@ bencher::benchmark_group!(
     contention_bounded_updater_publish_recv,
     contention_bounded_updater_publish_recv_many
 );
-
 
 bencher::benchmark_group!(
     contention_bounded_full_updater,

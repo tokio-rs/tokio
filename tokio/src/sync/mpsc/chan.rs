@@ -41,7 +41,7 @@ pub(crate) trait Semaphore {
 
     fn add_permit(&self);
 
-    fn add_permits(&self, n:usize);
+    fn add_permits(&self, n: usize);
 
     fn close(&self);
 
@@ -321,14 +321,17 @@ impl<T, S: Semaphore> Rx<T, S> {
                             }
                             buffer.push(value);
                             let mut next = rx_fields.list.peek();
-                            while (buffer.len() < capacity && match next {
-                                Some(Value(value)) => {
-                                    rx_fields.list.pop(&self.inner.tx);
-                                    buffer.push(value);
-                                    next = rx_fields.list.peek();
-                                    true }
-                                _ => false
-                            }) {}
+                            while (buffer.len() < capacity
+                                && match next {
+                                    Some(Value(value)) => {
+                                        rx_fields.list.pop(&self.inner.tx);
+                                        buffer.push(value);
+                                        next = rx_fields.list.peek();
+                                        true
+                                    }
+                                    _ => false,
+                                })
+                            {}
                             self.inner.semaphore.add_permits(buffer.len());
                             coop.made_progress();
                             return Ready(buffer.len());
@@ -366,7 +369,6 @@ impl<T, S: Semaphore> Rx<T, S> {
             }
         })
     }
-
 
     /// Try to receive the next value.
     pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
@@ -464,7 +466,7 @@ impl Semaphore for bounded::Semaphore {
         self.semaphore.release(1)
     }
 
-    fn add_permits(&self, n:usize) {
+    fn add_permits(&self, n: usize) {
         self.semaphore.release(n)
     }
 
@@ -497,7 +499,7 @@ impl Semaphore for unbounded::Semaphore {
         }
     }
 
-    fn add_permits(&self, n:usize) {
+    fn add_permits(&self, n: usize) {
         let prev = self.0.fetch_sub(n << 1, Release);
 
         if prev >> 1 == 0 {
@@ -521,5 +523,4 @@ impl Semaphore for unbounded::Semaphore {
     fn num_acquired(&self) -> usize {
         self.0.load(Acquire) >> 1
     }
-
 }
