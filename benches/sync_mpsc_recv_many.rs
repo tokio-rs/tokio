@@ -33,7 +33,7 @@ fn contention_bounded_updater_recv(b: &mut Bencher) {
 
             let mut last_value = 0usize;
             for _ in 0..1_000 * 5 {
-                let Some(v) = rx.recv().await else {continue};
+                let Some(v) = rx.recv().await else { continue };
                 last_value = v
             }
             last_value
@@ -89,7 +89,7 @@ fn contention_bounded_updater_publish_recv(b: &mut Bencher) {
             }
 
             for _ in 0..1_000 {
-                let Some(v) = rx.recv().await else {continue};
+                let Some(v) = rx.recv().await else { continue };
                 let _ = publish_last_value(v);
             }
         })
@@ -143,7 +143,7 @@ fn contention_bounded_full_updater_recv(b: &mut Bencher) {
 
             let mut last_value = 0usize;
             for _ in 0..1_000 * 5 {
-                let Some(v) = rx.recv().await else {continue};
+                let Some(v) = rx.recv().await else { continue };
                 last_value = v
             }
             last_value
@@ -200,7 +200,7 @@ fn contention_unbounded_updater_recv(b: &mut Bencher) {
 
             let mut last_value = 0usize;
             for _ in 0..1_000 * 5 {
-                let Some(v) = rx.recv().await else {continue};
+                let Some(v) = rx.recv().await else { continue };
                 last_value = v
             }
             last_value
@@ -252,7 +252,7 @@ fn uncontented_bounded_updater_recv(b: &mut Bencher) {
 
             let mut last_value = 0usize;
             for _ in 0..5_000 {
-                let Some(v) = rx.recv().await else {continue};
+                let Some(v) = rx.recv().await else { continue };
                 last_value = v
             }
             last_value
@@ -299,7 +299,7 @@ fn uncontented_unbounded_updater_recv(b: &mut Bencher) {
 
             let mut last_value = 0usize;
             for _ in 0..5_000 {
-                let Some(v) = rx.recv().await else {continue};
+                let Some(v) = rx.recv().await else { continue };
                 last_value = v
             }
             last_value
