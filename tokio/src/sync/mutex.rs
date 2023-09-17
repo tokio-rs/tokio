@@ -371,6 +371,11 @@ impl<T: ?Sized> Mutex<T> {
 
     /// Creates a new lock in an unlocked state ready for use.
     ///
+    /// When using the `tracing` [unstable feature], a `Mutex` created with
+    /// `const_new` will not be instrumented. As such, it will not be visible
+    /// in [`tokio-console`]. Instead, [`Mutex::new`] should be used to create
+    /// an instrumented object if that is needed.
+    ///
     /// # Examples
     ///
     /// ```
@@ -378,6 +383,9 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// static LOCK: Mutex<i32> = Mutex::const_new(5);
     /// ```
+    ///
+    /// [`tokio-console`]: https://github.com/tokio-rs/console
+    /// [unstable feature]: crate#unstable-features
     #[cfg(not(all(loom, test)))]
     pub const fn const_new(t: T) -> Self
     where
@@ -846,6 +854,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
     #[inline]
     pub fn map<U, F>(mut this: Self, f: F) -> MappedMutexGuard<'a, U>
     where
+        U: ?Sized,
         F: FnOnce(&mut T) -> &mut U,
     {
         let data = f(&mut *this) as *mut U;
@@ -894,6 +903,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
     #[inline]
     pub fn try_map<U, F>(mut this: Self, f: F) -> Result<MappedMutexGuard<'a, U>, Self>
     where
+        U: ?Sized,
         F: FnOnce(&mut T) -> Option<&mut U>,
     {
         let data = match f(&mut *this) {
@@ -1026,6 +1036,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
     #[inline]
     pub fn map<U, F>(mut this: Self, f: F) -> OwnedMappedMutexGuard<T, U>
     where
+        U: ?Sized,
         F: FnOnce(&mut T) -> &mut U,
     {
         let data = f(&mut *this) as *mut U;
@@ -1074,6 +1085,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
     #[inline]
     pub fn try_map<U, F>(mut this: Self, f: F) -> Result<OwnedMappedMutexGuard<T, U>, Self>
     where
+        U: ?Sized,
         F: FnOnce(&mut T) -> Option<&mut U>,
     {
         let data = match f(&mut *this) {

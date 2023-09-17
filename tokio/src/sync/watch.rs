@@ -380,7 +380,17 @@ mod state {
     impl Version {
         /// Get the initial version when creating the channel.
         pub(super) fn initial() -> Self {
-            Version(0)
+            // The initial version is 1 so that `mark_unseen` can decrement by one.
+            // (The value is 2 due to the closed bit.)
+            Version(2)
+        }
+
+        /// Decrements the version.
+        pub(super) fn decrement(&mut self) {
+            // Decrement by two to avoid touching the CLOSED bit.
+            if self.0 >= 2 {
+                self.0 -= 2;
+            }
         }
     }
 
@@ -400,7 +410,7 @@ mod state {
         /// Create a new `AtomicState` that is not closed and which has the
         /// version set to `Version::initial()`.
         pub(super) fn new() -> Self {
-            AtomicState(AtomicUsize::new(0))
+            AtomicState(AtomicUsize::new(2))
         }
 
         /// Load the current value of the state.
@@ -632,6 +642,11 @@ impl<T> Receiver<T> {
         let new_version = state.version();
 
         Ok(self.version != new_version)
+    }
+
+    /// Marks the state as unseen.
+    pub fn mark_unseen(&mut self) {
+        self.version.decrement();
     }
 
     /// Waits for a change notification, then marks the newest value as seen.
