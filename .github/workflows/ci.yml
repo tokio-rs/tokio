@@ -71,7 +71,9 @@ jobs:
         run: rustup update stable
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack --version 0.5.26
+        uses: taiki-e/install-action@v2 
+        with: 
+          tool: cargo-hack
 
       # Run `tokio` with `full` features. This excludes testing utilities which
       # can alter the runtime behavior of Tokio.
@@ -220,7 +222,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
           override: true
-      - uses: Swatinem/rust-cache@v1
+      # - uses: Swatinem/rust-cache@v1 -> CI failure observed due to insufficient storage space
       - name: asan
         run: cargo test --workspace --all-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1
         env:
@@ -274,7 +276,9 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack --version 0.5.26
+        uses: taiki-e/install-action@v2 
+        with: 
+          tool: cargo-hack
       - name: check --each-feature
         run: cargo hack check --all --each-feature -Z avoid-dev-deps
       # Try with unstable feature flags
@@ -310,7 +314,9 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install cargo-hack
-        run: cargo install cargo-hack --version 0.5.26
+        uses: taiki-e/install-action@v2 
+        with: 
+          tool: cargo-hack
       - name: "check --all-features -Z minimal-versions"
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
@@ -408,10 +414,10 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install Rust ${{ env.rust_stable }}
+      - name: Install Rust 1.65.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ env.rust_stable }}
+          toolchain: 1.65.0
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Test hyper
@@ -462,8 +468,9 @@ jobs:
 
       # Install dependencies
       - name: Install cargo-hack
-        run: cargo install cargo-hack
-
+        uses: taiki-e/install-action@v2 
+        with: 
+          tool: cargo-hack
       - name: Install wasm32-wasi target
         run: rustup target add wasm32-wasi
 
