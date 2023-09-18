@@ -27,11 +27,11 @@
 //! ## Change notifications
 //!
 //! The [`Receiver`] half provides an asynchronous [`changed`] method. This
-//! method is ready when a new, *unchanged* value is sent via the [`Sender`] half.
+//! method is ready when a new, *unseen* value is sent via the [`Sender`] half.
 //!
 //! * [`Receiver::changed()`] returns `Ok(())` on receiving a new value, or
 //!   `Err(`[`error::RecvError`]`)` if the [`Sender`] has been dropped.
-//! * If the current value is *unchanged* when calling [`changed`], then
+//! * If the current value is *unseen* when calling [`changed`], then
 //!   [`changed`] will return immediately. If the current value is *seen*, then
 //!   it will sleep until either a new message is sent via the [`Sender`] half,
 //!   or the [`Sender`] is dropped.
@@ -380,7 +380,7 @@ mod state {
     impl Version {
         /// Get the initial version when creating the channel.
         pub(super) fn initial() -> Self {
-            // The initial version is 1 so that `mark_unchanged` can decrement by one.
+            // The initial version is 1 so that `mark_changed` can decrement by one.
             // (The value is 2 due to the closed bit.)
             Version(2)
         }
@@ -644,8 +644,8 @@ impl<T> Receiver<T> {
         Ok(self.version != new_version)
     }
 
-    /// Marks the state as unchanged.
-    pub fn mark_unchanged(&mut self) {
+    /// Marks the state as unseen.
+    pub fn mark_changed(&mut self) {
         self.version.decrement();
     }
 
