@@ -167,6 +167,40 @@ impl Interest {
         Self(self.0 | other.0)
     }
 
+    /// Remove `Interest` from `self`.
+    ///
+    /// Interests present in `other` but *not* in `self` are ignored.
+    ///
+    /// Returns `None` if the set would be empty after removing `Interest`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::Interest;
+    ///
+    /// const RW_INTEREST: Interest = Interest::READABLE.add(Interest::WRITABLE);
+    ///
+    /// let w_interest = RW_INTEREST.remove(Interest::READABLE).unwrap();
+    /// assert!(!w_interest.is_readable());
+    /// assert!(w_interest.is_writable());
+    ///
+    /// // Removing all interests from the set returns `None`.
+    /// assert_eq!(w_interest.remove(Interest::WRITABLE), None);
+    ///
+    /// // Remove all interests at once.
+    /// assert_eq!(RW_INTEREST.remove(RW_INTEREST), None);
+    /// ```
+    #[must_use = "this returns the result of the operation, without modifying the original"]
+    pub fn remove(self, other: Interest) -> Option<Interest> {
+        let value = self.0 & !other.0;
+
+        if value != 0 {
+            Some(Self(value))
+        } else {
+            None
+        }
+    }
+
     // This function must be crate-private to avoid exposing a `mio` dependency.
     pub(crate) fn to_mio(self) -> mio::Interest {
         fn mio_add(wrapped: &mut Option<mio::Interest>, add: mio::Interest) {

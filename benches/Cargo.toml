@@ -9,7 +9,7 @@ test-util = ["tokio/test-util"]
 
 [dependencies]
 tokio = { version = "1.5.0", path = "../tokio", features = ["full"] }
-bencher = "0.1.5"
+criterion = "0.5.1"
 rand = "0.8"
 rand_chacha = "0.3"
 

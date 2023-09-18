@@ -45,6 +45,64 @@ fn single_rx_recv() {
 }
 
 #[test]
+fn rx_version_underflow() {
+    let (_tx, mut rx) = watch::channel("one");
+
+    // Version starts at 2, validate we do not underflow
+    rx.mark_unseen();
+    rx.mark_unseen();
+}
+
+#[test]
+fn rx_mark_unseen() {
+    let (tx, mut rx) = watch::channel("one");
+
+    let mut rx2 = rx.clone();
+    let mut rx3 = rx.clone();
+    let mut rx4 = rx.clone();
+    {
+        rx.mark_unseen();
+        assert!(rx.has_changed().unwrap());
+
+        let mut t = spawn(rx.changed());
+        assert_ready_ok!(t.poll());
+    }
+
+    {
+        assert!(!rx2.has_changed().unwrap());
+
+        let mut t = spawn(rx2.changed());
+        assert_pending!(t.poll());
+    }
+
+    {
+        rx3.mark_unseen();
+        assert_eq!(*rx3.borrow(), "one");
+
+        assert!(rx3.has_changed().unwrap());
+
+        assert_eq!(*rx3.borrow_and_update(), "one");
+
+        assert!(!rx3.has_changed().unwrap());
+
+        let mut t = spawn(rx3.changed());
+        assert_pending!(t.poll());
+    }
+
+    {
+        tx.send("two").unwrap();
+        assert!(rx4.has_changed().unwrap());
+        assert_eq!(*rx4.borrow_and_update(), "two");
+
+        rx4.mark_unseen();
+        assert!(rx4.has_changed().unwrap());
+        assert_eq!(*rx4.borrow_and_update(), "two")
+    }
+
+    assert_eq!(*rx.borrow(), "two");
+}
+
+#[test]
 fn multi_rx() {
     let (tx, mut rx1) = watch::channel("one");
     let mut rx2 = rx1.clone();

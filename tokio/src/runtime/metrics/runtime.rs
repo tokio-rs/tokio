@@ -474,7 +474,7 @@ impl RuntimeMetrics {
     ///
     /// This metric only applies to the **multi-threaded** scheduler.
     ///
-    /// The worker steal count starts at zero when the runtime is created and
+    /// The worker overflow count starts at zero when the runtime is created and
     /// increases by one each time the worker attempts to schedule a task
     /// locally, but its local queue is full. When this happens, half of the
     /// local queue is moved to the injection queue.
