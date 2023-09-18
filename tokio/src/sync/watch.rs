@@ -644,7 +644,7 @@ impl<T> Receiver<T> {
         Ok(self.version != new_version)
     }
 
-    /// Marks the state as unseen.
+    /// Marks the state as changed.
     pub fn mark_changed(&mut self) {
         self.version.decrement();
     }
