@@ -429,10 +429,11 @@ mod state {
         }
 
         /// Increment the version counter.
-        pub(super) fn increment_version(&self) {
-            // Use `Release` ordering to ensure that storing the version
-            // state is seen by the receiver side that uses `Acquire` for
-            // loading the state.
+        pub(super) fn increment_version_after_updating_shared_value_while_locked(&self) {
+            // Use `Release` ordering to ensure that the shared value
+            // has been written before updating the version. The shared
+            // value is still protected by an exclusive lock during this
+            // method.
             self.0.fetch_add(STEP_SIZE, Ordering::Release);
         }
 
@@ -1064,7 +1065,7 @@ impl<T> Sender<T> {
                 }
             };
 
-            self.shared.state.increment_version();
+            self.shared.state.increment_version_after_updating_shared_value_while_locked();
 
             // Release the write lock.
             //
