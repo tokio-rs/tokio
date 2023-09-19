@@ -1063,7 +1063,9 @@ impl<T> Sender<T> {
                 }
             };
 
-            self.shared.state.increment_version_after_updating_shared_value_while_locked();
+            self.shared
+                .state
+                .increment_version_after_updating_shared_value_while_locked();
 
             // Release the write lock.
             //
