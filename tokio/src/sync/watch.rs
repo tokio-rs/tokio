@@ -645,6 +645,13 @@ impl<T> Receiver<T> {
     }
 
     /// Marks the state as changed.
+    ///
+    /// After invoking this method [`has_changed()`](Self::has_changed)
+    /// returns `true` and [`changed()`](Self::changed) returns
+    /// immediately, regardless of whether a new value has been sent.
+    ///
+    /// This is useful for triggering an initial change notification after
+    /// subscribing to synchronize new receivers.
     pub fn mark_changed(&mut self) {
         self.version.decrement();
     }
