@@ -289,28 +289,16 @@ struct LocalData {
 }
 
 impl LocalData {
-    fn enter(&self, ctx: Rc<Context>) -> LocalDataEnterGuard<'_> {
+    /// When we call `LocalSet::enter`, `entered` should be `true`.
+    /// otherwise it should be `false`.
+    #[must_use = "dropping this guard will reset the entered state"]
+    fn enter(&self, ctx: Rc<Context>, entered: bool) -> LocalEnterGuard {
         let ctx = self.ctx.replace(Some(ctx));
-        let entered = self.entered.replace(true);
-
-        LocalDataEnterGuard {
-            local_data_ref: self,
+        let entered = self.entered.replace(entered);
+        LocalEnterGuard {
             ctx,
             entered,
         }
-    }
-}
-
-struct LocalDataEnterGuard<'a> {
-    local_data_ref: &'a LocalData,
-    ctx: Option<Rc<Context>>,
-    entered: bool,
-}
-
-impl<'a> Drop for LocalDataEnterGuard<'a> {
-    fn drop(&mut self) {
-        self.local_data_ref.ctx.set(self.ctx.take());
-        self.local_data_ref.entered.set(self.entered)
     }
 }
 
@@ -391,7 +379,7 @@ const REMOTE_FIRST_INTERVAL: u8 = 31;
 pub struct LocalEnterGuard {
     ctx: Option<Rc<Context>>,
 
-    /// Distinguish whether the context was entered or polled.
+    /// Distinguishes whether the context was entered or polled.
     entered: bool,
 }
 
@@ -442,11 +430,7 @@ impl LocalSet {
     ///
     /// [`spawn_local`]: fn@crate::task::spawn_local
     pub fn enter(&self) -> LocalEnterGuard {
-        CURRENT.with(|LocalData { ctx, entered }| {
-            let ctx = ctx.replace(Some(self.context.clone()));
-            let entered = entered.replace(true);
-            LocalEnterGuard { ctx, entered }
-        })
+        CURRENT.with(|local_data| local_data.enter(self.context.clone(), true))
     }
 
     /// Spawns a `!Send` task onto the local task set.
@@ -703,7 +687,7 @@ impl LocalSet {
 
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
         CURRENT.with(|local_data| {
-            let _guard = local_data.enter(self.context.clone());
+            let _guard = local_data.enter(self.context.clone(), false);
             f()
         })
     }
@@ -714,7 +698,7 @@ impl LocalSet {
         let mut f = Some(f);
 
         let res = CURRENT.try_with(|local_data| {
-            local_data.enter(self.context.clone());
+            let _guard = local_data.enter(self.context.clone(), false);
             (f.take().unwrap())()
         });
 
