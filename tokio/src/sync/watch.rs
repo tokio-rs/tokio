@@ -380,7 +380,7 @@ mod state {
     impl Version {
         /// Get the initial version when creating the channel.
         pub(super) fn initial() -> Self {
-            // The initial version is 1 so that `mark_unseen` can decrement by one.
+            // The initial version is 1 so that `mark_changed` can decrement by one.
             // (The value is 2 due to the closed bit.)
             Version(2)
         }
@@ -644,8 +644,15 @@ impl<T> Receiver<T> {
         Ok(self.version != new_version)
     }
 
-    /// Marks the state as unseen.
-    pub fn mark_unseen(&mut self) {
+    /// Marks the state as changed.
+    ///
+    /// After invoking this method [`has_changed()`](Self::has_changed)
+    /// returns `true` and [`changed()`](Self::changed) returns
+    /// immediately, regardless of whether a new value has been sent.
+    ///
+    /// This is useful for triggering an initial change notification after
+    /// subscribing to synchronize new receivers.
+    pub fn mark_changed(&mut self) {
         self.version.decrement();
     }
 
