@@ -439,10 +439,8 @@ mod state {
 
         /// Set the closed bit in the state.
         pub(super) fn set_closed(&self) {
-            // Use `Release` ordering to ensure that storing the version
-            // state is seen by the receiver side that uses `Acquire` for
-            // loading the state.
-            self.0.fetch_or(CLOSED_BIT, Ordering::Release);
+            // Relaxed ordering is sufficient here.
+            self.0.fetch_or(CLOSED_BIT, Ordering::Relaxed);
         }
     }
 }
