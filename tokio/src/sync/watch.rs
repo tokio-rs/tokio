@@ -114,7 +114,7 @@
 use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering;
+use crate::loom::sync::atomic::Ordering::*;
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 use std::mem;
@@ -248,7 +248,7 @@ struct Shared<T> {
 impl<T: fmt::Debug> fmt::Debug for Shared<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Using `Relaxed` ordering is sufficient for this purpose.
-        let state = self.state.load(Ordering::Relaxed);
+        let state = self.state.load(Relaxed);
         f.debug_struct("Shared")
             .field("value", &self.value)
             .field("version", &state.version())
@@ -342,7 +342,7 @@ mod big_notify {
         /// This function implements the case where randomness is not available.
         #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
         pub(super) fn notified(&self) -> Notified<'_> {
-            let i = self.next.fetch_add(1, Ordering::Relaxed) % 8;
+            let i = self.next.fetch_add(1, Relaxed) % 8;
             self.inner[i].notified()
         }
 
@@ -509,7 +509,7 @@ impl<T> Receiver<T> {
     fn from_shared(version: Version, shared: Arc<Shared<T>>) -> Self {
         // No synchronization necessary as this is only used as a counter and
         // not memory access.
-        shared.ref_count_rx.fetch_add(1, Ordering::Relaxed);
+        shared.ref_count_rx.fetch_add(1, Relaxed);
 
         Self { shared, version }
     }
@@ -885,7 +885,7 @@ impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         // No synchronization necessary as this is only used as a counter and
         // not memory access.
-        if 1 == self.shared.ref_count_rx.fetch_sub(1, Ordering::Relaxed) {
+        if 1 == self.shared.ref_count_rx.fetch_sub(1, Relaxed) {
             // This is the last `Receiver` handle, tasks waiting on `Sender::closed()`
             self.shared.notify_tx.notify_waiters();
         }
@@ -1274,7 +1274,7 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub fn receiver_count(&self) -> usize {
-        self.shared.ref_count_rx.load(Ordering::Relaxed)
+        self.shared.ref_count_rx.load(Relaxed)
     }
 }
 
