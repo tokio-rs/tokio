@@ -280,10 +280,12 @@ pin_project! {
 
 tokio_thread_local!(static CURRENT: LocalData = const { LocalData {
     ctx: RcCell::new(),
+    entered: Cell::new(false),
 } });
 
 struct LocalData {
     ctx: RcCell<Context>,
+    entered: Cell<bool>,
 }
 
 cfg_rt! {
@@ -360,12 +362,16 @@ const MAX_TASKS_PER_TICK: usize = 61;
 const REMOTE_FIRST_INTERVAL: u8 = 31;
 
 /// Context guard for LocalSet
-pub struct LocalEnterGuard(Option<Rc<Context>>);
+pub struct LocalEnterGuard {
+    ctx: Option<Rc<Context>>,
+    entered: bool,
+}
 
 impl Drop for LocalEnterGuard {
     fn drop(&mut self) {
-        CURRENT.with(|LocalData { ctx, .. }| {
-            ctx.set(self.0.take());
+        CURRENT.with(|LocalData { ctx, entered }| {
+            ctx.set(self.ctx.take());
+            entered.set(self.entered);
         })
     }
 }
@@ -408,9 +414,10 @@ impl LocalSet {
     ///
     /// [`spawn_local`]: fn@crate::task::spawn_local
     pub fn enter(&self) -> LocalEnterGuard {
-        CURRENT.with(|LocalData { ctx, .. }| {
-            let old = ctx.replace(Some(self.context.clone()));
-            LocalEnterGuard(old)
+        CURRENT.with(|LocalData { ctx, entered }| {
+            let ctx = ctx.replace(Some(self.context.clone()));
+            let entered = entered.replace(true);
+            LocalEnterGuard { ctx, entered }
         })
     }
 
@@ -667,21 +674,27 @@ impl LocalSet {
     }
 
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
-        CURRENT.with(|LocalData { ctx, .. }| {
+        CURRENT.with(|LocalData { ctx, entered, .. }| {
             struct Reset<'a> {
                 ctx_ref: &'a RcCell<Context>,
-                val: Option<Rc<Context>>,
+                entered_ref: &'a Cell<bool>,
+                ctx_val: Option<Rc<Context>>,
+                entered_val: bool,
             }
             impl<'a> Drop for Reset<'a> {
                 fn drop(&mut self) {
-                    self.ctx_ref.set(self.val.take());
+                    self.ctx_ref.set(self.ctx_val.take());
+                    self.entered_ref.set(self.entered_val)
                 }
             }
-            let old = ctx.replace(Some(self.context.clone()));
+            let ctx_old = ctx.replace(Some(self.context.clone()));
+            let entered_old = entered.replace(false);
 
             let _reset = Reset {
                 ctx_ref: ctx,
-                val: old,
+                entered_ref: entered,
+                ctx_val: ctx_old,
+                entered_val: entered_old,
             };
 
             f()
@@ -693,21 +706,27 @@ impl LocalSet {
     fn with_if_possible<T>(&self, f: impl FnOnce() -> T) -> T {
         let mut f = Some(f);
 
-        let res = CURRENT.try_with(|LocalData { ctx, .. }| {
+        let res = CURRENT.try_with(|LocalData { ctx, entered, .. }| {
             struct Reset<'a> {
                 ctx_ref: &'a RcCell<Context>,
-                val: Option<Rc<Context>>,
+                entered_ref: &'a Cell<bool>,
+                ctx_val: Option<Rc<Context>>,
+                entered_val: bool,
             }
             impl<'a> Drop for Reset<'a> {
                 fn drop(&mut self) {
-                    self.ctx_ref.replace(self.val.take());
+                    self.ctx_ref.set(self.ctx_val.take());
+                    self.entered_ref.set(self.entered_val)
                 }
             }
-            let old = ctx.replace(Some(self.context.clone()));
+            let ctx_old = ctx.replace(Some(self.context.clone()));
+            let entered_old = entered.replace(false);
 
             let _reset = Reset {
                 ctx_ref: ctx,
-                val: old,
+                entered_ref: entered,
+                ctx_val: ctx_old,
+                entered_val: entered_old,
             };
 
             (f.take().unwrap())()
@@ -967,7 +986,7 @@ impl Shared {
     fn schedule(&self, task: task::Notified<Arc<Self>>) {
         CURRENT.with(|localdata| {
             match localdata.ctx.get() {
-                Some(cx) if cx.shared.ptr_eq(self) => unsafe {
+                Some(cx) if cx.shared.ptr_eq(self) && !localdata.entered.get() => unsafe {
                     // Safety: if the current `LocalSet` context points to this
                     // `LocalSet`, then we are on the thread that owns it.
                     cx.shared.local_state.task_push_back(task);
