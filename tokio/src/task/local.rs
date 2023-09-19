@@ -295,10 +295,7 @@ impl LocalData {
     fn enter(&self, ctx: Rc<Context>, entered: bool) -> LocalEnterGuard {
         let ctx = self.ctx.replace(Some(ctx));
         let entered = self.entered.replace(entered);
-        LocalEnterGuard {
-            ctx,
-            entered,
-        }
+        LocalEnterGuard { ctx, entered }
     }
 }
 
