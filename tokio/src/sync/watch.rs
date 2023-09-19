@@ -247,8 +247,7 @@ struct Shared<T> {
 
 impl<T: fmt::Debug> fmt::Debug for Shared<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Using `Relaxed` ordering is sufficient for this purpose.
-        let state = self.state.load(Relaxed);
+        let state = self.state.load();
         f.debug_struct("Shared")
             .field("value", &self.value)
             .field("version", &state.version())
@@ -418,15 +417,14 @@ mod state {
         }
 
         /// Load the current value of the state.
-        pub(super) fn load(&self, ordering: Ordering) -> StateSnapshot {
-            StateSnapshot(self.0.load(ordering))
-        }
-
-        /// Load the current value of the state.
+        ///
+        /// Only used by the receiver and for debugging purposes.
         ///
         /// The receiver side (read-only) uses `Acquire` ordering for a proper handover
-        /// with the sender side (single writer).
-        pub(super) fn load_receiver(&self) -> StateSnapshot {
+        /// of the shared value with the sender side (single writer). The state is always
+        /// updated after modifying and before releasing the (exclusive) lock on the
+        /// shared value.
+        pub(super) fn load(&self) -> StateSnapshot {
             StateSnapshot(self.0.load(Ordering::Acquire))
         }
 
@@ -563,7 +561,7 @@ impl<T> Receiver<T> {
 
         // After obtaining a read-lock no concurrent writes could occur
         // and the loaded version matches that of the borrowed reference.
-        let new_version = self.shared.state.load_receiver().version();
+        let new_version = self.shared.state.load().version();
         let has_changed = self.version != new_version;
 
         Ref { inner, has_changed }
@@ -610,7 +608,7 @@ impl<T> Receiver<T> {
 
         // After obtaining a read-lock no concurrent writes could occur
         // and the loaded version matches that of the borrowed reference.
-        let new_version = self.shared.state.load_receiver().version();
+        let new_version = self.shared.state.load().version();
         let has_changed = self.version != new_version;
 
         // Mark the shared value as seen by updating the version
@@ -651,7 +649,7 @@ impl<T> Receiver<T> {
     /// ```
     pub fn has_changed(&self) -> Result<bool, error::RecvError> {
         // Load the version from the state
-        let state = self.shared.state.load_receiver();
+        let state = self.shared.state.load();
         if state.is_closed() {
             // The sender has dropped.
             return Err(error::RecvError(()));
@@ -788,7 +786,7 @@ impl<T> Receiver<T> {
             {
                 let inner = self.shared.value.read().unwrap();
 
-                let new_version = self.shared.state.load_receiver().version();
+                let new_version = self.shared.state.load().version();
                 let has_changed = self.version != new_version;
                 self.version = new_version;
 
@@ -834,7 +832,7 @@ fn maybe_changed<T>(
     version: &mut Version,
 ) -> Option<Result<(), error::RecvError>> {
     // Load the version from the state
-    let state = shared.state.load_receiver();
+    let state = shared.state.load();
     let new_version = state.version();
 
     if *version != new_version {
@@ -1248,7 +1246,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
-        let version = shared.state.load_receiver().version();
+        let version = shared.state.load().version();
 
         // The CLOSED bit in the state tracks only whether the sender is
         // dropped, so we do not need to unset it if this reopens the channel.
