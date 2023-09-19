@@ -573,6 +573,8 @@ async fn spawn_wakes_localset() {
     }
 }
 
+/// Checks that the task wakes up with `enter`.
+/// <https://github.com/tokio-rs/tokio/issues/5020>.
 #[tokio::test]
 async fn sleep_with_local_enter_guard() {
     let local = LocalSet::new();

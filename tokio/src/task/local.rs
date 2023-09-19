@@ -288,6 +288,32 @@ struct LocalData {
     entered: Cell<bool>,
 }
 
+impl LocalData {
+    fn enter(&self, ctx: Rc<Context>) -> LocalDataEnterGuard<'_> {
+        let ctx = self.ctx.replace(Some(ctx));
+        let entered = self.entered.replace(true);
+
+        LocalDataEnterGuard {
+            local_data_ref: self,
+            ctx,
+            entered,
+        }
+    }
+}
+
+struct LocalDataEnterGuard<'a> {
+    local_data_ref: &'a LocalData,
+    ctx: Option<Rc<Context>>,
+    entered: bool,
+}
+
+impl<'a> Drop for LocalDataEnterGuard<'a> {
+    fn drop(&mut self) {
+        self.local_data_ref.ctx.set(self.ctx.take());
+        self.local_data_ref.entered.set(self.entered)
+    }
+}
+
 cfg_rt! {
     /// Spawns a `!Send` future on the current [`LocalSet`].
     ///
@@ -364,6 +390,8 @@ const REMOTE_FIRST_INTERVAL: u8 = 31;
 /// Context guard for LocalSet
 pub struct LocalEnterGuard {
     ctx: Option<Rc<Context>>,
+
+    /// Distinguish whether the context was entered or polled.
     entered: bool,
 }
 
@@ -674,29 +702,8 @@ impl LocalSet {
     }
 
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
-        CURRENT.with(|LocalData { ctx, entered, .. }| {
-            struct Reset<'a> {
-                ctx_ref: &'a RcCell<Context>,
-                entered_ref: &'a Cell<bool>,
-                ctx_val: Option<Rc<Context>>,
-                entered_val: bool,
-            }
-            impl<'a> Drop for Reset<'a> {
-                fn drop(&mut self) {
-                    self.ctx_ref.set(self.ctx_val.take());
-                    self.entered_ref.set(self.entered_val)
-                }
-            }
-            let ctx_old = ctx.replace(Some(self.context.clone()));
-            let entered_old = entered.replace(false);
-
-            let _reset = Reset {
-                ctx_ref: ctx,
-                entered_ref: entered,
-                ctx_val: ctx_old,
-                entered_val: entered_old,
-            };
-
+        CURRENT.with(|local_data| {
+            let _guard = local_data.enter(self.context.clone());
             f()
         })
     }
@@ -706,29 +713,8 @@ impl LocalSet {
     fn with_if_possible<T>(&self, f: impl FnOnce() -> T) -> T {
         let mut f = Some(f);
 
-        let res = CURRENT.try_with(|LocalData { ctx, entered, .. }| {
-            struct Reset<'a> {
-                ctx_ref: &'a RcCell<Context>,
-                entered_ref: &'a Cell<bool>,
-                ctx_val: Option<Rc<Context>>,
-                entered_val: bool,
-            }
-            impl<'a> Drop for Reset<'a> {
-                fn drop(&mut self) {
-                    self.ctx_ref.set(self.ctx_val.take());
-                    self.entered_ref.set(self.entered_val)
-                }
-            }
-            let ctx_old = ctx.replace(Some(self.context.clone()));
-            let entered_old = entered.replace(false);
-
-            let _reset = Reset {
-                ctx_ref: ctx,
-                entered_ref: entered,
-                ctx_val: ctx_old,
-                entered_val: entered_old,
-            };
-
+        let res = CURRENT.try_with(|local_data| {
+            local_data.enter(self.context.clone());
             (f.take().unwrap())()
         });
 
