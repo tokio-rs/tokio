@@ -876,6 +876,27 @@ impl<T> Drop for Receiver<T> {
 }
 
 impl<T> Sender<T> {
+    /// Creates the sending-half of the [`watch`] channel.
+    ///
+    /// See documentation of [`watch::channel`] for errors when calling this function.
+    /// Beware that attempting to send a value when there are no receivers will
+    /// return an error.
+    ///
+    /// [`watch`]: crate::sync::watch
+    /// [`watch::channel`]: crate::sync::watch
+    ///
+    /// # Examples
+    /// ```
+    /// let sender = tokio::sync::watch::Sender::new(0u8);
+    /// assert!(sender.send(3).is_err());
+    /// let _rec = sender.subscribe();
+    /// assert!(sender.send(4).is_ok());
+    /// ```
+    pub fn new(init: T) -> Self {
+        let (tx, _) = channel(init);
+        tx
+    }
+
     /// Sends a new value via the channel, notifying all receivers.
     ///
     /// This method fails if the channel is closed, which is the case when
