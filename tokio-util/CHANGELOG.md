@@ -2,10 +2,10 @@
 
 ### Added
 
-- io: Add passthrough `AsyncRead`/`AsyncWrite` to `InspectWriter`/`InspectReader` ([#5739])
-- task: Add spawn blocking methods to joinmap ([#5797])
-- io: Enrich `StreamReader` and `SinkWriter` ([#5941])
-- io: SyncIoBridge: Add `into_inner` ([#5971])
+- io: add passthrough `AsyncRead`/`AsyncWrite` to `InspectWriter`/`InspectReader` ([#5739])
+- task: add spawn blocking methods to `JoinMap` ([#5797])
+- io: enrich `StreamReader` and `SinkWriter` ([#5941])
+- io: add `SyncIoBridge::into_inner` ([#5971])
 
 ### Changed
 
@@ -13,9 +13,9 @@
 
 ### Fixed
 
-- sync: Fix #5808: Handle possible dangling reference safely ([#5812])
-- util: Fix broken intra-doc link ([#5849])
-- compat: Fix clippy warnings ([#5891])
+- sync: handle possibly dangling reference safely ([#5812])
+- util: fix broken intra-doc link ([#5849])
+- compat: fix clippy warnings ([#5891])
 
 ### Documented
 
