@@ -439,8 +439,7 @@ mod state {
 
         /// Set the closed bit in the state.
         pub(super) fn set_closed(&self) {
-            // Relaxed ordering is sufficient here.
-            self.0.fetch_or(CLOSED_BIT, Ordering::Relaxed);
+            self.0.fetch_or(CLOSED_BIT, Ordering::Release);
         }
     }
 }
