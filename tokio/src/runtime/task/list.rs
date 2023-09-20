@@ -157,9 +157,9 @@ impl<S: 'static> OwnedTasks<S> {
         // The first iteration of the loop was unrolled so it can set the
         // closed bool.
         self.closed.store(true, Ordering::Release);
-        for i in start..self.lists.len() + start {
+        for i in start..self.grain as usize + start {
             loop {
-                let task = match self.lists[i % (self.lists.len())].lock().pop_back() {
+                let task = match self.lists[i & (self.grain - 1) as usize].lock().pop_back() {
                     Some(task) => {
                         self.count.fetch_sub(1, Ordering::Relaxed);
                         task
