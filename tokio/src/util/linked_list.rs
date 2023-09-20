@@ -296,11 +296,10 @@ cfg_io_driver_impl! {
 
 cfg_taskdump! {
     impl<T: Link> LinkedList<T, T::Target> {
-        pub(crate) fn for_each<F>(&mut self, mut f: F) -> F
+        pub(crate) fn for_each<F>(&mut self, f: &mut F)
         where
             F: FnMut(&T::Handle),
         {
-
             let mut next = self.head;
 
             while let Some(curr) = next {
@@ -310,7 +309,6 @@ cfg_taskdump! {
                     next = T::pointers(curr).as_ref().get_next();
                 }
             }
-         f
         }
     }
 }

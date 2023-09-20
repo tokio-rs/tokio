@@ -207,13 +207,12 @@ impl<S: 'static> OwnedTasks<S> {
 cfg_taskdump! {
     impl<S: 'static> OwnedTasks<S> {
         /// Locks the tasks, and calls `f` on an iterator over them.
-        pub(crate) fn for_each<F>(&self, f: F)
+        pub(crate) fn for_each<F>(&self, mut f: F)
         where
-            F: FnMut(&Task<S>)
+            F: FnMut(&Task<S>),
         {
-            let mut f = f;
-            for inner in &self.lists{
-                f = inner.lock().for_each(f);
+            for list in &self.lists {
+                list.lock().for_each(&mut f);
             }
         }
     }
