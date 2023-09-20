@@ -49,19 +49,19 @@ fn rx_version_underflow() {
     let (_tx, mut rx) = watch::channel("one");
 
     // Version starts at 2, validate we do not underflow
-    rx.mark_unseen();
-    rx.mark_unseen();
+    rx.mark_changed();
+    rx.mark_changed();
 }
 
 #[test]
-fn rx_mark_unseen() {
+fn rx_mark_changed() {
     let (tx, mut rx) = watch::channel("one");
 
     let mut rx2 = rx.clone();
     let mut rx3 = rx.clone();
     let mut rx4 = rx.clone();
     {
-        rx.mark_unseen();
+        rx.mark_changed();
         assert!(rx.has_changed().unwrap());
 
         let mut t = spawn(rx.changed());
@@ -76,7 +76,7 @@ fn rx_mark_unseen() {
     }
 
     {
-        rx3.mark_unseen();
+        rx3.mark_changed();
         assert_eq!(*rx3.borrow(), "one");
 
         assert!(rx3.has_changed().unwrap());
@@ -94,7 +94,7 @@ fn rx_mark_unseen() {
         assert!(rx4.has_changed().unwrap());
         assert_eq!(*rx4.borrow_and_update(), "two");
 
-        rx4.mark_unseen();
+        rx4.mark_changed();
         assert!(rx4.has_changed().unwrap());
         assert_eq!(*rx4.borrow_and_update(), "two")
     }
