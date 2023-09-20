@@ -308,7 +308,7 @@ impl Runtime {
     fn shutdown(&self) {
         let mut core = self.0.core.try_lock().unwrap();
 
-        self.0.owned.close_and_shutdown_all();
+        self.0.owned.close_and_shutdown_all(0);
 
         while let Some(task) = core.queue.pop_back() {
             drop(task);

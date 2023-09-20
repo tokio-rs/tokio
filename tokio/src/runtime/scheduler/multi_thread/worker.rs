@@ -547,7 +547,6 @@ impl Context {
         }
 
         core.pre_shutdown(&self.worker);
-
         // Signal shutdown
         self.worker.handle.shutdown_core(core);
         Err(())
@@ -954,8 +953,16 @@ impl Core {
     /// Signals all tasks to shut down, and waits for them to complete. Must run
     /// before we enter the single-threaded phase of shutdown processing.
     fn pre_shutdown(&mut self, worker: &Worker) {
+        // Start from a random inner list
+        let start = self
+            .rand
+            .fastrand_n(worker.handle.shared.owned.grain as u32);
         // Signal to all tasks to shut down.
-        worker.handle.shared.owned.close_and_shutdown_all();
+        worker
+            .handle
+            .shared
+            .owned
+            .close_and_shutdown_all(start as usize);
 
         self.stats
             .submit(&worker.handle.shared.worker_metrics[worker.index]);
