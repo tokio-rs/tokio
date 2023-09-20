@@ -127,6 +127,7 @@ impl<S: 'static> OwnedTasks<S> {
         let mut lock = self.lists[task_id.0 as usize & (self.grain - 1) as usize].lock();
         // check close flag
         if self.closed.load(Ordering::Acquire) {
+            drop(lock);
             task.shutdown();
             return None;
         }
@@ -159,13 +160,15 @@ impl<S: 'static> OwnedTasks<S> {
         self.closed.store(true, Ordering::Release);
         for i in start..self.grain as usize + start {
             loop {
-                let task = match self.lists[i & (self.grain - 1) as usize].lock().pop_back() {
+                let mut lock = self.lists[i & (self.grain - 1) as usize].lock();
+                let task = match lock.pop_back() {
                     Some(task) => {
                         self.count.fetch_sub(1, Ordering::Relaxed);
                         task
                     }
                     None => break,
                 };
+                drop(lock);
                 task.shutdown();
             }
         }
