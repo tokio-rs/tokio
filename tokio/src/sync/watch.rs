@@ -411,7 +411,7 @@ mod state {
 
     impl AtomicState {
         /// Create a new `AtomicState` that is not closed and which has the
-        /// version set to `Version::initial()`.
+        /// version set to `Version::INITIAL`.
         pub(super) fn new() -> Self {
             AtomicState(AtomicUsize::new(Version::INITIAL.0))
         }
