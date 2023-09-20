@@ -111,20 +111,28 @@ impl<S: 'static> OwnedTasks<S> {
             // to the field.
             task.header().set_owner_id(self.id);
         }
+        self.push_inner(id, task, notified)
+    }
+
+    #[inline]
+    pub(crate) fn push_inner(
+        &self,
+        task_id: super::Id,
+        task: Task<S>,
+        notified: Notified<S>,
+    ) -> Option<Notified<S>>
+    where
+        S: Schedule,
+    {
+        let mut lock = self.lists[task_id.0 as usize & (self.grain - 1)].lock();
         // check close flag
         if self.closed.load(Ordering::Acquire) {
             task.shutdown();
             return None;
         }
-        self.push_inner(id, task);
-        Some(notified)
-    }
-
-    #[inline]
-    fn push_inner(&self, task_id: super::Id, task: Task<S>) {
-        let mut lock = self.lists[task_id.0 as usize & (self.grain - 1)].lock();
         lock.push_front(task);
         self.count.fetch_add(1, Ordering::Relaxed);
+        Some(notified)
     }
 
     /// Asserts that the given task is owned by this OwnedTasks and convert it to
