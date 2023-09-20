@@ -39,15 +39,15 @@ fn get_next_id() -> NonZeroU32 {
 }
 
 pub(crate) struct OwnedTasks<S: 'static> {
-    lists: Vec<Mutex<CountedOwnedTasksInner<S>>>,
+    lists: Vec<Mutex<ListInner<S>>>,
     pub(crate) id: NonZeroU32,
     closed: AtomicBool,
     grain: usize,
     count: AtomicUsize,
 }
-struct CountedOwnedTasksInner<S: 'static> {
-    list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
-}
+
+type ListInner<S> = LinkedList<Task<S>, <Task<S> as Link>::Target>;
+
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
     pub(crate) id: NonZeroU32,
@@ -68,9 +68,7 @@ impl<S: 'static> OwnedTasks<S> {
         );
         let mut lists = Vec::with_capacity(grain);
         for _ in 0..grain {
-            lists.push(Mutex::new(CountedOwnedTasksInner {
-                list: LinkedList::new(),
-            }))
+            lists.push(Mutex::new(LinkedList::new()))
         }
         Self {
             lists,
@@ -126,7 +124,7 @@ impl<S: 'static> OwnedTasks<S> {
     #[inline]
     fn push_inner(&self, task_id: super::Id, task: Task<S>) {
         let mut lock = self.lists[task_id.0 as usize & (self.grain - 1)].lock();
-        lock.list.push_front(task);
+        lock.push_front(task);
         self.count.fetch_add(1, Ordering::Relaxed);
     }
 
@@ -153,25 +151,17 @@ impl<S: 'static> OwnedTasks<S> {
         // closed bool.
         self.closed.store(true, Ordering::Release);
 
-        for i in 0..self.lists.len() {
+        for list in &self.lists {
             loop {
-                let task = match self.pop_back_inner(i) {
-                    Some(task) => task,
+                let task = match list.lock().pop_back() {
+                    Some(task) => {
+                        self.count.fetch_sub(1, Ordering::Relaxed);
+                        task
+                    }
                     None => break,
                 };
                 task.shutdown();
             }
-        }
-    }
-
-    fn pop_back_inner(&self, index: usize) -> Option<Task<S>> {
-        debug_assert!(index < self.lists.len());
-        match self.lists[index].lock().list.pop_back() {
-            Some(task) => {
-                self.count.fetch_sub(1, Ordering::Relaxed);
-                Some(task)
-            }
-            None => None,
         }
     }
 
@@ -195,7 +185,6 @@ impl<S: 'static> OwnedTasks<S> {
     unsafe fn remove_inner(&self, task: &Task<S>) -> Option<Task<S>> {
         match self.lists[(task.header().task_id.0) as usize & (self.grain - 1)]
             .lock()
-            .list
             .remove(task.header_ptr())
         {
             Some(task) => {
@@ -224,7 +213,7 @@ cfg_taskdump! {
         {
             let mut f = f;
             for inner in &self.lists{
-                f = inner.lock().list.for_each(f);
+                f = inner.lock().for_each(f);
             }
         }
     }
