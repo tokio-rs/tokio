@@ -1,3 +1,31 @@
+# 0.7.9 (September 20th, 2023)
+
+### Added
+
+- io: add passthrough `AsyncRead`/`AsyncWrite` to `InspectWriter`/`InspectReader` ([#5739])
+- task: add spawn blocking methods to `JoinMap` ([#5797])
+- io: pass through traits for `StreamReader` and `SinkWriter` ([#5941])
+- io: add `SyncIoBridge::into_inner` ([#5971])
+
+### Fixed
+
+- sync: handle possibly dangling reference safely ([#5812])
+- util: fix broken intra-doc link ([#5849])
+- compat: fix clippy warnings ([#5891])
+
+### Documented
+
+- codec: Specify the line ending of `LinesCodec` ([#5982])
+
+[#5739]: https://github.com/tokio-rs/tokio/pull/5739
+[#5797]: https://github.com/tokio-rs/tokio/pull/5797
+[#5941]: https://github.com/tokio-rs/tokio/pull/5941
+[#5971]: https://github.com/tokio-rs/tokio/pull/5971
+[#5812]: https://github.com/tokio-rs/tokio/pull/5812
+[#5849]: https://github.com/tokio-rs/tokio/pull/5849
+[#5891]: https://github.com/tokio-rs/tokio/pull/5891
+[#5982]: https://github.com/tokio-rs/tokio/pull/5982
+
 # 0.7.8 (April 25th, 2023)
 
 This release bumps the MSRV of tokio-util to 1.56.
