@@ -4,7 +4,7 @@
 
 - io: add passthrough `AsyncRead`/`AsyncWrite` to `InspectWriter`/`InspectReader` ([#5739])
 - task: add spawn blocking methods to `JoinMap` ([#5797])
-- io: enrich `StreamReader` and `SinkWriter` ([#5941])
+- io: pass through traits for `StreamReader` and `SinkWriter` ([#5941])
 - io: add `SyncIoBridge::into_inner` ([#5971])
 
 ### Changed
