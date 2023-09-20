@@ -13,10 +13,9 @@ use crate::loom::sync::Mutex;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
 
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
@@ -27,7 +26,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 // bug in Tokio, so we accept that certain bugs would not be caught if the two
 // mixed up runtimes happen to have the same id.
 
-static NEXT_OWNED_TASKS_ID: AtomicU32 = AtomicU32::new(1);
+static NEXT_OWNED_TASKS_ID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
 
 fn get_next_id() -> NonZeroU32 {
     loop {
