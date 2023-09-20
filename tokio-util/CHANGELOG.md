@@ -9,8 +9,6 @@
 
 ### Changed
 
-- sync: replace `sync::reusable_box::Pending` with `std::future::Pending` ([#6000])
-
 ### Fixed
 
 - sync: handle possibly dangling reference safely ([#5812])
@@ -25,7 +23,6 @@
 [#5797]: https://github.com/tokio-rs/tokio/pull/5797
 [#5941]: https://github.com/tokio-rs/tokio/pull/5941
 [#5971]: https://github.com/tokio-rs/tokio/pull/5971
-[#6000]: https://github.com/tokio-rs/tokio/pull/6000
 [#5812]: https://github.com/tokio-rs/tokio/pull/5812
 [#5849]: https://github.com/tokio-rs/tokio/pull/5849
 [#5891]: https://github.com/tokio-rs/tokio/pull/5891
