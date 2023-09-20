@@ -429,7 +429,7 @@ mod state {
         }
 
         /// Increment the version counter.
-        pub(super) fn increment_version_after_updating_shared_value_while_locked(&self) {
+        pub(super) fn increment_version_while_locked(&self) {
             // Use `Release` ordering to ensure that the shared value
             // has been written before updating the version. The shared
             // value is still protected by an exclusive lock during this
@@ -1062,9 +1062,7 @@ impl<T> Sender<T> {
                 }
             };
 
-            self.shared
-                .state
-                .increment_version_after_updating_shared_value_while_locked();
+            self.shared.state.increment_version_while_locked();
 
             // Release the write lock.
             //
