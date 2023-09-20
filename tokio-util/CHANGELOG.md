@@ -7,8 +7,6 @@
 - io: pass through traits for `StreamReader` and `SinkWriter` ([#5941])
 - io: add `SyncIoBridge::into_inner` ([#5971])
 
-### Changed
-
 ### Fixed
 
 - sync: handle possibly dangling reference safely ([#5812])
