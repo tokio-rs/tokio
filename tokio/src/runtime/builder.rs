@@ -57,6 +57,11 @@ pub struct Builder {
     /// Only used when not using the current-thread executor.
     worker_threads: Option<usize>,
 
+    /// Configures the global OwnedTasks's concurrency level
+    ///
+    /// Only used when not using the current-thread executor.
+    pub(super) spawn_concurrency_level: Option<usize>,
+
     /// Cap on thread usage.
     max_blocking_threads: usize,
 
@@ -278,6 +283,9 @@ impl Builder {
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
 
+            // Default to lazy auto-detection (twice the number of worker threads)
+            spawn_concurrency_level: None,
+
             max_blocking_threads: 512,
 
             // Default thread name
@@ -398,6 +406,49 @@ impl Builder {
     pub fn worker_threads(&mut self, val: usize) -> &mut Self {
         assert!(val > 0, "Worker threads cannot be set to 0");
         self.worker_threads = Some(val);
+        self
+    }
+
+    /// Sets the spawn concurrency level the `Runtime` will use.
+    ///
+    /// This can be any number greater than 0 and less than or equal to 65536,
+    /// if the parameter is larger than this value, concurrency level will actually select 65536 internally.
+    ///
+    /// This should be set according to the expected scale of multi-thread concurrency of `tokio::spawn`,
+    /// This requires a trade-off between concurrency scale and CPU's cache.
+    ///
+    /// # Default
+    ///
+    /// The default value is twice the number of worker threads.
+    ///
+    /// When using the `current_thread` runtime this method has no effect.
+    ///
+    /// # Examples
+    ///
+    /// ## Multi threaded runtime with spawn_concurrency_level 8
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// // This will spawn a work-stealing runtime with 4 worker threads.
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .spawn_concurrency_level(8)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// rt.spawn(async move {});
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `val` is not larger than `0`.
+    #[track_caller]
+    pub fn spawn_concurrency_level(&mut self, mut val: usize) -> &mut Self {
+        assert!(val > 0, "spawn concurrency level cannot be set to 0");
+        if val > 1 << 16 {
+            val = 1 << 16;
+        }
+        self.spawn_concurrency_level = Some(val);
         self
     }
 
@@ -1231,6 +1282,7 @@ cfg_rt_multi_thread! {
             use crate::runtime::scheduler::{self, MultiThread};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
+            let spawn_concurrency_level = self.spawn_concurrency_level.unwrap_or(core_threads * 2);
 
             let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
@@ -1249,6 +1301,7 @@ cfg_rt_multi_thread! {
                 driver_handle,
                 blocking_spawner,
                 seed_generator_2,
+                spawn_concurrency_level,
                 Config {
                     before_park: self.before_park.clone(),
                     after_unpark: self.after_unpark.clone(),
@@ -1279,6 +1332,7 @@ cfg_rt_multi_thread! {
                 use crate::runtime::scheduler::MultiThreadAlt;
 
                 let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
+                let spawn_concurrency_level = self.spawn_concurrency_level.unwrap_or(core_threads * 2);
 
                 let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
@@ -1297,6 +1351,7 @@ cfg_rt_multi_thread! {
                     driver_handle,
                     blocking_spawner,
                     seed_generator_2,
+                    spawn_concurrency_level,
                     Config {
                         before_park: self.before_park.clone(),
                         after_unpark: self.after_unpark.clone(),
@@ -1321,6 +1376,7 @@ impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Builder")
             .field("worker_threads", &self.worker_threads)
+            .field("spawn_concurrency_level", &self.spawn_concurrency_level)
             .field("max_blocking_threads", &self.max_blocking_threads)
             .field(
                 "thread_name",

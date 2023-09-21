@@ -59,19 +59,7 @@ struct OwnedTasksInner<S: 'static> {
 }
 
 impl<S: 'static> OwnedTasks<S> {
-    /// The concurrency_level should be set according to the expected scale of multi-thread concurrency.
-    /// A large concurrency_level should not affect performance, but might affect the CPU's cache.
-    /// The concurrency_level is at least one, otherwise it will panic.
-    /// The maximum concurrency_level is 65536,
-    /// if the parameter is larger than this value, OwnedTasks will actually select 65536 internally.
-    pub(crate) fn new(mut concurrency_level: u32) -> Self {
-        if concurrency_level > 1 << 16 {
-            concurrency_level = 1 << 16;
-        }
-        assert!(
-            concurrency_level > 0,
-            "concurrency_level must be at least one"
-        );
+    pub(crate) fn new(concurrency_level: u32) -> Self {
         // Find power-of-two sizes best matching arguments
         let mut segment_size = 1;
         while segment_size < concurrency_level {

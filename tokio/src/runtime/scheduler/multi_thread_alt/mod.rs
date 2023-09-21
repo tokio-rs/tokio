@@ -49,6 +49,7 @@ impl MultiThread {
         driver_handle: driver::Handle,
         blocking_spawner: blocking::Spawner,
         seed_generator: RngSeedGenerator,
+        spawn_concurrency_level: usize,
         config: Config,
     ) -> (MultiThread, runtime::Handle) {
         let handle = worker::create(
@@ -57,6 +58,7 @@ impl MultiThread {
             driver_handle,
             blocking_spawner,
             seed_generator,
+            spawn_concurrency_level,
             config,
         );
 
