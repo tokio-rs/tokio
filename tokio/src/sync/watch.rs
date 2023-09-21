@@ -699,7 +699,7 @@ impl<T> Receiver<T> {
         changed_impl(&self.shared, &mut self.version).await
     }
 
-    /// Waits for a value that satisifes the provided condition.
+    /// Waits for a value that satisfies the provided condition.
     ///
     /// This method will call the provided closure whenever something is sent on
     /// the channel. Once the closure returns `true`, this method will return a
