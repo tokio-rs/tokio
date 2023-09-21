@@ -75,7 +75,7 @@ impl<S: 'static> OwnedTasks<S> {
         // Find power-of-two sizes best matching arguments
         let mut segment_size = 1;
         while segment_size < concurrency_level {
-            segment_size = segment_size << 1;
+            segment_size <<= 1;
         }
         let segment_mask = segment_size - 1;
 
