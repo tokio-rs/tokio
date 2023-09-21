@@ -1461,7 +1461,7 @@ impl Shared {
 
     pub(super) fn shutdown_core(&self, handle: &Handle, mut core: Box<Core>) {
         // Start from a random inner list
-        let start = core.rand.fastrand_n(self.owned.grain as u32);
+        let start = core.rand.fastrand_n(self.owned.segment_size as u32);
         self.owned.close_and_shutdown_all(start as usize);
 
         core.stats.submit(&self.worker_metrics[core.index]);

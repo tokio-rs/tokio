@@ -38,14 +38,15 @@ fn get_next_id() -> NonZeroU32 {
 }
 
 pub(crate) struct OwnedTasks<S: 'static> {
-    lists: Box<[Mutex<ListInner<S>>]>,
+    lists: Box<[Mutex<ListSement<S>>]>,
     pub(crate) id: NonZeroU32,
     closed: AtomicBool,
-    pub(crate) grain: u32,
+    pub(crate) segment_size: u32,
+    segment_mask: u32,
     count: AtomicUsize,
 }
 
-type ListInner<S> = LinkedList<Task<S>, <Task<S> as Link>::Target>;
+type ListSement<S> = LinkedList<Task<S>, <Task<S> as Link>::Target>;
 
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
@@ -58,22 +59,36 @@ struct OwnedTasksInner<S: 'static> {
 }
 
 impl<S: 'static> OwnedTasks<S> {
-    /// grain must be an integer power of 2
-    pub(crate) fn new(grain: u32) -> Self {
-        assert_eq!(
-            grain & (grain - 1),
-            0,
-            "the grain of OwnedTasks must be an integer power of 2"
+    /// The concurrency_level should be set according to the expected scale of multi-thread concurrency.
+    /// A large concurrency_level should not affect performance, but might affect the CPU's cache.
+    /// The concurrency_level is at least one, otherwise it will panic.
+    /// The maximum concurrency_level is 65536,
+    /// if the parameter is larger than this value, OwnedTasks will actually select 65536 internally.
+    pub(crate) fn new(mut concurrency_level: u32) -> Self {
+        if concurrency_level > 1 << 16 {
+            concurrency_level = 1 << 16;
+        }
+        assert!(
+            concurrency_level > 0,
+            "concurrency_level must be at least one"
         );
-        let mut lists = Vec::with_capacity(grain as usize);
-        for _ in 0..grain {
+        // Find power-of-two sizes best matching arguments
+        let mut segment_size = 1;
+        while segment_size < concurrency_level {
+            segment_size = segment_size << 1;
+        }
+        let segment_mask = segment_size - 1;
+
+        let mut lists = Vec::with_capacity(segment_size as usize);
+        for _ in 0..segment_size {
             lists.push(Mutex::new(LinkedList::new()))
         }
         Self {
             lists: lists.into_boxed_slice(),
             closed: AtomicBool::new(false),
             id: get_next_id(),
-            grain,
+            segment_size,
+            segment_mask,
             count: AtomicUsize::new(0),
         }
     }
@@ -114,7 +129,7 @@ impl<S: 'static> OwnedTasks<S> {
     where
         S: Schedule,
     {
-        let mut lock = self.list_inner(task.task_id() as usize);
+        let mut lock = self.segment_inner(task.task_id() as usize);
         // check close flag,
         // it must be checked in the lock, for ensuring all tasks will shutdown after OwnedTasks has beem closed
         if self.closed.load(Ordering::Acquire) {
@@ -148,9 +163,9 @@ impl<S: 'static> OwnedTasks<S> {
         S: Schedule,
     {
         self.closed.store(true, Ordering::Release);
-        for i in start..self.grain as usize + start {
+        for i in start..self.segment_size as usize + start {
             loop {
-                let mut lock = self.list_inner(i);
+                let mut lock = self.segment_inner(i);
                 let task = match lock.pop_back() {
                     Some(task) => {
                         drop(lock);
@@ -182,7 +197,7 @@ impl<S: 'static> OwnedTasks<S> {
 
     #[inline]
     unsafe fn remove_inner(&self, task: &Task<S>) -> Option<Task<S>> {
-        let mut lock = self.list_inner(task.task_id() as usize);
+        let mut lock = self.segment_inner(task.task_id() as usize);
         match lock.remove(task.header_ptr()) {
             Some(task) => {
                 drop(lock);
@@ -194,8 +209,8 @@ impl<S: 'static> OwnedTasks<S> {
     }
 
     #[inline]
-    fn list_inner(&self, id: usize) -> MutexGuard<'_, ListInner<S>> {
-        self.lists[id & (self.grain - 1) as usize].lock()
+    fn segment_inner(&self, id: usize) -> MutexGuard<'_, ListSement<S>> {
+        self.lists[id & (self.segment_mask) as usize].lock()
     }
 
     pub(crate) fn is_closed(&self) -> bool {
