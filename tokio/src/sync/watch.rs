@@ -918,7 +918,7 @@ impl<T> Sender<T> {
             return Err(error::SendError(value));
         }
 
-        self.send_replace(value);
+        self.send_modify(|old| *old = value);
         Ok(())
     }
 
