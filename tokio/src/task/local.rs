@@ -289,13 +289,31 @@ struct LocalData {
 }
 
 impl LocalData {
-    /// When we call `LocalSet::enter`, `entered` should be `true`.
-    /// otherwise it should be `false`.
+    /// Should be called except when we call `LocalSet::enter`.
+    /// Especially when we poll a LocalSet.
     #[must_use = "dropping this guard will reset the entered state"]
-    fn enter(&self, ctx: Rc<Context>, entered: bool) -> LocalEnterGuard {
+    fn enter(&self, ctx: Rc<Context>) -> LocalDataEnterGuard<'_> {
         let ctx = self.ctx.replace(Some(ctx));
-        let entered = self.entered.replace(entered);
-        LocalEnterGuard { ctx, entered }
+        let entered = self.entered.replace(false);
+        LocalDataEnterGuard {
+            local_data_ref: self,
+            ctx,
+            entered,
+        }
+    }
+}
+
+/// A guard for `LocalData::enter()`
+struct LocalDataEnterGuard<'a> {
+    local_data_ref: &'a LocalData,
+    ctx: Option<Rc<Context>>,
+    entered: bool,
+}
+
+impl<'a> Drop for LocalDataEnterGuard<'a> {
+    fn drop(&mut self) {
+        self.local_data_ref.ctx.set(self.ctx.take());
+        self.local_data_ref.entered.set(self.entered)
     }
 }
 
@@ -427,7 +445,11 @@ impl LocalSet {
     ///
     /// [`spawn_local`]: fn@crate::task::spawn_local
     pub fn enter(&self) -> LocalEnterGuard {
-        CURRENT.with(|local_data| local_data.enter(self.context.clone(), true))
+        CURRENT.with(|LocalData { ctx, entered, .. }| {
+            let ctx = ctx.replace(Some(self.context.clone()));
+            let entered = entered.replace(true);
+            LocalEnterGuard { ctx, entered }
+        })
     }
 
     /// Spawns a `!Send` task onto the local task set.
@@ -684,7 +706,7 @@ impl LocalSet {
 
     fn with<T>(&self, f: impl FnOnce() -> T) -> T {
         CURRENT.with(|local_data| {
-            let _guard = local_data.enter(self.context.clone(), false);
+            let _guard = local_data.enter(self.context.clone());
             f()
         })
     }
@@ -695,7 +717,7 @@ impl LocalSet {
         let mut f = Some(f);
 
         let res = CURRENT.try_with(|local_data| {
-            let _guard = local_data.enter(self.context.clone(), false);
+            let _guard = local_data.enter(self.context.clone());
             (f.take().unwrap())()
         });
 
