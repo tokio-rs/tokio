@@ -824,7 +824,7 @@ fn maybe_changed<T>(
     }
 
     if state.is_closed() {
-        // All receivers have dropped.
+        // The sender has been dropped.
         return Some(Err(error::RecvError(())));
     }
 
