@@ -9,7 +9,7 @@
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::Mutex;
+use crate::loom::sync::{Mutex, MutexGuard};
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
 
@@ -92,17 +92,12 @@ impl<S: 'static> OwnedTasks<S> {
         T::Output: Send + 'static,
     {
         let (task, notified, join) = super::new_task(task, scheduler, id);
-        let notified = unsafe { self.bind_inner(task, notified, id) };
+        let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
 
     /// The part of `bind` that's the same for every type of future.
-    unsafe fn bind_inner(
-        &self,
-        task: Task<S>,
-        notified: Notified<S>,
-        id: super::Id,
-    ) -> Option<Notified<S>>
+    unsafe fn bind_inner(&self, task: Task<S>, notified: Notified<S>) -> Option<Notified<S>>
     where
         S: Schedule,
     {
@@ -111,27 +106,24 @@ impl<S: 'static> OwnedTasks<S> {
             // to the field.
             task.header().set_owner_id(self.id);
         }
-        self.push_inner(id, task, notified)
+        self.push_inner(task, notified)
     }
 
     #[inline]
-    pub(crate) fn push_inner(
-        &self,
-        task_id: super::Id,
-        task: Task<S>,
-        notified: Notified<S>,
-    ) -> Option<Notified<S>>
+    pub(crate) fn push_inner(&self, task: Task<S>, notified: Notified<S>) -> Option<Notified<S>>
     where
         S: Schedule,
     {
-        let mut lock = self.lists[task_id.0 as usize & (self.grain - 1) as usize].lock();
-        // check close flag
+        let mut lock = self.list_inner(task.task_id() as usize);
+        // check close flag,
+        // it must be checked in the lock, for ensuring all tasks will shutdown after OwnedTasks has beem closed
         if self.closed.load(Ordering::Acquire) {
             drop(lock);
             task.shutdown();
             return None;
         }
         lock.push_front(task);
+        drop(lock);
         self.count.fetch_add(1, Ordering::Relaxed);
         Some(notified)
     }
@@ -155,20 +147,18 @@ impl<S: 'static> OwnedTasks<S> {
     where
         S: Schedule,
     {
-        // The first iteration of the loop was unrolled so it can set the
-        // closed bool.
         self.closed.store(true, Ordering::Release);
         for i in start..self.grain as usize + start {
             loop {
-                let mut lock = self.lists[i & (self.grain - 1) as usize].lock();
+                let mut lock = self.list_inner(i);
                 let task = match lock.pop_back() {
                     Some(task) => {
+                        drop(lock);
                         self.count.fetch_sub(1, Ordering::Relaxed);
                         task
                     }
                     None => break,
                 };
-                drop(lock);
                 task.shutdown();
             }
         }
@@ -192,16 +182,20 @@ impl<S: 'static> OwnedTasks<S> {
 
     #[inline]
     unsafe fn remove_inner(&self, task: &Task<S>) -> Option<Task<S>> {
-        match self.lists[(task.header().task_id.0) as usize & (self.grain - 1) as usize]
-            .lock()
-            .remove(task.header_ptr())
-        {
+        let mut lock = self.list_inner(task.task_id() as usize);
+        match lock.remove(task.header_ptr()) {
             Some(task) => {
+                drop(lock);
                 self.count.fetch_sub(1, Ordering::Relaxed);
                 Some(task)
             }
             None => None,
         }
+    }
+
+    #[inline]
+    fn list_inner(&self, id: usize) -> MutexGuard<'_, ListInner<S>> {
+        self.lists[id & (self.grain - 1) as usize].lock()
     }
 
     pub(crate) fn is_closed(&self) -> bool {
