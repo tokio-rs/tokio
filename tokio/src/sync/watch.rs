@@ -740,7 +740,6 @@ impl<T> Receiver<T> {
     /// use tokio::sync::watch;
     ///
     /// #[tokio::main]
-    ///
     /// async fn main() {
     ///     let (tx, _rx) = watch::channel("hello");
     ///
@@ -784,6 +783,74 @@ impl<T> Receiver<T> {
             // Wait for the value to change.
             closed = changed_impl(&self.shared, &mut self.version).await.is_err();
         }
+    }
+
+    /// Receive the next, unseen value that is considered as changed.
+    ///
+    /// Each value is returned at most once.
+    ///
+    /// If the channel is closed, then `next_changed` will return a `RecvError`.
+    /// But only if the last value is not considered as changed, i.e. if it
+    /// has already been seen by the `Receiver`.
+    ///
+    /// Like the `borrow()` method, the returned borrow holds a read lock on the
+    /// inner value. This means that long-lived borrows could cause the producer
+    /// half to block. It is recommended to keep the borrow as short-lived as
+    /// possible. See the documentation of [`borrow()`](Self::borrow) for more
+    /// information on this.
+    ///
+    /// This method is needed to effectively implement streams with strict
+    /// _at-most-once_ semantics that yield all changed values until the
+    /// channel is closed. The initial value could be included in the stream
+    /// by calling [`mark_changed()`](Self::mark_changed) beforehand.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let tx = watch::Sender::new("hello");
+    ///
+    ///     // Without any receivers yet we have to use `send_modify`
+    ///     // for sending a new value to circumvent an error.
+    ///     tx.send_modify(|value| *value = "hello again");
+    ///
+    ///     // Create a new receiver. It considers the current value as unchanged.
+    ///     let mut rx = tx.subscribe();
+    ///
+    ///     // Waiting for the next changed value times out before any new value is sent.
+    ///     assert!(tokio::time::timeout(
+    ///         std::time::Duration::from_millis(1),
+    ///         rx.next_changed()).await.is_err());
+    ///
+    ///     // Send a new value.
+    ///     tx.send("goodbye").unwrap();
+    ///     // Drop the sender to close the channel.
+    ///     drop(tx);
+    ///
+    ///     // The new, final value is detected and returned even though the channel
+    ///     // has already been closed by the sender.
+    ///     let last_ref = rx.next_changed().await.unwrap();
+    ///     assert!(last_ref.has_changed());
+    ///     assert_eq!(*last_ref, "goodbye");
+    ///     // Drop the reference to release the read-lock. Otherwise deadlocks could occur!
+    ///     drop(last_ref);
+    ///
+    ///     // All subsequent invocations return immediately with an error,
+    ///     // because the channel is closed and the final value has already
+    ///     // been marked as seen.
+    ///     assert!(rx.next_changed().await.is_err());
+    /// }
+    /// ```
+    pub async fn next_changed(&mut self) -> Result<Ref<'_, T>, error::RecvError> {
+        changed_impl(&self.shared, &mut self.version).await?;
+        let inner = self.shared.value.read().unwrap();
+        Ok(Ref {
+            inner,
+            has_changed: true,
+        })
     }
 
     /// Returns `true` if receivers belong to the same channel.
