@@ -414,12 +414,14 @@ impl Builder {
     /// This can be any number greater than 0 and less than or equal to 65536,
     /// if the parameter is larger than this value, concurrency level will actually select 65536 internally.
     ///
-    /// This should be set according to the expected scale of multi-thread concurrency of `tokio::spawn`,
-    /// This requires a trade-off between concurrency scale and CPU's cache.
+    /// When the value of this is small compared to the number of concurrent threads, increasing it
+    /// will help improve the performanc of concurrently spawn tasks. However, when the value is
+    /// already large enough, further increasing it will not continue to improve performance.
+    /// Instead, it may result in longer time of the Runtime creation.
     ///
     /// # Default
     ///
-    /// The default value is twice the number of worker threads.
+    /// The default value for this is 4 times the number of worker threads.
     ///
     /// When using the `current_thread` runtime this method has no effect.
     ///
@@ -1282,7 +1284,7 @@ cfg_rt_multi_thread! {
             use crate::runtime::scheduler::{self, MultiThread};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
-            let spawn_concurrency_level = self.spawn_concurrency_level.unwrap_or(core_threads * 2);
+            let spawn_concurrency_level = self.spawn_concurrency_level.unwrap_or(core_threads * 4);
 
             let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
@@ -1332,7 +1334,7 @@ cfg_rt_multi_thread! {
                 use crate::runtime::scheduler::MultiThreadAlt;
 
                 let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
-                let spawn_concurrency_level = self.spawn_concurrency_level.unwrap_or(core_threads * 2);
+                let spawn_concurrency_level = self.spawn_concurrency_level.unwrap_or(core_threads * 4);
 
                 let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
