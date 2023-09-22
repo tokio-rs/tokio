@@ -20,6 +20,7 @@ cfg_sync! {
 
 cfg_trace! {
     mod trace;
+    #[allow(unused_imports)]
     pub(crate) use trace::InstrumentedFuture as Future;
 }
 
