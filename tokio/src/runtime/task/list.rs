@@ -146,6 +146,10 @@ impl<S: 'static> OwnedTasks<S> {
 
     /// Shuts down all tasks in the collection. This call also closes the
     /// collection, preventing new items from being added.
+    /// The parameter start should be random among different worker threads
+    /// to reduce lock conflicts during shutdown.
+    /// Initiate shutting down the segment indexed by the start, and reset to 0
+    /// once the segment_size is reached, continuing until start - 1, it works like a ring.
     pub(crate) fn close_and_shutdown_all(&self, start: usize)
     where
         S: Schedule,
