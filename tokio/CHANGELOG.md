@@ -1,3 +1,13 @@
+# 1.20.6 (September 22, 2023)
+
+This is a backport of a change from 1.27.0.
+
+### Changed
+
+- io: use `memchr` from `libc` ([#5960])
+
+[#5960]: https://github.com/tokio-rs/tokio/pull/5960
+
 # 1.20.5 (May 28, 2023)
 
 Forward ports 1.18.6 changes.
