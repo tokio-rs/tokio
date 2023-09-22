@@ -283,7 +283,7 @@ impl Builder {
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
 
-            // Default to lazy auto-detection (twice the number of worker threads)
+            // Default to lazy auto-detection (4 times the number of worker threads)
             spawn_concurrency_level: None,
 
             max_blocking_threads: 512,
