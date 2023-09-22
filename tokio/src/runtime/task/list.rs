@@ -119,7 +119,7 @@ impl<S: 'static> OwnedTasks<S> {
     {
         let mut lock = self.segment_inner(task.task_id() as usize);
         // check close flag,
-        // it must be checked in the lock, for ensuring all tasks will shutdown after OwnedTasks has beem closed
+        // it must be checked in the lock, for ensuring all tasks will shutdown after OwnedTasks has been closed
         if self.closed.load(Ordering::Acquire) {
             drop(lock);
             task.shutdown();
