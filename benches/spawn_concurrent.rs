@@ -113,7 +113,7 @@ async fn spawn_job(iters: usize, procs: usize) {
 }
 
 fn bench_shutdown_parallel_multi_thread(c: &mut Criterion) {
-    let mut group = c.benchmark_group("shutdown_parallel_multi_thread");
+    let mut group = c.benchmark_group("shutdown_runtime_multi_thread");
     shutdown_tasks_parallel::<1>(&mut group);
     shutdown_tasks_parallel::<8>(&mut group);
     shutdown_tasks_parallel::<32>(&mut group);
