@@ -179,14 +179,18 @@ use std::sync::Arc;
 ///         Self { jh, sem }
 ///     }
 ///
-///     async fn acquire(&self) -> Result<(), AcquireError> {
-///         self.sem.acquire().await.map(|p| p.forget())
+///     async fn acquire(&self) {
+///         // This can return an error if the semaphore is closed, but we
+///         // never close it, so just ignore errors.
+///         let _ = self.sem.acquire().await;
 ///     }
+/// }
 ///
-///     async fn close(self) {
-///         self.sem.close();
+/// impl Drop for TokenBucket {
+///     fn drop(&mut self) {
+///         // Kill the background task so it stops taking up resources when we
+///         // don't need it anymore.
 ///         self.jh.abort();
-///         let _ = self.jh.await;
 ///     }
 /// }
 ///
@@ -197,12 +201,10 @@ use std::sync::Arc;
 ///     let bucket = TokenBucket::new(update_interval, capacity);
 ///
 ///     for _ in 0..5 {
-///         bucket.acquire().await.unwrap();
+///         bucket.acquire().await;
 ///
 ///         // do the operation
 ///     }
-///
-///     bucket.close().await;
 /// }
 /// ```
 ///
