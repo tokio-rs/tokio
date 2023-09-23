@@ -2,16 +2,16 @@
 //!
 //! See the documentation of [`TaskTracker`] for more information.
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::task::{Poll, Context};
-use std::pin::Pin;
+use pin_project_lite::pin_project;
 use std::fmt;
 use std::future::Future;
-use tokio::task::{JoinHandle, LocalSet};
+use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::task::{Context, Poll};
 use tokio::runtime::Handle;
-use tokio::sync::{Notify, futures::Notified};
-use pin_project_lite::pin_project;
+use tokio::sync::{futures::Notified, Notify};
+use tokio::task::{JoinHandle, LocalSet};
 
 /// A task tracker used for waiting until tasks exit.
 ///
