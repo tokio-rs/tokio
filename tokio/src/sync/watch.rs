@@ -359,7 +359,10 @@ mod state {
     use crate::loom::sync::atomic::AtomicUsize;
     use crate::loom::sync::atomic::Ordering::SeqCst;
 
-    const CLOSED: usize = 1;
+    const CLOSED_BIT: usize = 1;
+
+    // Using 2 as the step size preserves the `CLOSED_BIT`.
+    const STEP_SIZE: usize = 2;
 
     /// The version part of the state. The lowest bit is always zero.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -378,21 +381,26 @@ mod state {
     pub(super) struct AtomicState(AtomicUsize);
 
     impl Version {
-        /// Get the initial version when creating the channel.
-        pub(super) fn initial() -> Self {
-            Version(0)
+        /// Decrements the version.
+        pub(super) fn decrement(&mut self) {
+            // Using a wrapping decrement here is required to ensure that the
+            // operation is consistent with `std::sync::atomic::AtomicUsize::fetch_add()`
+            // which wraps on overflow.
+            self.0 = self.0.wrapping_sub(STEP_SIZE);
         }
+
+        pub(super) const INITIAL: Self = Version(0);
     }
 
     impl StateSnapshot {
         /// Extract the version from the state.
         pub(super) fn version(self) -> Version {
-            Version(self.0 & !CLOSED)
+            Version(self.0 & !CLOSED_BIT)
         }
 
         /// Is the closed bit set?
         pub(super) fn is_closed(self) -> bool {
-            (self.0 & CLOSED) == CLOSED
+            (self.0 & CLOSED_BIT) == CLOSED_BIT
         }
     }
 
@@ -400,7 +408,7 @@ mod state {
         /// Create a new `AtomicState` that is not closed and which has the
         /// version set to `Version::initial()`.
         pub(super) fn new() -> Self {
-            AtomicState(AtomicUsize::new(0))
+            AtomicState(AtomicUsize::new(Version::INITIAL.0))
         }
 
         /// Load the current value of the state.
@@ -410,13 +418,12 @@ mod state {
 
         /// Increment the version counter.
         pub(super) fn increment_version(&self) {
-            // Increment by two to avoid touching the CLOSED bit.
-            self.0.fetch_add(2, SeqCst);
+            self.0.fetch_add(STEP_SIZE, SeqCst);
         }
 
         /// Set the closed bit in the state.
         pub(super) fn set_closed(&self) {
-            self.0.fetch_or(CLOSED, SeqCst);
+            self.0.fetch_or(CLOSED_BIT, SeqCst);
         }
     }
 }
@@ -472,7 +479,7 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
 
     let rx = Receiver {
         shared,
-        version: Version::initial(),
+        version: Version::INITIAL,
     };
 
     (tx, rx)
@@ -632,6 +639,18 @@ impl<T> Receiver<T> {
         let new_version = state.version();
 
         Ok(self.version != new_version)
+    }
+
+    /// Marks the state as changed.
+    ///
+    /// After invoking this method [`has_changed()`](Self::has_changed)
+    /// returns `true` and [`changed()`](Self::changed) returns
+    /// immediately, regardless of whether a new value has been sent.
+    ///
+    /// This is useful for triggering an initial change notification after
+    /// subscribing to synchronize new receivers.
+    pub fn mark_changed(&mut self) {
+        self.version.decrement();
     }
 
     /// Waits for a change notification, then marks the newest value as seen.
@@ -805,7 +824,7 @@ fn maybe_changed<T>(
     }
 
     if state.is_closed() {
-        // All receivers have dropped.
+        // The sender has been dropped.
         return Some(Err(error::RecvError(())));
     }
 
@@ -854,6 +873,27 @@ impl<T> Drop for Receiver<T> {
 }
 
 impl<T> Sender<T> {
+    /// Creates the sending-half of the [`watch`] channel.
+    ///
+    /// See documentation of [`watch::channel`] for errors when calling this function.
+    /// Beware that attempting to send a value when there are no receivers will
+    /// return an error.
+    ///
+    /// [`watch`]: crate::sync::watch
+    /// [`watch::channel`]: crate::sync::watch
+    ///
+    /// # Examples
+    /// ```
+    /// let sender = tokio::sync::watch::Sender::new(0u8);
+    /// assert!(sender.send(3).is_err());
+    /// let _rec = sender.subscribe();
+    /// assert!(sender.send(4).is_ok());
+    /// ```
+    pub fn new(init: T) -> Self {
+        let (tx, _) = channel(init);
+        tx
+    }
+
     /// Sends a new value via the channel, notifying all receivers.
     ///
     /// This method fails if the channel is closed, which is the case when

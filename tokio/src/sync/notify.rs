@@ -436,6 +436,11 @@ impl Notify {
 
     /// Create a new `Notify`, initialized without a permit.
     ///
+    /// When using the `tracing` [unstable feature], a `Notify` created with
+    /// `const_new` will not be instrumented. As such, it will not be visible
+    /// in [`tokio-console`]. Instead, [`Notify::new`] should be used to create
+    /// an instrumented object if that is needed.
+    ///
     /// # Examples
     ///
     /// ```
@@ -443,6 +448,9 @@ impl Notify {
     ///
     /// static NOTIFY: Notify = Notify::const_new();
     /// ```
+    ///
+    /// [`tokio-console`]: https://github.com/tokio-rs/console
+    /// [unstable feature]: crate#unstable-features
     #[cfg(not(all(loom, test)))]
     pub const fn const_new() -> Notify {
         Notify {

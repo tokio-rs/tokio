@@ -47,32 +47,6 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// Use [`Semaphore::acquire_owned`] to move permits across tasks:
-///
-/// ```
-/// use std::sync::Arc;
-/// use tokio::sync::Semaphore;
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let semaphore = Arc::new(Semaphore::new(3));
-///     let mut join_handles = Vec::new();
-///
-///     for _ in 0..5 {
-///         let permit = semaphore.clone().acquire_owned().await.unwrap();
-///         join_handles.push(tokio::spawn(async move {
-///             // perform task...
-///             // explicitly own `permit` in the task
-///             drop(permit);
-///         }));
-///     }
-///
-///     for handle in join_handles {
-///         handle.await.unwrap();
-///     }
-/// }
-/// ```
-///
 /// Limit the number of simultaneously opened files in your program.
 ///
 /// Most operating systems have limits on the number of open file
@@ -100,6 +74,136 @@ use std::sync::Arc;
 ///     buffer.write_all(message).await?;
 ///     Ok(()) // Permit goes out of scope here, and is available again for acquisition
 /// }
+/// ```
+///
+/// Implement a simple token bucket for rate limiting
+///
+/// Many applications and systems have constraints on the rate at which certain
+/// operations should occur. Exceeding this rate can result in suboptimal
+/// performance or even errors.
+///
+/// This example implements rate limiting using a [token bucket]. A token bucket is a form of rate
+/// limiting that doesn't kick in immediately, to allow for short bursts of incoming requests that
+/// arrive at the same time.
+///
+/// With a token bucket, each incoming request consumes a token, and the tokens are refilled at a
+/// certain rate that defines the rate limit. When a burst of requests arrives, tokens are
+/// immediately given out until the bucket is empty. Once the bucket is empty, requests will have to
+/// wait for new tokens to be added.
+///
+/// Unlike the example that limits how many requests can be handled at the same time, we do not add
+/// tokens back when we finish handling a request. Instead, tokens are added only by a timer task.
+///
+/// Note that this implementation is suboptimal when the duration is small, because it consumes a
+/// lot of cpu constantly looping and sleeping.
+///
+/// [token bucket]: https://en.wikipedia.org/wiki/Token_bucket
+/// ```
+/// use std::sync::Arc;
+/// use tokio::sync::{AcquireError, Semaphore};
+/// use tokio::time::{interval, Duration};
+///
+/// struct TokenBucket {
+///     sem: Arc<Semaphore>,
+///     jh: tokio::task::JoinHandle<()>,
+/// }
+///
+/// impl TokenBucket {
+///     fn new(duration: Duration, capacity: usize) -> Self {
+///         let sem = Arc::new(Semaphore::new(capacity));
+///
+///         // refills the tokens at the end of each interval
+///         let jh = tokio::spawn({
+///             let sem = sem.clone();
+///             let mut interval = interval(duration);
+///             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+///
+///             async move {
+///                 loop {
+///                     interval.tick().await;
+///
+///                     if sem.available_permits() < capacity {
+///                         sem.add_permits(1);
+///                     }
+///                 }
+///             }
+///         });
+///
+///         Self { jh, sem }
+///     }
+///
+///     async fn acquire(&self) -> Result<(), AcquireError> {
+///         self.sem.acquire().await.map(|p| p.forget())
+///     }
+///
+///     async fn close(self) {
+///         self.sem.close();
+///         self.jh.abort();
+///         let _ = self.jh.await;
+///     }
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let capacity = 5; // operation per second
+///     let update_interval = Duration::from_secs_f32(1.0 / capacity as f32);
+///     let bucket = TokenBucket::new(update_interval, capacity);
+///
+///     for _ in 0..5 {
+///         bucket.acquire().await.unwrap();
+///
+///         // do the operation
+///     }
+///
+///     bucket.close().await;
+/// }
+/// ```
+///
+/// Limit the number of incoming requests being handled at the same time.
+///
+/// Similar to limiting the number of simultaneously opened files, network handles
+/// are a limited resource. Allowing an unbounded amount of requests to be processed
+/// could result in a denial-of-service, among many other issues.
+///
+/// This example uses an `Arc<Semaphore>` instead of a global variable.
+/// To limit the number of requests that can be processed at the time,
+/// we acquire a permit for each task before spawning it. Once acquired,
+/// a new task is spawned; and once finished, the permit is dropped inside
+/// of the task to allow others to spawn. Permits must be acquired via
+/// [`Semaphore::acquire_owned`] to be movable across the task boundary.
+/// (Since our semaphore is not a global variable — if it was, then `acquire` would be enough.)
+///
+/// ```no_run
+/// use std::sync::Arc;
+/// use tokio::sync::Semaphore;
+/// use tokio::net::TcpListener;
+///
+/// #[tokio::main]
+/// async fn main() -> std::io::Result<()> {
+///     let semaphore = Arc::new(Semaphore::new(3));
+///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
+///
+///     loop {
+///         // Acquire permit before accepting the next socket.
+///         //
+///         // We use `acquire_owned` so that we can move `permit` into
+///         // other tasks.
+///         let permit = semaphore.clone().acquire_owned().await.unwrap();
+///         let (mut socket, _) = listener.accept().await?;
+///
+///         tokio::spawn(async move {
+///             // Do work using the socket.
+///             handle_connection(&mut socket).await;
+///             // Drop socket while the permit is still live.
+///             drop(socket);
+///             // Drop the permit, so more tasks can be created.
+///             drop(permit);
+///         });
+///     }
+/// }
+/// # async fn handle_connection(_socket: &mut tokio::net::TcpStream) {
+/// #   // Do work
+/// # }
 /// ```
 ///
 /// [`PollSemaphore`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSemaphore.html
@@ -194,6 +298,11 @@ impl Semaphore {
 
     /// Creates a new semaphore with the initial number of permits.
     ///
+    /// When using the `tracing` [unstable feature], a `Semaphore` created with
+    /// `const_new` will not be instrumented. As such, it will not be visible
+    /// in [`tokio-console`]. Instead, [`Semaphore::new`] should be used to
+    /// create an instrumented object if that is needed.
+    ///
     /// # Examples
     ///
     /// ```
@@ -201,6 +310,9 @@ impl Semaphore {
     ///
     /// static SEM: Semaphore = Semaphore::const_new(10);
     /// ```
+    ///
+    /// [`tokio-console`]: https://github.com/tokio-rs/console
+    /// [unstable feature]: crate#unstable-features
     #[cfg(not(all(loom, test)))]
     pub const fn const_new(permits: usize) -> Self {
         Self {

@@ -360,6 +360,16 @@ This release bumps the MSRV of Tokio to 1.56. ([#5559])
 [#5513]: https://github.com/tokio-rs/tokio/pull/5513
 [#5517]: https://github.com/tokio-rs/tokio/pull/5517
 
+# 1.25.2 (September 22, 2023)
+
+Forward ports 1.20.6 changes.
+
+### Changed
+
+- io: use `memchr` from `libc` ([#5960])
+
+[#5960]: https://github.com/tokio-rs/tokio/pull/5960
+
 # 1.25.1 (May 28, 2023)
 
 Forward ports 1.18.6 changes.
@@ -705,6 +715,16 @@ wasm32-wasi target is given unstable support for the `net` feature.
 [#4953]: https://github.com/tokio-rs/tokio/pull/4953
 [#4956]: https://github.com/tokio-rs/tokio/pull/4956
 [#4959]: https://github.com/tokio-rs/tokio/pull/4959
+
+# 1.20.6 (September 22, 2023)
+
+This is a backport of a change from 1.27.0.
+
+### Changed
+
+- io: use `memchr` from `libc` ([#5960])
+
+[#5960]: https://github.com/tokio-rs/tokio/pull/5960
 
 # 1.20.5 (May 28, 2023)
 
