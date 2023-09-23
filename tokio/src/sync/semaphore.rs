@@ -195,9 +195,10 @@ use std::sync::Arc;
 /// }
 ///
 /// #[tokio::main]
+/// # async fn _hidden() {}
+/// # #[tokio::main(flavor = "current_thread", start_paused = true)]
 /// async fn main() {
-/// #   tokio::time::pause();
-///     let capacity = 5; // operation per second
+///     let capacity = 5;
 ///     let update_interval = Duration::from_secs_f32(1.0 / capacity as f32);
 ///     let bucket = TokenBucket::new(update_interval, capacity);
 ///
