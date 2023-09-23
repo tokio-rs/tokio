@@ -138,8 +138,9 @@ use std::sync::Arc;
 ///                 loop {
 ///                     interval.tick().await;
 ///
-///                     let cap = rate - sem.available_permits();
-///                     sem.add_permits(cap.min(1));
+///                     if sem.available_permits() < rate {
+///                         sem.add_permits(1);
+///                     }
 ///                 }
 ///             }
 ///         });
