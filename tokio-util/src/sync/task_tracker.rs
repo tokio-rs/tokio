@@ -143,7 +143,6 @@ use tokio::{
 /// [`join_next`]: tokio::task::JoinSet::join_next
 /// [graceful shutdown]: https://tokio.rs/tokio/topics/shutdown
 #[derive(Clone)]
-#[repr(transparent)]
 pub struct TaskTracker {
     inner: Arc<TaskTrackerInner>,
 }
