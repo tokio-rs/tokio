@@ -40,6 +40,7 @@ use tokio::{
 ///  2. By not closing the `TaskTracker`, you can prevent [`wait`] from returning even if the
 ///     `TaskTracker` is empty.
 ///  3. A `TaskTracker` does not require mutable access to insert tasks.
+///  4. A `TaskTracker` can be cloned to share it with many tasks.
 ///
 /// The first point is the most important one. With a [`JoinSet`], it keeps track of the return
 /// value of every task you insert into it. This means that if you keep inserting tasks and never
