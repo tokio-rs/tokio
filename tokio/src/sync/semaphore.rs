@@ -94,7 +94,7 @@ use std::sync::Arc;
 /// Unlike the example that limits how many requests can be handled at the same time, we do not add
 /// tokens back when we finish handling a request. Instead, tokens are added only by a timer task.
 ///
-/// Note that this implementation is suboptimal / when the duration is small, because it consumes a
+/// Note that this implementation is suboptimal when the duration is small, because it consumes a
 /// lot of cpu constantly looping and sleeping.
 ///
 /// [token bucket]: https://en.wikipedia.org/wiki/Token_bucket
