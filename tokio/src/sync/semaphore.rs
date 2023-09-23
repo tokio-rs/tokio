@@ -147,7 +147,7 @@ use std::sync::Arc;
 /// [token bucket]: https://en.wikipedia.org/wiki/Token_bucket
 /// ```
 /// use std::sync::Arc;
-/// use tokio::sync::{AcquireError, Semaphore};
+/// use tokio::sync::Semaphore;
 /// use tokio::time::{interval, Duration};
 ///
 /// struct TokenBucket {
@@ -196,6 +196,7 @@ use std::sync::Arc;
 ///
 /// #[tokio::main]
 /// async fn main() {
+/// #   tokio::time::pause();
 ///     let capacity = 5; // operation per second
 ///     let update_interval = Duration::from_secs_f32(1.0 / capacity as f32);
 ///     let bucket = TokenBucket::new(update_interval, capacity);
