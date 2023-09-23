@@ -187,7 +187,7 @@ pin_project! {
     pub struct TaskTrackerWaitFuture<'a> {
         #[pin]
         future: Notified<'a>,
-        inner: &'a TaskTrackerInner,
+        inner: Option<&'a TaskTrackerInner>,
     }
 }
 
@@ -292,7 +292,7 @@ impl TaskTracker {
     pub fn wait(&self) -> TaskTrackerWaitFuture<'_> {
         TaskTrackerWaitFuture {
             future: self.inner.on_last_exit.notified(),
-            inner: &self.inner,
+            inner: if self.inner.is_done() { None } else { Some(&self.inner) },
         }
     }
 
@@ -549,11 +549,18 @@ impl<'a> Future for TaskTrackerWaitFuture<'a> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let me = self.project();
 
-        if me.inner.is_done() {
-            return Poll::Ready(());
-        }
+        let inner = match me.inner.as_ref() {
+            None => return Poll::Ready(()),
+            Some(inner) => inner,
+        };
 
-        me.future.poll(cx)
+        let is_done = inner.is_done() || me.future.poll(cx).is_ready();
+        if is_done {
+            *me.inner = None;
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
     }
 }
 
@@ -569,7 +576,7 @@ impl<'a> fmt::Debug for TaskTrackerWaitFuture<'a> {
 
         f.debug_struct("TaskTrackerWaitFuture")
             .field("future", &self.future)
-            .field("task_tracker", &Helper(self.inner))
+            .field("task_tracker", &self.inner.map(Helper))
             .finish()
     }
 }

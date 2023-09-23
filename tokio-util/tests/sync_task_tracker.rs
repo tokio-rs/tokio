@@ -52,6 +52,25 @@ fn token_len() {
 }
 
 #[test]
+fn notify_immediately() {
+    let tracker = TaskTracker::new();
+    tracker.close();
+
+    let mut wait = task::spawn(tracker.wait());
+    assert_ready!(wait.poll());
+}
+
+#[test]
+fn notify_immediately_on_reopen() {
+    let tracker = TaskTracker::new();
+    tracker.close();
+
+    let mut wait = task::spawn(tracker.wait());
+    tracker.reopen();
+    assert_ready!(wait.poll());
+}
+
+#[test]
 fn notify_on_close() {
     let tracker = TaskTracker::new();
 
