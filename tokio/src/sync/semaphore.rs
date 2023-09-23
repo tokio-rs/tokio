@@ -152,10 +152,9 @@ use std::sync::Arc;
 ///     }
 ///
 ///     async fn close(self) {
+///         self.sem.close();
 ///         self.jh.abort();
 ///         let _ = self.jh.await;
-///
-///         self.sem.close();
 ///     }
 /// }
 ///
