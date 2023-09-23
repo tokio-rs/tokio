@@ -9,9 +9,13 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio::runtime::Handle;
 use tokio::sync::{futures::Notified, Notify};
-use tokio::task::{JoinHandle, LocalSet};
+
+#[cfg(feature = "rt")]
+use tokio::{
+    runtime::Handle,
+    task::{JoinHandle, LocalSet},
+};
 
 /// A task tracker used for waiting until tasks exit.
 ///
