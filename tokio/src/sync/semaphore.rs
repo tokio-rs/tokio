@@ -135,9 +135,8 @@ use std::sync::Arc;
 /// }
 ///
 /// impl TokenBucket {
-///     fn new(duration: Duration) -> Self {
-///         let rate = (1.0 / duration.as_secs_f32()) as usize;
-///         let sem = Arc::new(Semaphore::new(rate));
+///     fn new(duration: Duration, capacity: usize) -> Self {
+///         let sem = Arc::new(Semaphore::new(capacity));
 ///
 ///         // refills the tokens at the end of each interval
 ///         let jh = tokio::spawn({
@@ -149,7 +148,7 @@ use std::sync::Arc;
 ///                 loop {
 ///                     interval.tick().await;
 ///
-///                     if sem.available_permits() < rate {
+///                     if sem.available_permits() < capacity {
 ///                         sem.add_permits(1);
 ///                     }
 ///                 }
@@ -172,9 +171,9 @@ use std::sync::Arc;
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let ops = 1.0; // operation per second
-///     let update_interval = 1.0 / ops;
-///     let bucket = TokenBucket::new(Duration::from_secs_f32(update_interval));
+///     let capacity = 5; // operation per second
+///     let update_interval = Duration::from_secs_f32(1.0 / capacity as f32);
+///     let bucket = TokenBucket::new(update_interval, capacity);
 ///
 ///     for _ in 0..5 {
 ///         bucket.acquire().await.unwrap();
