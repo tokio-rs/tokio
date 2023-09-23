@@ -108,11 +108,22 @@ use std::sync::Arc;
 /// operations should occur. Exceeding this rate can result in suboptimal
 /// performance or even errors.
 ///
-/// The provided example uses a `TokenBucket`, implemented using a semaphore, that
-/// limits operations to a specific rate although token buckets allow short bursts that are faster
-/// than the allowed rate. The token bucket will be refilled after each interval. When the rate is exceeded,
-/// the `acquire` method will await until a token is available. Note that this implementation is suboptimal
-/// when the rate is large, because it consumes a lot of cpu constantly looping and sleeping.
+/// This example implements rate limiting using a [token bucket]. A token bucket is a form of rate
+/// limiting that doesn't kick in immediately, to allow for short bursts of incoming requests that
+/// arrive at the same time.
+///
+/// With a token bucket, each incoming request consumes a token, and the tokens are refilled at a
+/// certain rate that defines the rate limit. When a burst of requests arrives, tokens are
+/// immediately given out until the bucket is empty. Once the bucket is empty, requests will have to
+/// wait for new tokens to be added.
+///
+/// Unlike the example that limits how many requests can be handled at the same time, we do not add
+/// tokens back when we finish handling a request. Instead, tokens are added only by a timer task.
+///
+/// Note that this implementation is suboptimal / when the duration is small, because it consumes a
+/// lot of cpu constantly looping and sleeping.
+///
+/// [token bucket]: https://en.wikipedia.org/wiki/Token_bucket
 /// ```
 /// use std::sync::Arc;
 /// use tokio::sync::{AcquireError, Semaphore};
