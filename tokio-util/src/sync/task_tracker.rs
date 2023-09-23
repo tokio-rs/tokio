@@ -400,6 +400,7 @@ impl TaskTracker {
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
+    #[cfg(not(target_family = "wasm"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
     pub fn spawn_blocking<F, T>(&self, task: F) -> JoinHandle<T>
     where
@@ -419,6 +420,7 @@ impl TaskTracker {
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
+    #[cfg(not(target_family = "wasm"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
     pub fn spawn_blocking_on<F, T>(&self, task: F, handle: &Handle) -> JoinHandle<T>
     where
