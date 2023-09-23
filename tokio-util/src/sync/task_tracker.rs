@@ -468,6 +468,13 @@ impl TaskTracker {
     }
 }
 
+impl Default for TaskTracker {
+    #[inline]
+    fn default() -> TaskTracker {
+        TaskTracker::new()
+    }
+}
+
 fn debug_inner(inner: &TaskTrackerInner, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let state = inner.state.load(Ordering::Acquire);
     let is_closed = (state & 1) != 0;
