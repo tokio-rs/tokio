@@ -158,15 +158,14 @@ impl<S: 'static> OwnedTasks<S> {
         for i in start..self.segment_size as usize + start {
             loop {
                 let mut lock = self.segment_inner(i);
-                let task = match lock.pop_back() {
+                match lock.pop_back() {
                     Some(task) => {
                         drop(lock);
                         self.count.fetch_sub(1, Ordering::Relaxed);
-                        task
+                        task.shutdown();
                     }
                     None => break,
                 };
-                task.shutdown();
             }
         }
     }
@@ -190,14 +189,10 @@ impl<S: 'static> OwnedTasks<S> {
     #[inline]
     unsafe fn remove_inner(&self, task: &Task<S>) -> Option<Task<S>> {
         let mut lock = self.segment_inner(task.task_id() as usize);
-        match lock.remove(task.header_ptr()) {
-            Some(task) => {
-                drop(lock);
-                self.count.fetch_sub(1, Ordering::Relaxed);
-                Some(task)
-            }
-            None => None,
-        }
+        let task = lock.remove(task.header_ptr())?;
+        drop(lock);
+        self.count.fetch_sub(1, Ordering::Relaxed);
+        Some(task)
     }
 
     #[inline]
