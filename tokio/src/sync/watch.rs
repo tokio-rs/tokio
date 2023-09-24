@@ -699,7 +699,7 @@ impl<T> Receiver<T> {
         changed_impl(&self.shared, &mut self.version).await
     }
 
-    /// Waits for a value that satisifes the provided condition.
+    /// Waits for a value that satisfies the provided condition.
     ///
     /// This method will call the provided closure whenever something is sent on
     /// the channel. Once the closure returns `true`, this method will return a
@@ -772,8 +772,23 @@ impl<T> Receiver<T> {
                 let has_changed = self.version != new_version;
                 self.version = new_version;
 
-                if (!closed || has_changed) && f(&inner) {
-                    return Ok(Ref { inner, has_changed });
+                if !closed || has_changed {
+                    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| f(&inner)));
+                    match result {
+                        Ok(true) => {
+                            return Ok(Ref { inner, has_changed });
+                        }
+                        Ok(false) => {
+                            // Skip the value.
+                        }
+                        Err(panicked) => {
+                            // Drop the read-lock to avoid poisoning it.
+                            drop(inner);
+                            // Forward the panic to the caller.
+                            panic::resume_unwind(panicked);
+                            // Unreachable
+                        }
+                    };
                 }
             }
 
