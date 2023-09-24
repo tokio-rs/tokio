@@ -147,7 +147,7 @@ use std::sync::Arc;
 /// [token bucket]: https://en.wikipedia.org/wiki/Token_bucket
 /// ```
 /// use std::sync::Arc;
-/// use tokio::sync::{AcquireError, Semaphore};
+/// use tokio::sync::Semaphore;
 /// use tokio::time::{interval, Duration};
 ///
 /// struct TokenBucket {
@@ -179,30 +179,34 @@ use std::sync::Arc;
 ///         Self { jh, sem }
 ///     }
 ///
-///     async fn acquire(&self) -> Result<(), AcquireError> {
-///         self.sem.acquire().await.map(|p| p.forget())
+///     async fn acquire(&self) {
+///         // This can return an error if the semaphore is closed, but we
+///         // never close it, so just ignore errors.
+///         let _ = self.sem.acquire().await;
 ///     }
+/// }
 ///
-///     async fn close(self) {
-///         self.sem.close();
+/// impl Drop for TokenBucket {
+///     fn drop(&mut self) {
+///         // Kill the background task so it stops taking up resources when we
+///         // don't need it anymore.
 ///         self.jh.abort();
-///         let _ = self.jh.await;
 ///     }
 /// }
 ///
 /// #[tokio::main]
+/// # async fn _hidden() {}
+/// # #[tokio::main(flavor = "current_thread", start_paused = true)]
 /// async fn main() {
-///     let capacity = 5; // operation per second
+///     let capacity = 5;
 ///     let update_interval = Duration::from_secs_f32(1.0 / capacity as f32);
 ///     let bucket = TokenBucket::new(update_interval, capacity);
 ///
 ///     for _ in 0..5 {
-///         bucket.acquire().await.unwrap();
+///         bucket.acquire().await;
 ///
 ///         // do the operation
 ///     }
-///
-///     bucket.close().await;
 /// }
 /// ```
 ///
