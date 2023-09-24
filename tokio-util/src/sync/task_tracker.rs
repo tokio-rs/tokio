@@ -30,6 +30,10 @@ use tokio::{
 ///  * The `TaskTracker` must be closed using the [`close`] method.
 ///  * The `TaskTracker` must be empty, that is, all tasks that it is tracking must have exited.
 ///
+/// When a call to [`wait`] returns, it is guaranteed that all tracked tasks have exited and that
+/// the destructor of the future has finished running. However, there might be a short amount of
+/// time where [`JoinHandle::is_finished`] returns false.
+///
 /// # Comparison to `JoinSet`
 ///
 /// The main Tokio crate has a similar collection known as [`JoinSet`]. The `JoinSet` type has a
@@ -136,11 +140,12 @@ use tokio::{
 /// }
 /// ```
 ///
-/// [`wait`]: Self::wait
-/// [`close`]: Self::close
 /// [`CancellationToken`]: crate::sync::CancellationToken
+/// [`JoinHandle::is_finished`]: tokio::task::JoinHandle::is_finished
 /// [`JoinSet`]: tokio::task::JoinSet
+/// [`close`]: Self::close
 /// [`join_next`]: tokio::task::JoinSet::join_next
+/// [`wait`]: Self::wait
 /// [graceful shutdown]: https://tokio.rs/tokio/topics/shutdown
 #[derive(Clone)]
 pub struct TaskTracker {
