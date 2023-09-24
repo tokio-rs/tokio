@@ -297,7 +297,11 @@ impl TaskTracker {
     pub fn wait(&self) -> TaskTrackerWaitFuture<'_> {
         TaskTrackerWaitFuture {
             future: self.inner.on_last_exit.notified(),
-            inner: if self.inner.is_done() { None } else { Some(&self.inner) },
+            inner: if self.inner.is_done() {
+                None
+            } else {
+                Some(&self.inner)
+            },
         }
     }
 
