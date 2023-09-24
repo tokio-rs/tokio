@@ -518,8 +518,6 @@ where
 {
     /// Polls the next value, includes the vec entry index
     fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<Option<(usize, V::Item)>> {
-        use Poll::*;
-
         let start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
         let mut idx = start;
 
@@ -527,8 +525,8 @@ where
             let (_, stream) = &mut self.entries[idx];
 
             match Pin::new(stream).poll_next(cx) {
-                Ready(Some(val)) => return Ready(Some((idx, val))),
-                Ready(None) => {
+                Poll::Ready(Some(val)) => return Poll::Ready(Some((idx, val))),
+                Poll::Ready(None) => {
                     // Remove the entry
                     self.entries.swap_remove(idx);
 
@@ -542,7 +540,7 @@ where
                         idx = idx.wrapping_add(1) % self.entries.len();
                     }
                 }
-                Pending => {
+                Poll::Pending => {
                     idx = idx.wrapping_add(1) % self.entries.len();
                 }
             }
@@ -550,9 +548,9 @@ where
 
         // If the map is empty, then the stream is complete.
         if self.entries.is_empty() {
-            Ready(None)
+            Poll::Ready(None)
         } else {
-            Pending
+            Poll::Pending
         }
     }
 }

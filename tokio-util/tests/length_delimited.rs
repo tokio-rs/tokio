@@ -12,7 +12,6 @@ use futures::{pin_mut, Sink, Stream};
 use std::collections::VecDeque;
 use std::io;
 use std::pin::Pin;
-use std::task::Poll::*;
 use std::task::{Context, Poll};
 
 macro_rules! mock {
@@ -39,10 +38,10 @@ macro_rules! assert_next_eq {
 macro_rules! assert_next_pending {
     ($io:ident) => {{
         task::spawn(()).enter(|cx, _| match $io.as_mut().poll_next(cx) {
-            Ready(Some(Ok(v))) => panic!("value = {:?}", v),
-            Ready(Some(Err(e))) => panic!("error = {:?}", e),
-            Ready(None) => panic!("done"),
-            Pending => {}
+            Poll::Ready(Some(Ok(v))) => panic!("value = {:?}", v),
+            Poll::Ready(Some(Err(e))) => panic!("error = {:?}", e),
+            Poll::Ready(None) => panic!("done"),
+            Poll::Pending => {}
         });
     }};
 }
@@ -50,10 +49,10 @@ macro_rules! assert_next_pending {
 macro_rules! assert_next_err {
     ($io:ident) => {{
         task::spawn(()).enter(|cx, _| match $io.as_mut().poll_next(cx) {
-            Ready(Some(Ok(v))) => panic!("value = {:?}", v),
-            Ready(Some(Err(_))) => {}
-            Ready(None) => panic!("done"),
-            Pending => panic!("pending"),
+            Poll::Ready(Some(Ok(v))) => panic!("value = {:?}", v),
+            Poll::Ready(Some(Err(_))) => {}
+            Poll::Ready(None) => panic!("done"),
+            Poll::Pending => panic!("pending"),
         });
     }};
 }
@@ -186,11 +185,11 @@ fn read_single_frame_multi_packet_wait() {
     let io = FramedRead::new(
         mock! {
             data(b"\x00\x00"),
-            Pending,
+            Poll::Pending,
             data(b"\x00\x09abc"),
-            Pending,
+            Poll::Pending,
             data(b"defghi"),
-            Pending,
+            Poll::Pending,
         },
         LengthDelimitedCodec::new(),
     );
@@ -208,15 +207,15 @@ fn read_multi_frame_multi_packet_wait() {
     let io = FramedRead::new(
         mock! {
             data(b"\x00\x00"),
-            Pending,
+            Poll::Pending,
             data(b"\x00\x09abc"),
-            Pending,
+            Poll::Pending,
             data(b"defghi"),
-            Pending,
+            Poll::Pending,
             data(b"\x00\x00\x00\x0312"),
-            Pending,
+            Poll::Pending,
             data(b"3\x00\x00\x00\x0bhello world"),
-            Pending,
+            Poll::Pending,
         },
         LengthDelimitedCodec::new(),
     );
@@ -250,9 +249,9 @@ fn read_incomplete_head() {
 fn read_incomplete_head_multi() {
     let io = FramedRead::new(
         mock! {
-            Pending,
+            Poll::Pending,
             data(b"\x00"),
-            Pending,
+            Poll::Pending,
         },
         LengthDelimitedCodec::new(),
     );
@@ -268,9 +267,9 @@ fn read_incomplete_payload() {
     let io = FramedRead::new(
         mock! {
             data(b"\x00\x00\x00\x09ab"),
-            Pending,
+            Poll::Pending,
             data(b"cd"),
-            Pending,
+            Poll::Pending,
         },
         LengthDelimitedCodec::new(),
     );
@@ -310,7 +309,7 @@ fn read_update_max_frame_len_at_rest() {
 fn read_update_max_frame_len_in_flight() {
     let io = length_delimited::Builder::new().new_read(mock! {
         data(b"\x00\x00\x00\x09abcd"),
-        Pending,
+        Poll::Pending,
         data(b"efghi"),
         data(b"\x00\x00\x00\x09abcdefghi"),
     });
@@ -533,9 +532,9 @@ fn write_single_multi_frame_multi_packet() {
 fn write_single_frame_would_block() {
     let io = FramedWrite::new(
         mock! {
-            Pending,
+            Poll::Pending,
             data(b"\x00\x00"),
-            Pending,
+            Poll::Pending,
             data(b"\x00\x09"),
             data(b"abcdefghi"),
             flush(),
@@ -640,7 +639,7 @@ fn write_update_max_frame_len_in_flight() {
     let io = length_delimited::Builder::new().new_write(mock! {
         data(b"\x00\x00\x00\x06"),
         data(b"ab"),
-        Pending,
+        Poll::Pending,
         data(b"cdef"),
         flush(),
     });
@@ -701,8 +700,6 @@ enum Op {
     Flush,
 }
 
-use self::Op::*;
-
 impl AsyncRead for Mock {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -710,15 +707,15 @@ impl AsyncRead for Mock {
         dst: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         match self.calls.pop_front() {
-            Some(Ready(Ok(Op::Data(data)))) => {
+            Some(Poll::Ready(Ok(Op::Data(data)))) => {
                 debug_assert!(dst.remaining() >= data.len());
                 dst.put_slice(&data);
-                Ready(Ok(()))
+                Poll::Ready(Ok(()))
             }
-            Some(Ready(Ok(_))) => panic!(),
-            Some(Ready(Err(e))) => Ready(Err(e)),
-            Some(Pending) => Pending,
-            None => Ready(Ok(())),
+            Some(Poll::Ready(Ok(_))) => panic!(),
+            Some(Poll::Ready(Err(e))) => Poll::Ready(Err(e)),
+            Some(Poll::Pending) => Poll::Pending,
+            None => Poll::Ready(Ok(())),
         }
     }
 }
@@ -730,31 +727,31 @@ impl AsyncWrite for Mock {
         src: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
         match self.calls.pop_front() {
-            Some(Ready(Ok(Op::Data(data)))) => {
+            Some(Poll::Ready(Ok(Op::Data(data)))) => {
                 let len = data.len();
                 assert!(src.len() >= len, "expect={:?}; actual={:?}", data, src);
                 assert_eq!(&data[..], &src[..len]);
-                Ready(Ok(len))
+                Poll::Ready(Ok(len))
             }
-            Some(Ready(Ok(_))) => panic!(),
-            Some(Ready(Err(e))) => Ready(Err(e)),
-            Some(Pending) => Pending,
-            None => Ready(Ok(0)),
+            Some(Poll::Ready(Ok(_))) => panic!(),
+            Some(Poll::Ready(Err(e))) => Poll::Ready(Err(e)),
+            Some(Poll::Pending) => Poll::Pending,
+            None => Poll::Ready(Ok(0)),
         }
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         match self.calls.pop_front() {
-            Some(Ready(Ok(Op::Flush))) => Ready(Ok(())),
-            Some(Ready(Ok(_))) => panic!(),
-            Some(Ready(Err(e))) => Ready(Err(e)),
-            Some(Pending) => Pending,
-            None => Ready(Ok(())),
+            Some(Poll::Ready(Ok(Op::Flush))) => Poll::Ready(Ok(())),
+            Some(Poll::Ready(Ok(_))) => panic!(),
+            Some(Poll::Ready(Err(e))) => Poll::Ready(Err(e)),
+            Some(Poll::Pending) => Poll::Pending,
+            None => Poll::Ready(Ok(())),
         }
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        Ready(Ok(()))
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -771,9 +768,9 @@ impl From<Vec<u8>> for Op {
 }
 
 fn data(bytes: &[u8]) -> Poll<io::Result<Op>> {
-    Ready(Ok(bytes.into()))
+    Poll::Ready(Ok(bytes.into()))
 }
 
 fn flush() -> Poll<io::Result<Op>> {
-    Ready(Ok(Flush))
+    Poll::Ready(Ok(Op::Flush))
 }

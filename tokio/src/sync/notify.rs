@@ -888,13 +888,11 @@ impl Notified<'_> {
     }
 
     fn poll_notified(self: Pin<&mut Self>, waker: Option<&Waker>) -> Poll<()> {
-        use State::*;
-
         let (notify, state, notify_waiters_calls, waiter) = self.project();
 
         'outer_loop: loop {
             match *state {
-                Init => {
+                State::Init => {
                     let curr = notify.state.load(SeqCst);
 
                     // Optimistically try acquiring a pending notification
@@ -907,7 +905,7 @@ impl Notified<'_> {
 
                     if res.is_ok() {
                         // Acquired the notification
-                        *state = Done;
+                        *state = State::Done;
                         continue 'outer_loop;
                     }
 
@@ -925,7 +923,7 @@ impl Notified<'_> {
                     // if notify_waiters has been called after the future
                     // was created, then we are done
                     if get_num_notify_waiters_calls(curr) != *notify_waiters_calls {
-                        *state = Done;
+                        *state = State::Done;
                         continue 'outer_loop;
                     }
 
@@ -961,7 +959,7 @@ impl Notified<'_> {
                                 match res {
                                     Ok(_) => {
                                         // Acquired the notification
-                                        *state = Done;
+                                        *state = State::Done;
                                         continue 'outer_loop;
                                     }
                                     Err(actual) => {
@@ -989,14 +987,14 @@ impl Notified<'_> {
                     // Insert the waiter into the linked list
                     waiters.push_front(NonNull::from(waiter));
 
-                    *state = Waiting;
+                    *state = State::Waiting;
 
                     drop(waiters);
                     drop(old_waker);
 
                     return Poll::Pending;
                 }
-                Waiting => {
+                State::Waiting => {
                     #[cfg(tokio_taskdump)]
                     if let Some(waker) = waker {
                         let mut ctx = Context::from_waker(waker);
@@ -1009,7 +1007,7 @@ impl Notified<'_> {
                         drop(unsafe { waiter.waker.with_mut(|waker| (*waker).take()) });
 
                         waiter.notification.clear();
-                        *state = Done;
+                        *state = State::Done;
                         return Poll::Ready(());
                     }
 
@@ -1034,7 +1032,7 @@ impl Notified<'_> {
                         drop(waiters);
                         drop(old_waker);
 
-                        *state = Done;
+                        *state = State::Done;
                         return Poll::Ready(());
                     }
 
@@ -1056,7 +1054,7 @@ impl Notified<'_> {
                         // The list is used in `notify_waiters`, so it must be guarded.
                         unsafe { waiters.remove(NonNull::from(waiter)) };
 
-                        *state = Done;
+                        *state = State::Done;
                     } else {
                         // Safety: we hold the lock, so we can modify the waker.
                         unsafe {
@@ -1090,7 +1088,7 @@ impl Notified<'_> {
                     // Drop the old waker after releasing the lock.
                     drop(old_waker);
                 }
-                Done => {
+                State::Done => {
                     #[cfg(tokio_taskdump)]
                     if let Some(waker) = waker {
                         let mut ctx = Context::from_waker(waker);
@@ -1113,15 +1111,13 @@ impl Future for Notified<'_> {
 
 impl Drop for Notified<'_> {
     fn drop(&mut self) {
-        use State::*;
-
         // Safety: The type only transitions to a "Waiting" state when pinned.
         let (notify, state, _, waiter) = unsafe { Pin::new_unchecked(self).project() };
 
         // This is where we ensure safety. The `Notified` value is being
         // dropped, which means we must ensure that the waiter entry is no
         // longer stored in the linked list.
-        if matches!(*state, Waiting) {
+        if matches!(*state, State::Waiting) {
             let mut waiters = notify.waiters.lock();
             let mut notify_state = notify.state.load(SeqCst);
 

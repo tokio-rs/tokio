@@ -47,7 +47,7 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// Limit the number of simultaneously opened files in your program.
+/// ## Limit the number of simultaneously opened files in your program.
 ///
 /// Most operating systems have limits on the number of open file
 /// handles. Even in systems without explicit limits, resource constraints
@@ -76,7 +76,7 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// Limit the number of incoming requests being handled at the same time.
+/// ## Limit the number of incoming requests being handled at the same time.
 ///
 /// Similar to limiting the number of simultaneously opened files, network handles
 /// are a limited resource. Allowing an unbounded amount of requests to be processed
@@ -121,6 +121,93 @@ use std::sync::Arc;
 /// # async fn handle_connection(_socket: &mut tokio::net::TcpStream) {
 /// #   // Do work
 /// # }
+/// ```
+///
+/// ## Rate limiting using a token bucket
+///
+/// Many applications and systems have constraints on the rate at which certain
+/// operations should occur. Exceeding this rate can result in suboptimal
+/// performance or even errors.
+///
+/// This example implements rate limiting using a [token bucket]. A token bucket is a form of rate
+/// limiting that doesn't kick in immediately, to allow for short bursts of incoming requests that
+/// arrive at the same time.
+///
+/// With a token bucket, each incoming request consumes a token, and the tokens are refilled at a
+/// certain rate that defines the rate limit. When a burst of requests arrives, tokens are
+/// immediately given out until the bucket is empty. Once the bucket is empty, requests will have to
+/// wait for new tokens to be added.
+///
+/// Unlike the example that limits how many requests can be handled at the same time, we do not add
+/// tokens back when we finish handling a request. Instead, tokens are added only by a timer task.
+///
+/// Note that this implementation is suboptimal when the duration is small, because it consumes a
+/// lot of cpu constantly looping and sleeping.
+///
+/// [token bucket]: https://en.wikipedia.org/wiki/Token_bucket
+/// ```
+/// use std::sync::Arc;
+/// use tokio::sync::Semaphore;
+/// use tokio::time::{interval, Duration};
+///
+/// struct TokenBucket {
+///     sem: Arc<Semaphore>,
+///     jh: tokio::task::JoinHandle<()>,
+/// }
+///
+/// impl TokenBucket {
+///     fn new(duration: Duration, capacity: usize) -> Self {
+///         let sem = Arc::new(Semaphore::new(capacity));
+///
+///         // refills the tokens at the end of each interval
+///         let jh = tokio::spawn({
+///             let sem = sem.clone();
+///             let mut interval = interval(duration);
+///             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+///
+///             async move {
+///                 loop {
+///                     interval.tick().await;
+///
+///                     if sem.available_permits() < capacity {
+///                         sem.add_permits(1);
+///                     }
+///                 }
+///             }
+///         });
+///
+///         Self { jh, sem }
+///     }
+///
+///     async fn acquire(&self) {
+///         // This can return an error if the semaphore is closed, but we
+///         // never close it, so just ignore errors.
+///         let _ = self.sem.acquire().await;
+///     }
+/// }
+///
+/// impl Drop for TokenBucket {
+///     fn drop(&mut self) {
+///         // Kill the background task so it stops taking up resources when we
+///         // don't need it anymore.
+///         self.jh.abort();
+///     }
+/// }
+///
+/// #[tokio::main]
+/// # async fn _hidden() {}
+/// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+/// async fn main() {
+///     let capacity = 5;
+///     let update_interval = Duration::from_secs_f32(1.0 / capacity as f32);
+///     let bucket = TokenBucket::new(update_interval, capacity);
+///
+///     for _ in 0..5 {
+///         bucket.acquire().await;
+///
+///         // do the operation
+///     }
+/// }
 /// ```
 ///
 /// [`PollSemaphore`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSemaphore.html
