@@ -66,25 +66,23 @@ where
     T: Stream,
     U: Stream<Item = T::Item>,
 {
-    use Poll::*;
-
     let mut done = true;
 
     match first.poll_next(cx) {
-        Ready(Some(val)) => return Ready(Some(val)),
-        Ready(None) => {}
-        Pending => done = false,
+        Poll::Ready(Some(val)) => return Poll::Ready(Some(val)),
+        Poll::Ready(None) => {}
+        Poll::Pending => done = false,
     }
 
     match second.poll_next(cx) {
-        Ready(Some(val)) => return Ready(Some(val)),
-        Ready(None) => {}
-        Pending => done = false,
+        Poll::Ready(Some(val)) => return Poll::Ready(Some(val)),
+        Poll::Ready(None) => {}
+        Poll::Pending => done = false,
     }
 
     if done {
-        Ready(None)
+        Poll::Ready(None)
     } else {
-        Pending
+        Poll::Pending
     }
 }

@@ -241,7 +241,7 @@ impl<T, S: Semaphore> Rx<T, S> {
 
     /// Receive the next value
     pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        use super::block::Read::*;
+        use super::block::Read;
 
         ready!(crate::trace::trace_leaf(cx));
 
@@ -254,12 +254,12 @@ impl<T, S: Semaphore> Rx<T, S> {
             macro_rules! try_recv {
                 () => {
                     match rx_fields.list.pop(&self.inner.tx) {
-                        Some(Value(value)) => {
+                        Some(Read::Value(value)) => {
                             self.inner.semaphore.add_permit();
                             coop.made_progress();
                             return Ready(Some(value));
                         }
-                        Some(Closed) => {
+                        Some(Read::Closed) => {
                             // TODO: This check may not be required as it most
                             // likely can only return `true` at this point. A
                             // channel is closed when all tx handles are

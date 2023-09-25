@@ -28,7 +28,6 @@ use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::*;
-use std::task::Poll::*;
 use std::task::{Context, Poll, Waker};
 use std::{cmp, fmt};
 
@@ -391,7 +390,7 @@ impl Semaphore {
         let mut waiters = loop {
             // Has the semaphore closed?
             if curr & Self::CLOSED > 0 {
-                return Ready(Err(AcquireError::closed()));
+                return Poll::Ready(Err(AcquireError::closed()));
             }
 
             let mut remaining = 0;
@@ -436,7 +435,7 @@ impl Semaphore {
                                 )
                             });
 
-                            return Ready(Ok(()));
+                            return Poll::Ready(Ok(()));
                         } else if lock.is_none() {
                             break self.waiters.lock();
                         }
@@ -448,7 +447,7 @@ impl Semaphore {
         };
 
         if waiters.closed {
-            return Ready(Err(AcquireError::closed()));
+            return Poll::Ready(Err(AcquireError::closed()));
         }
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -462,7 +461,7 @@ impl Semaphore {
 
         if node.assign_permits(&mut acquired) {
             self.add_permits_locked(acquired, waiters);
-            return Ready(Ok(()));
+            return Poll::Ready(Ok(()));
         }
 
         assert_eq!(acquired, 0);
@@ -494,7 +493,7 @@ impl Semaphore {
         drop(waiters);
         drop(old_waker);
 
-        Pending
+        Poll::Pending
     }
 }
 
@@ -572,15 +571,15 @@ impl Future for Acquire<'_> {
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         let result = match semaphore.poll_acquire(cx, needed, node, *queued) {
-            Pending => {
+            Poll::Pending => {
                 *queued = true;
-                Pending
+                Poll::Pending
             }
-            Ready(r) => {
+            Poll::Ready(r) => {
                 coop.made_progress();
                 r?;
                 *queued = false;
-                Ready(Ok(()))
+                Poll::Ready(Ok(()))
             }
         };
 
