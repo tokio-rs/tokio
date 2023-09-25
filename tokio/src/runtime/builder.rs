@@ -1284,6 +1284,11 @@ cfg_rt_multi_thread! {
             use crate::runtime::scheduler::{self, MultiThread};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
+            // Shrink the size of spawn_concurrency_level when using loom. This shouldn't impact
+            // logic, but allows loom to test more edge cases in a reasoable a mount of time
+            #[cfg(loom)]
+            let spawn_concurrency_level = 4;
+            #[cfg(not(loom))]
             let spawn_concurrency_level = self.spawn_concurrency_level.unwrap_or(core_threads * 4);
 
             let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
@@ -1334,6 +1339,12 @@ cfg_rt_multi_thread! {
                 use crate::runtime::scheduler::MultiThreadAlt;
 
                 let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
+
+                // Shrink the size of spawn_concurrency_level when using loom. This shouldn't impact
+                // logic, but allows loom to test more edge cases in a reasoable a mount of time
+                #[cfg(loom)]
+                let spawn_concurrency_level = 4;
+                #[cfg(not(loom))]
                 let spawn_concurrency_level = self.spawn_concurrency_level.unwrap_or(core_threads * 4);
 
                 let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
