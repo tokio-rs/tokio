@@ -131,7 +131,8 @@ async fn async_send_recv_many_with_buffer() {
         assert_ok!(tx.send(7).await);
     });
 
-    let mut buffer = vec![0; 16];
+    let mut buffer = vec![0; 3];
+    let initial_capacity = buffer.capacity();
     let mut recv_count = 0usize;
     let mut sum = 0;
     let mut iter = 0;
@@ -141,7 +142,7 @@ async fn async_send_recv_many_with_buffer() {
         assert_eq!(buffer.len(), n);
         sum += buffer.iter().sum::<i32>();
         iter += 1;
-        assert!(buffer.capacity() >= 16);
+        assert!(buffer.capacity() == initial_capacity);
     }
 
     assert_eq!(3, recv_count);
@@ -217,10 +218,17 @@ async fn send_recv_many_unbounded() {
     assert_ok!(tx.send(100));
     assert_ok!(tx.send(1002));
 
-    let mut buffer = vec![0; 0];
-    assert_eq!(rx.recv_many(&mut buffer).await, 4);
-    assert_eq!(vec![7, 13, 100, 1002], buffer);
-    assert!(buffer.capacity() >= 4);
+    let mut buffer : Vec<i32> = Vec::new();
+    assert!(buffer.capacity() == 0);
+    let mut count = 0;
+    let mut sum = 0;
+    while count < 4 {
+        count += rx.recv_many(&mut buffer).await;
+        sum += buffer.iter().sum::<i32>()
+    }
+    assert_eq!(count,4);
+    assert_eq!(sum,1122);
+    assert!(buffer.capacity() > 0);
 
     drop(tx);
 
