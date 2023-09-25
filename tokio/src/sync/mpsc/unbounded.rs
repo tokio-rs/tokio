@@ -172,10 +172,35 @@ impl<T> UnboundedReceiver<T> {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Receives the all available values for this receiver
+    /// Receives the next values for this receiver and populates `buffer`.
     ///
-    /// Returns the number of elements populated in the passed-in
-    /// result buffer.  The capacity of the buffer is not reduced.
+    /// This method returns the number of values populated in `buffer`,
+    /// which is cleared on each call.
+    ///
+    /// If the buffer initially has zero capacity, the method reserves
+    /// `BLOCK_CAP` elements, otherwise the capacity is not changed.
+    /// The number of returned values can be at most the capacity of
+    /// the buffer.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::unbounded_channel();
+    ///
+    ///     tokio::spawn(async move {
+    ///         tx.send("hello").unwrap();
+    ///     });
+    ///
+    ///     let mut buffer : Vec<&str> = Vec::with_capacity(5);
+    ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
+    ///     assert_eq!(vec!["hello"], buffer);
+    ///     assert_eq!(0, rx.recv_many(&mut buffer).await);
+    ///     assert!(buffer.is_empty());
+    /// }
     pub async fn recv_many(&mut self, buffer: &mut Vec<T>) -> usize {
         use crate::future::poll_fn;
         poll_fn(|cx| self.chan.recv_many(cx, buffer)).await

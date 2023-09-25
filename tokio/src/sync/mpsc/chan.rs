@@ -46,8 +46,6 @@ pub(crate) trait Semaphore {
     fn close(&self);
 
     fn is_closed(&self) -> bool;
-
-    fn num_acquired(&self) -> usize;
 }
 
 pub(super) struct Chan<T, S> {
@@ -297,57 +295,56 @@ impl<T, S: Semaphore> Rx<T, S> {
         })
     }
 
-    /// Receives available values into result buffer whose capacity increases as needed
+    /// Receives values into `buffer` up to its capacity
+    ///
+    /// If the buffer initially has 0 capacity, reserves `super::BLOCK_CAP` elements
     pub(crate) fn recv_many(&mut self, cx: &mut Context<'_>, buffer: &mut Vec<T>) -> Poll<usize> {
-        use super::block::Read::*;
+        use super::block::Read;
+        if buffer.capacity() == 0 {
+            buffer.reserve(super::BLOCK_CAP);
+        }
+        buffer.clear();
 
         ready!(crate::trace::trace_leaf(cx));
 
         // Keep track of task budget
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
-        buffer.clear();
-
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
-
             macro_rules! try_recv {
                 () => {
-                    match rx_fields.list.pop(&self.inner.tx) {
-                        Some(Value(value)) => {
-                            let capacity = self.inner.semaphore.num_acquired();
-                            if buffer.capacity() < capacity {
-                                buffer.reserve(capacity);
+                    let mut working = true;
+                    while (working && buffer.len() < buffer.capacity()) {
+                        match rx_fields.list.pop(&self.inner.tx) {
+                            Some(Read::Value(value)) => {
+                                buffer.push(value);
                             }
-                            buffer.push(value);
-                            let mut next = rx_fields.list.peek();
-                            while (buffer.len() < capacity
-                                && match next {
-                                    Some(Value(value)) => {
-                                        rx_fields.list.pop(&self.inner.tx);
-                                        buffer.push(value);
-                                        next = rx_fields.list.peek();
-                                        true
-                                    }
-                                    _ => false,
-                                })
-                            {}
-                            self.inner.semaphore.add_permits(buffer.len());
-                            coop.made_progress();
-                            return Ready(buffer.len());
+
+                            Some(Read::Closed) => {
+                                if !buffer.is_empty() {
+                                    self.inner.semaphore.add_permits(buffer.len());
+                                }
+                                // TODO: This check may not be required as it most
+                                // likely can only return `true` at this point. A
+                                // channel is closed when all tx handles are
+                                // dropped. Dropping a tx handle releases memory,
+                                // which ensures that if dropping the tx handle is
+                                // visible, then all messages sent are also visible.
+                                assert!(self.inner.semaphore.is_idle());
+                                coop.made_progress();
+                                return Ready(buffer.len());
+                            }
+
+                            None => {
+                                working = false; // fall through
+                            }
                         }
-                        Some(Closed) => {
-                            // TODO: This check may not be required as it most
-                            // likely can only return `true` at this point. A
-                            // channel is closed when all tx handles are
-                            // dropped. Dropping a tx handle releases memory,
-                            // which ensures that if dropping the tx handle is
-                            // visible, then all messages sent are also visible.
-                            assert!(self.inner.semaphore.is_idle());
-                            coop.made_progress();
-                            return Ready(0usize);
-                        }
-                        None => {} // fall through
+                    }
+                    if !buffer.is_empty() {
+                        self.inner.semaphore.add_permits(buffer.len());
+                        coop.made_progress();
+                        return Ready(buffer.len());
                     }
                 };
             }
@@ -362,6 +359,7 @@ impl<T, S: Semaphore> Rx<T, S> {
             try_recv!();
 
             if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
+                assert!(buffer.is_empty());
                 coop.made_progress();
                 Ready(0usize)
             } else {
@@ -481,10 +479,6 @@ impl Semaphore for bounded::Semaphore {
     fn is_closed(&self) -> bool {
         self.semaphore.is_closed()
     }
-
-    fn num_acquired(&self) -> usize {
-        self.bound - self.semaphore.available_permits()
-    }
 }
 
 // ===== impl Semaphore for AtomicUsize =====
@@ -518,9 +512,5 @@ impl Semaphore for unbounded::Semaphore {
 
     fn is_closed(&self) -> bool {
         self.0.load(Acquire) & 1 == 1
-    }
-
-    fn num_acquired(&self) -> usize {
-        self.0.load(Acquire) >> 1
     }
 }
