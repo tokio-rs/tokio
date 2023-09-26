@@ -314,8 +314,7 @@ impl<T, S: Semaphore> Rx<T, S> {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
             macro_rules! try_recv {
                 () => {
-                    let mut working = true;
-                    while (working && buffer.len() < buffer.capacity()) {
+                    while (buffer.len() < buffer.capacity()) {
                         match rx_fields.list.pop(&self.inner.tx) {
                             Some(Read::Value(value)) => {
                                 buffer.push(value);
@@ -337,7 +336,7 @@ impl<T, S: Semaphore> Rx<T, S> {
                             }
 
                             None => {
-                                working = false; // fall through
+                                break; // fall through
                             }
                         }
                     }
