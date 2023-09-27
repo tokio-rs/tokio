@@ -275,6 +275,8 @@ pub(in crate::runtime) fn trace_current_thread(
         task.as_raw().state().transition_to_notified_for_tracing();
         // store the raw tasks into a vec
         tasks.push(task.as_raw());
+        // do NOT poll `task` here, since we hold a lock on `owned` and the task
+        // may complete and need to remove itself from `owned`.
     });
 
     tasks
@@ -317,20 +319,28 @@ cfg_rt_multi_thread! {
         drop(synced);
 
         // notify each task
-        let mut traces = vec![];
+        let mut tasks = vec![];
         owned.for_each(|task| {
             // set the notified bit
             task.as_raw().state().transition_to_notified_for_tracing();
-
-            // trace the task
-            let ((), trace) = Trace::capture(|| task.as_raw().poll());
-            traces.push(trace);
-
-            // reschedule the task
-            let _ = task.as_raw().state().transition_to_notified_by_ref();
-            task.as_raw().schedule();
+            // store the raw tasks into a vec
+            tasks.push(task.as_raw());
+            // do NOT poll `task` here, since we hold a lock on `owned` and the task
+            // may complete and need to remove itself from `owned`.
         });
 
-        traces
+        tasks
+            .into_iter()
+            .map(|task| {
+                // trace the task
+                let ((), trace) = Trace::capture(|| task.poll());
+
+                // reschedule the task
+                let _ = task.state().transition_to_notified_by_ref();
+                task.schedule();
+
+                trace
+            })
+            .collect()
     }
 }
