@@ -175,7 +175,11 @@ impl<T> UnboundedReceiver<T> {
     /// Receives the next values for this receiver and populates `buffer`.
     ///
     /// This method returns the number of values populated in `buffer`,
-    /// which is cleared on each call.
+    /// which is cleared on each call; it returns 0 if the channel has been
+    /// closed and there are no remaining messages in the channel.
+    /// If there are no messages in the channel's buffer, but the channel has
+    /// not yet been closed, this method will sleep until a message is sent or
+    /// the channel is closed.
     ///
     /// If the buffer initially has zero capacity, the method reserves
     /// `BLOCK_CAP` elements, otherwise the capacity is not changed.
