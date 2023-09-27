@@ -172,19 +172,17 @@ impl<T> UnboundedReceiver<T> {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Receives the next values for this receiver and populates `buffer`.
+    /// Receives the next values for this receiver and extends `buffer`.
     ///
-    /// This method returns the number of values populated in `buffer`,
-    /// which is cleared on each call; it returns 0 if the channel has been
-    /// closed and there are no remaining messages in the channel.
+    /// This method returns the number of values populated in `buffer`;
+    /// it returns 0 if the channel has been closed and there
+    /// are no remaining messages in the channel.
     /// If there are no messages in the channel's buffer, but the channel has
     /// not yet been closed, this method will sleep until a message is sent or
     /// the channel is closed.
     ///
-    /// If the buffer initially has zero capacity, the method reserves
-    /// `BLOCK_CAP` elements, otherwise the capacity is not changed.
-    /// The number of returned values can be at most the capacity of
-    /// the buffer.
+    /// Asserts that the passed-in buffer has capacity greater than its
+    /// length.
     ///
     /// # Example:
     ///
@@ -203,7 +201,7 @@ impl<T> UnboundedReceiver<T> {
     ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["hello"], buffer);
     ///     assert_eq!(0, rx.recv_many(&mut buffer).await);
-    ///     assert!(buffer.is_empty());
+    ///     // assert_eq!(vec!["hello"], buffer);
     /// }
     pub async fn recv_many(&mut self, buffer: &mut Vec<T>) -> usize {
         use crate::future::poll_fn;

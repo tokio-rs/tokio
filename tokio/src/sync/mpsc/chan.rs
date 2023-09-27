@@ -300,13 +300,15 @@ impl<T, S: Semaphore> Rx<T, S> {
     /// If the buffer initially has 0 capacity, reserves `super::BLOCK_CAP` elements
     pub(crate) fn recv_many(&mut self, cx: &mut Context<'_>, buffer: &mut Vec<T>) -> Poll<usize> {
         use super::block::Read;
-        if buffer.capacity() == 0 {
-            buffer.reserve(super::BLOCK_CAP);
-        }
-        buffer.clear();
+
+        assert!(
+            buffer.capacity() > buffer.len(),
+            "buffer must have non-zero unused capacity"
+        );
+
+        let initial_length = buffer.len();
 
         ready!(crate::trace::trace_leaf(cx));
-
         // Keep track of task budget
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
@@ -321,8 +323,9 @@ impl<T, S: Semaphore> Rx<T, S> {
                             }
 
                             Some(Read::Closed) => {
-                                if !buffer.is_empty() {
-                                    self.inner.semaphore.add_permits(buffer.len());
+                                let number_added = buffer.len() - initial_length;
+                                if number_added > 0 {
+                                    self.inner.semaphore.add_permits(number_added);
                                 }
                                 // TODO: This check may not be required as it most
                                 // likely can only return `true` at this point. A
@@ -332,7 +335,7 @@ impl<T, S: Semaphore> Rx<T, S> {
                                 // visible, then all messages sent are also visible.
                                 assert!(self.inner.semaphore.is_idle());
                                 coop.made_progress();
-                                return Ready(buffer.len());
+                                return Ready(number_added);
                             }
 
                             None => {
@@ -340,10 +343,13 @@ impl<T, S: Semaphore> Rx<T, S> {
                             }
                         }
                     }
-                    if !buffer.is_empty() {
-                        self.inner.semaphore.add_permits(buffer.len());
+                    let number_added = buffer.len() - initial_length;
+                    if number_added > 0 {
+                        if number_added > 0 {
+                            self.inner.semaphore.add_permits(number_added);
+                        }
                         coop.made_progress();
-                        return Ready(buffer.len());
+                        return Ready(number_added);
                     }
                 };
             }

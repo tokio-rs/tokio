@@ -122,6 +122,17 @@ async fn async_send_recv_with_buffer() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
+#[should_panic(expected = "buffer must have non-zero unused capacity")]
+async fn async_send_recv_many_zero() {
+    let (tx, mut rx) = mpsc::channel(2);
+    assert_ok!(tx.send(7).await);
+    let mut buffer = vec![0; 0];
+    assert_eq!(0, buffer.capacity());
+    assert_eq!(1, rx.recv_many(&mut buffer).await);
+}
+
+#[tokio::test]
+#[cfg(feature = "full")]
 async fn async_send_recv_many_with_buffer() {
     let (tx, mut rx) = mpsc::channel(2);
 
@@ -131,24 +142,17 @@ async fn async_send_recv_many_with_buffer() {
         assert_ok!(tx.send(7).await);
     });
 
-    let mut buffer = vec![0; 3];
-    let initial_capacity = buffer.capacity();
+    let mut buffer = Vec::<i32>::with_capacity(3);
     let mut recv_count = 0usize;
-    let mut sum = 0;
-    let mut iter = 0;
     while recv_count < 3 {
         let n = rx.recv_many(&mut buffer).await;
         recv_count += n;
-        assert_eq!(buffer.len(), n);
-        sum += buffer.iter().sum::<i32>();
-        iter += 1;
-        assert!(buffer.capacity() == initial_capacity);
+        assert_eq!(buffer.len(), recv_count);
+        assert!(buffer.iter().sum::<i32>() <= 10);
     }
-
+    assert_eq!(buffer.iter().sum::<i32>(), 10);
     assert_eq!(3, recv_count);
-    assert_eq!(10, sum);
-    assert!(iter > 1);
-
+    assert_eq!(recv_count, buffer.len());
     assert_eq!(None, rx.recv().await);
 }
 
@@ -218,16 +222,14 @@ async fn send_recv_many_unbounded() {
     assert_ok!(tx.send(100));
     assert_ok!(tx.send(1002));
 
-    let mut buffer: Vec<i32> = Vec::new();
-    assert!(buffer.capacity() == 0);
+    let mut buffer: Vec<i32> = Vec::with_capacity(4);
     let mut count = 0;
-    let mut sum = 0;
     while count < 4 {
         count += rx.recv_many(&mut buffer).await;
-        sum += buffer.iter().sum::<i32>()
     }
     assert_eq!(count, 4);
-    assert_eq!(sum, 1122);
+    assert_eq!(count, buffer.len());
+    assert_eq!(buffer.iter().sum::<i32>(), 1122);
     assert!(buffer.capacity() > 0);
 
     drop(tx);
