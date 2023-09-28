@@ -361,10 +361,6 @@ impl<S: 'static> Task<S> {
     fn header_ptr(&self) -> NonNull<Header> {
         self.raw.header_ptr()
     }
-
-    fn task_id(&self) -> u64 {
-        self.header().task_id.0
-    }
 }
 
 impl<S: 'static> Notified<S> {

@@ -17,6 +17,8 @@ use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
+use super::core::Header;
+
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
 // use `None` for tasks not owned by any list.
@@ -117,7 +119,10 @@ impl<S: 'static> OwnedTasks<S> {
     where
         S: Schedule,
     {
-        let mut lock = self.segment_inner(task.task_id() as usize);
+        // Safety: it is safe, because every task has one task_id
+        let task_id = unsafe { Header::get_id(task.header_ptr()) };
+        let mut lock = self.segment_inner(task_id.0 as usize);
+
         // check close flag,
         // it must be checked in the lock, for ensuring all tasks will shutdown after OwnedTasks has been closed
         if self.closed.load(Ordering::Acquire) {
@@ -188,7 +193,9 @@ impl<S: 'static> OwnedTasks<S> {
 
     #[inline]
     unsafe fn remove_inner(&self, task: &Task<S>) -> Option<Task<S>> {
-        let mut lock = self.segment_inner(task.task_id() as usize);
+        // Safety: it is safe, because every task has one task_id
+        let task_id = unsafe{Header::get_id(task.header_ptr())};
+        let mut lock = self.segment_inner(task_id.0 as usize);
         let task = lock.remove(task.header_ptr())?;
         drop(lock);
         self.count.fetch_sub(1, Ordering::Relaxed);
